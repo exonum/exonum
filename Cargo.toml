@@ -1,0 +1,10 @@
+[package]
+name = "da"
+version = "0.1.0"
+authors = ["Bitfury Inc. <ivan.ivashchenko@xdev.re>"]
+
+[dependencies]
+log = "0.3"
+env_logger = "0.3"
+mio = "0.5"
+sodiumoxide = {version="0.0.10", default-features=false}
