@@ -2,7 +2,7 @@ use std::{net, io, collections};
 
 use mio;
 
-use super::peers::{IncomingPeer, OutgoingPeer};
+use super::connection::{IncomingConnection, OutgoingConnection};
 use super::events::{Events, Event};
 use super::message::Message;
 
@@ -14,8 +14,8 @@ const SERVER_ID : PeerId = mio::Token(1);
 pub struct Network {
     listen_address: net::SocketAddr,
     listener: Option<mio::tcp::TcpListener>,
-    incoming: mio::util::Slab<IncomingPeer>,
-    outgoing: mio::util::Slab<OutgoingPeer>,
+    incoming: mio::util::Slab<IncomingConnection>,
+    outgoing: mio::util::Slab<OutgoingConnection>,
     addresses: collections::HashMap<net::SocketAddr, PeerId>
 }
 
@@ -86,7 +86,7 @@ impl Network {
                 None => return Ok(()),
             };
             while let Some((socket, address)) = try!(listener.accept()) {
-                let peer = IncomingPeer::new(socket, address);
+                let peer = IncomingConnection::new(socket, address);
                 let id = match self.incoming.insert(peer) {
                     Ok(id) => id,
                     Err(_) => {
@@ -151,7 +151,7 @@ impl Network {
             return Ok(*id)
         };
         let socket = try!(mio::tcp::TcpStream::connect(&address));
-        let peer = OutgoingPeer::new(socket, address.clone());
+        let peer = OutgoingConnection::new(socket, address.clone());
         let id = match self.outgoing.insert(peer) {
             Ok(id) => id,
             Err(_) => {

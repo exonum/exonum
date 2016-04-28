@@ -7,23 +7,24 @@ use super::message::{Message, MessageData, HEADER_SIZE};
 
 // TODO: implement trully continuation reading and writing
 
-pub struct IncomingPeer {
+pub struct IncomingConnection {
     socket: mio::tcp::TcpStream,
     address: net::SocketAddr,
     data: MessageData,
     position: usize,
 }
 
-pub struct OutgoingPeer {
+pub struct OutgoingConnection {
     socket: mio::tcp::TcpStream,
     address: net::SocketAddr,
     queue: collections::VecDeque<Message>,
+    position: usize,
 }
 
-impl IncomingPeer {
+impl IncomingConnection {
     pub fn new(socket: mio::tcp::TcpStream, address: net::SocketAddr)
-            -> IncomingPeer {
-        IncomingPeer {
+            -> IncomingConnection {
+        IncomingConnection {
             socket: socket,
             address: address,
             data: MessageData::new(),
@@ -39,7 +40,7 @@ impl IncomingPeer {
         &self.address
     }
 
-    pub fn read(&mut self) -> io::Result<Option<usize>> {
+    fn read(&mut self) -> io::Result<Option<usize>> {
         if self.position == HEADER_SIZE &&
            self.data.actual_length() == HEADER_SIZE {
             self.data.allocate_payload();
@@ -48,6 +49,8 @@ impl IncomingPeer {
     }
 
     pub fn readable(&mut self) -> io::Result<Option<MessageData>> {
+        // TODO: data length == 0?
+        // TODO: maximum data length?
         loop {
             match try!(self.read()) {
                 None | Some(0) => return Ok(None),
@@ -66,13 +69,14 @@ impl IncomingPeer {
     }
 }
 
-impl OutgoingPeer {
+impl OutgoingConnection {
     pub fn new(socket: mio::tcp::TcpStream, address: net::SocketAddr)
-            -> OutgoingPeer {
-        OutgoingPeer {
+            -> OutgoingConnection {
+        OutgoingConnection {
             socket: socket,
             address: address,
             queue: collections::VecDeque::new(),
+            position: 0
         }
     }
 
@@ -87,16 +91,17 @@ impl OutgoingPeer {
     pub fn writable(&mut self) -> io::Result<()> {
         // TODO: use try_write_buf
         while let Some(message) = self.queue.pop_front() {
-            match self.socket.try_write(message.as_ref().as_ref()) {
-                Ok(None) => {
+            match try!(self.socket.try_write(message.as_ref().as_ref())) {
+                None | Some(0) => {
                     self.queue.push_front(message);
                     break
                 },
-                Ok(Some(n)) => {
-                    // TODO: Continuation sending
-                    assert_eq!(n, message.total_length())
+                Some(n) => {
+                    self.position += n;
+                    if n == message.actual_length() {
+                        self.position = 0;
+                    }
                 }
-                Err(e) => return Err(e)
             }
         }
         // TODO: reregister

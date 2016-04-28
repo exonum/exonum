@@ -7,7 +7,7 @@ extern crate mio;
 extern crate sodiumoxide;
 
 mod message;
-mod peers;
+mod connection;
 mod network;
 mod events;
 mod signature;
