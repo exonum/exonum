@@ -1,6 +1,5 @@
 use std::{collections, net};
 
-use super::network::PeerId;
 use super::signature::PublicKey;
 
 pub struct State {

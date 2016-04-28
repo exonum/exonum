@@ -1,25 +1,23 @@
-use std::{io, net, sync, collections};
+use std::{io, net, mem, collections};
 
 use mio;
 use mio::{TryWrite, TryRead};
 
-use super::message::{Message, MessageHeader, HEADER_SIZE};
+use super::message::{Message, MessageData, HEADER_SIZE};
 
 // TODO: implement trully continuation reading and writing
-
-// TODO: Use Message type here, not Vec<u8>
-pub type OutgoingMessage = sync::Arc<Vec<u8>>;
 
 pub struct IncomingPeer {
     socket: mio::tcp::TcpStream,
     address: net::SocketAddr,
-    continuation: Option<MessageHeader>,
+    data: MessageData,
+    position: usize,
 }
 
 pub struct OutgoingPeer {
     socket: mio::tcp::TcpStream,
     address: net::SocketAddr,
-    queue: collections::VecDeque<OutgoingMessage>,
+    queue: collections::VecDeque<Message>,
 }
 
 impl IncomingPeer {
@@ -28,7 +26,8 @@ impl IncomingPeer {
         IncomingPeer {
             socket: socket,
             address: address,
-            continuation: None,
+            data: MessageData::new(),
+            position: 0,
         }
     }
 
@@ -40,45 +39,29 @@ impl IncomingPeer {
         &self.address
     }
 
-    fn read_header(&mut self) -> io::Result<Option<MessageHeader>> {
-        let mut header = MessageHeader::new();
-        match try!(self.socket.try_read(header.as_mut())) {
-            None => Ok(None),
-            Some(n) => {
-                if n != HEADER_SIZE {
-                    return Err(io::Error::new(io::ErrorKind::InvalidData,
-                                              "Invalid message header"));
-                }
-                Ok(Some(header))
-            }
+    pub fn read(&mut self) -> io::Result<Option<usize>> {
+        if self.position == HEADER_SIZE &&
+           self.data.actual_length() == HEADER_SIZE {
+            self.data.allocate_payload();
         }
+        self.socket.try_read(&mut self.data.as_mut()[self.position..])
     }
 
-    pub fn readable(&mut self) -> io::Result<Option<Message>> {
-        let header = match self.continuation {
-            Some(header) => header,
-            None => match try!(self.read_header()) {
-                Some(header) => header,
-                None => return Ok(None)
-            }
-        };
-        // TODO: data length == 0?
-        // TODO: maximum data length?
-        let mut buf = vec![0; header.length()];
-
-        match try!(self.socket.try_read(&mut buf)) {
-            None | Some(0) => {
-                self.continuation = Some(header);
-                Ok(None)
-            },
-            Some(n) => {
-                if n != header.length() {
-                    return Err(io::Error::new(io::ErrorKind::InvalidData,
-                                              "Did not read enough bytes"));
+    pub fn readable(&mut self) -> io::Result<Option<MessageData>> {
+        loop {
+            match try!(self.read()) {
+                None | Some(0) => return Ok(None),
+                Some(n) => {
+                    self.position += n;
+                    if self.position >= HEADER_SIZE &&
+                       self.position == self.data.total_length() {
+                        let mut data = MessageData::new();
+                        mem::swap(&mut data, &mut self.data);
+                        self.position = 0;
+                        return Ok(Some(data))
+                    }
                 }
-                self.continuation = None;
-                Ok(Some(Message::new(header, buf)))
-            },
+            }
         }
     }
 }
@@ -104,14 +87,14 @@ impl OutgoingPeer {
     pub fn writable(&mut self) -> io::Result<()> {
         // TODO: use try_write_buf
         while let Some(message) = self.queue.pop_front() {
-            match self.socket.try_write(&message) {
+            match self.socket.try_write(message.as_ref().as_ref()) {
                 Ok(None) => {
                     self.queue.push_front(message);
                     break
                 },
                 Ok(Some(n)) => {
                     // TODO: Continuation sending
-                    assert_eq!(n, message.len())
+                    assert_eq!(n, message.total_length())
                 }
                 Err(e) => return Err(e)
             }
@@ -120,7 +103,7 @@ impl OutgoingPeer {
         return Ok(())
     }
 
-    pub fn send(&mut self, message: OutgoingMessage) {
+    pub fn send(&mut self, message: Message) {
         // TODO: capacity overflow
         // TODO: reregister
         self.queue.push_back(message);

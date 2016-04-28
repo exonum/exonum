@@ -2,8 +2,9 @@ use std::{net, io, collections};
 
 use mio;
 
-use super::peers::{IncomingPeer, OutgoingPeer, OutgoingMessage};
+use super::peers::{IncomingPeer, OutgoingPeer};
 use super::events::{Events, Event};
+use super::message::Message;
 
 pub type PeerId = mio::Token;
 
@@ -126,8 +127,8 @@ impl Network {
 
         if set.is_readable() {
             // Read new data from socket
-            while let Some(message) = try!(self.incoming[id].readable()) {
-                events.push(Event::Incoming(message))
+            while let Some(data) = try!(self.incoming[id].readable()) {
+                events.push(Event::Incoming(Message::new(data)))
             };
             // let r = events.event_loop().reregister(
             //     self.incoming[id].socket(), id,
@@ -177,7 +178,7 @@ impl Network {
     pub fn send_to(&mut self, events:
                    &mut Events,
                    address: &net::SocketAddr,
-                   message: OutgoingMessage) -> io::Result<()> {
+                   message: Message) -> io::Result<()> {
         let id = try!(self.get_peer(events, address));
         self.outgoing[id].send(message);
         let r = events.event_loop().reregister(

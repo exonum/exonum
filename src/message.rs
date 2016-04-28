@@ -1,17 +1,20 @@
-use std::{mem, convert};
+use std::{mem, convert, sync};
 
 use super::signature::PublicKey;
 
 pub const HEADER_SIZE  : usize = 40;
-pub const MESSAGE_SIZE : usize = 64;
+pub const MESSAGE_SIZE : usize = 8;
 
 pub const TEST_NETWORK_ID        : u8 = 0;
 pub const PROTOCOL_MAJOR_VERSION : u8 = 0;
 
+pub const PROTOCOL_VERSION : u8 = 0;
+
+pub type Message = sync::Arc<MessageData>;
+
 #[derive(Debug)]
-pub struct Message {
-    pub header: MessageHeader,
-    pub data: Vec<u8>,
+pub struct MessageData {
+    data: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -19,8 +22,7 @@ pub struct Message {
 pub struct MessageHeader {
     network_id   : u8,
     version      : u8,
-    service_id   : u8,
-    message_type : u8,
+    message_type : u16,
     length       : u32,
     public_key   : PublicKey,
 }
@@ -43,6 +45,63 @@ impl convert::AsMut<[u8]> for MessageHeader {
     }
 }
 
+impl MessageData {
+    pub fn new() -> MessageData {
+        MessageData {
+            data: vec![0; HEADER_SIZE]
+        }
+    }
+
+    pub fn actual_length(&self) -> usize {
+        self.data.len()
+    }
+
+    pub fn total_length(&self) -> usize {
+        HEADER_SIZE + self.header().length()
+    }
+
+    pub fn header(&self) -> &MessageHeader {
+        unsafe {
+            mem::transmute(&self.data[0])
+        }
+    }
+
+    pub fn header_mut(&mut self) -> &mut MessageHeader {
+        unsafe {
+            mem::transmute(&mut self.data[0])
+        }
+    }
+
+    pub fn allocate_payload(&mut self) {
+        let size = HEADER_SIZE + self.header().length();
+        self.data.resize(size, 0);
+    }
+
+    pub fn extend(&mut self, data: &[u8]) {
+        self.data.extend(data);
+    }
+
+    pub fn payload(&self) -> &[u8] {
+        &self.data[HEADER_SIZE..]
+    }
+
+    pub fn payload_mut(&mut self) -> &mut [u8] {
+        &mut self.data[HEADER_SIZE..]
+    }
+}
+
+impl convert::AsRef<[u8]> for MessageData {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl convert::AsMut<[u8]> for MessageData {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.data
+    }
+}
+
 // FIXME: big endian vs little endian
 
 impl MessageHeader {
@@ -52,6 +111,8 @@ impl MessageHeader {
         }
     }
 
+    // TODO: move all this methods to MessageData type
+
     pub fn network_id(&self) -> u8 {
         self.network_id
     }
@@ -60,11 +121,7 @@ impl MessageHeader {
         self.version
     }
 
-    pub fn service_id(&self) -> u8 {
-        self.service_id
-    }
-
-    pub fn message_type(&self) -> u8 {
+    pub fn message_type(&self) -> u16 {
         self.message_type
     }
 
@@ -84,11 +141,7 @@ impl MessageHeader {
         self.version = version
     }
 
-    pub fn set_service_id(&mut self, service_id: u8) {
-        self.service_id = service_id
-    }
-
-    pub fn set_message_type(&mut self, message_type: u8) {
+    pub fn set_message_type(&mut self, message_type: u16) {
         self.message_type = message_type
     }
 
@@ -98,15 +151,6 @@ impl MessageHeader {
 
     pub fn set_public_key(&mut self, public_key: &PublicKey) {
         self.public_key = public_key.clone()
-    }
-}
-
-impl Message {
-    pub fn new(header: MessageHeader, data: Vec<u8>) -> Message {
-        Message {
-            header: header,
-            data: data
-        }
     }
 }
 
@@ -121,7 +165,6 @@ fn test_header_new() {
     let header = MessageHeader::new();
     assert_eq!(header.network_id(), 0);
     assert_eq!(header.version(), 0);
-    assert_eq!(header.service_id(), 0);
     assert_eq!(header.message_type(), 0);
     assert_eq!(header.length(), 0);
 }
@@ -134,13 +177,12 @@ fn test_as_mut() {
         bytes[0] = 1;
         bytes[1] = 2;
         bytes[2] = 3;
-        bytes[3] = 4;
+        bytes[3] = 0;
         bytes[4] = 5;
         bytes[5] = 6;
     }
     assert_eq!(header.network_id(), 1);
     assert_eq!(header.version(), 2);
-    assert_eq!(header.service_id(), 3);
-    assert_eq!(header.message_type(), 4);
+    assert_eq!(header.message_type(), 3);
     assert_eq!(header.length(), 1541);
 }

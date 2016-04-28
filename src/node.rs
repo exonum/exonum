@@ -3,12 +3,11 @@ use std::{net};
 use super::signature::{PublicKey, SecretKey};
 use super::events::{Events, Event, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
-use super::peers::{OutgoingMessage};
-use super::message::{Message, MessageHeader};
+use super::message::{Message, MessageData, MessageHeader};
 use super::state::{State};
 
-const CONNECT_MESSAGE : u8 = 0;
-const PREVOTE_MESSAGE : u8 = 1;
+const CONNECT_MESSAGE : u16 = 0;
+const PREVOTE_MESSAGE : u16 = 1;
 
 pub struct Node {
     public_key: PublicKey,
@@ -90,10 +89,10 @@ impl Node {
 
     fn handle(&mut self, message: Message) {
         // TODO: check message header (network id, protocol version)
-        match message.header.message_type() {
+        match message.header().message_type() {
             CONNECT_MESSAGE => {
-                let public_key = message.header.public_key().clone();
-                let address = ::std::str::from_utf8(&message.data)
+                let public_key = message.header().public_key().clone();
+                let address = ::std::str::from_utf8(message.payload())
                                           .unwrap().parse().unwrap();
                 info!("add validator {}", address);
                 let message = self.prevote_message();
@@ -101,7 +100,7 @@ impl Node {
                 self.state.add_validator(public_key, address);
             },
             PREVOTE_MESSAGE => {
-                let new_height = ::std::str::from_utf8(&message.data)
+                let new_height = ::std::str::from_utf8(message.payload())
                                             .unwrap().parse().unwrap();
                 if !self.state.validate_height(new_height) {
                     info!("INVALID HEIGHT {} (current: {})",
@@ -122,11 +121,11 @@ impl Node {
         }
     }
 
-    fn send_to(&mut self, address: &net::SocketAddr, message: OutgoingMessage) {
+    fn send_to(&mut self, address: &net::SocketAddr, message: Message) {
         self.network.send_to(&mut self.events, address, message).unwrap();
     }
 
-    fn broadcast(&mut self, message: OutgoingMessage) {
+    fn broadcast(&mut self, message: Message) {
         for address in self.state.validators().values() {
             if address == self.network.address() {
                 continue
@@ -137,23 +136,24 @@ impl Node {
         }
     }
 
-    fn create_message(&self, message_type: u8, data: &str) -> OutgoingMessage {
-        let mut header = MessageHeader::new();
-        header.set_message_type(message_type);
-        header.set_length(data.len());
-        header.set_public_key(&self.public_key);
-        let mut buf = Vec::new();
-        buf.extend(header.as_ref());
-        buf.extend(data.as_bytes());
-        OutgoingMessage::new(buf)
+    fn create_message(&self, message_type: u16, s: &str) -> Message {
+        let mut data = MessageData::new();
+        {
+            let mut header = data.header_mut();
+            header.set_message_type(message_type);
+            header.set_length(s.len());
+            header.set_public_key(&self.public_key);
+        }
+        data.extend(s.as_bytes());
+        Message::new(data)
     }
 
-    fn connect_message(&self) -> OutgoingMessage {
+    fn connect_message(&self) -> Message {
         self.create_message(CONNECT_MESSAGE,
                             &self.network.address().to_string())
     }
 
-    fn prevote_message(&self) -> OutgoingMessage {
+    fn prevote_message(&self) -> Message {
         self.create_message(PREVOTE_MESSAGE,
                             &(self.state.height() + 1).to_string())
     }
