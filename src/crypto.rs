@@ -2,7 +2,10 @@ pub use sodiumoxide::crypto::sign::ed25519::{
     PublicKey, SecretKey, Seed, Signature,
     sign_detached as sign,
     verify_detached as verify,
-    gen_keypair
+    gen_keypair,
+    PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
+    SECRETKEYBYTES as SECRET_KEY_LENGTH,
+    SIGNATUREBYTES as SIGNATURE_LENGTH,
 };
 
 pub use sodiumoxide::crypto::hash::sha256::{

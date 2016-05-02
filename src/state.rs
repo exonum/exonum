@@ -6,8 +6,7 @@ use super::crypto::PublicKey;
 pub struct State {
     validators: collections::HashMap<PublicKey, net::SocketAddr>,
     height: usize,
-    round: usize,
-    rounds: collections::VecDeque<RoundState>,
+    rounds: Vec<RoundState>,
 }
 
 pub enum RoundState {
@@ -19,7 +18,6 @@ pub struct ProposalState {
     propose: Message,
     prevotes: collections::HashMap<PublicKey, Message>,
     precommits: collections::HashMap<PublicKey, Message>,
-    commits: collections::HashMap<PublicKey, Message>,
 }
 
 impl ProposalState {
@@ -28,7 +26,6 @@ impl ProposalState {
             propose: propose,
             prevotes: collections::HashMap::new(),
             precommits: collections::HashMap::new(),
-            commits: collections::HashMap::new(),
         }
     }
 }
@@ -38,8 +35,7 @@ impl State {
         State {
             validators: collections::HashMap::new(),
             height: 0,
-            round: 0,
-            rounds: collections::VecDeque::new(),
+            rounds: Vec::new(),
         }
     }
 
@@ -61,20 +57,33 @@ impl State {
         self.height
     }
 
+    pub fn round(&self) -> usize {
+        self.rounds.len()
+    }
+
+    pub fn round_state(&mut self) -> &mut RoundState {
+        self.rounds.last_mut().unwrap()
+    }
+
     pub fn new_height(&mut self) {
         self.height += 1;
-        self.round = 0;
         self.rounds.clear();
+        self.new_round();
     }
 
     pub fn new_round(&mut self) {
-        self.round += 1;
+        self.rounds.push(RoundState::UnknownProposal(Vec::new()));
     }
 
     pub fn has_consensus(&self) -> bool {
         false
     }
 
-    pub fn add_prevote(&mut self) {
-    }
+    // pub fn add_prevote(&mut self, message: Message) {
+    //     self.prevotes.insert(message.public_key(), message)
+    // }
+
+    // pub fn add_precommit(&mut self, message: Message) {
+    //     self.precommits.insert(message.public_key(), message)
+    // }
 }

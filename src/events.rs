@@ -8,8 +8,8 @@ pub type EventsConfiguration = mio::EventLoopConfig;
 
 pub type EventLoop = mio::EventLoop<EventsQueue>;
 
-struct Timeout;
-struct InternalMessage;
+pub struct Timeout;
+pub struct InternalMessage;
 
 pub enum Event {
     Incoming(Message),
@@ -25,7 +25,7 @@ pub struct Events {
     queue: EventsQueue
 }
 
-struct EventsQueue {
+pub struct EventsQueue {
     events: collections::VecDeque<Event>
 }
 

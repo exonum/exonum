@@ -3,12 +3,12 @@ use std::{io, net, mem, collections};
 use mio;
 use mio::{TryWrite, TryRead};
 
-use super::message::{Message, MessageData, HEADER_SIZE};
+use super::message::{Message, RawMessage, HEADER_SIZE};
 
 pub struct IncomingConnection {
     socket: mio::tcp::TcpStream,
     address: net::SocketAddr,
-    data: MessageData,
+    raw: RawMessage,
     position: usize,
 }
 
@@ -25,7 +25,7 @@ impl IncomingConnection {
         IncomingConnection {
             socket: socket,
             address: address,
-            data: MessageData::new(),
+            raw: RawMessage::empty(),
             position: 0,
         }
     }
@@ -40,26 +40,26 @@ impl IncomingConnection {
 
     fn read(&mut self) -> io::Result<Option<usize>> {
         if self.position == HEADER_SIZE &&
-           self.data.actual_length() == HEADER_SIZE {
-            self.data.allocate_payload();
+           self.raw.actual_length() == HEADER_SIZE {
+            self.raw.allocate_payload();
         }
-        self.socket.try_read(&mut self.data.as_mut()[self.position..])
+        self.socket.try_read(&mut self.raw.as_mut()[self.position..])
     }
 
-    pub fn readable(&mut self) -> io::Result<Option<MessageData>> {
-        // TODO: data length == 0?
-        // TODO: maximum data length?
+    pub fn readable(&mut self) -> io::Result<Option<RawMessage>> {
+        // TODO: raw length == 0?
+        // TODO: maximum raw length?
         loop {
             match try!(self.read()) {
                 None | Some(0) => return Ok(None),
                 Some(n) => {
                     self.position += n;
                     if self.position >= HEADER_SIZE &&
-                       self.position == self.data.total_length() {
-                        let mut data = MessageData::new();
-                        mem::swap(&mut data, &mut self.data);
+                       self.position == self.raw.total_length() {
+                        let mut raw = RawMessage::empty();
+                        mem::swap(&mut raw, &mut self.raw);
                         self.position = 0;
-                        return Ok(Some(data))
+                        return Ok(Some(raw))
                     }
                 }
             }

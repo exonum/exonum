@@ -1,13 +1,17 @@
 #![allow(dead_code)]
 
+#![feature(associated_consts)]
+
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate time;
 extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
 
 mod message;
+mod protocol;
 mod connection;
 mod network;
 mod events;
@@ -46,7 +50,7 @@ fn main() {
         }))
     }
 
-    ::std::thread::sleep_ms(100);
+    ::std::thread::sleep(::std::time::Duration::from_millis(100));
 
     let mut threads = Vec::new();
     for mut node in nodes {
@@ -56,6 +60,6 @@ fn main() {
     }
 
     for thread in threads {
-        thread.join();
+        let _ = thread.join();
     }
 }
