@@ -1,6 +1,6 @@
 use std::{mem, convert, sync};
 
-use super::signature::PublicKey;
+use super::crypto::PublicKey;
 
 pub const HEADER_SIZE  : usize = 40;
 pub const MESSAGE_SIZE : usize = 8;

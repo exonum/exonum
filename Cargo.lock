@@ -2,9 +2,12 @@
 name = "da"
 version = "0.1.0"
 dependencies = [
+ "capnp 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnpc 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protobuf 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "sodiumoxide 0.0.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -22,9 +25,30 @@ version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "byteorder"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "bytes"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "capnp"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "byteorder 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "capnpc"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "capnp 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "cfg-if"
@@ -132,6 +156,11 @@ dependencies = [
 [[package]]
 name = "pkg-config"
 version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "protobuf"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]

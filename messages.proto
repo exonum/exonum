@@ -1,0 +1,19 @@
+message Connect {
+
+}
+
+message Propose {
+    optional    uint32    network_id    =1;
+}
+
+message Prevote {
+
+}
+
+message Precommit {
+
+}
+
+message Commit {
+
+}

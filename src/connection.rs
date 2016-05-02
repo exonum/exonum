@@ -5,8 +5,6 @@ use mio::{TryWrite, TryRead};
 
 use super::message::{Message, MessageData, HEADER_SIZE};
 
-// TODO: implement trully continuation reading and writing
-
 pub struct IncomingConnection {
     socket: mio::tcp::TcpStream,
     address: net::SocketAddr,

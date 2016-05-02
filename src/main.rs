@@ -2,6 +2,8 @@
 
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate capnp;
 extern crate env_logger;
 extern crate mio;
 extern crate sodiumoxide;
@@ -10,14 +12,18 @@ mod message;
 mod connection;
 mod network;
 mod events;
-mod signature;
+mod crypto;
 mod state;
 mod node;
+
+pub mod protocol_capnp {
+  include!(concat!(env!("OUT_DIR"), "/protocol_capnp.rs"));
+}
 
 use node::{Node, Configuration};
 use network::{NetworkConfiguration};
 use events::{EventsConfiguration};
-use signature::{gen_keypair};
+use crypto::{gen_keypair};
 
 fn main() {
     env_logger::init().unwrap();

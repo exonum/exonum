@@ -1,6 +1,9 @@
 use std::{net};
 
-use super::signature::{PublicKey, SecretKey};
+use capnp;
+use protocol_capnp;
+
+use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
 use super::message::{Message, MessageData, MessageHeader};
@@ -8,6 +11,7 @@ use super::state::{State};
 
 const CONNECT_MESSAGE : u16 = 0;
 const PREVOTE_MESSAGE : u16 = 1;
+const PROPOSE_MESSAGE : u16 = 2;
 
 pub struct Node {
     public_key: PublicKey,
@@ -109,16 +113,26 @@ impl Node {
                 }
                 self.state.add_prevote();
                 if self.state.has_consensus() {
-                    self.state.new_height(new_height);
+                    self.state.new_height();
                     info!("new height {}", new_height);
                     let message = self.prevote_message();
                     self.broadcast(message);
                 }
             },
+            PROPOSE_MESSAGE => {
+                let opt = capnp::message::ReaderOptions::default();
+                let reader = capnp::serialize::read_message(&mut message.payload(), opt).unwrap();
+                let propose : protocol_capnp::propose::Reader = reader.get_root::<protocol_capnp::propose::Reader>().unwrap();
+                self.handle_propose(propose);
+            },
             _ => {
                 // TODO: undefined message error
             }
         }
+    }
+
+    fn handle_propose(&mut self, propose: protocol_capnp::propose::Reader) {
+        // let network_id : u32 = propose.get_network_id();
     }
 
     fn send_to(&mut self, address: &net::SocketAddr, message: Message) {
