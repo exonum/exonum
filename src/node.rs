@@ -1,12 +1,9 @@
 use std::{net};
 
-use capnp;
-use protocol_capnp;
-
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
-use super::message::{Message, MessageData, MessageHeader};
+use super::message::{Message, MessageData};
 use super::state::{State};
 
 const CONNECT_MESSAGE : u16 = 0;
@@ -93,9 +90,9 @@ impl Node {
 
     fn handle(&mut self, message: Message) {
         // TODO: check message header (network id, protocol version)
-        match message.header().message_type() {
+        match message.message_type() {
             CONNECT_MESSAGE => {
-                let public_key = message.header().public_key().clone();
+                let public_key = message.public_key().clone();
                 let address = ::std::str::from_utf8(message.payload())
                                           .unwrap().parse().unwrap();
                 info!("add validator {}", address);
@@ -120,10 +117,10 @@ impl Node {
                 }
             },
             PROPOSE_MESSAGE => {
-                let opt = capnp::message::ReaderOptions::default();
-                let reader = capnp::serialize::read_message(&mut message.payload(), opt).unwrap();
-                let propose : protocol_capnp::propose::Reader = reader.get_root::<protocol_capnp::propose::Reader>().unwrap();
-                self.handle_propose(propose);
+                // let opt = capnp::message::ReaderOptions::default();
+                // let reader = capnp::serialize::read_message(&mut message.payload(), opt).unwrap();
+                // let propose : protocol_capnp::propose::Reader = reader.get_root::<protocol_capnp::propose::Reader>().unwrap();
+                // self.handle_propose(propose);
             },
             _ => {
                 // TODO: undefined message error
@@ -131,9 +128,9 @@ impl Node {
         }
     }
 
-    fn handle_propose(&mut self, propose: protocol_capnp::propose::Reader) {
-        // let network_id : u32 = propose.get_network_id();
-    }
+    // fn handle_propose(&mut self, propose: protocol_capnp::propose::Reader) {
+    //     // let network_id : u32 = propose.get_network_id();
+    // }
 
     fn send_to(&mut self, address: &net::SocketAddr, message: Message) {
         self.network.send_to(&mut self.events, address, message).unwrap();
@@ -152,12 +149,9 @@ impl Node {
 
     fn create_message(&self, message_type: u16, s: &str) -> Message {
         let mut data = MessageData::new();
-        {
-            let mut header = data.header_mut();
-            header.set_message_type(message_type);
-            header.set_length(s.len());
-            header.set_public_key(&self.public_key);
-        }
+        data.set_message_type(message_type);
+        data.set_payload_length(s.len());
+        data.set_public_key(&self.public_key);
         data.extend(s.as_bytes());
         Message::new(data)
     }

@@ -2,9 +2,8 @@
 
 #[macro_use]
 extern crate log;
-#[macro_use]
-extern crate capnp;
 extern crate env_logger;
+extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
 
@@ -15,10 +14,6 @@ mod events;
 mod crypto;
 mod state;
 mod node;
-
-pub mod protocol_capnp {
-  include!(concat!(env!("OUT_DIR"), "/protocol_capnp.rs"));
-}
 
 use node::{Node, Configuration};
 use network::{NetworkConfiguration};

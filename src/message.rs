@@ -1,9 +1,10 @@
 use std::{mem, convert, sync};
 
+use byteorder::{ByteOrder, LittleEndian};
+
 use super::crypto::PublicKey;
 
 pub const HEADER_SIZE  : usize = 40;
-pub const MESSAGE_SIZE : usize = 8;
 
 pub const TEST_NETWORK_ID        : u8 = 0;
 pub const PROTOCOL_MAJOR_VERSION : u8 = 0;
@@ -17,34 +18,6 @@ pub struct MessageData {
     data: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Copy)]
-#[repr(packed)]
-pub struct MessageHeader {
-    network_id   : u8,
-    version      : u8,
-    message_type : u16,
-    length       : u32,
-    public_key   : PublicKey,
-}
-
-impl convert::AsRef<[u8]> for MessageHeader {
-    fn as_ref(&self) -> &[u8] {
-        let bytes : &[u8; HEADER_SIZE] = unsafe {
-            mem::transmute(self)
-        };
-        bytes
-    }
-}
-
-impl convert::AsMut<[u8]> for MessageHeader {
-    fn as_mut(&mut self) -> &mut [u8] {
-        let bytes : &mut [u8; HEADER_SIZE] = unsafe {
-            mem::transmute(self)
-        };
-        bytes
-    }
-}
-
 impl MessageData {
     pub fn new() -> MessageData {
         MessageData {
@@ -52,28 +25,73 @@ impl MessageData {
         }
     }
 
+    pub fn network_id(&self) -> u8 {
+        self.data[0]
+    }
+
+    pub fn version(&self) -> u8 {
+        self.data[1]
+    }
+
+    pub fn message_type(&self) -> u16 {
+        LittleEndian::read_u16(&self.data[2..4])
+    }
+
+    pub fn payload_length(&self) -> usize {
+        LittleEndian::read_u32(&self.data[4..8]) as usize
+    }
+
+    pub fn public_key(&self) -> &PublicKey {
+        unsafe {
+            mem::transmute(&self.data[8])
+        }
+    }
+
+    pub fn set_network_id(&mut self, network_id: u8) {
+        self.data[0] = network_id
+    }
+
+    pub fn set_version(&mut self, version: u8) {
+        self.data[1] = version
+    }
+
+    pub fn set_message_type(&mut self, message_type: u16) {
+        LittleEndian::write_u16(&mut self.data[2..4], message_type)
+    }
+
+    pub fn set_payload_length(&mut self, length: usize) {
+        LittleEndian::write_u32(&mut self.data[4..8], length as u32)
+    }
+
+    pub fn set_public_key(&mut self, public_key: &PublicKey) {
+        let origin : &mut PublicKey = unsafe {
+            mem::transmute(&mut self.data[8])
+        };
+        origin.clone_from(public_key);
+    }
+
     pub fn actual_length(&self) -> usize {
         self.data.len()
     }
 
     pub fn total_length(&self) -> usize {
-        HEADER_SIZE + self.header().length()
+        HEADER_SIZE + self.payload_length()
     }
 
-    pub fn header(&self) -> &MessageHeader {
+    pub fn header(&self) -> &[u8] {
         unsafe {
-            mem::transmute(&self.data[0])
+            mem::transmute(&self.data[0..HEADER_SIZE])
         }
     }
 
-    pub fn header_mut(&mut self) -> &mut MessageHeader {
+    pub fn header_mut(&mut self) -> &mut [u8] {
         unsafe {
-            mem::transmute(&mut self.data[0])
+            mem::transmute(&mut self.data[0..HEADER_SIZE])
         }
     }
 
     pub fn allocate_payload(&mut self) {
-        let size = HEADER_SIZE + self.header().length();
+        let size = self.total_length();
         self.data.resize(size, 0);
     }
 
@@ -102,78 +120,21 @@ impl convert::AsMut<[u8]> for MessageData {
     }
 }
 
-// FIXME: big endian vs little endian
-
-impl MessageHeader {
-    pub fn new() -> MessageHeader {
-        unsafe {
-            mem::zeroed()
-        }
-    }
-
-    // TODO: move all this methods to MessageData type
-
-    pub fn network_id(&self) -> u8 {
-        self.network_id
-    }
-
-    pub fn version(&self) -> u8 {
-        self.version
-    }
-
-    pub fn message_type(&self) -> u16 {
-        self.message_type
-    }
-
-    pub fn length(&self) -> usize {
-        self.length as usize
-    }
-
-    pub fn public_key(&self) -> &PublicKey {
-        &self.public_key
-    }
-
-    pub fn set_network_id(&mut self, network_id: u8) {
-        self.network_id = network_id
-    }
-
-    pub fn set_version(&mut self, version: u8) {
-        self.version = version
-    }
-
-    pub fn set_message_type(&mut self, message_type: u16) {
-        self.message_type = message_type
-    }
-
-    pub fn set_length(&mut self, length: usize) {
-        self.length = length as u32
-    }
-
-    pub fn set_public_key(&mut self, public_key: &PublicKey) {
-        self.public_key = public_key.clone()
-    }
-}
 
 #[test]
-fn test_sizes() {
-    assert_eq!(::std::mem::size_of::<MessageHeader>(), HEADER_SIZE);
-    assert_eq!(::std::mem::size_of::<Message>(), MESSAGE_SIZE);
-}
-
-#[test]
-fn test_header_new() {
-    let header = MessageHeader::new();
-    assert_eq!(header.network_id(), 0);
-    assert_eq!(header.version(), 0);
-    assert_eq!(header.message_type(), 0);
-    assert_eq!(header.length(), 0);
+fn test_message_new() {
+    let data = MessageData::new();
+    assert_eq!(data.network_id(), 0);
+    assert_eq!(data.version(), 0);
+    assert_eq!(data.message_type(), 0);
+    assert_eq!(data.payload_length(), 0);
 }
 
 #[test]
 fn test_as_mut() {
-    let mut header = MessageHeader::new();
+    let mut data = MessageData::new();
     {
-        let bytes = header.as_mut();
+        let bytes = data.as_mut();
         bytes[0] = 1;
         bytes[1] = 2;
         bytes[2] = 3;
@@ -181,8 +142,8 @@ fn test_as_mut() {
         bytes[4] = 5;
         bytes[5] = 6;
     }
-    assert_eq!(header.network_id(), 1);
-    assert_eq!(header.version(), 2);
-    assert_eq!(header.message_type(), 3);
-    assert_eq!(header.length(), 1541);
+    assert_eq!(data.network_id(), 1);
+    assert_eq!(data.version(), 2);
+    assert_eq!(data.message_type(), 3);
+    assert_eq!(data.payload_length(), 1541);
 }
