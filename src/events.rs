@@ -1,4 +1,5 @@
 use std::{io, collections};
+use time::{get_time, Timespec};
 
 use mio;
 
@@ -8,7 +9,11 @@ pub type EventsConfiguration = mio::EventLoopConfig;
 
 pub type EventLoop = mio::EventLoop<EventsQueue>;
 
-pub struct Timeout;
+pub struct Timeout {
+    pub height: u64,
+    pub round: u32,
+}
+
 pub struct InternalMessage;
 
 pub enum Event {
@@ -50,24 +55,20 @@ impl mio::Handler for EventsQueue {
     type Timeout = Timeout;
     type Message = InternalMessage;
 
-    #[allow(unused_variables)]
-    fn ready(&mut self, event_loop: &mut mio::EventLoop<Self>,
+    fn ready(&mut self, _: &mut EventLoop,
              token: mio::Token, events: mio::EventSet) {
         self.push(Event::Io(token, events));
     }
 
-    #[allow(unused_variables)]
-    fn notify(&mut self, event_loop: &mut mio::EventLoop<Self>, msg: Self::Message) {
+    fn notify(&mut self, _: &mut EventLoop, msg: Self::Message) {
         self.push(Event::Internal(msg));
     }
 
-    #[allow(unused_variables)]
-    fn timeout(&mut self, event_loop: &mut mio::EventLoop<Self>, timeout: Self::Timeout) {
+    fn timeout(&mut self, _: &mut EventLoop, timeout: Self::Timeout) {
         self.push(Event::Timeout(timeout));
     }
 
-    #[allow(unused_variables)]
-    fn interrupted(&mut self, event_loop: &mut mio::EventLoop<Self>) {
+    fn interrupted(&mut self, _: &mut EventLoop) {
         self.push(Event::Terminate);
     }
 }
@@ -98,5 +99,18 @@ impl Events {
 
     pub fn push(&mut self, event: Event) {
         self.queue.push(event)
+    }
+
+    pub fn add_timeout(&mut self,
+                       timeout: Timeout,
+                       time: Timespec) {
+        let ms = (time - get_time()).num_milliseconds();
+        if ms < 0 {
+            self.push(Event::Timeout(timeout));
+        } else {
+            // FIXME: remove unwrap here
+            // TODO: use mio::Timeout
+            self.event_loop.timeout_ms(timeout, ms as u64).unwrap();
+        }
     }
 }

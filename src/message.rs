@@ -4,7 +4,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::crypto::{
     PublicKey, SecretKey, Signature,
-    sign, verify, SIGNATURE_LENGTH
+    sign, verify, Hash, hash, SIGNATURE_LENGTH
 };
 
 pub const HEADER_SIZE : usize = 40;
@@ -40,6 +40,10 @@ impl RawMessage {
         raw.set_payload_length(payload_length);
         raw.set_public_key(public_key);
         raw
+    }
+
+    pub fn hash(&self) -> Hash {
+        hash(&self.raw)
     }
 
     pub fn network_id(&self) -> u8 {
@@ -95,18 +99,6 @@ impl RawMessage {
         HEADER_SIZE + self.payload_length()
     }
 
-    pub fn header(&self) -> &[u8] {
-        unsafe {
-            mem::transmute(&self.raw[0..HEADER_SIZE])
-        }
-    }
-
-    pub fn header_mut(&mut self) -> &mut [u8] {
-        unsafe {
-            mem::transmute(&mut self.raw[0..HEADER_SIZE])
-        }
-    }
-
     pub fn payload(&self) -> &[u8] {
         &self.raw[HEADER_SIZE..]
     }
@@ -132,10 +124,6 @@ impl RawMessage {
     pub fn allocate_payload(&mut self) {
         let size = self.total_length();
         self.raw.resize(size, 0);
-    }
-
-    pub fn extend(&mut self, raw: &[u8]) {
-        self.raw.extend(raw);
     }
 
     pub fn sign(&mut self, secret_key: &SecretKey) {

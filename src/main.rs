@@ -34,19 +34,32 @@ fn main() {
         "127.0.0.1:7003".parse().unwrap(),
     ];
 
+    let pairs = vec![
+        gen_keypair(),
+        gen_keypair(),
+        gen_keypair(),
+        gen_keypair(),
+    ];
+
+    let validators : Vec<_> = pairs.iter()
+                                   .map(|&(ref p, _)| p.clone())
+                                   .collect();
+
     let mut nodes = Vec::new();
-    for address in &addresses {
-        let (public_key, secret_key) = gen_keypair();
+
+    for (address, (public_key, secret_key)) in addresses.iter().zip(pairs) {
         nodes.push(Node::with_config(Configuration {
             public_key: public_key,
             secret_key: secret_key,
+            round_timeout: 1000,
             network: NetworkConfiguration {
                 listen_address: address.clone(),
                 max_incoming_connections: 8,
                 max_outgoing_connections: 8,
             },
             events: EventsConfiguration::new(),
-            peer_discovery: addresses.clone()
+            peer_discovery: addresses.clone(),
+            validators: validators.clone(),
         }))
     }
 

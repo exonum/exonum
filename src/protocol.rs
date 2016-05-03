@@ -62,12 +62,6 @@ impl<'a> Connect<'a> {
             nsec: LittleEndian::read_i32(&self.raw[14..18]),
         }
     }
-
-    pub fn hash(&self) -> &Hash {
-        unsafe {
-            mem::transmute(&self.raw[20])
-        }
-    }
 }
 
 // PROPOSE MESSAGE
