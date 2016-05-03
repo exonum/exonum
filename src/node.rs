@@ -62,6 +62,8 @@ impl Node {
                                  address,
                                  message.clone()).unwrap();
         }
+
+        self.add_timeout();
     }
 
     pub fn run(&mut self) {
@@ -93,6 +95,7 @@ impl Node {
     }
 
     fn handle_timeout(&mut self, timeout: Timeout) {
+        info!("timeout");
         if timeout.height != self.state.height() {
             return;
         }
@@ -102,8 +105,9 @@ impl Node {
         }
 
         self.state.new_round();
+        info!("NEW ROUND: {}", self.state.round());
         if self.is_leader() {
-            self.make_proposal();
+            self.make_propose();
         }
         self.add_timeout();
     }
@@ -136,12 +140,14 @@ impl Node {
     }
 
     fn handle_connect(&mut self, message: Message) {
+        info!("recv connect");
         let public_key = message.public_key().clone();
         let address = Connect::from_raw(&message).socket_address();
         self.state.add_peer(public_key, address);
     }
 
     fn handle_propose(&mut self, message: Message) {
+        info!("recv propose");
         let propose = Propose::from_raw(&message);
 
         if propose.height() > self.state.height() + 1 {
@@ -164,10 +170,7 @@ impl Node {
         let (hash, queue) = self.state.add_propose(propose.round(),
                                                    message.clone());
 
-        for message in queue {
-            self.handle(message);
-        }
-
+        info!("send prevote");
         let prevote = Prevote::new(propose.height(),
                                    propose.round(),
                                    &hash,
@@ -175,9 +178,14 @@ impl Node {
                                    &self.secret_key);
         self.broadcast(prevote.clone());
         self.handle_prevote(prevote);
+
+        for message in queue {
+            self.handle(message);
+        }
     }
 
     fn handle_prevote(&mut self, message: Message) {
+        info!("recv prevote");
         let prevote = Prevote::from_raw(&message);
 
         if prevote.height() > self.state.height() + 1 {
@@ -195,6 +203,7 @@ impl Node {
 
         if has_consensus {
             self.state.lock_round(prevote.round());
+            info!("send precommit");
             let precommit = Precommit::new(prevote.height(),
                                            prevote.round(),
                                            prevote.hash(),
@@ -206,6 +215,7 @@ impl Node {
     }
 
     fn handle_precommit(&mut self, message: Message) {
+        info!("recv precommit");
         let precommit = Precommit::from_raw(&message);
 
         if precommit.height() > self.state.height() + 1 {
@@ -223,12 +233,11 @@ impl Node {
 
         if has_consensus {
             let queue = self.state.new_height(precommit.hash().clone());
-            for message in queue {
-                self.handle(message);
-            }
+            info!("NEW HEIGHT: {}", self.state.height());
             if self.is_leader() {
-                self.make_proposal();
+                self.make_propose();
             } else {
+                info!("send commit");
                 let commit = Commit::new(precommit.height(),
                                          precommit.hash(),
                                          &self.public_key,
@@ -236,11 +245,15 @@ impl Node {
                 self.broadcast(commit.clone());
                 self.handle_commit(commit);
             }
+            for message in queue {
+                self.handle(message);
+            }
             self.add_timeout();
         }
     }
 
     fn handle_commit(&mut self, _: Message) {
+        info!("recv commit");
         // nothing
     }
 
@@ -248,7 +261,8 @@ impl Node {
         self.state.leader(self.state.round()) == &self.public_key
     }
 
-    fn make_proposal(&mut self) {
+    fn make_propose(&mut self) {
+        info!("send propose");
         let propose = Propose::new(self.state.height() + 1,
                                    self.state.round(),
                                    get_time(),

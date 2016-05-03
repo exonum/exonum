@@ -92,7 +92,7 @@ impl State {
     }
 
     pub fn round_state(&mut self, round: u32) -> &mut RoundState {
-        while (round as usize) < self.rounds.len() {
+        while self.rounds.len() < round as usize {
             self.rounds.push(RoundState::UnknownProposal(Vec::new()));
         }
         &mut self.rounds[round as usize - 1]

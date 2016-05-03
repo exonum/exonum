@@ -51,7 +51,7 @@ fn main() {
         nodes.push(Node::with_config(Configuration {
             public_key: public_key,
             secret_key: secret_key,
-            round_timeout: 1000,
+            round_timeout: 5000,
             network: NetworkConfiguration {
                 listen_address: address.clone(),
                 max_incoming_connections: 8,
