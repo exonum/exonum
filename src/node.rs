@@ -16,7 +16,9 @@ pub struct Node {
     state: State,
     events: Events,
     network: Network,
+    propose_timeout: u32,
     round_timeout: u32,
+    byzantine: bool,
     // TODO: move this into peer exchange service
     peer_discovery: Vec<net::SocketAddr>
 }
@@ -27,9 +29,11 @@ pub struct Configuration {
     pub secret_key: SecretKey,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
+    pub propose_timeout: u32,
     pub round_timeout: u32,
     pub peer_discovery: Vec<net::SocketAddr>,
     pub validators: Vec<PublicKey>,
+    pub byzantine: bool,
 }
 
 impl Node {
@@ -44,13 +48,15 @@ impl Node {
             state: state,
             events: events,
             network: network,
+            propose_timeout: config.propose_timeout,
             round_timeout: config.round_timeout,
-            peer_discovery: config.peer_discovery
+            peer_discovery: config.peer_discovery,
+            byzantine: config.byzantine
         }
     }
 
     fn initialize(&mut self) {
-        info!("initialize");
+        // info!("Start listening...");
         self.network.bind(&mut self.events).unwrap();
         let message = Connect::new(self.network.address(), get_time(),
                                    &self.public_key, &self.secret_key);
@@ -95,7 +101,6 @@ impl Node {
     }
 
     fn handle_timeout(&mut self, timeout: Timeout) {
-        info!("timeout");
         if timeout.height != self.state.height() {
             return;
         }
@@ -105,7 +110,7 @@ impl Node {
         }
 
         self.state.new_round();
-        info!("NEW ROUND: {}", self.state.round());
+        // info!("Timeout, starting new round #{}", self.state.round());
         if self.is_leader() {
             self.make_propose();
         }
@@ -140,14 +145,22 @@ impl Node {
     }
 
     fn handle_connect(&mut self, message: Message) {
-        info!("recv connect");
+        // debug!("recv connect");
         let public_key = message.public_key().clone();
         let address = Connect::from_raw(&message).socket_address();
-        self.state.add_peer(public_key, address);
+        if self.state.add_peer(public_key, address) {
+            // TODO: reduce double sending of connect message
+            // info!("Establish connection with {}", address);
+            let message = Connect::new(self.network.address(), get_time(),
+                                       &self.public_key, &self.secret_key);
+            self.network.send_to(&mut self.events,
+                                 &address,
+                                 message).unwrap();
+        }
     }
 
     fn handle_propose(&mut self, message: Message) {
-        info!("recv propose");
+        // debug!("recv propose");
         let propose = Propose::from_raw(&message);
 
         if propose.height() > self.state.height() + 1 {
@@ -156,6 +169,9 @@ impl Node {
         }
 
         if propose.height() < self.state.height() + 1 {
+            if !self.byzantine {
+                // info!("=== Invalid block proposed, ignore ===")
+            }
             return;
         }
 
@@ -170,7 +186,7 @@ impl Node {
         let (hash, queue) = self.state.add_propose(propose.round(),
                                                    message.clone());
 
-        info!("send prevote");
+        // debug!("send prevote");
         let prevote = Prevote::new(propose.height(),
                                    propose.round(),
                                    &hash,
@@ -185,7 +201,7 @@ impl Node {
     }
 
     fn handle_prevote(&mut self, message: Message) {
-        info!("recv prevote");
+        // debug!("recv prevote");
         let prevote = Prevote::from_raw(&message);
 
         if prevote.height() > self.state.height() + 1 {
@@ -203,7 +219,7 @@ impl Node {
 
         if has_consensus {
             self.state.lock_round(prevote.round());
-            info!("send precommit");
+            // debug!("send precommit");
             let precommit = Precommit::new(prevote.height(),
                                            prevote.round(),
                                            prevote.hash(),
@@ -215,7 +231,7 @@ impl Node {
     }
 
     fn handle_precommit(&mut self, message: Message) {
-        info!("recv precommit");
+        // debug!("recv precommit");
         let precommit = Precommit::from_raw(&message);
 
         if precommit.height() > self.state.height() + 1 {
@@ -233,11 +249,11 @@ impl Node {
 
         if has_consensus {
             let queue = self.state.new_height(precommit.hash().clone());
-            info!("NEW HEIGHT: {}", self.state.height());
+            // info!("Commit block #{}", self.state.height());
             if self.is_leader() {
                 self.make_propose();
             } else {
-                info!("send commit");
+                // debug!("send commit");
                 let commit = Commit::new(precommit.height(),
                                          precommit.hash(),
                                          &self.public_key,
@@ -253,7 +269,7 @@ impl Node {
     }
 
     fn handle_commit(&mut self, _: Message) {
-        info!("recv commit");
+        // debug!("recv commit");
         // nothing
     }
 
@@ -262,8 +278,16 @@ impl Node {
     }
 
     fn make_propose(&mut self) {
-        info!("send propose");
-        let propose = Propose::new(self.state.height() + 1,
+        // debug!("send propose");
+        // FIXME: remove this sheet
+        // ::std::thread::sleep(::std::time::Duration::from_millis(self.propose_timeout as u64));
+        let height = if self.byzantine {
+            // info!("=== Propose invalid block ===");
+            0
+        } else {
+            self.state.height() + 1
+        };
+        let propose = Propose::new(height,
                                    self.state.round(),
                                    get_time(),
                                    self.state.prev_hash(),

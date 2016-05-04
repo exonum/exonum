@@ -73,8 +73,16 @@ impl Network {
 
     pub fn io(&mut self, events: &mut Events,
              id: PeerId, set: mio::EventSet) -> io::Result<()> {
-        if set.is_error() || set.is_hup() {
-            // TODO: reset connection
+        if set.is_error() {
+            // TODO: TEMPORARY FIX, MAKE IT NORMAL
+            self.addresses.remove(self.outgoing[id].address());
+            self.outgoing.remove(id);
+            return Ok(())
+        }
+
+        if set.is_hup() {
+            // TODO: TEMPORARY FIX, MAKE IT NORMAL
+            self.incoming.remove(id);
             return Ok(())
         }
 

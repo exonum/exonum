@@ -13,6 +13,7 @@ pub struct State {
     rounds: Vec<RoundState>,
     prev_hash: Hash,
     prev_time: Timespec,
+    checkpoint_time: Timespec,
     locked_round: u32,
     queue: Vec<Message>,
 }
@@ -51,14 +52,15 @@ impl State {
             // TODO: use genesis block instead
             prev_hash: super::crypto::hash(&[]),
             prev_time: get_time(),
+            checkpoint_time: get_time(),
             locked_round: 0,
             queue: Vec::new()
         }
     }
 
     pub fn add_peer(&mut self,
-                    public_key: PublicKey, address: net::SocketAddr) {
-        self.peers.insert(public_key, address);
+                    public_key: PublicKey, address: net::SocketAddr) -> bool {
+        self.peers.insert(public_key, address).is_none()
     }
 
     pub fn peers(&self)
@@ -72,7 +74,7 @@ impl State {
     }
 
     pub fn consensus_count(&self) -> usize {
-        self.peers.len() * 2 / 3 + 1
+        self.validators.len() * 2 / 3 + 1
     }
 
     pub fn height(&self) -> u64 {
@@ -108,6 +110,14 @@ impl State {
 
     pub fn new_height(&mut self, hash: Hash) -> Vec<Message> {
         self.height += 1;
+
+        if self.height % 250 == 0 {
+            let now = get_time();
+            let bps = 250_000f64 / (now - self.checkpoint_time).num_milliseconds() as f64;
+            info!("Commit {} blocks per second (height {})", bps as u32, self.height);
+            self.checkpoint_time = now;
+        }
+
         self.round = 1;
         self.prev_hash = hash;
         self.prev_time = get_time();
@@ -150,7 +160,7 @@ impl State {
                     return false;
                 }
                 state.prevotes.insert(message.public_key().clone(), message);
-                state.prevotes.len() > cc && locked_round < round
+                state.prevotes.len() >= cc && locked_round < round
             },
             RoundState::UnknownProposal(ref mut queue) => {
                 queue.push(message);
@@ -170,7 +180,7 @@ impl State {
                     return false;
                 }
                 state.precommits.insert(message.public_key().clone(), message);
-                state.precommits.len() > cc
+                state.precommits.len() >= cc
             },
             RoundState::UnknownProposal(ref mut queue) => {
                 queue.push(message);
