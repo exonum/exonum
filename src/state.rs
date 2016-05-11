@@ -70,11 +70,14 @@ impl State {
 
     pub fn leader(&self, round: u32) -> &PublicKey {
         let idx = self.height() as u64 + round as u64;
-        &self.validators[(idx % self.validators.len() as u64) as usize]
+        &self.validators[(idx % 2) as usize]
     }
 
     pub fn consensus_count(&self) -> usize {
-        self.validators.len() * 2 / 3 + 1
+        // FIXME: temporary constant
+        // FIXME: What if validators count < 4?
+        2
+        // self.validators.len() * 2 / 3 + 1
     }
 
     pub fn height(&self) -> u64 {

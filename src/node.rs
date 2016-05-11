@@ -75,9 +75,12 @@ impl Node {
     pub fn run(&mut self) {
         self.initialize();
         loop {
+            if self.state.height() == 1000 {
+                break;
+            }
             match self.events.poll() {
                 Event::Incoming(message) => {
-                    self.handle(message);
+                    self.handle(message, false);
                 },
                 Event::Internal(_) => {
 
@@ -127,17 +130,19 @@ impl Node {
         self.events.add_timeout(timeout, time);
     }
 
-    fn handle(&mut self, message: Message) {
+    fn handle(&mut self, message: Message, validated: bool) {
         // TODO: check message headers (network id, protocol version)
-        if !message.verify() {
-            return;
+        if !validated {
+            if !message.verify() {
+                return;
+            }
         }
         match message.message_type() {
             Connect::MESSAGE_TYPE => self.handle_connect(message),
             Propose::MESSAGE_TYPE => self.handle_propose(message),
             Prevote::MESSAGE_TYPE => self.handle_prevote(message),
           Precommit::MESSAGE_TYPE => self.handle_precommit(message),
-             Commit::MESSAGE_TYPE => self.handle_commit(message),
+             // Commit::MESSAGE_TYPE => self.handle_commit(message),
             _ => {
                 // TODO: unrecognized message type
             }
@@ -196,7 +201,7 @@ impl Node {
         self.handle_prevote(prevote);
 
         for message in queue {
-            self.handle(message);
+            self.handle(message, true);
         }
     }
 
@@ -254,24 +259,24 @@ impl Node {
                 self.make_propose();
             } else {
                 // debug!("send commit");
-                let commit = Commit::new(precommit.height(),
-                                         precommit.hash(),
-                                         &self.public_key,
-                                         &self.secret_key);
-                self.broadcast(commit.clone());
-                self.handle_commit(commit);
+                // let commit = Commit::new(precommit.height(),
+                //                          precommit.hash(),
+                //                          &self.public_key,
+                //                          &self.secret_key);
+                // self.broadcast(commit.clone());
+                // self.handle_commit(commit);
             }
             for message in queue {
-                self.handle(message);
+                self.handle(message, true);
             }
             self.add_timeout();
         }
     }
 
-    fn handle_commit(&mut self, _: Message) {
-        // debug!("recv commit");
-        // nothing
-    }
+    // fn handle_commit(&mut self, _: Message) {
+    //     // debug!("recv commit");
+    //     // nothing
+    // }
 
     fn is_leader(&self) -> bool {
         self.state.leader(self.state.round()) == &self.public_key
