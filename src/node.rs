@@ -1,4 +1,5 @@
-use std::{net};
+use std::net::SocketAddr;
+
 use time::{get_time, Duration};
 
 use super::crypto::{PublicKey, SecretKey};
@@ -20,7 +21,7 @@ pub struct Node {
     round_timeout: u32,
     byzantine: bool,
     // TODO: move this into peer exchange service
-    peer_discovery: Vec<net::SocketAddr>
+    peer_discovery: Vec<SocketAddr>
 }
 
 #[derive(Debug)]
@@ -31,7 +32,7 @@ pub struct Configuration {
     pub network: NetworkConfiguration,
     pub propose_timeout: u32,
     pub round_timeout: u32,
-    pub peer_discovery: Vec<net::SocketAddr>,
+    pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
     pub byzantine: bool,
 }

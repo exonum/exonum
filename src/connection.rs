@@ -1,26 +1,29 @@
-use std::{io, net, mem, collections};
+use std::io;
+use std::mem::swap;
+use std::net::SocketAddr;
+use std::collections::VecDeque;
 
-use mio;
+use mio::tcp::TcpStream;
 use mio::{TryWrite, TryRead};
 
 use super::message::{Message, RawMessage, HEADER_SIZE};
 
 pub struct IncomingConnection {
-    socket: mio::tcp::TcpStream,
-    address: net::SocketAddr,
+    socket: TcpStream,
+    address: SocketAddr,
     raw: RawMessage,
     position: usize,
 }
 
 pub struct OutgoingConnection {
-    socket: mio::tcp::TcpStream,
-    address: net::SocketAddr,
-    queue: collections::VecDeque<Message>,
+    socket: TcpStream,
+    address: SocketAddr,
+    queue: VecDeque<Message>,
     position: usize,
 }
 
 impl IncomingConnection {
-    pub fn new(socket: mio::tcp::TcpStream, address: net::SocketAddr)
+    pub fn new(socket: TcpStream, address: SocketAddr)
             -> IncomingConnection {
         IncomingConnection {
             socket: socket,
@@ -30,11 +33,11 @@ impl IncomingConnection {
         }
     }
 
-    pub fn socket(&self) -> &mio::tcp::TcpStream {
+    pub fn socket(&self) -> &TcpStream {
         &self.socket
     }
 
-    pub fn address(&self) -> &net::SocketAddr {
+    pub fn address(&self) -> &SocketAddr {
         &self.address
     }
 
@@ -57,7 +60,7 @@ impl IncomingConnection {
                     if self.position >= HEADER_SIZE &&
                        self.position == self.raw.total_length() {
                         let mut raw = RawMessage::empty();
-                        mem::swap(&mut raw, &mut self.raw);
+                        swap(&mut raw, &mut self.raw);
                         self.position = 0;
                         return Ok(Some(raw))
                     }
@@ -68,21 +71,21 @@ impl IncomingConnection {
 }
 
 impl OutgoingConnection {
-    pub fn new(socket: mio::tcp::TcpStream, address: net::SocketAddr)
+    pub fn new(socket: TcpStream, address: SocketAddr)
             -> OutgoingConnection {
         OutgoingConnection {
             socket: socket,
             address: address,
-            queue: collections::VecDeque::new(),
+            queue: VecDeque::new(),
             position: 0
         }
     }
 
-    pub fn socket(&self) -> &mio::tcp::TcpStream {
+    pub fn socket(&self) -> &TcpStream {
         &self.socket
     }
 
-    pub fn address(&self) -> &net::SocketAddr {
+    pub fn address(&self) -> &SocketAddr {
         &self.address
     }
 

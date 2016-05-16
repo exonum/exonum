@@ -1,27 +1,31 @@
-use std::{net, io, collections};
+use std::io;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 
-use mio;
+use mio::{EventSet, PollOpt, Token};
+use mio::tcp::{TcpListener, TcpStream};
+use mio::util::Slab;
 
 use super::connection::{IncomingConnection, OutgoingConnection};
 use super::events::{Events, Event};
 use super::message::Message;
 
-pub type PeerId = mio::Token;
+pub type PeerId = Token;
 
-const SERVER_ID : PeerId = mio::Token(1);
+const SERVER_ID : PeerId = Token(1);
 
 #[derive(Debug)]
 pub struct Network {
-    listen_address: net::SocketAddr,
-    listener: Option<mio::tcp::TcpListener>,
-    incoming: mio::util::Slab<IncomingConnection>,
-    outgoing: mio::util::Slab<OutgoingConnection>,
-    addresses: collections::HashMap<net::SocketAddr, PeerId>
+    listen_address: SocketAddr,
+    listener: Option<TcpListener>,
+    incoming: Slab<IncomingConnection>,
+    outgoing: Slab<OutgoingConnection>,
+    addresses: HashMap<SocketAddr, PeerId>
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
-    pub listen_address: net::SocketAddr,
+    pub listen_address: SocketAddr,
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     // TODO: think more about config parameters
@@ -32,19 +36,19 @@ impl Network {
         Network {
             listen_address: config.listen_address,
             listener: None,
-            incoming: mio::util::Slab::new_starting_at(
-                mio::Token(2),
+            incoming: Slab::new_starting_at(
+                Token(2),
                 config.max_incoming_connections
             ),
-            outgoing: mio::util::Slab::new_starting_at(
-                mio::Token(config.max_incoming_connections + 2),
+            outgoing: Slab::new_starting_at(
+                Token(config.max_incoming_connections + 2),
                 config.max_outgoing_connections
             ),
-            addresses: collections::HashMap::new()
+            addresses: HashMap::new()
         }
     }
 
-    pub fn address(&self) -> &net::SocketAddr {
+    pub fn address(&self) -> &SocketAddr {
         &self.listen_address
     }
 
@@ -53,11 +57,11 @@ impl Network {
             return Err(io::Error::new(io::ErrorKind::Other,
                                       "Already binded"));
         }
-        let listener = mio::tcp::TcpListener::bind(&self.listen_address)?;
+        let listener = TcpListener::bind(&self.listen_address)?;
         let r = events.event_loop().register(
             &listener, SERVER_ID,
-            mio::EventSet::readable(),
-            mio::PollOpt::edge()
+            EventSet::readable(),
+            PollOpt::edge()
         );
         match r {
             Ok(()) => {
@@ -72,7 +76,7 @@ impl Network {
     // TODO: Implement Connections collection with (re)registering
 
     pub fn io(&mut self, events: &mut Events,
-             id: PeerId, set: mio::EventSet) -> io::Result<()> {
+             id: PeerId, set: EventSet) -> io::Result<()> {
         if set.is_error() {
             // TODO: TEMPORARY FIX, MAKE IT NORMAL
             self.addresses.remove(self.outgoing[id].address());
@@ -104,8 +108,8 @@ impl Network {
                 };
                 let r = events.event_loop().register(
                     self.incoming[id].socket(), id,
-                    mio::EventSet::readable() | mio::EventSet::hup(),
-                    mio::PollOpt::edge()
+                    EventSet::readable() | EventSet::hup(),
+                    PollOpt::edge()
                 );
                 if let Err(e) = r {
                     self.incoming.remove(id);
@@ -121,8 +125,8 @@ impl Network {
             if !self.outgoing[id].is_idle() {
                 let r = events.event_loop().reregister(
                     self.outgoing[id].socket(), id,
-                    mio::EventSet::writable() | mio::EventSet::hup(),
-                    mio::PollOpt::edge() | mio::PollOpt::oneshot()
+                    EventSet::writable() | EventSet::hup(),
+                    PollOpt::edge() | PollOpt::oneshot()
                 );
                 if let Err(e) = r {
                     self.addresses.remove(self.outgoing[id].address());
@@ -140,8 +144,8 @@ impl Network {
             };
             // let r = events.event_loop().reregister(
             //     self.incoming[id].socket(), id,
-            //     mio::EventSet::readable() | mio::EventSet::hup(),
-            //     mio::PollOpt::level()
+            //     EventSet::readable() | EventSet::hup(),
+            //     PollOpt::level()
             // );
             // if let Err(e) = r {
             //     self.incoming.remove(id);
@@ -153,12 +157,12 @@ impl Network {
         return Ok(())
     }
 
-    pub fn get_peer(&mut self, events: &mut Events, address: &net::SocketAddr)
+    pub fn get_peer(&mut self, events: &mut Events, address: &SocketAddr)
                     -> io::Result<PeerId> {
         if let Some(id) = self.addresses.get(address) {
             return Ok(*id)
         };
-        let socket = mio::tcp::TcpStream::connect(&address)?;
+        let socket = TcpStream::connect(&address)?;
         let peer = OutgoingConnection::new(socket, address.clone());
         let id = match self.outgoing.insert(peer) {
             Ok(id) => id,
@@ -170,8 +174,8 @@ impl Network {
         self.addresses.insert(address.clone(), id);
         let r = events.event_loop().register(
             self.outgoing[id].socket(), id,
-            mio::EventSet::writable() | mio::EventSet::hup(),
-            mio::PollOpt::edge() | mio::PollOpt::oneshot()
+            EventSet::writable() | EventSet::hup(),
+            PollOpt::edge() | PollOpt::oneshot()
         );
         match r {
             Ok(()) => Ok(id),
@@ -185,14 +189,14 @@ impl Network {
 
     pub fn send_to(&mut self, events:
                    &mut Events,
-                   address: &net::SocketAddr,
+                   address: &SocketAddr,
                    message: Message) -> io::Result<()> {
         let id = self.get_peer(events, address)?;
         self.outgoing[id].send(message);
         let r = events.event_loop().reregister(
             self.outgoing[id].socket(), id,
-            mio::EventSet::writable() | mio::EventSet::hup(),
-            mio::PollOpt::edge() | mio::PollOpt::oneshot()
+            EventSet::writable() | EventSet::hup(),
+            PollOpt::edge() | PollOpt::oneshot()
         );
         if let Err(e) = r {
             self.outgoing.remove(id);

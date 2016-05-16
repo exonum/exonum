@@ -1,4 +1,5 @@
-use std::{io, collections};
+use std::io;
+use std::collections::VecDeque;
 use time::{get_time, Timespec};
 
 use mio;
@@ -31,14 +32,14 @@ pub struct Events {
 }
 
 pub struct EventsQueue {
-    events: collections::VecDeque<Event>
+    events: VecDeque<Event>
 }
 
 impl EventsQueue {
     fn new() -> EventsQueue {
         EventsQueue {
             // FIXME: configurable capacity?
-            events: collections::VecDeque::new(),
+            events: VecDeque::new(),
         }
     }
 

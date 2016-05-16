@@ -1,4 +1,5 @@
-use std::{collections, net};
+use std::net::SocketAddr;
+use std::collections::HashMap;
 
 use time::{Timespec, get_time};
 
@@ -6,7 +7,7 @@ use super::message::Message;
 use super::crypto::{PublicKey, Hash, hash};
 
 pub struct State {
-    peers: collections::HashMap<PublicKey, net::SocketAddr>,
+    peers: HashMap<PublicKey, SocketAddr>,
     validators: Vec<PublicKey>,
     height: u64,
     round: u32,
@@ -26,8 +27,8 @@ pub enum RoundState {
 pub struct ProposalState {
     hash: Hash,
     propose: Message,
-    prevotes: collections::HashMap<PublicKey, Message>,
-    precommits: collections::HashMap<PublicKey, Message>,
+    prevotes: HashMap<PublicKey, Message>,
+    precommits: HashMap<PublicKey, Message>,
 }
 
 impl ProposalState {
@@ -35,8 +36,8 @@ impl ProposalState {
         ProposalState {
             hash: propose.hash(),
             propose: propose,
-            prevotes: collections::HashMap::new(),
-            precommits: collections::HashMap::new(),
+            prevotes: HashMap::new(),
+            precommits: HashMap::new(),
         }
     }
 }
@@ -44,7 +45,7 @@ impl ProposalState {
 impl State {
     pub fn new(validators: Vec<PublicKey>) -> State {
         State {
-            peers: collections::HashMap::new(),
+            peers: HashMap::new(),
             validators: validators,
             height: 0,
             round: 1,
@@ -59,12 +60,12 @@ impl State {
     }
 
     pub fn add_peer(&mut self,
-                    public_key: PublicKey, address: net::SocketAddr) -> bool {
+                    public_key: PublicKey, address: SocketAddr) -> bool {
         self.peers.insert(public_key, address).is_none()
     }
 
     pub fn peers(&self)
-            -> &collections::HashMap<PublicKey, net::SocketAddr> {
+            -> &HashMap<PublicKey, SocketAddr> {
         &self.peers
     }
 
