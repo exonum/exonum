@@ -77,7 +77,7 @@ impl Events {
     pub fn with_config(config: EventsConfiguration) -> io::Result<Events> {
         // TODO: using EventLoopConfig + capacity of queue
         Ok(Events {
-            event_loop: try!(EventLoop::configured(config)),
+            event_loop: EventLoop::configured(config)?,
             queue: EventsQueue::new()
         })
     }

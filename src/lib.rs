@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 #![feature(associated_consts)]
+#![feature(question_mark)]
 
 #[macro_use]
 extern crate log;

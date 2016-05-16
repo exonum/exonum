@@ -50,7 +50,7 @@ impl IncomingConnection {
         // TODO: raw length == 0?
         // TODO: maximum raw length?
         loop {
-            match try!(self.read()) {
+            match self.read()? {
                 None | Some(0) => return Ok(None),
                 Some(n) => {
                     self.position += n;
@@ -89,7 +89,7 @@ impl OutgoingConnection {
     pub fn writable(&mut self) -> io::Result<()> {
         // TODO: use try_write_buf
         while let Some(message) = self.queue.pop_front() {
-            match try!(self.socket.try_write(message.as_ref().as_ref())) {
+            match self.socket.try_write(message.as_ref().as_ref())? {
                 None | Some(0) => {
                     self.queue.push_front(message);
                     break

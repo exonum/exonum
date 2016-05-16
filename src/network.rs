@@ -53,7 +53,7 @@ impl Network {
             return Err(io::Error::new(io::ErrorKind::Other,
                                       "Already binded"));
         }
-        let listener = try!(mio::tcp::TcpListener::bind(&self.listen_address));
+        let listener = mio::tcp::TcpListener::bind(&self.listen_address)?;
         let r = events.event_loop().register(
             &listener, SERVER_ID,
             mio::EventSet::readable(),
@@ -93,7 +93,7 @@ impl Network {
                 Some(ref listener) => listener,
                 None => return Ok(()),
             };
-            while let Some((socket, address)) = try!(listener.accept()) {
+            while let Some((socket, address)) = listener.accept()? {
                 let peer = IncomingConnection::new(socket, address);
                 let id = match self.incoming.insert(peer) {
                     Ok(id) => id,
@@ -117,7 +117,7 @@ impl Network {
 
         if set.is_writable() {
             // Write data into socket
-            try!(self.outgoing[id].writable());
+            self.outgoing[id].writable()?;
             if !self.outgoing[id].is_idle() {
                 let r = events.event_loop().reregister(
                     self.outgoing[id].socket(), id,
@@ -135,7 +135,7 @@ impl Network {
 
         if set.is_readable() {
             // Read new data from socket
-            while let Some(data) = try!(self.incoming[id].readable()) {
+            while let Some(data) = self.incoming[id].readable()? {
                 events.push(Event::Incoming(Message::new(data)))
             };
             // let r = events.event_loop().reregister(
@@ -158,7 +158,7 @@ impl Network {
         if let Some(id) = self.addresses.get(address) {
             return Ok(*id)
         };
-        let socket = try!(mio::tcp::TcpStream::connect(&address));
+        let socket = mio::tcp::TcpStream::connect(&address)?;
         let peer = OutgoingConnection::new(socket, address.clone());
         let id = match self.outgoing.insert(peer) {
             Ok(id) => id,
@@ -187,7 +187,7 @@ impl Network {
                    &mut Events,
                    address: &net::SocketAddr,
                    message: Message) -> io::Result<()> {
-        let id = try!(self.get_peer(events, address));
+        let id = self.get_peer(events, address)?;
         self.outgoing[id].send(message);
         let r = events.event_loop().reregister(
             self.outgoing[id].socket(), id,
