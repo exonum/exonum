@@ -1,270 +1,86 @@
-use std::{mem, net};
+use std::net::SocketAddr;
 
-use byteorder::{ByteOrder, LittleEndian};
 use time::Timespec;
 
-use super::crypto::{Hash, PublicKey, SecretKey, SIGNATURE_LENGTH};
-use super::message::{Message, RawMessage, ProtocolMessage};
+use super::message::{Message, ProtocolMessage};
+use super::crypto::Hash;
 
-// CONNECT MESSAGE
-
-pub struct Connect<'a> {
-    raw: &'a [u8]
+pub enum Any {
+    Connect(Connect),
+    Propose(Propose),
+    Prevote(Prevote),
+    Precommit(Precommit),
+    Commit(Commit),
 }
 
-impl<'a> ProtocolMessage<'a> for Connect<'a> {
-    const MESSAGE_TYPE   : u16   = 0;
-    const PAYLOAD_LENGTH : usize = 18 + SIGNATURE_LENGTH;
-
-    fn from_raw(raw: &'a RawMessage) -> Self {
-        if raw.message_type() != Self::MESSAGE_TYPE {
-            panic!("Trying to read message with incorrect reader type");
-        }
-        Connect { raw: raw.payload() }
-    }
-}
-
-impl<'a> Connect<'a> {
-    pub fn new(socket_address: &net::SocketAddr,
-               time: Timespec,
-               public_key: &PublicKey,
-               secret_key: &SecretKey) -> Message {
-        let mut raw = Connect::raw(public_key);
-        {
-            let mut payload = raw.payload_mut();
-            match *socket_address {
-                net::SocketAddr::V4(addr) => {
-                    &mut payload[0..4].copy_from_slice(&addr.ip().octets());
-                },
-                net::SocketAddr::V6(_) => {
-                    // FIXME: Supporting Ipv6
-                    panic!("Ipv6 are currently unsupported")
-                },
+impl Any {
+    pub fn from_raw(raw: Message) -> Any {
+        // TODO: check input message size
+        match raw.message_type() {
+            Connect::MESSAGE_TYPE => Any::Connect(Connect::from_raw(raw)),
+            Propose::MESSAGE_TYPE => Any::Propose(Propose::from_raw(raw)),
+            Prevote::MESSAGE_TYPE => Any::Prevote(Prevote::from_raw(raw)),
+            Precommit::MESSAGE_TYPE => Any::Precommit(Precommit::from_raw(raw)),
+            Commit::MESSAGE_TYPE => Any::Commit(Commit::from_raw(raw)),
+            _ => {
+                // TODO: use result here
+                panic!("unrecognized message type");
             }
-            LittleEndian::write_u16(&mut payload[4..6], socket_address.port());
-            LittleEndian::write_i64(&mut payload[06..14], time.sec);
-            LittleEndian::write_i32(&mut payload[14..18], time.nsec);
-        }
-        raw.sign(secret_key);
-        Message::new(raw)
-    }
-
-    pub fn socket_address(&self) -> net::SocketAddr {
-        let ip = net::Ipv4Addr::new(self.raw[0], self.raw[1],
-                                    self.raw[2], self.raw[3]);
-        let port = LittleEndian::read_u16(&self.raw[4..6]);
-        net::SocketAddr::V4(net::SocketAddrV4::new(ip, port))
-    }
-
-    pub fn time(&self) -> Timespec {
-        Timespec {
-            sec:  LittleEndian::read_i64(&self.raw[6..14]),
-            nsec: LittleEndian::read_i32(&self.raw[14..18]),
         }
     }
 }
 
-// PROPOSE MESSAGE
+message! {
+    Connect {
+        const ID = 0;
+        const SIZE = 18;
 
-pub struct Propose<'a> {
-    raw: &'a [u8]
-}
-
-impl<'a> ProtocolMessage<'a> for Propose<'a> {
-    const MESSAGE_TYPE   : u16   = 1;
-    const PAYLOAD_LENGTH : usize = 56 + SIGNATURE_LENGTH;
-
-    fn from_raw(raw: &'a RawMessage) -> Self {
-        if raw.message_type() != Self::MESSAGE_TYPE {
-            panic!("Trying to read message with incorrect reader type");
-        }
-        Propose { raw: raw.payload() }
+        addr:       SocketAddr  [00 => 06]
+        time:       Timespec    [06 => 18]
     }
 }
 
-impl<'a> Propose<'a> {
-    pub fn new(height: u64,
-               round: u32,
-               time: Timespec,
-               prev_hash: &Hash,
-               public_key: &PublicKey,
-               secret_key: &SecretKey) -> Message {
-        let mut raw = Propose::raw(public_key);
-        {
-            let mut payload = raw.payload_mut();
-            LittleEndian::write_u64(&mut payload[00..08], height);
-            LittleEndian::write_u32(&mut payload[08..12], round);
-            LittleEndian::write_i64(&mut payload[12..20], time.sec);
-            LittleEndian::write_i32(&mut payload[20..24], time.nsec);
-            &mut payload[24..56].copy_from_slice(prev_hash.as_ref());
-        }
-        raw.sign(secret_key);
-        Message::new(raw)
-    }
+message! {
+    Propose {
+        const ID = 1;
+        const SIZE = 56;
 
-    pub fn height(&self) -> u64 {
-        LittleEndian::read_u64(&self.raw[0..8])
-    }
-
-    pub fn round(&self) -> u32 {
-        LittleEndian::read_u32(&self.raw[8..12])
-    }
-
-    pub fn time(&self) -> Timespec {
-        Timespec {
-            sec:  LittleEndian::read_i64(&self.raw[12..20]),
-            nsec: LittleEndian::read_i32(&self.raw[20..24]),
-        }
-    }
-
-    pub fn prev_hash(&self) -> &Hash {
-        unsafe {
-            mem::transmute(&self.raw[24])
-        }
+        height:     u64         [00 => 08]
+        round:      u32         [08 => 12]
+        time:       Timespec    [12 => 24]
+        prev_hash:  Hash        [24 => 56]
     }
 }
 
-// PREVOTE MESSAGE
+message! {
+    Prevote {
+        const ID = 2;
+        const SIZE = 44;
 
-pub struct Prevote<'a> {
-    raw: &'a [u8]
-}
-
-impl<'a> ProtocolMessage<'a> for Prevote<'a> {
-    const MESSAGE_TYPE   : u16   = 2;
-    const PAYLOAD_LENGTH : usize = 44 + SIGNATURE_LENGTH;
-
-    fn from_raw(raw: &'a RawMessage) -> Self {
-        if raw.message_type() != Self::MESSAGE_TYPE {
-            panic!("Trying to read message with incorrect reader type");
-        }
-        Prevote { raw: raw.payload() }
+        height:     u64         [00 => 08]
+        round:      u32         [08 => 12]
+        hash:       Hash        [12 => 44]
     }
 }
 
-impl<'a> Prevote<'a> {
-    pub fn new(height: u64,
-               round: u32,
-               hash: &Hash,
-               public_key: &PublicKey,
-               secret_key: &SecretKey) -> Message {
-        let mut raw = Prevote::raw(public_key);
-        {
-            let mut payload = raw.payload_mut();
-            LittleEndian::write_u64(&mut payload[0..8], height);
-            LittleEndian::write_u32(&mut payload[8..12], round);
-            &mut payload[12..44].copy_from_slice(hash.as_ref());
-        }
-        raw.sign(secret_key);
-        Message::new(raw)
-    }
+message! {
+    Precommit {
+        const ID = 3;
+        const SIZE = 44;
 
-    pub fn height(&self) -> u64 {
-        LittleEndian::read_u64(&self.raw[0..8])
-    }
-
-    pub fn round(&self) -> u32 {
-        LittleEndian::read_u32(&self.raw[8..12])
-    }
-
-    pub fn hash(&self) -> &Hash {
-        unsafe {
-            mem::transmute(&self.raw[12])
-        }
+        height:     u64         [00 => 08]
+        round:      u32         [08 => 12]
+        hash:       Hash        [12 => 44]
     }
 }
 
-// PRECOMMIT MESSAGE
+message! {
+    Commit {
+        const ID = 4;
+        const SIZE = 40;
 
-pub struct Precommit<'a> {
-    raw: &'a [u8]
-}
-
-impl<'a> ProtocolMessage<'a> for Precommit<'a> {
-    const MESSAGE_TYPE   : u16   = 3;
-    const PAYLOAD_LENGTH : usize = 44 + SIGNATURE_LENGTH;
-
-    fn from_raw(raw: &'a RawMessage) -> Self {
-        if raw.message_type() != Self::MESSAGE_TYPE {
-            panic!("Trying to read message with incorrect reader type");
-        }
-        Precommit { raw: raw.payload() }
-    }
-}
-
-impl<'a> Precommit<'a> {
-    pub fn new(height: u64,
-               round: u32,
-               hash: &Hash,
-               public_key: &PublicKey,
-               secret_key: &SecretKey) -> Message {
-        let mut raw = Precommit::raw(public_key);
-        {
-            let mut payload = raw.payload_mut();
-            LittleEndian::write_u64(&mut payload[0..8], height);
-            LittleEndian::write_u32(&mut payload[8..12], round);
-            &mut payload[12..44].copy_from_slice(hash.as_ref());
-        }
-        raw.sign(secret_key);
-        Message::new(raw)
-    }
-
-    pub fn height(&self) -> u64 {
-        LittleEndian::read_u64(&self.raw[0..8])
-    }
-
-    pub fn round(&self) -> u32 {
-        LittleEndian::read_u32(&self.raw[8..12])
-    }
-
-    pub fn hash(&self) -> &Hash {
-        unsafe {
-            mem::transmute(&self.raw[12])
-        }
-    }
-}
-
-// COMMIT MESSAGE
-
-pub struct Commit<'a> {
-    raw: &'a [u8]
-}
-
-impl<'a> ProtocolMessage<'a> for Commit<'a> {
-    const MESSAGE_TYPE   : u16   = 4;
-    const PAYLOAD_LENGTH : usize = 40 + SIGNATURE_LENGTH;
-
-    fn from_raw(raw: &'a RawMessage) -> Self {
-        if raw.message_type() != Self::MESSAGE_TYPE {
-            panic!("Trying to read message with incorrect reader type");
-        }
-        Commit { raw: raw.payload() }
-    }
-}
-
-impl<'a> Commit<'a> {
-    pub fn new(height: u64,
-               hash: &Hash,
-               public_key: &PublicKey,
-               secret_key: &SecretKey) -> Message {
-        let mut raw = Commit::raw(public_key);
-        {
-            let mut payload = raw.payload_mut();
-            LittleEndian::write_u64(&mut payload[0..8], height);
-            &mut payload[8..40].copy_from_slice(hash.as_ref());
-        }
-        raw.sign(secret_key);
-        Message::new(raw)
-    }
-
-    pub fn height(&self) -> u64 {
-        LittleEndian::read_u64(&self.raw[0..8])
-    }
-
-    pub fn hash(&self) -> &Hash {
-        unsafe {
-            mem::transmute(&self.raw[8])
-        }
+        height:     u64         [00 => 08]
+        hash:       Hash        [08 => 40]
     }
 }
 
@@ -296,11 +112,9 @@ fn test_propose() {
     let (public_key, secret_key) = super::crypto::gen_keypair();
 
     // write
-    let message = Propose::new(height, round, time, &prev_hash,
+    let propose = Propose::new(height, round, time, &prev_hash,
                                &public_key, &secret_key);
     // read
-    let propose = Propose::from_raw(&message);
-
     assert_eq!(propose.height(), height);
     assert_eq!(propose.round(), round);
     assert_eq!(propose.time(), time);
@@ -316,10 +130,8 @@ fn test_prevote() {
     let (public_key, secret_key) = super::crypto::gen_keypair();
 
     // write
-    let message = Prevote::new(height, round, &hash, &public_key, &secret_key);
+    let prevote = Prevote::new(height, round, &hash, &public_key, &secret_key);
     // read
-    let prevote = Prevote::from_raw(&message);
-
     assert_eq!(prevote.height(), height);
     assert_eq!(prevote.round(), round);
     assert_eq!(prevote.hash(), &hash);
@@ -334,11 +146,9 @@ fn test_precommit() {
     let (public_key, secret_key) = super::crypto::gen_keypair();
 
     // write
-    let message = Precommit::new(height, round, &hash,
-                                 &public_key, &secret_key);
+    let precommit = Precommit::new(height, round, &hash,
+                                   &public_key, &secret_key);
     // read
-    let precommit = Precommit::from_raw(&message);
-
     assert_eq!(precommit.height(), height);
     assert_eq!(precommit.round(), round);
     assert_eq!(precommit.hash(), &hash);
@@ -352,11 +162,10 @@ fn test_commit() {
     let (public_key, secret_key) = super::crypto::gen_keypair();
 
     // write
-    let message = Commit::new(height, &hash, &public_key, &secret_key);
+    let commit = Commit::new(height, &hash, &public_key, &secret_key);
     // read
-    let commit = Commit::from_raw(&message);
-
     assert_eq!(commit.height(), height);
     assert_eq!(commit.hash(), &hash);
     assert!(message.verify());
 }
+

@@ -3,7 +3,8 @@ use std::collections::HashMap;
 
 use time::{Timespec, get_time};
 
-use super::message::Message;
+use super::message::{Message, ProtocolMessage};
+use super::protocol::{Propose, Prevote, Precommit};
 use super::crypto::{PublicKey, Hash, hash};
 
 pub struct State {
@@ -16,25 +17,25 @@ pub struct State {
     prev_time: Timespec,
     checkpoint_time: Timespec,
     locked_round: u32,
-    queue: Vec<Message>,
+    queue: Vec<Message>,  // TODO: AnyMessage here
 }
 
 pub enum RoundState {
     KnownProposal(ProposalState),
-    UnknownProposal(Vec<Message>)
+    UnknownProposal(Vec<Message>)  // TODO: AnyMessage here
 }
 
 pub struct ProposalState {
     hash: Hash,
-    propose: Message,
-    prevotes: HashMap<PublicKey, Message>,
-    precommits: HashMap<PublicKey, Message>,
+    propose: Propose,
+    prevotes: HashMap<PublicKey, Prevote>,
+    precommits: HashMap<PublicKey, Precommit>,
 }
 
 impl ProposalState {
-    fn new(propose: Message) -> ProposalState {
+    fn new(propose: Propose) -> ProposalState {
         ProposalState {
-            hash: propose.hash(),
+            hash: propose.raw().hash(),
             propose: propose,
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
@@ -138,7 +139,7 @@ impl State {
 
     pub fn add_propose(&mut self,
                        round: u32,
-                       message: Message) -> (Hash, Vec<Message>) {
+                       message: Propose) -> (Hash, Vec<Message>) {
         let proposal_state = ProposalState::new(message);
         let hash = proposal_state.hash.clone();
         let mut state = RoundState::KnownProposal(proposal_state);
@@ -155,7 +156,7 @@ impl State {
     pub fn add_prevote(&mut self,
                        round: u32,
                        hash: &Hash,
-                       message: Message) -> bool {
+                       message: Prevote) -> bool {
         let cc = self.consensus_count();
         let locked_round = self.locked_round;
         match *self.round_state(round) {
@@ -163,11 +164,11 @@ impl State {
                 if state.hash != *hash {
                     return false;
                 }
-                state.prevotes.insert(message.public_key().clone(), message);
+                state.prevotes.insert(message.raw().public_key().clone(), message);
                 state.prevotes.len() >= cc && locked_round < round
             },
             RoundState::UnknownProposal(ref mut queue) => {
-                queue.push(message);
+                queue.push(message.raw().clone());
                 false
             }
         }
@@ -176,18 +177,18 @@ impl State {
     pub fn add_precommit(&mut self,
                          round: u32,
                          hash: &Hash,
-                         message: Message) -> bool {
+                         message: Precommit) -> bool {
         let cc = self.consensus_count();
         match *self.round_state(round) {
             RoundState::KnownProposal(ref mut state) => {
                 if state.hash != *hash {
                     return false;
                 }
-                state.precommits.insert(message.public_key().clone(), message);
+                state.precommits.insert(message.raw().public_key().clone(), message);
                 state.precommits.len() >= cc
             },
             RoundState::UnknownProposal(ref mut queue) => {
-                queue.push(message);
+                queue.push(message.raw().clone());
                 false
             }
         }

@@ -6,7 +6,7 @@ use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
 use super::message::{Message, ProtocolMessage};
-use super::protocol::{Connect, Propose, Prevote, Precommit, Commit};
+use super::protocol::{Any, Connect, Propose, Prevote, Precommit, Commit};
 use super::state::{State};
 
 // TODO: avoid recursion calls?
@@ -67,7 +67,7 @@ impl Node {
             }
             self.network.send_to(&mut self.events,
                                  address,
-                                 message.clone()).unwrap();
+                                 message.raw().clone()).unwrap();
         }
 
         self.add_timeout();
@@ -131,29 +131,27 @@ impl Node {
         self.events.add_timeout(timeout, time);
     }
 
-    fn handle(&mut self, message: Message, validated: bool) {
+    fn handle(&mut self, raw: Message, validated: bool) {
         // TODO: check message headers (network id, protocol version)
         if !validated {
-            if !message.verify() {
+            if !raw.verify() {
                 return;
             }
         }
-        match message.message_type() {
-            Connect::MESSAGE_TYPE => self.handle_connect(message),
-            Propose::MESSAGE_TYPE => self.handle_propose(message),
-            Prevote::MESSAGE_TYPE => self.handle_prevote(message),
-          Precommit::MESSAGE_TYPE => self.handle_precommit(message),
-             // Commit::MESSAGE_TYPE => self.handle_commit(message),
-            _ => {
-                // TODO: unrecognized message type
-            }
+
+        match Any::from_raw(raw) {
+            Any::Connect(message) => self.handle_connect(message),
+            Any::Propose(message) => self.handle_propose(message),
+            Any::Prevote(message) => self.handle_prevote(message),
+            Any::Precommit(message) => self.handle_precommit(message),
+            Any::Commit(message) => self.handle_commit(message),
         }
     }
 
-    fn handle_connect(&mut self, message: Message) {
+    fn handle_connect(&mut self, message: Connect) {
         // debug!("recv connect");
-        let public_key = message.public_key().clone();
-        let address = Connect::from_raw(&message).socket_address();
+        let public_key = message.raw().public_key().clone();
+        let address = message.addr();
         if self.state.add_peer(public_key, address) {
             // TODO: reduce double sending of connect message
             // info!("Establish connection with {}", address);
@@ -161,16 +159,14 @@ impl Node {
                                        &self.public_key, &self.secret_key);
             self.network.send_to(&mut self.events,
                                  &address,
-                                 message).unwrap();
+                                 message.raw().clone()).unwrap();
         }
     }
 
-    fn handle_propose(&mut self, message: Message) {
+    fn handle_propose(&mut self, propose: Propose) {
         // debug!("recv propose");
-        let propose = Propose::from_raw(&message);
-
         if propose.height() > self.state.height() + 1 {
-            self.state.queue(message.clone());
+            self.state.queue(propose.raw().clone());
             return;
         }
 
@@ -185,12 +181,12 @@ impl Node {
             return;
         }
 
-        if message.public_key() != self.state.leader(propose.round()) {
+        if propose.raw().public_key() != self.state.leader(propose.round()) {
             return;
         }
 
         let (hash, queue) = self.state.add_propose(propose.round(),
-                                                   message.clone());
+                                                   propose.clone());
 
         // debug!("send prevote");
         let prevote = Prevote::new(propose.height(),
@@ -198,7 +194,7 @@ impl Node {
                                    &hash,
                                    &self.public_key,
                                    &self.secret_key);
-        self.broadcast(prevote.clone());
+        self.broadcast(prevote.raw().clone());
         self.handle_prevote(prevote);
 
         for message in queue {
@@ -206,12 +202,10 @@ impl Node {
         }
     }
 
-    fn handle_prevote(&mut self, message: Message) {
+    fn handle_prevote(&mut self, prevote: Prevote) {
         // debug!("recv prevote");
-        let prevote = Prevote::from_raw(&message);
-
         if prevote.height() > self.state.height() + 1 {
-            self.state.queue(message.clone());
+            self.state.queue(prevote.raw().clone());
             return;
         }
 
@@ -221,7 +215,7 @@ impl Node {
 
         let has_consensus = self.state.add_prevote(prevote.round(),
                                                    prevote.hash(),
-                                                   message.clone());
+                                                   prevote.clone());
 
         if has_consensus {
             self.state.lock_round(prevote.round());
@@ -231,17 +225,15 @@ impl Node {
                                            prevote.hash(),
                                            &self.public_key,
                                            &self.secret_key);
-            self.broadcast(precommit.clone());
+            self.broadcast(precommit.raw().clone());
             self.handle_precommit(precommit);
         }
     }
 
-    fn handle_precommit(&mut self, message: Message) {
+    fn handle_precommit(&mut self, precommit: Precommit) {
         // debug!("recv precommit");
-        let precommit = Precommit::from_raw(&message);
-
         if precommit.height() > self.state.height() + 1 {
-            self.state.queue(message.clone());
+            self.state.queue(precommit.raw().clone());
             return;
         }
 
@@ -251,7 +243,7 @@ impl Node {
 
         let has_consensus = self.state.add_precommit(precommit.round(),
                                                      precommit.hash(),
-                                                     message.clone());
+                                                     precommit.clone());
 
         if has_consensus {
             let queue = self.state.new_height(precommit.hash().clone());
@@ -274,10 +266,10 @@ impl Node {
         }
     }
 
-    // fn handle_commit(&mut self, _: Message) {
-    //     // debug!("recv commit");
-    //     // nothing
-    // }
+    fn handle_commit(&mut self, _: Commit) {
+        // debug!("recv commit");
+        // nothing
+    }
 
     fn is_leader(&self) -> bool {
         self.state.leader(self.state.round()) == &self.public_key
@@ -299,7 +291,7 @@ impl Node {
                                    self.state.prev_hash(),
                                    &self.public_key,
                                    &self.secret_key);
-        self.broadcast(propose.clone());
+        self.broadcast(propose.raw().clone());
         self.handle_propose(propose);
     }
 
@@ -307,6 +299,8 @@ impl Node {
     //     self.network.send_to(&mut self.events, address, message).unwrap();
     // }
 
+
+    // TODO: use Into<RawMessage>
     fn broadcast(&mut self, message: Message) {
         for address in self.state.peers().values() {
             self.network.send_to(&mut self.events,

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 #![feature(associated_consts)]
+#![feature(associated_type_defaults)]
 #![feature(question_mark)]
 
 #[macro_use]
@@ -11,6 +12,7 @@ extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
 
+#[macro_use]
 pub mod message;
 pub mod protocol;
 pub mod connection;

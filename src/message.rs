@@ -1,5 +1,7 @@
 use std::{mem, convert, sync};
+use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 
+use time::{Timespec};
 use byteorder::{ByteOrder, LittleEndian};
 
 use super::crypto::{
@@ -7,7 +9,7 @@ use super::crypto::{
     sign, verify, Hash, hash, SIGNATURE_LENGTH
 };
 
-pub const HEADER_SIZE : usize = 40;
+pub const HEADER_SIZE : usize = 40; // TODO: rename to HEADER_LENGTH?
 
 pub const TEST_NETWORK_ID        : u8 = 0;
 pub const PROTOCOL_MAJOR_VERSION : u8 = 0;
@@ -150,15 +152,169 @@ impl convert::AsMut<[u8]> for RawMessage {
     }
 }
 
-pub trait ProtocolMessage<'a> {
+pub trait ProtocolMessage {
     const MESSAGE_TYPE : u16;
+    const BODY_LENGTH : usize;
     const PAYLOAD_LENGTH : usize;
+    const TOTAL_LENGTH : usize;
 
-    fn raw(public_key: &PublicKey) -> RawMessage {
-        RawMessage::new(Self::MESSAGE_TYPE, Self::PAYLOAD_LENGTH, public_key)
+    fn raw(&self) -> &Message;
+    fn from_raw(raw: Message) -> Self;
+}
+
+pub trait MessageField<'a> {
+    type AsRead = Self;
+    type AsWrite = Self;
+
+    // TODO: use Read and Cursor
+    // TODO: debug_assert_eq!(to-from == size of Self)
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Self::AsRead;
+    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: Self::AsWrite);
+}
+
+impl<'a> MessageField<'a> for u32 {
+    type AsRead = u32;
+    type AsWrite = u32;
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> u32 {
+        LittleEndian::read_u32(&buffer[from..to])
     }
 
-    fn from_raw(raw: &'a RawMessage) -> Self;
+    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: u32) {
+        LittleEndian::write_u32(&mut buffer[from..to], value)
+    }
+}
+
+impl<'a> MessageField<'a> for u64 {
+    type AsRead = u64;
+    type AsWrite = u64;
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> u64 {
+        LittleEndian::read_u64(&buffer[from..to])
+    }
+
+    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: u64) {
+        LittleEndian::write_u64(&mut buffer[from..to], value)
+    }
+}
+
+impl<'a> MessageField<'a> for Hash {
+    type AsRead = &'a Hash;
+    type AsWrite = &'a Hash;
+
+    fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
+        unsafe {
+            mem::transmute(&buffer[from])
+        }
+    }
+
+    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: &'a Hash) {
+        &mut buffer[from..to].copy_from_slice(value.as_ref());
+    }
+}
+
+impl<'a> MessageField<'a> for Timespec {
+    type AsRead = Timespec;
+    type AsWrite = Timespec;
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Timespec {
+        let nsec = LittleEndian::read_u64(&buffer[from..to]);
+        Timespec {
+            sec:  (nsec / 1_000_000_000) as i64,
+            nsec: (nsec % 1_000_000_000) as i32,
+        }
+    }
+
+    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: Timespec) {
+        let nsec = (value.sec as u64) * 1_000_000_000 + value.nsec as u64;
+        LittleEndian::write_u64(&mut buffer[from..to], nsec)
+    }
+}
+
+impl<'a> MessageField<'a> for SocketAddr {
+    type AsRead = SocketAddr;
+    type AsWrite = &'a SocketAddr;
+
+    // TODO: supporting IPv6
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> SocketAddr {
+        let ip = Ipv4Addr::new(buffer[from+0], buffer[from+1],
+                               buffer[from+2], buffer[from+3]);
+        let port = LittleEndian::read_u16(&buffer[from+4..to]);
+        SocketAddr::V4(SocketAddrV4::new(ip, port))
+    }
+
+    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: &SocketAddr) {
+        match *value {
+            SocketAddr::V4(addr) => {
+                &mut buffer[from..to-4].copy_from_slice(&addr.ip().octets());
+            },
+            SocketAddr::V6(_) => {
+                // FIXME: Supporting Ipv6
+                panic!("Ipv6 are currently unsupported")
+            },
+        }
+        LittleEndian::write_u16(&mut buffer[to-4..to], value.port());
+    }
+}
+
+#[macro_export]
+macro_rules! message {
+    ($name:ident {
+        const ID = $id:expr;
+        const SIZE = $body:expr;
+
+        $($field_name:ident : $field_type:ty [$from:expr => $to:expr])*
+    }) => (
+        #[derive(Clone)]
+        pub struct $name {
+            raw: $crate::message::Message
+        }
+
+        impl $crate::message::ProtocolMessage for $name {
+            const MESSAGE_TYPE : u16 = $id;
+            const BODY_LENGTH : usize = $body;
+            const PAYLOAD_LENGTH : usize =
+                $body + $crate::crypto::SIGNATURE_LENGTH;
+            const TOTAL_LENGTH : usize =
+                $body + $crate::crypto::SIGNATURE_LENGTH + $crate::message::HEADER_SIZE;
+
+            fn raw(&self) -> &$crate::message::Message {
+                &self.raw
+            }
+
+            fn from_raw(raw: $crate::message::Message) -> $name {
+                $name { raw: raw }
+            }
+        }
+
+        impl $name {
+            pub fn new($($field_name: <$field_type as $crate::message::MessageField>::AsWrite),*,
+                       public_key: &$crate::crypto::PublicKey,
+                       secret_key: &$crate::crypto::SecretKey) -> $name {
+                use $crate::message::{
+                    Message, RawMessage, ProtocolMessage, MessageField
+                };
+                let mut raw = RawMessage::new(Self::MESSAGE_TYPE, Self::PAYLOAD_LENGTH, public_key);
+                {
+                    let mut payload = raw.payload_mut();
+                    $(
+                      <$field_type as MessageField>::write(
+                            &mut payload, $from, $to, $field_name
+                      );
+                    )*
+                }
+                raw.sign(secret_key);
+                $name::from_raw(Message::new(raw))
+            }
+
+            $(
+                pub fn $field_name(&self) -> <$field_type as $crate::message::MessageField>::AsRead {
+                    <$field_type as $crate::message::MessageField>::read(self.raw.payload(), $from, $to)
+                }
+            )*
+        }
+    )
 }
 
 #[test]
