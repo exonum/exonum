@@ -160,6 +160,10 @@ pub trait ProtocolMessage {
 
     fn raw(&self) -> &Message;
     fn from_raw(raw: Message) -> Self;
+
+    fn verify(&self) -> bool {
+        self.raw().verify()
+    }
 }
 
 pub trait MessageField<'a> {
@@ -229,14 +233,14 @@ impl<'a> MessageField<'a> for SocketAddr {
     fn write(&self, buffer: &'a mut [u8], from: usize, to: usize) {
         match *self {
             SocketAddr::V4(addr) => {
-                &mut buffer[from..to-4].copy_from_slice(&addr.ip().octets());
+                &mut buffer[from..to-2].copy_from_slice(&addr.ip().octets());
             },
             SocketAddr::V6(_) => {
                 // FIXME: Supporting Ipv6
                 panic!("Ipv6 are currently unsupported")
             },
         }
-        LittleEndian::write_u16(&mut buffer[to-4..to], self.port());
+        LittleEndian::write_u16(&mut buffer[to-2..to], self.port());
     }
 }
 

@@ -33,22 +33,22 @@ impl Any {
 message! {
     Connect {
         const ID = 0;
-        const SIZE = 18;
+        const SIZE = 14;
 
         addr:       SocketAddr  [00 => 06]
-        time:       Timespec    [06 => 18]
+        time:       Timespec    [06 => 14]
     }
 }
 
 message! {
     Propose {
         const ID = 1;
-        const SIZE = 56;
+        const SIZE = 52;
 
         height:     u64         [00 => 08]
         round:      u32         [08 => 12]
-        time:       Timespec    [12 => 24]
-        prev_hash:  &Hash       [24 => 56]
+        time:       Timespec    [12 => 20]
+        prev_hash:  &Hash       [20 => 52]
     }
 }
 
@@ -88,19 +88,17 @@ message! {
 fn test_connect() {
     use std::str::FromStr;
 
-    let socket_address = net::SocketAddr::from_str("18.34.3.4:7777").unwrap();
+    let socket_address = SocketAddr::from_str("18.34.3.4:7777").unwrap();
     let time = ::time::get_time();
     let (public_key, secret_key) = super::crypto::gen_keypair();
 
     // write
-    let message = Connect::new(&socket_address, time,
+    let connect = Connect::new(socket_address.clone(), time,
                                &public_key, &secret_key);
     // read
-    let connect = Connect::from_raw(&message);
-
-    assert_eq!(connect.socket_address(), socket_address);
+    assert_eq!(connect.addr(), socket_address);
     assert_eq!(connect.time(), time);
-    assert!(message.verify());
+    assert!(connect.verify());
 }
 
 #[test]
@@ -119,7 +117,7 @@ fn test_propose() {
     assert_eq!(propose.round(), round);
     assert_eq!(propose.time(), time);
     assert_eq!(propose.prev_hash(), &prev_hash);
-    assert!(message.verify());
+    assert!(propose.verify());
 }
 
 #[test]
@@ -135,7 +133,7 @@ fn test_prevote() {
     assert_eq!(prevote.height(), height);
     assert_eq!(prevote.round(), round);
     assert_eq!(prevote.hash(), &hash);
-    assert!(message.verify());
+    assert!(prevote.verify());
 }
 
 #[test]
@@ -152,7 +150,7 @@ fn test_precommit() {
     assert_eq!(precommit.height(), height);
     assert_eq!(precommit.round(), round);
     assert_eq!(precommit.hash(), &hash);
-    assert!(message.verify());
+    assert!(precommit.verify());
 }
 
 #[test]
@@ -166,6 +164,6 @@ fn test_commit() {
     // read
     assert_eq!(commit.height(), height);
     assert_eq!(commit.hash(), &hash);
-    assert!(message.verify());
+    assert!(commit.verify());
 }
 
