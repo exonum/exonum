@@ -48,7 +48,7 @@ message! {
         height:     u64         [00 => 08]
         round:      u32         [08 => 12]
         time:       Timespec    [12 => 24]
-        prev_hash:  Hash        [24 => 56]
+        prev_hash:  &Hash       [24 => 56]
     }
 }
 
@@ -59,7 +59,7 @@ message! {
 
         height:     u64         [00 => 08]
         round:      u32         [08 => 12]
-        hash:       Hash        [12 => 44]
+        hash:       &Hash       [12 => 44]
     }
 }
 
@@ -70,7 +70,7 @@ message! {
 
         height:     u64         [00 => 08]
         round:      u32         [08 => 12]
-        hash:       Hash        [12 => 44]
+        hash:       &Hash       [12 => 44]
     }
 }
 
@@ -80,7 +80,7 @@ message! {
         const SIZE = 40;
 
         height:     u64         [00 => 08]
-        hash:       Hash        [08 => 40]
+        hash:       &Hash       [08 => 40]
     }
 }
 

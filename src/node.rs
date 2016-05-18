@@ -59,7 +59,7 @@ impl Node {
     fn initialize(&mut self) {
         // info!("Start listening...");
         self.network.bind(&mut self.events).unwrap();
-        let message = Connect::new(self.network.address(), get_time(),
+        let message = Connect::new(self.network.address().clone(), get_time(),
                                    &self.public_key, &self.secret_key);
         for address in self.peer_discovery.iter() {
             if address == self.network.address() {
@@ -155,7 +155,7 @@ impl Node {
         if self.state.add_peer(public_key, address) {
             // TODO: reduce double sending of connect message
             // info!("Establish connection with {}", address);
-            let message = Connect::new(self.network.address(), get_time(),
+            let message = Connect::new(self.network.address().clone(), get_time(),
                                        &self.public_key, &self.secret_key);
             self.network.send_to(&mut self.events,
                                  &address,

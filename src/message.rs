@@ -163,60 +163,45 @@ pub trait ProtocolMessage {
 }
 
 pub trait MessageField<'a> {
-    type AsRead = Self;
-    type AsWrite = Self;
-
     // TODO: use Read and Cursor
     // TODO: debug_assert_eq!(to-from == size of Self)
-    fn read(buffer: &'a [u8], from: usize, to: usize) -> Self::AsRead;
-    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: Self::AsWrite);
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Self;
+    fn write(&self, buffer: &'a mut [u8], from: usize, to: usize);
 }
 
 impl<'a> MessageField<'a> for u32 {
-    type AsRead = u32;
-    type AsWrite = u32;
-
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u32 {
         LittleEndian::read_u32(&buffer[from..to])
     }
 
-    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: u32) {
-        LittleEndian::write_u32(&mut buffer[from..to], value)
+    fn write(&self, buffer: &'a mut [u8], from: usize, to: usize) {
+        LittleEndian::write_u32(&mut buffer[from..to], *self)
     }
 }
 
 impl<'a> MessageField<'a> for u64 {
-    type AsRead = u64;
-    type AsWrite = u64;
-
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u64 {
         LittleEndian::read_u64(&buffer[from..to])
     }
 
-    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: u64) {
-        LittleEndian::write_u64(&mut buffer[from..to], value)
+    fn write(&self, buffer: &'a mut [u8], from: usize, to: usize) {
+        LittleEndian::write_u64(&mut buffer[from..to], *self)
     }
 }
 
-impl<'a> MessageField<'a> for Hash {
-    type AsRead = &'a Hash;
-    type AsWrite = &'a Hash;
-
+impl<'a> MessageField<'a> for &'a Hash {
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
         unsafe {
             mem::transmute(&buffer[from])
         }
     }
 
-    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: &'a Hash) {
-        &mut buffer[from..to].copy_from_slice(value.as_ref());
+    fn write(&self, buffer: &'a mut [u8], from: usize, to: usize) {
+        &mut buffer[from..to].copy_from_slice(self.as_ref());
     }
 }
 
 impl<'a> MessageField<'a> for Timespec {
-    type AsRead = Timespec;
-    type AsWrite = Timespec;
-
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Timespec {
         let nsec = LittleEndian::read_u64(&buffer[from..to]);
         Timespec {
@@ -225,16 +210,13 @@ impl<'a> MessageField<'a> for Timespec {
         }
     }
 
-    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: Timespec) {
-        let nsec = (value.sec as u64) * 1_000_000_000 + value.nsec as u64;
+    fn write(&self, buffer: &'a mut [u8], from: usize, to: usize) {
+        let nsec = (self.sec as u64) * 1_000_000_000 + self.nsec as u64;
         LittleEndian::write_u64(&mut buffer[from..to], nsec)
     }
 }
 
 impl<'a> MessageField<'a> for SocketAddr {
-    type AsRead = SocketAddr;
-    type AsWrite = &'a SocketAddr;
-
     // TODO: supporting IPv6
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> SocketAddr {
@@ -244,8 +226,8 @@ impl<'a> MessageField<'a> for SocketAddr {
         SocketAddr::V4(SocketAddrV4::new(ip, port))
     }
 
-    fn write(buffer: &'a mut [u8], from: usize, to: usize, value: &SocketAddr) {
-        match *value {
+    fn write(&self, buffer: &'a mut [u8], from: usize, to: usize) {
+        match *self {
             SocketAddr::V4(addr) => {
                 &mut buffer[from..to-4].copy_from_slice(&addr.ip().octets());
             },
@@ -254,7 +236,7 @@ impl<'a> MessageField<'a> for SocketAddr {
                 panic!("Ipv6 are currently unsupported")
             },
         }
-        LittleEndian::write_u16(&mut buffer[to-4..to], value.port());
+        LittleEndian::write_u16(&mut buffer[to-4..to], self.port());
     }
 }
 
@@ -277,7 +259,8 @@ macro_rules! message {
             const PAYLOAD_LENGTH : usize =
                 $body + $crate::crypto::SIGNATURE_LENGTH;
             const TOTAL_LENGTH : usize =
-                $body + $crate::crypto::SIGNATURE_LENGTH + $crate::message::HEADER_SIZE;
+                $body + $crate::crypto::SIGNATURE_LENGTH
+                      + $crate::message::HEADER_SIZE;
 
             fn raw(&self) -> &$crate::message::Message {
                 &self.raw
@@ -289,30 +272,28 @@ macro_rules! message {
         }
 
         impl $name {
-            pub fn new($($field_name: <$field_type as $crate::message::MessageField>::AsWrite),*,
+            pub fn new($($field_name: $field_type),*,
                        public_key: &$crate::crypto::PublicKey,
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::message::{
                     Message, RawMessage, ProtocolMessage, MessageField
                 };
-                let mut raw = RawMessage::new(Self::MESSAGE_TYPE, Self::PAYLOAD_LENGTH, public_key);
+                let mut raw = RawMessage::new(Self::MESSAGE_TYPE,
+                                              Self::PAYLOAD_LENGTH,
+                                              public_key);
                 {
                     let mut payload = raw.payload_mut();
                     $(
-                      <$field_type as MessageField>::write(
-                            &mut payload, $from, $to, $field_name
-                      );
+                      $field_name.write(&mut payload, $from, $to);
                     )*
                 }
                 raw.sign(secret_key);
                 $name::from_raw(Message::new(raw))
             }
-
-            $(
-                pub fn $field_name(&self) -> <$field_type as $crate::message::MessageField>::AsRead {
-                    <$field_type as $crate::message::MessageField>::read(self.raw.payload(), $from, $to)
-                }
-            )*
+            $(pub fn $field_name(&self) -> $field_type {
+                use $crate::message::MessageField;
+                <$field_type>::read(self.raw.payload(), $from, $to)
+            })*
         }
     )
 }

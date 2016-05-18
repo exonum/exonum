@@ -42,6 +42,7 @@ impl IncomingConnection {
     }
 
     fn read(&mut self) -> io::Result<Option<usize>> {
+        // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
         if self.position == HEADER_SIZE &&
            self.raw.actual_length() == HEADER_SIZE {
             self.raw.allocate_payload();
@@ -98,6 +99,7 @@ impl OutgoingConnection {
                     break
                 },
                 Some(n) => {
+                    // FIXME: What if we write less than message size?
                     self.position += n;
                     if n == message.actual_length() {
                         self.position = 0;
