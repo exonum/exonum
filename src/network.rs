@@ -8,7 +8,7 @@ use mio::util::Slab;
 
 use super::connection::{IncomingConnection, OutgoingConnection};
 use super::events::{Events, Event};
-use super::message::RawMessage;
+use super::messages::RawMessage;
 
 pub type PeerId = Token;
 

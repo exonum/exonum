@@ -13,8 +13,7 @@ extern crate mio;
 extern crate sodiumoxide;
 
 #[macro_use]
-pub mod message;
-pub mod protocol;
+pub mod messages;
 pub mod connection;
 pub mod network;
 pub mod events;

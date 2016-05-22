@@ -4,7 +4,7 @@ use time::{get_time, Timespec};
 
 use mio;
 
-use super::message::RawMessage;
+use super::messages::RawMessage;
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 

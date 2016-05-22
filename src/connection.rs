@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 use mio::tcp::TcpStream;
 use mio::{TryWrite, TryRead};
 
-use super::message::{RawMessage, MessageBuffer, HEADER_SIZE};
+use super::messages::{RawMessage, MessageBuffer, HEADER_SIZE};
 
 pub struct IncomingConnection {
     socket: TcpStream,
