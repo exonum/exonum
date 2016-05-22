@@ -138,7 +138,7 @@ impl Node {
             }
         }
 
-        match Any::from_raw(raw) {
+        match Any::from_raw(raw).unwrap() {
             Any::Connect(message) => self.handle_connect(message),
             Any::Propose(message) => self.handle_propose(message),
             Any::Prevote(message) => self.handle_prevote(message),

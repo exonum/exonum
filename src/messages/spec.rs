@@ -24,8 +24,11 @@ macro_rules! message {
                 &self.raw
             }
 
-            fn from_raw(raw: $crate::messages::RawMessage) -> $name {
-                $name { raw: raw }
+            fn from_raw(raw: $crate::messages::RawMessage)
+                -> Result<$name, $crate::messages::MessageError> {
+                use $crate::messages::fields::MessageField;
+                $(<$field_type>::check(raw.payload(), $from, $to)?;)*
+                Ok($name { raw: raw })
             }
         }
 
@@ -44,7 +47,7 @@ macro_rules! message {
                     $($field_name.write(&mut payload, $from, $to);)*
                 }
                 raw.sign(secret_key);
-                $name::from_raw(RawMessage::new(raw))
+                $name { raw: RawMessage::new(raw) }
             }
             $(pub fn $field_name(&self) -> $field_type {
                 use $crate::messages::fields::MessageField;

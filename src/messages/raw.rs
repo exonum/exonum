@@ -150,14 +150,17 @@ impl convert::AsMut<[u8]> for MessageBuffer {
     }
 }
 
-pub trait ProtocolMessage {
+#[derive(Debug)]
+pub struct MessageError;
+
+pub trait ProtocolMessage : Sized {
     const MESSAGE_TYPE : u16;
     const BODY_LENGTH : usize;
     const PAYLOAD_LENGTH : usize;
     const TOTAL_LENGTH : usize;
 
     fn raw(&self) -> &RawMessage;
-    fn from_raw(raw: RawMessage) -> Self;
+    fn from_raw(raw: RawMessage) -> Result<Self, MessageError>;
 
     fn verify(&self) -> bool {
         self.raw().verify()

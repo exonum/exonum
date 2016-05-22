@@ -6,11 +6,19 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::Hash;
 
+use super::MessageError;
+
 pub trait MessageField<'a> {
     // TODO: use Read and Cursor
     // TODO: debug_assert_eq!(to-from == size of Self)
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Self;
     fn write(&self, buffer: &'a mut [u8], from: usize, to: usize);
+
+    #[allow(unused_variables)]
+    fn check(buffer: &'a [u8], from: usize, to: usize)
+        -> Result<(), MessageError> {
+        Ok(())
+    }
 }
 
 impl<'a> MessageField<'a> for u32 {
