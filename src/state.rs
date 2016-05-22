@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use time::{Timespec, get_time};
 
-use super::message::{Message, ProtocolMessage};
+use super::message::{RawMessage, ProtocolMessage};
 use super::protocol::{Propose, Prevote, Precommit};
 use super::crypto::{PublicKey, Hash, hash};
 
@@ -17,12 +17,12 @@ pub struct State {
     prev_time: Timespec,
     checkpoint_time: Timespec,
     locked_round: u32,
-    queue: Vec<Message>,  // TODO: AnyMessage here
+    queue: Vec<RawMessage>,  // TODO: AnyMessage here
 }
 
 pub enum RoundState {
     KnownProposal(ProposalState),
-    UnknownProposal(Vec<Message>)  // TODO: AnyMessage here
+    UnknownProposal(Vec<RawMessage>)  // TODO: AnyMessage here
 }
 
 pub struct ProposalState {
@@ -113,7 +113,7 @@ impl State {
         self.round += 1;
     }
 
-    pub fn new_height(&mut self, hash: Hash) -> Vec<Message> {
+    pub fn new_height(&mut self, hash: Hash) -> Vec<RawMessage> {
         self.height += 1;
 
         if self.height % 250 == 0 {
@@ -133,13 +133,13 @@ impl State {
         queue
     }
 
-    pub fn queue(&mut self, message: Message) {
+    pub fn queue(&mut self, message: RawMessage) {
         self.queue.push(message);
     }
 
     pub fn add_propose(&mut self,
                        round: u32,
-                       message: Propose) -> (Hash, Vec<Message>) {
+                       message: Propose) -> (Hash, Vec<RawMessage>) {
         let proposal_state = ProposalState::new(message);
         let hash = proposal_state.hash.clone();
         let mut state = RoundState::KnownProposal(proposal_state);

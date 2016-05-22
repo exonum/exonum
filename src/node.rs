@@ -5,7 +5,7 @@ use time::{get_time, Duration};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
-use super::message::{Message, ProtocolMessage};
+use super::message::{RawMessage, ProtocolMessage};
 use super::protocol::{Any, Connect, Propose, Prevote, Precommit, Commit};
 use super::state::{State};
 
@@ -131,7 +131,7 @@ impl Node {
         self.events.add_timeout(timeout, time);
     }
 
-    fn handle(&mut self, raw: Message, validated: bool) {
+    fn handle(&mut self, raw: RawMessage, validated: bool) {
         // TODO: check message headers (network id, protocol version)
         if !validated {
             if !raw.verify() {
@@ -295,13 +295,13 @@ impl Node {
         self.handle_propose(propose);
     }
 
-    // fn send_to(&mut self, address: &net::SocketAddr, message: Message) {
+    // fn send_to(&mut self, address: &net::SocketAddr, message: RawMessage) {
     //     self.network.send_to(&mut self.events, address, message).unwrap();
     // }
 
 
     // TODO: use Into<RawMessage>
-    fn broadcast(&mut self, message: Message) {
+    fn broadcast(&mut self, message: RawMessage) {
         for address in self.state.peers().values() {
             self.network.send_to(&mut self.events,
                                  address,

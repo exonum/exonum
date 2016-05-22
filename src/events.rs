@@ -4,7 +4,7 @@ use time::{get_time, Timespec};
 
 use mio;
 
-use super::message::Message;
+use super::message::RawMessage;
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 
@@ -18,7 +18,7 @@ pub struct Timeout {
 pub struct InternalMessage;
 
 pub enum Event {
-    Incoming(Message),
+    Incoming(RawMessage),
     Internal(InternalMessage),
     Timeout(Timeout),
     Io(mio::Token, mio::EventSet),

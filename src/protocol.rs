@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use time::Timespec;
 
-use super::message::{Message, ProtocolMessage};
+use super::message::{RawMessage, ProtocolMessage};
 use super::crypto::Hash;
 
 pub enum Any {
@@ -14,7 +14,7 @@ pub enum Any {
 }
 
 impl Any {
-    pub fn from_raw(raw: Message) -> Any {
+    pub fn from_raw(raw: RawMessage) -> Any {
         // TODO: check input message size
         match raw.message_type() {
             Connect::MESSAGE_TYPE => Any::Connect(Connect::from_raw(raw)),
@@ -83,6 +83,36 @@ message! {
         hash:       &Hash       [08 => 40]
     }
 }
+
+// message! {
+//     TxIssue {
+//         const ID = 5;
+//         const SIZE = 40;
+
+//     }
+// }
+
+// message! {
+//     TxTransfer {
+//         const ID = 6;
+//         const SIZE = 40;
+
+//     }
+// }
+
+// message! {
+//     TxVoteValidator {
+//         const ID = 6;
+//         const SIZE = 40;
+//     }
+// }
+
+// message! {
+//     TxVoteConfiguration {
+//         const ID = 6;
+//         const SIZE = 40;
+//     }
+// }
 
 #[test]
 fn test_connect() {

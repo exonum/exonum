@@ -8,7 +8,7 @@ use mio::util::Slab;
 
 use super::connection::{IncomingConnection, OutgoingConnection};
 use super::events::{Events, Event};
-use super::message::Message;
+use super::message::RawMessage;
 
 pub type PeerId = Token;
 
@@ -140,7 +140,7 @@ impl Network {
         if set.is_readable() {
             // Read new data from socket
             while let Some(data) = self.incoming[id].readable()? {
-                events.push(Event::Incoming(Message::new(data)))
+                events.push(Event::Incoming(RawMessage::new(data)))
             };
             // let r = events.event_loop().reregister(
             //     self.incoming[id].socket(), id,
@@ -190,7 +190,7 @@ impl Network {
     pub fn send_to(&mut self, events:
                    &mut Events,
                    address: &SocketAddr,
-                   message: Message) -> io::Result<()> {
+                   message: RawMessage) -> io::Result<()> {
         let id = self.get_peer(events, address)?;
         self.outgoing[id].send(message);
         let r = events.event_loop().reregister(

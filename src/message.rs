@@ -14,26 +14,26 @@ pub const HEADER_SIZE : usize = 40; // TODO: rename to HEADER_LENGTH?
 pub const TEST_NETWORK_ID        : u8 = 0;
 pub const PROTOCOL_MAJOR_VERSION : u8 = 0;
 
-pub type Message = sync::Arc<RawMessage>;
+pub type RawMessage = sync::Arc<MessageBuffer>;
 
 // TODO: make sure that message length is enougth when using mem::transmute
 
 #[derive(Debug)]
-pub struct RawMessage {
+pub struct MessageBuffer {
     raw: Vec<u8>,
 }
 
-impl RawMessage {
-    pub fn empty() -> RawMessage {
-        RawMessage {
+impl MessageBuffer {
+    pub fn empty() -> MessageBuffer {
+        MessageBuffer {
             raw: vec![0; HEADER_SIZE]
         }
     }
 
     pub fn new(message_type: u16,
                payload_length: usize,
-               public_key: &PublicKey) -> RawMessage {
-        let mut raw = RawMessage {
+               public_key: &PublicKey) -> MessageBuffer {
+        let mut raw = MessageBuffer {
             raw: vec![0; HEADER_SIZE + payload_length]
         };
         raw.set_network_id(TEST_NETWORK_ID);
@@ -140,13 +140,13 @@ impl RawMessage {
     }
 }
 
-impl convert::AsRef<[u8]> for RawMessage {
+impl convert::AsRef<[u8]> for MessageBuffer {
     fn as_ref(&self) -> &[u8] {
         &self.raw
     }
 }
 
-impl convert::AsMut<[u8]> for RawMessage {
+impl convert::AsMut<[u8]> for MessageBuffer {
     fn as_mut(&mut self) -> &mut [u8] {
         &mut self.raw
     }
@@ -158,8 +158,8 @@ pub trait ProtocolMessage {
     const PAYLOAD_LENGTH : usize;
     const TOTAL_LENGTH : usize;
 
-    fn raw(&self) -> &Message;
-    fn from_raw(raw: Message) -> Self;
+    fn raw(&self) -> &RawMessage;
+    fn from_raw(raw: RawMessage) -> Self;
 
     fn verify(&self) -> bool {
         self.raw().verify()
@@ -254,7 +254,7 @@ macro_rules! message {
     }) => (
         #[derive(Clone)]
         pub struct $name {
-            raw: $crate::message::Message
+            raw: $crate::message::RawMessage
         }
 
         impl $crate::message::ProtocolMessage for $name {
@@ -266,33 +266,31 @@ macro_rules! message {
                 $body + $crate::crypto::SIGNATURE_LENGTH
                       + $crate::message::HEADER_SIZE;
 
-            fn raw(&self) -> &$crate::message::Message {
+            fn raw(&self) -> &$crate::message::RawMessage {
                 &self.raw
             }
 
-            fn from_raw(raw: $crate::message::Message) -> $name {
+            fn from_raw(raw: $crate::message::RawMessage) -> $name {
                 $name { raw: raw }
             }
         }
 
         impl $name {
-            pub fn new($($field_name: $field_type),*,
+            pub fn new($($field_name: $field_type,)*
                        public_key: &$crate::crypto::PublicKey,
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::message::{
-                    Message, RawMessage, ProtocolMessage, MessageField
+                    RawMessage, MessageBuffer, ProtocolMessage, MessageField
                 };
-                let mut raw = RawMessage::new(Self::MESSAGE_TYPE,
+                let mut raw = MessageBuffer::new(Self::MESSAGE_TYPE,
                                               Self::PAYLOAD_LENGTH,
                                               public_key);
                 {
                     let mut payload = raw.payload_mut();
-                    $(
-                      $field_name.write(&mut payload, $from, $to);
-                    )*
+                    $($field_name.write(&mut payload, $from, $to);)*
                 }
                 raw.sign(secret_key);
-                $name::from_raw(Message::new(raw))
+                $name::from_raw(RawMessage::new(raw))
             }
             $(pub fn $field_name(&self) -> $field_type {
                 use $crate::message::MessageField;
@@ -304,7 +302,7 @@ macro_rules! message {
 
 #[test]
 fn test_empty_message() {
-    let raw = RawMessage::empty();
+    let raw = MessageBuffer::empty();
     assert_eq!(raw.network_id(), 0);
     assert_eq!(raw.version(), 0);
     assert_eq!(raw.message_type(), 0);
@@ -313,7 +311,7 @@ fn test_empty_message() {
 
 #[test]
 fn test_as_mut() {
-    let mut raw = RawMessage::empty();
+    let mut raw = MessageBuffer::empty();
     {
         let bytes = raw.as_mut();
         bytes[0] = 1;

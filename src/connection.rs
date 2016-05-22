@@ -6,19 +6,19 @@ use std::collections::VecDeque;
 use mio::tcp::TcpStream;
 use mio::{TryWrite, TryRead};
 
-use super::message::{Message, RawMessage, HEADER_SIZE};
+use super::message::{RawMessage, MessageBuffer, HEADER_SIZE};
 
 pub struct IncomingConnection {
     socket: TcpStream,
     address: SocketAddr,
-    raw: RawMessage,
+    raw: MessageBuffer,
     position: usize,
 }
 
 pub struct OutgoingConnection {
     socket: TcpStream,
     address: SocketAddr,
-    queue: VecDeque<Message>,
+    queue: VecDeque<RawMessage>,
     position: usize,
 }
 
@@ -28,7 +28,7 @@ impl IncomingConnection {
         IncomingConnection {
             socket: socket,
             address: address,
-            raw: RawMessage::empty(),
+            raw: MessageBuffer::empty(),
             position: 0,
         }
     }
@@ -50,7 +50,7 @@ impl IncomingConnection {
         self.socket.try_read(&mut self.raw.as_mut()[self.position..])
     }
 
-    pub fn readable(&mut self) -> io::Result<Option<RawMessage>> {
+    pub fn readable(&mut self) -> io::Result<Option<MessageBuffer>> {
         // TODO: raw length == 0?
         // TODO: maximum raw length?
         loop {
@@ -60,7 +60,7 @@ impl IncomingConnection {
                     self.position += n;
                     if self.position >= HEADER_SIZE &&
                        self.position == self.raw.total_length() {
-                        let mut raw = RawMessage::empty();
+                        let mut raw = MessageBuffer::empty();
                         swap(&mut raw, &mut self.raw);
                         self.position = 0;
                         return Ok(Some(raw))
@@ -111,7 +111,7 @@ impl OutgoingConnection {
         return Ok(())
     }
 
-    pub fn send(&mut self, message: Message) {
+    pub fn send(&mut self, message: RawMessage) {
         // TODO: capacity overflow
         // TODO: reregister
         self.queue.push_back(message);
