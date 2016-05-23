@@ -11,7 +11,7 @@ macro_rules! message {
             raw: $crate::messages::RawMessage
         }
 
-        impl $crate::messages::ProtocolMessage for $name {
+        impl $crate::messages::Message for $name {
             const MESSAGE_TYPE : u16 = $id;
             const BODY_LENGTH : usize = $body;
             const PAYLOAD_LENGTH : usize =
@@ -25,8 +25,8 @@ macro_rules! message {
             }
 
             fn from_raw(raw: $crate::messages::RawMessage)
-                -> Result<$name, $crate::messages::MessageError> {
-                use $crate::messages::fields::MessageField;
+                -> Result<$name, $crate::messages::Error> {
+                use $crate::messages::fields::Field;
                 $(<$field_type>::check(raw.payload(), $from, $to)?;)*
                 Ok($name { raw: raw })
             }
@@ -37,7 +37,7 @@ macro_rules! message {
                        public_key: &$crate::crypto::PublicKey,
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{
-                    RawMessage, MessageBuffer, ProtocolMessage, MessageField
+                    RawMessage, MessageBuffer, Message, Field
                 };
                 let mut raw = MessageBuffer::new(Self::MESSAGE_TYPE,
                                               Self::PAYLOAD_LENGTH,
@@ -50,7 +50,7 @@ macro_rules! message {
                 $name { raw: RawMessage::new(raw) }
             }
             $(pub fn $field_name(&self) -> $field_type {
-                use $crate::messages::fields::MessageField;
+                use $crate::messages::fields::Field;
                 <$field_type>::read(self.raw.payload(), $from, $to)
             })*
         }

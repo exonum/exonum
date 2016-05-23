@@ -1,4 +1,5 @@
 use std::mem;
+use std::io::{Cursor, Read, Write};
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 
 use time::{Timespec};
@@ -6,9 +7,12 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::Hash;
 
-use super::MessageError;
+use super::Error;
 
-pub trait MessageField<'a> {
+type Reader<'a> = Cursor<&'a [u8]>;
+type Writer = Cursor<Vec<u8>>;
+
+pub trait Field<'a> {
     // TODO: use Read and Cursor
     // TODO: debug_assert_eq!(to-from == size of Self)
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Self;
@@ -16,12 +20,34 @@ pub trait MessageField<'a> {
 
     #[allow(unused_variables)]
     fn check(buffer: &'a [u8], from: usize, to: usize)
-        -> Result<(), MessageError> {
+        -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<'a> MessageField<'a> for u32 {
+impl<'a> Field<'a> for bool {
+    fn read(buffer: &'a [u8], from: usize, _: usize) -> bool {
+        buffer[from] == 1
+    }
+
+    fn write(&self, buffer: &'a mut [u8], from: usize, _: usize) {
+        buffer[from] = if *self {1} else {0}
+    }
+
+    fn check(buffer: &'a [u8], from: usize, to: usize)
+        -> Result<(), Error> {
+        if buffer[from] != 0 && buffer[from] != 1 {
+            Err(Error::IncorrectBoolean {
+                position: from as u32,
+                value: buffer[from]
+            })
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<'a> Field<'a> for u32 {
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u32 {
         LittleEndian::read_u32(&buffer[from..to])
     }
@@ -31,7 +57,7 @@ impl<'a> MessageField<'a> for u32 {
     }
 }
 
-impl<'a> MessageField<'a> for u64 {
+impl<'a> Field<'a> for u64 {
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u64 {
         LittleEndian::read_u64(&buffer[from..to])
     }
@@ -41,7 +67,7 @@ impl<'a> MessageField<'a> for u64 {
     }
 }
 
-impl<'a> MessageField<'a> for &'a Hash {
+impl<'a> Field<'a> for &'a Hash {
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
         unsafe {
             mem::transmute(&buffer[from])
@@ -53,7 +79,7 @@ impl<'a> MessageField<'a> for &'a Hash {
     }
 }
 
-impl<'a> MessageField<'a> for Timespec {
+impl<'a> Field<'a> for Timespec {
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Timespec {
         let nsec = LittleEndian::read_u64(&buffer[from..to]);
         Timespec {
@@ -68,9 +94,7 @@ impl<'a> MessageField<'a> for Timespec {
     }
 }
 
-impl<'a> MessageField<'a> for SocketAddr {
-    // TODO: supporting IPv6
-
+impl<'a> Field<'a> for SocketAddr {
     fn read(buffer: &'a [u8], from: usize, to: usize) -> SocketAddr {
         let ip = Ipv4Addr::new(buffer[from+0], buffer[from+1],
                                buffer[from+2], buffer[from+3]);
@@ -91,3 +115,20 @@ impl<'a> MessageField<'a> for SocketAddr {
         LittleEndian::write_u16(&mut buffer[to-2..to], self.port());
     }
 }
+
+impl<'a> Field<'a> for &'a [u8] {
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> &'a [u8] {
+        let pos = LittleEndian::read_u32(&buffer[from..from+4]);
+        let len = LittleEndian::read_u32(&buffer[from+4..to]);
+        unsafe {
+            ::std::slice::from_raw_parts(pos as *const u8, len as usize)
+        }
+        // TODO: check that pos > from && (pos + len) < total size
+    }
+
+    fn write(&self, buffer: &'a mut [u8], from: usize, _: usize) {
+        // buffer[from] = if *self {1} else {0}
+    }
+
+}
+

@@ -2,11 +2,13 @@
 #[cfg(test)] mod tests;
 
 mod raw;
+mod error;
 mod fields;
 mod protocol;
 
-pub use self::raw::{RawMessage, MessageBuffer, ProtocolMessage, MessageError, HEADER_SIZE};
-pub use self::fields::{MessageField};
+pub use self::raw::{RawMessage, MessageBuffer, Message, HEADER_SIZE};
+pub use self::error::{Error};
+pub use self::fields::{Field};
 pub use self::protocol::*;
 
 pub enum Any {
@@ -18,7 +20,7 @@ pub enum Any {
 }
 
 impl Any {
-    pub fn from_raw(raw: RawMessage) -> Result<Any, MessageError> {
+    pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
         // TODO: check input message size
         Ok(match raw.message_type() {
             Connect::MESSAGE_TYPE => Any::Connect(Connect::from_raw(raw)?),

@@ -7,6 +7,8 @@ use super::super::crypto::{
     sign, verify, Hash, hash, SIGNATURE_LENGTH
 };
 
+use super::Error;
+
 pub const HEADER_SIZE : usize = 40; // TODO: rename to HEADER_LENGTH?
 
 pub const TEST_NETWORK_ID        : u8 = 0;
@@ -150,17 +152,14 @@ impl convert::AsMut<[u8]> for MessageBuffer {
     }
 }
 
-#[derive(Debug)]
-pub struct MessageError;
-
-pub trait ProtocolMessage : Sized {
+pub trait Message : Sized {
     const MESSAGE_TYPE : u16;
     const BODY_LENGTH : usize;
     const PAYLOAD_LENGTH : usize;
     const TOTAL_LENGTH : usize;
 
     fn raw(&self) -> &RawMessage;
-    fn from_raw(raw: RawMessage) -> Result<Self, MessageError>;
+    fn from_raw(raw: RawMessage) -> Result<Self, Error>;
 
     fn verify(&self) -> bool {
         self.raw().verify()

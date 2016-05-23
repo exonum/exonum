@@ -5,7 +5,7 @@ use time::{get_time, Duration};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
-use super::messages::{Any, Connect, Propose, Prevote, Precommit, Commit, RawMessage, ProtocolMessage};
+use super::messages::{Any, Connect, Propose, Prevote, Precommit, Commit, RawMessage, Message};
 use super::state::{State};
 
 // TODO: avoid recursion calls?

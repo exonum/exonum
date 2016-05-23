@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use time::{Timespec, get_time};
 
-use super::messages::{Propose, Prevote, Precommit, RawMessage, ProtocolMessage};
+use super::messages::{Propose, Prevote, Precommit, RawMessage, Message};
 use super::crypto::{PublicKey, Hash, hash};
 
 pub struct State {
