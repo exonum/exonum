@@ -6,8 +6,12 @@ use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
 use super::messages::{Any, BasicMessage, Connect, RawMessage, Message};
-use super::state::{State};
-use super::consensus::{Consensus, ConsensusService};
+
+mod state;
+mod consensus;
+
+pub use self::state::{State};
+pub use self::consensus::{Consensus, ConsensusService};
 
 // TODO: avoid recursion calls?
 

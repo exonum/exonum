@@ -1,7 +1,7 @@
 use time::{get_time};
 
-use super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Commit, Message};
-use super::node::NodeContext;
+use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Commit, Message};
+use super::NodeContext;
 
 pub struct Consensus;
 

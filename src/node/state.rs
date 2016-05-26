@@ -3,8 +3,8 @@ use std::collections::HashMap;
 
 use time::{Timespec, get_time};
 
-use super::messages::{Propose, Prevote, Precommit, ConsensusMessage, Message};
-use super::crypto::{PublicKey, Hash, hash};
+use super::super::messages::{Propose, Prevote, Precommit, ConsensusMessage, Message};
+use super::super::crypto::{PublicKey, Hash, hash};
 
 pub struct State {
     peers: HashMap<PublicKey, SocketAddr>,
@@ -51,7 +51,7 @@ impl State {
             round: 1,
             rounds: Vec::new(),
             // TODO: use genesis block instead
-            prev_hash: super::crypto::hash(&[]),
+            prev_hash: hash(&[]),
             prev_time: get_time(),
             checkpoint_time: get_time(),
             locked_round: 0,
