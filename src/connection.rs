@@ -43,11 +43,13 @@ impl IncomingConnection {
 
     fn read(&mut self) -> io::Result<Option<usize>> {
         // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
+        // TODO: read into growable Vec, not into [u8]
         if self.position == HEADER_SIZE &&
            self.raw.actual_length() == HEADER_SIZE {
             self.raw.allocate_payload();
         }
-        self.socket.try_read(&mut self.raw.as_mut()[self.position..])
+        let buffer : &mut [u8] = self.raw.as_mut();
+        self.socket.try_read(&mut buffer[self.position..])
     }
 
     pub fn readable(&mut self) -> io::Result<Option<MessageBuffer>> {

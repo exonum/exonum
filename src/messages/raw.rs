@@ -152,6 +152,12 @@ impl convert::AsMut<[u8]> for MessageBuffer {
     }
 }
 
+impl convert::AsMut<Vec<u8>> for MessageBuffer {
+    fn as_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.raw
+    }
+}
+
 pub trait Message : Sized {
     const MESSAGE_TYPE : u16;
     const BODY_LENGTH : usize;

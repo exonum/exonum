@@ -43,8 +43,12 @@ macro_rules! message {
                                               Self::PAYLOAD_LENGTH,
                                               public_key);
                 {
-                    let mut payload = raw.payload_mut();
-                    $($field_name.write(&mut payload, $from, $to);)*
+                    let mut buffer = raw.as_mut();
+                    $(
+                    let from = $from + $crate::messages::HEADER_SIZE;
+                    let to = $to + $crate::messages::HEADER_SIZE;
+                    $field_name.write(&mut buffer, from, to);
+                    )*
                 }
                 raw.sign(secret_key);
                 $name { raw: RawMessage::new(raw) }
