@@ -9,10 +9,12 @@ use super::messages::{Any, Connect, RawMessage, Message};
 
 mod state;
 mod basic;
+mod tx;
 mod consensus;
 
 pub use self::state::{State};
 pub use self::basic::{Basic, BasicService};
+pub use self::tx::{Tx, TxService};
 pub use self::consensus::{Consensus, ConsensusService};
 
 // TODO: avoid recursion calls?
@@ -20,6 +22,7 @@ pub use self::consensus::{Consensus, ConsensusService};
 pub struct Node {
     context: NodeContext,
     basic: Box<BasicService>,
+    tx: Box<TxService>,
     consensus: Box<ConsensusService>,
 }
 
@@ -60,6 +63,7 @@ impl Node {
         let network = Network::with_config(config.network);
         let state = State::new(config.validators);
         let basic = Box::new(Basic) as Box<BasicService>;
+        let tx = Box::new(Tx) as Box<TxService>;
         let consensus = Box::new(Consensus) as Box<ConsensusService>;
         Node {
             context: NodeContext {
@@ -75,6 +79,7 @@ impl Node {
                 byzantine: config.byzantine
             },
             basic: basic,
+            tx: tx,
             consensus: consensus,
         }
     }
@@ -155,8 +160,8 @@ impl Node {
 
         match Any::from_raw(raw).unwrap() {
             Any::Basic(message) => self.basic.handle(&mut self.context, message),
+            Any::Tx(message) => self.tx.handle(&mut self.context, message),
             Any::Consensus(message) => self.consensus.handle(&mut self.context, message),
-            Any::Tx(_) => panic!("tx handling not implemented")
         }
     }
 }
