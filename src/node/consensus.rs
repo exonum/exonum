@@ -3,9 +3,9 @@ use time::{get_time};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Commit, Message};
 use super::NodeContext;
 
-pub struct Consensus;
+pub struct ConsensusService;
 
-pub trait ConsensusService {
+pub trait ConsensusHandler {
     fn handle(&mut self, ctx: &mut NodeContext, message: ConsensusMessage) {
         match message {
             ConsensusMessage::Propose(message) => self.handle_propose(ctx, message),
@@ -148,6 +148,6 @@ pub trait ConsensusService {
     }
 }
 
-impl ConsensusService for Consensus {
+impl ConsensusHandler for ConsensusService {
     // default implementation
 }

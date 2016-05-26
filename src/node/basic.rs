@@ -4,9 +4,9 @@ use super::super::messages::{BasicMessage, Connect, Message};
 use super::{NodeContext};
 
 
-pub struct Basic;
+pub struct BasicService;
 
-pub trait BasicService {
+pub trait BasicHandler {
     fn handle(&mut self, ctx: &mut NodeContext, message: BasicMessage) {
         match message {
             BasicMessage::Connect(message) => self.handle_connect(ctx, message)
@@ -31,6 +31,6 @@ pub trait BasicService {
     }
 }
 
-impl BasicService for Basic {
+impl BasicHandler for BasicService {
     // default implementation
 }

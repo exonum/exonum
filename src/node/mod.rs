@@ -13,17 +13,17 @@ mod tx;
 mod consensus;
 
 pub use self::state::{State};
-pub use self::basic::{Basic, BasicService};
-pub use self::tx::{Tx, TxService};
-pub use self::consensus::{Consensus, ConsensusService};
+pub use self::basic::{BasicService, BasicHandler};
+pub use self::tx::{TxService, TxHandler};
+pub use self::consensus::{ConsensusService, ConsensusHandler};
 
 // TODO: avoid recursion calls?
 
 pub struct Node {
     context: NodeContext,
-    basic: Box<BasicService>,
-    tx: Box<TxService>,
-    consensus: Box<ConsensusService>,
+    basic: Box<BasicHandler>,
+    tx: Box<TxHandler>,
+    consensus: Box<ConsensusHandler>,
 }
 
 pub struct NodeContext {
@@ -62,9 +62,9 @@ impl Node {
         let events = Events::with_config(config.events).unwrap();
         let network = Network::with_config(config.network);
         let state = State::new(config.validators);
-        let basic = Box::new(Basic) as Box<BasicService>;
-        let tx = Box::new(Tx) as Box<TxService>;
-        let consensus = Box::new(Consensus) as Box<ConsensusService>;
+        let basic = Box::new(BasicService) as Box<BasicHandler>;
+        let tx = Box::new(TxService) as Box<TxHandler>;
+        let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
         Node {
             context: NodeContext {
                 id: id as u32,
