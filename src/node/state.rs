@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use time::{Timespec, get_time};
 
-use super::super::messages::{Propose, Prevote, Precommit, ConsensusMessage, Message};
+use super::super::messages::{Propose, Prevote, Precommit, ConsensusMessage, TxMessage, Message};
 use super::super::crypto::{PublicKey, Hash, hash};
 
 pub struct State {
@@ -17,6 +17,7 @@ pub struct State {
     checkpoint_time: Timespec,
     locked_round: u32,
     queue: Vec<ConsensusMessage>,  // TODO: AnyMessage here
+    tx_pool: Vec<TxMessage>,
 }
 
 pub enum RoundState {
@@ -55,7 +56,8 @@ impl State {
             prev_time: get_time(),
             checkpoint_time: get_time(),
             locked_round: 0,
-            queue: Vec::new()
+            queue: Vec::new(),
+            tx_pool: Vec::new(),
         }
     }
 
@@ -134,6 +136,10 @@ impl State {
 
     pub fn queue(&mut self, message: ConsensusMessage) {
         self.queue.push(message);
+    }
+
+    pub fn add_tx(&mut self, message: TxMessage) {
+        self.tx_pool.push(message);
     }
 
     pub fn add_propose(&mut self,

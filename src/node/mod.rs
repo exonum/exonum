@@ -6,6 +6,7 @@ use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
 use super::messages::{Any, Connect, RawMessage, Message};
+use super::tx_generator::TxGenerator;
 
 mod state;
 mod basic;
@@ -37,7 +38,8 @@ pub struct NodeContext {
     pub round_timeout: u32,
     pub byzantine: bool,
     // TODO: move this into peer exchange service
-    pub peer_discovery: Vec<SocketAddr>
+    pub peer_discovery: Vec<SocketAddr>,
+    pub tx_generator: TxGenerator,
 }
 
 #[derive(Debug)]
@@ -59,6 +61,7 @@ impl Node {
         let id = config.validators.iter()
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
+        let tx_generator = TxGenerator::new();
         let events = Events::with_config(config.events).unwrap();
         let network = Network::with_config(config.network);
         let state = State::new(config.validators);
@@ -76,7 +79,8 @@ impl Node {
                 propose_timeout: config.propose_timeout,
                 round_timeout: config.round_timeout,
                 peer_discovery: config.peer_discovery,
-                byzantine: config.byzantine
+                byzantine: config.byzantine,
+                tx_generator: tx_generator,
             },
             basic: basic,
             tx: tx,

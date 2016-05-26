@@ -7,6 +7,7 @@ pub use sodiumoxide::crypto::sign::ed25519::{
     PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
     SECRETKEYBYTES as SECRET_KEY_LENGTH,
     SIGNATUREBYTES as SIGNATURE_LENGTH,
+    SEEDBYTES as SEED_LENGTH,
 };
 
 pub use sodiumoxide::crypto::hash::sha256::{

@@ -94,11 +94,16 @@ pub trait ConsensusHandler {
         }
 
         let has_consensus = ctx.state.add_precommit(precommit.round(),
-                                                     precommit.hash(),
-                                                     precommit.clone());
+                                                    precommit.hash(),
+                                                    precommit.clone());
 
         if has_consensus {
             let queue = ctx.state.new_height(precommit.hash().clone());
+
+            for tx in (&mut ctx.tx_generator).take(100) {
+                ctx.state.add_tx(tx);
+            }
+
             // info!("Commit block #{}", ctx.state.height());
             if self.is_leader(ctx) {
                 self.make_propose(ctx);

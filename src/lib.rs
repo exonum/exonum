@@ -7,6 +7,7 @@
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate rand;
 extern crate time;
 extern crate byteorder;
 extern crate mio;
@@ -19,3 +20,5 @@ pub mod network;
 pub mod events;
 pub mod crypto;
 pub mod node;
+
+pub mod tx_generator;
