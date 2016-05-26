@@ -9,7 +9,7 @@ use super::super::crypto::{
 
 use super::Error;
 
-pub const HEADER_SIZE : usize = 40; // TODO: rename to HEADER_LENGTH?
+pub const HEADER_SIZE : usize = 8; // TODO: rename to HEADER_LENGTH?
 
 pub const TEST_NETWORK_ID        : u8 = 0;
 pub const PROTOCOL_MAJOR_VERSION : u8 = 0;
@@ -31,8 +31,7 @@ impl MessageBuffer {
     }
 
     pub fn new(message_type: u16,
-               payload_length: usize,
-               public_key: &PublicKey) -> MessageBuffer {
+               payload_length: usize) -> MessageBuffer {
         let mut raw = MessageBuffer {
             raw: vec![0; HEADER_SIZE + payload_length]
         };
@@ -40,7 +39,6 @@ impl MessageBuffer {
         raw.set_version(PROTOCOL_MAJOR_VERSION);
         raw.set_message_type(message_type);
         raw.set_payload_length(payload_length);
-        raw.set_public_key(public_key);
         raw
     }
 
@@ -64,12 +62,6 @@ impl MessageBuffer {
         LittleEndian::read_u32(&self.raw[4..8]) as usize
     }
 
-    pub fn public_key(&self) -> &PublicKey {
-        unsafe {
-            mem::transmute(&self.raw[8])
-        }
-    }
-
     pub fn set_network_id(&mut self, network_id: u8) {
         self.raw[0] = network_id
     }
@@ -84,13 +76,6 @@ impl MessageBuffer {
 
     pub fn set_payload_length(&mut self, length: usize) {
         LittleEndian::write_u32(&mut self.raw[4..8], length as u32)
-    }
-
-    pub fn set_public_key(&mut self, public_key: &PublicKey) {
-        let origin : &mut PublicKey = unsafe {
-            mem::transmute(&mut self.raw[8])
-        };
-        origin.clone_from(public_key);
     }
 
     pub fn actual_length(&self) -> usize {
@@ -134,9 +119,9 @@ impl MessageBuffer {
         self.signature_mut().clone_from(&signature);
     }
 
-    pub fn verify(&self) -> bool {
+    pub fn verify(&self, pub_key: &PublicKey) -> bool {
         let sign_idx = self.total_length() - SIGNATURE_LENGTH;
-        verify(self.signature(), &self.raw[..sign_idx], self.public_key())
+        verify(self.signature(), &self.raw[..sign_idx], pub_key)
     }
 }
 
@@ -167,8 +152,8 @@ pub trait Message : Sized {
     fn raw(&self) -> &RawMessage;
     fn from_raw(raw: RawMessage) -> Result<Self, Error>;
 
-    fn verify(&self) -> bool {
-        self.raw().verify()
+    fn verify(&self, pub_key: &PublicKey) -> bool {
+        self.raw().verify(pub_key)
     }
 }
 

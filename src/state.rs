@@ -69,9 +69,9 @@ impl State {
         &self.peers
     }
 
-    pub fn leader(&self, round: u32) -> &PublicKey {
-        let idx = self.height() as u64 + round as u64;
-        &self.validators[(idx % 2) as usize]
+    pub fn leader(&self, round: u32) -> u32 {
+        ((self.height() as u64 + round as u64) %
+         (self.validators.len() as u64)) as u32
     }
 
     pub fn consensus_count(&self) -> usize {
@@ -158,12 +158,14 @@ impl State {
                        message: Prevote) -> bool {
         let cc = self.consensus_count();
         let locked_round = self.locked_round;
+        // TODO: check that it is known validator
+        let pub_key = self.validators[message.validator() as usize];
         match *self.round_state(round) {
             RoundState::KnownProposal(ref mut state) => {
                 if state.hash != *hash {
                     return false;
                 }
-                state.prevotes.insert(message.raw().public_key().clone(), message);
+                state.prevotes.insert(pub_key.clone(), message);
                 state.prevotes.len() >= cc && locked_round < round
             },
             RoundState::UnknownProposal(ref mut queue) => {
@@ -178,12 +180,14 @@ impl State {
                          hash: &Hash,
                          message: Precommit) -> bool {
         let cc = self.consensus_count();
+        // TODO: check that it is known validator
+        let pub_key = self.validators[message.validator() as usize];
         match *self.round_state(round) {
             RoundState::KnownProposal(ref mut state) => {
                 if state.hash != *hash {
                     return false;
                 }
-                state.precommits.insert(message.raw().public_key().clone(), message);
+                state.precommits.insert(pub_key.clone(), message);
                 state.precommits.len() >= cc
             },
             RoundState::UnknownProposal(ref mut queue) => {

@@ -11,6 +11,7 @@ use super::state::{State};
 // TODO: avoid recursion calls?
 
 pub struct Node {
+    id: u32, // TODO: validator ID, move to ConsensusService
     public_key: PublicKey,
     secret_key: SecretKey,
     state: State,
@@ -39,10 +40,14 @@ pub struct Configuration {
 impl Node {
     pub fn with_config(config: Configuration) -> Node {
         // FIXME: remove unwraps here, use FATAL log level instead
+        let id = config.validators.iter()
+                                  .position(|pk| pk == &config.public_key)
+                                  .unwrap();
         let events = Events::with_config(config.events).unwrap();
         let network = Network::with_config(config.network);
         let state = State::new(config.validators);
         Node {
+            id: id as u32,
             public_key: config.public_key,
             secret_key: config.secret_key,
             state: state,
@@ -58,8 +63,10 @@ impl Node {
     fn initialize(&mut self) {
         // info!("Start listening...");
         self.network.bind(&mut self.events).unwrap();
-        let message = Connect::new(self.network.address().clone(), get_time(),
-                                   &self.public_key, &self.secret_key);
+        let message = Connect::new(&self.public_key,
+                                   self.network.address().clone(),
+                                   get_time(),
+                                   &self.secret_key);
         for address in self.peer_discovery.iter() {
             if address == self.network.address() {
                 continue
@@ -80,7 +87,7 @@ impl Node {
             }
             match self.events.poll() {
                 Event::Incoming(message) => {
-                    self.handle(message, false);
+                    self.handle(message);
                 },
                 Event::Internal(_) => {
 
@@ -130,13 +137,12 @@ impl Node {
         self.events.add_timeout(timeout, time);
     }
 
-    fn handle(&mut self, raw: RawMessage, validated: bool) {
+    fn handle(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
-        if !validated {
-            if !raw.verify() {
-                return;
-            }
-        }
+        // FIXME: call message.verify method
+        //     if !raw.verify() {
+        //         return;
+        //     }
 
         match Any::from_raw(raw).unwrap() {
             Any::Connect(message) => self.handle_connect(message),
@@ -149,13 +155,15 @@ impl Node {
 
     fn handle_connect(&mut self, message: Connect) {
         // debug!("recv connect");
-        let public_key = message.raw().public_key().clone();
+        let public_key = message.pub_key().clone();
         let address = message.addr();
         if self.state.add_peer(public_key, address) {
             // TODO: reduce double sending of connect message
             // info!("Establish connection with {}", address);
-            let message = Connect::new(self.network.address().clone(), get_time(),
-                                       &self.public_key, &self.secret_key);
+            let message = Connect::new(&self.public_key,
+                                       self.network.address().clone(),
+                                       get_time(),
+                                       &self.secret_key);
             self.network.send_to(&mut self.events,
                                  &address,
                                  message.raw().clone()).unwrap();
@@ -180,7 +188,7 @@ impl Node {
             return;
         }
 
-        if propose.raw().public_key() != self.state.leader(propose.round()) {
+        if propose.validator() != self.state.leader(propose.round()) {
             return;
         }
 
@@ -188,16 +196,16 @@ impl Node {
                                                    propose.clone());
 
         // debug!("send prevote");
-        let prevote = Prevote::new(propose.height(),
+        let prevote = Prevote::new(self.id,
+                                   propose.height(),
                                    propose.round(),
                                    &hash,
-                                   &self.public_key,
                                    &self.secret_key);
         self.broadcast(prevote.raw().clone());
         self.handle_prevote(prevote);
 
         for message in queue {
-            self.handle(message, true);
+            self.handle(message);
         }
     }
 
@@ -219,10 +227,10 @@ impl Node {
         if has_consensus {
             self.state.lock_round(prevote.round());
             // debug!("send precommit");
-            let precommit = Precommit::new(prevote.height(),
+            let precommit = Precommit::new(self.id,
+                                           prevote.height(),
                                            prevote.round(),
                                            prevote.hash(),
-                                           &self.public_key,
                                            &self.secret_key);
             self.broadcast(precommit.raw().clone());
             self.handle_precommit(precommit);
@@ -259,7 +267,7 @@ impl Node {
                 // self.handle_commit(commit);
             }
             for message in queue {
-                self.handle(message, true);
+                self.handle(message);
             }
             self.add_timeout();
         }
@@ -271,7 +279,7 @@ impl Node {
     }
 
     fn is_leader(&self) -> bool {
-        self.state.leader(self.state.round()) == &self.public_key
+        self.state.leader(self.state.round()) == self.id
     }
 
     fn make_propose(&mut self) {
@@ -284,11 +292,11 @@ impl Node {
         } else {
             self.state.height() + 1
         };
-        let propose = Propose::new(height,
+        let propose = Propose::new(self.id,
+                                   height,
                                    self.state.round(),
                                    get_time(),
                                    self.state.prev_hash(),
-                                   &self.public_key,
                                    &self.secret_key);
         self.broadcast(propose.raw().clone());
         self.handle_propose(propose);

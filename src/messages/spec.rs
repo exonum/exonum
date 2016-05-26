@@ -34,14 +34,12 @@ macro_rules! message {
 
         impl $name {
             pub fn new($($field_name: $field_type,)*
-                       public_key: &$crate::crypto::PublicKey,
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{
                     RawMessage, MessageBuffer, Message, Field
                 };
                 let mut raw = MessageBuffer::new(Self::MESSAGE_TYPE,
-                                              Self::PAYLOAD_LENGTH,
-                                              public_key);
+                                                 Self::PAYLOAD_LENGTH);
                 {
                     let mut buffer = raw.as_mut();
                     $(

@@ -5,54 +5,59 @@ use super::super::crypto::{Hash, PublicKey};
 message! {
     Connect {
         const ID = 0;
-        const SIZE = 14;
+        const SIZE = 46;
 
-        addr:       SocketAddr  [00 => 06]
-        time:       Timespec    [06 => 14]
+        pub_key:    &PublicKey  [00 => 32]
+        addr:       SocketAddr  [32 => 38]
+        time:       Timespec    [38 => 46]
     }
 }
 
 message! {
     Propose {
         const ID = 1;
-        const SIZE = 52;
+        const SIZE = 56;
 
-        height:     u64         [00 => 08]
-        round:      u32         [08 => 12]
-        time:       Timespec    [12 => 20]
-        prev_hash:  &Hash       [20 => 52]
+        validator:  u32         [00 => 04]
+        height:     u64         [04 => 12]
+        round:      u32         [12 => 16]
+        time:       Timespec    [16 => 24]
+        prev_hash:  &Hash       [24 => 56]
     }
 }
 
 message! {
     Prevote {
         const ID = 2;
-        const SIZE = 44;
+        const SIZE = 48;
 
-        height:     u64         [00 => 08]
-        round:      u32         [08 => 12]
-        hash:       &Hash       [12 => 44]
+        validator:  u32         [00 => 04]
+        height:     u64         [04 => 12]
+        round:      u32         [12 => 16]
+        hash:       &Hash       [16 => 48]
     }
 }
 
 message! {
     Precommit {
         const ID = 3;
-        const SIZE = 44;
+        const SIZE = 48;
 
-        height:     u64         [00 => 08]
-        round:      u32         [08 => 12]
-        hash:       &Hash       [12 => 44]
+        validator:  u32         [00 => 04]
+        height:     u64         [04 => 12]
+        round:      u32         [12 => 16]
+        hash:       &Hash       [16 => 48]
     }
 }
 
 message! {
     Commit {
         const ID = 4;
-        const SIZE = 40;
+        const SIZE = 44;
 
-        height:     u64         [00 => 08]
-        hash:       &Hash       [08 => 40]
+        validator:  u32         [00 => 04]
+        height:     u64         [04 => 12]
+        hash:       &Hash       [12 => 44]
     }
 }
 
@@ -62,7 +67,7 @@ message! {
         const SIZE = 56;
 
         seed:       u64         [00 => 08]
-        pub_key:    &PublicKey  [08 => 40]
+        asset:      &PublicKey  [08 => 40]
         name:       &str        [40 => 48]
         amount:     u64         [48 => 56]
     }
