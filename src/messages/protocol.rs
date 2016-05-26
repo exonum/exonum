@@ -97,7 +97,7 @@ message! {
 }
 
 message! {
-    TxVoteConfiguration {
+    TxVoteConfig {
         const ID = 8;
         const SIZE = 24;
 

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use time::{Timespec, get_time};
 
-use super::messages::{Propose, Prevote, Precommit, RawMessage, Message};
+use super::messages::{Propose, Prevote, Precommit, ConsensusMessage, Message};
 use super::crypto::{PublicKey, Hash, hash};
 
 pub struct State {
@@ -16,12 +16,12 @@ pub struct State {
     prev_time: Timespec,
     checkpoint_time: Timespec,
     locked_round: u32,
-    queue: Vec<RawMessage>,  // TODO: AnyMessage here
+    queue: Vec<ConsensusMessage>,  // TODO: AnyMessage here
 }
 
 pub enum RoundState {
     KnownProposal(ProposalState),
-    UnknownProposal(Vec<RawMessage>)  // TODO: AnyMessage here
+    UnknownProposal(Vec<ConsensusMessage>)  // TODO: AnyMessage here
 }
 
 pub struct ProposalState {
@@ -112,7 +112,7 @@ impl State {
         self.round += 1;
     }
 
-    pub fn new_height(&mut self, hash: Hash) -> Vec<RawMessage> {
+    pub fn new_height(&mut self, hash: Hash) -> Vec<ConsensusMessage> {
         self.height += 1;
 
         if self.height % 250 == 0 {
@@ -132,13 +132,13 @@ impl State {
         queue
     }
 
-    pub fn queue(&mut self, message: RawMessage) {
+    pub fn queue(&mut self, message: ConsensusMessage) {
         self.queue.push(message);
     }
 
     pub fn add_propose(&mut self,
                        round: u32,
-                       message: Propose) -> (Hash, Vec<RawMessage>) {
+                       message: Propose) -> (Hash, Vec<ConsensusMessage>) {
         let proposal_state = ProposalState::new(message);
         let hash = proposal_state.hash.clone();
         let mut state = RoundState::KnownProposal(proposal_state);
@@ -169,7 +169,7 @@ impl State {
                 state.prevotes.len() >= cc && locked_round < round
             },
             RoundState::UnknownProposal(ref mut queue) => {
-                queue.push(message.raw().clone());
+                queue.push(ConsensusMessage::Prevote(message.clone()));
                 false
             }
         }
@@ -191,7 +191,7 @@ impl State {
                 state.precommits.len() >= cc
             },
             RoundState::UnknownProposal(ref mut queue) => {
-                queue.push(message.raw().clone());
+                queue.push(ConsensusMessage::Precommit(message.clone()));
                 false
             }
         }

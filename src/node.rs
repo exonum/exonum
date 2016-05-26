@@ -5,23 +5,29 @@ use time::{get_time, Duration};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
-use super::messages::{Any, Connect, Propose, Prevote, Precommit, Commit, RawMessage, Message};
+use super::messages::{Any, BasicMessage, Connect, RawMessage, Message};
 use super::state::{State};
+use super::consensus::{Consensus, ConsensusService};
 
 // TODO: avoid recursion calls?
 
 pub struct Node {
-    id: u32, // TODO: validator ID, move to ConsensusService
-    public_key: PublicKey,
-    secret_key: SecretKey,
-    state: State,
-    events: Events,
-    network: Network,
-    propose_timeout: u32,
-    round_timeout: u32,
-    byzantine: bool,
+    context: NodeContext,
+    consensus: Box<ConsensusService>,
+}
+
+pub struct NodeContext {
+    pub id: u32, // TODO: validator ID, move to ConsensusService
+    pub public_key: PublicKey,
+    pub secret_key: SecretKey,
+    pub state: State,
+    pub events: Events,
+    pub network: Network,
+    pub propose_timeout: u32,
+    pub round_timeout: u32,
+    pub byzantine: bool,
     // TODO: move this into peer exchange service
-    peer_discovery: Vec<SocketAddr>
+    pub peer_discovery: Vec<SocketAddr>
 }
 
 #[derive(Debug)]
@@ -46,46 +52,50 @@ impl Node {
         let events = Events::with_config(config.events).unwrap();
         let network = Network::with_config(config.network);
         let state = State::new(config.validators);
+        let consensus = Box::new(Consensus) as Box<ConsensusService>;
         Node {
-            id: id as u32,
-            public_key: config.public_key,
-            secret_key: config.secret_key,
-            state: state,
-            events: events,
-            network: network,
-            propose_timeout: config.propose_timeout,
-            round_timeout: config.round_timeout,
-            peer_discovery: config.peer_discovery,
-            byzantine: config.byzantine
+            context: NodeContext {
+                id: id as u32,
+                public_key: config.public_key,
+                secret_key: config.secret_key,
+                state: state,
+                events: events,
+                network: network,
+                propose_timeout: config.propose_timeout,
+                round_timeout: config.round_timeout,
+                peer_discovery: config.peer_discovery,
+                byzantine: config.byzantine
+            },
+            consensus: consensus,
         }
     }
 
     fn initialize(&mut self) {
         // info!("Start listening...");
-        self.network.bind(&mut self.events).unwrap();
-        let message = Connect::new(&self.public_key,
-                                   self.network.address().clone(),
+        self.context.network.bind(&mut self.context.events).unwrap();
+        let message = Connect::new(&self.context.public_key,
+                                   self.context.network.address().clone(),
                                    get_time(),
-                                   &self.secret_key);
-        for address in self.peer_discovery.iter() {
-            if address == self.network.address() {
+                                   &self.context.secret_key);
+        for address in self.context.peer_discovery.iter() {
+            if address == self.context.network.address() {
                 continue
             }
-            self.network.send_to(&mut self.events,
+            self.context.network.send_to(&mut self.context.events,
                                  address,
                                  message.raw().clone()).unwrap();
         }
 
-        self.add_timeout();
+        self.context.add_timeout();
     }
 
     pub fn run(&mut self) {
         self.initialize();
         loop {
-            if self.state.height() == 1000 {
+            if self.context.state.height() == 1000 {
                 break;
             }
-            match self.events.poll() {
+            match self.context.events.poll() {
                 Event::Incoming(message) => {
                     self.handle(message);
                 },
@@ -98,7 +108,7 @@ impl Node {
                 Event::Io(id, set) => {
                     // TODO: shoud we call network.io through main event queue?
                     // FIXME: Remove unwrap here
-                    self.network.io(&mut self.events, id, set).unwrap()
+                    self.context.network.io(&mut self.context.events, id, set).unwrap()
                 },
                 Event::Error(_) => {
 
@@ -111,30 +121,20 @@ impl Node {
     }
 
     fn handle_timeout(&mut self, timeout: Timeout) {
-        if timeout.height != self.state.height() {
+        if timeout.height != self.context.state.height() {
             return;
         }
 
-        if timeout.round != self.state.round() {
+        if timeout.round != self.context.state.round() {
             return;
         }
 
-        self.state.new_round();
-        // info!("Timeout, starting new round #{}", self.state.round());
-        if self.is_leader() {
-            self.make_propose();
+        self.context.state.new_round();
+        // info!("Timeout, starting new round #{}", self.context.state.round());
+        if self.consensus.is_leader(&mut self.context) {
+            self.consensus.make_propose(&mut self.context);
         }
-        self.add_timeout();
-    }
-
-    fn add_timeout(&mut self) {
-        let ms = self.state.round() * self.round_timeout;
-        let time = self.state.prev_time() + Duration::milliseconds(ms as i64);
-        let timeout = Timeout {
-            height: self.state.height(),
-            round: self.state.round(),
-        };
-        self.events.add_timeout(timeout, time);
+        self.context.add_timeout();
     }
 
     fn handle(&mut self, raw: RawMessage) {
@@ -145,11 +145,9 @@ impl Node {
         //     }
 
         match Any::from_raw(raw).unwrap() {
-            Any::Connect(message) => self.handle_connect(message),
-            Any::Propose(message) => self.handle_propose(message),
-            Any::Prevote(message) => self.handle_prevote(message),
-            Any::Precommit(message) => self.handle_precommit(message),
-            Any::Commit(message) => self.handle_commit(message),
+            Any::Basic(BasicMessage::Connect(message)) => self.handle_connect(message),
+            Any::Consensus(message) => self.consensus.handle(&mut self.context, message),
+            Any::Tx(_) => panic!("tx handling not implemented")
         }
     }
 
@@ -157,158 +155,38 @@ impl Node {
         // debug!("recv connect");
         let public_key = message.pub_key().clone();
         let address = message.addr();
-        if self.state.add_peer(public_key, address) {
+        if self.context.state.add_peer(public_key, address) {
             // TODO: reduce double sending of connect message
             // info!("Establish connection with {}", address);
-            let message = Connect::new(&self.public_key,
-                                       self.network.address().clone(),
+            let message = Connect::new(&self.context.public_key,
+                                       self.context.network.address().clone(),
                                        get_time(),
-                                       &self.secret_key);
-            self.network.send_to(&mut self.events,
+                                       &self.context.secret_key);
+            self.context.network.send_to(&mut self.context.events,
                                  &address,
                                  message.raw().clone()).unwrap();
         }
     }
+}
 
-    fn handle_propose(&mut self, propose: Propose) {
-        // debug!("recv propose");
-        if propose.height() > self.state.height() + 1 {
-            self.state.queue(propose.raw().clone());
-            return;
-        }
-
-        if propose.height() < self.state.height() + 1 {
-            if !self.byzantine {
-                // info!("=== Invalid block proposed, ignore ===")
-            }
-            return;
-        }
-
-        if propose.prev_hash() != self.state.prev_hash() {
-            return;
-        }
-
-        if propose.validator() != self.state.leader(propose.round()) {
-            return;
-        }
-
-        let (hash, queue) = self.state.add_propose(propose.round(),
-                                                   propose.clone());
-
-        // debug!("send prevote");
-        let prevote = Prevote::new(self.id,
-                                   propose.height(),
-                                   propose.round(),
-                                   &hash,
-                                   &self.secret_key);
-        self.broadcast(prevote.raw().clone());
-        self.handle_prevote(prevote);
-
-        for message in queue {
-            self.handle(message);
-        }
-    }
-
-    fn handle_prevote(&mut self, prevote: Prevote) {
-        // debug!("recv prevote");
-        if prevote.height() > self.state.height() + 1 {
-            self.state.queue(prevote.raw().clone());
-            return;
-        }
-
-        if prevote.height() < self.state.height() + 1 {
-            return;
-        }
-
-        let has_consensus = self.state.add_prevote(prevote.round(),
-                                                   prevote.hash(),
-                                                   prevote.clone());
-
-        if has_consensus {
-            self.state.lock_round(prevote.round());
-            // debug!("send precommit");
-            let precommit = Precommit::new(self.id,
-                                           prevote.height(),
-                                           prevote.round(),
-                                           prevote.hash(),
-                                           &self.secret_key);
-            self.broadcast(precommit.raw().clone());
-            self.handle_precommit(precommit);
-        }
-    }
-
-    fn handle_precommit(&mut self, precommit: Precommit) {
-        // debug!("recv precommit");
-        if precommit.height() > self.state.height() + 1 {
-            self.state.queue(precommit.raw().clone());
-            return;
-        }
-
-        if precommit.height() < self.state.height() + 1 {
-            return;
-        }
-
-        let has_consensus = self.state.add_precommit(precommit.round(),
-                                                     precommit.hash(),
-                                                     precommit.clone());
-
-        if has_consensus {
-            let queue = self.state.new_height(precommit.hash().clone());
-            // info!("Commit block #{}", self.state.height());
-            if self.is_leader() {
-                self.make_propose();
-            } else {
-                // debug!("send commit");
-                // let commit = Commit::new(precommit.height(),
-                //                          precommit.hash(),
-                //                          &self.public_key,
-                //                          &self.secret_key);
-                // self.broadcast(commit.clone());
-                // self.handle_commit(commit);
-            }
-            for message in queue {
-                self.handle(message);
-            }
-            self.add_timeout();
-        }
-    }
-
-    fn handle_commit(&mut self, _: Commit) {
-        // debug!("recv commit");
-        // nothing
-    }
-
-    fn is_leader(&self) -> bool {
-        self.state.leader(self.state.round()) == self.id
-    }
-
-    fn make_propose(&mut self) {
-        // debug!("send propose");
-        // FIXME: remove this sheet
-        // ::std::thread::sleep(::std::time::Duration::from_millis(self.propose_timeout as u64));
-        let height = if self.byzantine {
-            // info!("=== Propose invalid block ===");
-            0
-        } else {
-            self.state.height() + 1
-        };
-        let propose = Propose::new(self.id,
-                                   height,
-                                   self.state.round(),
-                                   get_time(),
-                                   self.state.prev_hash(),
-                                   &self.secret_key);
-        self.broadcast(propose.raw().clone());
-        self.handle_propose(propose);
-    }
-
+impl NodeContext {
     // fn send_to(&mut self, address: &net::SocketAddr, message: RawMessage) {
-    //     self.network.send_to(&mut self.events, address, message).unwrap();
+    //     self.network.send_to(&mut self.context.events, address, message).unwrap();
     // }
+
+    pub fn add_timeout(&mut self) {
+        let ms = self.state.round() * self.round_timeout;
+        let time = self.state.prev_time() + Duration::milliseconds(ms as i64);
+        let timeout = Timeout {
+            height: self.state.height(),
+            round: self.state.round(),
+        };
+        self.events.add_timeout(timeout, time);
+    }
 
 
     // TODO: use Into<RawMessage>
-    fn broadcast(&mut self, message: RawMessage) {
+    pub fn broadcast(&mut self, message: RawMessage) {
         for address in self.state.peers().values() {
             self.network.send_to(&mut self.events,
                                  address,
