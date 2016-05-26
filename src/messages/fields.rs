@@ -4,7 +4,7 @@ use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use time::{Timespec};
 use byteorder::{ByteOrder, LittleEndian};
 
-use super::super::crypto::Hash;
+use super::super::crypto::{Hash, PublicKey};
 
 use super::Error;
 
@@ -65,6 +65,18 @@ impl<'a> Field<'a> for u64 {
 
 impl<'a> Field<'a> for &'a Hash {
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
+        unsafe {
+            mem::transmute(&buffer[from])
+        }
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        &mut buffer[from..to].copy_from_slice(self.as_ref());
+    }
+}
+
+impl<'a> Field<'a> for &'a PublicKey {
+    fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a PublicKey {
         unsafe {
             mem::transmute(&buffer[from])
         }
