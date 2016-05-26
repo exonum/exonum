@@ -42,10 +42,6 @@ impl MessageBuffer {
         raw
     }
 
-    pub fn hash(&self) -> Hash {
-        hash(&self.raw)
-    }
-
     pub fn network_id(&self) -> u8 {
         self.raw[0]
     }
@@ -151,6 +147,10 @@ pub trait Message : Sized {
 
     fn raw(&self) -> &RawMessage;
     fn from_raw(raw: RawMessage) -> Result<Self, Error>;
+
+    fn hash(&self) -> Hash {
+        hash(self.raw().as_ref().as_ref())
+    }
 
     fn verify(&self, pub_key: &PublicKey) -> bool {
         self.raw().verify(pub_key)

@@ -17,7 +17,7 @@ pub struct State {
     checkpoint_time: Timespec,
     locked_round: u32,
     queue: Vec<ConsensusMessage>,  // TODO: AnyMessage here
-    tx_pool: Vec<TxMessage>,
+    tx_pool: HashMap<Hash, TxMessage>,
 }
 
 pub enum RoundState {
@@ -35,7 +35,7 @@ pub struct ProposalState {
 impl ProposalState {
     fn new(propose: Propose) -> ProposalState {
         ProposalState {
-            hash: propose.raw().hash(),
+            hash: propose.hash(),
             propose: propose,
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
@@ -57,7 +57,7 @@ impl State {
             checkpoint_time: get_time(),
             locked_round: 0,
             queue: Vec::new(),
-            tx_pool: Vec::new(),
+            tx_pool: HashMap::new(),
         }
     }
 
@@ -138,8 +138,12 @@ impl State {
         self.queue.push(message);
     }
 
-    pub fn add_tx(&mut self, message: TxMessage) {
-        self.tx_pool.push(message);
+    pub fn add_tx(&mut self, hash: Hash, message: TxMessage) {
+        self.tx_pool.insert(hash, message);
+    }
+
+    pub fn tx_pool(&self) -> &HashMap<Hash, TxMessage> {
+        &self.tx_pool
     }
 
     pub fn add_propose(&mut self,

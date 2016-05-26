@@ -1,5 +1,6 @@
 use time::{get_time};
 
+use super::super::crypto::{Hash};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Commit, Message};
 use super::NodeContext;
 
@@ -41,6 +42,12 @@ pub trait ConsensusHandler {
                                                    propose.clone());
 
         // debug!("send prevote");
+        for hash in propose.transactions() {
+            if !ctx.state.tx_pool().contains_key(hash) {
+                panic!("unknown transaction into propose");
+            }
+        }
+
         let prevote = Prevote::new(ctx.id,
                                    propose.height(),
                                    propose.round(),
@@ -101,7 +108,7 @@ pub trait ConsensusHandler {
             let queue = ctx.state.new_height(precommit.hash().clone());
 
             for tx in (&mut ctx.tx_generator).take(100) {
-                ctx.state.add_tx(tx);
+                ctx.state.add_tx(tx.hash(), tx);
             }
 
             // info!("Commit block #{}", ctx.state.height());
@@ -142,11 +149,14 @@ pub trait ConsensusHandler {
         } else {
             ctx.state.height() + 1
         };
+
+        let transactions : Vec<Hash> = ctx.state.tx_pool().keys().map(|hash| hash.clone()).collect();
         let propose = Propose::new(ctx.id,
                                    height,
                                    ctx.state.round(),
                                    get_time(),
                                    ctx.state.prev_hash(),
+                                   &transactions,
                                    &ctx.secret_key);
         ctx.broadcast(propose.raw().clone());
         self.handle_propose(ctx, propose);

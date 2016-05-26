@@ -8,7 +8,7 @@ pub trait TxHandler {
     fn handle(&mut self, ctx: &mut NodeContext, message: TxMessage) {
         // FIXME: make sure that it is new transaction
         // FIXME: validate transaction signature
-        ctx.state.add_tx(message);
+        ctx.state.add_tx(message.hash(), message);
     }
 
 }

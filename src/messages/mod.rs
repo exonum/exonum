@@ -6,10 +6,14 @@ mod error;
 mod fields;
 mod protocol;
 
+use super::crypto::{Hash};
+
 pub use self::raw::{RawMessage, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::{Error};
 pub use self::fields::{Field};
 pub use self::protocol::*;
+
+// TODO: implement common methods for enum types (hash, raw, from_raw, verify, validator, height)
 
 pub enum Any {
     Basic(BasicMessage),
@@ -33,6 +37,17 @@ pub enum TxMessage {
     Transfer(TxTransfer),
     VoteValidator(TxVoteValidator),
     VoteConfig(TxVoteConfig),
+}
+
+impl TxMessage {
+    pub fn hash(&self) -> Hash {
+        match *self {
+            TxMessage::Issue(ref msg) => msg.hash(),
+            TxMessage::Transfer(ref msg) => msg.hash(),
+            TxMessage::VoteValidator(ref msg) => msg.hash(),
+            TxMessage::VoteConfig(ref msg) => msg.hash()
+        }
+    }
 }
 
 impl Any {
