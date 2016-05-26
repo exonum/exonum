@@ -5,18 +5,21 @@ use time::{get_time, Duration};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
-use super::messages::{Any, BasicMessage, Connect, RawMessage, Message};
+use super::messages::{Any, Connect, RawMessage, Message};
 
 mod state;
+mod basic;
 mod consensus;
 
 pub use self::state::{State};
+pub use self::basic::{Basic, BasicService};
 pub use self::consensus::{Consensus, ConsensusService};
 
 // TODO: avoid recursion calls?
 
 pub struct Node {
     context: NodeContext,
+    basic: Box<BasicService>,
     consensus: Box<ConsensusService>,
 }
 
@@ -56,6 +59,7 @@ impl Node {
         let events = Events::with_config(config.events).unwrap();
         let network = Network::with_config(config.network);
         let state = State::new(config.validators);
+        let basic = Box::new(Basic) as Box<BasicService>;
         let consensus = Box::new(Consensus) as Box<ConsensusService>;
         Node {
             context: NodeContext {
@@ -70,6 +74,7 @@ impl Node {
                 peer_discovery: config.peer_discovery,
                 byzantine: config.byzantine
             },
+            basic: basic,
             consensus: consensus,
         }
     }
@@ -149,26 +154,9 @@ impl Node {
         //     }
 
         match Any::from_raw(raw).unwrap() {
-            Any::Basic(BasicMessage::Connect(message)) => self.handle_connect(message),
+            Any::Basic(message) => self.basic.handle(&mut self.context, message),
             Any::Consensus(message) => self.consensus.handle(&mut self.context, message),
             Any::Tx(_) => panic!("tx handling not implemented")
-        }
-    }
-
-    fn handle_connect(&mut self, message: Connect) {
-        // debug!("recv connect");
-        let public_key = message.pub_key().clone();
-        let address = message.addr();
-        if self.context.state.add_peer(public_key, address) {
-            // TODO: reduce double sending of connect message
-            // info!("Establish connection with {}", address);
-            let message = Connect::new(&self.context.public_key,
-                                       self.context.network.address().clone(),
-                                       get_time(),
-                                       &self.context.secret_key);
-            self.context.network.send_to(&mut self.context.events,
-                                 &address,
-                                 message.raw().clone()).unwrap();
         }
     }
 }
