@@ -29,6 +29,7 @@ pub struct ProposalState {
     hash: Hash,
     propose: Propose,
     prevotes: HashMap<PublicKey, Prevote>,
+    changes: Option<Vec<Change>>,
     precommits: HashMap<PublicKey, Precommit>,
 }
 
@@ -38,6 +39,7 @@ impl ProposalState {
             hash: propose.hash(),
             propose: propose,
             prevotes: HashMap::new(),
+            changes: None,
             precommits: HashMap::new(),
         }
     }
@@ -181,6 +183,17 @@ impl State {
             RoundState::UnknownProposal(ref mut queue) => {
                 queue.push(ConsensusMessage::Prevote(message.clone()));
                 false
+            }
+        }
+    }
+
+    pub fn add_changes(&mut self, round: u32, changes: Vec<Changes>) {
+        match *self.round_state(round) {
+            RoundState::KnownProposal(ref mut state) => {
+                state.changes = Some(changes);
+            },
+            RoundState::UnknownProposal(_) => {
+                panic!("trying to add changes for unknown proposal")
             }
         }
     }

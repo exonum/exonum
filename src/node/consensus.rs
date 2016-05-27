@@ -73,12 +73,17 @@ pub trait ConsensusHandler {
         }
 
         let has_consensus = ctx.state.add_prevote(prevote.round(),
-                                                   prevote.hash(),
-                                                   prevote.clone());
+                                                  prevote.hash(),
+                                                  prevote.clone());
 
         if has_consensus {
             ctx.state.lock_round(prevote.round());
             // debug!("send precommit");
+
+            let changes = self.eval_propose(ctx, prevote.hash());
+
+            ctx.add_changes(prevote.round(), changes);
+
             let precommit = Precommit::new(ctx.id,
                                            prevote.height(),
                                            prevote.round(),
@@ -137,6 +142,14 @@ pub trait ConsensusHandler {
 
     fn is_leader(&self, ctx: &NodeContext) -> bool {
         ctx.state.leader(ctx.state.round()) == ctx.id
+    }
+
+    fn eval_propose(&mut self, ctx: &mut NodeContext, msg: Propose) -> Changes {
+        let fork = Fork::new(ctx.storage);
+
+        fork.put_block(msg);
+
+        fork.changes()
     }
 
     fn make_propose(&mut self, ctx: &mut NodeContext) {

@@ -10,7 +10,7 @@ use super::crypto::{Hash};
 
 pub use self::raw::{RawMessage, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::{Error};
-pub use self::fields::{Field};
+pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;
 
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify, validator, height)

@@ -5,6 +5,7 @@ use time::{get_time, Duration};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
+use super::storage::{Storage, MemoryStorage};
 use super::messages::{Any, Connect, RawMessage, Message};
 use super::tx_generator::TxGenerator;
 
@@ -34,6 +35,7 @@ pub struct NodeContext {
     pub state: State,
     pub events: Events,
     pub network: Network,
+    pub storage: Box<Storage>,
     pub propose_timeout: u32,
     pub round_timeout: u32,
     pub byzantine: bool,
@@ -68,6 +70,7 @@ impl Node {
         let basic = Box::new(BasicService) as Box<BasicHandler>;
         let tx = Box::new(TxService) as Box<TxHandler>;
         let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
+        let storage = Box::new(MemoryStorage::new()) as Box<Storage>;
         Node {
             context: NodeContext {
                 id: id as u32,
@@ -76,6 +79,7 @@ impl Node {
                 state: state,
                 events: events,
                 network: network,
+                storage: storage,
                 propose_timeout: config.propose_timeout,
                 round_timeout: config.round_timeout,
                 peer_discovery: config.peer_discovery,
