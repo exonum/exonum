@@ -7,172 +7,252 @@ use super::NodeContext;
 pub struct ConsensusService;
 
 pub trait ConsensusHandler {
-    fn handle(&mut self, ctx: &mut NodeContext, message: ConsensusMessage) {
+    fn handle(&mut self, ctx: &mut NodeContext, msg: ConsensusMessage) {
+        // Ignore messages from previous height
+        if msg.height() < ctx.state.height() + 1 {
+            return
+        }
+
+        // Queued messages from future height
+        if msg.height() > ctx.state.height() + 1 {
+            ctx.state.add_queued(msg);
+            return
+        }
+
+        match ctx.state.public_key_of(msg.validator()) {
+            // Incorrect signature of message
+            Some(public_key) => if !msg.verify() {
+                return
+            },
+            // Incorrect validator id
+            None => return
+        }
+
         match message {
-            ConsensusMessage::Propose(message) => self.handle_propose(ctx, message),
-            ConsensusMessage::Prevote(message) => self.handle_prevote(ctx, message),
-            ConsensusMessage::Precommit(message) => self.handle_precommit(ctx, message),
-            ConsensusMessage::Commit(message) => self.handle_commit(ctx, message),
+            ConsensusMessage::Propose(msg) => {
+                // Check prev_hash
+                if propose.prev_hash() != ctx.state.prev_hash() {
+                    return;
+                }
+
+                // Check leader
+                if propose.validator() != ctx.state.leader(propose.round()) {
+                    return;
+                }
+
+                // TODO: check time
+                // TODO: check that transactions are not commited yet
+
+                self.handle_propose(ctx, msg)
+            },
+            ConsensusMessage::Prevote(msg) => self.handle_prevote(ctx, msg),
+            ConsensusMessage::Precommit(msg) => self.handle_precommit(ctx, msg),
+            ConsensusMessage::Commit(msg) => self.handle_commit(ctx, msg),
         }
     }
 
     fn handle_propose(&mut self, ctx: &mut NodeContext, propose: Propose) {
-        // debug!("recv propose");
-        if propose.height() > ctx.state.height() + 1 {
-            ctx.state.queue(ConsensusMessage::Propose(propose.clone()));
-            return;
-        }
+        // Add propose
+        let hash = propose.hash();
+        let added = ctx.state.add_propose(hash, &propose);
 
-        if propose.height() < ctx.state.height() + 1 {
-            if !ctx.byzantine {
-                // info!("=== Invalid block proposed, ignore ===")
+        if added {
+            // TODO: Check that we "have block"
+            for h in propose.transactions() {
+                if !ctx.state.tx_pool().contains_key(h) {
+                    panic!("unknown transactions into propose");
+                }
             }
-            return;
+
+            self.have_block(ctx, hash);
+        }
+    }
+
+    fn have_block(&mut self, ctx: &mut NodeContext, block_hash: Hash) {
+        // Send prevote
+        if ctx.state.locked_round() == 0 {
+            self.send_prevote(ctx, block_hash);
         }
 
-        if propose.prev_hash() != ctx.state.prev_hash() {
-            return;
-        }
-
-        if propose.validator() != ctx.state.leader(propose.round()) {
-            return;
-        }
-
-        let (hash, queue) = ctx.state.add_propose(propose.round(),
-                                                   propose.clone());
-
-        // debug!("send prevote");
-        for hash in propose.transactions() {
-            if !ctx.state.tx_pool().contains_key(hash) {
-                panic!("unknown transaction into propose");
-            }
-        }
-
-        let prevote = Prevote::new(ctx.id,
-                                   propose.height(),
-                                   propose.round(),
-                                   &hash,
-                                   &ctx.secret_key);
-        ctx.broadcast(prevote.raw().clone());
-        self.handle_prevote(ctx, prevote);
-
-        for message in queue {
-            self.handle(ctx, message);
+        // Lock to propose
+        if ctx.state.has_majority_prevotes(ctx.state.round(), hash) {
+            self.lock(ctx, block_hash);
         }
     }
 
     fn handle_prevote(&mut self, ctx: &mut NodeContext, prevote: Prevote) {
-        // debug!("recv prevote");
-        if prevote.height() > ctx.state.height() + 1 {
-            ctx.state.queue(ConsensusMessage::Prevote(prevote.clone()));
-            return;
-        }
+        // Add prevote
+        let has_consensus = ctx.state.add_prevote(&prevote);
 
-        if prevote.height() < ctx.state.height() + 1 {
-            return;
-        }
-
-        let has_consensus = ctx.state.add_prevote(prevote.round(),
-                                                  prevote.hash(),
-                                                  prevote.clone());
-
-        if has_consensus {
-            ctx.state.lock_round(prevote.round());
-            // debug!("send precommit");
-
-            let changes = self.eval_propose(ctx, prevote.hash());
-
-            ctx.add_changes(prevote.round(), changes);
-
-            let precommit = Precommit::new(ctx.id,
-                                           prevote.height(),
-                                           prevote.round(),
-                                           prevote.hash(),
-                                           &ctx.secret_key);
-            ctx.broadcast(precommit.raw().clone());
-            self.handle_precommit(ctx, precommit);
+        // Lock to propose
+        if has_consensus && prevote.round() == ctx.state.round() {
+            self.lock(ctx, prevote.block_hash());
         }
     }
 
-    fn handle_precommit(&mut self, ctx: &mut NodeContext, precommit: Precommit) {
-        // debug!("recv precommit");
-        if precommit.height() > ctx.state.height() + 1 {
-            ctx.state.queue(ConsensusMessage::Precommit(precommit.clone()));
-            return;
-        }
+    fn lock(&mut self, ctx: &mut NodeContext, block_hash: Hash) {
+        // Change lock
+        ctx.state.lock_round();
 
-        if precommit.height() < ctx.state.height() + 1 {
-            return;
-        }
+        // Execute block and get state hash
+        let state_hash = match ctx.state.state_hash(block_hash) {
+            Some(state_hash) => state_hash,
+            None => self.execute(ctx, hash)
+        };
 
-        let has_consensus = ctx.state.add_precommit(precommit.round(),
-                                                    precommit.hash(),
-                                                    precommit.clone());
+        // Send precommit
+        self.send_precommit(ctx, block_hash, state_hash);
+
+        // Commit if has consensus
+        if ctx.state.has_majority_precommits(ctx.state.round(),
+                                             block_hash,
+                                             state_hash) {
+            self.commit(ctx, ctx.state.round(), block_hash);
+        }
+    }
+
+    fn handle_precommit(&mut self, ctx: &mut NodeContext, msg: Precommit) {
+        // Add precommit
+        let has_consensus = ctx.state.add_precommit(&msg);
 
         if has_consensus {
-            let queue = ctx.state.new_height(precommit.hash().clone());
+            // Execute block and get state hash
+            let state_hash = match ctx.state.state_hash(msg.block_hash()) {
+                Some(state_hash) => state_hash,
+                None => self.execute(ctx, hash)
+            };
 
-            for tx in (&mut ctx.tx_generator).take(100) {
-                ctx.state.add_tx(tx.hash(), tx);
+            if state_hash != msg.state_hash() {
+                panic!("We are fucked up...");
             }
 
-            // info!("Commit block #{}", ctx.state.height());
-            if self.is_leader(ctx) {
-                self.make_propose(ctx);
-            } else {
-                // debug!("send commit");
-                // let commit = Commit::new(precommit.height(),
-                //                          precommit.hash(),
-                //                          &ctx.public_key,
-                //                          &ctx.secret_key);
-                // ctx.broadcast(commit.clone());
-                // self.handle_commit(commit);
-            }
-            for message in queue {
-                self.handle(ctx, message);
-            }
-            ctx.add_timeout();
+            self.commit(ctx, msg.round(), msg.block_hash());
         }
+    }
+
+    fn commit(&mut self, ctx: &mut NodeContext,
+              round: Round, hash: Hash, changes: &Changes) {
+        // Merge changes into storage
+        ctx.storage.merge(changes);
+
+        // Update state to new height
+        ctx.state.new_height();
+
+        // TODO: remove old transactions
+
+        // Generate new transactions
+        for tx in (&mut ctx.tx_generator).take(100) {
+            ctx.state.add_tx(tx.hash(), tx);
+        }
+
+        // Send commit
+        self.send_commit(ctx, ctx.state.height() - 1, round, hash);
+
+        // Handle queued messages
+        for msg in ctx.state.queue() {
+            self.handle(ctx, msg);
+        }
+
+        // Send propose
+        if self.is_leader(ctx) {
+            self.send_propose(ctx);
+        }
+
+        // Add timeout for first round
+        ctx.add_timeout();
     }
 
     fn handle_commit(&mut self, _: &mut NodeContext, _: Commit) {
-        // debug!("recv commit");
-        // nothing
+    }
+
+    fn handle_timeout(&mut self, ctx: &mut NodeContext, timeout: Timeout) {
+        if timeout.height != ctx.state.height() {
+            return;
+        }
+
+        if timeout.round != ctx.state.round() {
+            return;
+        }
+
+        // Update state to new round
+        ctx.state.new_round();
+
+        // Send prevote if we are locked or propose if we are leader
+        if let Some(hash) = self.locked_propose() {
+            self.send_prevote(ctx, hash);
+        } else if self.is_leader(ctx) {
+            self.send_propose(ctx);
+        }
+
+        // Add timeout for this round
+        self.context.add_timeout();
     }
 
     fn is_leader(&self, ctx: &NodeContext) -> bool {
         ctx.state.leader(ctx.state.round()) == ctx.id
     }
 
-    fn eval_propose(&mut self, ctx: &mut NodeContext, msg: Propose) -> Changes {
+    fn execute(&mut self, ctx: &mut NodeContext, hash: Hash) -> Hash {
         let fork = Fork::new(ctx.storage);
 
         fork.put_block(msg);
 
-        fork.changes()
+        let changes = fork.changes();
+        let hash = changes.hash();
+        ctx.add_changes(hash, changes);
+        hash
     }
 
-    fn make_propose(&mut self, ctx: &mut NodeContext) {
-        // debug!("send propose");
-        // FIXME: remove this sheet
-        // ::std::thread::sleep(::std::time::Duration::from_millis(ctx.propose_timeout as u64));
-        let height = if ctx.byzantine {
-            // info!("=== Propose invalid block ===");
-            0
-        } else {
-            ctx.state.height() + 1
-        };
-
-        let transactions : Vec<Hash> = ctx.state.tx_pool().keys().map(|hash| hash.clone()).collect();
+    fn send_propose(&mut self, ctx: &mut NodeContext) {
         let propose = Propose::new(ctx.id,
-                                   height,
+                                   ctx.state.height(),
                                    ctx.state.round(),
                                    get_time(),
-                                   ctx.state.prev_hash(),
-                                   &transactions,
+                                   ctx.storage.prev_hash(),
+                                   &ctx.state.transactions(),
                                    &ctx.secret_key);
-        ctx.broadcast(propose.raw().clone());
-        self.handle_propose(ctx, propose);
+        ctx.broadcast(&propose);
+
+        let hash = propose.hash();
+        ctx.state.add_propose(propose., propose);
+
+        // Send prevote
+        self.send_prevote(hash);
+    }
+
+    fn send_prevote(&mut self, ctx: &mut NodeContext, block_hash: Hash) {
+        // TODO: check that we are not send prevote for this round
+        let prevote = Prevote::new(ctx.id,
+                                   ctx.height(),
+                                   ctx.round(),
+                                   block_hash,
+                                   &ctx.secret_key);
+        ctx.state.add_prevote(&prevote);
+        ctx.broadcast(prevote);
+    }
+
+    fn send_precommit(&mut self, ctx: &mut NodeContext,
+                      block_hash: Hash, state_hash: Hash) {
+        // TODO: check that we are not send precommit for this round
+        let precommit = Precommit::new(ctx.id,
+                                       ctx.state.height(),
+                                       ctx.state.round(),
+                                       block_hash,
+                                       state_hash,
+                                       &ctx.secret_key);
+        ctx.broadcast(&precommit);
+        ctx.state.add_precommit(&precommit);
+    }
+
+    fn send_commit(&mut self, ctx: &mut NodeContext,
+                   height: Height, round: Round, block_hash: Hash) {
+        // Send commit
+        let commit = Commit::new(ctx.state.id,
+                                 height,
+                                 round,
+                                 block_hash,
+                                 &ctx.secret_key);
+        ctx.broadcast(commit);
     }
 }
 

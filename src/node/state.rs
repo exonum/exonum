@@ -6,66 +6,56 @@ use time::{Timespec, get_time};
 use super::super::messages::{Propose, Prevote, Precommit, ConsensusMessage, TxMessage, Message};
 use super::super::crypto::{PublicKey, Hash, hash};
 
+type Round = u32;
+type ValidatorId = u32;
+
+// TODO: reduce copying of Hash
+
 pub struct State {
     peers: HashMap<PublicKey, SocketAddr>,
     validators: Vec<PublicKey>,
     height: u64,
-    round: u32,
-    rounds: Vec<RoundState>,
+    round: Round,
+    locked_round: Round,
+    locked_propose: Hash,
     prev_hash: Hash,
-    prev_time: Timespec,
-    checkpoint_time: Timespec,
-    locked_round: u32,
-    queue: Vec<ConsensusMessage>,  // TODO: AnyMessage here
-    tx_pool: HashMap<Hash, TxMessage>,
-}
 
-pub enum RoundState {
-    KnownProposal(ProposalState),
-    UnknownProposal(Vec<ConsensusMessage>)  // TODO: AnyMessage here
-}
+    // messages
+    proposals: HashMap<Hash, Proposal>,
+    prevotes: HashMap<(Round, Hash), HashMap<ValidatorId, Prevote>>,
+    precommits: HashMap<(Round, Hash, Hash), HashMap<ValidatorId, Precommit>>,
 
-pub struct ProposalState {
-    hash: Hash,
-    propose: Propose,
-    prevotes: HashMap<PublicKey, Prevote>,
-    changes: Option<Vec<Change>>,
-    precommits: HashMap<PublicKey, Precommit>,
-}
+    transactions: HashMap<Hash, TxMessage>,
+    queued: Vec<ConsensusMessage>,
 
-impl ProposalState {
-    fn new(propose: Propose) -> ProposalState {
-        ProposalState {
-            hash: propose.hash(),
-            propose: propose,
-            prevotes: HashMap::new(),
-            changes: None,
-            precommits: HashMap::new(),
-        }
-    }
+    changes: HashMap<Hash, Changes>,
+
+    // TODO: add hashmap of transactions we wait for
 }
 
 impl State {
-    pub fn new(validators: Vec<PublicKey>) -> State {
+    pub fn new(validators: Vec<PublicKey>, prev_hash: Hash) -> State {
         State {
             peers: HashMap::new(),
             validators: validators,
             height: 0,
             round: 1,
-            rounds: Vec::new(),
-            // TODO: use genesis block instead
-            prev_hash: hash(&[]),
-            prev_time: get_time(),
-            checkpoint_time: get_time(),
             locked_round: 0,
-            queue: Vec::new(),
-            tx_pool: HashMap::new(),
+            prev_hash: Hash,
+
+            proposals: HashMap::new(),
+            prevotes: HashMap::new(),
+            precommits: HashMap::new(),
+
+            transactions: HashMap::new(),
+            queued: Vec::new(),
+
+            changes: HashMap::new(),
         }
     }
 
-    pub fn add_peer(&mut self,
-                    public_key: PublicKey, address: SocketAddr) -> bool {
-        self.peers.insert(public_key, address).is_none()
+    pub fn add_peer(&mut self, pubkey: PublicKey, addr: SocketAddr) -> bool {
+        self.peers.insert(pubkey, addr).is_none()
     }
 
     pub fn peers(&self)
@@ -73,150 +63,113 @@ impl State {
         &self.peers
     }
 
-    pub fn leader(&self, round: u32) -> u32 {
-        ((self.height() as u64 + round as u64) %
-         (self.validators.len() as u64)) as u32
+    pub fn public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
+        self.validators.get(id)
     }
 
-    pub fn consensus_count(&self) -> usize {
-        // FIXME: temporary constant
+    pub fn leader(&self, round: u32) -> ValidatorId {
+        ((self.height() + round as u64) %
+         (self.validators.len() as u64)) as ValidatorId
+    }
+
+    pub fn majority_count(&self) -> usize {
         // FIXME: What if validators count < 4?
-        2
-        // self.validators.len() * 2 / 3 + 1
+        self.validators.len() * 2 / 3 + 1
     }
 
     pub fn height(&self) -> u64 {
         self.height
     }
 
-    pub fn round(&self) -> u32 {
+    pub fn round(&self) -> Round {
         self.round
     }
 
-    pub fn prev_hash(&self) -> &Hash {
-        &self.prev_hash
-    }
-
-    pub fn prev_time(&self) -> Timespec {
-        self.prev_time
-    }
-
-    pub fn round_state(&mut self, round: u32) -> &mut RoundState {
-        while self.rounds.len() < round as usize {
-            self.rounds.push(RoundState::UnknownProposal(Vec::new()));
-        }
-        &mut self.rounds[round as usize - 1]
-    }
-
-    pub fn lock_round(&mut self, round: u32) {
-        self.locked_round = round;
+    pub fn lock(&mut self, hash: Hash) {
+        self.locked_round = self.round;
+        self.locked_propose = hash;
     }
 
     pub fn new_round(&mut self) {
         self.round += 1;
     }
 
-    pub fn new_height(&mut self, hash: Hash) -> Vec<ConsensusMessage> {
+    pub fn new_height(&mut self, hash: Hash) {
         self.height += 1;
-
-        if self.height % 250 == 0 {
-            let now = get_time();
-            let bps = 250_000f64 / (now - self.checkpoint_time).num_milliseconds() as f64;
-            info!("Commit {} blocks per second (height {})", bps as u32, self.height);
-            self.checkpoint_time = now;
-        }
-
         self.round = 1;
-        self.prev_hash = hash;
-        self.prev_time = get_time();
         self.locked_round = 0;
-        self.rounds.clear();
+        self.proposals.clear();
+        self.prevotes.clear();
+        self.precommits.clear();
+        self.changes.clear()
+    }
+
+    pub fn queued(&mut self) -> Vec<ConsensusMessage> {
         let mut queue = Vec::new();
         ::std::mem::swap(&mut self.queue, &mut queue);
         queue
     }
 
-    pub fn queue(&mut self, message: ConsensusMessage) {
-        self.queue.push(message);
+    pub fn add_queued(&mut self, msg: ConsensusMessage) {
+        self.queue.push(msg);
     }
 
-    pub fn add_tx(&mut self, hash: Hash, message: TxMessage) {
-        self.tx_pool.insert(hash, message);
+    pub fn transactions(&self) -> Vec<Hash> {
+        self.transactions.keys().collect()
     }
 
-    pub fn tx_pool(&self) -> &HashMap<Hash, TxMessage> {
-        &self.tx_pool
+    pub fn add_transaction(&mut self, hash: Hash, msg: TxMessage) {
+        self.tx_pool.insert(hash, msg);
     }
 
-    pub fn add_propose(&mut self,
-                       round: u32,
-                       message: Propose) -> (Hash, Vec<ConsensusMessage>) {
-        let proposal_state = ProposalState::new(message);
-        let hash = proposal_state.hash.clone();
-        let mut state = RoundState::KnownProposal(proposal_state);
-        ::std::mem::swap(self.round_state(round), &mut state);
-        match state {
-            RoundState::KnownProposal(_) => {
-                // FIXME: double proposal attack
-                panic!("Double proposal attack");
-            }
-            RoundState::UnknownProposal(queue) => (hash, queue)
+    pub fn state_hash(&self, hash: Hash) -> Option<Hash> {
+        self.changes.get(hash).map(|changes| changes.state_hash())
+    }
+
+    pub fn add_changes(&mut self, hash: Hash, changes: Changes) {
+        self.changes.insert(hash, changes);
+    }
+
+    pub fn add_propose(&mut self, msg: &Propose) -> Hash {
+        let hash = msg.hash();
+        self.proposes.entry(&hash).or_insert_with(|| msg.clone());
+        hash
+    }
+
+    pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
+        let key = (msg.round(), msg.block_hash());
+        let map = self.prevotes.entry(key).or_insert_with(|| HashMap::new());
+        map.entry(msg.validator()).or_insert_with(|| msg.clone());
+
+        if self.locked_round >= msg.round() {
+            return false
+        }
+        map.len() >= self.majority_count()
+    }
+
+    pub fn has_majority_prevotes(&self, round: Round, hash: Hash) -> bool {
+        if self.locked_round >= round {
+            return false
+        }
+        match self.prevotes.get((round, hash)) {
+            Some(map) => map.len() >= self.majority_count(),
+            None => false
         }
     }
 
-    pub fn add_prevote(&mut self,
-                       round: u32,
-                       hash: &Hash,
-                       message: Prevote) -> bool {
-        let cc = self.consensus_count();
-        let locked_round = self.locked_round;
-        // TODO: check that it is known validator
-        let pub_key = self.validators[message.validator() as usize];
-        match *self.round_state(round) {
-            RoundState::KnownProposal(ref mut state) => {
-                if state.hash != *hash {
-                    return false;
-                }
-                state.prevotes.insert(pub_key.clone(), message);
-                state.prevotes.len() >= cc && locked_round < round
-            },
-            RoundState::UnknownProposal(ref mut queue) => {
-                queue.push(ConsensusMessage::Prevote(message.clone()));
-                false
-            }
-        }
+    pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
+        let key = (msg.round(), msg.block_hash(), msg.state_hash());
+        let map = self.precommits.entry(key).or_insert_with(|| HashMap::new());
+        map.entry(msg.validator()).or_insert_with(|| msg.clone());
+
+        map.len() >= self.majority_count()
     }
 
-    pub fn add_changes(&mut self, round: u32, changes: Vec<Changes>) {
-        match *self.round_state(round) {
-            RoundState::KnownProposal(ref mut state) => {
-                state.changes = Some(changes);
-            },
-            RoundState::UnknownProposal(_) => {
-                panic!("trying to add changes for unknown proposal")
-            }
-        }
-    }
-
-    pub fn add_precommit(&mut self,
-                         round: u32,
-                         hash: &Hash,
-                         message: Precommit) -> bool {
-        let cc = self.consensus_count();
-        // TODO: check that it is known validator
-        let pub_key = self.validators[message.validator() as usize];
-        match *self.round_state(round) {
-            RoundState::KnownProposal(ref mut state) => {
-                if state.hash != *hash {
-                    return false;
-                }
-                state.precommits.insert(pub_key.clone(), message);
-                state.precommits.len() >= cc
-            },
-            RoundState::UnknownProposal(ref mut queue) => {
-                queue.push(ConsensusMessage::Precommit(message.clone()));
-                false
-            }
+    pub fn has_majority_precommits(&self, round: Round, block_hash: Hash,
+                                   state_hash: Hash) -> bool {
+        match self.precommits.get((round, block_hash, state_hash)) {
+            Some(map) => map.len() >= self.majority_count(),
+            None => false
         }
     }
 }

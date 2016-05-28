@@ -35,7 +35,7 @@ message! {
         validator:      u32         [00 => 04]
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
-        hash:           &Hash       [16 => 48]
+        block_hash:     &Hash       [16 => 48]
     }
 }
 
@@ -47,18 +47,19 @@ message! {
         validator:      u32         [00 => 04]
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
-        hash:           &Hash       [16 => 48]
+        block_hash:     &Hash       [16 => 48]
     }
 }
 
 message! {
     Commit {
         const ID = 4;
-        const SIZE = 44;
+        const SIZE = 48;
 
         validator:      u32         [00 => 04]
         height:         u64         [04 => 12]
-        hash:           &Hash       [12 => 44]
+        round:          u32         [12 => 16]
+        block_hash:     &Hash       [16 => 48]
     }
 }
 
