@@ -141,16 +141,10 @@ impl State {
         let map = self.prevotes.entry(key).or_insert_with(|| HashMap::new());
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
-        if self.locked_round >= msg.round() {
-            return false
-        }
         map.len() >= self.majority_count()
     }
 
     pub fn has_majority_prevotes(&self, round: Round, hash: Hash) -> bool {
-        if self.locked_round >= round {
-            return false
-        }
         match self.prevotes.get((round, hash)) {
             Some(map) => map.len() >= self.majority_count(),
             None => false

@@ -36,6 +36,7 @@ message! {
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
         block_hash:     &Hash       [16 => 48]
+        // TODO: lock?
     }
 }
 
@@ -60,6 +61,7 @@ message! {
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
         block_hash:     &Hash       [16 => 48]
+        // TODO: state hash?
     }
 }
 

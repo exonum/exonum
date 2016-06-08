@@ -32,12 +32,12 @@ pub trait ConsensusHandler {
             ConsensusMessage::Propose(msg) => {
                 // Check prev_hash
                 if propose.prev_hash() != ctx.state.prev_hash() {
-                    return;
+                    return
                 }
 
                 // Check leader
                 if propose.validator() != ctx.state.leader(propose.round()) {
-                    return;
+                    return
                 }
 
                 // TODO: check time
@@ -68,31 +68,38 @@ pub trait ConsensusHandler {
         }
     }
 
-    fn have_block(&mut self, ctx: &mut NodeContext, block_hash: Hash) {
+    fn have_block(&mut self, ctx: &mut NodeContext, hash: Hash) {
         // Send prevote
-        if ctx.state.locked_round() == 0 {
+        if ctx.state.locked_round() == 0 &&
+           ctx.state.propose(hash).round() == ctx.state.round() {
             self.send_prevote(ctx, block_hash);
         }
 
         // Lock to propose
-        if ctx.state.has_majority_prevotes(ctx.state.round(), hash) {
-            self.lock(ctx, block_hash);
+        if ctx.state.has_majority_prevotes(ctx.state.round(), hash) &&
+           ctx.state.locked_round() < ctx.state.round() {
+            self.lock(ctx, hash);
         }
     }
 
     fn handle_prevote(&mut self, ctx: &mut NodeContext, prevote: Prevote) {
+        // TODO: what is the reason of handling and storing
+        //  prevotes for previous rounds?
+
         // Add prevote
         let has_consensus = ctx.state.add_prevote(&prevote);
 
         // Lock to propose
-        if has_consensus && prevote.round() == ctx.state.round() {
+        if has_consensus &&
+           prevote.round() == ctx.state.round() &&
+           ctx.state.locked_round() < ctx.state.round() {
             self.lock(ctx, prevote.block_hash());
         }
     }
 
     fn lock(&mut self, ctx: &mut NodeContext, block_hash: Hash) {
         // Change lock
-        ctx.state.lock_round();
+        ctx.state.lock(block_hash);
 
         // Execute block and get state hash
         let state_hash = match ctx.state.state_hash(block_hash) {
@@ -177,7 +184,11 @@ pub trait ConsensusHandler {
         // Update state to new round
         ctx.state.new_round();
 
+        // TODO: check that we have +2/3 prevotes in this round for some
+        // block and lock to it.
+
         // Send prevote if we are locked or propose if we are leader
+        // TODO: check that we have propose for new round and prevote it
         if let Some(hash) = self.locked_propose() {
             self.send_prevote(ctx, hash);
         } else if self.is_leader(ctx) {
