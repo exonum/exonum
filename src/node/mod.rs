@@ -14,7 +14,7 @@ mod basic;
 mod tx;
 mod consensus;
 
-pub use self::state::{State};
+pub use self::state::{State, Round, Height};
 pub use self::basic::{BasicService, BasicHandler};
 pub use self::tx::{TxService, TxHandler};
 pub use self::consensus::{ConsensusService, ConsensusHandler};
@@ -29,7 +29,6 @@ pub struct Node {
 }
 
 pub struct NodeContext {
-    pub id: u32, // TODO: validator ID, move to ConsensusService
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub state: State,
@@ -66,14 +65,13 @@ impl Node {
         let tx_generator = TxGenerator::new();
         let events = Events::with_config(config.events).unwrap();
         let network = Network::with_config(config.network);
-        let state = State::new(config.validators);
+        let state = State::new(id as u32, config.validators);
         let basic = Box::new(BasicService) as Box<BasicHandler>;
         let tx = Box::new(TxService) as Box<TxHandler>;
         let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
         let storage = Box::new(MemoryStorage::new()) as Box<Storage>;
         Node {
             context: NodeContext {
-                id: id as u32,
                 public_key: config.public_key,
                 secret_key: config.secret_key,
                 state: state,

@@ -53,37 +53,37 @@ impl TxMessage {
 impl ConsensusMessage {
     pub fn validator(&self) -> u32 {
         match *self {
-            Consensus::Propose(ref msg) => msg.validator(),
-            Consensus::Prevote(ref msg) => msg.validator(),
-            Consensus::Precommit(ref msg) => msg.validator(),
-            Consensus::Commit(ref msg) => msg.validator(),
+            ConsensusMessage::Propose(ref msg) => msg.validator(),
+            ConsensusMessage::Prevote(ref msg) => msg.validator(),
+            ConsensusMessage::Precommit(ref msg) => msg.validator(),
+            ConsensusMessage::Commit(ref msg) => msg.validator(),
         }
     }
 
     pub fn height(&self) -> u64 {
         match *self {
-            Consensus::Propose(ref msg) => msg.height(),
-            Consensus::Prevote(ref msg) => msg.height(),
-            Consensus::Precommit(ref msg) => msg.height(),
-            Consensus::Commit(ref msg) => msg.height(),
+            ConsensusMessage::Propose(ref msg) => msg.height(),
+            ConsensusMessage::Prevote(ref msg) => msg.height(),
+            ConsensusMessage::Precommit(ref msg) => msg.height(),
+            ConsensusMessage::Commit(ref msg) => msg.height(),
         }
     }
 
     pub fn round(&self) -> u32 {
         match *self {
-            Consensus::Propose(ref msg) => msg.round(),
-            Consensus::Prevote(ref msg) => msg.round(),
-            Consensus::Precommit(ref msg) => msg.round(),
-            Consensus::Commit(ref msg) => msg.round(),
+            ConsensusMessage::Propose(ref msg) => msg.round(),
+            ConsensusMessage::Prevote(ref msg) => msg.round(),
+            ConsensusMessage::Precommit(ref msg) => msg.round(),
+            ConsensusMessage::Commit(ref msg) => msg.round(),
         }
     }
 
     pub fn raw(&self) -> RawMessage {
         match *self {
-            Consensus::Propose(ref msg) => msg.raw(),
-            Consensus::Prevote(ref msg) => msg.raw(),
-            Consensus::Precommit(ref msg) => msg.raw(),
-            Consensus::Commit(ref msg) => msg.raw(),
+            ConsensusMessage::Propose(ref msg) => msg.raw(),
+            ConsensusMessage::Prevote(ref msg) => msg.raw(),
+            ConsensusMessage::Precommit(ref msg) => msg.raw(),
+            ConsensusMessage::Commit(ref msg) => msg.raw(),
         }
     }
 }

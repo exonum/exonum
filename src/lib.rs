@@ -3,6 +3,7 @@
 #![feature(associated_consts)]
 #![feature(associated_type_defaults)]
 #![feature(question_mark)]
+#![feature(inclusive_range_syntax)]
 
 #[macro_use]
 extern crate log;

@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use byteorder::{ByteOrder, LittleEndian};
 
 use super::messages::Propose;
+use super::crypto::{Hash};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Height([u8; 8]);
@@ -76,6 +77,10 @@ impl MemoryStorage {
 }
 
 impl Storage for MemoryStorage {
+    fn height(&self) -> Height {
+        self.blocks.keys().last().unwrap()
+    }
+
     fn get_block(&self, height: &Height) -> Option<Propose> {
         self.blocks.get(height).map(|b| b.clone())
     }
@@ -118,6 +123,10 @@ impl<'a, S: Storage + 'a> Fork<'a, S> {
 }
 
 impl<'a, S: Storage + 'a> Storage for Fork<'a, S> {
+    fn height(&self) -> Height {
+        ::std::cmp::max(self.changes.height(), self.storage.height());
+    }
+
     fn get_block(&self, height: &Height) -> Option<Propose> {
         self.changes.get_block(height)
                     .or_else(|| self.storage.get_block(height))

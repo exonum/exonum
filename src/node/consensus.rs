@@ -1,8 +1,10 @@
 use time::{get_time};
 
+use super::super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::super::crypto::{Hash};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Commit, Message};
-use super::NodeContext;
+use super::super::storage::{Changes};
+use super::{NodeContext, Round, Height};
 
 pub struct ConsensusService;
 
@@ -13,8 +15,9 @@ pub trait ConsensusHandler {
             return
         }
 
-        // Queued messages from future height
-        if msg.height() > ctx.state.height() + 1 {
+        // Queued messages from future height or round
+        if msg.height() > ctx.state.height() + 1 ||
+           msg.round() > ctx.state.round() {
             ctx.state.add_queued(msg);
             return
         }
@@ -28,15 +31,15 @@ pub trait ConsensusHandler {
             None => return
         }
 
-        match message {
+        match msg {
             ConsensusMessage::Propose(msg) => {
                 // Check prev_hash
-                if propose.prev_hash() != ctx.state.prev_hash() {
+                if msg.prev_hash() != ctx.state.prev_hash() {
                     return
                 }
 
                 // Check leader
-                if propose.validator() != ctx.state.leader(propose.round()) {
+                if msg.validator() != ctx.state.leader(msg.round()) {
                     return
                 }
 
@@ -57,7 +60,7 @@ pub trait ConsensusHandler {
         let added = ctx.state.add_propose(hash, &propose);
 
         if added {
-            // TODO: Check that we "have block"
+            // TODO: Temp (Check that we "have block")
             for h in propose.transactions() {
                 if !ctx.state.tx_pool().contains_key(h) {
                     panic!("unknown transactions into propose");
@@ -70,51 +73,75 @@ pub trait ConsensusHandler {
 
     fn have_block(&mut self, ctx: &mut NodeContext, hash: Hash) {
         // Send prevote
-        if ctx.state.locked_round() == 0 &&
-           ctx.state.propose(hash).round() == ctx.state.round() {
-            self.send_prevote(ctx, block_hash);
+        if ctx.state.locked_round() == 0 {
+            self.send_prevote(ctx, ctx.state.propose(hash).round(), hash);
         }
 
         // Lock to propose
-        if ctx.state.has_majority_prevotes(ctx.state.round(), hash) &&
-           ctx.state.locked_round() < ctx.state.round() {
-            self.lock(ctx, hash);
+        let start_round = ::std::cmp::max(ctx.state.locked_round() + 1,
+                                          ctx.state.proposal(hash).round());
+        for round in start_round ... ctx.state.round() {
+            if ctx.state.has_majority_prevotes(round, hash) {
+                self.lock(ctx, round, hash);
+            }
         }
+
+        // FIXME: Commit if we have +2/3 precommits?
+        // for round in propose.round() ... ctx.state.round() {
+        //     if ctx.state.has_majority_precommits(round, hash) {
+        //         self.commit
+        //     }
+        // }
+
+        //     self.lock(ctx, hash);
+        // }
     }
 
     fn handle_prevote(&mut self, ctx: &mut NodeContext, prevote: Prevote) {
-        // TODO: what is the reason of handling and storing
-        //  prevotes for previous rounds?
-
         // Add prevote
         let has_consensus = ctx.state.add_prevote(&prevote);
 
         // Lock to propose
-        if has_consensus &&
-           prevote.round() == ctx.state.round() &&
-           ctx.state.locked_round() < ctx.state.round() {
-            self.lock(ctx, prevote.block_hash());
+        if has_consensus && ctx.state.locked_round() < prevote.round() {
+            let hash = prevote.block_hash();
+            if ctx.state.propose(hash) != None {
+                self.lock(ctx, prevote.round(), hash);
+            }
         }
     }
 
-    fn lock(&mut self, ctx: &mut NodeContext, block_hash: Hash) {
+    fn lock(&mut self, ctx: &mut NodeContext,
+            round: Round, block_hash: Hash) {
         // Change lock
-        ctx.state.lock(block_hash);
+        ctx.state.lock(round, block_hash);
 
         // Execute block and get state hash
         let state_hash = match ctx.state.state_hash(block_hash) {
             Some(state_hash) => state_hash,
-            None => self.execute(ctx, hash)
+            None => self.execute(ctx, block_hash)
         };
 
         // Send precommit
-        self.send_precommit(ctx, block_hash, state_hash);
+        self.send_precommit(ctx, round, block_hash, state_hash);
 
         // Commit if has consensus
-        if ctx.state.has_majority_precommits(ctx.state.round(),
+        if ctx.state.has_majority_precommits(round,
                                              block_hash,
                                              state_hash) {
-            self.commit(ctx, ctx.state.round(), block_hash);
+            self.commit(ctx, round, block_hash);
+            return
+        }
+
+        // Send prevotes
+        if !ctx.state.have_incompatible_prevotes() {
+            for round in ctx.state.locked_round() + 1 ... ctx.state.round() {
+                if !ctx.state.have_prevote(round) {
+                    self.send_prevote(ctx, round, block_hash);
+                    if ctx.state.has_majority_prevotes(round, block_hash) {
+                        self.lock(ctx, round, block_hash);
+                    }
+                }
+            }
         }
     }
 
@@ -123,17 +150,20 @@ pub trait ConsensusHandler {
         let has_consensus = ctx.state.add_precommit(&msg);
 
         if has_consensus {
-            // Execute block and get state hash
-            let state_hash = match ctx.state.state_hash(msg.block_hash()) {
-                Some(state_hash) => state_hash,
-                None => self.execute(ctx, hash)
-            };
+            let block_hash = msg.block_hash();
+            if ctx.state.proposal(block_hash) != None {
+                // Execute block and get state hash
+                let state_hash = match ctx.state.state_hash(block_hash) {
+                    Some(state_hash) => state_hash,
+                    None => self.execute(ctx, block_hash)
+                };
 
-            if state_hash != msg.state_hash() {
-                panic!("We are fucked up...");
+                if state_hash != msg.state_hash() {
+                    panic!("We are fucked up...");
+                }
+
+                self.commit(ctx, msg.round(), block_hash);
             }
-
-            self.commit(ctx, msg.round(), msg.block_hash());
         }
     }
 
@@ -143,9 +173,7 @@ pub trait ConsensusHandler {
         ctx.storage.merge(changes);
 
         // Update state to new height
-        ctx.state.new_height();
-
-        // TODO: remove old transactions
+        ctx.state.new_height(hash);
 
         // Generate new transactions
         for tx in (&mut ctx.tx_generator).take(100) {
@@ -174,48 +202,49 @@ pub trait ConsensusHandler {
 
     fn handle_timeout(&mut self, ctx: &mut NodeContext, timeout: Timeout) {
         if timeout.height != ctx.state.height() {
-            return;
+            return
         }
 
         if timeout.round != ctx.state.round() {
-            return;
+            return
         }
+
+        // Add timeout for this round
+        self.context.add_timeout();
 
         // Update state to new round
         ctx.state.new_round();
 
-        // TODO: check that we have +2/3 prevotes in this round for some
-        // block and lock to it.
-
         // Send prevote if we are locked or propose if we are leader
-        // TODO: check that we have propose for new round and prevote it
         if let Some(hash) = self.locked_propose() {
             self.send_prevote(ctx, hash);
         } else if self.is_leader(ctx) {
             self.send_propose(ctx);
         }
 
-        // Add timeout for this round
-        self.context.add_timeout();
+        // Handle queued messages
+        for msg in ctx.state.queue() {
+            self.handle(ctx, msg);
+        }
     }
 
     fn is_leader(&self, ctx: &NodeContext) -> bool {
-        ctx.state.leader(ctx.state.round()) == ctx.id
+        ctx.state.leader(ctx.state.round()) == ctx.state.id()
     }
 
     fn execute(&mut self, ctx: &mut NodeContext, hash: Hash) -> Hash {
-        let fork = Fork::new(ctx.storage);
+        // let fork = Fork::new(ctx.storage);
 
-        fork.put_block(msg);
+        // fork.put_block(msg);
 
-        let changes = fork.changes();
-        let hash = changes.hash();
-        ctx.add_changes(hash, changes);
-        hash
+        // let changes = fork.changes();
+        // let hash = changes.hash();
+        // ctx.add_changes(hash, changes);
+        // hash
     }
 
     fn send_propose(&mut self, ctx: &mut NodeContext) {
-        let propose = Propose::new(ctx.id,
+        let propose = Propose::new(ctx.state.id(),
                                    ctx.state.height(),
                                    ctx.state.round(),
                                    get_time(),
@@ -225,17 +254,17 @@ pub trait ConsensusHandler {
         ctx.broadcast(&propose);
 
         let hash = propose.hash();
-        ctx.state.add_propose(propose., propose);
+        ctx.state.add_propose(hash, propose);
 
         // Send prevote
-        self.send_prevote(hash);
+        self.send_prevote(ctx.state.round(), hash);
     }
 
-    fn send_prevote(&mut self, ctx: &mut NodeContext, block_hash: Hash) {
-        // TODO: check that we are not send prevote for this round
-        let prevote = Prevote::new(ctx.id,
+    fn send_prevote(&mut self, ctx: &mut NodeContext,
+                    round: Round, block_hash: Hash) {
+        let prevote = Prevote::new(ctx.state.id(),
                                    ctx.height(),
-                                   ctx.round(),
+                                   round,
                                    block_hash,
                                    &ctx.secret_key);
         ctx.state.add_prevote(&prevote);
@@ -243,16 +272,15 @@ pub trait ConsensusHandler {
     }
 
     fn send_precommit(&mut self, ctx: &mut NodeContext,
-                      block_hash: Hash, state_hash: Hash) {
-        // TODO: check that we are not send precommit for this round
-        let precommit = Precommit::new(ctx.id,
+                      round: Round, block_hash: Hash, state_hash: Hash) {
+        let precommit = Precommit::new(ctx.state.id(),
                                        ctx.state.height(),
-                                       ctx.state.round(),
+                                       round,
                                        block_hash,
                                        state_hash,
                                        &ctx.secret_key);
-        ctx.broadcast(&precommit);
         ctx.state.add_precommit(&precommit);
+        ctx.broadcast(&precommit);
     }
 
     fn send_commit(&mut self, ctx: &mut NodeContext,

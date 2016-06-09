@@ -5,13 +5,16 @@ use time::{Timespec, get_time};
 
 use super::super::messages::{Propose, Prevote, Precommit, ConsensusMessage, TxMessage, Message};
 use super::super::crypto::{PublicKey, Hash, hash};
+use super::super::storage::{Changes};
 
-type Round = u32;
-type ValidatorId = u32;
+pub type Round = u32;
+pub type Height = u64;
+pub type ValidatorId = u32;
 
 // TODO: reduce copying of Hash
 
 pub struct State {
+    id: u32,
     peers: HashMap<PublicKey, SocketAddr>,
     validators: Vec<PublicKey>,
     height: u64,
@@ -21,7 +24,7 @@ pub struct State {
     prev_hash: Hash,
 
     // messages
-    proposals: HashMap<Hash, Proposal>,
+    proposals: HashMap<Hash, Propose>,
     prevotes: HashMap<(Round, Hash), HashMap<ValidatorId, Prevote>>,
     precommits: HashMap<(Round, Hash, Hash), HashMap<ValidatorId, Precommit>>,
 
@@ -31,10 +34,15 @@ pub struct State {
     changes: HashMap<Hash, Changes>,
 
     // TODO: add hashmap of transactions we wait for
+
+    our_prevotes: HashMap<Round, Prevote>,
+    our_precommits: HashMap<Round, Precommit>
 }
 
 impl State {
-    pub fn new(validators: Vec<PublicKey>, prev_hash: Hash) -> State {
+    pub fn new(id: u32,
+               validators: Vec<PublicKey>,
+               prev_hash: Hash) -> State {
         State {
             peers: HashMap::new(),
             validators: validators,
@@ -52,6 +60,10 @@ impl State {
 
             changes: HashMap::new(),
         }
+    }
+
+    pub fn id(&self) -> u32 {
+        self.id
     }
 
     pub fn add_peer(&mut self, pubkey: PublicKey, addr: SocketAddr) -> bool {
@@ -85,8 +97,11 @@ impl State {
         self.round
     }
 
-    pub fn lock(&mut self, hash: Hash) {
-        self.locked_round = self.round;
+    pub fn lock(&mut self, round: Round, hash: Hash) {
+        if self.locked_round >= round {
+            panic!("Incorrect lock")
+        }
+        self.locked_round = round;
         self.locked_propose = hash;
     }
 
@@ -98,10 +113,19 @@ impl State {
         self.height += 1;
         self.round = 1;
         self.locked_round = 0;
+        // TODO: destruct/construct structure HeightState instead of call clear
         self.proposals.clear();
         self.prevotes.clear();
         self.precommits.clear();
-        self.changes.clear()
+        self.our_prevotes.clear();
+        self.our_precommits.clear();
+        self.changes.clear();
+
+        let propose = self.proposals.get(hash)
+                                    .except("Trying to commit unknown proposal");
+        for tx in propose.transactions() {
+            self.transactions.remove(tx)
+        }
     }
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
@@ -130,13 +154,19 @@ impl State {
         self.changes.insert(hash, changes);
     }
 
-    pub fn add_propose(&mut self, msg: &Propose) -> Hash {
-        let hash = msg.hash();
-        self.proposes.entry(&hash).or_insert_with(|| msg.clone());
-        hash
+    pub fn add_propose(&mut self, hash: Hash, msg: &Propose) -> bool {
+        self.proposes.insert(hash, msg) == None
     }
 
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
+        if msg.validator() == self.id() {
+            if let Some(prev) = self.our_prevotes.insert(msg) {
+                if prev != msg {
+                    panic!("Trying to send different prevotes for same round");
+                }
+            }
+        }
+
         let key = (msg.round(), msg.block_hash());
         let map = self.prevotes.entry(key).or_insert_with(|| HashMap::new());
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
@@ -152,6 +182,14 @@ impl State {
     }
 
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
+        if msg.validator() == self.id() {
+            if let Some(prev) = self.our_precommits.insert(msg) {
+                if prev != msg {
+                    panic!("Trying to send different precommits for same round");
+                }
+            }
+        }
+
         let key = (msg.round(), msg.block_hash(), msg.state_hash());
         let map = self.precommits.entry(key).or_insert_with(|| HashMap::new());
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
@@ -165,5 +203,19 @@ impl State {
             Some(map) => map.len() >= self.majority_count(),
             None => false
         }
+    }
+
+    pub fn have_incompatible_prevotes(&self) -> bool {
+        for round in self.locked_round + 1 ... self.round {
+            match self.our_prevotes.get(round) {
+                Some(msg) => {
+                    if msg.block_hash() != self.locked_propose {
+                        return true
+                    }
+                },
+                None => (),
+            }
+        }
+        false
     }
 }
