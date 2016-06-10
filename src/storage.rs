@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
+use time::Timespec;
 use byteorder::{ByteOrder, LittleEndian};
 
-use super::messages::Propose;
-use super::crypto::{Hash};
+use super::messages::{Message, Propose};
+use super::crypto::{Hash, hash};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Height([u8; 8]);
@@ -36,17 +37,24 @@ pub trait Storage {
     // fn blocks(&self) -> &Self::Blocks;
     // fn blocks_mut(&mut self) -> &mut Self::Blocks;
 
+    fn state_hash(&self) -> &Hash;
+
     fn height(&self) -> Height;
 
-    fn prev_hash(&self) -> Hash {
+    fn prev_hash(&self) -> &Hash {
         // TODO: Possibly inefficient
-        self.get_block(self.height()).hash()
+        &self.get_block(&self.height()).unwrap().hash()
+    }
+
+    fn prev_time(&self) -> Timespec {
+        // TODO: Possibly inefficient
+        self.get_block(&self.height()).unwrap().time()
     }
 
     fn get_block(&self, height: &Height) -> Option<Propose>;
     fn put_block(&mut self, height: Height, propose: Propose);
 
-    fn merge(&mut self, changes: Changes);
+    fn merge(&mut self, patch: &Patch);
 }
 
 // trait Table<K, V> where K: AsRef<[u8]> {
@@ -77,8 +85,13 @@ impl MemoryStorage {
 }
 
 impl Storage for MemoryStorage {
+
+    fn state_hash(&self) -> &Hash {
+        &hash(&[])
+    }
+
     fn height(&self) -> Height {
-        self.blocks.keys().last().unwrap()
+        *self.blocks.keys().last().unwrap()
     }
 
     fn get_block(&self, height: &Height) -> Option<Propose> {
@@ -89,8 +102,8 @@ impl Storage for MemoryStorage {
         self.blocks.insert(height, block);
     }
 
-    fn merge(&mut self, changes: Changes) {
-        for change in changes {
+    fn merge(&mut self, patch: &Patch) {
+        for change in patch.changes {
             match change {
                 Change::PutBlock(height, block)
                     => self.put_block(height, block),
@@ -99,12 +112,12 @@ impl Storage for MemoryStorage {
     }
 }
 
-struct Fork<'a, S: Storage + 'a> {
+pub struct Fork<'a, S: Storage + 'a + ?Sized> {
     storage: &'a S,
     changes: MemoryStorage
 }
 
-impl<'a, S: Storage + 'a> Fork<'a, S> {
+impl<'a, S: Storage + 'a + ?Sized> Fork<'a, S> {
     pub fn new(storage: &'a S) -> Fork<'a, S> {
         Fork {
             storage: storage,
@@ -112,17 +125,24 @@ impl<'a, S: Storage + 'a> Fork<'a, S> {
         }
     }
 
-    pub fn changes(self) -> Changes {
-        let mut changes = Changes::new();
+    pub fn patch(self) -> Patch {
+        let mut changes = Vec::new();
 
         changes.extend(self.changes.blocks
                        .into_iter().map(|(k, v)| Change::PutBlock(k, v)));
 
-        changes
+        Patch {
+            state_hash: *self.state_hash(),
+            changes: changes
+        }
     }
 }
 
-impl<'a, S: Storage + 'a> Storage for Fork<'a, S> {
+impl<'a, S: Storage + 'a + ?Sized> Storage for Fork<'a, S> {
+    fn state_hash(&self) -> &Hash {
+        &hash(&[])
+    }
+
     fn height(&self) -> Height {
         ::std::cmp::max(self.changes.height(), self.storage.height());
     }
@@ -136,13 +156,23 @@ impl<'a, S: Storage + 'a> Storage for Fork<'a, S> {
         self.changes.put_block(height, block);
     }
 
-    fn merge(&mut self, changes: Changes) {
-        self.changes.merge(changes);
+    fn merge(&mut self, patch: &Patch) {
+        self.changes.merge(patch);
     }
 }
 
-pub type Changes = Vec<Change>;
+pub struct Patch {
+    state_hash: Hash,
+    changes: Vec<Change>
+}
 
 pub enum Change {
     PutBlock(Height, Propose)
+}
+
+impl Patch {
+
+    pub fn state_hash(&self) -> &Hash {
+        &self.state_hash
+    }
 }

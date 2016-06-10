@@ -43,12 +43,13 @@ message! {
 message! {
     Precommit {
         const ID = 3;
-        const SIZE = 48;
+        const SIZE = 80;
 
         validator:      u32         [00 => 04]
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
         block_hash:     &Hash       [16 => 48]
+        state_hash:     &Hash       [48 => 80]
     }
 }
 
@@ -61,7 +62,6 @@ message! {
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
         block_hash:     &Hash       [16 => 48]
-        // TODO: state hash?
     }
 }
 

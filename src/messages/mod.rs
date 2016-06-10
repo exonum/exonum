@@ -6,7 +6,7 @@ mod error;
 mod fields;
 mod protocol;
 
-use super::crypto::{Hash};
+use super::crypto::{Hash, PublicKey};
 
 pub use self::raw::{RawMessage, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::{Error};
@@ -78,12 +78,21 @@ impl ConsensusMessage {
         }
     }
 
-    pub fn raw(&self) -> RawMessage {
+    pub fn raw(&self) -> &RawMessage {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.raw(),
             ConsensusMessage::Prevote(ref msg) => msg.raw(),
             ConsensusMessage::Precommit(ref msg) => msg.raw(),
             ConsensusMessage::Commit(ref msg) => msg.raw(),
+        }
+    }
+
+    pub fn verify(&self, public_key: &PublicKey) -> bool {
+        match *self {
+            ConsensusMessage::Propose(ref msg) => msg.verify(public_key),
+            ConsensusMessage::Prevote(ref msg) => msg.verify(public_key),
+            ConsensusMessage::Precommit(ref msg) => msg.verify(public_key),
+            ConsensusMessage::Commit(ref msg) => msg.verify(public_key),
         }
     }
 }

@@ -179,7 +179,7 @@ impl NodeContext {
 
     pub fn add_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;
-        let time = self.state.prev_time() + Duration::milliseconds(ms as i64);
+        let time = self.storage.prev_time() + Duration::milliseconds(ms as i64);
         let timeout = Timeout {
             height: self.state.height(),
             round: self.state.round(),
@@ -189,7 +189,7 @@ impl NodeContext {
 
 
     // TODO: use Into<RawMessage>
-    pub fn broadcast(&mut self, message: RawMessage) {
+    pub fn broadcast(&mut self, message: &RawMessage) {
         for address in self.state.peers().values() {
             self.network.send_to(&mut self.events,
                                  address,
