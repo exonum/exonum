@@ -123,7 +123,7 @@ impl Node {
 
                 },
                 Event::Timeout(timeout) => {
-                    self.handle_timeout(timeout);
+                    self.consensus.handle_timeout(&mut self.context, timeout);
                 },
                 Event::Io(id, set) => {
                     // TODO: shoud we call network.io through main event queue?
@@ -138,23 +138,6 @@ impl Node {
                 }
             }
         }
-    }
-
-    fn handle_timeout(&mut self, timeout: Timeout) {
-        if timeout.height != self.context.state.height() {
-            return;
-        }
-
-        if timeout.round != self.context.state.round() {
-            return;
-        }
-
-        self.context.state.new_round();
-        // info!("Timeout, starting new round #{}", self.context.state.round());
-        if self.consensus.is_leader(&mut self.context) {
-            self.consensus.make_propose(&mut self.context);
-        }
-        self.context.add_timeout();
     }
 
     fn handle(&mut self, raw: RawMessage) {

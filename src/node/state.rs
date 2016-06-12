@@ -161,21 +161,19 @@ impl State {
         self.transactions.insert(hash, msg);
     }
 
-    pub fn patch(&self, hash: &Hash) -> Option<&Patch> {
-        self.patches.get(hash)
-    }
-
-    pub fn add_patch(&mut self, hash: Hash, patch: Patch) {
-        self.patches.insert(hash, patch);
+    pub fn patch<F>(&self, hash: Hash, or_insert: F) -> &Patch
+        where F: Fn() -> Patch {
+        self.patches.entry(hash).or_insert_with(or_insert)
     }
 
     pub fn add_propose(&mut self, hash: Hash, msg: &Propose) -> bool {
-        self.proposals.insert(hash, *msg).is_none()
+        self.proposals.insert(hash, msg.clone()).is_none()
     }
 
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
+        let majority_count = self.majority_count();
         if msg.validator() == self.id() {
-            if let Some(_) = self.our_prevotes.insert(msg.round(), *msg) {
+            if let Some(_) = self.our_prevotes.insert(msg.round(), msg.clone()) {
                 panic!("Trying to send different prevotes for same round");
             }
         }
@@ -184,7 +182,7 @@ impl State {
         let map = self.prevotes.entry(key).or_insert_with(|| HashMap::new());
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
-        map.len() >= self.majority_count()
+        map.len() >= majority_count
     }
 
     pub fn has_majority_prevotes(&self, round: Round, hash: Hash) -> bool {
@@ -195,8 +193,9 @@ impl State {
     }
 
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
+        let majority_count = self.majority_count();
         if msg.validator() == self.id() {
-            if let Some(_) = self.our_precommits.insert(msg.round(), *msg) {
+            if let Some(_) = self.our_precommits.insert(msg.round(), msg.clone()) {
                 panic!("Trying to send different precommits for same round");
             }
         }
@@ -205,7 +204,7 @@ impl State {
         let map = self.precommits.entry(key).or_insert_with(|| HashMap::new());
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
-        map.len() >= self.majority_count()
+        map.len() >= majority_count
     }
 
     pub fn has_majority_precommits(&self, round: Round, block_hash: Hash,

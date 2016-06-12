@@ -6,7 +6,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use super::messages::{Message, Propose};
 use super::crypto::{Hash, hash};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct Height([u8; 8]);
 
 impl Height {
@@ -37,13 +37,13 @@ pub trait Storage {
     // fn blocks(&self) -> &Self::Blocks;
     // fn blocks_mut(&mut self) -> &mut Self::Blocks;
 
-    fn state_hash(&self) -> &Hash;
+    fn state_hash(&self) -> Hash;
 
     fn height(&self) -> Height;
 
-    fn prev_hash(&self) -> &Hash {
+    fn prev_hash(&self) -> Hash {
         // TODO: Possibly inefficient
-        &self.get_block(&self.height()).unwrap().hash()
+        self.get_block(&self.height()).unwrap().hash()
     }
 
     fn prev_time(&self) -> Timespec {
@@ -86,8 +86,8 @@ impl MemoryStorage {
 
 impl Storage for MemoryStorage {
 
-    fn state_hash(&self) -> &Hash {
-        &hash(&[])
+    fn state_hash(&self) -> Hash {
+        self.prev_hash()
     }
 
     fn height(&self) -> Height {
@@ -103,10 +103,10 @@ impl Storage for MemoryStorage {
     }
 
     fn merge(&mut self, patch: &Patch) {
-        for change in patch.changes {
-            match change {
-                Change::PutBlock(height, block)
-                    => self.put_block(height, block),
+        for change in &patch.changes {
+            match *change {
+                Change::PutBlock(ref height, ref block)
+                    => self.put_block(*height, block.clone()),
             }
         }
     }
@@ -126,25 +126,26 @@ impl<'a, S: Storage + 'a + ?Sized> Fork<'a, S> {
     }
 
     pub fn patch(self) -> Patch {
+        let state_hash = self.state_hash().clone();
         let mut changes = Vec::new();
 
         changes.extend(self.changes.blocks
-                       .into_iter().map(|(k, v)| Change::PutBlock(k, v)));
+                           .into_iter().map(|(k, v)| Change::PutBlock(k, v)));
 
         Patch {
-            state_hash: *self.state_hash(),
+            state_hash: state_hash,
             changes: changes
         }
     }
 }
 
 impl<'a, S: Storage + 'a + ?Sized> Storage for Fork<'a, S> {
-    fn state_hash(&self) -> &Hash {
-        &hash(&[])
+    fn state_hash(&self) -> Hash {
+        self.prev_hash()
     }
 
     fn height(&self) -> Height {
-        ::std::cmp::max(self.changes.height(), self.storage.height());
+        ::std::cmp::max(self.changes.height(), self.storage.height())
     }
 
     fn get_block(&self, height: &Height) -> Option<Propose> {
