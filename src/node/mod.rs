@@ -13,11 +13,13 @@ mod state;
 mod basic;
 mod tx;
 mod consensus;
+mod requests;
 
 pub use self::state::{State, Round, Height};
 pub use self::basic::{BasicService, BasicHandler};
 pub use self::tx::{TxService, TxHandler};
 pub use self::consensus::{ConsensusService, ConsensusHandler};
+pub use self::requests::{RequestService, RequestHandler};
 
 // TODO: avoid recursion calls?
 
@@ -26,6 +28,7 @@ pub struct Node {
     basic: Box<BasicHandler>,
     tx: Box<TxHandler>,
     consensus: Box<ConsensusHandler>,
+    requests: Box<RequestHandler>,
 }
 
 pub struct NodeContext {
@@ -69,6 +72,7 @@ impl Node {
         let basic = Box::new(BasicService) as Box<BasicHandler>;
         let tx = Box::new(TxService) as Box<TxHandler>;
         let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
+        let requests = Box::new(RequestService) as Box<RequestHandler>;
         let storage = Box::new(MemoryStorage::new()) as Box<Storage>;
         Node {
             context: NodeContext {
@@ -87,6 +91,7 @@ impl Node {
             basic: basic,
             tx: tx,
             consensus: consensus,
+            requests: requests
         }
     }
 
@@ -156,9 +161,24 @@ impl Node {
 }
 
 impl NodeContext {
-    // fn send_to(&mut self, address: &net::SocketAddr, message: RawMessage) {
-    //     self.network.send_to(&mut self.context.events, address, message).unwrap();
-    // }
+    fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
+        // TODO: check validator id
+        let public_key = self.state.validators()[id as usize];
+        self.send_to_peer(public_key, message);
+    }
+
+    fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
+        let &mut NodeContext {ref state, ref mut events, ..} = self;
+        if let Some(addr) = state.peers().get(&public_key) {
+            self.network.send_to(events, addr, message.clone()).unwrap();
+        } else {
+            // TODO: warning - hasn't connection with peer
+        }
+    }
+
+    fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
+        self.network.send_to(&mut self.events, address, message.clone()).unwrap();
+    }
 
     pub fn add_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;

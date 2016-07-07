@@ -187,8 +187,8 @@ impl Network {
         }
     }
 
-    pub fn send_to(&mut self, events:
-                   &mut Events,
+    pub fn send_to(&mut self,
+                   events: &mut Events,
                    address: &SocketAddr,
                    message: RawMessage) -> io::Result<()> {
         let id = self.get_peer(events, address)?;

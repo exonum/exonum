@@ -3,7 +3,10 @@ use std::collections::HashMap;
 
 use time::{Timespec, get_time};
 
-use super::super::messages::{Propose, Prevote, Precommit, ConsensusMessage, TxMessage, Message};
+use super::super::messages::{
+    TxMessage, Message, RequestMessage,
+    Propose, Prevote, Precommit, ConsensusMessage
+};
 use super::super::crypto::{PublicKey, Hash, hash};
 use super::super::storage::{Patch};
 
@@ -35,7 +38,57 @@ pub struct State {
     // TODO: add hashmap of transactions we wait for
 
     our_prevotes: HashMap<Round, Prevote>,
-    our_precommits: HashMap<Round, Precommit>
+    our_precommits: HashMap<Round, Precommit>,
+
+    // Информация о состоянии наших запросов
+    requests: HashMap<RequestData, RequestState>,
+
+    // Максимальная высота, на которой
+    // "засветились" другие валидаторы
+    validator_heights: Vec<Height>,
+}
+
+// Данные, которые нас интересуют,
+// специфичны для некоторой высоты
+enum RequestData {
+    Propose(Hash),
+    Transactions(Hash),
+    Prevotes(Round, Hash),
+    Precommits(Round, Hash, Hash),
+    Commit,
+    Peers
+}
+
+// Состояние запроса
+struct RequestState {
+    // К-во попыток, которые уже произошли
+    retries: u16,
+    // Наше сообщение, сформированное и подписанное
+    message: RequestMessage,
+    // Узлы, которые имеют интересующую нас информацию
+    known_nodes: Vec<ValidatorId>
+}
+
+// Таймаут, который сигнализирует о необходимости
+// отправить запрос
+struct RequestWaitTimeout {
+    // Высота, которой соответсвует данный таймаут
+    height: u64,
+    // Данные, который мы должны запросить
+    data: RequestData
+}
+
+// Таймаут, который сигнализирует о необходимости
+// отправить запрос еще раз
+struct RequestRetryTimeout {
+    // Высота, которой соответсвует данный таймаут
+    height: u64,
+    // Номер попытки, которая завершилась таймаутом
+    retry: u16,
+    // Данные, который мы должны запросить
+    data: RequestData,
+    // Валидатор, у которого мы запрашивали данные
+    validator_id: ValidatorId
 }
 
 impl State {
@@ -67,6 +120,10 @@ impl State {
 
     pub fn id(&self) -> ValidatorId {
         self.id
+    }
+
+    pub fn validators(&self) -> &[PublicKey] {
+        &self.validators
     }
 
     pub fn add_peer(&mut self, pubkey: PublicKey, addr: SocketAddr) -> bool {
@@ -124,7 +181,7 @@ impl State {
         self.round += 1;
     }
 
-    pub fn new_height(&mut self, hash: &Hash) {
+    pub fn new_height(&mut self, propose_hash: &Hash) {
         self.height += 1;
         self.round = 1;
         self.locked_round = 0;
@@ -136,7 +193,7 @@ impl State {
         self.our_precommits.clear();
         self.patches.clear();
 
-        let propose = self.proposals.get(&hash)
+        let propose = self.proposals.get(&propose_hash)
                                     .expect("Trying to commit unknown proposal");
         for tx in propose.transactions() {
             self.transactions.remove(tx);
@@ -153,21 +210,34 @@ impl State {
         self.queued.push(msg);
     }
 
-    pub fn transactions(&self) -> Vec<Hash> {
-        self.transactions.keys().map(|h| h.clone()).collect()
+    pub fn transactions(&self) -> &HashMap<Hash, TxMessage> {
+        &self.transactions
     }
 
     pub fn add_transaction(&mut self, hash: Hash, msg: TxMessage) {
         self.transactions.insert(hash, msg);
     }
 
-    pub fn patch<F>(&self, hash: Hash, or_insert: F) -> &Patch
-        where F: Fn() -> Patch {
-        self.patches.entry(hash).or_insert_with(or_insert)
+    pub fn patch(&self, hash: &Hash) -> Option<&Patch> {
+        self.patches.get(hash)
     }
 
-    pub fn add_propose(&mut self, hash: Hash, msg: &Propose) -> bool {
-        self.proposals.insert(hash, msg.clone()).is_none()
+    pub fn set_patch(&mut self, hash: Hash, patch: Patch) -> &Patch {
+        self.patches.entry(hash).or_insert(patch)
+    }
+
+    pub fn prevotes(&self, round: Round, propose_hash: Hash)
+        -> Option<&HashMap<ValidatorId, Prevote>> {
+        self.prevotes.get(&(round, propose_hash))
+    }
+
+    pub fn precommits(&self, round: Round, propose_hash: Hash, block_hash: Hash)
+        -> Option<&HashMap<ValidatorId, Precommit>> {
+        self.precommits.get(&(round, propose_hash, block_hash))
+    }
+
+    pub fn add_propose(&mut self, propose_hash: Hash, msg: &Propose) -> bool {
+        self.proposals.insert(propose_hash, msg.clone()).is_none()
     }
 
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
@@ -178,15 +248,15 @@ impl State {
             }
         }
 
-        let key = (msg.round(), *msg.block_hash());
+        let key = (msg.round(), *msg.propose_hash());
         let map = self.prevotes.entry(key).or_insert_with(|| HashMap::new());
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
         map.len() >= majority_count
     }
 
-    pub fn has_majority_prevotes(&self, round: Round, hash: Hash) -> bool {
-        match self.prevotes.get(&(round, hash)) {
+    pub fn has_majority_prevotes(&self, round: Round, propose_hash: Hash) -> bool {
+        match self.prevotes.get(&(round, propose_hash)) {
             Some(map) => map.len() >= self.majority_count(),
             None => false
         }
@@ -200,16 +270,18 @@ impl State {
             }
         }
 
-        let key = (msg.round(), *msg.block_hash(), *msg.state_hash());
+        let key = (msg.round(), *msg.propose_hash(), *msg.block_hash());
         let map = self.precommits.entry(key).or_insert_with(|| HashMap::new());
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
         map.len() >= majority_count
     }
 
-    pub fn has_majority_precommits(&self, round: Round, block_hash: Hash,
-                                   state_hash: Hash) -> bool {
-        match self.precommits.get(&(round, block_hash, state_hash)) {
+    pub fn has_majority_precommits(&self,
+                                   round: Round,
+                                   propose_hash: Hash,
+                                   block_hash: Hash) -> bool {
+        match self.precommits.get(&(round, propose_hash, block_hash)) {
             Some(map) => map.len() >= self.majority_count(),
             None => false
         }
@@ -224,7 +296,7 @@ impl State {
             match self.our_prevotes.get(&round) {
                 Some(msg) => {
                     // TODO: unefficient
-                    if Some(*msg.block_hash()) != self.locked_propose {
+                    if Some(*msg.propose_hash()) != self.locked_propose {
                         return true
                     }
                 },

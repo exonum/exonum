@@ -6,6 +6,8 @@ mod error;
 mod fields;
 mod protocol;
 
+use time::{Timespec};
+
 use super::crypto::{Hash, PublicKey};
 
 pub use self::raw::{RawMessage, MessageBuffer, Message, HEADER_SIZE};
@@ -14,17 +16,21 @@ pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;
 
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify)
+// TODO: use macro for implementing enums
 
+#[derive(Clone)]
 pub enum Any {
     Basic(BasicMessage),
     Consensus(ConsensusMessage),
     Tx(TxMessage),
 }
 
+#[derive(Clone)]
 pub enum BasicMessage {
     Connect(Connect),
 }
 
+#[derive(Clone)]
 pub enum ConsensusMessage {
     Propose(Propose),
     Prevote(Prevote),
@@ -32,6 +38,17 @@ pub enum ConsensusMessage {
     Commit(Commit),
 }
 
+#[derive(Clone)]
+pub enum RequestMessage {
+    Propose(RequestPropose),
+    Transactions(RequestTransactions),
+    Prevotes(RequestPrevotes),
+    Precommits(RequestPrecommits),
+    Commit(RequestCommit),
+    Peers(RequestPeers)
+}
+
+#[derive(Clone)]
 pub enum TxMessage {
     Issue(TxIssue),
     Transfer(TxTransfer),
@@ -46,6 +63,72 @@ impl TxMessage {
             TxMessage::Transfer(ref msg) => msg.hash(),
             TxMessage::VoteValidator(ref msg) => msg.hash(),
             TxMessage::VoteConfig(ref msg) => msg.hash()
+        }
+    }
+
+    pub fn raw(&self) -> &RawMessage {
+        match *self {
+            TxMessage::Issue(ref msg) => msg.raw(),
+            TxMessage::Transfer(ref msg) => msg.raw(),
+            TxMessage::VoteValidator(ref msg) => msg.raw(),
+            TxMessage::VoteConfig(ref msg) => msg.raw()
+        }
+    }
+}
+
+impl RequestMessage {
+    pub fn from(&self) -> u32 {
+        match *self {
+            RequestMessage::Propose(ref msg) => msg.from(),
+            RequestMessage::Transactions(ref msg) => msg.from(),
+            RequestMessage::Prevotes(ref msg) => msg.from(),
+            RequestMessage::Precommits(ref msg) => msg.from(),
+            RequestMessage::Commit(ref msg) => msg.from(),
+            RequestMessage::Peers(ref msg) => msg.from(),
+        }
+    }
+
+    pub fn to(&self) -> u32 {
+        match *self {
+            RequestMessage::Propose(ref msg) => msg.to(),
+            RequestMessage::Transactions(ref msg) => msg.to(),
+            RequestMessage::Prevotes(ref msg) => msg.to(),
+            RequestMessage::Precommits(ref msg) => msg.to(),
+            RequestMessage::Commit(ref msg) => msg.to(),
+            RequestMessage::Peers(ref msg) => msg.to(),
+        }
+    }
+
+    pub fn time(&self) -> Timespec {
+        match *self {
+            RequestMessage::Propose(ref msg) => msg.time(),
+            RequestMessage::Transactions(ref msg) => msg.time(),
+            RequestMessage::Prevotes(ref msg) => msg.time(),
+            RequestMessage::Precommits(ref msg) => msg.time(),
+            RequestMessage::Commit(ref msg) => msg.time(),
+            RequestMessage::Peers(ref msg) => msg.time(),
+        }
+    }
+
+    pub fn verify(&self, public_key: &PublicKey) -> bool {
+        match *self {
+            RequestMessage::Propose(ref msg) => msg.verify(public_key),
+            RequestMessage::Transactions(ref msg) => msg.verify(public_key),
+            RequestMessage::Prevotes(ref msg) => msg.verify(public_key),
+            RequestMessage::Precommits(ref msg) => msg.verify(public_key),
+            RequestMessage::Commit(ref msg) => msg.verify(public_key),
+            RequestMessage::Peers(ref msg) => msg.verify(public_key),
+        }
+    }
+
+    pub fn raw(&self) -> &RawMessage {
+        match *self {
+            RequestMessage::Propose(ref msg) => msg.raw(),
+            RequestMessage::Transactions(ref msg) => msg.raw(),
+            RequestMessage::Prevotes(ref msg) => msg.raw(),
+            RequestMessage::Precommits(ref msg) => msg.raw(),
+            RequestMessage::Commit(ref msg) => msg.raw(),
+            RequestMessage::Peers(ref msg) => msg.raw(),
         }
     }
 }

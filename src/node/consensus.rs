@@ -105,42 +105,39 @@ pub trait ConsensusHandler {
 
         // Lock to propose
         if has_consensus && ctx.state.locked_round() < prevote.round() {
-            let hash = prevote.block_hash();
-            if ctx.state.proposal(hash).is_none() {
+            let hash = prevote.propose_hash();
+            // FIXME: проверка что у нас есть все транзакции
+            if ctx.state.proposal(hash).is_some() {
                 self.lock(ctx, prevote.round(), *hash);
             }
         }
     }
 
     fn lock(&self, ctx: &mut NodeContext,
-            round: Round, block_hash: Hash) {
+            round: Round, propose_hash: Hash) {
         // Change lock
-        ctx.state.lock(round, block_hash);
-
-        // Execute block and get state hash
-        let patch = ctx.state.patch(block_hash,
-                                    || self.execute(ctx, &block_hash));
+        ctx.state.lock(round, propose_hash);
 
         // Send precommit
-        self.send_precommit(ctx, round, &block_hash, patch.state_hash());
-
-        // Commit if has consensus
-        if ctx.state.has_majority_precommits(round,
-                                             block_hash,
-                                             *patch.state_hash()) {
-            self.commit(ctx, round, &block_hash, patch);
-            return
+        if !ctx.state.have_incompatible_prevotes() {
+            // Execute block and get state hash
+            let block_hash = self.execute(ctx, &propose_hash);
+            self.send_precommit(ctx, round, &propose_hash, &block_hash);
+            // Commit if has consensus
+            if ctx.state.has_majority_precommits(round,
+                                                 propose_hash,
+                                                 block_hash) {
+                self.commit(ctx, round, &propose_hash);
+                return
+            }
         }
 
         // Send prevotes
-        // FIXME: incorrect!!!
-        if !ctx.state.have_incompatible_prevotes() {
-            for round in ctx.state.locked_round() + 1 ... ctx.state.round() {
-                if !ctx.state.have_prevote(round) {
-                    self.send_prevote(ctx, round, &block_hash);
-                    if ctx.state.has_majority_prevotes(round, block_hash) {
-                        self.lock(ctx, round, block_hash);
-                    }
+        for round in ctx.state.locked_round() + 1 ... ctx.state.round() {
+            if !ctx.state.have_prevote(round) {
+                self.send_prevote(ctx, round, &propose_hash);
+                if ctx.state.has_majority_prevotes(round, propose_hash) {
+                    self.lock(ctx, round, propose_hash);
                 }
             }
         }
@@ -151,25 +148,26 @@ pub trait ConsensusHandler {
         let has_consensus = ctx.state.add_precommit(&msg);
 
         if has_consensus {
-            let block_hash = msg.block_hash();
-            if ctx.state.proposal(&block_hash).is_none() {
+            let propose_hash = msg.propose_hash();
+            // FIXME: у нас есть все транзакции
+            if ctx.state.proposal(&propose_hash).is_none() {
                 // Execute block and get state hash
-                let patch = ctx.state.patch(*block_hash,
-                                            || self.execute(ctx, block_hash));
+                let block_hash = self.execute(ctx, propose_hash);
 
-                if patch.state_hash() != msg.state_hash() {
+                if &block_hash != msg.block_hash() {
                     panic!("We are fucked up...");
                 }
 
-                self.commit(ctx, msg.round(), block_hash, patch);
+                self.commit(ctx, msg.round(), propose_hash);
             }
         }
     }
 
     fn commit(&self, ctx: &mut NodeContext,
-              round: Round, hash: &Hash, patch: &Patch) {
+              round: Round, hash: &Hash) {
         // Merge changes into storage
-        ctx.storage.merge(patch);
+        // FIXME: remove unwrap here
+        ctx.storage.merge(ctx.state.patch(hash).unwrap());
 
         // Update state to new height
         ctx.state.new_height(hash);
@@ -233,22 +231,27 @@ pub trait ConsensusHandler {
         ctx.state.leader(ctx.state.round()) == ctx.state.id()
     }
 
-    fn execute<'a>(&'a self, ctx: &'a mut NodeContext, hash: &Hash) -> Patch {
+    // FIXME: fix this bull shit
+    fn execute(&self, ctx: &mut NodeContext, hash: &Hash) -> Hash {
         let fork = Fork::new(ctx.storage.as_ref());
 
         // fork.put_block(msg);
 
-        fork.patch()
+        ctx.state.set_patch(hash.clone(), fork.patch()).block_hash().clone()
     }
 
     fn send_propose(&self, ctx: &mut NodeContext) {
         let round = ctx.state.round();
+        let txs : Vec<Hash> = ctx.state.transactions()
+                                       .keys()
+                                       .map(|h| h.clone())
+                                       .collect();
         let propose = Propose::new(ctx.state.id(),
                                    ctx.state.height(),
                                    round,
                                    get_time(),
                                    &ctx.storage.prev_hash(),
-                                   &ctx.state.transactions(),
+                                   &txs,
                                    &ctx.secret_key);
         ctx.broadcast(propose.raw());
 
@@ -260,35 +263,40 @@ pub trait ConsensusHandler {
     }
 
     fn send_prevote(&self, ctx: &mut NodeContext,
-                    round: Round, block_hash: &Hash) {
+                    round: Round, propose_hash: &Hash) {
+        let locked_round = ctx.state.locked_round();
+        if locked_round > 0 {
+            debug_assert_eq!(&ctx.state.locked_propose().unwrap(), propose_hash);
+        }
         let prevote = Prevote::new(ctx.state.id(),
                                    ctx.state.height(),
                                    round,
-                                   block_hash,
+                                   propose_hash,
+                                   locked_round,
                                    &ctx.secret_key);
         ctx.state.add_prevote(&prevote);
         ctx.broadcast(prevote.raw());
     }
 
     fn send_precommit(&self, ctx: &mut NodeContext,
-                      round: Round, block_hash: &Hash, state_hash: &Hash) {
+                      round: Round, propose_hash: &Hash, block_hash: &Hash) {
         let precommit = Precommit::new(ctx.state.id(),
                                        ctx.state.height(),
                                        round,
+                                       propose_hash,
                                        block_hash,
-                                       state_hash,
                                        &ctx.secret_key);
         ctx.state.add_precommit(&precommit);
         ctx.broadcast(precommit.raw());
     }
 
     fn send_commit(&self, ctx: &mut NodeContext,
-                   height: Height, round: Round, block_hash: &Hash) {
+                   height: Height, round: Round, propose_hash: &Hash) {
         // Send commit
         let commit = Commit::new(ctx.state.id(),
                                  height,
                                  round,
-                                 block_hash,
+                                 propose_hash,
                                  &ctx.secret_key);
         ctx.broadcast(commit.raw());
     }
