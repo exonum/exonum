@@ -1,7 +1,15 @@
 use std::net::SocketAddr;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::collections::hash_map::Entry;
 
-use time::{Timespec, get_time};
+use time::{Timespec, Duration, get_time};
+
+const REQUEST_PROPOSE_WAIT       : u64 = 1_000_000; // milliseconds
+const REQUEST_TRANSACTIONS_WAIT  : u64 = 1_000_000;
+const REQUEST_PREVOTES_WAIT      : u64 = 1_000_000;
+const REQUEST_PRECOMMITS_WAIT    : u64 = 1_000_000;
+const REQUEST_COMMIT_WAIT        : u64 = 1_000_000;
+const REQUEST_PEERS_WAIT         : u64 = 1_000_000;
 
 use super::super::messages::{
     TxMessage, Message, RequestMessage,
@@ -26,14 +34,15 @@ pub struct State {
     locked_propose: Option<Hash>,
 
     // messages
-    proposals: HashMap<Hash, Propose>,
+    proposes: HashMap<Hash, ProposeState>,
     prevotes: HashMap<(Round, Hash), HashMap<ValidatorId, Prevote>>,
     precommits: HashMap<(Round, Hash, Hash), HashMap<ValidatorId, Precommit>>,
 
     transactions: HashMap<Hash, TxMessage>,
     queued: Vec<ConsensusMessage>,
 
-    patches: HashMap<Hash, Patch>,
+    unknown_txs: HashMap<Hash, Vec<Hash>>,
+    unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
 
     // TODO: add hashmap of transactions we wait for
 
@@ -50,12 +59,13 @@ pub struct State {
 
 // Данные, которые нас интересуют,
 // специфичны для некоторой высоты
-enum RequestData {
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum RequestData {
     Propose(Hash),
     Transactions(Hash),
     Prevotes(Round, Hash),
     Precommits(Round, Hash, Hash),
-    Commit,
+    Commit, // TODO: add height?
     Peers
 }
 
@@ -63,37 +73,84 @@ enum RequestData {
 struct RequestState {
     // К-во попыток, которые уже произошли
     retries: u16,
-    // Наше сообщение, сформированное и подписанное
-    message: RequestMessage,
     // Узлы, которые имеют интересующую нас информацию
-    known_nodes: Vec<ValidatorId>
+    known_nodes: HashSet<ValidatorId>
 }
 
-// Таймаут, который сигнализирует о необходимости
-// отправить запрос
-struct RequestWaitTimeout {
-    // Высота, которой соответсвует данный таймаут
-    height: u64,
-    // Данные, который мы должны запросить
-    data: RequestData
+pub struct ProposeState {
+    // Тело предложения
+    propose:        Propose,
+    // Вычисленный хеш блока (из предложения)
+    block_hash:     Option<Hash>,
+    // Набор изменений, которые нужно внести в состояние для применения блока
+    patch:          Option<Patch>,
+    // Множество неизвестных транзакций из этого предложения
+    unknown_txs:    HashSet<Hash>
 }
 
-// Таймаут, который сигнализирует о необходимости
-// отправить запрос еще раз
-struct RequestRetryTimeout {
-    // Высота, которой соответсвует данный таймаут
-    height: u64,
-    // Номер попытки, которая завершилась таймаутом
-    retry: u16,
-    // Данные, который мы должны запросить
-    data: RequestData,
-    // Валидатор, у которого мы запрашивали данные
-    validator_id: ValidatorId
+impl RequestData {
+    pub fn timeout(&self) -> Timespec { // TODO: return Duration
+        let ms = match *self {
+            RequestData::Propose(..)      => REQUEST_PROPOSE_WAIT,
+            RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
+            RequestData::Prevotes(..)     => REQUEST_PREVOTES_WAIT,
+            RequestData::Precommits(..)   => REQUEST_PRECOMMITS_WAIT,
+            RequestData::Commit           => REQUEST_COMMIT_WAIT,
+            RequestData::Peers            => REQUEST_PEERS_WAIT,
+        };
+        get_time() + Duration::milliseconds(ms as i64)
+    }
+}
+
+impl RequestState {
+    fn new() -> RequestState {
+        RequestState {
+            retries: 0,
+            known_nodes: HashSet::new()
+        }
+    }
+
+    fn insert(&mut self, validator: ValidatorId) {
+        self.known_nodes.insert(validator);
+    }
+
+    fn remove(&mut self, validator: &ValidatorId) {
+        self.retries += 1;
+        self.known_nodes.remove(validator);
+    }
+
+    fn is_empty(&mut self) -> bool {
+        self.known_nodes.is_empty()
+    }
+
+    fn peek(&self) -> Option<ValidatorId> {
+        self.known_nodes.iter().next().map(|v| *v)
+    }
+}
+
+impl ProposeState {
+    pub fn message(&self) -> &Propose {
+        &self.propose
+    }
+
+    pub fn unknown_txs(&self) -> &HashSet<Hash> {
+        &self.unknown_txs
+    }
+
+    pub fn has_unknown_txs(&self) -> bool {
+        !self.unknown_txs.is_empty()
+    }
+
+    pub fn block_hash(&self) -> Option<Hash> {
+        self.block_hash
+    }
 }
 
 impl State {
     pub fn new(id: u32,
                validators: Vec<PublicKey>) -> State {
+        let validators_len = validators.len() as u64;
+
         State {
             id: id,
 
@@ -104,17 +161,22 @@ impl State {
             locked_round: 0,
             locked_propose: None,
 
-            proposals: HashMap::new(),
+            proposes: HashMap::new(),
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
             transactions: HashMap::new(),
             queued: Vec::new(),
 
-            patches: HashMap::new(),
+            unknown_txs: HashMap::new(),
+            unknown_proposes_with_precommits: HashMap::new(),
+
+            validator_heights: vec![0, validators_len],
 
             our_prevotes: HashMap::new(),
             our_precommits: HashMap::new(),
+
+            requests: HashMap::new(),
         }
     }
 
@@ -142,6 +204,22 @@ impl State {
     pub fn leader(&self, round: Round) -> ValidatorId {
         ((self.height() + round as u64) %
          (self.validators.len() as u64)) as ValidatorId
+    }
+
+    pub fn validator_height(&self, id: ValidatorId) -> Height {
+        self.validator_heights[id as usize]
+    }
+
+    pub fn set_validator_height(&mut self, id: ValidatorId, height: Height) {
+        self.validator_heights[id as usize] = height;
+    }
+
+    pub fn validator_heights(&self) -> Vec<ValidatorId> {
+        self.validator_heights.iter()
+                              .enumerate()
+                              .filter(|&(v, h)| *h > self.height())
+                              .map(|(v, h)| v as ValidatorId)
+                              .collect()
     }
 
     pub fn majority_count(&self) -> usize {
@@ -173,8 +251,8 @@ impl State {
         self.locked_propose
     }
 
-    pub fn proposal(&self, hash: &Hash) -> Option<&Propose> {
-        self.proposals.get(hash)
+    pub fn propose(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
+        self.proposes.get_mut(hash)
     }
 
     pub fn new_round(&mut self) {
@@ -186,16 +264,16 @@ impl State {
         self.round = 1;
         self.locked_round = 0;
         // TODO: destruct/construct structure HeightState instead of call clear
-        self.proposals.clear();
+        self.proposes.clear();
         self.prevotes.clear();
         self.precommits.clear();
         self.our_prevotes.clear();
         self.our_precommits.clear();
-        self.patches.clear();
+        self.requests.clear(); // FIXME: clear all timeouts
 
-        let propose = self.proposals.get(&propose_hash)
-                                    .expect("Trying to commit unknown proposal");
-        for tx in propose.transactions() {
+        let state = self.proposes.get(&propose_hash)
+                                 .expect("Trying to commit unknown propose");
+        for tx in state.propose.transactions() {
             self.transactions.remove(tx);
         }
     }
@@ -214,16 +292,16 @@ impl State {
         &self.transactions
     }
 
-    pub fn add_transaction(&mut self, hash: Hash, msg: TxMessage) {
+    pub fn add_transaction(&mut self, hash: Hash, msg: TxMessage) -> Vec<Hash> {
+        let mut full_proposes = Vec::new();
+        for (hash, state) in self.proposes.iter_mut() {
+            state.unknown_txs.remove(&hash);
+            if state.unknown_txs.is_empty() {
+                full_proposes.push(*hash);
+            }
+        }
         self.transactions.insert(hash, msg);
-    }
-
-    pub fn patch(&self, hash: &Hash) -> Option<&Patch> {
-        self.patches.get(hash)
-    }
-
-    pub fn set_patch(&mut self, hash: Hash, patch: Patch) -> &Patch {
-        self.patches.entry(hash).or_insert(patch)
+        return full_proposes;
     }
 
     pub fn prevotes(&self, round: Round, propose_hash: Hash)
@@ -237,7 +315,29 @@ impl State {
     }
 
     pub fn add_propose(&mut self, propose_hash: Hash, msg: &Propose) -> bool {
-        self.proposals.insert(propose_hash, msg.clone()).is_none()
+        let txs = &self.transactions;
+        match self.proposes.entry(propose_hash) {
+            Entry::Occupied(..) => false,
+            Entry::Vacant(e) => {
+                let unknown_txs = msg.transactions()
+                                     .iter()
+                                     .filter(|tx| !txs.contains_key(tx))
+                                     .map(|tx| *tx)
+                                     .collect(): HashSet<Hash>;
+                for tx in &unknown_txs {
+                    self.unknown_txs.entry(*tx)
+                                    .or_insert_with(Vec::new)
+                                    .push(propose_hash);
+                };
+                e.insert(ProposeState {
+                    propose: msg.clone(),
+                    block_hash: None,
+                    patch: None,
+                    unknown_txs: unknown_txs
+                });
+                true
+            }
+        }
     }
 
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
@@ -277,6 +377,20 @@ impl State {
         map.len() >= majority_count
     }
 
+    pub fn add_unknown_propose_with_precommits(&mut self,
+                                               round: Round,
+                                               propose_hash: Hash,
+                                               block_hash: Hash) {
+        self.unknown_proposes_with_precommits.entry(propose_hash)
+                                             .or_insert_with(Vec::new)
+                                             .push((round, block_hash));
+    }
+
+    pub fn unknown_propose_with_precommits(&mut self, propose_hash: &Hash)
+        -> Vec<(Round, Hash)> {
+        self.unknown_proposes_with_precommits.remove(propose_hash).unwrap_or_default()
+    }
+
     pub fn has_majority_precommits(&self,
                                    round: Round,
                                    propose_hash: Hash,
@@ -304,5 +418,32 @@ impl State {
             }
         }
         false
+    }
+
+    pub fn request(&mut self, data: RequestData, validator: ValidatorId) -> bool {
+        let mut state = self.requests.entry(data)
+                                     .or_insert_with(RequestState::new);
+        let is_new = state.is_empty();
+        state.insert(validator);
+        return is_new;
+    }
+
+    pub fn retry(&mut self, data: &RequestData, validator: ValidatorId) -> Option<ValidatorId> {
+        let next = {
+            let mut state = self.requests.get_mut(data).unwrap();
+            state.remove(&validator);
+            state.peek()
+        };
+
+        if next.is_none() {
+            self.requests.remove(data);
+        };
+
+        return next;
+    }
+
+    pub fn remove_request(&mut self, data: &RequestData) -> HashSet<ValidatorId> {
+        let state = self.requests.remove(data);
+        state.map(|s| s.known_nodes).unwrap_or_default()
     }
 }

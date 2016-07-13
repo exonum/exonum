@@ -4,6 +4,7 @@
 #![feature(associated_type_defaults)]
 #![feature(question_mark)]
 #![feature(inclusive_range_syntax)]
+#![feature(type_ascription)]
 
 #[macro_use]
 extern crate log;

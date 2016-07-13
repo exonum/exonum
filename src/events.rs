@@ -6,13 +6,16 @@ use mio;
 
 use super::messages::RawMessage;
 
+use super::node::{RequestData, ValidatorId};
+
 pub type EventsConfiguration = mio::EventLoopConfig;
 
 pub type EventLoop = mio::EventLoop<EventsQueue>;
 
-pub struct Timeout {
-    pub height: u64,
-    pub round: u32,
+// FIXME: move this into node module
+pub enum Timeout {
+    Round(u64, u32),
+    Request(RequestData, ValidatorId),
 }
 
 pub struct InternalMessage;

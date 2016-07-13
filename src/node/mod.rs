@@ -11,13 +11,11 @@ use super::tx_generator::TxGenerator;
 
 mod state;
 mod basic;
-mod tx;
 mod consensus;
 mod requests;
 
-pub use self::state::{State, Round, Height};
+pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 pub use self::basic::{BasicService, BasicHandler};
-pub use self::tx::{TxService, TxHandler};
 pub use self::consensus::{ConsensusService, ConsensusHandler};
 pub use self::requests::{RequestService, RequestHandler};
 
@@ -26,7 +24,6 @@ pub use self::requests::{RequestService, RequestHandler};
 pub struct Node {
     context: NodeContext,
     basic: Box<BasicHandler>,
-    tx: Box<TxHandler>,
     consensus: Box<ConsensusHandler>,
     requests: Box<RequestHandler>,
 }
@@ -70,7 +67,6 @@ impl Node {
         let network = Network::with_config(config.network);
         let state = State::new(id as u32, config.validators);
         let basic = Box::new(BasicService) as Box<BasicHandler>;
-        let tx = Box::new(TxService) as Box<TxHandler>;
         let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
         let requests = Box::new(RequestService) as Box<RequestHandler>;
         let storage = Box::new(MemoryStorage::new()) as Box<Storage>;
@@ -89,7 +85,6 @@ impl Node {
                 tx_generator: tx_generator,
             },
             basic: basic,
-            tx: tx,
             consensus: consensus,
             requests: requests
         }
@@ -111,7 +106,7 @@ impl Node {
                                  message.raw().clone()).unwrap();
         }
 
-        self.context.add_timeout();
+        self.context.add_round_timeout();
     }
 
     pub fn run(&mut self) {
@@ -122,13 +117,13 @@ impl Node {
             }
             match self.context.events.poll() {
                 Event::Incoming(message) => {
-                    self.handle(message);
+                    self.handle_message(message);
                 },
                 Event::Internal(_) => {
 
                 },
                 Event::Timeout(timeout) => {
-                    self.consensus.handle_timeout(&mut self.context, timeout);
+                    self.handle_timeout(timeout);
                 },
                 Event::Io(id, set) => {
                     // TODO: shoud we call network.io through main event queue?
@@ -145,7 +140,7 @@ impl Node {
         }
     }
 
-    fn handle(&mut self, raw: RawMessage) {
+    fn handle_message(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method
         //     if !raw.verify() {
@@ -154,8 +149,19 @@ impl Node {
 
         match Any::from_raw(raw).unwrap() {
             Any::Basic(message) => self.basic.handle(&mut self.context, message),
-            Any::Tx(message) => self.tx.handle(&mut self.context, message),
+            Any::Tx(message) => self.consensus.handle_tx(&mut self.context, message),
             Any::Consensus(message) => self.consensus.handle(&mut self.context, message),
+        }
+    }
+
+    fn handle_timeout(&mut self, timeout: Timeout) {
+        match timeout {
+            Timeout::Round(height, round) =>
+                self.consensus.handle_round_timeout(&mut self.context,
+                                                    height, round),
+            Timeout::Request(data, validator) =>
+                self.consensus.handle_request_timeout(&mut self.context,
+                                                      data, validator),
         }
     }
 }
@@ -180,13 +186,10 @@ impl NodeContext {
         self.network.send_to(&mut self.events, address, message.clone()).unwrap();
     }
 
-    pub fn add_timeout(&mut self) {
+    pub fn add_round_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;
         let time = self.storage.prev_time() + Duration::milliseconds(ms as i64);
-        let timeout = Timeout {
-            height: self.state.height(),
-            round: self.state.round(),
-        };
+        let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
     }
 

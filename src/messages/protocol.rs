@@ -56,12 +56,13 @@ message! {
 message! {
     Commit {
         const ID = 4;
-        const SIZE = 48;
+        const SIZE = 80;
 
         validator:      u32         [00 => 04]
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
         propose_hash:   &Hash       [16 => 48]
+        block_hash:     &Hash       [48 => 80]
     }
 }
 

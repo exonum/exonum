@@ -59,7 +59,7 @@ pub trait RequestHandler {
         }
 
         let propose = if msg.height() == ctx.state.height() {
-            ctx.state.proposal(msg.propose_hash()).map(|p| p.raw().clone())
+            ctx.state.propose(msg.propose_hash()).map(|p| p.message().raw().clone())
         } else {  // msg.height < state.height
             ctx.storage.get_propose(msg.propose_hash()).map(|p| p.raw().clone())
         };
