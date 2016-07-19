@@ -42,6 +42,13 @@ impl MessageBuffer {
         raw
     }
 
+    pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
+        // TODO: check that size >= HEADER_SIZE
+        MessageBuffer {
+            raw: raw
+        }
+    }
+
     pub fn network_id(&self) -> u8 {
         self.raw[0]
     }

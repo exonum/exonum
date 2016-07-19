@@ -189,10 +189,6 @@ impl<'a, S: Storage + 'a + ?Sized> Storage for Fork<'a, S> {
                     .or_else(|| self.storage.get_tx(hash))
     }
 
-    // fn put_block(&mut self, height: Height, block: Propose) {
-    //     self.changes.put_block(height, block);
-    // }
-
     fn merge(&mut self, patch: &Patch) {
         self.changes.merge(patch);
     }
