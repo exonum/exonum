@@ -6,13 +6,14 @@ use std::cell::Cell;
 use std::num::{Zero, One};
 use std::ops::{Add, Sub};
 use std::sync::Arc;
+use std::collections::BTreeMap;
 
 use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::Hash;
 use ::messages::{MessageBuffer, Message, TxMessage, Precommit, Propose};
 
-pub struct Storage<T: Map<[u8], Vec<u8>>> {
+pub struct Storage<T: Database> {
     db: T
 }
 
@@ -21,20 +22,12 @@ const PROPOSES_PREFIX: &'static [u8] = &[01];
 const PRECOMMIT_PREFIX: &'static [u8] = &[02];
 const HEIGHT_PREFIX: &'static [u8] = &[03];
 
-impl<T> Storage<T> where T: Map<[u8], Vec<u8>> {
-
-//     fn block_hash(&self) -> Hash;
-
-//     fn height(&self) -> Height;
-
-//     fn prev_hash(&self) -> Hash {
-//         self.get_block(self.height().height()).unwrap()
-//     }
-
-//     fn prev_time(&self) -> Timespec {
-//         // TODO: Possibly inefficient
-//         self.get_propose(&self.prev_hash()).unwrap().time()
-//     }
+impl<T> Storage<T> where T: Database {
+    fn memory() -> Storage<MemoryDatabase> {
+        Storage {
+            db: MemoryDatabase::new()
+        }
+    }
 
     fn transactions<'a>(&'a mut self) -> PrefixMap<'a, T, Hash, TxMessage> {
         self.db.map(vec![00])
@@ -59,23 +52,135 @@ impl<T> Storage<T> where T: Map<[u8], Vec<u8>> {
         self.db.list([PRECOMMIT_PREFIX, hash.as_ref()].concat())
     }
 
-//     fn merge(&mut self, patch: &Patch);
+    fn fork<'a>(&'a self) -> Storage<Fork<'a, T>> {
+        Storage {
+            db: self.db.fork()
+        }
+    }
+
+    fn merge(&mut self, patch: Patch) {
+        self.db.merge(patch)
+    }
+}
+
+impl<'a, T> Storage<Fork<'a, T>> where T: Database {
+    fn patch(self) -> Patch {
+        self.db.patch()
+    }
+}
+
+pub trait Database: Map<[u8], Vec<u8>>+Sized {
+    fn fork<'a>(&'a self) -> Fork<'a, Self>;
+    fn merge(&mut self, patch: Patch);
+}
+
+pub enum Change {
+    Put(Vec<u8>),
+    Delete,
+}
+
+pub struct Patch {
+    changes: BTreeMap<Vec<u8>, Change>
+}
+
+pub struct Fork<'a, T: Database + 'a> {
+    database: &'a T,
+    changes: BTreeMap<Vec<u8>, Change>
+}
+
+impl<'a, T: Database + 'a> Fork<'a, T> {
+    fn patch(self) -> Patch {
+        Patch {
+            changes: self.changes
+        }
+    }
+}
+
+impl<'a, T> Map<[u8], Vec<u8>> for Fork<'a, T> where T: Database + 'a {
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        match self.changes.get(key) {
+            Some(change) => match *change {
+                Change::Put(ref v) => Some(v.clone()),
+                Change::Delete => None,
+            },
+            None => self.database.get(key)
+        }
+    }
+
+    fn put(&mut self, key: &[u8], value: Vec<u8>) {
+        self.changes.insert(key.to_vec(), Change::Put(value));
+    }
+
+    fn delete(&mut self, key: &[u8]) {
+        self.changes.insert(key.to_vec(), Change::Delete);
+    }
+}
+
+impl<'a, T: Database + 'a + ?Sized> Database for Fork<'a, T> {
+    fn fork<'b>(&'b self) -> Fork<'b, Self> {
+        Fork {
+            database: self,
+            changes: BTreeMap::new()
+        }
+    }
+
+    fn merge(&mut self, patch: Patch) {
+        self.changes.extend(patch.changes.into_iter());
+    }
+}
+
+struct MemoryDatabase {
+    map: BTreeMap<Vec<u8>, Vec<u8>>
+}
+
+impl MemoryDatabase {
+    fn new() -> MemoryDatabase {
+        MemoryDatabase {
+            map: BTreeMap::new()
+        }
+    }
+}
+
+impl Map<[u8], Vec<u8>> for MemoryDatabase {
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        self.map.get(key).map(Clone::clone)
+    }
+
+    fn put(&mut self, key: &[u8], value: Vec<u8>) {
+        self.map.insert(key.to_vec(), value);
+    }
+
+    fn delete(&mut self, key: &[u8]) {
+        self.map.remove(key);
+    }
+}
+
+impl Database for MemoryDatabase {
+    fn fork<'a>(&'a self) -> Fork<'a, Self> {
+        Fork {
+            database: self,
+            changes: BTreeMap::new()
+        }
+    }
+
+    fn merge(&mut self, patch: Patch) {
+        for (key, change) in patch.changes.iter() {
+            match *change {
+                Change::Put(ref v) => {
+                    self.map.insert(key.clone(), v.clone());
+                },
+                Change::Delete => {
+                    self.map.remove(key);
+                }
+            }
+        }
+    }
 }
 
 pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;
     fn deserialize(v: Vec<u8>) -> Self;
 }
-
-// impl<T> StorageValue for T where T: From<Vec<u8>> + Into<Vec<u8>> {
-//     fn serialize(self) -> Vec<u8> {
-//         self.into()
-//     }
-
-//     fn deserialize(v: Vec<u8>) -> Self {
-//         Self::from(v)
-//     }
-// }
 
 impl StorageValue for u32 {
     // TODO: return Cow<[u8]>
@@ -170,8 +275,6 @@ trait MapExt : Map<[u8], Vec<u8>> + Sized {
               V: StorageValue;
 
     fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> PrefixMap<'a, Self, K, V>;
-
-    fn prefix<'a>(&'a mut self, prefix: Vec<u8>) -> PrefixMap<'a, Self, [u8], Vec<u8>>;
 }
 
 impl<T> MapExt for T where T: Map<[u8], Vec<u8>> + Sized {
@@ -179,7 +282,7 @@ impl<T> MapExt for T where T: Map<[u8], Vec<u8>> + Sized {
         where K: Copy+StorageValue,
               V: StorageValue {
         MappedList {
-            map: self.prefix(prefix),
+            map: self.map(prefix),
             count: Cell::new(None),
             _v: PhantomData
         }
@@ -193,30 +296,7 @@ impl<T> MapExt for T where T: Map<[u8], Vec<u8>> + Sized {
             _v: PhantomData
         }
     }
-
-    fn prefix<'a>(&'a mut self, prefix: Vec<u8>) -> PrefixMap<'a, Self, [u8], Vec<u8>> {
-        PrefixMap {
-            prefix: prefix,
-            storage: self,
-            _k: PhantomData,
-            _v: PhantomData
-        }
-    }
 }
-
-// impl<T> T where T: Map<[u8], Vec<u8>> {
-//     fn list<'a, K, V>(&'a self) -> MappedList<T, K, V> {
-//     }
-// }
-
-// pub struct Value<'a, T: Map<[u8], Vec<u8>> + 'a, V> {
-//     storage: &'a mut T,
-//     _v: PhantomData<V>,
-// }
-
-// impl<'a, T, V> Value<'a, T, V> {
-//     fn get(&self)
-// }
 
 pub struct MappedList<T: Map<[u8], Vec<u8>>, K, V> {
     map: T,
@@ -257,6 +337,7 @@ impl<'a, T, K, V> MappedList<T, K, V>
         }
     }
 
+    // TODO: implement iterator for List
 //     fn iter() {
 
 //     }
@@ -271,5 +352,3 @@ impl<'a, T, K, V> MappedList<T, K, V>
         c
     }
 }
-
-
