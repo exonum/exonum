@@ -47,7 +47,7 @@ pub trait ConsensusHandler {
         match msg {
             ConsensusMessage::Propose(msg) => {
                 // Check prev_hash
-                if msg.prev_hash() != &ctx.storage.last_hash().unwrap_or_else(|| hash(&[])) {
+                if msg.prev_hash() != &ctx.storage.last_hash().unwrap().unwrap_or_else(|| hash(&[])) {
                     return
                 }
 
@@ -298,7 +298,7 @@ pub trait ConsensusHandler {
 
         // Make sure that it is new transaction
         // TODO: use contains instead of get?
-        if ctx.storage.transactions().get(&hash).is_some() {
+        if ctx.storage.transactions().get(&hash).unwrap().is_some() {
             return;
         }
 
@@ -526,7 +526,7 @@ pub trait ConsensusHandler {
                                    ctx.state.height(),
                                    round,
                                    get_time(),
-                                   &ctx.storage.last_hash().unwrap_or_else(|| hash(&[])),
+                                   &ctx.storage.last_hash().unwrap().unwrap_or_else(|| hash(&[])),
                                    &txs,
                                    &ctx.secret_key);
         ctx.broadcast(propose.raw());

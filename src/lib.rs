@@ -16,6 +16,9 @@ extern crate time;
 extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
+extern crate leveldb;
+extern crate db_key;
+extern crate tempdir;
 
 #[macro_use]
 pub mod messages;

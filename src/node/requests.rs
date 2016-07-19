@@ -63,7 +63,7 @@ pub trait RequestHandler {
         let propose = if msg.height() == ctx.state.height() {
             ctx.state.propose(msg.propose_hash()).map(|p| p.message().raw().clone())
         } else {  // msg.height < state.height
-            ctx.storage.proposes().get(msg.propose_hash()).map(|p| p.raw().clone())
+            ctx.storage.proposes().get(msg.propose_hash()).unwrap().map(|p| p.raw().clone())
         };
 
         if let Some(propose) = propose {
@@ -74,7 +74,7 @@ pub trait RequestHandler {
     fn handle_txs(&mut self, ctx: &mut NodeContext, msg: RequestTransactions) {
         for hash in msg.txs() {
             let tx = ctx.state.transactions().get(hash).map(|tx| tx.clone())
-                              .or_else(|| ctx.storage.transactions().get(hash));
+                              .or_else(|| ctx.storage.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {
                 ctx.send_to_validator(msg.from(), tx.raw());
@@ -113,7 +113,7 @@ pub trait RequestHandler {
                 Vec::new()
             }
         } else {  // msg.height < state.height
-            if let Some(precommits) = ctx.storage.precommits(msg.block_hash()).iter() {
+            if let Some(precommits) = ctx.storage.precommits(msg.block_hash()).iter().unwrap() {
                 precommits.iter().map(|p| p.raw().clone()).collect()
             } else {
                 Vec::new()
@@ -130,9 +130,9 @@ pub trait RequestHandler {
             return
         }
 
-        let block_hash = ctx.storage.heights().get(msg.height()).unwrap();
+        let block_hash = ctx.storage.heights().get(msg.height()).unwrap().unwrap();
 
-        let precommits = if let Some(precommits) = ctx.storage.precommits(&block_hash).iter() {
+        let precommits = if let Some(precommits) = ctx.storage.precommits(&block_hash).iter().unwrap() {
             precommits.iter().map(|p| p.raw().clone()).collect()
         } else {
             Vec::new()
