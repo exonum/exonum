@@ -3,14 +3,14 @@ use std::collections::HashSet;
 use time::{get_time};
 
 use super::super::events::{Events, Event, Timeout, EventsConfiguration};
-use super::super::crypto::{Hash};
+use super::super::crypto::{Hash, hash};
 use super::super::messages::{
     ConsensusMessage, Propose, Prevote, Precommit, Commit, Message,
     RequestPropose, RequestTransactions, RequestPrevotes,
     RequestPrecommits, RequestCommit,
     RequestPeers, TxMessage
 };
-use super::super::storage::{Fork, Patch};
+use super::super::storage::{Fork, Patch, Map};
 use super::{NodeContext, Round, Height, RequestData, ValidatorId};
 
 pub struct ConsensusService;
@@ -46,7 +46,7 @@ pub trait ConsensusHandler {
         match msg {
             ConsensusMessage::Propose(msg) => {
                 // Check prev_hash
-                if msg.prev_hash() != &ctx.storage.prev_hash() {
+                if msg.prev_hash() != &ctx.storage.last_hash().unwrap_or_else(|| hash(&[])) {
                     return
                 }
 
@@ -289,7 +289,7 @@ pub trait ConsensusHandler {
 
         // Make sure that it is new transaction
         // TODO: use contains instead of get?
-        if ctx.storage.get_tx(&hash).is_some() {
+        if ctx.storage.transactions().get(&hash).is_some() {
             return;
         }
 
@@ -445,13 +445,14 @@ pub trait ConsensusHandler {
 
     // FIXME: fix this bull shit
     fn execute(&self, ctx: &mut NodeContext, hash: &Hash) -> Hash {
-        let fork = Fork::new(ctx.storage.as_ref());
+        // let fork = Fork::new(ctx.storage.as_ref());
 
         // fork.put_block(msg);
 
-        fork.patch().block_hash().clone()
+        // fork.patch().block_hash().clone()
 
         // ctx.state.propose(hash).unwrap().set_patch(fork.patch()).block_hash().clone()
+        hash.clone()
     }
 
     fn request_propose_or_txs(&self, ctx: &mut NodeContext,
@@ -501,7 +502,7 @@ pub trait ConsensusHandler {
                                    ctx.state.height(),
                                    round,
                                    get_time(),
-                                   &ctx.storage.prev_hash(),
+                                   &ctx.storage.last_hash().unwrap_or_else(|| hash(&[])),
                                    &txs,
                                    &ctx.secret_key);
         ctx.broadcast(propose.raw());

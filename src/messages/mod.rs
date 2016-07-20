@@ -74,6 +74,20 @@ impl TxMessage {
             TxMessage::VoteConfig(ref msg) => msg.raw()
         }
     }
+
+    pub fn from_raw(raw: RawMessage) -> Result<TxMessage, Error> {
+        // TODO: check input message size
+        Ok(match raw.message_type() {
+            TxIssue::MESSAGE_TYPE => TxMessage::Issue(TxIssue::from_raw(raw)?),
+            TxTransfer::MESSAGE_TYPE => TxMessage::Transfer(TxTransfer::from_raw(raw)?),
+            TxVoteValidator::MESSAGE_TYPE => TxMessage::VoteValidator(TxVoteValidator::from_raw(raw)?),
+            TxVoteConfig::MESSAGE_TYPE => TxMessage::VoteConfig(TxVoteConfig::from_raw(raw)?),
+            _ => {
+                // TODO: use result here
+                panic!("unrecognized message type");
+            }
+        })
+    }
 }
 
 impl RequestMessage {

@@ -5,7 +5,7 @@ use time::{get_time, Duration};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
-use super::storage::{Storage, MemoryStorage};
+use super::storage::{Storage, MemoryDatabase};
 use super::messages::{Any, Connect, RawMessage, Message};
 use super::tx_generator::TxGenerator;
 
@@ -34,7 +34,7 @@ pub struct NodeContext {
     pub state: State,
     pub events: Events,
     pub network: Network,
-    pub storage: Box<Storage>,
+    pub storage: Storage<MemoryDatabase>,
     pub propose_timeout: u32,
     pub round_timeout: u32,
     pub byzantine: bool,
@@ -69,7 +69,7 @@ impl Node {
         let basic = Box::new(BasicService) as Box<BasicHandler>;
         let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
         let requests = Box::new(RequestService) as Box<RequestHandler>;
-        let storage = Box::new(MemoryStorage::new()) as Box<Storage>;
+        let storage = Storage::new(MemoryDatabase::new());
         Node {
             context: NodeContext {
                 public_key: config.public_key,
@@ -188,11 +188,10 @@ impl NodeContext {
 
     pub fn add_round_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;
-        let time = self.storage.prev_time() + Duration::milliseconds(ms as i64);
+        let time = self.storage.last_propose().map(|p| p.time()).unwrap_or_else(|| get_time()) + Duration::milliseconds(ms as i64);
         let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
     }
-
 
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {

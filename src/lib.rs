@@ -25,6 +25,5 @@ pub mod events;
 pub mod crypto;
 pub mod node;
 pub mod storage;
-pub mod storage2;
 
 pub mod tx_generator;
