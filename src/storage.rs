@@ -7,6 +7,7 @@ use std::num::{Zero, One};
 use std::ops::{Add, Sub};
 use std::sync::Arc;
 use std::collections::BTreeMap;
+use std::mem;
 
 use byteorder::{ByteOrder, BigEndian};
 
@@ -190,7 +191,7 @@ pub trait StorageValue {
 impl StorageValue for u32 {
     // TODO: return Cow<[u8]>
     fn serialize(self) -> Vec<u8> {
-        let mut v = Vec::new();
+        let mut v = vec![0; mem::size_of::<u32>()];
         BigEndian::write_u32(&mut v, self);
         v
     }
@@ -202,7 +203,7 @@ impl StorageValue for u32 {
 
 impl StorageValue for u64 {
     fn serialize(self) -> Vec<u8> {
-        let mut v = Vec::new();
+        let mut v = vec![0; mem::size_of::<u64>()];
         BigEndian::write_u64(&mut v, self);
         v
     }

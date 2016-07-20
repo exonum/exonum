@@ -166,9 +166,9 @@ message! {
         const SIZE = 80;
 
         seed:           u64         [00 => 08]
-        from:           &PublicKey  [00 => 40]
+        from:           &PublicKey  [08 => 40]
         to:             &PublicKey  [40 => 72]
-        amount:         u64         [78 => 80]
+        amount:         u64         [72 => 80]
     }
 }
 

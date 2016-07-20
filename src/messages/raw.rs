@@ -164,29 +164,29 @@ pub trait Message : Sized {
     }
 }
 
-#[test]
-fn test_empty_message() {
-    let raw = MessageBuffer::empty();
-    assert_eq!(raw.network_id(), 0);
-    assert_eq!(raw.version(), 0);
-    assert_eq!(raw.message_type(), 0);
-    assert_eq!(raw.payload_length(), 0);
-}
+// #[test]
+// fn test_empty_message() {
+//     let raw = MessageBuffer::empty();
+//     assert_eq!(raw.network_id(), 0);
+//     assert_eq!(raw.version(), 0);
+//     assert_eq!(raw.message_type(), 0);
+//     assert_eq!(raw.payload_length(), 0);
+// }
 
-#[test]
-fn test_as_mut() {
-    let mut raw = MessageBuffer::empty();
-    {
-        let bytes = raw.as_mut();
-        bytes[0] = 1;
-        bytes[1] = 2;
-        bytes[2] = 3;
-        bytes[3] = 0;
-        bytes[4] = 5;
-        bytes[5] = 6;
-    }
-    assert_eq!(raw.network_id(), 1);
-    assert_eq!(raw.version(), 2);
-    assert_eq!(raw.message_type(), 3);
-    assert_eq!(raw.payload_length(), 1541);
-}
+// #[test]
+// fn test_as_mut() {
+//     let mut raw = MessageBuffer::empty();
+//     {
+//         let bytes = raw.as_mut();
+//         bytes[0] = 1;
+//         bytes[1] = 2;
+//         bytes[2] = 3;
+//         bytes[3] = 0;
+//         bytes[4] = 5;
+//         bytes[5] = 6;
+//     }
+//     assert_eq!(raw.network_id(), 1);
+//     assert_eq!(raw.version(), 2);
+//     assert_eq!(raw.message_type(), 3);
+//     assert_eq!(raw.payload_length(), 1541);
+// }

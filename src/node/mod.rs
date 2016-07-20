@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use time::{get_time, Duration};
+use time::{get_time, Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
@@ -91,7 +91,7 @@ impl Node {
     }
 
     fn initialize(&mut self) {
-        // info!("Start listening...");
+        info!("Start listening...");
         self.context.network.bind(&mut self.context.events).unwrap();
         let message = Connect::new(&self.context.public_key,
                                    self.context.network.address().clone(),
@@ -188,7 +188,8 @@ impl NodeContext {
 
     pub fn add_round_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;
-        let time = self.storage.last_propose().map(|p| p.time()).unwrap_or_else(|| get_time()) + Duration::milliseconds(ms as i64);
+        let time = self.storage.last_propose().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 1469002618, nsec: 0}) + Duration::milliseconds(ms as i64);
+        info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}", time, self.state.height(), self.state.round());
         let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
     }

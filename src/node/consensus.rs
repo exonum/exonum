@@ -17,8 +17,9 @@ pub struct ConsensusService;
 
 pub trait ConsensusHandler {
     fn handle(&self, ctx: &mut NodeContext, msg: ConsensusMessage) {
-        // Ignore messages from previous height
-        if msg.height() < ctx.state.height() + 1 {
+        info!("handle consensus message");
+        // Ignore messages from previous and future height
+        if msg.height() < ctx.state.height() || msg.height() > ctx.state.height() + 1 {
             return
         }
 
@@ -64,6 +65,7 @@ pub trait ConsensusHandler {
     }
 
     fn handle_propose(&self, ctx: &mut NodeContext, propose: Propose) {
+        info!("recv propose");
         // TODO: check time
         // TODO: check that transactions are not commited yet
 
@@ -121,6 +123,7 @@ pub trait ConsensusHandler {
     }
 
     fn handle_prevote(&self, ctx: &mut NodeContext, prevote: Prevote) {
+        info!("recv prevote");
         // Add prevote
         let has_consensus = ctx.state.add_prevote(&prevote);
 
@@ -185,6 +188,7 @@ pub trait ConsensusHandler {
 
     fn lock(&self, ctx: &mut NodeContext,
             round: Round, propose_hash: Hash) {
+        info!("MAKE LOCK");
         // Change lock
         ctx.state.lock(round, propose_hash);
 
@@ -214,6 +218,7 @@ pub trait ConsensusHandler {
     }
 
     fn handle_precommit(&self, ctx: &mut NodeContext, msg: Precommit) {
+        info!("recv precommit");
         // Add precommit
         let has_consensus = ctx.state.add_precommit(&msg);
 
@@ -246,10 +251,13 @@ pub trait ConsensusHandler {
 
     fn commit(&self, ctx: &mut NodeContext,
               round: Round, hash: &Hash) {
+        info!("COMMIT");
         // Merge changes into storage
         // FIXME: remove unwrap here, merge patch into storage
-        // ctx.storage.merge(ctx.state.propose(hash).unwrap().patch());
-        let block_hash = ctx.state.propose(hash).unwrap().block_hash().unwrap();
+        ctx.storage.merge(ctx.state.propose(hash).unwrap().patch().unwrap());
+
+        // FIXME: use block hash here
+        let block_hash = hash;
 
         // Update state to new height
         ctx.state.new_height(hash);
@@ -285,6 +293,7 @@ pub trait ConsensusHandler {
     }
 
     fn handle_tx(&mut self, ctx: &mut NodeContext, msg: TxMessage) {
+        info!("recv tx");
         let hash = msg.hash();
 
         // Make sure that it is new transaction
@@ -308,6 +317,7 @@ pub trait ConsensusHandler {
     }
 
     fn handle_commit(&self, ctx: &mut NodeContext, msg: Commit) {
+        info!("recv commit");
         // Handle message from future height
         if msg.height() > ctx.state.height() {
             // Check validator height info
@@ -351,6 +361,7 @@ pub trait ConsensusHandler {
 
     fn handle_round_timeout(&self, ctx: &mut NodeContext,
                             height: Height, round: Round) {
+        info!("ROUND TIMEOUT height={}, round={}", height, round);
         if height != ctx.state.height() {
             return
         }
@@ -359,11 +370,11 @@ pub trait ConsensusHandler {
             return
         }
 
-        // Add timeout for this round
-        ctx.add_round_timeout();
-
         // Update state to new round
         ctx.state.new_round();
+
+        // Add timeout for this round
+        ctx.add_round_timeout();
 
         // Send prevote if we are locked or propose if we are leader
         if let Some(hash) = ctx.state.locked_propose() {
@@ -381,6 +392,7 @@ pub trait ConsensusHandler {
 
     fn handle_request_timeout(&self, ctx: &mut NodeContext,
                               data: RequestData, validator: ValidatorId) {
+        info!("REQUEST TIMEOUT");
         if let Some(validator) = ctx.state.retry(&data, validator) {
             let duration = data.timeout();
             ctx.events.add_timeout(Timeout::Request(data.clone(), validator), duration);
@@ -445,13 +457,23 @@ pub trait ConsensusHandler {
 
     // FIXME: fix this bull shit
     fn execute(&self, ctx: &mut NodeContext, hash: &Hash) -> Hash {
-        // let fork = Fork::new(ctx.storage.as_ref());
+        let mut fork = ctx.storage.fork();
 
-        // fork.put_block(msg);
+        let msg = ctx.state.propose(hash).unwrap().message().clone();
 
-        // fork.patch().block_hash().clone()
+        // Update height
+        fork.heights().append(*hash);
+        // Save propose
+        fork.proposes().put(hash, msg.clone());
+        // Save transactions
+        for hash in msg.transactions() {
+            fork.transactions().put(hash, ctx.state.transactions().get(hash).unwrap().clone());
+        }
+        // FIXME: put precommits
 
-        // ctx.state.propose(hash).unwrap().set_patch(fork.patch()).block_hash().clone()
+        // Save patch
+        ctx.state.propose(hash).unwrap().set_patch(fork.patch());
+
         hash.clone()
     }
 
@@ -479,6 +501,7 @@ pub trait ConsensusHandler {
 
     fn request(&self, ctx: &mut NodeContext,
                data: RequestData, validator: ValidatorId) {
+        info!("REQUEST");
         let is_new = ctx.state.request(data.clone(), validator);
 
         if is_new {
@@ -493,6 +516,7 @@ pub trait ConsensusHandler {
     }
 
     fn send_propose(&self, ctx: &mut NodeContext) {
+        info!("send propose");
         let round = ctx.state.round();
         let txs : Vec<Hash> = ctx.state.transactions()
                                        .keys()
@@ -516,6 +540,7 @@ pub trait ConsensusHandler {
 
     fn send_prevote(&self, ctx: &mut NodeContext,
                     round: Round, propose_hash: &Hash) {
+        info!("send prevote");
         let locked_round = ctx.state.locked_round();
         if locked_round > 0 {
             debug_assert_eq!(&ctx.state.locked_propose().unwrap(), propose_hash);
@@ -532,6 +557,7 @@ pub trait ConsensusHandler {
 
     fn send_precommit(&self, ctx: &mut NodeContext,
                       round: Round, propose_hash: &Hash, block_hash: &Hash) {
+        info!("send precommit");
         let precommit = Precommit::new(ctx.state.id(),
                                        ctx.state.height(),
                                        round,
@@ -545,6 +571,7 @@ pub trait ConsensusHandler {
     fn send_commit(&self, ctx: &mut NodeContext,
                    height: Height, round: Round,
                    propose_hash: &Hash, block_hash: &Hash) {
+        info!("send commit");
         // Send commit
         let commit = Commit::new(ctx.state.id(),
                                  height,

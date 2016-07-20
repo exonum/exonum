@@ -1,5 +1,5 @@
 use std::net::SocketAddr;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 
 use time::{Timespec, Duration, get_time};
@@ -85,7 +85,8 @@ pub struct ProposeState {
     // Набор изменений, которые нужно внести в состояние для применения блока
     patch:          Option<Patch>,
     // Множество неизвестных транзакций из этого предложения
-    unknown_txs:    HashSet<Hash>
+    // FIXME: use HashSet here
+    unknown_txs:    BTreeSet<Hash>
 }
 
 impl RequestData {
@@ -133,7 +134,7 @@ impl ProposeState {
         &self.propose
     }
 
-    pub fn unknown_txs(&self) -> &HashSet<Hash> {
+    pub fn unknown_txs(&self) -> &BTreeSet<Hash> {
         &self.unknown_txs
     }
 
@@ -142,7 +143,17 @@ impl ProposeState {
     }
 
     pub fn block_hash(&self) -> Option<Hash> {
-        self.block_hash
+        // FIXME: here we should return block hash
+        // self.block_hash
+        Some(self.propose.hash())
+    }
+
+    pub fn set_patch(&mut self, patch: Patch) {
+        self.patch = Some(patch);
+    }
+
+    pub fn patch(&mut self) -> Option<Patch> {
+        self.patch.take()
     }
 }
 
@@ -263,6 +274,14 @@ impl State {
         self.height += 1;
         self.round = 1;
         self.locked_round = 0;
+
+        {
+            let state = self.proposes.get(&propose_hash)
+                                     .expect("Trying to commit unknown propose");
+            for tx in state.propose.transactions() {
+                self.transactions.remove(tx);
+            }
+        }
         // TODO: destruct/construct structure HeightState instead of call clear
         self.proposes.clear();
         self.prevotes.clear();
@@ -270,12 +289,6 @@ impl State {
         self.our_prevotes.clear();
         self.our_precommits.clear();
         self.requests.clear(); // FIXME: clear all timeouts
-
-        let state = self.proposes.get(&propose_hash)
-                                 .expect("Trying to commit unknown propose");
-        for tx in state.propose.transactions() {
-            self.transactions.remove(tx);
-        }
     }
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
@@ -319,11 +332,13 @@ impl State {
         match self.proposes.entry(propose_hash) {
             Entry::Occupied(..) => false,
             Entry::Vacant(e) => {
-                let unknown_txs = msg.transactions()
-                                     .iter()
-                                     .filter(|tx| !txs.contains_key(tx))
-                                     .map(|tx| *tx)
-                                     .collect(): HashSet<Hash>;
+                let unknown_txs = BTreeSet::new();
+                // FIXME: TEMPORARY, bad memory access occurs here o.O
+                // let unknown_txs = msg.transactions()
+                //                      .iter()
+                //                      .filter(|tx| !txs.contains_key(tx))
+                //                      .map(|tx| *tx)
+                //                      .collect(): BTreeSet<Hash>;
                 for tx in &unknown_txs {
                     self.unknown_txs.entry(*tx)
                                     .or_insert_with(Vec::new)

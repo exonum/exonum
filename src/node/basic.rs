@@ -14,12 +14,11 @@ pub trait BasicHandler {
     }
 
     fn handle_connect(&mut self, ctx: &mut NodeContext, message: Connect) {
-        // debug!("recv connect");
         let public_key = message.pub_key().clone();
         let address = message.addr();
         if ctx.state.add_peer(public_key, address) {
             // TODO: reduce double sending of connect message
-            // info!("Establish connection with {}", address);
+            info!("Establish connection with {}", address);
             let message = Connect::new(&ctx.public_key,
                                        ctx.network.address().clone(),
                                        get_time(),
