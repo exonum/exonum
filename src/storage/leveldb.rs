@@ -68,7 +68,7 @@ impl Map<[u8], Vec<u8>> for LevelDB {
 impl Database for LevelDB {
     fn merge(&mut self, patch: Patch) -> Result<(), Error> {
         let mut batch = Writebatch::new();
-        for (key, change) in patch.changes.into_iter() {
+        for (key, change) in patch.into_iter() {
             match change {
                 Change::Put(ref v) => {
                     batch.put(BinaryKey(key.to_vec()), v);

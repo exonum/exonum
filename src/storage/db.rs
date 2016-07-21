@@ -20,18 +20,16 @@ pub enum Change {
     Delete,
 }
 
-pub struct Patch {
-    pub changes: BTreeMap<Vec<u8>, Change>,
-}
+pub type Patch = BTreeMap<Vec<u8>, Change>;
 
 pub struct Fork<'a, T: Database + 'a> {
     database: &'a T,
-    changes: BTreeMap<Vec<u8>, Change>,
+    changes: Patch,
 }
 
 impl<'a, T: Database + 'a> Fork<'a, T> {
     pub fn patch(self) -> Patch {
-        Patch { changes: self.changes }
+        self.changes
     }
 }
 
@@ -64,7 +62,7 @@ impl<'a, T> Map<[u8], Vec<u8>> for Fork<'a, T>
 
 impl<'a, T: Database + 'a + ?Sized> Database for Fork<'a, T> {
     fn merge(&mut self, patch: Patch) -> Result<(), Error> {
-        self.changes.extend(patch.changes.into_iter());
+        self.changes.extend(patch.into_iter());
         Ok(())
     }
 }

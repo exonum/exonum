@@ -30,7 +30,7 @@ impl Map<[u8], Vec<u8>> for MemoryDB {
 
 impl Database for MemoryDB {
     fn merge(&mut self, patch: Patch) -> Result<(), Error> {
-        for (key, change) in patch.changes.into_iter() {
+        for (key, change) in patch.into_iter() {
             match change {
                 Change::Put(ref v) => {
                     self.map.insert(key.clone(), v.clone());
