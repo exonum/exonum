@@ -6,17 +6,25 @@ use std::ops::{Add, Sub};
 use super::{Map, Error, StorageValue};
 
 pub struct ListTable<T: Map<[u8], Vec<u8>>, K, V> {
-    pub map: T,
-    pub count: Cell<Option<K>>,
-    pub _v: PhantomData<V>,
+    map: T,
+    count: Cell<Option<K>>,
+    _v: PhantomData<V>,
 }
 
 impl<'a, T, K, V> ListTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
           K: Zero + One + Add<Output = K> + Sub<Output = K> + PartialEq + Copy + StorageValue,
-          ::std::ops::Range<K>: ::std::iter::Iterator<Item=K>,
+          ::std::ops::Range<K>: ::std::iter::Iterator<Item = K>,
           V: StorageValue
 {
+    pub fn new(map: T) -> Self {
+        ListTable {
+            map: map,
+            count: Cell::new(None),
+            _v: PhantomData,
+        }
+    }
+
     pub fn append(&mut self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.map.put(&len.serialize(), value.serialize())?;

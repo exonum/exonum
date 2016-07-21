@@ -3,10 +3,21 @@ use std::marker::PhantomData;
 use super::{Map, Error, StorageValue};
 
 pub struct MapTable<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> {
-    pub prefix: Vec<u8>,
-    pub storage: &'a mut T,
-    pub _k: PhantomData<K>,
-    pub _v: PhantomData<V>,
+    prefix: Vec<u8>,
+    storage: &'a mut T,
+    _k: PhantomData<K>,
+    _v: PhantomData<V>,
+}
+
+impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> MapTable<'a, T, K, V> {
+    pub fn new(prefix: Vec<u8>, storage: &'a mut T) -> Self {
+        MapTable {
+            prefix: prefix,
+            storage: storage,
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
 }
 
 impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>

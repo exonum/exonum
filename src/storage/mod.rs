@@ -1,4 +1,5 @@
-#[cfg(test)] mod tests;
+#[cfg(test)]
+mod tests;
 
 use std::slice::SliceConcatExt;
 use std::convert::AsRef;
@@ -9,7 +10,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::cell::Cell;
 use std::num::{Zero, One};
-use std::ops::{Add};
+use std::ops::{Add, Sub};
 
 use byteorder::{ByteOrder, BigEndian};
 
@@ -21,10 +22,10 @@ mod memorydb;
 mod map_table;
 mod list_table;
 
-pub use self::memorydb::{MemoryDB};
-pub use self::leveldb::{LevelDB};
-pub use self::map_table::{MapTable};
-pub use self::list_table::{ListTable};
+pub use self::memorydb::MemoryDB;
+pub use self::leveldb::LevelDB;
+pub use self::map_table::MapTable;
+pub use self::list_table::ListTable;
 
 pub struct Storage<T: Database> {
     db: T,
@@ -36,9 +37,7 @@ impl<T> Storage<T>
     where T: Database
 {
     pub fn new(backend: T) -> Self {
-        Storage {
-            db: backend
-        }
+        Storage { db: backend }
     }
 
     pub fn transactions<'a>(&'a mut self) -> MapTable<'a, T, Hash, TxMessage> {
@@ -60,14 +59,14 @@ impl<T> Storage<T>
     pub fn last_propose(&mut self) -> Result<Option<Propose>, Error> {
         Ok(match self.last_hash()? {
             Some(hash) => Some(self.proposes().get(&hash)?.unwrap()),
-            None => None
+            None => None,
         })
 
     }
 
     pub fn precommits<'a>(&'a mut self,
-                      hash: &'a Hash)
-                      -> ListTable<MapTable<'a, T, [u8], Vec<u8>>, u32, Precommit> {
+                          hash: &'a Hash)
+                          -> ListTable<MapTable<'a, T, [u8], Vec<u8>>, u32, Precommit> {
         self.db.list([&[03], hash.as_ref()].concat())
     }
 
@@ -80,14 +79,16 @@ impl<T> Storage<T>
     }
 }
 
-impl<'a, T> Storage<Fork<'a, T>> where T: Database {
+impl<'a, T> Storage<Fork<'a, T>>
+    where T: Database
+{
     pub fn patch(self) -> Patch {
         self.db.patch()
     }
 }
 
-//TODO In this implementation there are extra memory allocations when key is passed into specific database.
-//Think about key type. Maybe we can use keys with fixed length?
+// TODO In this implementation there are extra memory allocations when key is passed into specific database.
+// Think about key type. Maybe we can use keys with fixed length?
 pub trait Database: Map<[u8], Vec<u8>> + Sized {
     fn fork<'a>(&'a self) -> Fork<'a, Self> {
         Fork {
@@ -120,7 +121,8 @@ impl<'a, T: Database + 'a> Fork<'a, T> {
 }
 
 impl<'a, T> Map<[u8], Vec<u8>> for Fork<'a, T>
-    where T: Database + 'a {
+    where T: Database + 'a
+{
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         match self.changes.get(key) {
             Some(change) => {
@@ -212,7 +214,6 @@ impl StorageValue for TxMessage {
     fn deserialize(v: Vec<u8>) -> Self {
         TxMessage::from_raw(Arc::new(MessageBuffer::from_vec(v))).unwrap()
     }
-
 }
 
 impl StorageValue for Vec<u8> {
@@ -235,7 +236,8 @@ pub trait MapExt: Map<[u8], Vec<u8>> + Sized {
     fn list<'a, K, V>(&'a mut self,
                       prefix: Vec<u8>)
                       -> ListTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: Zero + One + Add<Output = K> + Copy + StorageValue,
+        where K: Zero + One + Add<Output = K> + Sub<Output = K> + PartialEq + Copy + StorageValue,
+              ::std::ops::Range<K>: ::std::iter::Iterator<Item = K>,
               V: StorageValue;
 
     fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> MapTable<'a, Self, K, V>;
@@ -247,22 +249,14 @@ impl<T> MapExt for T
     fn list<'a, K, V>(&'a mut self,
                       prefix: Vec<u8>)
                       -> ListTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: Copy + StorageValue,
+        where K: Zero + One + Add<Output = K> + Sub<Output = K> + PartialEq + Copy + StorageValue,
+              ::std::ops::Range<K>: ::std::iter::Iterator<Item = K>,
               V: StorageValue
     {
-        ListTable {
-            map: self.map(prefix),
-            count: Cell::new(None),
-            _v: PhantomData,
-        }
+        ListTable::new(self.map(prefix))
     }
 
     fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> MapTable<'a, Self, K, V> {
-        MapTable {
-            prefix: prefix,
-            storage: self,
-            _k: PhantomData,
-            _v: PhantomData,
-        }
+        MapTable::new(prefix, self)
     }
 }
