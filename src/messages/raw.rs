@@ -164,14 +164,14 @@ pub trait Message : Sized {
     }
 }
 
-// #[test]
-// fn test_empty_message() {
-//     let raw = MessageBuffer::empty();
-//     assert_eq!(raw.network_id(), 0);
-//     assert_eq!(raw.version(), 0);
-//     assert_eq!(raw.message_type(), 0);
-//     assert_eq!(raw.payload_length(), 0);
-// }
+#[test]
+fn test_empty_message() {
+    let raw = MessageBuffer::empty();
+    assert_eq!(raw.network_id(), 0);
+    assert_eq!(raw.version(), 0);
+    assert_eq!(raw.message_type(), 0);
+    assert_eq!(raw.payload_length(), 0);
+}
 
 // #[test]
 // fn test_as_mut() {
