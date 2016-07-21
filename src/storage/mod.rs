@@ -101,6 +101,7 @@ pub trait MapExt: Map<[u8], Vec<u8>> + Sized {
     fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> MapTable<'a, Self, K, V>;
 }
 
+//TODO MapExt looks too complex. Find more simple way.
 impl<T> MapExt for T
     where T: Map<[u8], Vec<u8>> + Sized
 {
