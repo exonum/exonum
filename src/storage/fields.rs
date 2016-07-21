@@ -4,7 +4,7 @@ use std::sync::Arc;
 use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::Hash;
-use ::messages::{MessageBuffer, Message, TxMessage, Precommit, Propose};
+use ::messages::{MessageBuffer, Message, TxMessage};
 
 pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;

@@ -3,7 +3,6 @@ mod tests;
 
 use std::slice::SliceConcatExt;
 use std::convert::AsRef;
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::num::{Zero, One};
 use std::ops::{Add, Sub};
