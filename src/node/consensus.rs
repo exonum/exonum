@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use time::{get_time};
 
-use super::super::events::{Events, Event, Timeout, EventsConfiguration};
+use super::super::events::{Reactor, Events, Event, Timeout, EventsConfiguration};
 use super::super::crypto::{Hash, hash};
 use super::super::messages::{
     ConsensusMessage, Propose, Prevote, Precommit, Commit, Message,

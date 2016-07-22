@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use time::{get_time, Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
-use super::events::{Events, Event, Timeout, EventsConfiguration};
+use super::events::{Reactor, Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration, PeerId, EventSet};
 use super::storage::{Storage, MemoryDB};
 use super::messages::{Any, Connect, RawMessage, Message};

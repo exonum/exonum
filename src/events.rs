@@ -80,6 +80,19 @@ impl mio::Handler for EventsQueue {
     }
 }
 
+pub trait Reactor {
+    fn get_time(&self) -> Timespec;
+    fn poll(&mut self) -> Event;
+    fn io(&mut self, id: PeerId, set: EventSet) -> io::Result<()>;
+    fn bind(&mut self) -> ::std::io::Result<()>;
+    fn send_to(&mut self,
+                   address: &SocketAddr,
+                   message: RawMessage) -> io::Result<()>;
+    fn address(&self) -> &SocketAddr;
+    fn push(&mut self, event: Event);
+    fn add_timeout(&mut self, timeout: Timeout, time: Timespec);
+}
+
 impl Events {
     pub fn with_config(config: EventsConfiguration,
                        network: Network) -> io::Result<Events> {
@@ -90,12 +103,14 @@ impl Events {
             network: network
         })
     }
+}
 
-    pub fn get_time(&self) -> Timespec {
+impl Reactor for Events {
+    fn get_time(&self) -> Timespec {
         get_time()
     }
 
-    pub fn poll(&mut self) -> Event {
+    fn poll(&mut self) -> Event {
         loop {
             if let Some(event) = self.queue.pop() {
                 return event;
@@ -106,7 +121,7 @@ impl Events {
         }
     }
 
-    pub fn io(&mut self, id: PeerId, set: EventSet) -> io::Result<()> {
+    fn io(&mut self, id: PeerId, set: EventSet) -> io::Result<()> {
         while let Some(buf) = self.network.io(&mut self.event_loop, id, set)? {
             self.queue.push(Event::Incoming(RawMessage::new(buf)));
         }
@@ -114,27 +129,27 @@ impl Events {
     }
 
 
-    pub fn bind(&mut self) -> ::std::io::Result<()> {
+    fn bind(&mut self) -> ::std::io::Result<()> {
         self.network.bind(&mut self.event_loop)
     }
 
-    pub fn send_to(&mut self,
+    fn send_to(&mut self,
                    address: &SocketAddr,
                    message: RawMessage) -> io::Result<()> {
         self.network.send_to(&mut self.event_loop, address, message)
     }
 
-    pub fn address(&self) -> &SocketAddr {
+    fn address(&self) -> &SocketAddr {
         self.network.address()
     }
 
-    pub fn push(&mut self, event: Event) {
+    fn push(&mut self, event: Event) {
         self.queue.push(event)
     }
 
-    pub fn add_timeout(&mut self,
-                       timeout: Timeout,
-                       time: Timespec) {
+    fn add_timeout(&mut self,
+                   timeout: Timeout,
+                   time: Timespec) {
         let ms = (time - self.get_time()).num_milliseconds();
         if ms < 0 {
             self.push(Event::Timeout(timeout));

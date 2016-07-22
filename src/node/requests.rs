@@ -5,6 +5,7 @@ use super::super::messages::{
     RequestPropose, RequestTransactions, RequestPrevotes,
     RequestPrecommits, RequestCommit, RequestPeers
 };
+use super::super::events::Reactor;
 use super::super::storage::{Map};
 use super::{NodeContext};
 
