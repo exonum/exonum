@@ -400,7 +400,7 @@ pub trait ConsensusHandler {
                 &RequestData::Propose(ref propose_hash) =>
                     RequestPropose::new(ctx.state.id(),
                                         validator,
-                                        ctx.get_time(),
+                                        ctx.events.get_time(),
                                         ctx.state.height(),
                                         propose_hash,
                                         &ctx.secret_key).raw().clone(),
@@ -413,14 +413,14 @@ pub trait ConsensusHandler {
                                                 .collect();
                     RequestTransactions::new(ctx.state.id(),
                                              validator,
-                                             ctx.get_time(),
+                                             ctx.events.get_time(),
                                              &txs,
                                              &ctx.secret_key).raw().clone()
                 },
                 &RequestData::Prevotes(round, ref propose_hash) =>
                     RequestPrevotes::new(ctx.state.id(),
                                          validator,
-                                         ctx.get_time(),
+                                         ctx.events.get_time(),
                                          ctx.state.height(),
                                          round,
                                          propose_hash,
@@ -428,7 +428,7 @@ pub trait ConsensusHandler {
                 &RequestData::Precommits(round, ref propose_hash, ref block_hash) =>
                     RequestPrecommits::new(ctx.state.id(),
                                         validator,
-                                        ctx.get_time(),
+                                        ctx.events.get_time(),
                                         ctx.state.height(),
                                         round,
                                         propose_hash,
@@ -437,13 +437,13 @@ pub trait ConsensusHandler {
                 &RequestData::Commit =>
                     RequestCommit::new(ctx.state.id(),
                                        validator,
-                                       ctx.get_time(),
+                                       ctx.events.get_time(),
                                        ctx.state.height(),
                                        &ctx.secret_key).raw().clone(),
                 &RequestData::Peers =>
                     RequestPeers::new(ctx.state.id(),
                                       validator,
-                                      ctx.get_time(),
+                                      ctx.events.get_time(),
                                       &ctx.secret_key).raw().clone()
             };
             ctx.send_to_validator(validator, &message);

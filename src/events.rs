@@ -1,4 +1,5 @@
 use std::io;
+use std::net::SocketAddr;
 use std::collections::VecDeque;
 use time::{get_time, Timespec};
 
@@ -7,6 +8,7 @@ use mio;
 use super::messages::RawMessage;
 
 use super::node::{RequestData, ValidatorId};
+use super::network::{Network, PeerId, EventSet};
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 
@@ -79,12 +81,18 @@ impl mio::Handler for EventsQueue {
 }
 
 impl Events {
-    pub fn with_config(config: EventsConfiguration) -> io::Result<Events> {
+    pub fn with_config(config: EventsConfiguration,
+                       network: Network) -> io::Result<Events> {
         // TODO: using EventLoopConfig + capacity of queue
         Ok(Events {
             event_loop: EventLoop::configured(config)?,
-            queue: EventsQueue::new()
+            queue: EventsQueue::new(),
+            network: network
         })
+    }
+
+    pub fn get_time(&self) -> Timespec {
+        get_time()
     }
 
     pub fn poll(&mut self) -> Event {
@@ -98,20 +106,26 @@ impl Events {
         }
     }
 
-    fn bind(&mut self) -> ::std::io::Result<()> {
-        self.network.bind(&mut self.events)
+    pub fn io(&mut self, id: PeerId, set: EventSet) -> io::Result<()> {
+        while let Some(buf) = self.network.io(&mut self.event_loop, id, set)? {
+            self.queue.push(Event::Incoming(RawMessage::new(buf)));
+        }
+        Ok(())
     }
 
-    fn address(&self) -> &SocketAddr {
+
+    pub fn bind(&mut self) -> ::std::io::Result<()> {
+        self.network.bind(&mut self.event_loop)
+    }
+
+    pub fn send_to(&mut self,
+                   address: &SocketAddr,
+                   message: RawMessage) -> io::Result<()> {
+        self.network.send_to(&mut self.event_loop, address, message)
+    }
+
+    pub fn address(&self) -> &SocketAddr {
         self.network.address()
-    }
-
-    fn io(&mut self, id: PeerId, set: EventSet) -> ::std::io::Result<()> {
-        self.network.io(&mut self.event_loop, id, set)
-    }
-
-    pub fn event_loop(&mut self) -> &mut EventLoop {
-        &mut self.event_loop
     }
 
     pub fn push(&mut self, event: Event) {
@@ -121,7 +135,7 @@ impl Events {
     pub fn add_timeout(&mut self,
                        timeout: Timeout,
                        time: Timespec) {
-        let ms = (time - get_time()).num_milliseconds();
+        let ms = (time - self.get_time()).num_milliseconds();
         if ms < 0 {
             self.push(Event::Timeout(timeout));
         } else {

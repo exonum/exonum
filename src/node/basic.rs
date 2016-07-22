@@ -20,8 +20,8 @@ pub trait BasicHandler {
             // TODO: reduce double sending of connect message
             info!("Establish connection with {}", address);
             let message = Connect::new(&ctx.public_key,
-                                       ctx.address().clone(),
-                                       ctx.get_time(),
+                                       ctx.events.address().clone(),
+                                       ctx.events.get_time(),
                                        &ctx.secret_key);
             ctx.send_to_addr(&address, message.raw());
         }

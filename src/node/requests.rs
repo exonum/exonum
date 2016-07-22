@@ -23,7 +23,7 @@ pub trait RequestHandler {
         }
 
         // FIXME: we should use some epsilon for checking lifetime < 0
-        let lifetime = match (ctx.get_time() - msg.time()).num_nanoseconds() {
+        let lifetime = match (ctx.events.get_time() - msg.time()).num_nanoseconds() {
             Some(nanos) => nanos,
             None => {
                 // Incorrect time into message

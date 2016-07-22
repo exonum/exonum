@@ -33,7 +33,6 @@ pub struct NodeContext {
     pub secret_key: SecretKey,
     pub state: State,
     pub events: Events,
-    pub network: Network,
     pub storage: Storage<MemoryDB>,
     pub propose_timeout: u32,
     pub round_timeout: u32,
@@ -63,8 +62,8 @@ impl Node {
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
         let tx_generator = TxGenerator::new();
-        let events = Events::with_config(config.events).unwrap();
         let network = Network::with_config(config.network);
+        let events = Events::with_config(config.events, network).unwrap();
         let state = State::new(id as u32, config.validators);
         let basic = Box::new(BasicService) as Box<BasicHandler>;
         let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
@@ -76,7 +75,6 @@ impl Node {
                 secret_key: config.secret_key,
                 state: state,
                 events: events,
-                network: network,
                 storage: storage,
                 propose_timeout: config.propose_timeout,
                 round_timeout: config.round_timeout,
@@ -92,13 +90,13 @@ impl Node {
 
     fn initialize(&mut self) {
         info!("Start listening...");
-        self.context.bind().unwrap();
+        self.context.events.bind().unwrap();
         let message = Connect::new(&self.context.public_key,
-                                   self.context.address().clone(),
-                                   self.context.get_time(),
+                                   self.context.events.address().clone(),
+                                   self.context.events.get_time(),
                                    &self.context.secret_key);
         for address in self.context.peer_discovery.clone().iter() {
-            if address == self.context.address() {
+            if address == self.context.events.address() {
                 continue
             }
             self.context.send_to_addr(address, message.raw());
@@ -113,7 +111,7 @@ impl Node {
             if self.context.state.height() == 1000 {
                 break;
             }
-            match self.context.poll() {
+            match self.context.events.poll() {
                 Event::Incoming(message) => {
                     self.handle_message(message);
                 },
@@ -126,7 +124,7 @@ impl Node {
                 Event::Io(id, set) => {
                     // TODO: shoud we call network.io through main event queue?
                     // FIXME: Remove unwrap here
-                    self.context.io(id, set).unwrap()
+                    self.context.events.io(id, set).unwrap()
                 },
                 Event::Error(_) => {
 
@@ -165,26 +163,6 @@ impl Node {
 }
 
 impl NodeContext {
-    fn get_time(&self) -> Timespec {
-        get_time()
-    }
-
-    fn poll(&mut self) -> Event {
-        self.events.poll()
-    }
-
-    fn bind(&mut self) -> ::std::io::Result<()> {
-        self.network.bind(&mut self.events)
-    }
-
-    fn address(&self) -> &SocketAddr {
-        self.network.address()
-    }
-
-    fn io(&mut self, id: PeerId, set: EventSet) -> ::std::io::Result<()> {
-        self.network.io(&mut self.events, id, set)
-    }
-
     fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
         // TODO: check validator id
         let public_key = self.state.validators()[id as usize];
@@ -194,14 +172,14 @@ impl NodeContext {
     fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         let &mut NodeContext {ref state, ref mut events, ..} = self;
         if let Some(addr) = state.peers().get(&public_key) {
-            self.network.send_to(events, addr, message.clone()).unwrap();
+            events.send_to(addr, message.clone()).unwrap();
         } else {
             // TODO: warning - hasn't connection with peer
         }
     }
 
     fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        self.network.send_to(&mut self.events, address, message.clone()).unwrap();
+        self.events.send_to(address, message.clone()).unwrap();
     }
 
     fn add_round_timeout(&mut self) {
@@ -215,16 +193,14 @@ impl NodeContext {
     pub fn add_request_timeout(&mut self,
                                data: RequestData,
                                validator: ValidatorId) {
-        let time = self.get_time() + data.timeout();
+        let time = self.events.get_time() + data.timeout();
         self.events.add_timeout(Timeout::Request(data, validator), time);
     }
 
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
         for address in self.state.peers().values() {
-            self.network.send_to(&mut self.events,
-                                 address,
-                                 message.clone()).unwrap();
+            self.events.send_to(address, message.clone()).unwrap();
         }
     }
 }

@@ -7,8 +7,8 @@ use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
 use super::connection::{IncomingConnection, OutgoingConnection};
-use super::events::{Events, Event};
-use super::messages::RawMessage;
+use super::events::{Events, Event, EventLoop};
+use super::messages::{MessageBuffer, RawMessage};
 
 pub type PeerId = Token;
 
@@ -52,13 +52,13 @@ impl Network {
         &self.listen_address
     }
 
-    pub fn bind(&mut self, events: &mut Events) -> io::Result<()> {
+    pub fn bind(&mut self, event_loop: &mut EventLoop) -> io::Result<()> {
         if let Some(_) = self.listener {
             return Err(io::Error::new(io::ErrorKind::Other,
                                       "Already binded"));
         }
         let listener = TcpListener::bind(&self.listen_address)?;
-        let r = events.event_loop().register(
+        let r = event_loop.register(
             &listener, SERVER_ID,
             EventSet::readable(),
             PollOpt::edge()
@@ -75,19 +75,19 @@ impl Network {
     // TODO: Use ticks for fast reregistering sockets
     // TODO: Implement Connections collection with (re)registering
 
-    pub fn io(&mut self, events: &mut Events,
-             id: PeerId, set: EventSet) -> io::Result<()> {
+    pub fn io(&mut self, event_loop: &mut EventLoop,
+             id: PeerId, set: EventSet) -> io::Result<Option<MessageBuffer>> {
         if set.is_error() {
             // TODO: TEMPORARY FIX, MAKE IT NORMAL
             self.addresses.remove(self.outgoing[id].address());
             self.outgoing.remove(id);
-            return Ok(())
+            return Ok(None)
         }
 
         if set.is_hup() {
             // TODO: TEMPORARY FIX, MAKE IT NORMAL
             self.incoming.remove(id);
-            return Ok(())
+            return Ok(None)
         }
 
         if id == SERVER_ID {
@@ -95,7 +95,7 @@ impl Network {
             // FIXME: Fail-safe accepting of new connections?
             let listener = match self.listener {
                 Some(ref listener) => listener,
-                None => return Ok(()),
+                None => return Ok(None),
             };
             while let Some((socket, address)) = listener.accept()? {
                 let peer = IncomingConnection::new(socket, address);
@@ -106,7 +106,7 @@ impl Network {
                                                   "Maximum connections"));
                     }
                 };
-                let r = events.event_loop().register(
+                let r = event_loop.register(
                     self.incoming[id].socket(), id,
                     EventSet::readable() | EventSet::hup(),
                     PollOpt::edge()
@@ -116,14 +116,14 @@ impl Network {
                     return Err(e)
                 }
             }
-            return Ok(())
+            return Ok(None)
         }
 
         if set.is_writable() {
             // Write data into socket
             self.outgoing[id].writable()?;
             if !self.outgoing[id].is_idle() {
-                let r = events.event_loop().reregister(
+                let r = event_loop.reregister(
                     self.outgoing[id].socket(), id,
                     EventSet::writable() | EventSet::hup(),
                     PollOpt::edge() | PollOpt::oneshot()
@@ -134,15 +134,13 @@ impl Network {
                     return Err(e);
                 }
             }
-            return Ok(());
+            return Ok(None);
         }
 
         if set.is_readable() {
             // Read new data from socket
-            while let Some(data) = self.incoming[id].readable()? {
-                events.push(Event::Incoming(RawMessage::new(data)))
-            };
-            // let r = events.event_loop().reregister(
+            return self.incoming[id].readable();
+            // let r = event_loop.reregister(
             //     self.incoming[id].socket(), id,
             //     EventSet::readable() | EventSet::hup(),
             //     PollOpt::level()
@@ -151,13 +149,12 @@ impl Network {
             //     self.incoming.remove(id);
             //     return Err(e);
             // }
-            return Ok(())
         }
         // FIXME: Can we be here?
-        return Ok(())
+        return Ok(None)
     }
 
-    pub fn get_peer(&mut self, events: &mut Events, address: &SocketAddr)
+    pub fn get_peer(&mut self, event_loop: &mut EventLoop, address: &SocketAddr)
                     -> io::Result<PeerId> {
         if let Some(id) = self.addresses.get(address) {
             return Ok(*id)
@@ -172,7 +169,7 @@ impl Network {
             }
         };
         self.addresses.insert(address.clone(), id);
-        let r = events.event_loop().register(
+        let r = event_loop.register(
             self.outgoing[id].socket(), id,
             EventSet::writable() | EventSet::hup(),
             PollOpt::edge() | PollOpt::oneshot()
@@ -188,12 +185,12 @@ impl Network {
     }
 
     pub fn send_to(&mut self,
-                   events: &mut Events,
+                   event_loop: &mut EventLoop,
                    address: &SocketAddr,
                    message: RawMessage) -> io::Result<()> {
-        let id = self.get_peer(events, address)?;
+        let id = self.get_peer(event_loop, address)?;
         self.outgoing[id].send(message);
-        let r = events.event_loop().reregister(
+        let r = event_loop.reregister(
             self.outgoing[id].socket(), id,
             EventSet::writable() | EventSet::hup(),
             PollOpt::edge() | PollOpt::oneshot()
