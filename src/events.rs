@@ -31,7 +31,8 @@ pub enum Event {
 
 pub struct Events {
     event_loop: EventLoop,
-    queue: EventsQueue
+    queue: EventsQueue,
+    network: Network,
 }
 
 pub struct EventsQueue {
@@ -95,6 +96,18 @@ impl Events {
                 self.queue.push(Event::Error(err))
             }
         }
+    }
+
+    fn bind(&mut self) -> ::std::io::Result<()> {
+        self.network.bind(&mut self.events)
+    }
+
+    fn address(&self) -> &SocketAddr {
+        self.network.address()
+    }
+
+    fn io(&mut self, id: PeerId, set: EventSet) -> ::std::io::Result<()> {
+        self.network.io(&mut self.event_loop, id, set)
     }
 
     pub fn event_loop(&mut self) -> &mut EventLoop {

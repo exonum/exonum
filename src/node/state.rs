@@ -90,7 +90,7 @@ pub struct ProposeState {
 }
 
 impl RequestData {
-    pub fn timeout(&self) -> Timespec { // TODO: return Duration
+    pub fn timeout(&self) -> Duration {
         let ms = match *self {
             RequestData::Propose(..)      => REQUEST_PROPOSE_WAIT,
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
@@ -99,7 +99,7 @@ impl RequestData {
             RequestData::Commit           => REQUEST_COMMIT_WAIT,
             RequestData::Peers            => REQUEST_PEERS_WAIT,
         };
-        get_time() + Duration::milliseconds(ms as i64)
+        Duration::milliseconds(ms as i64)
     }
 }
 

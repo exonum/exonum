@@ -4,7 +4,7 @@ use time::{get_time, Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, Event, Timeout, EventsConfiguration};
-use super::network::{Network, NetworkConfiguration};
+use super::network::{Network, NetworkConfiguration, PeerId, EventSet};
 use super::storage::{Storage, MemoryDB};
 use super::messages::{Any, Connect, RawMessage, Message};
 use super::tx_generator::TxGenerator;
@@ -92,18 +92,16 @@ impl Node {
 
     fn initialize(&mut self) {
         info!("Start listening...");
-        self.context.network.bind(&mut self.context.events).unwrap();
+        self.context.bind().unwrap();
         let message = Connect::new(&self.context.public_key,
-                                   self.context.network.address().clone(),
-                                   get_time(),
+                                   self.context.address().clone(),
+                                   self.context.get_time(),
                                    &self.context.secret_key);
-        for address in self.context.peer_discovery.iter() {
-            if address == self.context.network.address() {
+        for address in self.context.peer_discovery.clone().iter() {
+            if address == self.context.address() {
                 continue
             }
-            self.context.network.send_to(&mut self.context.events,
-                                 address,
-                                 message.raw().clone()).unwrap();
+            self.context.send_to_addr(address, message.raw());
         }
 
         self.context.add_round_timeout();
@@ -115,7 +113,7 @@ impl Node {
             if self.context.state.height() == 1000 {
                 break;
             }
-            match self.context.events.poll() {
+            match self.context.poll() {
                 Event::Incoming(message) => {
                     self.handle_message(message);
                 },
@@ -128,7 +126,7 @@ impl Node {
                 Event::Io(id, set) => {
                     // TODO: shoud we call network.io through main event queue?
                     // FIXME: Remove unwrap here
-                    self.context.network.io(&mut self.context.events, id, set).unwrap()
+                    self.context.io(id, set).unwrap()
                 },
                 Event::Error(_) => {
 
@@ -167,6 +165,26 @@ impl Node {
 }
 
 impl NodeContext {
+    fn get_time(&self) -> Timespec {
+        get_time()
+    }
+
+    fn poll(&mut self) -> Event {
+        self.events.poll()
+    }
+
+    fn bind(&mut self) -> ::std::io::Result<()> {
+        self.network.bind(&mut self.events)
+    }
+
+    fn address(&self) -> &SocketAddr {
+        self.network.address()
+    }
+
+    fn io(&mut self, id: PeerId, set: EventSet) -> ::std::io::Result<()> {
+        self.network.io(&mut self.events, id, set)
+    }
+
     fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
         // TODO: check validator id
         let public_key = self.state.validators()[id as usize];
@@ -186,12 +204,19 @@ impl NodeContext {
         self.network.send_to(&mut self.events, address, message.clone()).unwrap();
     }
 
-    pub fn add_round_timeout(&mut self) {
+    fn add_round_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;
         let time = self.storage.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 1469002618, nsec: 0}) + Duration::milliseconds(ms as i64);
         info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}", time, self.state.height(), self.state.round());
         let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
+    }
+
+    pub fn add_request_timeout(&mut self,
+                               data: RequestData,
+                               validator: ValidatorId) {
+        let time = self.get_time() + data.timeout();
+        self.events.add_timeout(Timeout::Request(data, validator), time);
     }
 
     // TODO: use Into<RawMessage>

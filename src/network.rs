@@ -2,7 +2,7 @@ use std::io;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-use mio::{EventSet, PollOpt, Token};
+pub use mio::{EventSet, PollOpt, Token};
 use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 

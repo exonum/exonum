@@ -394,14 +394,13 @@ pub trait ConsensusHandler {
                               data: RequestData, validator: ValidatorId) {
         info!("REQUEST TIMEOUT");
         if let Some(validator) = ctx.state.retry(&data, validator) {
-            let duration = data.timeout();
-            ctx.events.add_timeout(Timeout::Request(data.clone(), validator), duration);
+            ctx.add_request_timeout(data.clone(), validator);
 
             let message = match &data {
                 &RequestData::Propose(ref propose_hash) =>
                     RequestPropose::new(ctx.state.id(),
                                         validator,
-                                        get_time(),
+                                        ctx.get_time(),
                                         ctx.state.height(),
                                         propose_hash,
                                         &ctx.secret_key).raw().clone(),
@@ -414,14 +413,14 @@ pub trait ConsensusHandler {
                                                 .collect();
                     RequestTransactions::new(ctx.state.id(),
                                              validator,
-                                             get_time(),
+                                             ctx.get_time(),
                                              &txs,
                                              &ctx.secret_key).raw().clone()
                 },
                 &RequestData::Prevotes(round, ref propose_hash) =>
                     RequestPrevotes::new(ctx.state.id(),
                                          validator,
-                                         get_time(),
+                                         ctx.get_time(),
                                          ctx.state.height(),
                                          round,
                                          propose_hash,
@@ -429,7 +428,7 @@ pub trait ConsensusHandler {
                 &RequestData::Precommits(round, ref propose_hash, ref block_hash) =>
                     RequestPrecommits::new(ctx.state.id(),
                                         validator,
-                                        get_time(),
+                                        ctx.get_time(),
                                         ctx.state.height(),
                                         round,
                                         propose_hash,
@@ -438,13 +437,13 @@ pub trait ConsensusHandler {
                 &RequestData::Commit =>
                     RequestCommit::new(ctx.state.id(),
                                        validator,
-                                       get_time(),
+                                       ctx.get_time(),
                                        ctx.state.height(),
                                        &ctx.secret_key).raw().clone(),
                 &RequestData::Peers =>
                     RequestPeers::new(ctx.state.id(),
                                       validator,
-                                      get_time(),
+                                      ctx.get_time(),
                                       &ctx.secret_key).raw().clone()
             };
             ctx.send_to_validator(validator, &message);
@@ -505,8 +504,7 @@ pub trait ConsensusHandler {
         let is_new = ctx.state.request(data.clone(), validator);
 
         if is_new {
-            let duration = data.timeout();
-            ctx.events.add_timeout(Timeout::Request(data, validator), duration);
+            ctx.add_request_timeout(data, validator);
         }
     }
 
