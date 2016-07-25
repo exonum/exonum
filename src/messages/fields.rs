@@ -139,11 +139,14 @@ pub trait SegmentField<'a> {
 
 impl<'a, T> Field<'a> for T where T: SegmentField<'a> {
     fn read(buffer: &'a [u8], from: usize, to: usize) -> T {
-        let pos = LittleEndian::read_u32(&buffer[from..from+4]);
-        let len = LittleEndian::read_u32(&buffer[from+4..to]);
-        Self::from_slice(unsafe {
-            ::std::slice::from_raw_parts(pos as *const u8, len as usize)
-        })
+        unsafe {
+            let pos = LittleEndian::read_u32(&buffer[from..from+4]);
+            let len = LittleEndian::read_u32(&buffer[from+4..to]);
+            let ptr = buffer.as_ptr().offset(pos as isize);
+            Self::from_slice(unsafe {
+                ::std::slice::from_raw_parts(ptr as *const u8, len as usize)
+            })
+        }
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
