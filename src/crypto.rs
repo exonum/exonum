@@ -12,5 +12,6 @@ pub use sodiumoxide::crypto::sign::ed25519::{
 
 pub use sodiumoxide::crypto::hash::sha256::{
     hash,
-    Digest as Hash
+    Digest as Hash,
+    DIGESTBYTES as HASH_SIZE
 };
