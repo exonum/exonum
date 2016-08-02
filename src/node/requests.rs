@@ -1,13 +1,10 @@
-use time::{get_time, Duration};
-
 use super::super::messages::{
     RequestMessage, Message,
     RequestPropose, RequestTransactions, RequestPrevotes,
     RequestPrecommits, RequestCommit, RequestPeers
 };
-use super::super::events::Reactor;
-use super::super::storage::{Map};
-use super::{NodeContext};
+use super::super::storage::Map;
+use super::NodeContext;
 
 
 
@@ -144,7 +141,7 @@ pub trait RequestHandler {
         }
     }
 
-    fn handle_peers(&mut self, ctx: &mut NodeContext, msg: RequestPeers) {
+    fn handle_peers(&mut self, _: &mut NodeContext, _: RequestPeers) {
         // TODO
     }
 }

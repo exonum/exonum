@@ -7,7 +7,7 @@ use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
 use super::connection::{IncomingConnection, OutgoingConnection};
-use super::events::{Events, Event, EventLoop};
+use super::events::{EventLoop};
 use super::messages::{MessageBuffer, RawMessage};
 
 pub type PeerId = Token;

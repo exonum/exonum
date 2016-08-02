@@ -6,7 +6,6 @@
 #![feature(inclusive_range_syntax)]
 #![feature(type_ascription)]
 #![feature(slice_concat_ext)]
-#![feature(zero_one)]
 
 #[macro_use]
 extern crate log;
@@ -19,6 +18,7 @@ extern crate sodiumoxide;
 extern crate leveldb;
 extern crate db_key;
 extern crate tempdir;
+extern crate num;
 
 #[macro_use]
 pub mod messages;

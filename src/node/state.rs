@@ -2,7 +2,14 @@ use std::net::SocketAddr;
 use std::collections::{HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 
-use time::{Timespec, Duration, get_time};
+use time::{Duration};
+
+use super::super::messages::{
+    TxMessage, Message,
+    Propose, Prevote, Precommit, ConsensusMessage
+};
+use super::super::crypto::{PublicKey, Hash, hash};
+use super::super::storage::{Patch};
 
 const REQUEST_PROPOSE_WAIT       : u64 = 1_000_000; // milliseconds
 const REQUEST_TRANSACTIONS_WAIT  : u64 = 1_000_000;
@@ -10,13 +17,6 @@ const REQUEST_PREVOTES_WAIT      : u64 = 1_000_000;
 const REQUEST_PRECOMMITS_WAIT    : u64 = 1_000_000;
 const REQUEST_COMMIT_WAIT        : u64 = 1_000_000;
 const REQUEST_PEERS_WAIT         : u64 = 1_000_000;
-
-use super::super::messages::{
-    TxMessage, Message, RequestMessage,
-    Propose, Prevote, Precommit, ConsensusMessage
-};
-use super::super::crypto::{PublicKey, Hash, hash};
-use super::super::storage::{Patch};
 
 pub type Round = u32;
 pub type Height = u64;
@@ -228,8 +228,8 @@ impl State {
     pub fn validator_heights(&self) -> Vec<ValidatorId> {
         self.validator_heights.iter()
                               .enumerate()
-                              .filter(|&(v, h)| *h > self.height())
-                              .map(|(v, h)| v as ValidatorId)
+                              .filter(|&(_, h)| *h > self.height())
+                              .map(|(v, _)| v as ValidatorId)
                               .collect()
     }
 
@@ -332,13 +332,11 @@ impl State {
         match self.proposes.entry(propose_hash) {
             Entry::Occupied(..) => false,
             Entry::Vacant(e) => {
-                let unknown_txs = BTreeSet::new();
-                // FIXME: TEMPORARY, bad memory access occurs here o.O
-                // let unknown_txs = msg.transactions()
-                //                      .iter()
-                //                      .filter(|tx| !txs.contains_key(tx))
-                //                      .map(|tx| *tx)
-                //                      .collect(): BTreeSet<Hash>;
+                let unknown_txs = msg.transactions()
+                                     .iter()
+                                     .filter(|tx| !txs.contains_key(tx))
+                                     .map(|tx| *tx)
+                                     .collect(): BTreeSet<Hash>;
                 for tx in &unknown_txs {
                     self.unknown_txs.entry(*tx)
                                     .or_insert_with(Vec::new)

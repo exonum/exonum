@@ -4,7 +4,7 @@ use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, Timeout, EventsConfiguration};
-use super::network::{Network, NetworkConfiguration, PeerId, EventSet};
+use super::network::{Network, NetworkConfiguration};
 use super::storage::{Storage, MemoryDB};
 use super::messages::{Any, Connect, RawMessage, Message};
 use super::tx_generator::TxGenerator;

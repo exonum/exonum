@@ -1,4 +1,4 @@
-use rand::{XorShiftRng, Rand, Rng, SeedableRng};
+use rand::{XorShiftRng, Rng, SeedableRng};
 
 use super::crypto::{PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 use super::messages::{TxMessage, TxIssue, TxTransfer};

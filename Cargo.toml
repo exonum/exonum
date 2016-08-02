@@ -14,3 +14,4 @@ sodiumoxide = {version="0.0.10", default-features=false}
 leveldb = "0.8.3"
 db-key = "0.0.5"
 tempdir = "0.3.4"
+num = "0.1.34"
