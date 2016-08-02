@@ -59,7 +59,7 @@ pub struct State {
 
 // Данные, которые нас интересуют,
 // специфичны для некоторой высоты
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RequestData {
     Propose(Hash),
     Transactions(Hash),

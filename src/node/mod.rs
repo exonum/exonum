@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use time::{get_time, Duration, Timespec};
+use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, Timeout, EventsConfiguration};
@@ -32,7 +32,7 @@ pub struct NodeContext {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub state: State,
-    pub events: Events,
+    pub events: Box<Reactor>,
     pub storage: Storage<MemoryDB>,
     pub propose_timeout: u32,
     pub round_timeout: u32,
@@ -42,7 +42,7 @@ pub struct NodeContext {
     pub tx_generator: TxGenerator,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Configuration {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
@@ -62,33 +62,38 @@ impl Node {
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
         let tx_generator = TxGenerator::new();
-        let network = Network::with_config(config.network);
-        let events = Events::with_config(config.events, network).unwrap();
         let state = State::new(id as u32, config.validators);
+        let storage = Storage::new(MemoryDB::new());
+        let network = Network::with_config(config.network);
+        let reactor = Box::new(Events::with_config(config.events, network).unwrap()) as Box<Reactor>;
+        let context = NodeContext {
+            public_key: config.public_key,
+            secret_key: config.secret_key,
+            state: state,
+            events: reactor,
+            storage: storage,
+            propose_timeout: config.propose_timeout,
+            round_timeout: config.round_timeout,
+            peer_discovery: config.peer_discovery,
+            byzantine: config.byzantine,
+            tx_generator: tx_generator,
+        };
+        Self::with_context(context)
+    }
+
+    pub fn with_context(context: NodeContext) -> Node {
         let basic = Box::new(BasicService) as Box<BasicHandler>;
         let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
         let requests = Box::new(RequestService) as Box<RequestHandler>;
-        let storage = Storage::new(MemoryDB::new());
         Node {
-            context: NodeContext {
-                public_key: config.public_key,
-                secret_key: config.secret_key,
-                state: state,
-                events: events,
-                storage: storage,
-                propose_timeout: config.propose_timeout,
-                round_timeout: config.round_timeout,
-                peer_discovery: config.peer_discovery,
-                byzantine: config.byzantine,
-                tx_generator: tx_generator,
-            },
+            context: context,
             basic: basic,
             consensus: consensus,
-            requests: requests
+            requests: requests,
         }
     }
 
-    fn initialize(&mut self) {
+    pub fn initialize(&mut self) {
         info!("Start listening...");
         self.context.events.bind().unwrap();
         let message = Connect::new(&self.context.public_key,
@@ -96,7 +101,7 @@ impl Node {
                                    self.context.events.get_time(),
                                    &self.context.secret_key);
         for address in self.context.peer_discovery.clone().iter() {
-            if address == self.context.events.address() {
+            if address == &self.context.events.address() {
                 continue
             }
             self.context.send_to_addr(address, message.raw());
@@ -136,7 +141,7 @@ impl Node {
         }
     }
 
-    fn handle_message(&mut self, raw: RawMessage) {
+    pub fn handle_message(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method
         //     if !raw.verify() {
@@ -150,7 +155,7 @@ impl Node {
         }
     }
 
-    fn handle_timeout(&mut self, timeout: Timeout) {
+    pub fn handle_timeout(&mut self, timeout: Timeout) {
         match timeout {
             Timeout::Round(height, round) =>
                 self.consensus.handle_round_timeout(&mut self.context,

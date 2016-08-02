@@ -1,8 +1,5 @@
 use std::collections::HashSet;
 
-use time::{get_time};
-
-use super::super::events::{Reactor, Events, Event, Timeout, EventsConfiguration};
 use super::super::crypto::{Hash, hash};
 use super::super::messages::{
     ConsensusMessage, Propose, Prevote, Precommit, Commit, Message,
@@ -306,7 +303,6 @@ pub trait ConsensusHandler {
             return;
         }
 
-        // FIXME: validate transaction signature
 
         let full_proposes = ctx.state.add_transaction(hash, msg);
 
@@ -523,7 +519,7 @@ pub trait ConsensusHandler {
         let propose = Propose::new(ctx.state.id(),
                                    ctx.state.height(),
                                    round,
-                                   get_time(),
+                                   ctx.events.get_time(),
                                    &ctx.storage.last_hash().unwrap().unwrap_or_else(|| hash(&[])),
                                    &txs,
                                    &ctx.secret_key);

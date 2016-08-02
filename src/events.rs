@@ -15,6 +15,7 @@ pub type EventsConfiguration = mio::EventLoopConfig;
 pub type EventLoop = mio::EventLoop<EventsQueue>;
 
 // FIXME: move this into node module
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub enum Timeout {
     Round(u64, u32),
     Request(RequestData, ValidatorId),
@@ -88,8 +89,7 @@ pub trait Reactor {
     fn send_to(&mut self,
                    address: &SocketAddr,
                    message: RawMessage) -> io::Result<()>;
-    fn address(&self) -> &SocketAddr;
-    fn push(&mut self, event: Event);
+    fn address(&self) -> SocketAddr;
     fn add_timeout(&mut self, timeout: Timeout, time: Timespec);
 }
 
@@ -139,12 +139,8 @@ impl Reactor for Events {
         self.network.send_to(&mut self.event_loop, address, message)
     }
 
-    fn address(&self) -> &SocketAddr {
-        self.network.address()
-    }
-
-    fn push(&mut self, event: Event) {
-        self.queue.push(event)
+    fn address(&self) -> SocketAddr {
+        self.network.address().clone()
     }
 
     fn add_timeout(&mut self,
@@ -152,7 +148,7 @@ impl Reactor for Events {
                    time: Timespec) {
         let ms = (time - self.get_time()).num_milliseconds();
         if ms < 0 {
-            self.push(Event::Timeout(timeout));
+            self.queue.push(Event::Timeout(timeout))
         } else {
             // FIXME: remove unwrap here
             // TODO: use mio::Timeout
