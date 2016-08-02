@@ -152,6 +152,7 @@ impl Node {
             Any::Basic(message) => self.basic.handle(&mut self.context, message),
             Any::Tx(message) => self.consensus.handle_tx(&mut self.context, message),
             Any::Consensus(message) => self.consensus.handle(&mut self.context, message),
+            Any::Request(message) => self.requests.handle(&mut self.context, message),
         }
     }
 

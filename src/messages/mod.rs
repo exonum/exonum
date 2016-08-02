@@ -22,6 +22,7 @@ pub use self::protocol::*;
 pub enum Any {
     Basic(BasicMessage),
     Consensus(ConsensusMessage),
+    Request(RequestMessage),
     Tx(TxMessage),
 }
 

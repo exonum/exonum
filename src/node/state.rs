@@ -81,7 +81,7 @@ pub struct ProposeState {
     // Тело предложения
     propose:        Propose,
     // Вычисленный хеш блока (из предложения)
-    block_hash:     Option<Hash>,
+    // block_hash:     Option<Hash>,
     // Набор изменений, которые нужно внести в состояние для применения блока
     patch:          Option<Patch>,
     // Множество неизвестных транзакций из этого предложения
@@ -344,7 +344,6 @@ impl State {
                 };
                 e.insert(ProposeState {
                     propose: msg.clone(),
-                    block_hash: None,
                     patch: None,
                     unknown_txs: unknown_txs
                 });
