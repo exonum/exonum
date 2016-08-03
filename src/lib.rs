@@ -1,3 +1,6 @@
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+
 #![feature(associated_consts)]
 #![feature(associated_type_defaults)]
 #![feature(question_mark)]

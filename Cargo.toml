@@ -15,3 +15,5 @@ leveldb = "0.8.3"
 db-key = "0.0.5"
 tempdir = "0.3.4"
 num = "0.1.34"
+
+clippy = {version = "*", optional = true}
