@@ -143,8 +143,7 @@ impl Sandbox {
         if let Some((addr, msg)) = sended {
             let any_msg = Any::from_raw(msg.clone())
                               .expect("Send incorrect message");
-            panic!("Send unexpected message");
-            // panic!("Send unexpected message {:?} to {}", any_msg, addr);
+            panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
     }
 
