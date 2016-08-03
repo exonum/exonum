@@ -15,7 +15,7 @@ pub type EventsConfiguration = mio::EventLoopConfig;
 pub type EventLoop = mio::EventLoop<EventsQueue>;
 
 // FIXME: move this into node module
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum Timeout {
     Round(u64, u32),
     Request(RequestData, ValidatorId),

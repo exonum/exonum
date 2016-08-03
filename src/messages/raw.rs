@@ -1,4 +1,5 @@
 use std::{mem, convert, sync};
+use std::fmt::Debug;
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -18,7 +19,7 @@ pub type RawMessage = sync::Arc<MessageBuffer>;
 
 // TODO: make sure that message length is enougth when using mem::transmute
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MessageBuffer {
     raw: Vec<u8>,
 }
@@ -146,7 +147,7 @@ impl convert::AsMut<Vec<u8>> for MessageBuffer {
     }
 }
 
-pub trait Message : Sized {
+pub trait Message : Debug + Sized {
     const MESSAGE_TYPE : u16;
     const BODY_LENGTH : usize;
     const PAYLOAD_LENGTH : usize;

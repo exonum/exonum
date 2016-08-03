@@ -34,9 +34,7 @@ pub struct NodeContext {
     pub state: State,
     pub events: Box<Reactor>,
     pub storage: Storage<MemoryDB>,
-    pub propose_timeout: u32,
     pub round_timeout: u32,
-    pub byzantine: bool,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
     pub tx_generator: TxGenerator,
@@ -48,11 +46,9 @@ pub struct Configuration {
     pub secret_key: SecretKey,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
-    pub propose_timeout: u32,
     pub round_timeout: u32,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
-    pub byzantine: bool,
 }
 
 impl Node {
@@ -72,10 +68,8 @@ impl Node {
             state: state,
             events: reactor,
             storage: storage,
-            propose_timeout: config.propose_timeout,
             round_timeout: config.round_timeout,
             peer_discovery: config.peer_discovery,
-            byzantine: config.byzantine,
             tx_generator: tx_generator,
         };
         Self::with_context(context)
@@ -91,6 +85,10 @@ impl Node {
             consensus: consensus,
             requests: requests,
         }
+    }
+
+    pub fn context(&self) -> &NodeContext {
+        &self.context
     }
 
     pub fn initialize(&mut self) {
@@ -190,7 +188,7 @@ impl NodeContext {
 
     fn add_round_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;
-        let time = self.storage.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 1469002618, nsec: 0}) + Duration::milliseconds(ms as i64);
+        let time = self.storage.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0}) + Duration::milliseconds(ms as i64);
         info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}", time, self.state.height(), self.state.round());
         let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
