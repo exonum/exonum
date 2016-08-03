@@ -4,7 +4,7 @@ extern crate test;
 extern crate da;
 
 use test::Bencher;
-use da::crypto::{gen_keypair, sign, verify};
+use da::crypto::{gen_keypair, sign, verify, hash};
 
 #[bench]
 fn bench_sign_64(b: &mut Bencher) {
@@ -59,5 +59,28 @@ fn bench_verify_1024(b: &mut Bencher) {
     let signature = sign(&data, &secret_key);
     b.iter(|| {
         verify(&signature, &data, &public_key)
+    })
+}
+
+#[bench]
+fn bench_hash_64(b: &mut Bencher) {
+    let data = (0..64).collect::<Vec<u8>>();
+    b.iter(|| {
+        hash(&data)
+    })
+}
+
+#[bench]
+fn bench_hash_128(b: &mut Bencher) {
+    let data = (0..128).collect::<Vec<u8>>();
+    b.iter(|| {
+        hash(&data)
+    })
+}
+#[bench]
+fn bench_hash_1024(b: &mut Bencher) {
+    let data = (0..1024).collect::<Vec<u8>>();
+    b.iter(|| {
+        hash(&data)
     })
 }

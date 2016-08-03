@@ -13,7 +13,7 @@ use super::messages::{Any, Message, RawMessage, Connect};
 use super::events::{Reactor, Event, Timeout};
 use super::network::{PeerId, EventSet};
 use super::tx_generator::TxGenerator;
-use super::crypto::{hash, Hash, Seed, PublicKey, SecretKey, gen_keypair_from_seed};
+use super::crypto::{hash, Hash, Seed, PublicKey, SecretKey, gen_keypair};
 
 struct SandboxInner {
     address: SocketAddr,
@@ -36,10 +36,10 @@ pub struct SandboxReactor {
 impl Sandbox {
     pub fn new() -> Sandbox {
         let validators = vec![
-            gen_keypair_from_seed(&Seed::from_slice(&vec![0; 32]).unwrap()),
-            gen_keypair_from_seed(&Seed::from_slice(&vec![1; 32]).unwrap()),
-            gen_keypair_from_seed(&Seed::from_slice(&vec![2; 32]).unwrap()),
-            gen_keypair_from_seed(&Seed::from_slice(&vec![3; 32]).unwrap()),
+            gen_keypair(),
+            gen_keypair(),
+            gen_keypair(),
+            gen_keypair(),
         ];
 
         let addresses = vec![
@@ -234,7 +234,7 @@ fn test_sandbox_init() {
 #[test]
 fn test_sandbox_recv_and_send() {
     let s = Sandbox::new();
-    let (public, secret) = gen_keypair_from_seed(&Seed::from_slice(&vec![17; 32]).unwrap());
+    let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
     s.send(s.a(2), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
 }
@@ -260,7 +260,7 @@ fn test_sandbox_expected_to_send_but_nothing_happened() {
 #[should_panic(expected = "Expected to send the message")]
 fn test_sandbox_expected_to_send_another_message() {
     let s = Sandbox::new();
-    let (public, secret) = gen_keypair_from_seed(&Seed::from_slice(&vec![17; 32]).unwrap());
+    let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
     s.send(s.a(1), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
 }
@@ -269,7 +269,7 @@ fn test_sandbox_expected_to_send_another_message() {
 #[should_panic(expected = "Send unexpected message")]
 fn test_sandbox_unexpected_message_when_drop() {
     let s = Sandbox::new();
-    let (public, secret) = gen_keypair_from_seed(&Seed::from_slice(&vec![17; 32]).unwrap());
+    let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
 }
 
@@ -277,7 +277,7 @@ fn test_sandbox_unexpected_message_when_drop() {
 #[should_panic(expected = "Send unexpected message")]
 fn test_sandbox_unexpected_message_when_handle_another_message() {
     let s = Sandbox::new();
-    let (public, secret) = gen_keypair_from_seed(&Seed::from_slice(&vec![17; 32]).unwrap());
+    let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
     s.recv(Connect::new(&public, s.a(3), s.time(), &secret));
     panic!("Oops! We don't catch unexpected message");
@@ -287,7 +287,7 @@ fn test_sandbox_unexpected_message_when_handle_another_message() {
 #[should_panic(expected = "Send unexpected message")]
 fn test_sandbox_unexpected_message_when_time_changed() {
     let s = Sandbox::new();
-    let (public, secret) = gen_keypair_from_seed(&Seed::from_slice(&vec![17; 32]).unwrap());
+    let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
     s.set_time(1, 0);
     panic!("Oops! We don't catch unexpected message");
