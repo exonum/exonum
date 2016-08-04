@@ -10,7 +10,7 @@ rand = "0.3"
 mio = "0.5"
 time = "0.1"
 byteorder = "0.5"
-sodiumoxide = {version="0.0.10", default-features=false}
+sodiumoxide = {version="0.0.12", default-features=false}
 leveldb = "0.8.3"
 db-key = "0.0.5"
 tempdir = "0.3.4"

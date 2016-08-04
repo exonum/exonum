@@ -14,3 +14,26 @@ use super::messages::{Message, Propose, Prevote, Precommit, Commit};
 // TODO: add self test (every panics)
 // TODO: add test by consensus.rs
 // TODO: add test by state.rs
+
+// fn handle
+// fn handle_propose
+// fn has_full_propose
+// fn handle_prevote
+// fn has_majority_prevotes
+// fn has_majority_precommits
+// fn lock
+// fn handle_precommit
+// fn commit
+// fn handle_tx
+// fn handle_commit
+// fn handle_round_timeout
+// fn handle_request_timeout
+// fn is_leader
+// fn execute
+// fn request_propose_or_txs
+// fn request
+// fn remove_request
+// fn send_propose
+// fn send_prevote
+// fn send_precommit
+// fn send_commit
