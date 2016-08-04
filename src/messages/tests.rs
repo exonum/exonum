@@ -1,83 +1,112 @@
-// #[test]
-// fn test_connect() {
-//     use std::str::FromStr;
+use std::net::SocketAddr;
 
-//     let socket_address = SocketAddr::from_str("18.34.3.4:7777").unwrap();
-//     let time = ::time::get_time();
-//     let (public_key, secret_key) = super::crypto::gen_keypair();
+use super::super::crypto::{hash, gen_keypair};
 
-//     // write
-//     let connect = Connect::new(socket_address.clone(), time,
-//                                &public_key, &secret_key);
-//     // read
-//     assert_eq!(connect.addr(), socket_address);
-//     assert_eq!(connect.time(), time);
-//     assert!(connect.verify());
-// }
+use super::{Message, Connect, Propose, Prevote, Precommit, Commit};
 
-// #[test]
-// fn test_propose() {
-//     let height = 123_123_123;
-//     let round = 321_321_312;
-//     let time = ::time::get_time();
-//     let prev_hash = super::crypto::hash(&[1, 2, 3]);
-//     let (public_key, secret_key) = super::crypto::gen_keypair();
+#[test]
+fn test_connect() {
+    use std::str::FromStr;
 
-//     // write
-//     let propose = Propose::new(height, round, time, &prev_hash,
-//                                &public_key, &secret_key);
-//     // read
-//     assert_eq!(propose.height(), height);
-//     assert_eq!(propose.round(), round);
-//     assert_eq!(propose.time(), time);
-//     assert_eq!(propose.prev_hash(), &prev_hash);
-//     assert!(propose.verify());
-// }
+    let socket_address = SocketAddr::from_str("18.34.3.4:7777").unwrap();
+    let time = ::time::get_time();
+    let (public_key, secret_key) = gen_keypair();
 
-// #[test]
-// fn test_prevote() {
-//     let height = 123_123_123;
-//     let round = 321_321_312;
-//     let hash = super::crypto::hash(&[1, 2, 3]);
-//     let (public_key, secret_key) = super::crypto::gen_keypair();
+    // write
+    let connect = Connect::new(&public_key, socket_address, time, &secret_key);
+    // read
+    assert_eq!(connect.pub_key(), &public_key);
+    assert_eq!(connect.addr(), socket_address);
+    assert_eq!(connect.time(), time);
+    assert!(connect.verify(&public_key));
+}
 
-//     // write
-//     let prevote = Prevote::new(height, round, &hash, &public_key, &secret_key);
-//     // read
-//     assert_eq!(prevote.height(), height);
-//     assert_eq!(prevote.round(), round);
-//     assert_eq!(prevote.hash(), &hash);
-//     assert!(prevote.verify());
-// }
+#[test]
+fn test_propose() {
+    let validator = 123_123;
+    let height = 123_123_123;
+    let round = 321_321_312;
+    let time = ::time::get_time();
+    let prev_hash = hash(&[1, 2, 3]);
+    // TODO: check with real transactions
+    let txs = vec![];
+    let (public_key, secret_key) = gen_keypair();
 
-// #[test]
-// fn test_precommit() {
-//     let height = 123_123_123;
-//     let round = 321_321_312;
-//     let hash = super::crypto::hash(&[1, 2, 3]);
-//     let (public_key, secret_key) = super::crypto::gen_keypair();
+    // write
+    let propose = Propose::new(validator, height, round, time, &prev_hash, &txs,
+                               &secret_key);
+    // read
+    assert_eq!(propose.validator(), validator);
+    assert_eq!(propose.height(), height);
+    assert_eq!(propose.round(), round);
+    assert_eq!(propose.time(), time);
+    assert_eq!(propose.prev_hash(), &prev_hash);
+    // assert_eq!(propose.transactions(), &txs);
+    assert!(propose.verify(&public_key));
+}
 
-//     // write
-//     let precommit = Precommit::new(height, round, &hash,
-//                                    &public_key, &secret_key);
-//     // read
-//     assert_eq!(precommit.height(), height);
-//     assert_eq!(precommit.round(), round);
-//     assert_eq!(precommit.hash(), &hash);
-//     assert!(precommit.verify());
-// }
+#[test]
+fn test_prevote() {
+    let validator = 123_123;
+    let height = 123_123_123;
+    let round = 321_321_312;
+    let propose_hash = hash(&[1, 2, 3]);
+    let locked_round = 654_345;
+    let (public_key, secret_key) = gen_keypair();
 
-// #[test]
-// fn test_commit() {
-//     let height = 123_123_123;
-//     let hash = super::crypto::hash(&[1, 2, 3]);
-//     let (public_key, secret_key) = super::crypto::gen_keypair();
+    // write
+    let prevote = Prevote::new(validator, height, round, &propose_hash, locked_round,
+                               &secret_key);
+    // read
+    assert_eq!(prevote.validator(), validator);
+    assert_eq!(prevote.height(), height);
+    assert_eq!(prevote.round(), round);
+    assert_eq!(prevote.propose_hash(), &propose_hash);
+    assert_eq!(prevote.locked_round(), locked_round);
+    assert!(prevote.verify(&public_key));
+}
 
-//     // write
-//     let commit = Commit::new(height, &hash, &public_key, &secret_key);
-//     // read
-//     assert_eq!(commit.height(), height);
-//     assert_eq!(commit.hash(), &hash);
-//     assert!(commit.verify());
-// }
+#[test]
+fn test_precommit() {
+    let validator = 123_123;
+    let height = 123_123_123;
+    let round = 321_321_312;
+    let propose_hash = hash(&[1, 2, 3]);
+    let block_hash = hash(&[3, 2, 1]);
+    let (public_key, secret_key) = gen_keypair();
+
+    // write
+    let precommit = Precommit::new(validator, height, round,
+                                   &propose_hash, &block_hash,
+                                   &secret_key);
+    // read
+    assert_eq!(precommit.validator(), validator);
+    assert_eq!(precommit.height(), height);
+    assert_eq!(precommit.round(), round);
+    assert_eq!(precommit.propose_hash(), &propose_hash);
+    assert_eq!(precommit.block_hash(), &block_hash);
+    assert!(precommit.verify(&public_key));
+}
+
+#[test]
+fn test_commit() {
+    let validator = 123_123;
+    let height = 123_123_123;
+    let round = 321_321_312;
+    let propose_hash = hash(&[1, 2, 3]);
+    let block_hash = hash(&[3, 2, 1]);
+    let (public_key, secret_key) = gen_keypair();
+
+    // write
+    let commit = Commit::new(validator, height, round,
+                             &propose_hash, &block_hash,
+                             &secret_key);
+    // read
+    assert_eq!(commit.validator(), validator);
+    assert_eq!(commit.height(), height);
+    assert_eq!(commit.round(), round);
+    assert_eq!(commit.propose_hash(), &propose_hash);
+    assert_eq!(commit.block_hash(), &block_hash);
+    assert!(commit.verify(&public_key));
+}
 

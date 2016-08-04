@@ -1,8 +1,5 @@
 use std::collections::HashSet;
 
-use time::{get_time};
-
-use super::super::events::{Reactor, Events, Event, Timeout, EventsConfiguration};
 use super::super::crypto::{Hash, hash};
 use super::super::messages::{
     ConsensusMessage, Propose, Prevote, Precommit, Commit, Message,
@@ -10,7 +7,7 @@ use super::super::messages::{
     RequestPrecommits, RequestCommit,
     RequestPeers, TxMessage
 };
-use super::super::storage::{Fork, Patch, Map};
+use super::super::storage::{Map};
 use super::{NodeContext, Round, Height, RequestData, ValidatorId};
 
 pub struct ConsensusService;
@@ -254,7 +251,7 @@ pub trait ConsensusHandler {
         info!("COMMIT");
         // Merge changes into storage
         // FIXME: remove unwrap here, merge patch into storage
-        ctx.storage.merge(ctx.state.propose(hash).unwrap().patch().unwrap());
+        ctx.storage.merge(ctx.state.propose(hash).unwrap().patch().unwrap()).is_ok();
 
         // FIXME: use block hash here
         let block_hash = hash;
@@ -306,7 +303,6 @@ pub trait ConsensusHandler {
             return;
         }
 
-        // FIXME: validate transaction signature
 
         let full_proposes = ctx.state.add_transaction(hash, msg);
 
@@ -461,12 +457,12 @@ pub trait ConsensusHandler {
         let msg = ctx.state.propose(hash).unwrap().message().clone();
 
         // Update height
-        fork.heights().append(*hash);
+        fork.heights().append(*hash).is_ok();
         // Save propose
-        fork.proposes().put(hash, msg.clone());
+        fork.proposes().put(hash, msg.clone()).is_ok();
         // Save transactions
         for hash in msg.transactions() {
-            fork.transactions().put(hash, ctx.state.transactions().get(hash).unwrap().clone());
+            fork.transactions().put(hash, ctx.state.transactions().get(hash).unwrap().clone()).is_ok();
         }
         // FIXME: put precommits
 
@@ -523,7 +519,7 @@ pub trait ConsensusHandler {
         let propose = Propose::new(ctx.state.id(),
                                    ctx.state.height(),
                                    round,
-                                   get_time(),
+                                   ctx.events.get_time(),
                                    &ctx.storage.last_hash().unwrap().unwrap_or_else(|| hash(&[])),
                                    &txs,
                                    &ctx.secret_key);

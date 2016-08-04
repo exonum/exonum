@@ -6,7 +6,7 @@ macro_rules! message {
 
         $($field_name:ident : $field_type:ty [$from:expr => $to:expr])*
     }) => (
-        #[derive(Clone)]
+        #[derive(Clone, PartialEq)]
         pub struct $name {
             raw: $crate::messages::RawMessage
         }
@@ -55,6 +55,15 @@ macro_rules! message {
                 use $crate::messages::fields::Field;
                 <$field_type>::read(self.raw.payload(), $from, $to)
             })*
+        }
+
+        impl ::std::fmt::Debug for $name {
+            fn fmt(&self, fmt: &mut ::std::fmt::Formatter)
+                -> Result<(), ::std::fmt::Error> {
+                fmt.debug_struct(stringify!($name))
+                 $(.field(stringify!($field_name), &self.$field_name()))*
+                   .finish()
+            }
         }
     )
 }

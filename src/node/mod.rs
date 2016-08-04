@@ -1,10 +1,10 @@
 use std::net::SocketAddr;
 
-use time::{get_time, Duration, Timespec};
+use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, Timeout, EventsConfiguration};
-use super::network::{Network, NetworkConfiguration, PeerId, EventSet};
+use super::network::{Network, NetworkConfiguration};
 use super::storage::{Storage, MemoryDB};
 use super::messages::{Any, Connect, RawMessage, Message};
 use super::tx_generator::TxGenerator;
@@ -32,27 +32,23 @@ pub struct NodeContext {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub state: State,
-    pub events: Events,
+    pub events: Box<Reactor>,
     pub storage: Storage<MemoryDB>,
-    pub propose_timeout: u32,
     pub round_timeout: u32,
-    pub byzantine: bool,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
     pub tx_generator: TxGenerator,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Configuration {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
-    pub propose_timeout: u32,
     pub round_timeout: u32,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
-    pub byzantine: bool,
 }
 
 impl Node {
@@ -62,33 +58,40 @@ impl Node {
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
         let tx_generator = TxGenerator::new();
-        let network = Network::with_config(config.network);
-        let events = Events::with_config(config.events, network).unwrap();
         let state = State::new(id as u32, config.validators);
+        let storage = Storage::new(MemoryDB::new());
+        let network = Network::with_config(config.network);
+        let reactor = Box::new(Events::with_config(config.events, network).unwrap()) as Box<Reactor>;
+        let context = NodeContext {
+            public_key: config.public_key,
+            secret_key: config.secret_key,
+            state: state,
+            events: reactor,
+            storage: storage,
+            round_timeout: config.round_timeout,
+            peer_discovery: config.peer_discovery,
+            tx_generator: tx_generator,
+        };
+        Self::with_context(context)
+    }
+
+    pub fn with_context(context: NodeContext) -> Node {
         let basic = Box::new(BasicService) as Box<BasicHandler>;
         let consensus = Box::new(ConsensusService) as Box<ConsensusHandler>;
         let requests = Box::new(RequestService) as Box<RequestHandler>;
-        let storage = Storage::new(MemoryDB::new());
         Node {
-            context: NodeContext {
-                public_key: config.public_key,
-                secret_key: config.secret_key,
-                state: state,
-                events: events,
-                storage: storage,
-                propose_timeout: config.propose_timeout,
-                round_timeout: config.round_timeout,
-                peer_discovery: config.peer_discovery,
-                byzantine: config.byzantine,
-                tx_generator: tx_generator,
-            },
+            context: context,
             basic: basic,
             consensus: consensus,
-            requests: requests
+            requests: requests,
         }
     }
 
-    fn initialize(&mut self) {
+    pub fn context(&self) -> &NodeContext {
+        &self.context
+    }
+
+    pub fn initialize(&mut self) {
         info!("Start listening...");
         self.context.events.bind().unwrap();
         let message = Connect::new(&self.context.public_key,
@@ -96,7 +99,7 @@ impl Node {
                                    self.context.events.get_time(),
                                    &self.context.secret_key);
         for address in self.context.peer_discovery.clone().iter() {
-            if address == self.context.events.address() {
+            if address == &self.context.events.address() {
                 continue
             }
             self.context.send_to_addr(address, message.raw());
@@ -136,7 +139,7 @@ impl Node {
         }
     }
 
-    fn handle_message(&mut self, raw: RawMessage) {
+    pub fn handle_message(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method
         //     if !raw.verify() {
@@ -147,10 +150,11 @@ impl Node {
             Any::Basic(message) => self.basic.handle(&mut self.context, message),
             Any::Tx(message) => self.consensus.handle_tx(&mut self.context, message),
             Any::Consensus(message) => self.consensus.handle(&mut self.context, message),
+            Any::Request(message) => self.requests.handle(&mut self.context, message),
         }
     }
 
-    fn handle_timeout(&mut self, timeout: Timeout) {
+    pub fn handle_timeout(&mut self, timeout: Timeout) {
         match timeout {
             Timeout::Round(height, round) =>
                 self.consensus.handle_round_timeout(&mut self.context,
@@ -184,7 +188,7 @@ impl NodeContext {
 
     fn add_round_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;
-        let time = self.storage.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 1469002618, nsec: 0}) + Duration::milliseconds(ms as i64);
+        let time = self.storage.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0}) + Duration::milliseconds(ms as i64);
         info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}", time, self.state.height(), self.state.round());
         let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);

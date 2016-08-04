@@ -1,6 +1,8 @@
 #[macro_use] mod spec;
 #[cfg(test)] mod tests;
 
+use std::fmt;
+
 mod raw;
 mod error;
 mod fields;
@@ -18,19 +20,20 @@ pub use self::protocol::*;
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify)
 // TODO: use macro for implementing enums
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Any {
     Basic(BasicMessage),
     Consensus(ConsensusMessage),
+    Request(RequestMessage),
     Tx(TxMessage),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum BasicMessage {
     Connect(Connect),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum ConsensusMessage {
     Propose(Propose),
     Prevote(Prevote),
@@ -38,7 +41,7 @@ pub enum ConsensusMessage {
     Commit(Commit),
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum RequestMessage {
     Propose(RequestPropose),
     Transactions(RequestTransactions),
@@ -48,13 +51,22 @@ pub enum RequestMessage {
     Peers(RequestPeers)
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum TxMessage {
     Issue(TxIssue),
     Transfer(TxTransfer),
     VoteValidator(TxVoteValidator),
     VoteConfig(TxVoteConfig),
 }
+
+impl fmt::Debug for BasicMessage {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            BasicMessage::Connect(ref msg) => write!(fmt, "{:?}", msg),
+        }
+    }
+}
+
 
 impl TxMessage {
     pub fn hash(&self) -> Hash {
@@ -87,6 +99,17 @@ impl TxMessage {
                 panic!("unrecognized message type");
             }
         })
+    }
+}
+
+impl fmt::Debug for TxMessage {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            TxMessage::Issue(ref msg) => write!(fmt, "{:?}", msg),
+            TxMessage::Transfer(ref msg) => write!(fmt, "{:?}", msg),
+            TxMessage::VoteValidator(ref msg) => write!(fmt, "{:?}", msg),
+            TxMessage::VoteConfig(ref msg) => write!(fmt, "{:?}", msg)
+        }
     }
 }
 
@@ -147,6 +170,19 @@ impl RequestMessage {
     }
 }
 
+impl fmt::Debug for RequestMessage {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            RequestMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
+            RequestMessage::Transactions(ref msg) => write!(fmt, "{:?}", msg),
+            RequestMessage::Prevotes(ref msg) => write!(fmt, "{:?}", msg),
+            RequestMessage::Precommits(ref msg) => write!(fmt, "{:?}", msg),
+            RequestMessage::Commit(ref msg) => write!(fmt, "{:?}", msg),
+            RequestMessage::Peers(ref msg) => write!(fmt, "{:?}", msg),
+        }
+    }
+}
+
 impl ConsensusMessage {
     pub fn validator(&self) -> u32 {
         match *self {
@@ -194,6 +230,17 @@ impl ConsensusMessage {
     }
 }
 
+impl fmt::Debug for ConsensusMessage {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            ConsensusMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
+            ConsensusMessage::Prevote(ref msg) => write!(fmt, "{:?}", msg),
+            ConsensusMessage::Precommit(ref msg) => write!(fmt, "{:?}", msg),
+            ConsensusMessage::Commit(ref msg) => write!(fmt, "{:?}", msg),
+        }
+    }
+}
+
 impl Any {
     pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
         // TODO: check input message size
@@ -208,6 +255,17 @@ impl Any {
                 panic!("unrecognized message type");
             }
         })
+    }
+}
+
+impl fmt::Debug for Any {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            Any::Basic(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Consensus(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Request(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Tx(ref msg) => write!(fmt, "{:?}", msg),
+        }
     }
 }
 

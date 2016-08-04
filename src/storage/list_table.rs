@@ -1,7 +1,7 @@
+use num::{Integer, range, ToPrimitive};
+
 use std::marker::PhantomData;
 use std::cell::Cell;
-use std::num::{Zero, One};
-use std::ops::{Add, Sub};
 
 use super::{Map, Error, StorageValue};
 
@@ -13,8 +13,7 @@ pub struct ListTable<T: Map<[u8], Vec<u8>>, K, V> {
 
 impl<'a, T, K, V> ListTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
-          K: Zero + One + Add<Output = K> + Sub<Output = K> + PartialEq + Copy + StorageValue,
-          ::std::ops::Range<K>: ::std::iter::Iterator<Item = K>,
+          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
           V: StorageValue
 {
     pub fn new(map: T) -> Self {
@@ -28,8 +27,8 @@ impl<'a, T, K, V> ListTable<T, K, V>
     pub fn append(&mut self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.map.put(&len.serialize(), value.serialize())?;
-        self.map.put(&[], (len + One::one()).serialize())?;
-        self.count.set(Some(len + One::one()));
+        self.map.put(&[], (len + K::one()).serialize())?;
+        self.count.set(Some(len + K::one()));
         Ok(())
     }
 
@@ -39,10 +38,10 @@ impl<'a, T, K, V> ListTable<T, K, V>
         let mut len = self.len()?;
         for value in iter {
             self.map.put(&len.serialize(), value.serialize())?;
-            len = len + One::one();
+            len = len + K::one();
         }
-        self.map.put(&[], (len + One::one()).serialize())?;
-        self.count.set(Some(len + One::one()));
+        self.map.put(&[], (len + K::one()).serialize())?;
+        self.count.set(Some(len + K::one()));
         Ok(())
     }
 
@@ -53,10 +52,10 @@ impl<'a, T, K, V> ListTable<T, K, V>
 
     pub fn last(&self) -> Result<Option<V>, Error> {
         let len = self.len()?;
-        if len == Zero::zero() {
+        if len == K::zero() {
             Ok(None)
         } else {
-            self.get(len - One::one())
+            self.get(len - K::one())
         }
     }
 
@@ -65,12 +64,12 @@ impl<'a, T, K, V> ListTable<T, K, V>
         Ok(if self.is_empty()? {
             None
         } else {
-            Some((Zero::zero()..self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect())
+            Some(range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect())
         })
     }
 
     pub fn is_empty(&self) -> Result<bool, Error> {
-        Ok(self.len()? == Zero::zero())
+        Ok(self.len()? == K::zero())
     }
 
     pub fn len(&self) -> Result<K, Error> {
@@ -79,7 +78,7 @@ impl<'a, T, K, V> ListTable<T, K, V>
         }
 
         let v = self.map.get(&[])?;
-        let c = v.map(K::deserialize).unwrap_or(Zero::zero());
+        let c = v.map(K::deserialize).unwrap_or(K::zero());
         self.count.set(Some(c));
         Ok(c)
     }

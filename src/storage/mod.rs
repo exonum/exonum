@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests;
 
+use num::{Integer, ToPrimitive};
+
 use std::slice::SliceConcatExt;
 use std::convert::AsRef;
 use std::fmt::Debug;
-use std::num::{Zero, One};
-use std::ops::{Add, Sub};
 
 use ::crypto::Hash;
 use ::messages::{TxMessage, Precommit, Propose};
@@ -94,8 +94,7 @@ pub trait MapExt: Map<[u8], Vec<u8>> + Sized {
     fn list<'a, K, V>(&'a mut self,
                       prefix: Vec<u8>)
                       -> ListTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: Zero + One + Add<Output = K> + Sub<Output = K> + PartialEq + Copy + StorageValue,
-              ::std::ops::Range<K>: ::std::iter::Iterator<Item = K>,
+        where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
               V: StorageValue;
 
     fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> MapTable<'a, Self, K, V>;
@@ -108,8 +107,7 @@ impl<T> MapExt for T
     fn list<'a, K, V>(&'a mut self,
                       prefix: Vec<u8>)
                       -> ListTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: Zero + One + Add<Output = K> + Sub<Output = K> + PartialEq + Copy + StorageValue,
-              ::std::ops::Range<K>: ::std::iter::Iterator<Item = K>,
+        where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
               V: StorageValue
     {
         ListTable::new(self.map(prefix))

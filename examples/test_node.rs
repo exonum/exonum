@@ -40,7 +40,6 @@ fn main() {
     Node::with_config(Configuration {
         public_key: public_key.clone(),
         secret_key: secret_key.clone(),
-        propose_timeout: 0,
         round_timeout: 1000,
         network: NetworkConfiguration {
             listen_address: address.clone(),
@@ -50,6 +49,5 @@ fn main() {
         events: EventsConfiguration::new(),
         peer_discovery: addresses.clone(),
         validators: validators.clone(),
-        byzantine: false,
     }).run();
 }

@@ -30,13 +30,13 @@ message! {
 message! {
     Prevote {
         const ID = 2;
-        const SIZE = 56;
+        const SIZE = 52;
 
         validator:      u32         [00 => 04]
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
         propose_hash:   &Hash       [16 => 48]
-        locked_round:   u32         [48 => 56]
+        locked_round:   u32         [48 => 52]
     }
 }
 
