@@ -13,7 +13,7 @@ use super::messages::{Any, Message, RawMessage, Connect};
 use super::events::{Reactor, Event, Timeout};
 use super::network::{PeerId, EventSet};
 use super::tx_generator::TxGenerator;
-use super::crypto::{hash, Hash, Seed, PublicKey, SecretKey, gen_keypair};
+use super::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 struct SandboxInner {
     address: SocketAddr,

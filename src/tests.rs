@@ -1,5 +1,5 @@
-use super::sandbox::Sandbox;
-use super::messages::{Message, Propose, Prevote, Precommit, Commit};
+// use super::sandbox::Sandbox;
+// use super::messages::{Message, Propose, Prevote, Precommit, Commit};
 
 // #[test]
 // fn test_basic_send_prevote() {
@@ -14,6 +14,12 @@ use super::messages::{Message, Propose, Prevote, Precommit, Commit};
 // TODO: add self test (every panics)
 // TODO: add test by consensus.rs
 // TODO: add test by state.rs
+// TODO: тесты на идемпотентность
+// TODO: fuzz test: получение сообщений в разном порядке приводит к одному и тому же состоянию
+
+// send propose
+// send prevote
+// send precommit
 
 // fn handle
 // fn handle_propose
