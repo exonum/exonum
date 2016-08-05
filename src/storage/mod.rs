@@ -14,6 +14,7 @@ mod leveldb;
 mod memorydb;
 mod map_table;
 mod list_table;
+mod merkle_table;
 mod fields;
 mod db;
 
@@ -22,7 +23,8 @@ pub use self::memorydb::MemoryDB;
 pub use self::leveldb::LevelDB;
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
-pub use self::fields::{StorageValue};
+pub use self::merkle_table::MerkleTable;
+pub use self::fields::StorageValue;
 
 pub struct Storage<T: Database> {
     db: T,
@@ -98,9 +100,14 @@ pub trait MapExt: Map<[u8], Vec<u8>> + Sized {
               V: StorageValue;
 
     fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> MapTable<'a, Self, K, V>;
+    fn merkle_list<'a, K, V>(&'a mut self,
+                             prefix: Vec<u8>)
+                             -> MerkleTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
+        where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+              V: StorageValue;
 }
 
-//TODO MapExt looks too complex. Find more simple way.
+// TODO MapExt looks too complex. Find more simple way.
 impl<T> MapExt for T
     where T: Map<[u8], Vec<u8>> + Sized
 {
@@ -115,5 +122,13 @@ impl<T> MapExt for T
 
     fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> MapTable<'a, Self, K, V> {
         MapTable::new(prefix, self)
+    }
+    fn merkle_list<'a, K, V>(&'a mut self,
+                             prefix: Vec<u8>)
+                             -> MerkleTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
+        where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+              V: StorageValue
+    {
+        MerkleTable::new(self.map(prefix))
     }
 }
