@@ -195,10 +195,22 @@ mod tests {
         let h2 = hash(&vec![2]);
         let h3 = hash(&vec![3]);
         let h4 = hash(&vec![4]);
+        let h5 = hash(&vec![5]);
+        let h6 = hash(&vec![6]);
+        let h7 = hash(&vec![7]);
+        let h8 = hash(&vec![8]);        
         let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
-        let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
         let h123 = hash(&[h12.as_ref(), h3.as_ref()].concat());
+        let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
         let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
+        let h12345 = hash(&[h1234.as_ref(), h5.as_ref()].concat());
+        let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());    
+        let h123456 = hash(&[h1234.as_ref(), h56.as_ref()].concat());      
+        let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());    
+        let h567 = hash(&[h56.as_ref(), h7.as_ref()].concat());    
+        let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());                
+        let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());   
+        let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());  
 
         table.append(vec![1]).unwrap();
         assert_eq!(table.root_hash().unwrap(), Some(h1));
@@ -211,6 +223,18 @@ mod tests {
 
         table.append(vec![4]).unwrap();
         assert_eq!(table.root_hash().unwrap(), Some(h1234));
+
+        table.append(vec![5]).unwrap();
+        assert_eq!(table.root_hash().unwrap(), Some(h12345));
+
+        table.append(vec![6]).unwrap();
+        assert_eq!(table.root_hash().unwrap(), Some(h123456));       
+
+        table.append(vec![7]).unwrap();
+        assert_eq!(table.root_hash().unwrap(), Some(h1234567));
+
+        table.append(vec![8]).unwrap();
+        assert_eq!(table.root_hash().unwrap(), Some(h12345678));                                      
 
         assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
     }    
