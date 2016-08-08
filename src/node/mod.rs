@@ -7,7 +7,6 @@ use super::events::{Reactor, Events, Event, Timeout, EventsConfiguration};
 use super::network::{Network, NetworkConfiguration};
 use super::storage::{Storage, MemoryDB};
 use super::messages::{Any, Connect, RawMessage, Message};
-use super::tx_generator::TxGenerator;
 
 mod state;
 mod basic;
@@ -38,7 +37,6 @@ pub struct NodeContext {
     pub status_timeout: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    pub tx_generator: TxGenerator,
 }
 
 #[derive(Debug, Clone)]
@@ -59,7 +57,6 @@ impl Node {
         let id = config.validators.iter()
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
-        let tx_generator = TxGenerator::new();
         let state = State::new(id as u32, config.validators);
         let storage = Storage::new(MemoryDB::new());
         let network = Network::with_config(config.network);
@@ -73,7 +70,6 @@ impl Node {
             round_timeout: config.round_timeout,
             status_timeout: config.status_timeout,
             peer_discovery: config.peer_discovery,
-            tx_generator: tx_generator,
         };
         Self::with_context(context)
     }

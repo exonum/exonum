@@ -247,13 +247,6 @@ pub trait ConsensusHandler {
         // Update state to new height
         ctx.state.new_height(hash);
 
-        // Generate new transactions
-        let txs = (&mut ctx.tx_generator).take(100).collect(): Vec<_>;
-        for tx in txs {
-            ctx.broadcast(&tx.raw().clone());
-            ctx.state.add_transaction(tx.hash(), tx);
-        }
-
         // Handle queued messages
         for msg in ctx.state.queued() {
             self.handle(ctx, msg);

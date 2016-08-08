@@ -11,7 +11,6 @@
 //     // sandbox.recv(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
 // }
 
-// TODO: add self test (every panics)
 // TODO: add test by consensus.rs
 // TODO: add test by state.rs
 // TODO: тесты на идемпотентность
@@ -20,6 +19,7 @@
 // send propose
 // send prevote
 // send precommit
+// send status
 
 // fn handle
 // fn handle_propose

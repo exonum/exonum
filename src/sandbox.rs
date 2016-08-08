@@ -13,7 +13,6 @@ use super::storage::{Storage, MemoryDB};
 use super::messages::{Any, Message, RawMessage, Connect};
 use super::events::{Reactor, Event, Timeout};
 use super::network::{PeerId, EventSet};
-use super::tx_generator::TxGenerator;
 use super::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 struct SandboxInner {
@@ -87,7 +86,6 @@ impl Sandbox {
             round_timeout: 1000,
             status_timeout: 5000,
             peer_discovery: Vec::new(),
-            tx_generator: TxGenerator::new(),
         };
 
         let node = Node::with_context(context);
@@ -208,6 +206,7 @@ impl Sandbox {
         }
     }
 
+    // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
         let mut set = HashSet::from_iter(self.addresses.iter().map(Clone::clone)): HashSet<SocketAddr>;
