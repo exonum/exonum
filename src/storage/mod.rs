@@ -92,6 +92,15 @@ pub trait Map<K: ?Sized, V> {
     fn delete(&mut self, key: &K) -> Result<(), Error>;
 }
 
+pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
+    fn append(&mut self, value: V) -> Result<(), Error>;
+    fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) -> Result<(), Error>;
+    fn get(&self, index: K) -> Result<Option<V>, Error>;
+    fn last(&self) -> Result<Option<V>, Error>;
+    fn is_empty(&self) -> Result<bool, Error>;
+    fn len(&self) -> Result<K, Error>;
+}
+
 pub trait MapExt: Map<[u8], Vec<u8>> + Sized {
     fn list<'a, K, V>(&'a mut self,
                       prefix: Vec<u8>)

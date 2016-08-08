@@ -3,12 +3,12 @@ use num::{Integer, range, ToPrimitive};
 use std::marker::PhantomData;
 use std::cell::Cell;
 
-use super::{Map, Error, StorageValue};
+use super::{Map, List, Error, StorageValue};
 
 use ::crypto::{hash, Hash};
 
 /// Merkle tree over list.
-/// Данные в таблице хранятся в строчках, 
+/// Данные в таблице хранятся в строчках,
 /// высота определяется количеством записаных значений H = len / 2 +1
 /// H  | Элементы
 /// 0  | Записанные данные
@@ -33,39 +33,6 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         }
     }
 
-    pub fn append(&mut self, value: V) -> Result<(), Error> {
-        let len = self.len()?;
-        let bytes = value.serialize();
-        self.rebuild_hash(len, &bytes)?;
-
-        self.map.put(&Self::db_key(K::zero(), len), bytes)?;
-        self.set_len(len + K::one())?;
-        Ok(())
-    }
-
-    pub fn extend<I>(&mut self, iter: I) -> Result<(), Error>
-        where I: IntoIterator<Item = V>
-    {
-        for value in iter {
-            self.append(value)?;
-        }
-        Ok(())
-    }
-
-    pub fn get(&self, index: K) -> Result<Option<V>, Error> {
-        let value = self.map.get(&Self::db_key(K::zero(), index))?;
-        Ok(value.map(StorageValue::deserialize))
-    }
-
-    pub fn last(&self) -> Result<Option<V>, Error> {
-        let len = self.len()?;
-        if len == K::zero() {
-            Ok(None)
-        } else {
-            self.get(len - K::one())
-        }
-    }
-
     // TODO: implement iterator for List
     pub fn iter(&self) -> Result<Option<Vec<V>>, Error> {
         Ok(if self.is_empty()? {
@@ -73,21 +40,6 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         } else {
             Some(range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect())
         })
-    }
-
-    pub fn is_empty(&self) -> Result<bool, Error> {
-        Ok(self.len()? == K::zero())
-    }
-
-    pub fn len(&self) -> Result<K, Error> {
-        if let Some(count) = self.count.get() {
-            return Ok(count);
-        }
-
-        let v = self.map.get(&[])?;
-        let c = v.map(K::deserialize).unwrap_or(K::zero());
-        self.count.set(Some(c));
-        Ok(c)
     }
 
     pub fn root_hash(&self) -> Result<Option<Hash>, Error> {
@@ -116,23 +68,24 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         self.map.put(&[], len.serialize())
     }
 
+    // TODO reduce reallocations. We can create a key by one allocation.
     fn db_key(h: K, i: K) -> Vec<u8> {
         [h.serialize(), i.serialize()].concat()
     }
 
     fn get_hash(&self, height: K, index: K) -> Result<Option<Hash>, Error> {
         debug_assert!(height > K::zero());
-        
+
         let v = self.map.get(&Self::db_key(height, index))?;
         let hash = v.map(|x| {
-            debug_assert_eq!(x.len(), 32);            
+            debug_assert_eq!(x.len(), 32);
             Hash::from_slice(&x).unwrap()
         });
         Ok(hash)
     }
 
     fn rebuild_hash(&mut self, mut index: K, bytes: &Vec<u8>) -> Result<(), Error> {
-        //FIXME avoid reallocation
+        // FIXME avoid reallocation
         self.map.put(&Self::db_key(K::one(), index), hash(bytes).serialize())?;
         let mut current_height = K::one();
         while index != K::zero() {
@@ -141,43 +94,121 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
                 let h1 = self.get_hash(current_height, index)?.unwrap(); //TODO replace by error
                 h1
             } else {
-            // Right leaf
+                // Right leaf
                 let h1 = self.get_hash(current_height, index - K::one())?.unwrap();
                 let h2 = self.get_hash(current_height, index)?.unwrap();
                 hash(&[h1.as_ref(), h2.as_ref()].concat())
             };
             current_height = current_height + K::one();
-            index = index / (K::one() + K::one()); 
-            self.map.put(&Self::db_key(current_height, index), new_hash.serialize())?;      
+            index = index / (K::one() + K::one());
+            self.map.put(&Self::db_key(current_height, index), new_hash.serialize())?;
         }
         Ok(())
     }
 }
+
+impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
+    where T: Map<[u8], Vec<u8>>,
+          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+          V: StorageValue
+{
+    fn append(&mut self, value: V) -> Result<(), Error> {
+        let len = self.len()?;
+        let bytes = value.serialize();
+        self.rebuild_hash(len, &bytes)?;
+
+        self.map.put(&Self::db_key(K::zero(), len), bytes)?;
+        self.set_len(len + K::one())?;
+        Ok(())
+    }
+
+    fn extend<I>(&mut self, iter: I) -> Result<(), Error>
+        where I: IntoIterator<Item = V>
+    {
+        for value in iter {
+            self.append(value)?;
+        }
+        Ok(())
+    }
+
+    fn get(&self, index: K) -> Result<Option<V>, Error> {
+        let value = self.map.get(&Self::db_key(K::zero(), index))?;
+        Ok(value.map(StorageValue::deserialize))
+    }
+
+    fn last(&self) -> Result<Option<V>, Error> {
+        let len = self.len()?;
+        if len == K::zero() {
+            Ok(None)
+        } else {
+            self.get(len - K::one())
+        }
+    }
+
+    fn is_empty(&self) -> Result<bool, Error> {
+        Ok(self.len()? == K::zero())
+    }
+
+    fn len(&self) -> Result<K, Error> {
+        if let Some(count) = self.count.get() {
+            return Ok(count);
+        }
+
+        let v = self.map.get(&[])?;
+        let c = v.map(K::deserialize).unwrap_or(K::zero());
+        self.count.set(Some(c));
+        Ok(c)
+    }
+}
+
 
 
 #[cfg(test)]
 mod tests {
     extern crate rand;
 
-    use ::crypto::{hash};
-    use ::storage::{MemoryDB, MapExt};
+    use ::crypto::hash;
+    use ::storage::{MemoryDB, MapExt, List};
+
+
+    #[test]
+    fn list_methods() {
+        let mut storage = MemoryDB::new();
+        let mut table = storage.merkle_list(vec![255]);
+
+        assert!(table.is_empty().unwrap());
+        assert_eq!(table.len().unwrap(), 0);
+        table.append(vec![1]).unwrap();
+        assert!(!table.is_empty().unwrap());
+        assert_eq!(table.len().unwrap(), 1);
+
+        table.append(vec![2]).unwrap();
+        assert_eq!(table.len().unwrap(), 2);
+
+        table.append(vec![3]).unwrap();
+        assert_eq!(table.len().unwrap(), 3);
+
+        assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
+        assert_eq!(table.get(1).unwrap(), Some(vec![2]));
+        assert_eq!(table.get(2).unwrap(), Some(vec![3]));
+    }
 
     #[test]
     fn height() {
         let mut storage = MemoryDB::new();
         let mut table = storage.merkle_list(vec![255]);
-        
+
         table.append(vec![1]).unwrap();
         assert_eq!(table.height().unwrap(), 1);
 
         table.append(vec![2]).unwrap();
-        assert_eq!(table.height().unwrap(), 2);    
+        assert_eq!(table.height().unwrap(), 2);
 
         table.append(vec![3]).unwrap();
-        assert_eq!(table.height().unwrap(), 3);   
+        assert_eq!(table.height().unwrap(), 3);
 
         table.append(vec![4]).unwrap();
-        assert_eq!(table.height().unwrap(), 3);        
+        assert_eq!(table.height().unwrap(), 3);
 
         assert_eq!(table.len().unwrap(), 4);
         assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
@@ -190,6 +221,7 @@ mod tests {
     fn hashes() {
         let mut storage = MemoryDB::new();
         let mut table = storage.merkle_list(vec![255]);
+        assert_eq!(table.root_hash().unwrap(), None);
 
         let h1 = hash(&vec![1]);
         let h2 = hash(&vec![2]);
@@ -198,26 +230,26 @@ mod tests {
         let h5 = hash(&vec![5]);
         let h6 = hash(&vec![6]);
         let h7 = hash(&vec![7]);
-        let h8 = hash(&vec![8]);        
+        let h8 = hash(&vec![8]);
         let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
         let h123 = hash(&[h12.as_ref(), h3.as_ref()].concat());
         let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
         let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
         let h12345 = hash(&[h1234.as_ref(), h5.as_ref()].concat());
-        let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());    
-        let h123456 = hash(&[h1234.as_ref(), h56.as_ref()].concat());      
-        let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());    
-        let h567 = hash(&[h56.as_ref(), h7.as_ref()].concat());    
-        let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());                
-        let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());   
-        let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());  
+        let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());
+        let h123456 = hash(&[h1234.as_ref(), h56.as_ref()].concat());
+        let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());
+        let h567 = hash(&[h56.as_ref(), h7.as_ref()].concat());
+        let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());
+        let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
+        let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
         table.append(vec![1]).unwrap();
         assert_eq!(table.root_hash().unwrap(), Some(h1));
 
         table.append(vec![2]).unwrap();
         assert_eq!(table.root_hash().unwrap(), Some(h12));
-        
+
         table.append(vec![3]).unwrap();
         assert_eq!(table.root_hash().unwrap(), Some(h123));
 
@@ -228,14 +260,14 @@ mod tests {
         assert_eq!(table.root_hash().unwrap(), Some(h12345));
 
         table.append(vec![6]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h123456));       
+        assert_eq!(table.root_hash().unwrap(), Some(h123456));
 
         table.append(vec![7]).unwrap();
         assert_eq!(table.root_hash().unwrap(), Some(h1234567));
 
         table.append(vec![8]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h12345678));                                      
+        assert_eq!(table.root_hash().unwrap(), Some(h12345678));
 
         assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
-    }    
+    }
 }

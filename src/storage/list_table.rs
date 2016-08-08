@@ -3,7 +3,7 @@ use num::{Integer, range, ToPrimitive};
 use std::marker::PhantomData;
 use std::cell::Cell;
 
-use super::{Map, Error, StorageValue};
+use super::{Map, Error, StorageValue, List};
 
 pub struct ListTable<T: Map<[u8], Vec<u8>>, K, V> {
     map: T,
@@ -24,7 +24,22 @@ impl<'a, T, K, V> ListTable<T, K, V>
         }
     }
 
-    pub fn append(&mut self, value: V) -> Result<(), Error> {
+    // TODO: implement iterator for List
+    pub fn iter(&self) -> Result<Option<Vec<V>>, Error> {
+        Ok(if self.is_empty()? {
+            None
+        } else {
+            Some(range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect())
+        })
+    }
+}
+
+impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
+    where T: Map<[u8], Vec<u8>>,
+          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+          V: StorageValue
+{
+    fn append(&mut self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.map.put(&len.serialize(), value.serialize())?;
         self.map.put(&[], (len + K::one()).serialize())?;
@@ -32,7 +47,7 @@ impl<'a, T, K, V> ListTable<T, K, V>
         Ok(())
     }
 
-    pub fn extend<I>(&mut self, iter: I) -> Result<(), Error>
+    fn extend<I>(&mut self, iter: I) -> Result<(), Error>
         where I: IntoIterator<Item = V>
     {
         let mut len = self.len()?;
@@ -45,12 +60,12 @@ impl<'a, T, K, V> ListTable<T, K, V>
         Ok(())
     }
 
-    pub fn get(&self, index: K) -> Result<Option<V>, Error> {
+    fn get(&self, index: K) -> Result<Option<V>, Error> {
         let value = self.map.get(&index.serialize())?;
         Ok(value.map(StorageValue::deserialize))
     }
 
-    pub fn last(&self) -> Result<Option<V>, Error> {
+    fn last(&self) -> Result<Option<V>, Error> {
         let len = self.len()?;
         if len == K::zero() {
             Ok(None)
@@ -59,20 +74,11 @@ impl<'a, T, K, V> ListTable<T, K, V>
         }
     }
 
-    // TODO: implement iterator for List
-    pub fn iter(&self) -> Result<Option<Vec<V>>, Error> {
-        Ok(if self.is_empty()? {
-            None
-        } else {
-            Some(range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect())
-        })
-    }
-
-    pub fn is_empty(&self) -> Result<bool, Error> {
+    fn is_empty(&self) -> Result<bool, Error> {
         Ok(self.len()? == K::zero())
     }
 
-    pub fn len(&self) -> Result<K, Error> {
+    fn len(&self) -> Result<K, Error> {
         if let Some(count) = self.count.get() {
             return Ok(count);
         }
