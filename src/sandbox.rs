@@ -1,4 +1,5 @@
-use std::collections::{VecDeque, BinaryHeap};
+use std::collections::{VecDeque, BinaryHeap, HashSet};
+use std::iter::FromIterator;
 use std::cell::RefCell;
 use std::sync::Arc;
 use std::io;
@@ -207,6 +208,32 @@ impl Sandbox {
         }
     }
 
+    pub fn broadcast<T: Message>(&self, msg: T) {
+        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
+        let mut set = HashSet::from_iter(self.addresses.iter().map(Clone::clone)): HashSet<SocketAddr>;
+        for _ in 0..self.validators.len() {
+            let sended = self.inner.borrow_mut().sended.pop_front();
+            if let Some((real_addr, real_msg)) = sended {
+                let any_real_msg = Any::from_raw(real_msg.clone())
+                                        .expect("Send incorrect message");
+                if any_real_msg != any_expected_msg {
+                    panic!("Expected to broadcast the message {:?} instead sending {:?} to {}",
+                           any_expected_msg, any_real_msg, real_addr)
+                }
+                if !set.contains(&real_addr) {
+                    panic!("Double send the same message {:?} to {:?} during broadcasting",
+                           any_expected_msg, real_addr)
+                } else {
+                    set.remove(&real_addr);
+                }
+            } else {
+                panic!("Expected to broadcast the message {:?} but someone don't recieve messages: {:?}",
+                       any_expected_msg, set);
+            }
+        }
+
+    }
+
     pub fn set_time(&self, sec: i64, nsec: i32) {
         self.check_unexpected_message();
         // set time
@@ -231,10 +258,22 @@ impl Sandbox {
         }
     }
 
-    pub fn assert_round(&self, round: u32) {
+    pub fn assert_state(&self, height: u64, round: u32) {
+        let achual_height = self.node.borrow().context().state.height();
         let actual_round = self.node.borrow().context().state.round();
+        assert!(achual_height == height,
+                "Incorrect height, actual={}, expected={}", achual_height, height);
         assert!(actual_round == round,
                 "Incorrect round, actual={}, expected={}", actual_round, round);
+    }
+
+    pub fn assert_lock(&self, round: u32, hash: Option<Hash>) {
+        let actual_round = self.node.borrow().context().state.locked_round();
+        let actual_hash = self.node.borrow().context().state.locked_propose();
+        assert!(actual_round == round,
+                "Incorrect height, actual={}, expected={}", actual_round, round);
+        assert!(actual_hash == hash,
+                "Incorrect round, actual={:?}, expected={:?}", actual_hash, hash);
     }
 }
 
@@ -258,13 +297,14 @@ fn test_sandbox_recv_and_send() {
 }
 
 #[test]
-fn test_sandbox_assert_round() {
+fn test_sandbox_assert_status() {
+    // TODO: remove this?
     let s = Sandbox::new();
-    s.assert_round(1);
+    s.assert_state(0, 1);
     s.set_time(0, 999_999_999);
-    s.assert_round(1);
+    s.assert_state(0, 1);
     s.set_time(1, 0);
-    s.assert_round(2);
+    s.assert_state(0, 2);
 }
 
 #[test]
