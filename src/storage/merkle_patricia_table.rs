@@ -267,6 +267,10 @@ impl StorageValue for BranchNode {
     fn deserialize(v: Vec<u8>) -> Self {
         BranchNode::from_bytes(v)
     }
+
+    fn hash(&self) -> Hash {
+        self.hash()
+    }
 }
 
 pub struct MerklePatriciaTable<T: Map<[u8], Vec<u8>>, K: ?Sized, V> {

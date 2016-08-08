@@ -131,6 +131,7 @@ pub trait MapExt: Map<[u8], Vec<u8>> + Sized {
                              prefix: Vec<u8>)
                              -> MerkleTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
         where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+              V: StorageValue;
     fn merkle_map<'a, K: ?Sized, V>
         (&'a mut self,
          prefix: Vec<u8>)

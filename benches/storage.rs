@@ -11,8 +11,8 @@ use tempdir::TempDir;
 use rand::{SeedableRng, XorShiftRng, Rng};
 use leveldb::options::Options;
 
-use da::storage::{MemoryDB, LevelDB};
-use da::storage::{List, MapExt};
+use da::storage::{MerklePatriciaTable, MemoryDB, LevelDB};
+use da::storage::{Map, List, MapExt};
 
 fn merkle_table_insertion<T: MapExt>(b: &mut Bencher, mut db: T) {
     let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);

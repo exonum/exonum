@@ -277,7 +277,7 @@ mod tests {
         let mut table = storage.merkle_list(vec![255]);
 
         let h = hash(&[1, 2, 3 ,4]);
-        table.append(h);
+        table.append(h).unwrap();
         assert_eq!(table.get(0u32).unwrap(), Some(h));
     }
 }
