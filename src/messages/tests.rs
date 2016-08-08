@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use super::super::crypto::{hash, gen_keypair};
 
-use super::{Message, Connect, Propose, Prevote, Precommit, Commit};
+use super::{Message, Connect, Propose, Prevote, Precommit, Status};
 
 #[test]
 fn test_connect() {
@@ -89,24 +89,19 @@ fn test_precommit() {
 }
 
 #[test]
-fn test_commit() {
+fn test_status() {
     let validator = 123_123;
     let height = 123_123_123;
-    let round = 321_321_312;
-    let propose_hash = hash(&[1, 2, 3]);
-    let block_hash = hash(&[3, 2, 1]);
+    let last_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let commit = Commit::new(validator, height, round,
-                             &propose_hash, &block_hash,
+    let commit = Status::new(validator, height, &last_hash,
                              &secret_key);
     // read
     assert_eq!(commit.validator(), validator);
     assert_eq!(commit.height(), height);
-    assert_eq!(commit.round(), round);
-    assert_eq!(commit.propose_hash(), &propose_hash);
-    assert_eq!(commit.block_hash(), &block_hash);
+    assert_eq!(commit.last_hash(), &last_hash);
     assert!(commit.verify(&public_key));
 }
 

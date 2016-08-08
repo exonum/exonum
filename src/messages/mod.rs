@@ -31,6 +31,7 @@ pub enum Any {
 #[derive(Clone, PartialEq)]
 pub enum BasicMessage {
     Connect(Connect),
+    Status(Status),
 }
 
 #[derive(Clone, PartialEq)]
@@ -38,7 +39,6 @@ pub enum ConsensusMessage {
     Propose(Propose),
     Prevote(Prevote),
     Precommit(Precommit),
-    Commit(Commit),
 }
 
 #[derive(Clone, PartialEq)]
@@ -63,6 +63,7 @@ impl fmt::Debug for BasicMessage {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
             BasicMessage::Connect(ref msg) => write!(fmt, "{:?}", msg),
+            BasicMessage::Status(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }
@@ -189,7 +190,6 @@ impl ConsensusMessage {
             ConsensusMessage::Propose(ref msg) => msg.validator(),
             ConsensusMessage::Prevote(ref msg) => msg.validator(),
             ConsensusMessage::Precommit(ref msg) => msg.validator(),
-            ConsensusMessage::Commit(ref msg) => msg.validator(),
         }
     }
 
@@ -198,7 +198,6 @@ impl ConsensusMessage {
             ConsensusMessage::Propose(ref msg) => msg.height(),
             ConsensusMessage::Prevote(ref msg) => msg.height(),
             ConsensusMessage::Precommit(ref msg) => msg.height(),
-            ConsensusMessage::Commit(ref msg) => msg.height(),
         }
     }
 
@@ -207,7 +206,6 @@ impl ConsensusMessage {
             ConsensusMessage::Propose(ref msg) => msg.round(),
             ConsensusMessage::Prevote(ref msg) => msg.round(),
             ConsensusMessage::Precommit(ref msg) => msg.round(),
-            ConsensusMessage::Commit(ref msg) => msg.round(),
         }
     }
 
@@ -216,7 +214,6 @@ impl ConsensusMessage {
             ConsensusMessage::Propose(ref msg) => msg.raw(),
             ConsensusMessage::Prevote(ref msg) => msg.raw(),
             ConsensusMessage::Precommit(ref msg) => msg.raw(),
-            ConsensusMessage::Commit(ref msg) => msg.raw(),
         }
     }
 
@@ -225,7 +222,6 @@ impl ConsensusMessage {
             ConsensusMessage::Propose(ref msg) => msg.verify(public_key),
             ConsensusMessage::Prevote(ref msg) => msg.verify(public_key),
             ConsensusMessage::Precommit(ref msg) => msg.verify(public_key),
-            ConsensusMessage::Commit(ref msg) => msg.verify(public_key),
         }
     }
 }
@@ -236,7 +232,6 @@ impl fmt::Debug for ConsensusMessage {
             ConsensusMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
             ConsensusMessage::Prevote(ref msg) => write!(fmt, "{:?}", msg),
             ConsensusMessage::Precommit(ref msg) => write!(fmt, "{:?}", msg),
-            ConsensusMessage::Commit(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }
@@ -246,10 +241,10 @@ impl Any {
         // TODO: check input message size
         Ok(match raw.message_type() {
             Connect::MESSAGE_TYPE => Any::Basic(BasicMessage::Connect(Connect::from_raw(raw)?)),
+            Status::MESSAGE_TYPE => Any::Basic(BasicMessage::Status(Status::from_raw(raw)?)),
             Propose::MESSAGE_TYPE => Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?)),
             Prevote::MESSAGE_TYPE => Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?)),
             Precommit::MESSAGE_TYPE => Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?)),
-            Commit::MESSAGE_TYPE => Any::Consensus(ConsensusMessage::Commit(Commit::from_raw(raw)?)),
             _ => {
                 // TODO: use result here
                 panic!("unrecognized message type");

@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::super::crypto::{Hash, hash};
 use super::super::messages::{
-    ConsensusMessage, Propose, Prevote, Precommit, Commit, Message,
+    ConsensusMessage, Propose, Prevote, Precommit, Message,
     RequestPropose, RequestTransactions, RequestPrevotes,
     RequestPrecommits, RequestCommit,
     RequestPeers, TxMessage
@@ -17,11 +17,6 @@ pub trait ConsensusHandler {
         info!("handle consensus message");
         // Ignore messages from previous and future height
         if msg.height() < ctx.state.height() || msg.height() > ctx.state.height() + 1 {
-            return
-        }
-
-        if let ConsensusMessage::Commit(msg) = msg {
-            self.handle_commit(ctx, msg);
             return
         }
 
@@ -57,7 +52,6 @@ pub trait ConsensusHandler {
             },
             ConsensusMessage::Prevote(msg) => self.handle_prevote(ctx, msg),
             ConsensusMessage::Precommit(msg) => self.handle_precommit(ctx, msg),
-            ConsensusMessage::Commit(msg) => self.handle_commit(ctx, msg),
         }
     }
 
@@ -75,9 +69,9 @@ pub trait ConsensusHandler {
             let known_nodes = self.remove_request(ctx, RequestData::Propose(hash));
 
             if ctx.state.propose(&hash).unwrap().has_unknown_txs() {
-                self.request(ctx, RequestData::Transactions(hash), propose.validator());
+                ctx.request(RequestData::Transactions(hash), propose.validator());
                 for node in known_nodes {
-                    self.request(ctx, RequestData::Transactions(hash), node);
+                    ctx.request(RequestData::Transactions(hash), node);
                 }
             } else {
                 self.has_full_propose(ctx, hash);
@@ -107,7 +101,7 @@ pub trait ConsensusHandler {
         }
 
         // Commit propose
-        for (round, block_hash) in ctx.state.unknown_propose_with_precommits(&hash) {
+        for (_, block_hash) in ctx.state.unknown_propose_with_precommits(&hash) {
             // Execute block and get state hash
             let our_block_hash = self.execute(ctx, &hash);
 
@@ -115,7 +109,7 @@ pub trait ConsensusHandler {
                 panic!("We are fucked up...");
             }
 
-            self.commit(ctx, round, &hash);
+            self.commit(ctx, &hash);
         }
     }
 
@@ -131,8 +125,7 @@ pub trait ConsensusHandler {
 
         // Request prevotes
         if prevote.locked_round() > ctx.state.locked_round() {
-            self.request(ctx,
-                         RequestData::Prevotes(prevote.locked_round(),
+            ctx.request(RequestData::Prevotes(prevote.locked_round(),
                                                *prevote.propose_hash()),
                          prevote.validator());
         }
@@ -175,7 +168,7 @@ pub trait ConsensusHandler {
                 panic!("We are fucked up...");
             }
 
-            self.commit(ctx, round, propose_hash);
+            self.commit(ctx, propose_hash);
         } else {
             ctx.state.add_unknown_propose_with_precommits(round,
                                                           *propose_hash,
@@ -221,8 +214,7 @@ pub trait ConsensusHandler {
 
         // Request propose
         if let None = ctx.state.propose(msg.propose_hash()) {
-            self.request(ctx,
-                         RequestData::Propose(*msg.propose_hash()),
+            ctx.request(RequestData::Propose(*msg.propose_hash()),
                          msg.validator());
         }
 
@@ -231,8 +223,7 @@ pub trait ConsensusHandler {
         // у него уже нет +2/3 prevote. Можем ли мы избавится от бесполезной
         // отправки RequestPrevotes?
         if msg.round() > ctx.state.locked_round() {
-            self.request(ctx,
-                         RequestData::Prevotes(msg.round(),
+            ctx.request(RequestData::Prevotes(msg.round(),
                                                *msg.propose_hash()),
                          msg.validator());
         }
@@ -246,15 +237,12 @@ pub trait ConsensusHandler {
         }
     }
 
-    fn commit(&self, ctx: &mut NodeContext,
-              round: Round, hash: &Hash) {
+    // FIXME: push precommits into storage
+    fn commit(&self, ctx: &mut NodeContext, hash: &Hash) {
         info!("COMMIT");
         // Merge changes into storage
         // FIXME: remove unwrap here, merge patch into storage
         ctx.storage.merge(ctx.state.propose(hash).unwrap().patch().unwrap()).is_ok();
-
-        // FIXME: use block hash here
-        let block_hash = hash;
 
         // Update state to new height
         ctx.state.new_height(hash);
@@ -265,10 +253,6 @@ pub trait ConsensusHandler {
             ctx.broadcast(&tx.raw().clone());
             ctx.state.add_transaction(tx.hash(), tx);
         }
-
-        // Send commit
-        let height = ctx.state.height() - 1;
-        self.send_commit(ctx, height, round, hash, &block_hash);
 
         // Handle queued messages
         for msg in ctx.state.queued() {
@@ -285,7 +269,7 @@ pub trait ConsensusHandler {
 
         // Request commits
         for validator in ctx.state.validator_heights() {
-            self.request(ctx, RequestData::Commit, validator)
+            ctx.request(RequestData::Commit, validator)
         }
     }
 
@@ -309,49 +293,6 @@ pub trait ConsensusHandler {
         // Go to has full propose if we get last transaction
         for hash in full_proposes {
             self.has_full_propose(ctx, hash);
-        }
-    }
-
-    fn handle_commit(&self, ctx: &mut NodeContext, msg: Commit) {
-        info!("recv commit");
-        // Handle message from future height
-        if msg.height() > ctx.state.height() {
-            // Check validator height info
-            // FIXME: make sure that validator id < validator count
-            if ctx.state.validator_height(msg.validator()) >= msg.height() {
-                return;
-            }
-            // Verify validator if and signature
-            match ctx.state.public_key_of(msg.validator()) {
-                // Incorrect signature of message
-                Some(public_key) => if !msg.verify(&public_key) {
-                    return
-                },
-                // Incorrect validator id
-                None => return
-            };
-            // Update validator height
-            ctx.state.set_validator_height(msg.validator(), msg.height());
-            // Request commit
-            self.request(ctx, RequestData::Commit, msg.validator());
-
-            return;
-        }
-
-        // Handle message from current height
-        if msg.height() == ctx.state.height() {
-            // Request propose or txs
-            self.request_propose_or_txs(ctx, msg.propose_hash(), msg.validator());
-
-            // Request precommits
-            if !ctx.state.has_majority_precommits(msg.round(),
-                                                  *msg.propose_hash(),
-                                                  *msg.block_hash()) {
-                let data = RequestData::Precommits(msg.round(),
-                                                  *msg.propose_hash(),
-                                                  *msg.block_hash());
-                self.request(ctx, data, msg.validator());
-            }
         }
     }
 
@@ -490,17 +431,7 @@ pub trait ConsensusHandler {
         };
 
         if let Some(data) = requested_data {
-            self.request(ctx, data, validator);
-        }
-    }
-
-    fn request(&self, ctx: &mut NodeContext,
-               data: RequestData, validator: ValidatorId) {
-        info!("REQUEST");
-        let is_new = ctx.state.request(data.clone(), validator);
-
-        if is_new {
-            ctx.add_request_timeout(data, validator);
+            ctx.request(data, validator);
         }
     }
 
@@ -560,20 +491,6 @@ pub trait ConsensusHandler {
                                        &ctx.secret_key);
         ctx.state.add_precommit(&precommit);
         ctx.broadcast(precommit.raw());
-    }
-
-    fn send_commit(&self, ctx: &mut NodeContext,
-                   height: Height, round: Round,
-                   propose_hash: &Hash, block_hash: &Hash) {
-        info!("send commit");
-        // Send commit
-        let commit = Commit::new(ctx.state.id(),
-                                 height,
-                                 round,
-                                 propose_hash,
-                                 block_hash,
-                                 &ctx.secret_key);
-        ctx.broadcast(commit.raw());
     }
 }
 

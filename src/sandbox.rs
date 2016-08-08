@@ -67,6 +67,7 @@ impl Sandbox {
             }) as Box<Reactor>,
             storage: Storage::new(MemoryDB::new()),
             round_timeout: 1000,
+            status_timeout: 5000,
             peer_discovery: Vec::new(),
             tx_generator: TxGenerator::new(),
         };

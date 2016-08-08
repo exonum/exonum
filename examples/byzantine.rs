@@ -41,6 +41,7 @@ fn main() {
         public_key: public_key.clone(),
         secret_key: secret_key.clone(),
         round_timeout: 2000,
+        status_timeout: 5000,
         network: NetworkConfiguration {
             listen_address: address.clone(),
             max_incoming_connections: 8,

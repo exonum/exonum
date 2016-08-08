@@ -35,6 +35,7 @@ pub struct NodeContext {
     pub events: Box<Reactor>,
     pub storage: Storage<MemoryDB>,
     pub round_timeout: u32,
+    pub status_timeout: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
     pub tx_generator: TxGenerator,
@@ -47,6 +48,7 @@ pub struct Configuration {
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
     pub round_timeout: u32,
+    pub status_timeout: u32,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
 }
@@ -69,6 +71,7 @@ impl Node {
             events: reactor,
             storage: storage,
             round_timeout: config.round_timeout,
+            status_timeout: config.status_timeout,
             peer_discovery: config.peer_discovery,
             tx_generator: tx_generator,
         };
@@ -106,6 +109,7 @@ impl Node {
         }
 
         self.context.add_round_timeout();
+        self.context.add_status_timeout();
     }
 
     pub fn run(&mut self) {
@@ -162,6 +166,9 @@ impl Node {
             Timeout::Request(data, validator) =>
                 self.consensus.handle_request_timeout(&mut self.context,
                                                       data, validator),
+            Timeout::Status =>
+                self.basic.handle_status_timeout(&mut self.context),
+
         }
     }
 }
@@ -186,12 +193,25 @@ impl NodeContext {
         self.events.send_to(address, message.clone()).unwrap();
     }
 
+    fn request(&mut self, data: RequestData, validator: ValidatorId) {
+        let is_new = self.state.request(data.clone(), validator);
+
+        if is_new {
+            self.add_request_timeout(data, validator);
+        }
+    }
+
     fn add_round_timeout(&mut self) {
         let ms = self.state.round() * self.round_timeout;
         let time = self.storage.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0}) + Duration::milliseconds(ms as i64);
         info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}", time, self.state.height(), self.state.round());
         let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
+    }
+
+    pub fn add_status_timeout(&mut self) {
+        let time = self.events.get_time() + Duration::milliseconds(self.status_timeout as i64);
+        self.events.add_timeout(Timeout::Status, time);
     }
 
     pub fn add_request_timeout(&mut self,
