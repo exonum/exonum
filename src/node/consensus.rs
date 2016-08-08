@@ -7,7 +7,7 @@ use super::super::messages::{
     RequestPrecommits, RequestCommit,
     RequestPeers, TxMessage
 };
-use super::super::storage::{Map};
+use super::super::storage::{Map, List};
 use super::{NodeContext, Round, Height, RequestData, ValidatorId};
 
 pub struct ConsensusService;

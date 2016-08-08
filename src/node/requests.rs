@@ -3,7 +3,7 @@ use super::super::messages::{
     RequestPropose, RequestTransactions, RequestPrevotes,
     RequestPrecommits, RequestCommit, RequestPeers
 };
-use super::super::storage::Map;
+use super::super::storage::{Map, List};
 use super::NodeContext;
 
 
