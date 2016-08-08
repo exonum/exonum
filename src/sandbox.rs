@@ -19,8 +19,25 @@ struct SandboxInner {
     address: SocketAddr,
     time: Timespec,
     sended: VecDeque<(SocketAddr, RawMessage)>,
-    timers: BinaryHeap<(Timespec, Timeout)>,
+    timers: BinaryHeap<TimerPair>,
 }
+
+#[derive(PartialEq, Eq)]
+struct TimerPair(Timespec, Timeout);
+
+impl PartialOrd for TimerPair {
+    fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
+        Some((&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse())
+    }
+}
+
+
+impl Ord for TimerPair {
+    fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
+        (&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse()
+    }
+}
+
 
 pub struct Sandbox {
     inner: Arc<RefCell<SandboxInner>>,
@@ -117,7 +134,7 @@ impl Reactor for SandboxReactor {
 
     fn add_timeout(&mut self, timeout: Timeout, time: Timespec) {
         // assert!(time < self.inner.borrow().time, "Tring to add timeout for the past");
-        self.inner.borrow_mut().timers.push((time, timeout));
+        self.inner.borrow_mut().timers.push(TimerPair(time, timeout));
     }
 }
 
@@ -199,9 +216,9 @@ impl Sandbox {
         loop {
             let timeout = {
                 let ref mut timers = self.inner.borrow_mut().timers;
-                if let Some((time, timeout)) = timers.pop() {
+                if let Some(TimerPair(time, timeout)) = timers.pop() {
                     if time > now {
-                        timers.push((time, timeout));
+                        timers.push(TimerPair(time, timeout));
                         break;
                     } else {
                         timeout
