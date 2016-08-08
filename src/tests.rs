@@ -1,25 +1,77 @@
-// use super::sandbox::Sandbox;
-// use super::messages::{Message, Propose, Prevote, Precommit, Commit};
+use super::sandbox::Sandbox;
+use super::messages::{Message, Propose, Prevote, Precommit, Status};
 
-// #[test]
-// fn test_basic_send_prevote() {
-//     let mut sandbox = Sandbox::new();
+// Send propose
 
-//     // let propose = Propose::new(1, 1, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
+#[test]
+fn test_send_propose_and_prevote() {
+    let sandbox = Sandbox::new();
 
-//     // sandbox.send(sandbox.a(1), propose.clone());
-//     // sandbox.recv(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
-// }
+    // round happens
+    sandbox.set_time(1, 0);
+    sandbox.set_time(2, 0);
+    sandbox.set_time(3, 0);
+
+    sandbox.assert_state(0, 4);
+
+    // ok, we are leader
+    let propose = Propose::new(0, 0, 4,
+                               sandbox.time(),
+                               &sandbox.last_hash(),
+                               &[],
+                               sandbox.s(0));
+
+    sandbox.broadcast(propose.clone());
+    sandbox.broadcast(Prevote::new(0, 0, 4, &propose.hash(), 0, sandbox.s(0)));
+}
+
+#[test]
+fn test_send_prevote() {
+    let sandbox = Sandbox::new();
+
+    let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
+
+    sandbox.recv(propose.clone());
+    sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
+}
+
+#[test]
+fn test_get_lock_and_send_precommit() {
+    let sandbox = Sandbox::new();
+
+    let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
+
+    sandbox.recv(propose.clone());
+    sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
+    sandbox.recv(Prevote::new(1, 0, 1, &propose.hash(), 0, sandbox.s(1)));
+    sandbox.assert_lock(0, None);
+    sandbox.recv(Prevote::new(2, 0, 1, &propose.hash(), 0, sandbox.s(2)));
+    sandbox.broadcast(Precommit::new(0, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(0)));
+    sandbox.assert_lock(1, Some(propose.hash()));
+}
+
+#[test]
+fn test_commit() {
+    let sandbox = Sandbox::new();
+
+    let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
+
+    sandbox.recv(propose.clone());
+    sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
+    sandbox.recv(Prevote::new(1, 0, 1, &propose.hash(), 0, sandbox.s(1)));
+    sandbox.recv(Prevote::new(2, 0, 1, &propose.hash(), 0, sandbox.s(2)));
+    sandbox.broadcast(Precommit::new(0, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(0)));
+    sandbox.recv(Precommit::new(2, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(2)));
+    sandbox.recv(Precommit::new(3, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(3)));
+    sandbox.assert_state(1, 1);
+}
 
 // TODO: add test by consensus.rs
 // TODO: add test by state.rs
 // TODO: тесты на идемпотентность
 // TODO: fuzz test: получение сообщений в разном порядке приводит к одному и тому же состоянию
-
-// send propose
-// send prevote
-// send precommit
-// send status
+// TODO: test byzantine behavior
+// TODO: test incorrect message in some way (incorrect sign, validator id, etc)
 
 // fn handle
 // fn handle_propose

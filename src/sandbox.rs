@@ -209,8 +209,10 @@ impl Sandbox {
     // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let mut set = HashSet::from_iter(self.addresses.iter().map(Clone::clone)): HashSet<SocketAddr>;
-        for _ in 0..self.validators.len() {
+        let mut set = HashSet::from_iter(self.addresses.iter()
+                                                       .skip(1)
+                                                       .map(Clone::clone)): HashSet<SocketAddr>;
+        for _ in 0..self.validators.len()-1 {
             let sended = self.inner.borrow_mut().sended.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone())
@@ -278,7 +280,9 @@ impl Sandbox {
 
 impl Drop for Sandbox {
     fn drop(&mut self) {
-        self.check_unexpected_message();
+        if !::std::thread::panicking() {
+            self.check_unexpected_message();
+        }
     }
 }
 
