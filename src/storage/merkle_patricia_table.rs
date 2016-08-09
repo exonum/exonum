@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::fmt;
 use std::ops::Not;
 
-use byteorder::{ByteOrder, LittleEndian};
+use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{hash, Hash, HASH_SIZE};
 
@@ -252,13 +252,13 @@ impl BranchNode {
     fn read_slice(&self, from: usize) -> BitSlice {
         BitSlice {
             from: 0,
-            to: LittleEndian::read_u16(&self.raw[from..from + 2]),
+            to: BigEndian::read_u16(&self.raw[from..from + 2]),
             data: &self.raw[from + 2..from + BITSLICE_SIZE],
         }
     }
     fn write_slice(&mut self, from: usize, slice: &BitSlice) -> usize {
         debug_assert!(slice.data.len() <= KEY_SIZE);
-        LittleEndian::write_u16(&mut self.raw[from..from + 2], slice.to);
+        BigEndian::write_u16(&mut self.raw[from..from + 2], slice.to);
         let from = from + 2;
         self.raw[from..from + slice.data.len()].copy_from_slice(slice.data);
         from + KEY_SIZE
