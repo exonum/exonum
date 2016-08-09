@@ -387,25 +387,30 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         // If the slice is fully fit in key then there is a two cases
         let i = child_slice.common_prefix(&key_slice);
         if child_slice.len() == i {
-            match self.read_node(&child_slice)? {
-                // there is a leaf in branch and we needs to update its value
-                Node::Leaf(data) => {
-                    let hash = Self::hash_value(&key_slice.data, &data);
-                    self.insert_leaf(&key_slice.data, data)?;
-                    return Ok((None, hash));
-                }
-                // There is a child in branch and we needs to lookup it recursively
-                Node::Branch(mut branch) => {
-                    let (j, h) = self.do_insert_branch(&branch, &key_slice.mid(i), data)?;
-                    match j {
-                        Some(j) => {
-                            branch.set_child(key_slice.at(i), &key_slice.mid(i).truncate(j), &h)
-                        }
-                        None => branch.set_child_hash(key_slice.at(i), &h),
-                    };
-                    let hash = branch.hash();
-                    self.insert_branch(&child_slice, branch)?;
-                    return Ok((None, hash));
+            // check that child is leaf to avoid unnecessary read
+            if child_slice.is_leaf_key() {
+                let hash = Self::hash_value(&key_slice.data, &data);
+                self.insert_leaf(&key_slice.data, data)?;
+                return Ok((None, hash));
+            } else {
+                match self.read_node(&child_slice)? {
+                    // there is a leaf in branch and we needs to update its value
+                    Node::Leaf(_) => {
+                        unreachable!("Somethink went wrong!");
+                    }
+                    // There is a child in branch and we needs to lookup it recursively
+                    Node::Branch(mut branch) => {
+                        let (j, h) = self.do_insert_branch(&branch, &key_slice.mid(i), data)?;
+                        match j {
+                            Some(j) => {
+                                branch.set_child(key_slice.at(i), &key_slice.mid(i).truncate(j), &h)
+                            }
+                            None => branch.set_child_hash(key_slice.at(i), &h),
+                        };
+                        let hash = branch.hash();
+                        self.insert_branch(&child_slice, branch)?;
+                        return Ok((None, hash));
+                    }
                 }
             }
         } else {
@@ -963,7 +968,7 @@ mod tests {
         table2.put(&vec![250; 32], vec![1]).unwrap();
         table2.put(&vec![254; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![3]).unwrap();
-        table1.put(&vec![254; 32], vec![5]).unwrap();
+        table2.put(&vec![254; 32], vec![5]).unwrap();
 
         assert!(table1.root_hash().unwrap() != None);
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
