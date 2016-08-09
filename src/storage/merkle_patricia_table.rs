@@ -2,6 +2,7 @@ use std::mem;
 use std::cmp::{min, PartialEq};
 use std::marker::PhantomData;
 use std::fmt;
+use std::ops::Not;
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -15,10 +16,27 @@ const BRANCH_KEY_SIZE: usize = KEY_SIZE + 2;
 const BITSLICE_SIZE: usize = KEY_SIZE + 2;
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + BITSLICE_SIZE);
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ChildKind {
+    Left,
+    Right,
+}
+
 struct BitSlice<'a> {
     data: &'a [u8],
     from: u16,
     to: u16,
+}
+
+impl Not for ChildKind {
+    type Output = ChildKind;
+
+    fn not(self) -> ChildKind {
+        match self {
+            ChildKind::Left => ChildKind::Right,
+            ChildKind::Right => ChildKind::Left,
+        }
+    }
 }
 
 // TODO combine bitslice with db prefix and add cache to avoid reallocations
@@ -47,7 +65,7 @@ impl<'a> BitSlice<'a> {
         self.len() == 0
     }
     /// Get bit at position `idx`.
-    fn at(&self, idx: usize) -> bool {
+    fn at(&self, idx: usize) -> ChildKind {
         debug_assert!(!self.is_empty());
         debug_assert!((idx as u16) < self.to);
 
@@ -55,7 +73,11 @@ impl<'a> BitSlice<'a> {
         let chunk = self.data[(pos / 8) as usize];
         let bit = 7 - pos % 8;
         let value = (1 << bit) & chunk;
-        value != 0
+        if value != 0 {
+            ChildKind::Right
+        } else {
+            ChildKind::Left
+        }
     }
     /// Return object which represents a view on to this slice (further) offset by `i` bits.
     fn mid(&self, sz: usize) -> BitSlice {
@@ -169,21 +191,6 @@ enum Node<T: StorageValue> {
     Branch(BranchNode),
 }
 
-#[derive(Debug, Clone, Copy)]
-enum Child {
-    Left,
-    Right,
-}
-
-impl<'a> Into<bool> for Child {
-    fn into(self) -> bool {
-        match self {
-            Child::Left => false,
-            Child::Right => true,
-        }
-    }
-}
-
 impl BranchNode {
     fn from_bytes(raw: Vec<u8>) -> BranchNode {
         debug_assert_eq!(raw.len(), BRANCH_NODE_SIZE);
@@ -194,48 +201,49 @@ impl BranchNode {
     }
 
     fn hash(&self) -> Hash {
-        hash(&[self.child_hash(Child::Left).as_ref(), self.child_hash(Child::Right).as_ref()]
+        hash(&[self.child_hash(ChildKind::Left).as_ref(),
+               self.child_hash(ChildKind::Right).as_ref()]
             .concat())
     }
 
-    fn child_hash<T: Into<bool>>(&self, is_right: T) -> &Hash {
+    fn child_hash(&self, kind: ChildKind) -> &Hash {
         // TODO move offset to trait or const or enum or macro?
-        let from = match is_right.into() {
-            true => HASH_SIZE,
-            false => 0,
+        let from = match kind {
+            ChildKind::Right => HASH_SIZE,
+            ChildKind::Left => 0,
         };
         unsafe { self.read_hash(from) }
     }
-    fn child_prefix<T: Into<bool>>(&self, is_right: T) -> BitSlice {
-        let from = match is_right.into() {
-            true => 2 * HASH_SIZE + BITSLICE_SIZE,
-            false => 2 * HASH_SIZE,
+    fn child_prefix(&self, kind: ChildKind) -> BitSlice {
+        let from = match kind {
+            ChildKind::Right => 2 * HASH_SIZE + BITSLICE_SIZE,
+            ChildKind::Left => 2 * HASH_SIZE,
         };
         self.read_slice(from)
     }
-    fn set_child_prefix<T: Into<bool>>(&mut self, is_right: T, prefix: &BitSlice) {
-        let from = match is_right.into() {
-            true => 2 * HASH_SIZE + BITSLICE_SIZE,
-            false => 2 * HASH_SIZE,
+    fn set_child_prefix(&mut self, kind: ChildKind, prefix: &BitSlice) {
+        let from = match kind {
+            ChildKind::Right => 2 * HASH_SIZE + BITSLICE_SIZE,
+            ChildKind::Left => 2 * HASH_SIZE,
         };
-        self.write_slice(from, &prefix);
+        self.write_slice(from, prefix);
     }
-    fn set_child_hash<T: Into<bool> + Copy>(&mut self, is_right: T, hash: &Hash) {
-        let from = match is_right.into() {
-            true => HASH_SIZE,
-            false => 0,
+    fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
+        let from = match kind {
+            ChildKind::Right => HASH_SIZE,
+            ChildKind::Left => 0,
         };
         unsafe {
             self.write_hash(from, hash);
         }
     }
-    fn set_child<T: Into<bool> + Copy>(&mut self, is_right: T, prefix: &BitSlice, hash: &Hash) {
-        self.set_child_prefix(is_right, prefix);
-        self.set_child_hash(is_right, hash);
+    fn set_child(&mut self, kind: ChildKind, prefix: &BitSlice, hash: &Hash) {
+        self.set_child_prefix(kind, prefix);
+        self.set_child_hash(kind, hash);
     }
 
     unsafe fn read_hash(&self, from: usize) -> &Hash {
-        return mem::transmute(&self.raw[from]);
+        mem::transmute(&self.raw[from])
     }
     unsafe fn write_hash(&mut self, from: usize, hash: &Hash) -> usize {
         self.raw[from..from + HASH_SIZE].copy_from_slice(hash.as_ref());
@@ -296,7 +304,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
     pub fn root_hash(&self) -> Result<Option<Hash>, Error> {
         match self.root_node()? {
-            Some((prefix, Node::Leaf(value))) => Ok(Some(Self::hash_leaf(&prefix[1..], &value.serialize()))),
+            Some((prefix, Node::Leaf(value))) => {
+                Ok(Some(Self::hash_leaf(&prefix[1..], &value.serialize())))
+            }
             Some((_, Node::Branch(branch))) => Ok(Some(branch.hash())),
             None => Ok(None),
         }
@@ -317,27 +327,25 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         debug_assert_eq!(key.len(), KEY_SIZE);
         match self.root_node()? {
             Some((prefix, Node::Leaf(prefix_data))) => {
-                let key_slice = BitSlice::from_bytes(&key);
+                let key_slice = BitSlice::from_bytes(key);
                 let prefix_slice = BitSlice::from_key(&prefix);
                 let i = prefix_slice.common_prefix(&key_slice);
 
                 let leaf_hash = self.insert_leaf(key, value)?;
                 if i < key_slice.len() {
                     let mut branch = BranchNode::empty();
-                    branch.set_child(key_slice.at(i),
-                                     &key_slice.mid(i),
-                                     &leaf_hash);
+                    branch.set_child(key_slice.at(i), &key_slice.mid(i), &leaf_hash);
                     branch.set_child(prefix_slice.at(i),
                                      &prefix_slice.mid(i),
                                      &Self::hash_leaf(&prefix[1..], &prefix_data.serialize()));
                     let new_prefix = key_slice.truncate(i);
                     self.insert_branch(&new_prefix, branch)?;
                 }
-                return Ok(());
+                Ok(())
             }
             Some((prefix, Node::Branch(mut branch))) => {
                 let prefix_slice = BitSlice::from_key(&prefix);
-                let key_slice = BitSlice::from_bytes(&key);
+                let key_slice = BitSlice::from_bytes(key);
                 let i = prefix_slice.common_prefix(&key_slice);
 
                 if i == prefix_slice.len() {
@@ -356,14 +364,12 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                     let hash = self.insert_leaf(key, value)?;
                     let mut new_branch = BranchNode::empty();
                     new_branch.set_child(prefix_slice.at(i), &prefix_slice.mid(i), &branch.hash());
-                    new_branch.set_child(key_slice.at(i),
-                                         &key_slice.mid(i),
-                                         &hash);
+                    new_branch.set_child(key_slice.at(i), &key_slice.mid(i), &hash);
                     // Saves a new branch
                     let new_prefix = prefix_slice.truncate(i);
-                    self.insert_branch(&new_prefix, new_branch)?;                    
+                    self.insert_branch(&new_prefix, new_branch)?;
                 }
-                return Ok(());
+                Ok(())
             }
             None => {
                 // Eats hash
@@ -382,13 +388,13 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         let mut child_slice = parent.child_prefix(key_slice.at(0));
         child_slice.from = key_slice.from;
         // If the slice is fully fit in key then there is a two cases
-        let i = child_slice.common_prefix(&key_slice);
+        let i = child_slice.common_prefix(key_slice);
         if child_slice.len() == i {
             // check that child is leaf to avoid unnecessary read
             if child_slice.is_leaf_key() {
                 // there is a leaf in branch and we needs to update its value
                 let hash = self.insert_leaf(&key_slice.data, value)?;
-                return Ok((None, hash));
+                Ok((None, hash))
             } else {
                 match self.read_node(&child_slice)? {
                     Node::Leaf(_) => {
@@ -405,7 +411,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                         };
                         let hash = branch.hash();
                         self.insert_branch(&child_slice, branch)?;
-                        return Ok((None, hash));
+                        Ok((None, hash))
                     }
                 }
             }
@@ -415,17 +421,15 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
             let mut new_branch = BranchNode::empty();
             // Add a new leaf
             let hash = self.insert_leaf(&suffix_slice.data, value)?;
-            new_branch.set_child(suffix_slice.at(0),
-                                 &suffix_slice,
-                                 &hash);
+            new_branch.set_child(suffix_slice.at(0), &suffix_slice, &hash);
             // Move current branch
             new_branch.set_child(child_slice.at(i),
                                  &child_slice.mid(i),
-                                 &parent.child_hash(key_slice.at(0)));
+                                 parent.child_hash(key_slice.at(0)));
 
-            let hash = new_branch.hash();            
+            let hash = new_branch.hash();
             self.insert_branch(&key_slice.truncate(i), new_branch)?;
-            return Ok((Some(i), hash));
+            Ok((Some(i), hash))
         }
     }
 
@@ -441,7 +445,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                 if key == prefix {
                     self.map.delete(&key)?;
                 }
-                return Ok(());
+                Ok(())
             }
             Some((prefix, Node::Branch(mut branch))) => {
                 // Truncate prefix
@@ -468,11 +472,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                         }
                     }
                 }
-                return Ok(());
+                Ok(())
             }
-            None => {
-                return Ok(());
-            }
+            None => Ok(()),
         }
     }
 
@@ -496,11 +498,11 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                         RemoveResult::Leaf => {
                             let child = !suffix_slice.at(0);
                             let key = branch.child_prefix(child).to_key();
-                            let hash = branch.child_hash(child).clone();
+                            let hash = branch.child_hash(child);
 
                             self.map.delete(&child_slice.to_key())?;
 
-                            return Ok(RemoveResult::Branch((key, hash)));
+                            return Ok(RemoveResult::Branch((key, *hash)));
                         }
                         RemoveResult::Branch((key, hash)) => {
                             let mut new_child_slice = BitSlice::from_key(key.as_ref());
@@ -536,9 +538,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         match self.map.get(db_key)? {
             Some(data) => {
                 match db_key.len() {
-                    33 => Ok(Node::Leaf(StorageValue::deserialize(data))),
-                    34 => Ok(Node::Branch(BranchNode::from_bytes(data))),
-                    i @ _ => Err(Box::new(format!("Wrong key size: {}", i))),
+                    LEAF_KEY_SIZE => Ok(Node::Leaf(StorageValue::deserialize(data))),
+                    BRANCH_KEY_SIZE => Ok(Node::Branch(BranchNode::from_bytes(data))),
+                    other => Err(Box::new(format!("Wrong key size: {}", other))),
                 }
             }
             None => Err(Box::new(format!("Unable to find node with key {:?}", key))),
@@ -634,23 +636,21 @@ impl<'a> fmt::Debug for BitSlice<'a> {
         let key = &bytes[1..];
         if key.is_empty() {
             f.debug_struct("BitSlice").finish()
+        } else if self.is_leaf_key() {
+            f.debug_struct("BitSlice")
+                .field("type", &"leaf")
+                .field("key", &format!("0x{}", &bytes_to_hex(&key)))
+                .field("from", &self.from)
+                .field("to", &self.to)
+                .finish()
         } else {
-            if self.is_leaf_key() {
-                f.debug_struct("BitSlice")
-                    .field("type", &"leaf")
-                    .field("key", &format!("0x{}", &bytes_to_hex(&key)))
-                    .field("from", &self.from)
-                    .field("to", &self.to)
-                    .finish()
-            } else {
-                f.debug_struct("BitSlice")
-                    .field("type", &"branch")
-                    .field("key", &format!("0x{}", &bytes_to_hex(&key)))
-                    .field("from", &self.from)
-                    .field("to", &self.to)
-                    .field("len", &key[32])
-                    .finish()
-            }
+            f.debug_struct("BitSlice")
+                .field("type", &"branch")
+                .field("key", &format!("0x{}", &bytes_to_hex(&key)))
+                .field("from", &self.from)
+                .field("to", &self.to)
+                .field("len", &key[32])
+                .finish()
         }
     }
 }
@@ -658,10 +658,11 @@ impl<'a> fmt::Debug for BitSlice<'a> {
 impl fmt::Debug for BranchNode {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("BranchNode")
-            .field("left_prefix", &self.child_prefix(Child::Left))
-            .field("left_hash", &bytes_to_hex(self.child_hash(Child::Left)))
-            .field("right_prefix", &self.child_prefix(Child::Right))
-            .field("right_hash", &bytes_to_hex(self.child_hash(Child::Right)))
+            .field("left_prefix", &self.child_prefix(ChildKind::Left))
+            .field("left_hash", &bytes_to_hex(self.child_hash(ChildKind::Left)))
+            .field("right_prefix", &self.child_prefix(ChildKind::Right))
+            .field("right_hash",
+                   &bytes_to_hex(self.child_hash(ChildKind::Right)))
             .field("hash", &bytes_to_hex(&self.hash()))
             .finish()
     }
@@ -694,7 +695,7 @@ mod tests {
     use ::storage::{Map, MemoryDB, MapExt};
 
     use super::{BitSlice, BranchNode, MerklePatriciaTable};
-    use super::Child::{Left, Right};
+    use super::ChildKind::{Left, Right};
     use super::KEY_SIZE;
 
     impl BranchNode {
@@ -748,23 +749,23 @@ mod tests {
 
         assert_eq!(b.len(), 32);
 
-        assert_eq!(b.at(0), false);
-        assert_eq!(b.at(7), true);
-        assert_eq!(b.at(8), false);
-        assert_eq!(b.at(14), true);
-        assert_eq!(b.at(15), false);
-        assert_eq!(b.at(16), true);
-        assert_eq!(b.at(20), true);
-        assert_eq!(b.at(23), true);
-        assert_eq!(b.at(31), false);
+        assert_eq!(b.at(0), Left);
+        assert_eq!(b.at(7), Right);
+        assert_eq!(b.at(8), Left);
+        assert_eq!(b.at(14), Right);
+        assert_eq!(b.at(15), Left);
+        assert_eq!(b.at(16), Right);
+        assert_eq!(b.at(20), Right);
+        assert_eq!(b.at(23), Right);
+        assert_eq!(b.at(31), Left);
 
         let b2 = b.mid(8);
         assert_eq!(b2.len(), 24);
-        assert_eq!(b2.at(0), false);
-        assert_eq!(b2.at(6), true);
-        assert_eq!(b2.at(7), false);
-        assert_eq!(b2.at(12), true);
-        assert_eq!(b2.at(15), true);
+        assert_eq!(b2.at(0), Left);
+        assert_eq!(b2.at(6), Right);
+        assert_eq!(b2.at(7), Left);
+        assert_eq!(b2.at(12), Right);
+        assert_eq!(b2.at(15), Right);
 
         let b3 = b2.mid(24);
         assert_eq!(b3.len(), 0);
@@ -776,7 +777,7 @@ mod tests {
         let b = BitSlice::from_bytes(&v1);
 
         assert_eq!(b.len(), 8);
-        assert_eq!(b.truncate(1).at(0), true);
+        assert_eq!(b.truncate(1).at(0), Right);
     }
 
     #[test]

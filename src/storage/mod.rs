@@ -20,9 +20,12 @@ mod fields;
 mod db;
 mod merkle_patricia_table;
 
+pub use leveldb::options::Options as LevelDBOptions;
+pub use leveldb::database::cache::Cache as LevelDBCache;
+
+pub use self::leveldb::LevelDB;
 pub use self::db::{Database, Fork, Patch, Change};
 pub use self::memorydb::MemoryDB;
-pub use self::leveldb::LevelDB;
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::merkle_table::MerkleTable;

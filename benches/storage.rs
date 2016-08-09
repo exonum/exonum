@@ -9,10 +9,10 @@ extern crate leveldb;
 use test::Bencher;
 use tempdir::TempDir;
 use rand::{SeedableRng, XorShiftRng, Rng};
-use leveldb::options::Options;
 
-use da::storage::{MerklePatriciaTable, MemoryDB, LevelDB};
+use da::storage::{MerklePatriciaTable};
 use da::storage::{Map, List, MapExt};
+use da::storage::{MemoryDB, LevelDB, LevelDBOptions};
 
 fn merkle_table_insertion<T: MapExt>(b: &mut Bencher, mut db: T) {
     let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
@@ -90,7 +90,7 @@ fn bench_merkle_table_append_memorydb(b: &mut Bencher) {
 
 #[bench]
 fn bench_merkle_table_append_leveldb(b: &mut Bencher) {
-    let mut options = Options::new();
+    let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
     let dir = TempDir::new("da_bench").unwrap();
     let db = LevelDB::new(dir.path(), options).unwrap();
@@ -106,7 +106,7 @@ fn bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
 
 #[bench]
 fn bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
-    let mut options = Options::new();
+    let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
     let dir = TempDir::new("da_bench").unwrap();
     let mut db = LevelDB::new(dir.path(), options).unwrap();
@@ -123,7 +123,7 @@ fn long_bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
 
 #[bench]
 fn long_bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
-    let mut options = Options::new();
+    let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
     let dir = TempDir::new("da_bench").unwrap();
     let mut db = LevelDB::new(dir.path(), options).unwrap();
