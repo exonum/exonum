@@ -13,6 +13,7 @@ use da::storage::{Map, MapExt};
 /// path  - Directory where database is situated
 /// count - Total amount of data items to write
 /// data_len - Length of data chunk
+/// seed - seed for rng
 
 fn main() {
     ::std::env::set_var("RUST_LOG", "da=info");
@@ -23,9 +24,10 @@ fn main() {
     let path = args.next().unwrap();
     let count: usize = args.next().unwrap().parse().unwrap();
     let data_len: usize = args.next().unwrap().parse().unwrap();
+    let seed_part: u32 = args.next().unwrap().parse().unwrap();
     // TODO get them from command line
     let prefix = vec![1];
-    let seed = [192, 168, 56, 1];
+    let seed = [seed_part, 168, 56, 1];
 
     let mut rng = XorShiftRng::from_seed(seed);
     let kv_generator = |_| {
