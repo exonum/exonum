@@ -1,13 +1,15 @@
 extern crate da;
 extern crate env_logger;
 extern crate rand;
+#[macro_use]
+extern crate clap;
 
 use std::path::Path;
 
 use rand::{SeedableRng, XorShiftRng, Rng};
 
 use da::storage::{LevelDB, LevelDBOptions};
-use da::storage::{Map, MapExt};
+use da::storage::{Database, Map, MapExt};
 
 /// usage 
 /// path  - Directory where database is situated
@@ -18,13 +20,22 @@ use da::storage::{Map, MapExt};
 fn main() {
     ::std::env::set_var("RUST_LOG", "da=info");
 
-    let mut args = ::std::env::args();
-    args.next();
+    let matches = clap_app!(merkle_map =>
+        (version: "0.1")
+        (author: "Aleksey S. <aleksei.sidorov@xdev.re>")
+        (about: "Merkle map benchmarking tool")
+        (@arg DIR: +required "Sets the input directory to use")
+        (@arg count: -c --count +takes_value "Total amount of data items to write")
+        (@arg data_len: -l --len +takes_value "Length of data chunk")
+        (@arg seed: -s --seed +takes_value "Seed for rng")
+        (@arg fork: -f --fork "Use fork to write data in one transaction")
+    ).get_matches();    
 
-    let path = args.next().unwrap();
-    let count: usize = args.next().unwrap().parse().unwrap();
-    let data_len: usize = args.next().unwrap().parse().unwrap();
-    let seed_part: u32 = args.next().unwrap().parse().unwrap();
+    let path = matches.value_of("DIR").unwrap();
+    let count: usize = matches.value_of("count").unwrap_or("100").parse().unwrap();
+    let data_len: usize = matches.value_of("data_len").unwrap_or("64").parse().unwrap();
+    let seed_part: u32 = matches.value_of("seed").unwrap_or("0").parse().unwrap();
+    let use_fork: bool = matches.is_present("fork");
     // TODO get them from command line
     let prefix = vec![1];
     let seed = [seed_part, 168, 56, 1];
@@ -42,9 +53,23 @@ fn main() {
     let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
     let mut db = LevelDB::new(&Path::new(&path), options).unwrap();
-
-    let mut map = db.merkle_map(prefix); 
-    for item in (0..count).map(kv_generator) {
-        map.put(&item.0, item.1.clone()).unwrap();
+    if use_fork {
+        let patch;
+        {
+            let mut fork = db.fork();
+            {
+                let mut map = fork.merkle_map(prefix);        
+                for item in (0..count).map(kv_generator) {
+                    map.put(&item.0, item.1.clone()).unwrap();
+                }
+            }
+            patch = fork.patch();
+        }
+        db.merge(patch).unwrap();
+    } else {
+        let mut map = db.merkle_map(prefix); 
+        for item in (0..count).map(kv_generator) {
+            map.put(&item.0, item.1.clone()).unwrap();
+        }
     }
 }
