@@ -160,14 +160,12 @@ impl<'a> PartialEq for BitSlice<'a> {
 //     left_prefix:    &BitSlice    BITSLICE_SIZE,
 //     right_prefix:   &BitSlice    BITSLICE_SIZE
 // }
-type LeafNode = Vec<u8>;
 struct BranchNode {
     raw: Vec<u8>,
 }
 
-#[derive(Debug)]
-enum Node {
-    Leaf(LeafNode),
+enum Node<T: StorageValue> {
+    Leaf(T),
     Branch(BranchNode),
 }
 
@@ -298,13 +296,13 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
     pub fn root_hash(&self) -> Result<Option<Hash>, Error> {
         match self.root_node()? {
-            Some((prefix, Node::Leaf(data))) => Ok(Some(Self::hash_value(&prefix[1..], &data))),
+            Some((prefix, Node::Leaf(value))) => Ok(Some(Self::hash_leaf(&prefix[1..], &value.serialize()))),
             Some((_, Node::Branch(branch))) => Ok(Some(branch.hash())),
             None => Ok(None),
         }
     }
 
-    fn root_node(&self) -> Result<Option<(Vec<u8>, Node)>, Error> {
+    fn root_node(&self) -> Result<Option<(Vec<u8>, Node<V>)>, Error> {
         let out = match self.root_prefix()? {
             Some(prefix) => {
                 let node = self.read_node(&BitSlice::from_key(&prefix))?;
@@ -315,7 +313,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         Ok(out)
     }
 
-    fn insert(&mut self, key: &Vec<u8>, data: Vec<u8>) -> Result<(), Error> {
+    fn insert(&mut self, key: &Vec<u8>, value: V) -> Result<(), Error> {
         debug_assert_eq!(key.len(), KEY_SIZE);
         match self.root_node()? {
             Some((prefix, Node::Leaf(prefix_data))) => {
@@ -323,19 +321,18 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                 let prefix_slice = BitSlice::from_key(&prefix);
                 let i = prefix_slice.common_prefix(&key_slice);
 
+                let leaf_hash = self.insert_leaf(key, value)?;
                 if i < key_slice.len() {
                     let mut branch = BranchNode::empty();
                     branch.set_child(key_slice.at(i),
                                      &key_slice.mid(i),
-                                     &Self::hash_value(&key, &data));
+                                     &leaf_hash);
                     branch.set_child(prefix_slice.at(i),
                                      &prefix_slice.mid(i),
-                                     &Self::hash_value(&prefix[1..], &prefix_data));
+                                     &Self::hash_leaf(&prefix[1..], &prefix_data.serialize()));
                     let new_prefix = key_slice.truncate(i);
                     self.insert_branch(&new_prefix, branch)?;
                 }
-                self.insert_leaf(key, data)?;
-
                 return Ok(());
             }
             Some((prefix, Node::Branch(mut branch))) => {
@@ -346,7 +343,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                 if i == prefix_slice.len() {
                     let suffix_slice = key_slice.mid(i);
                     // Just cut the prefix and recursively descent on.
-                    let (j, h) = self.do_insert_branch(&branch, &suffix_slice, data)?;
+                    let (j, h) = self.do_insert_branch(&branch, &suffix_slice, value)?;
                     match j {
                         Some(j) => {
                             branch.set_child(suffix_slice.at(0), &suffix_slice.truncate(j), &h)
@@ -356,21 +353,21 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                     self.insert_branch(&prefix_slice, branch)?;
                 } else {
                     // Inserts a new branch and adds current branch as its child
+                    let hash = self.insert_leaf(key, value)?;
                     let mut new_branch = BranchNode::empty();
                     new_branch.set_child(prefix_slice.at(i), &prefix_slice.mid(i), &branch.hash());
                     new_branch.set_child(key_slice.at(i),
                                          &key_slice.mid(i),
-                                         &Self::hash_value(&key, &data));
+                                         &hash);
                     // Saves a new branch
                     let new_prefix = prefix_slice.truncate(i);
-                    self.insert_branch(&new_prefix, new_branch)?;
-                    self.insert_leaf(key, data)?;
+                    self.insert_branch(&new_prefix, new_branch)?;                    
                 }
                 return Ok(());
             }
             None => {
-                self.insert_leaf(key, data)?;
-                return Ok(());
+                // Eats hash
+                self.insert_leaf(key, value).map(|_| ())
             }    
         }
     }
@@ -380,7 +377,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     fn do_insert_branch(&mut self,
                         parent: &BranchNode,
                         key_slice: &BitSlice,
-                        data: Vec<u8>)
+                        value: V)
                         -> Result<(Option<usize>, Hash), Error> {
         let mut child_slice = parent.child_prefix(key_slice.at(0));
         child_slice.from = key_slice.from;
@@ -389,18 +386,17 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         if child_slice.len() == i {
             // check that child is leaf to avoid unnecessary read
             if child_slice.is_leaf_key() {
-                let hash = Self::hash_value(&key_slice.data, &data);
-                self.insert_leaf(&key_slice.data, data)?;
+                // there is a leaf in branch and we needs to update its value
+                let hash = self.insert_leaf(&key_slice.data, value)?;
                 return Ok((None, hash));
             } else {
                 match self.read_node(&child_slice)? {
-                    // there is a leaf in branch and we needs to update its value
                     Node::Leaf(_) => {
-                        unreachable!("Somethink went wrong!");
+                        unreachable!("Something went wrong!");
                     }
                     // There is a child in branch and we needs to lookup it recursively
                     Node::Branch(mut branch) => {
-                        let (j, h) = self.do_insert_branch(&branch, &key_slice.mid(i), data)?;
+                        let (j, h) = self.do_insert_branch(&branch, &key_slice.mid(i), value)?;
                         match j {
                             Some(j) => {
                                 branch.set_child(key_slice.at(i), &key_slice.mid(i).truncate(j), &h)
@@ -418,22 +414,22 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
             let suffix_slice = key_slice.mid(i);
             let mut new_branch = BranchNode::empty();
             // Add a new leaf
+            let hash = self.insert_leaf(&suffix_slice.data, value)?;
             new_branch.set_child(suffix_slice.at(0),
                                  &suffix_slice,
-                                 &Self::hash_value(key_slice.data, &data));
+                                 &hash);
             // Move current branch
             new_branch.set_child(child_slice.at(i),
                                  &child_slice.mid(i),
                                  &parent.child_hash(key_slice.at(0)));
 
-            let hash = new_branch.hash();
-            self.insert_leaf(&suffix_slice.data, data)?;
+            let hash = new_branch.hash();            
             self.insert_branch(&key_slice.truncate(i), new_branch)?;
             return Ok((Some(i), hash));
         }
     }
 
-    fn hash_value<A: AsRef<[u8]>, B: AsRef<[u8]>>(key: A, value: B) -> Hash {
+    fn hash_leaf<A: AsRef<[u8]>, B: AsRef<[u8]>>(key: A, value: B) -> Hash {
         hash(&[key.as_ref(), value.as_ref()].concat())
     }
 
@@ -535,12 +531,12 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         self.map.find_key(&[])
     }
 
-    fn read_node(&self, key: &BitSlice) -> Result<Node, Error> {
+    fn read_node(&self, key: &BitSlice) -> Result<Node<V>, Error> {
         let db_key = &key.to_key();
         match self.map.get(db_key)? {
             Some(data) => {
                 match db_key.len() {
-                    33 => Ok(Node::Leaf(data)),
+                    33 => Ok(Node::Leaf(StorageValue::deserialize(data))),
                     34 => Ok(Node::Branch(BranchNode::from_bytes(data))),
                     i @ _ => Err(Box::new(format!("Wrong key size: {}", i))),
                 }
@@ -549,11 +545,14 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn insert_leaf<A: AsRef<[u8]>>(&mut self, key: A, data: Vec<u8>) -> Result<(), Error> {
+    fn insert_leaf<A: AsRef<[u8]>>(&mut self, key: A, value: V) -> Result<Hash, Error> {
         debug_assert_eq!(key.as_ref().len(), KEY_SIZE);
 
         let db_key = [&[01u8], key.as_ref()].concat();
-        self.map.put(&db_key, data)
+        let bytes = value.serialize();
+        let hash = Self::hash_leaf(key, &bytes);
+        self.map.put(&db_key, bytes)?;
+        Ok(hash)
     }
 
     fn insert_branch(&mut self, key: &BitSlice, branch: BranchNode) -> Result<(), Error> {
@@ -562,7 +561,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     }
 
     // TODO replace by debug trait impl
-    // fn print_node(&self, node: Node) {
+    // fn print_node(&self, node: Node<V>) {
     //     match node {
     //         Node::Branch(branch) => {
     //             println!("{:#?}", branch);
@@ -573,7 +572,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     //             }
     //         }
     //         Node::Leaf(data) => {
-    //             println!("    Leaf: {:?}", data);
+    //             println!("    Leaf: {:?}", data.serialize());
     //         }
     //     };
     // }
@@ -600,7 +599,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
 
     fn put(&mut self, key: &K, value: V) -> Result<(), Error> {
         // FIXME avoid reallocation
-        self.insert(&key.as_ref().to_vec(), value.serialize())
+        self.insert(&key.as_ref().to_vec(), value)
     }
 
     fn delete(&mut self, key: &K) -> Result<(), Error> {
@@ -668,19 +667,20 @@ impl fmt::Debug for BranchNode {
     }
 }
 
-impl<'a, T, K: ?Sized, V> fmt::Debug for MerklePatriciaTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: AsRef<[u8]>,
-          V: StorageValue
-{
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO add debug map
-        let mut b = f.debug_struct("MerklePatriciaTable");
-        b.field("root_prefix", &self.root_prefix().unwrap());
-        b.field("root_node", &self.root_node().unwrap());
-        b.finish()
-    }
-}
+// TODO add proper implementation based on debug_map
+// impl<'a, T, K: ?Sized, V> fmt::Debug for MerklePatriciaTable<T, K, V>
+//     where T: Map<[u8], Vec<u8>>,
+//           K: AsRef<[u8]>,
+//           V: StorageValue
+// {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         // TODO add debug map
+//         let mut b = f.debug_struct("MerklePatriciaTable");
+//         b.field("root_prefix", &self.root_prefix().unwrap());
+//         b.field("root_node", &self.root_node().unwrap());
+//         b.finish()
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
