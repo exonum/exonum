@@ -6,6 +6,7 @@ use num::{Integer, ToPrimitive};
 use std::slice::SliceConcatExt;
 use std::convert::AsRef;
 use std::fmt::Debug;
+// use std::iter::Iterator;
 
 use ::crypto::Hash;
 use ::messages::{TxMessage, Precommit, Propose};
@@ -17,14 +18,19 @@ mod list_table;
 mod merkle_table;
 mod fields;
 mod db;
+mod merkle_patricia_table;
 
+pub use leveldb::options::Options as LevelDBOptions;
+pub use leveldb::database::cache::Cache as LevelDBCache;
+
+pub use self::leveldb::LevelDB;
 pub use self::db::{Database, Fork, Patch, Change};
 pub use self::memorydb::MemoryDB;
-pub use self::leveldb::LevelDB;
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::merkle_table::MerkleTable;
 pub use self::fields::StorageValue;
+pub use self::merkle_patricia_table::MerklePatriciaTable;
 
 pub struct Storage<T: Database> {
     db: T,
@@ -86,10 +92,25 @@ impl<'a, T> Storage<Fork<'a, T>>
     }
 }
 
+// TODO We need to understand how to finish them
+// pub trait Iterable {
+//     type Iter: Iterator;
+
+//     fn iter(self) -> Self::Iter;
+// }
+
+// pub trait Seekable<'a> {
+//     type Item;
+//     type Key: ?Sized;
+
+//     fn seek(&mut self, key: &Self::Key) -> Option<Self::Item>;
+// }
+
 pub trait Map<K: ?Sized, V> {
     fn get(&self, key: &K) -> Result<Option<V>, Error>;
     fn put(&mut self, key: &K, value: V) -> Result<(), Error>;
     fn delete(&mut self, key: &K) -> Result<(), Error>;
+    fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>, Error>;
 }
 
 pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
@@ -113,6 +134,12 @@ pub trait MapExt: Map<[u8], Vec<u8>> + Sized {
                              prefix: Vec<u8>)
                              -> MerkleTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
         where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+              V: StorageValue;
+    fn merkle_map<'a, K: ?Sized, V>
+        (&'a mut self,
+         prefix: Vec<u8>)
+         -> MerklePatriciaTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
+        where K: AsRef<[u8]>,
               V: StorageValue;
 }
 
@@ -139,5 +166,15 @@ impl<T> MapExt for T
               V: StorageValue
     {
         MerkleTable::new(self.map(prefix))
+    }
+    fn merkle_map<'a, K: ?Sized, V>
+        (&'a mut self,
+         prefix: Vec<u8>)
+         -> MerklePatriciaTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
+        where K: AsRef<[u8]>,
+              V: StorageValue
+    {
+        let map_table = self.map(prefix);
+        MerklePatriciaTable::new(map_table)
     }
 }

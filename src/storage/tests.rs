@@ -1,10 +1,7 @@
-use super::{Map, List};
-use super::Database;
-use super::MemoryDB;
-use super::LevelDB;
-use super::MapExt;
-use super::StorageValue;
-use super::Error;
+use super::{Map, MapExt, List};
+use super::{Database, StorageValue, Error};
+use super::{MemoryDB, LevelDB};
+// use super::{Iterable, Seekable};
 
 use tempdir::TempDir;
 use leveldb::options::Options;
@@ -90,6 +87,31 @@ fn test_table_map<T: Database>(prefix: Vec<u8>, db: &mut T) -> Result<(), Error>
     test_map_simple(map)
 }
 
+fn test_map_find_keys<T: Map<[u8], Vec<u8>>>(db: &mut T) {
+    db.put(b"a", b"12345".to_vec()).unwrap();
+    db.put(b"ab", b"123456".to_vec()).unwrap();
+    db.put(b"ac", b"123457".to_vec()).unwrap();
+    db.put(b"baca", b"1".to_vec()).unwrap();
+    db.put(b"bza", b"2".to_vec()).unwrap();
+    db.put(b"bzac", b"3".to_vec()).unwrap();
+
+    assert_eq!(db.find_key(b"a").unwrap(), Some(b"a".to_vec()));
+    assert_eq!(db.find_key(&[]).unwrap(), Some(b"a".to_vec()));
+    assert_eq!(db.find_key(b"b").unwrap(), Some(b"baca".to_vec()));
+    assert_eq!(db.find_key(b"c").unwrap(), None);       
+}
+
+fn test_map_table_different_prefixes<T: MapExt>(db: &mut T) {
+    {
+        let mut map2 = db.map(b"abc".to_vec());
+        map2.put(&b"abac".to_vec(), b"12345".to_vec()).unwrap();
+    }
+    let mut map1 = db.map(b"bcd".to_vec());
+    map1.put(&b"baca".to_vec(), b"1".to_vec()).unwrap();
+
+    assert_eq!(map1.find_key(&b"abd".to_vec()).unwrap(), None);
+}
+
 #[test]
 fn serializer() {
     let a: u32 = 10;
@@ -156,3 +178,98 @@ fn leveldb_table_map() {
     test_table_map(vec![01], &mut db).unwrap();
     test_table_map(vec![02], &mut db).unwrap();
 }
+
+#[test]
+fn leveldb_find_key() {
+    let mut db = leveldb_database();
+    test_map_find_keys(&mut db);
+}
+
+#[test]
+fn memorydb_find_key() {
+    let mut db = MemoryDB::new();
+    test_map_find_keys(&mut db);    
+}
+
+#[test]
+fn leveldb_map_find_key() {
+    let mut db = leveldb_database();
+    let mut map = db.map(vec![02]);
+    test_map_find_keys(&mut map);
+}
+
+#[test]
+fn memorydb_map_find_key() {
+    let mut db = MemoryDB::new();
+    let mut map = db.map(vec![02]);
+    test_map_find_keys(&mut map);    
+}
+
+#[test]
+fn leveldb_map_table_different_prefixes() {
+    let mut db = leveldb_database();
+    test_map_table_different_prefixes(&mut db);
+}
+
+#[test]
+fn memorydb_map_table_different_prefixes() {
+    let mut db = MemoryDB::new();
+    test_map_table_different_prefixes(&mut db);    
+}
+
+// #[test]
+// fn memorydb_iter() {
+//     let mut db = MemoryDB::new();
+//     db.put(b"a", b"12345".to_vec()).unwrap();
+//     db.put(b"ab", b"123456".to_vec()).unwrap();
+//     db.put(b"ac", b"123457".to_vec()).unwrap();
+//     db.put(b"baca", b"1".to_vec()).unwrap();
+//     db.put(b"bza", b"2".to_vec()).unwrap();
+//     db.put(b"bzac", b"3".to_vec()).unwrap();
+
+//     let mut it = db.iter();
+//     assert_eq!(it.next(), Some((b"a".to_vec(), b"12345".to_vec())));
+//     assert_eq!(it.next(), Some((b"ab".to_vec(), b"123456".to_vec())));
+//     assert_eq!(it.next(), Some((b"ac".to_vec(), b"123457".to_vec())));
+
+//     assert_eq!(it.seek(&b"bza".to_vec()), Some((b"bza".to_vec(), b"2".to_vec())));
+//     assert_eq!(it.next(), Some((b"bzac".to_vec(), b"3".to_vec())));    
+// }
+
+// #[test]
+// fn leveldb_iter() {
+//     let mut db = leveldb_database();
+
+//     db.put(b"a", b"12345".to_vec()).unwrap();
+//     db.put(b"ab", b"123456".to_vec()).unwrap();
+//     db.put(b"ac", b"123457".to_vec()).unwrap();
+//     db.put(b"baca", b"1".to_vec()).unwrap();
+//     db.put(b"bza", b"2".to_vec()).unwrap();
+//     db.put(b"bzac", b"3".to_vec()).unwrap();
+
+//     let mut it = db.iter();
+//     assert_eq!(it.next(), Some((b"a".to_vec(), b"12345".to_vec())));
+//     assert_eq!(it.next(), Some((b"ab".to_vec(), b"123456".to_vec())));
+//     assert_eq!(it.next(), Some((b"ac".to_vec(), b"123457".to_vec())));
+
+//     assert_eq!(it.seek(&b"bza".to_vec()), Some((b"bza".to_vec(), b"2".to_vec())));
+//     assert_eq!(it.next(), Some((b"bzac".to_vec(), b"3".to_vec())));   
+// }
+
+// #[test]
+// fn leveldb_map_table_iter() {
+//     let mut db = leveldb_database();  
+//     let mut map = db.map(vec![02]);
+
+//     map.put(&vec![1, 2], vec![1, 3, 4]).unwrap();
+//     map.put(&vec![1, 3], vec![1, 4, 5]).unwrap();
+//     map.put(&vec![2, 3], vec![2, 4, 5]).unwrap();
+//     map.put(&vec![2, 4], vec![4, 4, 5]).unwrap();
+
+//     let mut it = map.into_iter();
+//     assert_eq!(it.next(), Some((vec![1, 2], vec![1, 3, 4])));
+//     assert_eq!(it.next(), Some((vec![1, 3], vec![1, 4, 5])));
+//     assert_eq!(it.seek(&vec![2, 4]), Some((vec![2, 4], vec![4, 4, 5])));
+// }
+
+// TODO add tests for changes 
