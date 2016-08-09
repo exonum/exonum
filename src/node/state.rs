@@ -8,7 +8,7 @@ use super::super::messages::{
     TxMessage, Message,
     Propose, Prevote, Precommit, ConsensusMessage
 };
-use super::super::crypto::{PublicKey, Hash, hash};
+use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::{Patch};
 
 const REQUEST_PROPOSE_WAIT       : u64 = 1_000_000; // milliseconds
