@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::collections::Bound::{Included, Unbounded};
 
 use super::{Map, Error};
 
@@ -62,14 +63,8 @@ impl<'a, T> Map<[u8], Vec<u8>> for Fork<'a, T>
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         //TODO merge with the same function in memorydb
         let out = {
-            let mut out = None;
-            for other in self.changes.keys() {
-                if other.as_slice() >= key {
-                    out = Some(other);
-                    break;
-                }
-            }
-            out.map(|x| x.to_vec())
+            let mut it = self.changes.range::<[u8], [u8]>(Included(key), Unbounded);
+            it.next().map(|x| x.0.to_vec())            
         };
         if out.is_none() {
             return self.database.find_key(key); 

@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map;
+use std::collections::Bound::{Included, Unbounded};
 // use std::iter::Iterator;
 
 use super::{Map, Database, Error, Patch, Change};
@@ -32,14 +33,8 @@ impl Map<[u8], Vec<u8>> for MemoryDB {
     }
     //TODO optimize me
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        let mut out = None;
-        for other in self.map.keys() {
-            if other.as_slice() >= key {
-                out = Some(other);
-                break;
-            }
-        }
-        Ok(out.map(|x| x.to_vec()))
+        let mut it = self.map.range::<[u8], [u8]>(Included(key), Unbounded);
+        Ok(it.next().map(|x| x.0.to_vec()))
     }      
 }
 
