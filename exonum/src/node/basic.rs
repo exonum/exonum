@@ -84,17 +84,26 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_peers_timeout(&mut self) {
-        let mut rng = rand::thread_rng();
-        let validator = rng.gen_range(0, self.state.validators().len() as ValidatorId - 1);
-        if validator != self.state.id() {
-            let msg = RequestPeers::new(self.state.id(),
-                                validator,
-                                self.events.get_time(),
-                                &self.secret_key).raw().clone();
-            self.send_to_validator(validator, &msg);
+        let to = self.state.validators().len() as ValidatorId - 1;
+        let gen_validator = || {
+            let mut rng = rand::thread_rng();
+            let validator = rng.gen_range(0, to);
+            validator
+        };
 
-            info!("request peers from validator {}", validator);
+        let mut validator = gen_validator();
+        while validator == self.state.id() {
+            validator = gen_validator();
         }
+
+
+        let msg = RequestPeers::new(self.state.id(),
+                            validator,
+                            self.events.get_time(),
+                            &self.secret_key).raw().clone();
+        self.send_to_validator(validator, &msg);
+
+        info!("request peers from validator {}", validator);
         self.add_peers_timeout();
     }
 }

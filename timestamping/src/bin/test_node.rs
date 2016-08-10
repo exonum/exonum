@@ -48,7 +48,7 @@ fn main() {
         secret_key: secret_key.clone(),
         round_timeout: 1000,
         status_timeout: 5000,
-        peers_timeout: 5000,
+        peers_timeout: 10000,
         network: NetworkConfiguration {
             listen_address: address.clone(),
             max_incoming_connections: 8,
