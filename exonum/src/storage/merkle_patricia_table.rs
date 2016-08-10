@@ -10,6 +10,9 @@ use ::crypto::{hash, Hash, HASH_SIZE};
 
 use super::{Map, Error, StorageValue};
 
+const BRANCH_KEY_PREFIX: u8 = 00;
+const LEAF_KEY_PREFIX: u8 = 01;
+
 const KEY_SIZE: usize = HASH_SIZE;
 const LEAF_KEY_SIZE: usize = KEY_SIZE + 1;
 const BRANCH_KEY_SIZE: usize = KEY_SIZE + 2;
@@ -129,17 +132,16 @@ impl<'a> BitSlice<'a> {
     /// Also it writes len in bits on tail and adds prefix on head
     // ( 00 for branches and 01 for leaves )
     fn to_key(&self) -> Vec<u8> {
-        if self.to == 0 {
-            return vec![0u8; BRANCH_KEY_SIZE];
-        } else if self.is_leaf_key() {
-            let mut v = vec![01];
+        if self.is_leaf_key() {
+            let mut v = vec![LEAF_KEY_PREFIX];
             v.extend_from_slice(self.data);
             v.resize(LEAF_KEY_SIZE, 0u8);
             v
         } else {
-            let right = (self.to as usize - 1) / 8 + 1;
+            let right = (self.to as usize + 7) / 8;
             let mut v = Vec::new();
             v.resize(BRANCH_KEY_SIZE, 0u8);
+            v[0] = BRANCH_KEY_PREFIX;
             v[1..right + 1].copy_from_slice(&self.data[0..right]);
             if self.to % 8 != 0 {
                 v[right] &= !(255u8 >> (self.to % 8));
@@ -149,22 +151,22 @@ impl<'a> BitSlice<'a> {
         }
     }
     fn from_key(key: &'a [u8]) -> BitSlice {
-        match key.len() {
-            LEAF_KEY_SIZE => {
+        match key[0] {
+            LEAF_KEY_PREFIX => {
                 BitSlice {
                     data: &key[1..],
                     from: 0,
                     to: KEY_SIZE as u16 * 8,
                 }
             }
-            BRANCH_KEY_SIZE => {
+            BRANCH_KEY_PREFIX => {
                 BitSlice {
                     data: &key[1..key.len() - 1],
                     from: 0,
                     to: key[BRANCH_KEY_SIZE - 1] as u16,
                 }
             }
-            _ => unreachable!("Wrong key size"),
+            _ => unreachable!("Wrong key prefix"),
         }
     }
 }
@@ -537,10 +539,10 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         let db_key = &key.to_key();
         match self.map.get(db_key)? {
             Some(data) => {
-                match db_key.len() {
-                    LEAF_KEY_SIZE => Ok(Node::Leaf(StorageValue::deserialize(data))),
-                    BRANCH_KEY_SIZE => Ok(Node::Branch(BranchNode::from_bytes(data))),
-                    other => Err(Box::new(format!("Wrong key size: {}", other))),
+                match db_key[0] {
+                    LEAF_KEY_PREFIX => Ok(Node::Leaf(StorageValue::deserialize(data))),
+                    BRANCH_KEY_PREFIX => Ok(Node::Branch(BranchNode::from_bytes(data))),
+                    other => Err(Box::new(format!("Wrong key prefix: {}", other))),
                 }
             }
             None => Err(Box::new(format!("Unable to find node with key {:?}", key))),
@@ -550,7 +552,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     fn insert_leaf<A: AsRef<[u8]>>(&mut self, key: A, value: V) -> Result<Hash, Error> {
         debug_assert_eq!(key.as_ref().len(), KEY_SIZE);
 
-        let db_key = [&[01u8], key.as_ref()].concat();
+        let db_key = [&[LEAF_KEY_PREFIX], key.as_ref()].concat();
         let bytes = value.serialize();
         let hash = Self::hash_leaf(key, &bytes);
         self.map.put(&db_key, bytes)?;
