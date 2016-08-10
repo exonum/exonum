@@ -27,6 +27,7 @@ pub struct Node<B: Blockchain> {
     pub blockchain: B,
     pub round_timeout: u32,
     pub status_timeout: u32,
+    pub peers_timeout: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
 }
@@ -39,6 +40,7 @@ pub struct Configuration {
     pub network: NetworkConfiguration,
     pub round_timeout: u32,
     pub status_timeout: u32,
+    pub peers_timeout: u32,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
 }
@@ -60,6 +62,7 @@ impl<B: Blockchain> Node<B> {
             blockchain: blockchain,
             round_timeout: config.round_timeout,
             status_timeout: config.status_timeout,
+            peers_timeout: config.peers_timeout,
             peer_discovery: config.peer_discovery,
         }
     }
@@ -77,6 +80,7 @@ impl<B: Blockchain> Node<B> {
             }
             self.send_to_addr(address, message.raw());
         }
+        self.state.set_our_connect_message(Some(message));
 
         // TODO: rewrite this bullshit
         let time = self.blockchain.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0});
@@ -87,6 +91,7 @@ impl<B: Blockchain> Node<B> {
 
         self.add_round_timeout();
         self.add_status_timeout();
+        self.add_peers_timeout();
     }
 
     pub fn run(&mut self) {
@@ -144,7 +149,8 @@ impl<B: Blockchain> Node<B> {
                 self.handle_request_timeout(data, validator),
             Timeout::Status =>
                 self.handle_status_timeout(),
-
+            Timeout::Peers => 
+                self.handle_peers_timeout()
         }
     }
 
@@ -155,8 +161,8 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
-        if let Some(addr) = self.state.peers().get(&public_key) {
-            self.events.send_to(addr, message.clone()).unwrap();
+        if let Some(conn) = self.state.peers().get(&public_key) {
+            self.events.send_to(&conn.addr(), message.clone()).unwrap();
         } else {
             // TODO: warning - hasn't connection with peer
         }
@@ -194,10 +200,15 @@ impl<B: Blockchain> Node<B> {
         self.events.add_timeout(Timeout::Request(data, validator), time);
     }
 
+    pub fn add_peers_timeout(&mut self) {
+        let time = self.events.get_time() + Duration::milliseconds(self.peers_timeout as i64);
+        self.events.add_timeout(Timeout::Peers, time);
+    }
+
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
-        for address in self.state.peers().values() {
-            self.events.send_to(address, message.clone()).unwrap();
+        for conn in self.state.peers().values() {
+            self.events.send_to(&conn.addr(), message.clone()).unwrap();
         }
     }
 }

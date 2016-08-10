@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use std::collections::{HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 
@@ -6,7 +5,7 @@ use time::{Duration};
 
 use super::super::messages::{
     Message,
-    Propose, Prevote, Precommit, ConsensusMessage
+    Propose, Prevote, Precommit, ConsensusMessage, Connect
 };
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::{Patch};
@@ -28,7 +27,7 @@ pub type ValidatorId = u32;
 
 pub struct State<Tx> {
     id: u32,
-    peers: HashMap<PublicKey, SocketAddr>,
+    peers: HashMap<PublicKey, Connect>,
     validators: Vec<PublicKey>,
     height: u64,
     round: Round,
@@ -50,6 +49,7 @@ pub struct State<Tx> {
 
     our_prevotes: HashMap<Round, Prevote>,
     our_precommits: HashMap<Round, Precommit>,
+    our_connect_message: Option<Connect>,    
 
     // Информация о состоянии наших запросов
     requests: HashMap<RequestData, RequestState>,
@@ -188,6 +188,7 @@ impl<Tx> State<Tx> {
 
             our_prevotes: HashMap::new(),
             our_precommits: HashMap::new(),
+            our_connect_message: None,
 
             requests: HashMap::new(),
         }
@@ -201,12 +202,12 @@ impl<Tx> State<Tx> {
         &self.validators
     }
 
-    pub fn add_peer(&mut self, pubkey: PublicKey, addr: SocketAddr) -> bool {
-        self.peers.insert(pubkey, addr).is_none()
+    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
+        self.peers.insert(pubkey, msg).is_none()
     }
 
     pub fn peers(&self)
-            -> &HashMap<PublicKey, SocketAddr> {
+            -> &HashMap<PublicKey, Connect> {
         &self.peers
     }
 
@@ -463,5 +464,13 @@ impl<Tx> State<Tx> {
     pub fn remove_request(&mut self, data: &RequestData) -> HashSet<ValidatorId> {
         let state = self.requests.remove(data);
         state.map(|s| s.known_nodes).unwrap_or_default()
+    }
+
+    pub fn our_connect_message(&self) -> Option<&Connect> {
+        self.our_connect_message.as_ref()
+    }
+
+    pub fn set_our_connect_message(&mut self, msg: Option<Connect>) {
+        self.our_connect_message = msg;
     }
 }
