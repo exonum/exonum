@@ -11,6 +11,8 @@ use super::super::messages::{
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::{Patch};
 
+// TODO: move request timeouts into node configuration
+
 const REQUEST_PROPOSE_WAIT       : u64 = 1_000_000; // milliseconds
 const REQUEST_TRANSACTIONS_WAIT  : u64 = 1_000_000;
 const REQUEST_PREVOTES_WAIT      : u64 = 1_000_000;
@@ -160,7 +162,7 @@ impl ProposeState {
 impl<Tx> State<Tx> {
     pub fn new(id: u32,
                validators: Vec<PublicKey>) -> State<Tx> {
-        let validators_len = validators.len() as u64;
+        let validators_len = validators.len();
 
         State {
             id: id,
@@ -182,7 +184,7 @@ impl<Tx> State<Tx> {
             unknown_txs: HashMap::new(),
             unknown_proposes_with_precommits: HashMap::new(),
 
-            validator_heights: vec![0, validators_len],
+            validator_heights: vec![0; validators_len],
 
             our_prevotes: HashMap::new(),
             our_precommits: HashMap::new(),
@@ -264,6 +266,10 @@ impl<Tx> State<Tx> {
 
     pub fn propose(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
         self.proposes.get_mut(hash)
+    }
+
+    pub fn jump_round(&mut self, round: Round) {
+        self.round = round;
     }
 
     pub fn new_round(&mut self) {

@@ -78,6 +78,13 @@ impl<B: Blockchain> Node<B> {
             self.send_to_addr(address, message.raw());
         }
 
+        // TODO: rewrite this bullshit
+        let time = self.blockchain.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0});
+        let round = (self.events.get_time() - time).num_milliseconds() / self.round_timeout as i64;
+        self.state.jump_round(round as u32);
+
+        info!("Jump to round {}", round);
+
         self.add_round_timeout();
         self.add_status_timeout();
     }
@@ -168,8 +175,8 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn add_round_timeout(&mut self) {
-        let ms = self.state.round() * self.round_timeout;
-        let time = self.blockchain.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0}) + Duration::milliseconds(ms as i64);
+        let ms = self.state.round() as i64 * self.round_timeout as i64;
+        let time = self.blockchain.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0}) + Duration::milliseconds(ms);
         info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}", time, self.state.height(), self.state.round());
         let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);

@@ -1,18 +1,20 @@
-extern crate da;
+extern crate exonum;
+extern crate timestamping;
 extern crate env_logger;
 
-use da::node::{Node, Configuration};
-use da::network::{NetworkConfiguration};
-use da::events::{EventsConfiguration};
-use da::crypto::{gen_keypair_from_seed, Seed};
+use exonum::node::{Node, Configuration};
+use exonum::events::{NetworkConfiguration, EventsConfiguration};
+use exonum::crypto::{gen_keypair_from_seed, Seed};
+use exonum::storage::MemoryDB;
+
+use timestamping::TimestampingBlockchain;
 
 
 fn main() {
-
     let mut idx: usize = ::std::env::args().last().unwrap().parse().unwrap();
     idx -= 1;
 
-    ::std::env::set_var("RUST_LOG", "da=info");
+    ::std::env::set_var("RUST_LOG", "exonum=info");
 
     env_logger::init().unwrap();
 
@@ -37,10 +39,14 @@ fn main() {
     let address = addresses[idx];
     let (ref public_key, ref secret_key) = pairs[idx];
 
-    Node::with_config(Configuration {
+    let blockchain = TimestampingBlockchain {
+        db: MemoryDB::new()
+    };
+
+    Node::with_config(blockchain, Configuration {
         public_key: public_key.clone(),
         secret_key: secret_key.clone(),
-        round_timeout: 2000,
+        round_timeout: 1000,
         status_timeout: 5000,
         network: NetworkConfiguration {
             listen_address: address.clone(),

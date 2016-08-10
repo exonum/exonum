@@ -4,7 +4,7 @@
 extern crate exonum;
 
 use exonum::crypto::PublicKey;
-use exonum::storage::{Blockchain, LevelDB, Fork};
+use exonum::storage::{Blockchain, LevelDB, Database, Fork};
 
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID : u16 = 128;
 
@@ -18,12 +18,12 @@ message! {
     }
 }
 
-struct TimestampingBlockchain {
-    db: LevelDB
+pub struct TimestampingBlockchain<D: Database> {
+    pub db: D
 }
 
-impl Blockchain for TimestampingBlockchain {
-    type Database = LevelDB;
+impl<D> Blockchain for TimestampingBlockchain<D> where D: Database {
+    type Database = D;
     type Transaction = TimestampTx;
 
     fn db(&self) -> &Self::Database {
