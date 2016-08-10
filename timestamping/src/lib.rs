@@ -4,7 +4,7 @@
 extern crate exonum;
 
 use exonum::crypto::PublicKey;
-use exonum::storage::{Blockchain, LevelDB, Database, Fork};
+use exonum::storage::{Blockchain, Database};
 
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID : u16 = 128;
 
