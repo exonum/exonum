@@ -32,29 +32,25 @@ pub use self::merkle_table::MerkleTable;
 pub use self::fields::StorageValue;
 pub use self::merkle_patricia_table::MerklePatriciaTable;
 
-pub trait Blockchain : Sized {
-    type Database: Database;
-    type Transaction: Message + StorageValue;
-    type Fork: Into<Patch> + Blockchain<Transaction=Self::Transaction>;
+pub trait Storage<D: Database, T: Message + StorageValue> {
+    fn db(&self) -> &D;
+    fn db_mut(&mut self) -> &mut D;
 
-    // TODO: type Error;
-
-    fn from_db(db: Self::Database) -> Self;
-    fn db(&self) -> &Self::Database;
-    fn db_mut(&mut self) -> &mut Self::Database;
-    fn fork(&self) -> Self::Fork;
+    fn fork(&self) -> Fork<D> {
+        self.db().fork()
+    }
 
     // TODO: remove ellided lifetimes
 
-    fn transactions<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Self::Transaction> {
+    fn transactions<'a>(&'a mut self) -> MapTable<'a, D, Hash, T> {
         self.db_mut().map(vec![00])
     }
 
-    fn proposes<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Propose> {
+    fn proposes<'a>(&'a mut self) -> MapTable<'a, D, Hash, Propose> {
         self.db_mut().map(vec![01])
     }
 
-    fn heights<'a>(&'a mut self) -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u64, Hash> {
+    fn heights<'a>(&'a mut self) -> ListTable<MapTable<'a, D, [u8], Vec<u8>>, u64, Hash> {
         self.db_mut().list(vec![02])
     }
 
@@ -72,12 +68,43 @@ pub trait Blockchain : Sized {
 
     fn precommits<'a>(&'a mut self,
                           hash: &'a Hash)
-                          -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u32, Precommit> {
+                          -> ListTable<MapTable<'a, D, [u8], Vec<u8>>, u32, Precommit> {
         self.db_mut().list([&[03], hash.as_ref()].concat())
     }
 
     fn merge(&mut self, patch: Patch) -> Result<(), Error> {
         self.db_mut().merge(patch)
+    }
+}
+
+pub trait Blockchain : Sized {
+    type Database: Database;
+    type Transaction: Message + StorageValue;
+
+    fn db(&self) -> &Self::Database;
+    fn db_mut(&mut self) -> &mut Self::Database;
+}
+
+impl<T, Tx, Db> Storage<Db, Tx> for T where T: Blockchain<Database=Db, Transaction=Tx>,
+                                            Db: Database,
+                                            Tx: Message + StorageValue {
+    fn db(&self) -> &Db {
+        Blockchain::db(self)
+    }
+
+    fn db_mut(&mut self) -> &mut Db {
+        Blockchain::db_mut(self)
+    }
+}
+
+impl<'a, Tx, Db> Storage<Fork<'a, Db>, Tx> for Fork<'a, Db> where Db: Database,
+                                                                  Tx: Message + StorageValue {
+    fn db(&self) -> &Fork<'a, Db> {
+        self
+    }
+
+    fn db_mut(&mut self) -> &mut Fork<'a, Db> {
+        self
     }
 }
 

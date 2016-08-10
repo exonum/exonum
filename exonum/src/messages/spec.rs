@@ -26,7 +26,7 @@ macro_rules! message {
 
             fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::messages::Error> {
-                use $crate::messages::fields::Field;
+                use $crate::messages::Field;
                 $(<$field_type>::check(raw.payload(), $from, $to)?;)*
                 Ok($name { raw: raw })
             }
@@ -52,7 +52,7 @@ macro_rules! message {
                 $name { raw: RawMessage::new(raw) }
             }
             $(pub fn $field_name(&self) -> $field_type {
-                use $crate::messages::fields::Field;
+                use $crate::messages::Field;
                 <$field_type>::read(self.raw.payload(), $from, $to)
             })*
         }

@@ -1,5 +1,4 @@
-use super::super::storage::Blockchain;
-
+use super::super::storage::{Blockchain, Storage};
 use super::super::messages::{Connect, Status, Message};
 use super::{Node, RequestData};
 

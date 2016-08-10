@@ -7,7 +7,7 @@ use super::events::{
     Reactor, Events, Event, Timeout, EventsConfiguration,
     Network, NetworkConfiguration
 };
-use super::storage::Blockchain;
+use super::storage::{Blockchain, Storage};
 use super::messages::{Any, Connect, RawMessage, Message};
 
 mod state;

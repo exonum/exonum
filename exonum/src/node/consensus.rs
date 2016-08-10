@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::super::crypto::{Hash, hash};
-use super::super::storage::Blockchain;
+use super::super::storage::{Blockchain, Storage};
 use super::super::messages::{
     ConsensusMessage, Propose, Prevote, Precommit, Message,
     RequestPropose, RequestTransactions, RequestPrevotes,
@@ -387,9 +387,11 @@ impl<B: Blockchain> Node<B> {
         let msg = self.state.propose(hash).unwrap().message().clone();
 
         // Update height
-        fork.heights().append(*hash).is_ok();
+        Storage::<_, B::Transaction>::heights(&mut fork).append(*hash).is_ok();
+        // fork.heights().append(*hash).is_ok();
         // Save propose
-        fork.proposes().put(hash, msg.clone()).is_ok();
+        Storage::<_, B::Transaction>::proposes(&mut fork).put(hash, msg.clone()).is_ok();
+        // fork.proposes().put(hash, msg.clone()).is_ok();
         // Save transactions
         for hash in msg.transactions() {
             fork.transactions().put(hash, self.state.transactions().get(hash).unwrap().clone()).is_ok();
