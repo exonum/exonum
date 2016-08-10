@@ -4,8 +4,6 @@ use std::marker::PhantomData;
 use std::fmt;
 use std::ops::Not;
 
-use byteorder::{ByteOrder, BigEndian};
-
 use ::crypto::{hash, Hash, HASH_SIZE};
 
 use super::{Map, Error, StorageValue};
@@ -14,10 +12,8 @@ const BRANCH_KEY_PREFIX: u8 = 00;
 const LEAF_KEY_PREFIX: u8 = 01;
 
 const KEY_SIZE: usize = HASH_SIZE;
-const LEAF_KEY_SIZE: usize = KEY_SIZE + 1;
-const BRANCH_KEY_SIZE: usize = KEY_SIZE + 2;
-const BITSLICE_SIZE: usize = KEY_SIZE + 2;
-const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + BITSLICE_SIZE);
+const DB_KEY_SIZE: usize = KEY_SIZE + 2;
+const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ChildKind {
@@ -135,18 +131,18 @@ impl<'a> BitSlice<'a> {
         if self.is_leaf_key() {
             let mut v = vec![LEAF_KEY_PREFIX];
             v.extend_from_slice(self.data);
-            v.resize(LEAF_KEY_SIZE, 0u8);
+            v.resize(DB_KEY_SIZE, 0u8);
             v
         } else {
             let right = (self.to as usize + 7) / 8;
             let mut v = Vec::new();
-            v.resize(BRANCH_KEY_SIZE, 0u8);
+            v.resize(DB_KEY_SIZE, 0u8);
             v[0] = BRANCH_KEY_PREFIX;
             v[1..right + 1].copy_from_slice(&self.data[0..right]);
             if self.to % 8 != 0 {
                 v[right] &= !(255u8 >> (self.to % 8));
             }
-            v[BRANCH_KEY_SIZE - 1] = self.to as u8;
+            v[DB_KEY_SIZE - 1] = self.to as u8;
             v
         }
     }
@@ -154,7 +150,7 @@ impl<'a> BitSlice<'a> {
         match key[0] {
             LEAF_KEY_PREFIX => {
                 BitSlice {
-                    data: &key[1..KEY_SIZE+1],
+                    data: &key[1..KEY_SIZE + 1],
                     from: 0,
                     to: KEY_SIZE as u16 * 8,
                 }
@@ -163,7 +159,7 @@ impl<'a> BitSlice<'a> {
                 BitSlice {
                     data: &key[1..key.len() - 1],
                     from: 0,
-                    to: key[BRANCH_KEY_SIZE - 1] as u16,
+                    to: key[DB_KEY_SIZE - 1] as u16,
                 }
             }
             _ => unreachable!("Wrong key prefix"),
@@ -181,8 +177,8 @@ impl<'a> PartialEq for BitSlice<'a> {
 // struct BranchData {
 //     left_hash:      &Hash,       HASH_SIZE,
 //     right_hash:     &Hash,       HASH_SIZE,
-//     left_prefix:    &BitSlice    BITSLICE_SIZE,
-//     right_prefix:   &BitSlice    BITSLICE_SIZE
+//     left_prefix:    &BitSlice    DB_KEY_SIZE,
+//     right_prefix:   &BitSlice    DB_KEY_SIZE
 // }
 struct BranchNode {
     raw: Vec<u8>,
@@ -218,14 +214,14 @@ impl BranchNode {
     }
     fn child_prefix(&self, kind: ChildKind) -> BitSlice {
         let from = match kind {
-            ChildKind::Right => 2 * HASH_SIZE + BITSLICE_SIZE,
+            ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
         };
         self.read_slice(from)
     }
     fn set_child_prefix(&mut self, kind: ChildKind, prefix: &BitSlice) {
         let from = match kind {
-            ChildKind::Right => 2 * HASH_SIZE + BITSLICE_SIZE,
+            ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
         };
         self.write_slice(from, prefix);
@@ -252,18 +248,29 @@ impl BranchNode {
         from + HASH_SIZE
     }
     fn read_slice(&self, from: usize) -> BitSlice {
+        let to = match self.raw[from] {
+            LEAF_KEY_PREFIX => (KEY_SIZE * 8) as u16,
+            BRANCH_KEY_PREFIX => self.raw[from + DB_KEY_SIZE - 1] as u16,
+            _ => unreachable!("Wrong key prefix")
+        };
         BitSlice {
             from: 0,
-            to: BigEndian::read_u16(&self.raw[from..from + 2]),
-            data: &self.raw[from + 2..from + BITSLICE_SIZE],
+            to: to,
+            data: &self.raw[from + 1..from + DB_KEY_SIZE - 1],
         }
     }
     fn write_slice(&mut self, from: usize, slice: &BitSlice) -> usize {
         debug_assert!(slice.data.len() <= KEY_SIZE);
-        BigEndian::write_u16(&mut self.raw[from..from + 2], slice.to);
-        let from = from + 2;
-        self.raw[from..from + slice.data.len()].copy_from_slice(slice.data);
-        from + KEY_SIZE
+
+        if slice.is_leaf_key() {
+             self.raw[from] = LEAF_KEY_PREFIX;
+             self.raw[from + DB_KEY_SIZE - 1] = 0; 
+        } else { 
+             self.raw[from] = BRANCH_KEY_PREFIX;
+             self.raw[from + DB_KEY_SIZE - 1] = slice.to as u8; 
+        };
+        self.raw[from + 1 .. from + DB_KEY_SIZE - 1].copy_from_slice(slice.data);
+        from + DB_KEY_SIZE
     }
 }
 
@@ -307,7 +314,8 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     pub fn root_hash(&self) -> Result<Option<Hash>, Error> {
         match self.root_node()? {
             Some((prefix, Node::Leaf(value))) => {
-                Ok(Some(Self::hash_leaf(&prefix[1..], &value.serialize())))
+                let prefix_slice = BitSlice::from_key(&prefix);
+                Ok(Some(Self::hash_leaf(&prefix_slice, &value.serialize())))
             }
             Some((_, Node::Branch(branch))) => Ok(Some(branch.hash())),
             None => Ok(None),
@@ -328,7 +336,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     fn insert(&mut self, key: &Vec<u8>, value: V) -> Result<(), Error> {
         debug_assert_eq!(key.len(), KEY_SIZE);
 
-        let key_slice = BitSlice::from_bytes(key);       
+        let key_slice = BitSlice::from_bytes(key);
         match self.root_node()? {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_slice = BitSlice::from_key(&prefix);
@@ -340,7 +348,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                     branch.set_child(key_slice.at(i), &key_slice.mid(i), &leaf_hash);
                     branch.set_child(prefix_slice.at(i),
                                      &prefix_slice.mid(i),
-                                     &Self::hash_leaf(&prefix[1..], &prefix_data.serialize()));
+                                     &Self::hash_leaf(&prefix_slice, &prefix_data.serialize()));
                     let new_prefix = key_slice.truncate(i);
                     self.insert_branch(&new_prefix, branch)?;
                 }
@@ -435,8 +443,8 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn hash_leaf<A: AsRef<[u8]>, B: AsRef<[u8]>>(key: A, value: B) -> Hash {
-        hash(&[key.as_ref(), value.as_ref()].concat())
+    fn hash_leaf<B: AsRef<[u8]>>(key: &BitSlice, value: B) -> Hash {
+        hash(&[key.data, value.as_ref()].concat())
     }
 
     fn remove(&mut self, key_slice: BitSlice) -> Result<(), Error> {
@@ -553,7 +561,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         debug_assert!(key.is_leaf_key());
 
         let bytes = value.serialize();
-        let hash = Self::hash_leaf(key.data, &bytes);
+        let hash = Self::hash_leaf(key, &bytes);
 
         let db_key = key.to_key();
         self.map.put(&db_key, bytes)?;
@@ -570,7 +578,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     //     match node {
     //         Node::Branch(branch) => {
     //             println!("{:#?}", branch);
-    //             for i in [false, true].iter() {
+    //             for i in [ChildKind::Left, ChildKind::Right].iter() {
     //                 let key = &branch.child_prefix(*i);
     //                 println!("Key: {:#?}", key);
     //                 self.print_node(self.read_node(&key).unwrap());
@@ -587,6 +595,8 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     //     let root_node = self.root_node().unwrap();
     //     if let Some(node) = root_node {
     //         println!("Prefix: {:?}", node.0);
+    //         println!("Root hash: {:#?}",
+    //                  &bytes_to_hex(&self.root_hash().unwrap().unwrap()));
     //         self.print_node(node.1);
     //     }
     // }
@@ -850,7 +860,7 @@ mod tests {
 
         assert_eq!(b.to_key(),
                    vec![1, 98, 97, 99, 101, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97,
-                        97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97]);
+                        97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 0]);
         assert_eq!(b.truncate(16).to_key(),
                    vec![0, 98, 97, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 16]);
@@ -862,10 +872,10 @@ mod tests {
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 16]);
         assert_eq!(b.mid(8).to_key(),
                    vec![1, 98, 97, 99, 101, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97,
-                        97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97]);
+                        97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 0]);
         assert_eq!(b.mid(12).to_key(),
                    vec![1, 98, 97, 99, 101, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97,
-                        97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97]);
+                        97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 0]);
         assert_eq!(b.mid(12).truncate(4).to_key(),
                    vec![0, 98, 97, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                         0, 0, 0, 0, 0, 0, 0, 0, 0, 16]);
@@ -876,7 +886,7 @@ mod tests {
         let b = BitSlice::from_bytes(b"p");
         assert_eq!(b.mid(4).to_key(),
                    vec![1, 112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                        0, 0, 0, 0, 0, 0, 0, 0, 0]);
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     }
 
     #[test]
