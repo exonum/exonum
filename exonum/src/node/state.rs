@@ -5,7 +5,7 @@ use std::collections::hash_map::Entry;
 use time::{Duration};
 
 use super::super::messages::{
-    TxMessage, Message,
+    Message,
     Propose, Prevote, Precommit, ConsensusMessage
 };
 use super::super::crypto::{PublicKey, Hash};
@@ -24,7 +24,7 @@ pub type ValidatorId = u32;
 
 // TODO: reduce copying of Hash
 
-pub struct State {
+pub struct State<Tx> {
     id: u32,
     peers: HashMap<PublicKey, SocketAddr>,
     validators: Vec<PublicKey>,
@@ -38,7 +38,7 @@ pub struct State {
     prevotes: HashMap<(Round, Hash), HashMap<ValidatorId, Prevote>>,
     precommits: HashMap<(Round, Hash, Hash), HashMap<ValidatorId, Precommit>>,
 
-    transactions: HashMap<Hash, TxMessage>,
+    transactions: HashMap<Hash, Tx>,
     queued: Vec<ConsensusMessage>,
 
     unknown_txs: HashMap<Hash, Vec<Hash>>,
@@ -157,9 +157,9 @@ impl ProposeState {
     }
 }
 
-impl State {
+impl<Tx> State<Tx> {
     pub fn new(id: u32,
-               validators: Vec<PublicKey>) -> State {
+               validators: Vec<PublicKey>) -> State<Tx> {
         let validators_len = validators.len() as u64;
 
         State {
@@ -301,11 +301,11 @@ impl State {
         self.queued.push(msg);
     }
 
-    pub fn transactions(&self) -> &HashMap<Hash, TxMessage> {
+    pub fn transactions(&self) -> &HashMap<Hash, Tx> {
         &self.transactions
     }
 
-    pub fn add_transaction(&mut self, hash: Hash, msg: TxMessage) -> Vec<Hash> {
+    pub fn add_transaction(&mut self, hash: Hash, msg: Tx) -> Vec<Hash> {
         let mut full_proposes = Vec::new();
         for (hash, state) in self.proposes.iter_mut() {
             state.unknown_txs.remove(&hash);

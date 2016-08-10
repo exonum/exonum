@@ -2,9 +2,23 @@ use std::net::SocketAddr;
 use time::Timespec;
 use super::super::crypto::{Hash, PublicKey};
 
+pub const CONNECT_MESSAGE_ID              : u16 = 0;
+pub const STATUS_MESSAGE_ID               : u16 = 1;
+
+pub const PROPOSE_MESSAGE_ID              : u16 = 2;
+pub const PREVOTE_MESSAGE_ID              : u16 = 3;
+pub const PRECOMMIT_MESSAGE_ID            : u16 = 4;
+
+pub const REQUEST_PROPOSE_MESSAGE_ID      : u16 = 5;
+pub const REQUEST_TRANSACTIONS_MESSAGE_ID : u16 = 6;
+pub const REQUEST_PREVOTES_MESSAGE_ID     : u16 = 7;
+pub const REQUEST_PRECOMMITS_MESSAGE_ID   : u16 = 8;
+pub const REQUEST_COMMIT_MESSAGE_ID       : u16 = 9;
+pub const REQUEST_PEERS_MESSAGE_ID        : u16 = 10;
+
 message! {
     Connect {
-        const ID = 0;
+        const ID = CONNECT_MESSAGE_ID;
         const SIZE = 46;
 
         pub_key:        &PublicKey  [00 => 32]
@@ -15,7 +29,7 @@ message! {
 
 message! {
     Propose {
-        const ID = 1;
+        const ID = PROPOSE_MESSAGE_ID;
         const SIZE = 64;
 
         validator:      u32         [00 => 04]
@@ -29,7 +43,7 @@ message! {
 
 message! {
     Prevote {
-        const ID = 2;
+        const ID = PREVOTE_MESSAGE_ID;
         const SIZE = 52;
 
         validator:      u32         [00 => 04]
@@ -42,7 +56,7 @@ message! {
 
 message! {
     Precommit {
-        const ID = 3;
+        const ID = PRECOMMIT_MESSAGE_ID;
         const SIZE = 80;
 
         validator:      u32         [00 => 04]
@@ -55,7 +69,7 @@ message! {
 
 message! {
     Status {
-        const ID = 4;
+        const ID = STATUS_MESSAGE_ID;
         const SIZE = 44;
 
         validator:      u32         [00 => 04]
@@ -69,7 +83,7 @@ message! {
 
 message! {
     RequestPropose {
-        const ID = 5;
+        const ID = REQUEST_PROPOSE_MESSAGE_ID;
         const SIZE = 56;
 
         from:           u32         [00 => 04]
@@ -82,7 +96,7 @@ message! {
 
 message! {
     RequestTransactions {
-        const ID = 6;
+        const ID = REQUEST_TRANSACTIONS_MESSAGE_ID;
         const SIZE = 24;
 
         from:           u32         [00 => 04]
@@ -94,7 +108,7 @@ message! {
 
 message! {
     RequestPrevotes {
-        const ID = 7;
+        const ID = REQUEST_PREVOTES_MESSAGE_ID;
         const SIZE = 60;
 
         from:           u32         [00 => 04]
@@ -109,7 +123,7 @@ message! {
 
 message! {
     RequestPrecommits {
-        const ID = 8;
+        const ID = REQUEST_PRECOMMITS_MESSAGE_ID;
         const SIZE = 92;
 
         from:           u32         [00 => 04]
@@ -125,7 +139,7 @@ message! {
 
 message! {
     RequestCommit {
-        const ID = 9;
+        const ID = REQUEST_COMMIT_MESSAGE_ID;
         const SIZE = 24;
 
         from:           u32         [00 => 04]
@@ -137,7 +151,7 @@ message! {
 
 message! {
     RequestPeers {
-        const ID = 10;
+        const ID = REQUEST_PEERS_MESSAGE_ID;
         const SIZE = 16;
 
         from:           u32         [00 => 04]
@@ -146,48 +160,48 @@ message! {
     }
 }
 
-message! {
-    TxIssue {
-        const ID = 11;
-        const SIZE = 56;
+// message! {
+//     TxIssue//{
+//         const ID = 11;
+//         const SIZE = 56;
 
-        seed:           u64         [00 => 08]
-        asset:          &PublicKey  [08 => 40]
-        name:           &str        [40 => 48]
-        amount:         u64         [48 => 56]
-    }
-}
+//         seed:           u64         [00 => 08]
+//         asset:          &PublicKey  [08 => 40]
+//         name:           &str        [40 => 48]
+//         amount:         u64         [48 => 56]
+//     }
+// }
 
-message! {
-    TxTransfer {
-        const ID = 12;
-        const SIZE = 80;
+// message! {
+//     TxTransfer//{
+//         const ID = 12;
+//         const SIZE = 80;
 
-        seed:           u64         [00 => 08]
-        from:           &PublicKey  [08 => 40]
-        to:             &PublicKey  [40 => 72]
-        amount:         u64         [72 => 80]
-    }
-}
+//         seed:           u64         [00 => 08]
+//         from:           &PublicKey  [08 => 40]
+//         to:             &PublicKey  [40 => 72]
+//         amount:         u64         [72 => 80]
+//     }
+// }
 
-message! {
-    TxVoteValidator {
-        const ID = 13;
-        const SIZE = 48;
+// message! {
+//     TxVoteValidator//{
+//         const ID = 13;
+//         const SIZE = 48;
 
-        seed:           u64         [00 => 08]
-        pub_key:        &PublicKey  [08 => 40]
-        power:          u64         [40 => 48]
-    }
-}
+//         seed:           u64         [00 => 08]
+//         pub_key:        &PublicKey  [08 => 40]
+//         power:          u64         [40 => 48]
+//     }
+// }
 
-message! {
-    TxVoteConfig {
-        const ID = 14;
-        const SIZE = 24;
+// message! {
+//     TxVoteConfig//{
+//         const ID = 14;
+//         const SIZE = 24;
 
-        seed:           u64         [00 => 08]
-        key:            &[u8]       [08 => 16]
-        value:          &[u8]       [16 => 24]
-    }
-}
+//         seed:           u64         [00 => 08]
+//         key:            &[u8]       [08 => 16]
+//         value:          &[u8]       [16 => 24]
+//     }
+// }

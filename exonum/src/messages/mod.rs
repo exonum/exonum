@@ -10,7 +10,7 @@ mod protocol;
 
 use time::{Timespec};
 
-use super::crypto::{Hash, PublicKey};
+use super::crypto::PublicKey;
 
 pub use self::raw::{RawMessage, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::{Error};
@@ -21,17 +21,12 @@ pub use self::protocol::*;
 // TODO: use macro for implementing enums
 
 #[derive(Clone, PartialEq)]
-pub enum Any {
-    Basic(BasicMessage),
-    Consensus(ConsensusMessage),
-    Request(RequestMessage),
-    Tx(TxMessage),
-}
-
-#[derive(Clone, PartialEq)]
-pub enum BasicMessage {
+pub enum Any<Tx: Message> {
     Connect(Connect),
     Status(Status),
+    Consensus(ConsensusMessage),
+    Request(RequestMessage),
+    Transaction(Tx),
 }
 
 #[derive(Clone, PartialEq)]
@@ -51,68 +46,58 @@ pub enum RequestMessage {
     Peers(RequestPeers)
 }
 
-#[derive(Clone, PartialEq)]
-pub enum TxMessage {
-    Issue(TxIssue),
-    Transfer(TxTransfer),
-    VoteValidator(TxVoteValidator),
-    VoteConfig(TxVoteConfig),
-}
+// #[derive(Clone, PartialEq)]
+// pub enum TxMessage {
+//     Issue(TxIssue),
+//     Transfer(TxTransfer),
+//     VoteValidator(TxVoteValidator),
+//     VoteConfig(TxVoteConfig),
+// }
 
-impl fmt::Debug for BasicMessage {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            BasicMessage::Connect(ref msg) => write!(fmt, "{:?}", msg),
-            BasicMessage::Status(ref msg) => write!(fmt, "{:?}", msg),
-        }
-    }
-}
+// impl TxMessage {
+//     pub fn hash(&self) -> Hash {
+//         match *self {
+//             TxMessage::Issue(ref msg) => msg.hash(),
+//             TxMessage::Transfer(ref msg) => msg.hash(),
+//             TxMessage::VoteValidator(ref msg) => msg.hash(),
+//             TxMessage::VoteConfig(ref msg) => msg.hash()
+//         }
+//     }
 
+//     pub fn raw(&self) -> &RawMessage {
+//         match *self {
+//             TxMessage::Issue(ref msg) => msg.raw(),
+//             TxMessage::Transfer(ref msg) => msg.raw(),
+//             TxMessage::VoteValidator(ref msg) => msg.raw(),
+//             TxMessage::VoteConfig(ref msg) => msg.raw()
+//         }
+//     }
 
-impl TxMessage {
-    pub fn hash(&self) -> Hash {
-        match *self {
-            TxMessage::Issue(ref msg) => msg.hash(),
-            TxMessage::Transfer(ref msg) => msg.hash(),
-            TxMessage::VoteValidator(ref msg) => msg.hash(),
-            TxMessage::VoteConfig(ref msg) => msg.hash()
-        }
-    }
+//     pub fn from_raw(raw: RawMessage) -> Result<TxMessage, Error> {
+//         // TODO: check input message size
+//         Ok(match raw.message_type() {
+//             TxIssue::MESSAGE_TYPE => TxMessage::Issue(TxIssue::from_raw(raw)?),
+//             TxTransfer::MESSAGE_TYPE => TxMessage::Transfer(TxTransfer::from_raw(raw)?),
+//             TxVoteValidator::MESSAGE_TYPE => TxMessage::VoteValidator(TxVoteValidator::from_raw(raw)?),
+//             TxVoteConfig::MESSAGE_TYPE => TxMessage::VoteConfig(TxVoteConfig::from_raw(raw)?),
+//             _ => {
+//                 // TODO: use result here
+//                 panic!("unrecognized message type");
+//             }
+//         })
+//     }
+// }
 
-    pub fn raw(&self) -> &RawMessage {
-        match *self {
-            TxMessage::Issue(ref msg) => msg.raw(),
-            TxMessage::Transfer(ref msg) => msg.raw(),
-            TxMessage::VoteValidator(ref msg) => msg.raw(),
-            TxMessage::VoteConfig(ref msg) => msg.raw()
-        }
-    }
-
-    pub fn from_raw(raw: RawMessage) -> Result<TxMessage, Error> {
-        // TODO: check input message size
-        Ok(match raw.message_type() {
-            TxIssue::MESSAGE_TYPE => TxMessage::Issue(TxIssue::from_raw(raw)?),
-            TxTransfer::MESSAGE_TYPE => TxMessage::Transfer(TxTransfer::from_raw(raw)?),
-            TxVoteValidator::MESSAGE_TYPE => TxMessage::VoteValidator(TxVoteValidator::from_raw(raw)?),
-            TxVoteConfig::MESSAGE_TYPE => TxMessage::VoteConfig(TxVoteConfig::from_raw(raw)?),
-            _ => {
-                // TODO: use result here
-                panic!("unrecognized message type");
-            }
-        })
-    }
-}
-
-impl fmt::Debug for TxMessage {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            TxMessage::Issue(ref msg) => write!(fmt, "{:?}", msg),
-            TxMessage::Transfer(ref msg) => write!(fmt, "{:?}", msg),
-            TxMessage::VoteValidator(ref msg) => write!(fmt, "{:?}", msg),
-            TxMessage::VoteConfig(ref msg) => write!(fmt, "{:?}", msg)
-        }
-    }
-}
+// impl fmt::Debug for TxMessage {
+//     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+//         match *self {
+//             TxMessage::Issue(ref msg) => write!(fmt, "{:?}", msg),
+//             TxMessage::Transfer(ref msg) => write!(fmt, "{:?}", msg),
+//             TxMessage::VoteValidator(ref msg) => write!(fmt, "{:?}", msg),
+//             TxMessage::VoteConfig(ref msg) => write!(fmt, "{:?}", msg)
+//         }
+//     }
+// }
 
 impl RequestMessage {
     pub fn from(&self) -> u32 {
@@ -236,30 +221,36 @@ impl fmt::Debug for ConsensusMessage {
     }
 }
 
-impl Any {
-    pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
+impl<Tx: Message> Any<Tx> {
+    pub fn from_raw(raw: RawMessage) -> Result<Any<Tx>, Error> {
         // TODO: check input message size
         Ok(match raw.message_type() {
-            Connect::MESSAGE_TYPE => Any::Basic(BasicMessage::Connect(Connect::from_raw(raw)?)),
-            Status::MESSAGE_TYPE => Any::Basic(BasicMessage::Status(Status::from_raw(raw)?)),
-            Propose::MESSAGE_TYPE => Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?)),
-            Prevote::MESSAGE_TYPE => Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?)),
-            Precommit::MESSAGE_TYPE => Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?)),
-            _ => {
-                // TODO: use result here
-                panic!("unrecognized message type");
-            }
+            CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
+            STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
+
+            PROPOSE_MESSAGE_ID => Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?)),
+            PREVOTE_MESSAGE_ID => Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?)),
+            PRECOMMIT_MESSAGE_ID => Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?)),
+
+            REQUEST_PROPOSE_MESSAGE_ID => Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?)),
+            REQUEST_TRANSACTIONS_MESSAGE_ID => Any::Request(RequestMessage::Transactions(RequestTransactions::from_raw(raw)?)),
+            REQUEST_PREVOTES_MESSAGE_ID => Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?)),
+            REQUEST_PRECOMMITS_MESSAGE_ID => Any::Request(RequestMessage::Precommits(RequestPrecommits::from_raw(raw)?)),
+            REQUEST_COMMIT_MESSAGE_ID => Any::Request(RequestMessage::Commit(RequestCommit::from_raw(raw)?)),
+            REQUEST_PEERS_MESSAGE_ID => Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?)),
+            _ => Any::Transaction(Tx::from_raw(raw)?),
         })
     }
 }
 
-impl fmt::Debug for Any {
+impl<Tx: Message> fmt::Debug for Any<Tx> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            Any::Basic(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Connect(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Status(ref msg) => write!(fmt, "{:?}", msg),
             Any::Consensus(ref msg) => write!(fmt, "{:?}", msg),
             Any::Request(ref msg) => write!(fmt, "{:?}", msg),
-            Any::Tx(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Transaction(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }

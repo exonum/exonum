@@ -147,11 +147,11 @@ impl convert::AsMut<Vec<u8>> for MessageBuffer {
     }
 }
 
-pub trait Message : Debug + Sized {
-    const MESSAGE_TYPE : u16;
-    const BODY_LENGTH : usize;
-    const PAYLOAD_LENGTH : usize;
-    const TOTAL_LENGTH : usize;
+pub trait Message : Debug + Clone + Sized {
+    // const MESSAGE_TYPE : u16;
+    // const BODY_LENGTH : usize;
+    // const PAYLOAD_LENGTH : usize;
+    // const TOTAL_LENGTH : usize;
 
     fn raw(&self) -> &RawMessage;
     fn from_raw(raw: RawMessage) -> Result<Self, Error>;

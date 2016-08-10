@@ -9,7 +9,7 @@ use std::fmt::Debug;
 // use std::iter::Iterator;
 
 use ::crypto::Hash;
-use ::messages::{TxMessage, Precommit, Propose};
+use ::messages::{Precommit, Propose, Message};
 
 mod leveldb;
 mod memorydb;
@@ -24,7 +24,7 @@ pub use leveldb::options::Options as LevelDBOptions;
 pub use leveldb::database::cache::Cache as LevelDBCache;
 
 pub use self::leveldb::LevelDB;
-pub use self::db::{Database, Fork, Patch, Change};
+pub use self::db::{Database, Patch, Fork, Change};
 pub use self::memorydb::MemoryDB;
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
@@ -32,57 +32,30 @@ pub use self::merkle_table::MerkleTable;
 pub use self::fields::StorageValue;
 pub use self::merkle_patricia_table::MerklePatriciaTable;
 
-pub trait Blockchain {
+pub trait Blockchain : Sized {
     type Database: Database;
-    type Transaction: StorageValue;
+    type Transaction: Message + StorageValue;
+    type Fork: Into<Patch> + Blockchain<Transaction=Self::Transaction>;
 
     // TODO: type Error;
 
-    fn transactions<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Self::Transaction>;
+    fn from_db(db: Self::Database) -> Self;
+    fn db(&self) -> &Self::Database;
+    fn db_mut(&mut self) -> &mut Self::Database;
+    fn fork(&self) -> Self::Fork;
 
-    fn proposes<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Propose>;
-
-    fn heights<'a>(&'a mut self) -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u64, Hash>;
-
-    fn last_hash(&mut self) -> Result<Option<Hash>, Error>;
-
-    fn last_propose(&mut self) -> Result<Option<Propose>, Error>;
-
-    fn precommits<'a>(&'a mut self,
-                          hash: &'a Hash)
-                          -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u32, Precommit>;
-
-    fn fork<'a>(&'a self) -> Storage<Fork<'a, Self::Database>>;
-
-    fn merge(&mut self, patch: Patch) -> Result<(), Error>;
-}
-
-pub struct Storage<T: Database> {
-    db: T,
-}
-
-pub type Error = Box<Debug>;
-
-impl<T> Storage<T> where T: Database {
-    pub fn new(backend: T) -> Self {
-        Storage { db: backend }
-    }
-}
-
-impl<D: Database> Blockchain for Storage<D> {
-    type Transaction = TxMessage;
-    type Database = D;
+    // TODO: remove ellided lifetimes
 
     fn transactions<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Self::Transaction> {
-        self.db.map(vec![00])
+        self.db_mut().map(vec![00])
     }
 
     fn proposes<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Propose> {
-        self.db.map(vec![01])
+        self.db_mut().map(vec![01])
     }
 
     fn heights<'a>(&'a mut self) -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u64, Hash> {
-        self.db.list(vec![02])
+        self.db_mut().list(vec![02])
     }
 
     fn last_hash(&mut self) -> Result<Option<Hash>, Error> {
@@ -100,25 +73,15 @@ impl<D: Database> Blockchain for Storage<D> {
     fn precommits<'a>(&'a mut self,
                           hash: &'a Hash)
                           -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u32, Precommit> {
-        self.db.list([&[03], hash.as_ref()].concat())
-    }
-
-    fn fork<'a>(&'a self) -> Storage<Fork<'a, Self::Database>> {
-        Storage { db: self.db.fork() }
+        self.db_mut().list([&[03], hash.as_ref()].concat())
     }
 
     fn merge(&mut self, patch: Patch) -> Result<(), Error> {
-        self.db.merge(patch)
+        self.db_mut().merge(patch)
     }
 }
 
-impl<'a, T> Storage<Fork<'a, T>>
-    where T: Database
-{
-    pub fn patch(self) -> Patch {
-        self.db.patch()
-    }
-}
+pub type Error = Box<Debug>;
 
 // TODO We need to understand how to finish them
 // pub trait Iterable {

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{Hash, hash};
-use ::messages::{MessageBuffer, Message, TxMessage};
+use ::messages::{MessageBuffer, Message};
 
 pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;
@@ -27,8 +27,8 @@ impl StorageValue for u32 {
     fn hash(&self) -> Hash {
         let mut v = vec![0; mem::size_of::<u64>()];
         BigEndian::write_u32(&mut v, *self);
-        hash(&v)        
-    }    
+        hash(&v)
+    }
 }
 
 impl StorageValue for u64 {
@@ -45,7 +45,7 @@ impl StorageValue for u64 {
     fn hash(&self) -> Hash {
         let mut v = vec![0; mem::size_of::<u64>()];
         BigEndian::write_u64(&mut v, *self);
-        hash(&v)        
+        hash(&v)
     }
 }
 
@@ -73,25 +73,25 @@ impl<T> StorageValue for T
     fn deserialize(v: Vec<u8>) -> Self {
         Message::from_raw(Arc::new(MessageBuffer::from_vec(v))).unwrap()
     }
-    
+
     fn hash(&self) -> Hash {
         self.hash()
     }
 }
 
-impl StorageValue for TxMessage {
-    fn serialize(self) -> Vec<u8> {
-        self.raw().as_ref().as_ref().to_vec()
-    }
+// impl StorageValue for TxMessage {
+//     fn serialize(self) -> Vec<u8> {
+//         self.raw().as_ref().as_ref().to_vec()
+//     }
 
-    fn deserialize(v: Vec<u8>) -> Self {
-        TxMessage::from_raw(Arc::new(MessageBuffer::from_vec(v))).unwrap()
-    }
+//     fn deserialize(v: Vec<u8>) -> Self {
+//         TxMessage::from_raw(Arc::new(MessageBuffer::from_vec(v))).unwrap()
+//     }
 
-    fn hash(&self) -> Hash {
-        self.hash()
-    }    
-}
+//     fn hash(&self) -> Hash {
+//         self.hash()
+//     }
+// }
 
 impl StorageValue for Vec<u8> {
     fn serialize(self) -> Vec<u8> {
@@ -104,5 +104,5 @@ impl StorageValue for Vec<u8> {
 
     fn hash(&self) -> Hash {
         hash(&self)
-    }    
+    }
 }

@@ -6,7 +6,7 @@ use super::super::messages::{
     ConsensusMessage, Propose, Prevote, Precommit, Message,
     RequestPropose, RequestTransactions, RequestPrevotes,
     RequestPrecommits, RequestCommit,
-    RequestPeers, TxMessage
+    RequestPeers
 };
 use super::super::storage::{Map, List};
 use super::{Node, Round, Height, RequestData, ValidatorId};
@@ -262,7 +262,7 @@ impl<B: Blockchain> Node<B> {
         }
     }
 
-    pub fn handle_tx(&mut self, msg: TxMessage) {
+    pub fn handle_tx(&mut self, msg: B::Transaction) {
         info!("recv tx");
         let hash = msg.hash();
 
@@ -380,7 +380,7 @@ impl<B: Blockchain> Node<B> {
         self.state.leader(self.state.round()) == self.state.id()
     }
 
-    // FIXME: fix this bull shit
+    // FIXME: remove this bull shit
     pub fn execute(&mut self, hash: &Hash) -> Hash {
         let mut fork = self.blockchain.fork();
 
@@ -397,7 +397,7 @@ impl<B: Blockchain> Node<B> {
         // FIXME: put precommits
 
         // Save patch
-        self.state.propose(hash).unwrap().set_patch(fork.patch());
+        self.state.propose(hash).unwrap().set_patch(fork.into());
 
         hash.clone()
     }

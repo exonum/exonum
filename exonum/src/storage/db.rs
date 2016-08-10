@@ -28,9 +28,9 @@ pub struct Fork<'a, T: Database + 'a> {
     changes: Patch,
 }
 
-impl<'a, T: Database + 'a> Fork<'a, T> {
-    pub fn patch(self) -> Patch {
-        self.changes
+impl<'a, T: Database + 'a> From<Fork<'a, T>> for Patch {
+    fn from(fork: Fork<'a, T>) -> Patch {
+        fork.changes
     }
 }
 
@@ -64,10 +64,10 @@ impl<'a, T> Map<[u8], Vec<u8>> for Fork<'a, T>
         //TODO merge with the same function in memorydb
         let out = {
             let mut it = self.changes.range::<[u8], [u8]>(Included(key), Unbounded);
-            it.next().map(|x| x.0.to_vec())            
+            it.next().map(|x| x.0.to_vec())
         };
         if out.is_none() {
-            return self.database.find_key(key); 
+            return self.database.find_key(key);
         } else {
             return Ok(out);
         }

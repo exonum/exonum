@@ -7,8 +7,8 @@ use super::events::{
     Reactor, Events, Event, Timeout, EventsConfiguration,
     Network, NetworkConfiguration
 };
-use super::storage::{Blockchain, Storage, MemoryDB};
-use super::messages::{Any, Connect, BasicMessage, RawMessage, Message};
+use super::storage::Blockchain;
+use super::messages::{Any, Connect, RawMessage, Message};
 
 mod state;
 mod basic;
@@ -22,7 +22,7 @@ pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 pub struct Node<B: Blockchain> {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub state: State,
+    pub state: State<B::Transaction>,
     pub events: Box<Reactor>,
     pub blockchain: B,
     pub round_timeout: u32,
@@ -121,11 +121,9 @@ impl<B: Blockchain> Node<B> {
         //     }
 
         match Any::from_raw(raw).unwrap() {
-            Any::Basic(msg) => match msg {
-                BasicMessage::Connect(msg) => self.handle_connect(msg),
-                BasicMessage::Status(msg) => self.handle_status(msg),
-            },
-            Any::Tx(message) => self.handle_tx(message),
+            Any::Connect(msg) => self.handle_connect(msg),
+            Any::Status(msg) => self.handle_status(msg),
+            Any::Transaction(message) => self.handle_tx(message),
             Any::Consensus(message) => self.handle_consensus(message),
             Any::Request(message) => self.handle_request(message),
         }

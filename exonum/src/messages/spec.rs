@@ -12,13 +12,13 @@ macro_rules! message {
         }
 
         impl $crate::messages::Message for $name {
-            const MESSAGE_TYPE : u16 = $id;
-            const BODY_LENGTH : usize = $body;
-            const PAYLOAD_LENGTH : usize =
-                $body + $crate::crypto::SIGNATURE_LENGTH;
-            const TOTAL_LENGTH : usize =
-                $body + $crate::crypto::SIGNATURE_LENGTH
-                      + $crate::messages::HEADER_SIZE;
+            // const MESSAGE_TYPE : u16 = $id;
+            // const BODY_LENGTH : usize = $body;
+            // const PAYLOAD_LENGTH : usize =
+            //     $body + $crate::crypto::SIGNATURE_LENGTH;
+            // const TOTAL_LENGTH : usize =
+            //     $body + $crate::crypto::SIGNATURE_LENGTH
+            //           + $crate::messages::HEADER_SIZE;
 
             fn raw(&self) -> &$crate::messages::RawMessage {
                 &self.raw
@@ -36,10 +36,10 @@ macro_rules! message {
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{
-                    RawMessage, MessageBuffer, Message, Field
+                    RawMessage, MessageBuffer, Field
                 };
-                let mut raw = MessageBuffer::new(Self::MESSAGE_TYPE,
-                                                 Self::PAYLOAD_LENGTH);
+                let mut raw = MessageBuffer::new($id,
+                                                 $body + $crate::crypto::SIGNATURE_LENGTH);
                 {
                     let mut buffer = raw.as_mut();
                     $(
