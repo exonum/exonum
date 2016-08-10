@@ -154,7 +154,7 @@ impl<'a> BitSlice<'a> {
         match key[0] {
             LEAF_KEY_PREFIX => {
                 BitSlice {
-                    data: &key[1..],
+                    data: &key[1..KEY_SIZE+1],
                     from: 0,
                     to: KEY_SIZE as u16 * 8,
                 }
@@ -327,13 +327,14 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
     fn insert(&mut self, key: &Vec<u8>, value: V) -> Result<(), Error> {
         debug_assert_eq!(key.len(), KEY_SIZE);
+
+        let key_slice = BitSlice::from_bytes(key);       
         match self.root_node()? {
             Some((prefix, Node::Leaf(prefix_data))) => {
-                let key_slice = BitSlice::from_bytes(key);
                 let prefix_slice = BitSlice::from_key(&prefix);
                 let i = prefix_slice.common_prefix(&key_slice);
 
-                let leaf_hash = self.insert_leaf(key, value)?;
+                let leaf_hash = self.insert_leaf(&key_slice, value)?;
                 if i < key_slice.len() {
                     let mut branch = BranchNode::empty();
                     branch.set_child(key_slice.at(i), &key_slice.mid(i), &leaf_hash);
@@ -347,7 +348,6 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
             }
             Some((prefix, Node::Branch(mut branch))) => {
                 let prefix_slice = BitSlice::from_key(&prefix);
-                let key_slice = BitSlice::from_bytes(key);
                 let i = prefix_slice.common_prefix(&key_slice);
 
                 if i == prefix_slice.len() {
@@ -363,7 +363,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                     self.insert_branch(&prefix_slice, branch)?;
                 } else {
                     // Inserts a new branch and adds current branch as its child
-                    let hash = self.insert_leaf(key, value)?;
+                    let hash = self.insert_leaf(&key_slice, value)?;
                     let mut new_branch = BranchNode::empty();
                     new_branch.set_child(prefix_slice.at(i), &prefix_slice.mid(i), &branch.hash());
                     new_branch.set_child(key_slice.at(i), &key_slice.mid(i), &hash);
@@ -375,7 +375,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
             }
             None => {
                 // Eats hash
-                self.insert_leaf(key, value).map(|_| ())
+                self.insert_leaf(&key_slice, value).map(|_| ())
             }
         }
     }
@@ -395,7 +395,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
             // check that child is leaf to avoid unnecessary read
             if child_slice.is_leaf_key() {
                 // there is a leaf in branch and we needs to update its value
-                let hash = self.insert_leaf(&key_slice.data, value)?;
+                let hash = self.insert_leaf(&key_slice, value)?;
                 Ok((None, hash))
             } else {
                 match self.read_node(&child_slice)? {
@@ -422,7 +422,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
             let suffix_slice = key_slice.mid(i);
             let mut new_branch = BranchNode::empty();
             // Add a new leaf
-            let hash = self.insert_leaf(&suffix_slice.data, value)?;
+            let hash = self.insert_leaf(&suffix_slice, value)?;
             new_branch.set_child(suffix_slice.at(0), &suffix_slice, &hash);
             // Move current branch
             new_branch.set_child(child_slice.at(i),
@@ -549,12 +549,13 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn insert_leaf<A: AsRef<[u8]>>(&mut self, key: A, value: V) -> Result<Hash, Error> {
-        debug_assert_eq!(key.as_ref().len(), KEY_SIZE);
+    fn insert_leaf(&mut self, key: &BitSlice, value: V) -> Result<Hash, Error> {
+        debug_assert!(key.is_leaf_key());
 
-        let db_key = [&[LEAF_KEY_PREFIX], key.as_ref()].concat();
         let bytes = value.serialize();
-        let hash = Self::hash_leaf(key, &bytes);
+        let hash = Self::hash_leaf(key.data, &bytes);
+
+        let db_key = key.to_key();
         self.map.put(&db_key, bytes)?;
         Ok(hash)
     }
