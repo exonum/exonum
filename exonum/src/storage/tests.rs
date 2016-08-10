@@ -1,4 +1,4 @@
-use super::{Map, MapExt, List};
+use super::{Map, List, MapTable, MerkleTable};
 use super::{Database, StorageValue, Error};
 use super::{MemoryDB, LevelDB, Patch};
 // use super::{Iterable, Seekable};
@@ -64,7 +64,7 @@ fn test_database_merge<T: Database>(mut db: T) -> Result<(), Error> {
 }
 
 fn test_table_list<T: Database>(prefix: Vec<u8>, db: &mut T) -> Result<(), Error> {
-    let mut list = db.list(prefix);
+    let mut list = MerkleTable::new(MapTable::new(prefix, db));
     assert_eq!(list.len()?, 0 as u64);
     list.append(vec![10])?;
     assert_eq!(list.get(0)?, Some(vec![10]));
@@ -83,7 +83,7 @@ fn test_table_list<T: Database>(prefix: Vec<u8>, db: &mut T) -> Result<(), Error
 }
 
 fn test_table_map<T: Database>(prefix: Vec<u8>, db: &mut T) -> Result<(), Error> {
-    let map = db.map(prefix);
+    let map = MapTable::new(prefix, db);
     test_map_simple(map)
 }
 
@@ -101,12 +101,12 @@ fn test_map_find_keys<T: Map<[u8], Vec<u8>>>(db: &mut T) {
     assert_eq!(db.find_key(b"c").unwrap(), None);
 }
 
-fn test_map_table_different_prefixes<T: MapExt>(db: &mut T) {
+fn test_map_table_different_prefixes<T: Database>(db: &mut T) {
     {
-        let mut map2 = db.map(b"abc".to_vec());
+        let mut map2 = MapTable::new(b"abc".to_vec(), db);
         map2.put(&b"abac".to_vec(), b"12345".to_vec()).unwrap();
     }
-    let mut map1 = db.map(b"bcd".to_vec());
+    let mut map1 = MapTable::new(b"bcd".to_vec(), db);
     map1.put(&b"baca".to_vec(), b"1".to_vec()).unwrap();
 
     assert_eq!(map1.find_key(&b"abd".to_vec()).unwrap(), None);
@@ -194,14 +194,14 @@ fn memorydb_find_key() {
 #[test]
 fn leveldb_map_find_key() {
     let mut db = leveldb_database();
-    let mut map = db.map(vec![02]);
+    let mut map = MapTable::new(vec![02], &mut db);
     test_map_find_keys(&mut map);
 }
 
 #[test]
 fn memorydb_map_find_key() {
     let mut db = MemoryDB::new();
-    let mut map = db.map(vec![02]);
+    let mut map = MapTable::new(vec![02], &mut db);
     test_map_find_keys(&mut map);
 }
 
@@ -259,7 +259,7 @@ fn memorydb_map_table_different_prefixes() {
 // #[test]
 // fn leveldb_map_table_iter() {
 //     let mut db = leveldb_database();
-//     let mut map = db.map(vec![02]);
+//     let mut map = MapTable::new(vec![02], &mut db);
 
 //     map.put(&vec![1, 2], vec![1, 3, 4]).unwrap();
 //     map.put(&vec![1, 3], vec![1, 4, 5]).unwrap();
