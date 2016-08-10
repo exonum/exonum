@@ -32,36 +32,64 @@ pub use self::merkle_table::MerkleTable;
 pub use self::fields::StorageValue;
 pub use self::merkle_patricia_table::MerklePatriciaTable;
 
+pub trait Blockchain {
+    type Database: Database;
+    type Transaction: StorageValue;
+
+    // TODO: type Error;
+
+    fn transactions<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Self::Transaction>;
+
+    fn proposes<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Propose>;
+
+    fn heights<'a>(&'a mut self) -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u64, Hash>;
+
+    fn last_hash(&mut self) -> Result<Option<Hash>, Error>;
+
+    fn last_propose(&mut self) -> Result<Option<Propose>, Error>;
+
+    fn precommits<'a>(&'a mut self,
+                          hash: &'a Hash)
+                          -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u32, Precommit>;
+
+    fn fork<'a>(&'a self) -> Storage<Fork<'a, Self::Database>>;
+
+    fn merge(&mut self, patch: Patch) -> Result<(), Error>;
+}
+
 pub struct Storage<T: Database> {
     db: T,
 }
 
 pub type Error = Box<Debug>;
 
-impl<T> Storage<T>
-    where T: Database
-{
+impl<T> Storage<T> where T: Database {
     pub fn new(backend: T) -> Self {
         Storage { db: backend }
     }
+}
 
-    pub fn transactions<'a>(&'a mut self) -> MapTable<'a, T, Hash, TxMessage> {
+impl<D: Database> Blockchain for Storage<D> {
+    type Transaction = TxMessage;
+    type Database = D;
+
+    fn transactions<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Self::Transaction> {
         self.db.map(vec![00])
     }
 
-    pub fn proposes<'a>(&'a mut self) -> MapTable<'a, T, Hash, Propose> {
+    fn proposes<'a>(&'a mut self) -> MapTable<'a, Self::Database, Hash, Propose> {
         self.db.map(vec![01])
     }
 
-    pub fn heights<'a>(&'a mut self) -> ListTable<MapTable<'a, T, [u8], Vec<u8>>, u64, Hash> {
+    fn heights<'a>(&'a mut self) -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u64, Hash> {
         self.db.list(vec![02])
     }
 
-    pub fn last_hash(&mut self) -> Result<Option<Hash>, Error> {
+    fn last_hash(&mut self) -> Result<Option<Hash>, Error> {
         self.heights().last()
     }
 
-    pub fn last_propose(&mut self) -> Result<Option<Propose>, Error> {
+    fn last_propose(&mut self) -> Result<Option<Propose>, Error> {
         Ok(match self.last_hash()? {
             Some(hash) => Some(self.proposes().get(&hash)?.unwrap()),
             None => None,
@@ -69,17 +97,17 @@ impl<T> Storage<T>
 
     }
 
-    pub fn precommits<'a>(&'a mut self,
+    fn precommits<'a>(&'a mut self,
                           hash: &'a Hash)
-                          -> ListTable<MapTable<'a, T, [u8], Vec<u8>>, u32, Precommit> {
+                          -> ListTable<MapTable<'a, Self::Database, [u8], Vec<u8>>, u32, Precommit> {
         self.db.list([&[03], hash.as_ref()].concat())
     }
 
-    pub fn fork<'a>(&'a self) -> Storage<Fork<'a, T>> {
+    fn fork<'a>(&'a self) -> Storage<Fork<'a, Self::Database>> {
         Storage { db: self.db.fork() }
     }
 
-    pub fn merge(&mut self, patch: Patch) -> Result<(), Error> {
+    fn merge(&mut self, patch: Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
 }

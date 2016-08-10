@@ -1,14 +1,14 @@
 #![feature(test)]
 
 extern crate test;
-extern crate da;
+extern crate exonum;
 
 use test::Bencher;
-use da::crypto::{gen_keypair, sign, verify, hash};
+use exonum::crypto::{gen_keypair, sign, verify, hash};
 
 #[bench]
 fn bench_sign_64(b: &mut Bencher) {
-    let (public_key, secret_key) = gen_keypair();
+    let (_, secret_key) = gen_keypair();
     let data = (0..64).collect::<Vec<u8>>();
     b.iter(|| {
         sign(&data, &secret_key)
@@ -17,7 +17,7 @@ fn bench_sign_64(b: &mut Bencher) {
 
 #[bench]
 fn bench_sign_128(b: &mut Bencher) {
-    let (public_key, secret_key) = gen_keypair();
+    let (_, secret_key) = gen_keypair();
     let data = (0..128).collect::<Vec<u8>>();
     b.iter(|| {
         sign(&data, &secret_key)
@@ -26,7 +26,7 @@ fn bench_sign_128(b: &mut Bencher) {
 
 #[bench]
 fn bench_sign_1024(b: &mut Bencher) {
-    let (public_key, secret_key) = gen_keypair();
+    let (_, secret_key) = gen_keypair();
     let data = (0..128).collect::<Vec<u8>>();
     b.iter(|| {
         sign(&data, &secret_key)

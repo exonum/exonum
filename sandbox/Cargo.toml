@@ -1,0 +1,6 @@
+[package]
+name = "sandbox"
+version = "0.1.0"
+authors = ["defuz <ivan.ivashchenko@xdev.re>"]
+
+[dependencies]

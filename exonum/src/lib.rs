@@ -12,30 +12,22 @@
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-extern crate rand;
 extern crate time;
 extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
 extern crate leveldb;
 extern crate db_key;
-extern crate tempdir;
 extern crate num;
+
+#[cfg(test)]
+extern crate tempdir;
+#[cfg(test)]
+extern crate rand;
 
 #[macro_use]
 pub mod messages;
-pub mod connection;
-pub mod network;
 pub mod events;
 pub mod crypto;
 pub mod node;
 pub mod storage;
-
-pub mod tx_generator;
-
-#[cfg(test)]
-pub mod sandbox;
-
-#[cfg(test)]
-pub mod tests;
-

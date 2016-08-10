@@ -7,8 +7,9 @@ use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
 use super::connection::{IncomingConnection, OutgoingConnection};
-use super::events::{EventLoop};
-use super::messages::{MessageBuffer, RawMessage};
+use super::{EventLoop};
+
+use super::super::messages::{MessageBuffer, RawMessage};
 
 pub type PeerId = Token;
 
@@ -97,8 +98,8 @@ impl Network {
                 Some(ref listener) => listener,
                 None => return Ok(None),
             };
-            while let Some((socket, address)) = listener.accept()? {
-                let peer = IncomingConnection::new(socket, address);
+            while let Some((socket, _)) = listener.accept()? {
+                let peer = IncomingConnection::new(socket/*, address*/);
                 let id = match self.incoming.insert(peer) {
                     Ok(id) => id,
                     Err(_) => {

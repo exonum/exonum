@@ -2,17 +2,17 @@
 
 extern crate test;
 extern crate rand;
-extern crate da;
 extern crate tempdir;
-extern crate leveldb;
+
+extern crate exonum;
 
 use test::Bencher;
 use tempdir::TempDir;
 use rand::{SeedableRng, XorShiftRng, Rng};
 
-use da::storage::{MerklePatriciaTable};
-use da::storage::{Map, List, MapExt};
-use da::storage::{MemoryDB, LevelDB, LevelDBOptions};
+use exonum::storage::{MerklePatriciaTable};
+use exonum::storage::{Map, List, MapExt};
+use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 
 fn merkle_table_insertion<T: MapExt>(b: &mut Bencher, mut db: T) {
     let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);

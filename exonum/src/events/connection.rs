@@ -6,11 +6,11 @@ use std::collections::VecDeque;
 use mio::tcp::TcpStream;
 use mio::{TryWrite, TryRead};
 
-use super::messages::{RawMessage, MessageBuffer, HEADER_SIZE};
+use super::super::messages::{RawMessage, MessageBuffer, HEADER_SIZE};
 
 pub struct IncomingConnection {
     socket: TcpStream,
-    address: SocketAddr,
+    // address: SocketAddr,
     raw: MessageBuffer,
     position: usize,
 }
@@ -23,11 +23,11 @@ pub struct OutgoingConnection {
 }
 
 impl IncomingConnection {
-    pub fn new(socket: TcpStream, address: SocketAddr)
+    pub fn new(socket: TcpStream/*, address: SocketAddr*/)
             -> IncomingConnection {
         IncomingConnection {
             socket: socket,
-            address: address,
+            // address: address,
             raw: MessageBuffer::empty(),
             position: 0,
         }
@@ -37,9 +37,9 @@ impl IncomingConnection {
         &self.socket
     }
 
-    pub fn address(&self) -> &SocketAddr {
-        &self.address
-    }
+    // pub fn  address(&self) -> &SocketAddr {
+    //     &self.address
+    // }
 
     fn read(&mut self) -> io::Result<Option<usize>> {
         // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
