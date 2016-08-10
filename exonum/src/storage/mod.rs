@@ -40,18 +40,16 @@ pub trait Storage<D: Database, T: Message + StorageValue> {
         self.db().fork()
     }
 
-    // TODO: remove ellided lifetimes
-
-    fn transactions<'a>(&'a mut self) -> MapTable<'a, D, Hash, T> {
-        self.db_mut().map(vec![00])
+    fn transactions(&mut self) -> MapTable<D, Hash, T> {
+        MapTable::new(vec![00], self.db_mut())
     }
 
-    fn proposes<'a>(&'a mut self) -> MapTable<'a, D, Hash, Propose> {
-        self.db_mut().map(vec![01])
+    fn proposes(&mut self) -> MapTable<D, Hash, Propose> {
+        MapTable::new(vec![01], self.db_mut())
     }
 
-    fn heights<'a>(&'a mut self) -> ListTable<MapTable<'a, D, [u8], Vec<u8>>, u64, Hash> {
-        self.db_mut().list(vec![02])
+    fn heights(&mut self) -> ListTable<MapTable<D, [u8], Vec<u8>>, u64, Hash> {
+        ListTable::new(MapTable::new(vec![02], self.db_mut()))
     }
 
     fn last_hash(&mut self) -> Result<Option<Hash>, Error> {
@@ -66,10 +64,9 @@ pub trait Storage<D: Database, T: Message + StorageValue> {
 
     }
 
-    fn precommits<'a>(&'a mut self,
-                          hash: &'a Hash)
-                          -> ListTable<MapTable<'a, D, [u8], Vec<u8>>, u32, Precommit> {
-        self.db_mut().list([&[03], hash.as_ref()].concat())
+    fn precommits(&mut self, hash: &Hash)
+        -> ListTable<MapTable<D, [u8], Vec<u8>>, u32, Precommit> {
+        ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.db_mut()))
     }
 
     fn merge(&mut self, patch: Patch) -> Result<(), Error> {
@@ -138,61 +135,4 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
     fn last(&self) -> Result<Option<V>, Error>;
     fn is_empty(&self) -> Result<bool, Error>;
     fn len(&self) -> Result<K, Error>;
-}
-
-pub trait MapExt: Map<[u8], Vec<u8>> + Sized {
-    fn list<'a, K, V>(&'a mut self,
-                      prefix: Vec<u8>)
-                      -> ListTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-              V: StorageValue;
-
-    fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> MapTable<'a, Self, K, V>;
-    fn merkle_list<'a, K, V>(&'a mut self,
-                             prefix: Vec<u8>)
-                             -> MerkleTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-              V: StorageValue;
-    fn merkle_map<'a, K: ?Sized, V>
-        (&'a mut self,
-         prefix: Vec<u8>)
-         -> MerklePatriciaTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: AsRef<[u8]>,
-              V: StorageValue;
-}
-
-// TODO MapExt looks too complex. Find more simple way.
-impl<T> MapExt for T
-    where T: Map<[u8], Vec<u8>> + Sized
-{
-    fn list<'a, K, V>(&'a mut self,
-                      prefix: Vec<u8>)
-                      -> ListTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-              V: StorageValue
-    {
-        ListTable::new(self.map(prefix))
-    }
-
-    fn map<'a, K: ?Sized, V>(&'a mut self, prefix: Vec<u8>) -> MapTable<'a, Self, K, V> {
-        MapTable::new(prefix, self)
-    }
-    fn merkle_list<'a, K, V>(&'a mut self,
-                             prefix: Vec<u8>)
-                             -> MerkleTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-              V: StorageValue
-    {
-        MerkleTable::new(self.map(prefix))
-    }
-    fn merkle_map<'a, K: ?Sized, V>
-        (&'a mut self,
-         prefix: Vec<u8>)
-         -> MerklePatriciaTable<MapTable<'a, Self, [u8], Vec<u8>>, K, V>
-        where K: AsRef<[u8]>,
-              V: StorageValue
-    {
-        let map_table = self.map(prefix);
-        MerklePatriciaTable::new(map_table)
-    }
 }
