@@ -11,7 +11,7 @@ use tempdir::TempDir;
 use rand::{SeedableRng, XorShiftRng, Rng};
 
 use exonum::storage::{MerkleTable, MerklePatriciaTable};
-use exonum::storage::{Database, Map, List, MapTable};
+use exonum::storage::{Database, Map, List, MapTable, Patch};
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 
 fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
@@ -56,6 +56,27 @@ fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, mut db: T) {
         for item in &data {
             table.put(&item.0, item.1.clone()).unwrap();
         }
+    });
+}
+
+fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, mut db: T) {
+    let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
+    let data = generate_random_kv(&mut rng, 200);
+
+    b.iter(|| {
+        let patch;
+        {
+            let mut fork = db.fork();
+            {
+                let map = MapTable::new(vec![234], &mut fork);
+                let mut table = MerklePatriciaTable::new(map);
+                for item in &data {
+                    table.put(&item.0, item.1.clone()).unwrap();
+                }
+            }
+            patch = Patch::from(fork);
+        }
+        db.merge(patch).unwrap();
     });
 }
 
@@ -112,6 +133,15 @@ fn bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
     let dir = TempDir::new("da_bench").unwrap();
     let db = LevelDB::new(dir.path(), options).unwrap();
     merkle_patricia_table_insertion(b, db);
+}
+
+#[bench]
+fn bench_merkle_patricia_table_insertion_fork_leveldb(b: &mut Bencher) {
+    let mut options = LevelDBOptions::new();
+    options.create_if_missing = true;
+    let dir = TempDir::new("da_bench").unwrap();
+    let db = LevelDB::new(dir.path(), options).unwrap();
+    merkle_patricia_table_insertion_fork(b, db);
 }
 
 #[bench]
