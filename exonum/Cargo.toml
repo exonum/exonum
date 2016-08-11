@@ -15,6 +15,5 @@ sodiumoxide = {version="0.0.12", default-features=false}
 
 [dev-dependencies]
 tempdir = "0.3.4"
-clap = {version="2.10.0", features=["unstable"]}
 clippy = "0.0.80"
 rand = "0.3"

@@ -4,3 +4,8 @@ version = "0.1.0"
 authors = ["defuz <ivan.ivashchenko@xdev.re>"]
 
 [dependencies]
+exonum = {version="0.1", path="../exonum"}
+env_logger = "0.3"
+[dev-dependencies]
+clap = {version="2.10.0", features=["unstable"]}
+rand = "0.3"
