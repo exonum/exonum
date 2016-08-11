@@ -1,8 +1,7 @@
 use super::super::messages::{
     RequestMessage, Message,
     RequestPropose, RequestTransactions, RequestPrevotes,
-    RequestPrecommits, RequestCommit, RequestPeers,
-    Connect
+    RequestPrecommits, RequestCommit
 };
 use super::super::storage::{Blockchain, Storage, Map, List};
 use super::Node;
@@ -134,14 +133,6 @@ impl<B: Blockchain> Node<B> {
 
         for precommit in precommits {
             self.send_to_validator(msg.from(), &precommit);
-        }
-    }
-
-    pub fn handle_request_peers(&mut self, msg: RequestPeers) {
-        info!("recv peers request from validator {}", msg.from());
-        let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
-        for peer in peers {
-            self.send_to_addr(&peer.addr(), peer.raw());
         }
     }
 }

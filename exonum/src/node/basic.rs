@@ -13,19 +13,23 @@ impl<B: Blockchain> Node<B> {
         let address = message.addr();
 
         // Check if we have another connect message from peer with the given public_key
+        // TODO add spam protection
+        let mut need_connect = true;        
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
                 info!("Received weird connection message from {}", address);
                 return;
-            }
+            } 
+            need_connect = saved_message.addr() != message.addr();
         }
-        // TODO add spam protection
-        if self.state.add_peer(public_key, message) {
+        self.state.add_peer(public_key, message);
+
+        if need_connect {
             // TODO: reduce double sending of connect message
             info!("Establish connection with {}", address);
-            let message = self.state.our_connect_message().unwrap().clone();
+            let message = self.state.our_connect_message().clone();
             self.send_to_addr(&address, message.raw());
-        }
+        }        
     }
 
     pub fn handle_status(&mut self, msg: Status) {
@@ -70,6 +74,14 @@ impl<B: Blockchain> Node<B> {
         // }
     }
 
+    pub fn handle_request_peers(&mut self, msg: RequestPeers) {
+        info!("recv peers request from validator {}", msg.from());
+        let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
+        for peer in peers {
+            self.send_to_validator(msg.from(), peer.raw());
+        }
+    }    
+
     pub fn handle_status_timeout(&mut self) {
         if let Some(hash) = self.blockchain.last_hash().unwrap() {
             info!("send status");
@@ -83,7 +95,7 @@ impl<B: Blockchain> Node<B> {
         self.add_status_timeout();
     }
 
-    pub fn handle_peers_timeout(&mut self) {
+    pub fn handle_peer_exchange_timeout(&mut self) {
         let to = self.state.validators().len() as ValidatorId - 1;
         let gen_validator = || {
             let mut rng = rand::thread_rng();
@@ -100,10 +112,10 @@ impl<B: Blockchain> Node<B> {
         let msg = RequestPeers::new(self.state.id(),
                             validator,
                             self.events.get_time(),
-                            &self.secret_key).raw().clone();
-        self.send_to_validator(validator, &msg);
+                            &self.secret_key);
+        self.send_to_validator(validator, msg.raw());
 
         info!("request peers from validator {}", validator);
-        self.add_peers_timeout();
+        self.add_peer_exchange_timeout();
     }
 }

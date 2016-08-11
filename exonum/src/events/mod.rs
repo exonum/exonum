@@ -25,7 +25,7 @@ pub enum Timeout {
     Status,
     Round(u64, u32),
     Request(RequestData, ValidatorId),
-    Peers
+    PeerExchange
 }
 
 pub struct InternalMessage;

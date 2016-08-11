@@ -51,9 +51,14 @@ impl<B: Blockchain> Node<B> {
         let id = config.validators.iter()
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
-        let state = State::new(id as u32, config.validators);
+
         let network = Network::with_config(config.network);
         let reactor = Box::new(Events::with_config(config.events, network).unwrap()) as Box<Reactor>;
+        let connect = Connect::new(&config.public_key,
+                                   reactor.address().clone(),
+                                   reactor.get_time(),
+                                   &config.secret_key);
+        let state = State::new(id as u32, config.validators, connect);                                   
         Node {
             public_key: config.public_key,
             secret_key: config.secret_key,
@@ -70,17 +75,14 @@ impl<B: Blockchain> Node<B> {
     pub fn initialize(&mut self) {
         info!("Start listening...");
         self.events.bind().unwrap();
-        let message = Connect::new(&self.public_key,
-                                   self.events.address().clone(),
-                                   self.events.get_time(),
-                                   &self.secret_key);
+
+        let connect = self.state.our_connect_message().clone();
         for address in self.peer_discovery.clone().iter() {
             if address == &self.events.address() {
                 continue
             }
-            self.send_to_addr(address, message.raw());
+            self.send_to_addr(address, connect.raw());
         }
-        self.state.set_our_connect_message(Some(message));
 
         // TODO: rewrite this bullshit
         let time = self.blockchain.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0});
@@ -91,7 +93,7 @@ impl<B: Blockchain> Node<B> {
 
         self.add_round_timeout();
         self.add_status_timeout();
-        self.add_peers_timeout();
+        self.add_peer_exchange_timeout();
     }
 
     pub fn run(&mut self) {
@@ -149,8 +151,8 @@ impl<B: Blockchain> Node<B> {
                 self.handle_request_timeout(data, validator),
             Timeout::Status =>
                 self.handle_status_timeout(),
-            Timeout::Peers => 
-                self.handle_peers_timeout()
+            Timeout::PeerExchange => 
+                self.handle_peer_exchange_timeout()
         }
     }
 
@@ -200,9 +202,9 @@ impl<B: Blockchain> Node<B> {
         self.events.add_timeout(Timeout::Request(data, validator), time);
     }
 
-    pub fn add_peers_timeout(&mut self) {
+    pub fn add_peer_exchange_timeout(&mut self) {
         let time = self.events.get_time() + Duration::milliseconds(self.peers_timeout as i64);
-        self.events.add_timeout(Timeout::Peers, time);
+        self.events.add_timeout(Timeout::PeerExchange, time);
     }
 
     // TODO: use Into<RawMessage>

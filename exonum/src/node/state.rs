@@ -17,7 +17,6 @@ const REQUEST_TRANSACTIONS_WAIT  : u64 = 1_000_000;
 const REQUEST_PREVOTES_WAIT      : u64 = 1_000_000;
 const REQUEST_PRECOMMITS_WAIT    : u64 = 1_000_000;
 const REQUEST_COMMIT_WAIT        : u64 = 1_000_000;
-const REQUEST_PEERS_WAIT         : u64 = 1_000_000;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -49,7 +48,7 @@ pub struct State<Tx> {
 
     our_prevotes: HashMap<Round, Prevote>,
     our_precommits: HashMap<Round, Precommit>,
-    our_connect_message: Option<Connect>,    
+    our_connect_message: Connect,    
 
     // Информация о состоянии наших запросов
     requests: HashMap<RequestData, RequestState>,
@@ -68,7 +67,6 @@ pub enum RequestData {
     Prevotes(Round, Hash),
     Precommits(Round, Hash, Hash),
     Commit, // TODO: add height?
-    Peers
 }
 
 // Состояние запроса
@@ -99,7 +97,6 @@ impl RequestData {
             RequestData::Prevotes(..)     => REQUEST_PREVOTES_WAIT,
             RequestData::Precommits(..)   => REQUEST_PRECOMMITS_WAIT,
             RequestData::Commit           => REQUEST_COMMIT_WAIT,
-            RequestData::Peers            => REQUEST_PEERS_WAIT,
         };
         Duration::milliseconds(ms as i64)
     }
@@ -161,7 +158,8 @@ impl ProposeState {
 
 impl<Tx> State<Tx> {
     pub fn new(id: u32,
-               validators: Vec<PublicKey>) -> State<Tx> {
+               validators: Vec<PublicKey>,
+               connect: Connect) -> State<Tx> {
         let validators_len = validators.len();
 
         State {
@@ -188,7 +186,7 @@ impl<Tx> State<Tx> {
 
             our_prevotes: HashMap::new(),
             our_precommits: HashMap::new(),
-            our_connect_message: None,
+            our_connect_message: connect,
 
             requests: HashMap::new(),
         }
@@ -466,11 +464,11 @@ impl<Tx> State<Tx> {
         state.map(|s| s.known_nodes).unwrap_or_default()
     }
 
-    pub fn our_connect_message(&self) -> Option<&Connect> {
-        self.our_connect_message.as_ref()
+    pub fn our_connect_message(&self) -> &Connect {
+        &self.our_connect_message
     }
 
-    pub fn set_our_connect_message(&mut self, msg: Option<Connect>) {
+    pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
     }
 }
