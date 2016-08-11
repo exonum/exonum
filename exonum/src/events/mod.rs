@@ -16,7 +16,7 @@ pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 
-pub type EventLoop = mio::EventLoop<EventsQueue>;
+pub type EventLoop = mio::EventLoop<MioAdapter>;
 
 // FIXME: move this into node module
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -33,26 +33,26 @@ pub enum Event {
     Incoming(RawMessage),
     Internal(InternalMessage),
     Timeout(Timeout),
-    Io(mio::Token, mio::EventSet),
     Error(io::Error),
     Terminate
 }
 
 pub struct Events {
     event_loop: EventLoop,
-    queue: EventsQueue,
+    queue: MioAdapter,
+}
+
+pub struct MioAdapter {
+    events: VecDeque<Event>,
     network: Network,
 }
 
-pub struct EventsQueue {
-    events: VecDeque<Event>
-}
-
-impl EventsQueue {
-    fn new() -> EventsQueue {
-        EventsQueue {
+impl MioAdapter {
+    fn new(network: Network) -> MioAdapter {
+        MioAdapter {
             // FIXME: configurable capacity?
             events: VecDeque::new(),
+            network: network
         }
     }
 
@@ -65,13 +65,16 @@ impl EventsQueue {
     }
 }
 
-impl mio::Handler for EventsQueue {
+impl mio::Handler for MioAdapter {
     type Timeout = Timeout;
     type Message = InternalMessage;
 
-    fn ready(&mut self, _: &mut EventLoop,
+    fn ready(&mut self, event_loop: &mut EventLoop,
              token: mio::Token, events: mio::EventSet) {
-        self.push(Event::Io(token, events));
+        // TODO: remove unwrap here
+        while let Some(buf) = self.network.io(event_loop, token, events).unwrap() {
+            self.push(Event::Incoming(RawMessage::new(buf)));
+        }
     }
 
     fn notify(&mut self, _: &mut EventLoop, msg: Self::Message) {
@@ -90,7 +93,6 @@ impl mio::Handler for EventsQueue {
 pub trait Reactor {
     fn get_time(&self) -> Timespec;
     fn poll(&mut self) -> Event;
-    fn io(&mut self, id: PeerId, set: EventSet) -> io::Result<()>;
     fn bind(&mut self) -> ::std::io::Result<()>;
     fn send_to(&mut self,
                    address: &SocketAddr,
@@ -105,8 +107,7 @@ impl Events {
         // TODO: using EventLoopConfig + capacity of queue
         Ok(Events {
             event_loop: EventLoop::configured(config)?,
-            queue: EventsQueue::new(),
-            network: network
+            queue: MioAdapter::new(network),
         })
     }
 }
@@ -127,26 +128,18 @@ impl Reactor for Events {
         }
     }
 
-    fn io(&mut self, id: PeerId, set: EventSet) -> io::Result<()> {
-        while let Some(buf) = self.network.io(&mut self.event_loop, id, set)? {
-            self.queue.push(Event::Incoming(RawMessage::new(buf)));
-        }
-        Ok(())
-    }
-
-
     fn bind(&mut self) -> ::std::io::Result<()> {
-        self.network.bind(&mut self.event_loop)
+        self.queue.network.bind(&mut self.event_loop)
     }
 
     fn send_to(&mut self,
                    address: &SocketAddr,
                    message: RawMessage) -> io::Result<()> {
-        self.network.send_to(&mut self.event_loop, address, message)
+        self.queue.network.send_to(&mut self.event_loop, address, message)
     }
 
     fn address(&self) -> SocketAddr {
-        self.network.address().clone()
+        self.queue.network.address().clone()
     }
 
     fn add_timeout(&mut self,

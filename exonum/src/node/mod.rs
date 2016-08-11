@@ -122,11 +122,6 @@ impl<B: Blockchain> Node<B> {
                 Event::Timeout(timeout) => {
                     self.handle_timeout(timeout);
                 },
-                Event::Io(id, set) => {
-                    // TODO: shoud we call network.io through main event queue?
-                    // FIXME: Remove unwrap here
-                    self.events.io(id, set).unwrap()
-                },
                 Event::Error(_) => {
 
                 },

@@ -12,7 +12,6 @@ use exonum::node::{Node, Configuration};
 use exonum::storage::{Blockchain, MemoryDB};
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, Timeout, EventsConfiguration, NetworkConfiguration};
-use exonum::events::{PeerId, EventSet};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 use timestamping::TimestampingBlockchain;
@@ -116,10 +115,6 @@ impl Reactor for SandboxReactor {
     }
 
     fn poll(&mut self) -> Event {
-        unreachable!();
-    }
-
-    fn io(&mut self, _: PeerId, _: EventSet) -> io::Result<()> {
         unreachable!();
     }
 
