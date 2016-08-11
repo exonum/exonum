@@ -46,19 +46,18 @@ pub struct Configuration {
 }
 
 impl<B: Blockchain> Node<B> {
-    pub fn with_config(blockchain: B, config: Configuration) -> Node<B> {
+    pub fn new(blockchain: B, reactor: Box<Reactor>, config: Configuration) -> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let id = config.validators.iter()
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
-
         let network = Network::with_config(config.network);
         let reactor = Box::new(Events::with_config(config.events, network).unwrap()) as Box<Reactor>;
         let connect = Connect::new(&config.public_key,
                                    reactor.address().clone(),
                                    reactor.get_time(),
                                    &config.secret_key);
-        let state = State::new(id as u32, config.validators, connect);                                   
+        let state = State::new(id as u32, config.validators, connect);
         Node {
             public_key: config.public_key,
             secret_key: config.secret_key,
@@ -70,6 +69,17 @@ impl<B: Blockchain> Node<B> {
             peers_timeout: config.peers_timeout,
             peer_discovery: config.peer_discovery,
         }
+    }
+
+    pub fn with_config(blockchain: B, config: Configuration) -> Node<B> {
+        // FIXME: remove unwraps here, use FATAL log level instead
+        let network = Network::with_config(config.network);
+        let reactor = Box::new(Events::with_config(config.events.clone(), network).unwrap()) as Box<Reactor>;
+        Self::new(blockchain, reactor, config)
+    }
+
+    pub fn state(&self) -> &State<B::Transaction> {
+        &self.state
     }
 
     pub fn initialize(&mut self) {
@@ -86,7 +96,7 @@ impl<B: Blockchain> Node<B> {
 
         // TODO: rewrite this bullshit
         let time = self.blockchain.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0});
-        let round = (self.events.get_time() - time).num_milliseconds() / self.round_timeout as i64;
+        let round = 1 + (self.events.get_time() - time).num_milliseconds() / self.round_timeout as i64;
         self.state.jump_round(round as u32);
 
         info!("Jump to round {}", round);
@@ -151,7 +161,7 @@ impl<B: Blockchain> Node<B> {
                 self.handle_request_timeout(data, validator),
             Timeout::Status =>
                 self.handle_status_timeout(),
-            Timeout::PeerExchange => 
+            Timeout::PeerExchange =>
                 self.handle_peer_exchange_timeout()
         }
     }

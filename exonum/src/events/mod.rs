@@ -8,12 +8,11 @@ use mio;
 use super::messages::RawMessage;
 
 use super::node::{RequestData, ValidatorId};
-use self::network::{PeerId, EventSet};
 
 mod network;
 mod connection;
 
-pub use self::network::{Network, NetworkConfiguration};
+pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 

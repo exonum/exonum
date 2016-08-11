@@ -8,12 +8,14 @@ use std::ops::Drop;
 
 use time::Timespec;
 
-use super::node::{Node, NodeContext, State};
-use super::storage::{Storage, MemoryDB};
-use super::messages::{Any, Message, RawMessage, Connect};
-use super::events::{Reactor, Event, Timeout};
-use super::network::{PeerId, EventSet};
-use super::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
+use exonum::node::{Node, Configuration};
+use exonum::storage::{Blockchain, MemoryDB};
+use exonum::messages::{Any, Message, RawMessage, Connect};
+use exonum::events::{Reactor, Event, Timeout, EventsConfiguration, NetworkConfiguration};
+use exonum::events::{PeerId, EventSet};
+use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
+
+use timestamping::TimestampingBlockchain;
 
 struct SandboxInner {
     address: SocketAddr,
@@ -39,9 +41,9 @@ impl Ord for TimerPair {
 }
 
 
-pub struct Sandbox {
+pub struct Sandbox<B: Blockchain> {
     inner: Arc<RefCell<SandboxInner>>,
-    node: RefCell<Node>,
+    node: RefCell<Node<B>>,
     validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
 }
@@ -50,8 +52,8 @@ pub struct SandboxReactor {
     inner: Arc<RefCell<SandboxInner>>
 }
 
-impl Sandbox {
-    pub fn new() -> Sandbox {
+impl<B: Blockchain> Sandbox<B> {
+    pub fn new(b: B) -> Sandbox<B> {
         let validators = vec![
             gen_keypair(),
             gen_keypair(),
@@ -73,22 +75,27 @@ impl Sandbox {
             timers: BinaryHeap::new(),
         }));
 
-        let state = State::new(0, validators.iter().map(|&(p, _)| p.clone()).collect());
-
-        let context = NodeContext {
+        let config = Configuration {
             public_key: validators[0].0.clone(),
             secret_key: validators[0].1.clone(),
-            state: state,
-            events: Box::new(SandboxReactor {
-                inner: inner.clone(),
-            }) as Box<Reactor>,
-            storage: Storage::new(MemoryDB::new()),
             round_timeout: 1000,
             status_timeout: 5000,
+            // TODO: remove events and network config from node::Configuration
+            network: NetworkConfiguration {
+                listen_address: addresses[0].clone(),
+                max_incoming_connections: 8,
+                max_outgoing_connections: 8,
+            },
+            events: EventsConfiguration::new(),
+            validators: validators.iter().map(|&(p, _)| p.clone()).collect(),
             peer_discovery: Vec::new(),
         };
 
-        let node = Node::with_context(context);
+        let reactor = Box::new(SandboxReactor {
+            inner: inner.clone(),
+        }) as Box<Reactor>;
+
+        let node = Node::new(b, reactor, config);
 
         let sandbox = Sandbox {
             inner: inner,
@@ -137,7 +144,7 @@ impl Reactor for SandboxReactor {
     }
 }
 
-impl Sandbox {
+impl<B: Blockchain> Sandbox<B> {
     fn initialize(&self) {
         self.node.borrow_mut().initialize();
 
@@ -158,8 +165,8 @@ impl Sandbox {
     fn check_unexpected_message(&self) {
         let sended = self.inner.borrow_mut().sended.pop_front();
         if let Some((addr, msg)) = sended {
-            let any_msg = Any::from_raw(msg.clone())
-                              .expect("Send incorrect message");
+            let any_msg = Any::<B::Transaction>::from_raw(msg.clone())
+                                              .expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
     }
@@ -191,7 +198,7 @@ impl Sandbox {
     }
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
-        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
+        let any_expected_msg = Any::<B::Transaction>::from_raw(msg.raw().clone()).unwrap();
         let sended = self.inner.borrow_mut().sended.pop_front();
         if let Some((real_addr, real_msg)) = sended {
             let any_real_msg = Any::from_raw(real_msg.clone())
@@ -208,7 +215,7 @@ impl Sandbox {
 
     // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
-        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
+        let any_expected_msg = Any::<B::Transaction>::from_raw(msg.raw().clone()).unwrap();
         let mut set = HashSet::from_iter(self.addresses.iter()
                                                        .skip(1)
                                                        .map(Clone::clone)): HashSet<SocketAddr>;
@@ -260,8 +267,8 @@ impl Sandbox {
     }
 
     pub fn assert_state(&self, height: u64, round: u32) {
-        let achual_height = self.node.borrow().context().state.height();
-        let actual_round = self.node.borrow().context().state.round();
+        let achual_height = self.node.borrow().state().height();
+        let actual_round = self.node.borrow().state().round();
         assert!(achual_height == height,
                 "Incorrect height, actual={}, expected={}", achual_height, height);
         assert!(actual_round == round,
@@ -269,8 +276,8 @@ impl Sandbox {
     }
 
     pub fn assert_lock(&self, round: u32, hash: Option<Hash>) {
-        let actual_round = self.node.borrow().context().state.locked_round();
-        let actual_hash = self.node.borrow().context().state.locked_propose();
+        let actual_round = self.node.borrow().state().locked_round();
+        let actual_hash = self.node.borrow().state().locked_propose();
         assert!(actual_round == round,
                 "Incorrect height, actual={}, expected={}", actual_round, round);
         assert!(actual_hash == hash,
@@ -278,7 +285,7 @@ impl Sandbox {
     }
 }
 
-impl Drop for Sandbox {
+impl<B: Blockchain> Drop for Sandbox<B> {
     fn drop(&mut self) {
         if !::std::thread::panicking() {
             self.check_unexpected_message();
@@ -286,14 +293,18 @@ impl Drop for Sandbox {
     }
 }
 
+pub fn timestamping_sandbox() -> Sandbox<TimestampingBlockchain<MemoryDB>> {
+    Sandbox::new(TimestampingBlockchain { db: MemoryDB::new() })
+}
+
 #[test]
 fn test_sandbox_init() {
-    Sandbox::new();
+    timestamping_sandbox();
 }
 
 #[test]
 fn test_sandbox_recv_and_send() {
-    let s = Sandbox::new();
+    let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
     s.send(s.a(2), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
@@ -302,7 +313,7 @@ fn test_sandbox_recv_and_send() {
 #[test]
 fn test_sandbox_assert_status() {
     // TODO: remove this?
-    let s = Sandbox::new();
+    let s = timestamping_sandbox();
     s.assert_state(0, 1);
     s.set_time(0, 999_999_999);
     s.assert_state(0, 1);
@@ -313,14 +324,14 @@ fn test_sandbox_assert_status() {
 #[test]
 #[should_panic(expected = "Expected to send the message")]
 fn test_sandbox_expected_to_send_but_nothing_happened() {
-    let s = Sandbox::new();
+    let s = timestamping_sandbox();
     s.send(s.a(1), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
 }
 
 #[test]
 #[should_panic(expected = "Expected to send the message")]
 fn test_sandbox_expected_to_send_another_message() {
-    let s = Sandbox::new();
+    let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
     s.send(s.a(1), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
@@ -329,7 +340,7 @@ fn test_sandbox_expected_to_send_another_message() {
 #[test]
 #[should_panic(expected = "Send unexpected message")]
 fn test_sandbox_unexpected_message_when_drop() {
-    let s = Sandbox::new();
+    let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
 }
@@ -337,7 +348,7 @@ fn test_sandbox_unexpected_message_when_drop() {
 #[test]
 #[should_panic(expected = "Send unexpected message")]
 fn test_sandbox_unexpected_message_when_handle_another_message() {
-    let s = Sandbox::new();
+    let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
     s.recv(Connect::new(&public, s.a(3), s.time(), &secret));
@@ -347,7 +358,7 @@ fn test_sandbox_unexpected_message_when_handle_another_message() {
 #[test]
 #[should_panic(expected = "Send unexpected message")]
 fn test_sandbox_unexpected_message_when_time_changed() {
-    let s = Sandbox::new();
+    let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
     s.set_time(1, 0);

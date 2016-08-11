@@ -147,7 +147,7 @@ impl convert::AsMut<Vec<u8>> for MessageBuffer {
     }
 }
 
-pub trait Message : Debug + Clone + Sized {
+pub trait Message : Debug + Clone + PartialEq + Sized {
     // const MESSAGE_TYPE : u16;
     // const BODY_LENGTH : usize;
     // const PAYLOAD_LENGTH : usize;
