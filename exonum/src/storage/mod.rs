@@ -4,8 +4,8 @@ mod tests;
 use num::{Integer, ToPrimitive};
 
 use std::slice::SliceConcatExt;
-use std::convert::AsRef;
 use std::fmt::Debug;
+use std::borrow::{Borrow, BorrowMut};
 // use std::iter::Iterator;
 
 use ::crypto::Hash;
@@ -32,24 +32,21 @@ pub use self::merkle_table::MerkleTable;
 pub use self::fields::StorageValue;
 pub use self::merkle_patricia_table::MerklePatriciaTable;
 
-pub trait Storage<D: Database, T: Message + StorageValue> {
-    fn db(&self) -> &D;
-    fn db_mut(&mut self) -> &mut D;
-
+pub trait Storage<D: Database, T: Message + StorageValue> where Self: Borrow<D>+BorrowMut<D> {
     fn fork(&self) -> Fork<D> {
-        self.db().fork()
+        self.borrow().fork()
     }
 
     fn transactions(&mut self) -> MapTable<D, Hash, T> {
-        MapTable::new(vec![00], self.db_mut())
+        MapTable::new(vec![00], self.borrow_mut())
     }
 
     fn proposes(&mut self) -> MapTable<D, Hash, Propose> {
-        MapTable::new(vec![01], self.db_mut())
+        MapTable::new(vec![01], self.borrow_mut())
     }
 
     fn heights(&mut self) -> ListTable<MapTable<D, [u8], Vec<u8>>, u64, Hash> {
-        ListTable::new(MapTable::new(vec![02], self.db_mut()))
+        ListTable::new(MapTable::new(vec![02], self.borrow_mut()))
     }
 
     fn last_hash(&mut self) -> Result<Option<Hash>, Error> {
@@ -66,43 +63,28 @@ pub trait Storage<D: Database, T: Message + StorageValue> {
 
     fn precommits(&mut self, hash: &Hash)
         -> ListTable<MapTable<D, [u8], Vec<u8>>, u32, Precommit> {
-        ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.db_mut()))
+        ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.borrow_mut()))
     }
 
     fn merge(&mut self, patch: Patch) -> Result<(), Error> {
-        self.db_mut().merge(patch)
+        self.borrow_mut().merge(patch)
     }
 }
 
-pub trait Blockchain : Sized {
+pub trait Blockchain : Sized
+    where Self: Borrow<<Self as Blockchain>::Database>,
+          Self: BorrowMut<<Self as Blockchain>::Database> {
     type Database: Database;
     type Transaction: Message + StorageValue;
-
-    fn db(&self) -> &Self::Database;
-    fn db_mut(&mut self) -> &mut Self::Database;
 }
 
 impl<T, Tx, Db> Storage<Db, Tx> for T where T: Blockchain<Database=Db, Transaction=Tx>,
                                             Db: Database,
                                             Tx: Message + StorageValue {
-    fn db(&self) -> &Db {
-        Blockchain::db(self)
-    }
-
-    fn db_mut(&mut self) -> &mut Db {
-        Blockchain::db_mut(self)
-    }
 }
 
 impl<'a, Tx, Db> Storage<Fork<'a, Db>, Tx> for Fork<'a, Db> where Db: Database,
                                                                   Tx: Message + StorageValue {
-    fn db(&self) -> &Fork<'a, Db> {
-        self
-    }
-
-    fn db_mut(&mut self) -> &mut Fork<'a, Db> {
-        self
-    }
 }
 
 pub type Error = Box<Debug>;

@@ -3,6 +3,8 @@
 #[macro_use(message)]
 extern crate exonum;
 
+use std::borrow::{Borrow, BorrowMut};
+
 use exonum::crypto::PublicKey;
 use exonum::storage::{Blockchain, Database};
 
@@ -22,15 +24,20 @@ pub struct TimestampingBlockchain<D: Database> {
     pub db: D
 }
 
+impl<D: Database> Borrow<D> for TimestampingBlockchain<D> {
+    fn borrow(&self) -> &D {
+        &self.db
+    }
+}
+
+impl<D: Database> BorrowMut<D> for TimestampingBlockchain<D> {
+    fn borrow_mut(&mut self) -> &mut D {
+        &mut self.db
+    }
+}
+
+
 impl<D> Blockchain for TimestampingBlockchain<D> where D: Database {
     type Database = D;
     type Transaction = TimestampTx;
-
-    fn db(&self) -> &Self::Database {
-        &self.db
-    }
-
-    fn db_mut(&mut self) -> &mut Self::Database {
-        &mut self.db
-    }
 }
