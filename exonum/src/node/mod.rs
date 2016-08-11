@@ -51,8 +51,6 @@ impl<B: Blockchain> Node<B> {
         let id = config.validators.iter()
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
-        let network = Network::with_config(config.network);
-        let reactor = Box::new(Events::with_config(config.events, network).unwrap()) as Box<Reactor>;
         let connect = Connect::new(&config.public_key,
                                    reactor.address().clone(),
                                    reactor.get_time(),
