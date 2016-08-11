@@ -9,11 +9,16 @@ use super::state::ValidatorId;
 
 impl<B: Blockchain> Node<B> {
     pub fn handle_connect(&mut self, message: Connect) {
-        let public_key = message.pub_key().clone();
-        let address = message.addr();
-
-        // Check if we have another connect message from peer with the given public_key
         // TODO add spam protection
+        
+        let address = message.addr();
+        if address == self.state.our_connect_message().addr() {
+            return;    
+        }
+
+        info!("recv connect message from {}", address);
+        // Check if we have another connect message from peer with the given public_key
+        let public_key = message.pub_key().clone();        
         let mut need_connect = true;        
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
