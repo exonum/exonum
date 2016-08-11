@@ -251,7 +251,7 @@ impl BranchNode {
         let to = match self.raw[from] {
             LEAF_KEY_PREFIX => (KEY_SIZE * 8) as u16,
             BRANCH_KEY_PREFIX => self.raw[from + DB_KEY_SIZE - 1] as u16,
-            _ => unreachable!("Wrong key prefix")
+            _ => unreachable!("Wrong key prefix"),
         };
         BitSlice {
             from: 0,
@@ -263,13 +263,13 @@ impl BranchNode {
         debug_assert!(slice.data.len() <= KEY_SIZE);
 
         if slice.is_leaf_key() {
-             self.raw[from] = LEAF_KEY_PREFIX;
-             self.raw[from + DB_KEY_SIZE - 1] = 0; 
-        } else { 
-             self.raw[from] = BRANCH_KEY_PREFIX;
-             self.raw[from + DB_KEY_SIZE - 1] = slice.to as u8; 
+            self.raw[from] = LEAF_KEY_PREFIX;
+            self.raw[from + DB_KEY_SIZE - 1] = 0;
+        } else {
+            self.raw[from] = BRANCH_KEY_PREFIX;
+            self.raw[from + DB_KEY_SIZE - 1] = slice.to as u8;
         };
-        self.raw[from + 1 .. from + DB_KEY_SIZE - 1].copy_from_slice(slice.data);
+        self.raw[from + 1..from + DB_KEY_SIZE - 1].copy_from_slice(slice.data);
         from + DB_KEY_SIZE
     }
 }
@@ -315,7 +315,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         match self.root_node()? {
             Some((prefix, Node::Leaf(value))) => {
                 let prefix_slice = BitSlice::from_key(&prefix);
-                Ok(Some(Self::hash_leaf(&prefix_slice, &value.serialize())))
+                Ok(Some(Self::hash_leaf(&prefix_slice, &value)))
             }
             Some((_, Node::Branch(branch))) => Ok(Some(branch.hash())),
             None => Ok(None),
@@ -348,7 +348,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                     branch.set_child(key_slice.at(i), &key_slice.mid(i), &leaf_hash);
                     branch.set_child(prefix_slice.at(i),
                                      &prefix_slice.mid(i),
-                                     &Self::hash_leaf(&prefix_slice, &prefix_data.serialize()));
+                                     &Self::hash_leaf(&prefix_slice, &prefix_data));
                     let new_prefix = key_slice.truncate(i);
                     self.insert_branch(&new_prefix, branch)?;
                 }
@@ -443,8 +443,8 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn hash_leaf<B: AsRef<[u8]>>(key: &BitSlice, value: B) -> Hash {
-        hash(&[key.data, value.as_ref()].concat())
+    fn hash_leaf(key: &BitSlice, value: &V) -> Hash {
+        hash(&[key.data, value.hash().as_ref()].concat())
     }
 
     fn remove(&mut self, key_slice: BitSlice) -> Result<(), Error> {
@@ -560,10 +560,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     fn insert_leaf(&mut self, key: &BitSlice, value: V) -> Result<Hash, Error> {
         debug_assert!(key.is_leaf_key());
 
-        let bytes = value.serialize();
-        let hash = Self::hash_leaf(key, &bytes);
-
+        let hash = Self::hash_leaf(key, &value);
         let db_key = key.to_key();
+        let bytes = value.serialize();
         self.map.put(&db_key, bytes)?;
         Ok(hash)
     }
@@ -958,7 +957,7 @@ mod tests {
         let mut storage = MemoryDB::new();
         let map = MapTable::new(vec![255], &mut storage);
         let mut table = MerklePatriciaTable::new(map);
-        let hash = hash(&[vec![255; 32], vec![2]].concat());
+        let hash = hash([vec![255; 32].as_ref(), hash(&vec![2]).as_ref()].concat().as_ref());
 
         table.put(&vec![255; 32], vec![1]).unwrap();
         table.put(&vec![255; 32], vec![2]).unwrap();
