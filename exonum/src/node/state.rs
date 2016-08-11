@@ -1,4 +1,3 @@
-use std::net::SocketAddr;
 use std::collections::{HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 
@@ -6,7 +5,7 @@ use time::{Duration};
 
 use super::super::messages::{
     Message,
-    Propose, Prevote, Precommit, ConsensusMessage
+    Propose, Prevote, Precommit, ConsensusMessage, Connect
 };
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::{Patch};
@@ -18,7 +17,6 @@ const REQUEST_TRANSACTIONS_WAIT  : u64 = 1_000_000;
 const REQUEST_PREVOTES_WAIT      : u64 = 1_000_000;
 const REQUEST_PRECOMMITS_WAIT    : u64 = 1_000_000;
 const REQUEST_COMMIT_WAIT        : u64 = 1_000_000;
-const REQUEST_PEERS_WAIT         : u64 = 1_000_000;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -28,7 +26,7 @@ pub type ValidatorId = u32;
 
 pub struct State<Tx> {
     id: u32,
-    peers: HashMap<PublicKey, SocketAddr>,
+    peers: HashMap<PublicKey, Connect>,
     validators: Vec<PublicKey>,
     height: u64,
     round: Round,
@@ -50,6 +48,7 @@ pub struct State<Tx> {
 
     our_prevotes: HashMap<Round, Prevote>,
     our_precommits: HashMap<Round, Precommit>,
+    our_connect_message: Connect,    
 
     // Информация о состоянии наших запросов
     requests: HashMap<RequestData, RequestState>,
@@ -68,7 +67,6 @@ pub enum RequestData {
     Prevotes(Round, Hash),
     Precommits(Round, Hash, Hash),
     Commit, // TODO: add height?
-    Peers
 }
 
 // Состояние запроса
@@ -99,7 +97,6 @@ impl RequestData {
             RequestData::Prevotes(..)     => REQUEST_PREVOTES_WAIT,
             RequestData::Precommits(..)   => REQUEST_PRECOMMITS_WAIT,
             RequestData::Commit           => REQUEST_COMMIT_WAIT,
-            RequestData::Peers            => REQUEST_PEERS_WAIT,
         };
         Duration::milliseconds(ms as i64)
     }
@@ -161,7 +158,8 @@ impl ProposeState {
 
 impl<Tx> State<Tx> {
     pub fn new(id: u32,
-               validators: Vec<PublicKey>) -> State<Tx> {
+               validators: Vec<PublicKey>,
+               connect: Connect) -> State<Tx> {
         let validators_len = validators.len();
 
         State {
@@ -188,6 +186,7 @@ impl<Tx> State<Tx> {
 
             our_prevotes: HashMap::new(),
             our_precommits: HashMap::new(),
+            our_connect_message: connect,
 
             requests: HashMap::new(),
         }
@@ -201,12 +200,12 @@ impl<Tx> State<Tx> {
         &self.validators
     }
 
-    pub fn add_peer(&mut self, pubkey: PublicKey, addr: SocketAddr) -> bool {
-        self.peers.insert(pubkey, addr).is_none()
+    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
+        self.peers.insert(pubkey, msg).is_none()
     }
 
     pub fn peers(&self)
-            -> &HashMap<PublicKey, SocketAddr> {
+            -> &HashMap<PublicKey, Connect> {
         &self.peers
     }
 
@@ -463,5 +462,13 @@ impl<Tx> State<Tx> {
     pub fn remove_request(&mut self, data: &RequestData) -> HashSet<ValidatorId> {
         let state = self.requests.remove(data);
         state.map(|s| s.known_nodes).unwrap_or_default()
+    }
+
+    pub fn our_connect_message(&self) -> &Connect {
+        &self.our_connect_message
+    }
+
+    pub fn set_our_connect_message(&mut self, msg: Connect) {
+        self.our_connect_message = msg;
     }
 }

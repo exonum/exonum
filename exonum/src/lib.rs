@@ -18,11 +18,10 @@ extern crate sodiumoxide;
 extern crate leveldb;
 extern crate db_key;
 extern crate num;
+extern crate rand;
 
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(test)]
-extern crate rand;
 
 #[macro_use]
 pub mod messages;

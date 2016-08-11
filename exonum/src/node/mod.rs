@@ -27,6 +27,7 @@ pub struct Node<B: Blockchain> {
     pub blockchain: B,
     pub round_timeout: u32,
     pub status_timeout: u32,
+    pub peers_timeout: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
 }
@@ -39,6 +40,7 @@ pub struct Configuration {
     pub network: NetworkConfiguration,
     pub round_timeout: u32,
     pub status_timeout: u32,
+    pub peers_timeout: u32,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
 }
@@ -49,9 +51,14 @@ impl<B: Blockchain> Node<B> {
         let id = config.validators.iter()
                                   .position(|pk| pk == &config.public_key)
                                   .unwrap();
-        let state = State::new(id as u32, config.validators);
+
         let network = Network::with_config(config.network);
         let reactor = Box::new(Events::with_config(config.events, network).unwrap()) as Box<Reactor>;
+        let connect = Connect::new(&config.public_key,
+                                   reactor.address().clone(),
+                                   reactor.get_time(),
+                                   &config.secret_key);
+        let state = State::new(id as u32, config.validators, connect);                                   
         Node {
             public_key: config.public_key,
             secret_key: config.secret_key,
@@ -60,6 +67,7 @@ impl<B: Blockchain> Node<B> {
             blockchain: blockchain,
             round_timeout: config.round_timeout,
             status_timeout: config.status_timeout,
+            peers_timeout: config.peers_timeout,
             peer_discovery: config.peer_discovery,
         }
     }
@@ -67,15 +75,13 @@ impl<B: Blockchain> Node<B> {
     pub fn initialize(&mut self) {
         info!("Start listening...");
         self.events.bind().unwrap();
-        let message = Connect::new(&self.public_key,
-                                   self.events.address().clone(),
-                                   self.events.get_time(),
-                                   &self.secret_key);
+
+        let connect = self.state.our_connect_message().clone();
         for address in self.peer_discovery.clone().iter() {
             if address == &self.events.address() {
                 continue
             }
-            self.send_to_addr(address, message.raw());
+            self.send_to_addr(address, connect.raw());
         }
 
         // TODO: rewrite this bullshit
@@ -87,6 +93,7 @@ impl<B: Blockchain> Node<B> {
 
         self.add_round_timeout();
         self.add_status_timeout();
+        self.add_peer_exchange_timeout();
     }
 
     pub fn run(&mut self) {
@@ -144,7 +151,8 @@ impl<B: Blockchain> Node<B> {
                 self.handle_request_timeout(data, validator),
             Timeout::Status =>
                 self.handle_status_timeout(),
-
+            Timeout::PeerExchange => 
+                self.handle_peer_exchange_timeout()
         }
     }
 
@@ -155,8 +163,8 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
-        if let Some(addr) = self.state.peers().get(&public_key) {
-            self.events.send_to(addr, message.clone()).unwrap();
+        if let Some(conn) = self.state.peers().get(&public_key) {
+            self.events.send_to(&conn.addr(), message.clone()).unwrap();
         } else {
             // TODO: warning - hasn't connection with peer
         }
@@ -194,10 +202,15 @@ impl<B: Blockchain> Node<B> {
         self.events.add_timeout(Timeout::Request(data, validator), time);
     }
 
+    pub fn add_peer_exchange_timeout(&mut self) {
+        let time = self.events.get_time() + Duration::milliseconds(self.peers_timeout as i64);
+        self.events.add_timeout(Timeout::PeerExchange, time);
+    }
+
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
-        for address in self.state.peers().values() {
-            self.events.send_to(address, message.clone()).unwrap();
+        for conn in self.state.peers().values() {
+            self.events.send_to(&conn.addr(), message.clone()).unwrap();
         }
     }
 }

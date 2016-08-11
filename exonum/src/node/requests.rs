@@ -1,7 +1,7 @@
 use super::super::messages::{
     RequestMessage, Message,
     RequestPropose, RequestTransactions, RequestPrevotes,
-    RequestPrecommits, RequestCommit, RequestPeers
+    RequestPrecommits, RequestCommit
 };
 use super::super::storage::{Blockchain, Storage, Map, List};
 use super::Node;
@@ -134,9 +134,5 @@ impl<B: Blockchain> Node<B> {
         for precommit in precommits {
             self.send_to_validator(msg.from(), &precommit);
         }
-    }
-
-    pub fn handle_request_peers(&mut self, _: RequestPeers) {
-        // TODO
     }
 }

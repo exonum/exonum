@@ -5,8 +5,7 @@ use super::super::storage::{Blockchain, Storage};
 use super::super::messages::{
     ConsensusMessage, Propose, Prevote, Precommit, Message,
     RequestPropose, RequestTransactions, RequestPrevotes,
-    RequestPrecommits, RequestCommit,
-    RequestPeers
+    RequestPrecommits, RequestCommit
 };
 use super::super::storage::{Map, List};
 use super::{Node, Round, Height, RequestData, ValidatorId};
@@ -366,11 +365,6 @@ impl<B: Blockchain> Node<B> {
                                        self.events.get_time(),
                                        self.state.height(),
                                        &self.secret_key).raw().clone(),
-                &RequestData::Peers =>
-                    RequestPeers::new(self.state.id(),
-                                      validator,
-                                      self.events.get_time(),
-                                      &self.secret_key).raw().clone()
             };
             self.send_to_validator(validator, &message);
         }

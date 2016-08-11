@@ -12,9 +12,9 @@ leveldb = "0.8"
 db-key = "0.0.5"
 num = "0.1"
 sodiumoxide = {version="0.0.12", default-features=false}
+rand = "0.3"
 
 [dev-dependencies]
 tempdir = "0.3.4"
 clap = {version="2.10.0", features=["unstable"]}
 clippy = "0.0.80"
-rand = "0.3"
