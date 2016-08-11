@@ -1,4 +1,4 @@
-extern crate da;
+extern crate exonum;
 extern crate env_logger;
 extern crate rand;
 #[macro_use]
@@ -8,8 +8,8 @@ use std::path::Path;
 
 use rand::{SeedableRng, XorShiftRng, Rng};
 
-use da::storage::{LevelDB, LevelDBOptions};
-use da::storage::{Database, Map, MapExt};
+use exonum::storage::{LevelDB, LevelDBOptions};
+use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Patch};
 
 /// usage 
 /// path  - Directory where database is situated
@@ -58,16 +58,16 @@ fn main() {
         {
             let mut fork = db.fork();
             {
-                let mut map = fork.merkle_map(prefix);        
+                let mut map = MerklePatriciaTable::new(MapTable::new(prefix, &mut fork));        
                 for item in (0..count).map(kv_generator) {
                     map.put(&item.0, item.1.clone()).unwrap();
                 }
             }
-            patch = fork.patch();
+            patch = Patch::from(fork);
         }
         db.merge(patch).unwrap();
     } else {
-        let mut map = db.merkle_map(prefix); 
+        let mut map = MerklePatriciaTable::new(MapTable::new(prefix, &mut db));  
         for item in (0..count).map(kv_generator) {
             map.put(&item.0, item.1.clone()).unwrap();
         }
