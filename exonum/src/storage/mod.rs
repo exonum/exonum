@@ -32,15 +32,13 @@ pub use self::merkle_table::MerkleTable;
 pub use self::fields::StorageValue;
 pub use self::merkle_patricia_table::MerklePatriciaTable;
 
-pub trait Storage<D: Database, T: Message + StorageValue> where Self: Borrow<D>+BorrowMut<D> {
-    fn fork(&self) -> Fork<D> {
-        self.borrow().fork()
-    }
-
+pub trait TxStorage<D: Database, T: Message + StorageValue> where Self: Borrow<D>+BorrowMut<D> {
     fn transactions(&mut self) -> MapTable<D, Hash, T> {
         MapTable::new(vec![00], self.borrow_mut())
     }
+}
 
+pub trait BlockStorage<D: Database> where Self: Borrow<D>+BorrowMut<D> {
     fn proposes(&mut self) -> MapTable<D, Hash, Propose> {
         MapTable::new(vec![01], self.borrow_mut())
     }
@@ -65,10 +63,6 @@ pub trait Storage<D: Database, T: Message + StorageValue> where Self: Borrow<D>+
         -> ListTable<MapTable<D, [u8], Vec<u8>>, u32, Precommit> {
         ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.borrow_mut()))
     }
-
-    fn merge(&mut self, patch: Patch) -> Result<(), Error> {
-        self.borrow_mut().merge(patch)
-    }
 }
 
 pub trait Blockchain : Sized
@@ -76,16 +70,32 @@ pub trait Blockchain : Sized
           Self: BorrowMut<<Self as Blockchain>::Database> {
     type Database: Database;
     type Transaction: Message + StorageValue;
+
+    fn fork(&self) -> Fork<Self::Database> {
+        self.borrow().fork()
+    }
+
+    fn merge(&mut self, patch: Patch) -> Result<(), Error> {
+        self.borrow_mut().merge(patch)
+    }
 }
 
-impl<T, Tx, Db> Storage<Db, Tx> for T where T: Blockchain<Database=Db, Transaction=Tx>,
-                                            Db: Database,
-                                            Tx: Message + StorageValue {
-}
+impl<T, Tx, Db> TxStorage<Db, Tx> for T
+    where T: Blockchain<Database=Db, Transaction=Tx>,
+          Db: Database,
+          Tx: Message + StorageValue {}
 
-impl<'a, Tx, Db> Storage<Fork<'a, Db>, Tx> for Fork<'a, Db> where Db: Database,
-                                                                  Tx: Message + StorageValue {
-}
+impl<'a, Tx, Db> TxStorage<Fork<'a, Db>, Tx> for Fork<'a, Db>
+    where Db: Database,
+          Tx: Message + StorageValue {}
+
+impl<T, Db, Tx> BlockStorage<Db> for T
+    where T: Blockchain<Database=Db, Transaction=Tx>,
+          Db: Database,
+          Tx: Message + StorageValue {}
+
+impl<'a, Db> BlockStorage<Fork<'a, Db>> for Fork<'a, Db>
+    where Db: Database {}
 
 pub type Error = Box<Debug>;
 

@@ -2,7 +2,7 @@ extern crate rand;
 
 use rand::Rng;
 
-use super::super::storage::{Blockchain, Storage};
+use super::super::storage::{Blockchain, BlockStorage};
 use super::super::messages::{Connect, Status, Message, RequestPeers};
 use super::{Node, RequestData};
 use super::state::ValidatorId;
@@ -10,21 +10,21 @@ use super::state::ValidatorId;
 impl<B: Blockchain> Node<B> {
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO add spam protection
-        
+
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
-            return;    
+            return;
         }
 
         info!("recv connect message from {}", address);
         // Check if we have another connect message from peer with the given public_key
-        let public_key = message.pub_key().clone();        
-        let mut need_connect = true;        
+        let public_key = message.pub_key().clone();
+        let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
                 info!("Received weird connection message from {}", address);
                 return;
-            } 
+            }
             need_connect = saved_message.addr() != message.addr();
         }
         self.state.add_peer(public_key, message);
@@ -34,7 +34,7 @@ impl<B: Blockchain> Node<B> {
             info!("Establish connection with {}", address);
             let message = self.state.our_connect_message().clone();
             self.send_to_addr(&address, message.raw());
-        }        
+        }
     }
 
     pub fn handle_status(&mut self, msg: Status) {
@@ -85,7 +85,7 @@ impl<B: Blockchain> Node<B> {
         for peer in peers {
             self.send_to_validator(msg.from(), peer.raw());
         }
-    }    
+    }
 
     pub fn handle_status_timeout(&mut self) {
         if let Some(hash) = self.blockchain.last_hash().unwrap() {

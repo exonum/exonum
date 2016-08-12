@@ -79,6 +79,7 @@ impl<B: Blockchain> Sandbox<B> {
             secret_key: validators[0].1.clone(),
             round_timeout: 1000,
             status_timeout: 5000,
+            peers_timeout: 10000,
             // TODO: remove events and network config from node::Configuration
             network: NetworkConfiguration {
                 listen_address: addresses[0].clone(),
