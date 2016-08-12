@@ -157,7 +157,7 @@ fn main() {
                 .short("p")
                 .long("known-peers")
                 .value_name("PEERS")
-                .help("Somma separated list of known validator ids")
+                .help("Comma separated list of known validator ids")
                 .takes_value(true))
             .arg(Arg::with_name("VALIDATOR")
                 .help("Sets a validator id")
