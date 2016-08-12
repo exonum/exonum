@@ -1,11 +1,12 @@
-use super::sandbox::Sandbox;
-use super::messages::{Message, Propose, Prevote, Precommit, Status};
+use exonum::messages::{Message, Propose, Prevote, Precommit};
+
+use super::sandbox::timestamping_sandbox;
 
 // Send propose
 
 #[test]
 fn test_send_propose_and_prevote() {
-    let sandbox = Sandbox::new();
+    let sandbox = timestamping_sandbox();
 
     // round happens
     sandbox.set_time(1, 0);
@@ -27,7 +28,7 @@ fn test_send_propose_and_prevote() {
 
 #[test]
 fn test_send_prevote() {
-    let sandbox = Sandbox::new();
+    let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
 
@@ -37,7 +38,7 @@ fn test_send_prevote() {
 
 #[test]
 fn test_get_lock_and_send_precommit() {
-    let sandbox = Sandbox::new();
+    let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
 
@@ -52,7 +53,7 @@ fn test_get_lock_and_send_precommit() {
 
 #[test]
 fn test_commit() {
-    let sandbox = Sandbox::new();
+    let sandbox = timestamping_sandbox();
 
     let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
 
