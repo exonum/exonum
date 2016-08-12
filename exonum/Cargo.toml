@@ -11,7 +11,7 @@ byteorder = "0.5"
 leveldb = "0.8"
 db-key = "0.0.5"
 num = "0.1"
-sodiumoxide = {version="0.0.12", default-features=false}
+sodiumoxide = {version="0.0.12"}
 rand = "0.3"
 clippy = {version="*", optional=true}
 
