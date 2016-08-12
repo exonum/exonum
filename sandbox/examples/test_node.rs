@@ -42,7 +42,6 @@ struct TestNetConfiguration {
     peers_timeout: u32,
     max_incoming_connections: usize,
     max_outgoing_connections: usize,
-    db_path: Option<String>,
 }
 
 impl TestNetConfiguration {
@@ -93,19 +92,14 @@ impl TestNetConfiguration {
             peers_timeout: 10000,
             max_incoming_connections: validators_count as usize,
             max_outgoing_connections: validators_count as usize,
-            db_path: None,
         }
     }
 
-    fn to_node_configuration(&self, idx: usize) -> Configuration {
+    fn to_node_configuration(&self, idx: usize, known_peers: Vec<::std::net::SocketAddr>) -> Configuration {
         let validator = self.validators[idx].clone();
         let validators: Vec<_> = self.validators
             .iter()
             .map(|v| v.public_key)
-            .collect();
-        let addresses: Vec<_> = self.validators
-            .iter()
-            .map(|v| v.address)
             .collect();
 
         Configuration {
@@ -120,7 +114,7 @@ impl TestNetConfiguration {
                 max_outgoing_connections: self.max_outgoing_connections,
             },
             events: EventsConfiguration::new(),
-            peer_discovery: addresses,
+            peer_discovery: known_peers,
             validators: validators,
         }
     }
@@ -134,12 +128,6 @@ fn main() {
         .version("0.1")
         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
         .about("Test network node")
-        .arg(Arg::with_name("LEVELDB_PATH")
-            .short("d")
-            .long("leveldb-path")
-            .value_name("LEVELDB_PATH")
-            .help("Use leveldb database with the given path")
-            .takes_value(true))
         .arg(Arg::with_name("CONFIG")
             .short("c")
             .long("config")
@@ -159,6 +147,18 @@ fn main() {
             .about("Run test node with the given validator id")
             .version("0.1")
             .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+            .arg(Arg::with_name("LEVELDB_PATH")
+                .short("d")
+                .long("leveldb-path")
+                .value_name("LEVELDB_PATH")
+                .help("Use leveldb database with the given path")
+                .takes_value(true))
+            .arg(Arg::with_name("PEERS")
+                .short("p")
+                .long("known-peers")
+                .value_name("PEERS")
+                .help("Somma separated list of known validator ids")
+                .takes_value(true))
             .arg(Arg::with_name("VALIDATOR")
                 .help("Sets a validator id")
                 .required(true)
@@ -166,24 +166,39 @@ fn main() {
 
     let matches = app.get_matches();
     let path = Path::new(matches.value_of("CONFIG").unwrap());
-    let db_path = matches.value_of("LEVELDB_PATH").map(|x| x.to_owned());
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let mut cfg = TestNetConfiguration::gen(count);
-            cfg.db_path = db_path;
-
+            let cfg = TestNetConfiguration::gen(count);
             cfg.save_to_file(&path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
         }
         ("run", Some(matches)) => {
-            let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let cfg = TestNetConfiguration::from_file(path).unwrap();
+            let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
+            let peers = match matches.value_of("PEERS") {
+                Some(string) => {
+                    string.split(" ")
+                        .map(|x| -> usize { x.parse().unwrap() })
+                        .map(|x| cfg.validators[x].address)
+                        .collect()
+                }
+                None => {
+                    cfg.validators
+                        .iter()
+                        .map(|v| v.address)
+                        .collect()
+                }
+            };
+            println!("Known peers is {:#?}", peers);
+            let node_cfg = cfg.to_node_configuration(idx, peers);
+            let db_path = matches.value_of("LEVELDB_PATH").map(|x| x.to_owned());
 
-            let node_cfg = cfg.to_node_configuration(idx);
-            match cfg.db_path {
+
+            match db_path {
                 Some(db_path) => {
+                    println!("Using levedb storage with path: {}", db_path);
                     let mut options = LevelDBOptions::new();
                     options.create_if_missing = true;
                     let leveldb = LevelDB::new(&Path::new(&db_path), options).unwrap();
@@ -192,6 +207,7 @@ fn main() {
                     Node::with_config(blockchain, node_cfg).run();
                 }
                 None => {
+                    println!("Using memorydb storage");
                     let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
                     Node::with_config(blockchain, node_cfg).run();
                 }
