@@ -13,7 +13,10 @@ db-key = "0.0.5"
 num = "0.1"
 sodiumoxide = {version="0.0.12", default-features=false}
 rand = "0.3"
+clippy = {version="*", optional=true}
 
 [dev-dependencies]
 tempdir = "0.3.4"
-clippy = "0.0.80"
+
+[features]
+default = []

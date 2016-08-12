@@ -37,7 +37,7 @@ impl<B: Blockchain> Node<B> {
             ConsensusMessage::Propose(msg) => {
                 // Check prev_hash
                 if msg.prev_hash() !=
-                   &self.blockchain.last_hash().unwrap().unwrap_or_else(|| hash(&[])) {
+                   self.state.last_hash() {
                     return;
                 }
 
@@ -53,35 +53,33 @@ impl<B: Blockchain> Node<B> {
         }
     }
 
-    pub fn handle_propose(&mut self, propose: Propose) {
+    pub fn handle_propose(&mut self, msg: Propose) {
         info!("recv propose");
         // TODO: check time
         // TODO: check that transactions are not commited yet
 
         // Add propose
-        let hash = propose.hash();
-        let added = self.state.add_propose(hash, &propose);
+        let (hash, has_unknown_txs) = match self.state.add_propose(msg.clone()) {
+            Some(state) => (state.hash(), state.has_unknown_txs()),
+            None => return
+        };
 
-        if added {
-            // Remove request info
-            let known_nodes = self.remove_request(RequestData::Propose(hash));
+        // Remove request info
+        let known_nodes = self.remove_request(RequestData::Propose(hash));
 
-            if self.state.propose(&hash).unwrap().has_unknown_txs() {
-                self.request(RequestData::Transactions(hash), propose.validator());
-                for node in known_nodes {
-                    self.request(RequestData::Transactions(hash), node);
-                }
-            } else {
-                self.has_full_propose(hash);
+        if has_unknown_txs {
+            self.request(RequestData::Transactions(hash), msg.validator());
+            for node in known_nodes {
+                self.request(RequestData::Transactions(hash), node);
             }
+        } else {
+            self.has_full_propose(hash, msg.round());
         }
     }
 
-    pub fn has_full_propose(&mut self, hash: Hash) {
+    pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Remove request info
         self.remove_request(RequestData::Transactions(hash.clone()));
-
-        let propose_round = self.state.propose(&hash).unwrap().message().round();
 
         // Send prevote
         if self.state.locked_round() == 0 {
@@ -265,8 +263,8 @@ impl<B: Blockchain> Node<B> {
         let full_proposes = self.state.add_transaction(hash, msg);
 
         // Go to has full propose if we get last transaction
-        for hash in full_proposes {
-            self.has_full_propose(hash);
+        for (hash, round) in full_proposes {
+            self.has_full_propose(hash, round);
         }
     }
 
@@ -436,13 +434,13 @@ impl<B: Blockchain> Node<B> {
                          self.state.height(),
                          round,
                          self.events.get_time(),
-                         &self.blockchain.last_hash().unwrap().unwrap_or_else(|| hash(&[])),
+                         self.state.last_hash(),
                          &txs,
                          &self.secret_key);
         self.broadcast(propose.raw());
 
-        let hash = propose.hash();
-        self.state.add_propose(hash, &propose);
+        // Save our propose into state
+        let hash = self.state.add_self_propose(propose);
 
         // Send prevote
         self.send_prevote(round, &hash);
@@ -451,9 +449,6 @@ impl<B: Blockchain> Node<B> {
     pub fn send_prevote(&mut self, round: Round, propose_hash: &Hash) {
         info!("send prevote");
         let locked_round = self.state.locked_round();
-        if locked_round > 0 {
-            debug_assert_eq!(&self.state.locked_propose().unwrap(), propose_hash);
-        }
         let prevote = Prevote::new(self.state.id(),
                                    self.state.height(),
                                    round,

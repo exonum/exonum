@@ -44,7 +44,7 @@ pub struct Configuration {
 }
 
 impl<B: Blockchain> Node<B> {
-    pub fn new(blockchain: B, reactor: Box<Reactor>, config: Configuration) -> Node<B> {
+    pub fn new(mut blockchain: B, reactor: Box<Reactor>, config: Configuration) -> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let id = config.validators
             .iter()
@@ -54,7 +54,10 @@ impl<B: Blockchain> Node<B> {
                                    reactor.address().clone(),
                                    reactor.get_time(),
                                    &config.secret_key);
-        let state = State::new(id as u32, config.validators, connect);
+
+        let last_hash = blockchain.last_hash().unwrap().unwrap_or_else(|| super::crypto::hash(&[]));
+
+        let state = State::new(id as u32, config.validators, connect, last_hash);
         Node {
             public_key: config.public_key,
             secret_key: config.secret_key,

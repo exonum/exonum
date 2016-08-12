@@ -29,6 +29,7 @@ pub struct State<Tx> {
     round: Round,
     locked_round: Round,
     locked_propose: Option<Hash>,
+    last_hash: Hash,
 
     // messages
     proposes: HashMap<Hash, ProposeState>,
@@ -74,6 +75,8 @@ struct RequestState {
 }
 
 pub struct ProposeState {
+    /// Хеш предложения
+    hash: Hash,
     // Тело предложения
     propose: Propose,
     // Вычисленный хеш блока (из предложения)
@@ -125,6 +128,10 @@ impl RequestState {
 }
 
 impl ProposeState {
+    pub fn hash(&self) -> Hash {
+        self.hash
+    }
+
     pub fn message(&self) -> &Propose {
         &self.propose
     }
@@ -153,7 +160,10 @@ impl ProposeState {
 }
 
 impl<Tx> State<Tx> {
-    pub fn new(id: u32, validators: Vec<PublicKey>, connect: Connect) -> State<Tx> {
+    pub fn new(id: u32,
+               validators: Vec<PublicKey>,
+               connect: Connect,
+               last_hash: Hash) -> State<Tx> {
         let validators_len = validators.len();
 
         State {
@@ -165,6 +175,7 @@ impl<Tx> State<Tx> {
             round: 1,
             locked_round: 0,
             locked_propose: None,
+            last_hash: last_hash,
 
             proposes: HashMap::new(),
             prevotes: HashMap::new(),
@@ -240,6 +251,10 @@ impl<Tx> State<Tx> {
         self.round
     }
 
+    pub fn last_hash(&self) -> &Hash {
+        &self.last_hash
+    }
+
     pub fn lock(&mut self, round: Round, hash: Hash) {
         if self.locked_round >= round {
             panic!("Incorrect lock")
@@ -272,6 +287,8 @@ impl<Tx> State<Tx> {
         self.height += 1;
         self.round = 1;
         self.locked_round = 0;
+        // TODO: use block hash instead
+        self.last_hash = propose_hash.clone();
 
         {
             let state = self.proposes
@@ -304,12 +321,12 @@ impl<Tx> State<Tx> {
         &self.transactions
     }
 
-    pub fn add_transaction(&mut self, hash: Hash, msg: Tx) -> Vec<Hash> {
+    pub fn add_transaction(&mut self, hash: Hash, msg: Tx) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (hash, state) in self.proposes.iter_mut() {
             state.unknown_txs.remove(&hash);
             if state.unknown_txs.is_empty() {
-                full_proposes.push(*hash);
+                full_proposes.push((*hash, state.message().round()));
             }
         }
         self.transactions.insert(hash, msg);
@@ -331,10 +348,24 @@ impl<Tx> State<Tx> {
         self.precommits.get(&(round, propose_hash, block_hash))
     }
 
-    pub fn add_propose(&mut self, propose_hash: Hash, msg: &Propose) -> bool {
+    pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
+        debug_assert_eq!(msg.validator(), self.id);
+        let propose_hash = msg.hash();
+        self.proposes.insert(propose_hash, ProposeState {
+            hash: propose_hash,
+            propose: msg,
+            patch: None,
+            unknown_txs: BTreeSet::new()
+        });
+
+        propose_hash
+    }
+
+    pub fn add_propose(&mut self, msg: Propose) -> Option<&ProposeState> {
+        let propose_hash = msg.hash();
         let txs = &self.transactions;
         match self.proposes.entry(propose_hash) {
-            Entry::Occupied(..) => false,
+            Entry::Occupied(..) => None,
             Entry::Vacant(e) => {
                 let unknown_txs = msg.transactions()
                     .iter()
@@ -347,12 +378,12 @@ impl<Tx> State<Tx> {
                         .or_insert_with(Vec::new)
                         .push(propose_hash);
                 }
-                e.insert(ProposeState {
+                Some(e.insert(ProposeState {
+                    hash: propose_hash,
                     propose: msg.clone(),
                     patch: None,
                     unknown_txs: unknown_txs,
-                });
-                true
+                }))
             }
         }
     }
