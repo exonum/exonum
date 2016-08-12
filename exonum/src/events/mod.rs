@@ -24,7 +24,7 @@ pub enum Timeout {
     Status,
     Round(u64, u32),
     Request(RequestData, ValidatorId),
-    PeerExchange
+    PeerExchange,
 }
 
 pub struct InternalMessage;
@@ -34,7 +34,7 @@ pub enum Event {
     Internal(InternalMessage),
     Timeout(Timeout),
     Error(io::Error),
-    Terminate
+    Terminate,
 }
 
 pub struct Events {
@@ -52,7 +52,7 @@ impl MioAdapter {
         MioAdapter {
             // FIXME: configurable capacity?
             events: VecDeque::new(),
-            network: network
+            network: network,
         }
     }
 
@@ -69,8 +69,7 @@ impl mio::Handler for MioAdapter {
     type Timeout = Timeout;
     type Message = InternalMessage;
 
-    fn ready(&mut self, event_loop: &mut EventLoop,
-             token: mio::Token, events: mio::EventSet) {
+    fn ready(&mut self, event_loop: &mut EventLoop, token: mio::Token, events: mio::EventSet) {
         // TODO: remove unwrap here
         while let Some(buf) = self.network.io(event_loop, token, events).unwrap() {
             self.push(Event::Incoming(RawMessage::new(buf)));
@@ -94,16 +93,13 @@ pub trait Reactor {
     fn get_time(&self) -> Timespec;
     fn poll(&mut self) -> Event;
     fn bind(&mut self) -> ::std::io::Result<()>;
-    fn send_to(&mut self,
-                   address: &SocketAddr,
-                   message: RawMessage) -> io::Result<()>;
+    fn send_to(&mut self, address: &SocketAddr, message: RawMessage) -> io::Result<()>;
     fn address(&self) -> SocketAddr;
     fn add_timeout(&mut self, timeout: Timeout, time: Timespec);
 }
 
 impl Events {
-    pub fn with_config(config: EventsConfiguration,
-                       network: Network) -> io::Result<Events> {
+    pub fn with_config(config: EventsConfiguration, network: Network) -> io::Result<Events> {
         // TODO: using EventLoopConfig + capacity of queue
         Ok(Events {
             event_loop: EventLoop::configured(config)?,
@@ -132,9 +128,7 @@ impl Reactor for Events {
         self.queue.network.bind(&mut self.event_loop)
     }
 
-    fn send_to(&mut self,
-                   address: &SocketAddr,
-                   message: RawMessage) -> io::Result<()> {
+    fn send_to(&mut self, address: &SocketAddr, message: RawMessage) -> io::Result<()> {
         self.queue.network.send_to(&mut self.event_loop, address, message)
     }
 
@@ -142,9 +136,7 @@ impl Reactor for Events {
         self.queue.network.address().clone()
     }
 
-    fn add_timeout(&mut self,
-                   timeout: Timeout,
-                   time: Timespec) {
+    fn add_timeout(&mut self, timeout: Timeout, time: Timespec) {
         let ms = (time - self.get_time()).num_milliseconds();
         if ms < 0 {
             self.queue.push(Event::Timeout(timeout))

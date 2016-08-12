@@ -246,11 +246,11 @@ impl BranchNode {
     //         ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
     //         ChildKind::Left => 2 * HASH_SIZE,
     //     };
-    //     self.read_db_key(from)        
+    //     self.read_db_key(from)
     // }
     // fn read_db_key(&self, from: usize) -> &[u8] {
     //     &self.raw[from..from+DB_KEY_SIZE]
-    // }    
+    // }
 
     unsafe fn read_hash(&self, from: usize) -> &Hash {
         mem::transmute(&self.raw[from])
@@ -904,8 +904,10 @@ mod tests {
     fn bitslice_from_db_key() {
         let b = BitSlice::from_bytes(b"qwertyuiopasdfghjklzxcvbnm123456");
         assert_eq!(b.len(), 256);
-        assert_eq!(b.mid(4), BitSlice::from_db_key(&b.mid(4).to_db_key()).mid(4));
-        assert_eq!(b.truncate(24), BitSlice::from_db_key(&b.truncate(24).to_db_key()));
+        assert_eq!(b.mid(4),
+                   BitSlice::from_db_key(&b.mid(4).to_db_key()).mid(4));
+        assert_eq!(b.truncate(24),
+                   BitSlice::from_db_key(&b.truncate(24).to_db_key()));
     }
 
     #[test]

@@ -49,11 +49,13 @@ impl<B: Blockchain> Node<B> {
             // Verify validator if and signature
             match self.state.public_key_of(msg.validator()) {
                 // Incorrect signature of message
-                Some(public_key) => if !msg.verify(&public_key) {
-                    return
-                },
+                Some(public_key) => {
+                    if !msg.verify(&public_key) {
+                        return;
+                    }
+                }
                 // Incorrect validator id
-                None => return
+                None => return,
             };
             // Update validator height
             self.state.set_validator_height(msg.validator(), msg.height());
@@ -115,9 +117,9 @@ impl<B: Blockchain> Node<B> {
 
 
         let msg = RequestPeers::new(self.state.id(),
-                            validator,
-                            self.events.get_time(),
-                            &self.secret_key);
+                                    validator,
+                                    self.events.get_time(),
+                                    &self.secret_key);
         self.send_to_validator(validator, msg.raw());
 
         info!("request peers from validator {}", validator);

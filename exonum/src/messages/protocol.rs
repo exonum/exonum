@@ -2,19 +2,19 @@ use std::net::SocketAddr;
 use time::Timespec;
 use super::super::crypto::{Hash, PublicKey};
 
-pub const CONNECT_MESSAGE_ID              : u16 = 0;
-pub const STATUS_MESSAGE_ID               : u16 = 1;
+pub const CONNECT_MESSAGE_ID: u16 = 0;
+pub const STATUS_MESSAGE_ID: u16 = 1;
 
-pub const PROPOSE_MESSAGE_ID              : u16 = 2;
-pub const PREVOTE_MESSAGE_ID              : u16 = 3;
-pub const PRECOMMIT_MESSAGE_ID            : u16 = 4;
+pub const PROPOSE_MESSAGE_ID: u16 = 2;
+pub const PREVOTE_MESSAGE_ID: u16 = 3;
+pub const PRECOMMIT_MESSAGE_ID: u16 = 4;
 
-pub const REQUEST_PROPOSE_MESSAGE_ID      : u16 = 5;
-pub const REQUEST_TRANSACTIONS_MESSAGE_ID : u16 = 6;
-pub const REQUEST_PREVOTES_MESSAGE_ID     : u16 = 7;
-pub const REQUEST_PRECOMMITS_MESSAGE_ID   : u16 = 8;
-pub const REQUEST_COMMIT_MESSAGE_ID       : u16 = 9;
-pub const REQUEST_PEERS_MESSAGE_ID        : u16 = 10;
+pub const REQUEST_PROPOSE_MESSAGE_ID: u16 = 5;
+pub const REQUEST_TRANSACTIONS_MESSAGE_ID: u16 = 6;
+pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 7;
+pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 8;
+pub const REQUEST_COMMIT_MESSAGE_ID: u16 = 9;
+pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
 
 message! {
     Connect {

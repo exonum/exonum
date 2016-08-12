@@ -48,7 +48,7 @@ pub struct Sandbox<B: Blockchain> {
 }
 
 pub struct SandboxReactor {
-    inner: Arc<RefCell<SandboxInner>>
+    inner: Arc<RefCell<SandboxInner>>,
 }
 
 impl<B: Blockchain> Sandbox<B> {
@@ -65,11 +65,11 @@ impl<B: Blockchain> Sandbox<B> {
             "2.2.2.2:2".parse().unwrap(),
             "3.3.3.3:3".parse().unwrap(),
             "4.4.4.4:4".parse().unwrap(),
-        ] : Vec<SocketAddr>;
+        ]: Vec<SocketAddr>;
 
         let inner = Arc::new(RefCell::new(SandboxInner {
             address: addresses[0].clone(),
-            time: Timespec { sec: 0, nsec: 0},
+            time: Timespec { sec: 0, nsec: 0 },
             sended: VecDeque::new(),
             timers: BinaryHeap::new(),
         }));
@@ -91,9 +91,7 @@ impl<B: Blockchain> Sandbox<B> {
             peer_discovery: Vec::new(),
         };
 
-        let reactor = Box::new(SandboxReactor {
-            inner: inner.clone(),
-        }) as Box<Reactor>;
+        let reactor = Box::new(SandboxReactor { inner: inner.clone() }) as Box<Reactor>;
 
         let node = Node::new(b, reactor, config);
 
@@ -123,9 +121,7 @@ impl Reactor for SandboxReactor {
         Ok(())
     }
 
-    fn send_to(&mut self,
-                   address: &SocketAddr,
-                   message: RawMessage) -> io::Result<()> {
+    fn send_to(&mut self, address: &SocketAddr, message: RawMessage) -> io::Result<()> {
         self.inner.borrow_mut().sended.push_back((address.clone(), message));
         Ok(())
     }
@@ -162,7 +158,7 @@ impl<B: Blockchain> Sandbox<B> {
         let sended = self.inner.borrow_mut().sended.pop_front();
         if let Some((addr, msg)) = sended {
             let any_msg = Any::<B::Transaction>::from_raw(msg.clone())
-                                              .expect("Send incorrect message");
+                .expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
     }
@@ -197,42 +193,50 @@ impl<B: Blockchain> Sandbox<B> {
         let any_expected_msg = Any::<B::Transaction>::from_raw(msg.raw().clone()).unwrap();
         let sended = self.inner.borrow_mut().sended.pop_front();
         if let Some((real_addr, real_msg)) = sended {
-            let any_real_msg = Any::from_raw(real_msg.clone())
-                                    .expect("Send incorrect message");
+            let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
                 panic!("Expected to send the message {:?} to {} instead sending {:?} to {}",
-                       any_expected_msg, addr, any_real_msg, real_addr)
+                       any_expected_msg,
+                       addr,
+                       any_real_msg,
+                       real_addr)
             }
         } else {
             panic!("Expected to send the message {:?} to {} but nothing happened",
-                   any_expected_msg, addr);
+                   any_expected_msg,
+                   addr);
         }
     }
 
     // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
         let any_expected_msg = Any::<B::Transaction>::from_raw(msg.raw().clone()).unwrap();
-        let mut set = HashSet::from_iter(self.addresses.iter()
-                                                       .skip(1)
-                                                       .map(Clone::clone)): HashSet<SocketAddr>;
-        for _ in 0..self.validators.len()-1 {
+        let mut set = HashSet::from_iter(self.addresses
+            .iter()
+            .skip(1)
+            .map(Clone::clone)): HashSet<SocketAddr>;
+        for _ in 0..self.validators.len() - 1 {
             let sended = self.inner.borrow_mut().sended.pop_front();
             if let Some((real_addr, real_msg)) = sended {
-                let any_real_msg = Any::from_raw(real_msg.clone())
-                                        .expect("Send incorrect message");
+                let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
                     panic!("Expected to broadcast the message {:?} instead sending {:?} to {}",
-                           any_expected_msg, any_real_msg, real_addr)
+                           any_expected_msg,
+                           any_real_msg,
+                           real_addr)
                 }
                 if !set.contains(&real_addr) {
                     panic!("Double send the same message {:?} to {:?} during broadcasting",
-                           any_expected_msg, real_addr)
+                           any_expected_msg,
+                           real_addr)
                 } else {
                     set.remove(&real_addr);
                 }
             } else {
-                panic!("Expected to broadcast the message {:?} but someone don't recieve messages: {:?}",
-                       any_expected_msg, set);
+                panic!("Expected to broadcast the message {:?} but someone don't recieve \
+                        messages: {:?}",
+                       any_expected_msg,
+                       set);
             }
         }
 
@@ -241,7 +245,10 @@ impl<B: Blockchain> Sandbox<B> {
     pub fn set_time(&self, sec: i64, nsec: i32) {
         self.check_unexpected_message();
         // set time
-        let now = Timespec {sec: sec, nsec: nsec};
+        let now = Timespec {
+            sec: sec,
+            nsec: nsec,
+        };
         self.inner.borrow_mut().time = now;
         // handle timeouts if occurs
         loop {
@@ -266,18 +273,26 @@ impl<B: Blockchain> Sandbox<B> {
         let achual_height = self.node.borrow().state().height();
         let actual_round = self.node.borrow().state().round();
         assert!(achual_height == height,
-                "Incorrect height, actual={}, expected={}", achual_height, height);
+                "Incorrect height, actual={}, expected={}",
+                achual_height,
+                height);
         assert!(actual_round == round,
-                "Incorrect round, actual={}, expected={}", actual_round, round);
+                "Incorrect round, actual={}, expected={}",
+                actual_round,
+                round);
     }
 
     pub fn assert_lock(&self, round: u32, hash: Option<Hash>) {
         let actual_round = self.node.borrow().state().locked_round();
         let actual_hash = self.node.borrow().state().locked_propose();
         assert!(actual_round == round,
-                "Incorrect height, actual={}, expected={}", actual_round, round);
+                "Incorrect height, actual={}, expected={}",
+                actual_round,
+                round);
         assert!(actual_hash == hash,
-                "Incorrect round, actual={:?}, expected={:?}", actual_hash, hash);
+                "Incorrect round, actual={:?}, expected={:?}",
+                actual_hash,
+                hash);
     }
 }
 

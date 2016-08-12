@@ -4,7 +4,7 @@ use std::collections::Bound::{Included, Unbounded};
 // use std::iter::Iterator;
 
 use super::{Map, Database, Error, Patch, Change};
-//use super::{Iterable, Seekable}
+// use super::{Iterable, Seekable}
 
 pub struct MemoryDB {
     map: BTreeMap<Vec<u8>, Vec<u8>>,
@@ -14,7 +14,7 @@ pub type MemoryDBIterator<'a> = btree_map::Iter<'a, Vec<u8>, Vec<u8>>;
 impl MemoryDB {
     pub fn new() -> MemoryDB {
         MemoryDB { map: BTreeMap::new() }
-    }  
+    }
 }
 
 impl Map<[u8], Vec<u8>> for MemoryDB {
@@ -31,11 +31,11 @@ impl Map<[u8], Vec<u8>> for MemoryDB {
         self.map.remove(key);
         Ok(())
     }
-    //TODO optimize me
+    // TODO optimize me
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let mut it = self.map.range::<[u8], [u8]>(Included(key), Unbounded);
         Ok(it.next().map(|x| x.0.to_vec()))
-    }      
+    }
 }
 
 impl Database for MemoryDB {
@@ -71,7 +71,7 @@ impl Database for MemoryDB {
 //     type Iter = DatabaseIterator<'a>;
 
 //     fn iter(self) -> Self::Iter {
-//         DatabaseIterator { 
+//         DatabaseIterator {
 //             iter: self.map.iter()
 //         }
 //     }

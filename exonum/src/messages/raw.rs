@@ -3,17 +3,15 @@ use std::fmt::Debug;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use super::super::crypto::{
-    PublicKey, SecretKey, Signature,
-    sign, verify, Hash, hash, SIGNATURE_LENGTH
-};
+use super::super::crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash,
+                           SIGNATURE_LENGTH};
 
 use super::Error;
 
-pub const HEADER_SIZE : usize = 8; // TODO: rename to HEADER_LENGTH?
+pub const HEADER_SIZE: usize = 8; // TODO: rename to HEADER_LENGTH?
 
-pub const TEST_NETWORK_ID        : u8 = 0;
-pub const PROTOCOL_MAJOR_VERSION : u8 = 0;
+pub const TEST_NETWORK_ID: u8 = 0;
+pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
 
 pub type RawMessage = sync::Arc<MessageBuffer>;
 
@@ -26,16 +24,11 @@ pub struct MessageBuffer {
 
 impl MessageBuffer {
     pub fn empty() -> MessageBuffer {
-        MessageBuffer {
-            raw: vec![0; HEADER_SIZE]
-        }
+        MessageBuffer { raw: vec![0; HEADER_SIZE] }
     }
 
-    pub fn new(message_type: u16,
-               payload_length: usize) -> MessageBuffer {
-        let mut raw = MessageBuffer {
-            raw: vec![0; HEADER_SIZE + payload_length]
-        };
+    pub fn new(message_type: u16, payload_length: usize) -> MessageBuffer {
+        let mut raw = MessageBuffer { raw: vec![0; HEADER_SIZE + payload_length] };
         raw.set_network_id(TEST_NETWORK_ID);
         raw.set_version(PROTOCOL_MAJOR_VERSION);
         raw.set_message_type(message_type);
@@ -45,9 +38,7 @@ impl MessageBuffer {
 
     pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
         // TODO: check that size >= HEADER_SIZE
-        MessageBuffer {
-            raw: raw
-        }
+        MessageBuffer { raw: raw }
     }
 
     pub fn network_id(&self) -> u8 {
@@ -100,16 +91,12 @@ impl MessageBuffer {
 
     pub fn signature(&self) -> &Signature {
         let sign_idx = self.total_length() - SIGNATURE_LENGTH;
-        unsafe {
-            mem::transmute(&self.raw[sign_idx])
-        }
+        unsafe { mem::transmute(&self.raw[sign_idx]) }
     }
 
     pub fn signature_mut(&mut self) -> &mut Signature {
         let sign_idx = self.total_length() - SIGNATURE_LENGTH;
-        unsafe {
-            mem::transmute(&mut self.raw[sign_idx])
-        }
+        unsafe { mem::transmute(&mut self.raw[sign_idx]) }
     }
 
     pub fn allocate_payload(&mut self) {
@@ -147,7 +134,7 @@ impl convert::AsMut<Vec<u8>> for MessageBuffer {
     }
 }
 
-pub trait Message : Debug + Clone + PartialEq + Sized {
+pub trait Message: Debug + Clone + PartialEq + Sized {
     // const MESSAGE_TYPE : u16;
     // const BODY_LENGTH : usize;
     // const PAYLOAD_LENGTH : usize;

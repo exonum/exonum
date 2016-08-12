@@ -18,7 +18,7 @@ fn main() {
 
     env_logger::init().unwrap();
 
-    let addresses : Vec<::std::net::SocketAddr> = vec![
+    let addresses: Vec<::std::net::SocketAddr> = vec![
         "127.0.0.1:7000".parse().unwrap(),
         "127.0.0.1:7001".parse().unwrap(),
         "127.0.0.1:7002".parse().unwrap(),
@@ -32,30 +32,30 @@ fn main() {
         gen_keypair_from_seed(&Seed::from_slice(&vec![3; 32]).unwrap()),
     ];
 
-    let validators : Vec<_> = pairs.iter()
-                                   .map(|&(ref p, _)| p.clone())
-                                   .collect();
+    let validators: Vec<_> = pairs.iter()
+        .map(|&(ref p, _)| p.clone())
+        .collect();
 
     let address = addresses[idx];
     let (ref public_key, ref secret_key) = pairs[idx];
 
-    let blockchain = TimestampingBlockchain {
-        db: MemoryDB::new()
-    };
+    let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
 
-    Node::with_config(blockchain, Configuration {
-        public_key: public_key.clone(),
-        secret_key: secret_key.clone(),
-        round_timeout: 1000,
-        status_timeout: 5000,
-        peers_timeout: 10000,
-        network: NetworkConfiguration {
-            listen_address: address.clone(),
-            max_incoming_connections: 8,
-            max_outgoing_connections: 8,
-        },
-        events: EventsConfiguration::new(),
-        peer_discovery: addresses.clone(),
-        validators: validators.clone(),
-    }).run();
+    Node::with_config(blockchain,
+                      Configuration {
+                          public_key: public_key.clone(),
+                          secret_key: secret_key.clone(),
+                          round_timeout: 1000,
+                          status_timeout: 5000,
+                          peers_timeout: 10000,
+                          network: NetworkConfiguration {
+                              listen_address: address.clone(),
+                              max_incoming_connections: 8,
+                              max_outgoing_connections: 8,
+                          },
+                          events: EventsConfiguration::new(),
+                          peer_discovery: addresses.clone(),
+                          validators: validators.clone(),
+                      })
+        .run();
 }

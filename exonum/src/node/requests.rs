@@ -1,12 +1,9 @@
-use super::super::messages::{
-    RequestMessage, Message,
-    RequestPropose, RequestTransactions, RequestPrevotes,
-    RequestPrecommits, RequestCommit
-};
+use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
+                             RequestPrevotes, RequestPrecommits, RequestCommit};
 use super::super::storage::{Blockchain, TxStorage, BlockStorage, Map, List};
 use super::Node;
 
-const REQUEST_ALIVE : i64 = 3_000_000_000; // 3 seconds
+const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 impl<B: Blockchain> Node<B> {
     pub fn handle_request(&mut self, msg: RequestMessage) {
@@ -20,7 +17,7 @@ impl<B: Blockchain> Node<B> {
             Some(nanos) => nanos,
             None => {
                 // Incorrect time into message
-                return
+                return;
             }
         };
 
@@ -31,11 +28,13 @@ impl<B: Blockchain> Node<B> {
 
         match self.state.public_key_of(msg.from()) {
             // Incorrect signature of message
-            Some(public_key) => if !msg.verify(&public_key) {
-                return
-            },
+            Some(public_key) => {
+                if !msg.verify(&public_key) {
+                    return;
+                }
+            }
             // Incorrect validator id
-            None => return
+            None => return,
         }
 
         match msg {
@@ -50,12 +49,13 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_request_propose(&mut self, msg: RequestPropose) {
         if msg.height() > self.state.height() {
-            return
+            return;
         }
 
         let propose = if msg.height() == self.state.height() {
             self.state.propose(msg.propose_hash()).map(|p| p.message().raw().clone())
-        } else {  // msg.height < state.height
+        } else {
+            // msg.height < state.height
             self.blockchain.proposes().get(msg.propose_hash()).unwrap().map(|p| p.raw().clone())
         };
 
@@ -66,8 +66,11 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
         for hash in msg.txs() {
-            let tx = self.state.transactions().get(hash).map(|tx| tx.clone())
-                              .or_else(|| self.blockchain.transactions().get(hash).unwrap());
+            let tx = self.state
+                .transactions()
+                .get(hash)
+                .map(|tx| tx.clone())
+                .or_else(|| self.blockchain.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {
                 self.send_to_validator(msg.from(), tx.raw());
@@ -77,11 +80,11 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_request_prevotes(&mut self, msg: RequestPrevotes) {
         if msg.height() != self.state.height() {
-            return
+            return;
         }
 
-        let prevotes = if let Some(prevotes) = self.state.prevotes(msg.round(),
-                                                                  msg.propose_hash().clone()) {
+        let prevotes = if let Some(prevotes) = self.state
+            .prevotes(msg.round(), msg.propose_hash().clone()) {
             prevotes.values().map(|p| p.raw().clone()).collect()
         } else {
             Vec::new()
@@ -94,18 +97,19 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_request_precommits(&mut self, msg: RequestPrecommits) {
         if msg.height() > self.state.height() {
-            return
+            return;
         }
 
         let precommits = if msg.height() == self.state.height() {
             if let Some(precommits) = self.state.precommits(msg.round(),
-                                                           msg.propose_hash().clone(),
-                                                           msg.block_hash().clone()) {
+                                                            msg.propose_hash().clone(),
+                                                            msg.block_hash().clone()) {
                 precommits.values().map(|p| p.raw().clone()).collect()
             } else {
                 Vec::new()
             }
-        } else {  // msg.height < state.height
+        } else {
+            // msg.height < state.height
             if let Some(precommits) = self.blockchain.precommits(msg.block_hash()).iter().unwrap() {
                 precommits.iter().map(|p| p.raw().clone()).collect()
             } else {
@@ -120,16 +124,17 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_request_commit(&mut self, msg: RequestCommit) {
         if msg.height() >= self.state.height() {
-            return
+            return;
         }
 
         let block_hash = self.blockchain.heights().get(msg.height()).unwrap().unwrap();
 
-        let precommits = if let Some(precommits) = self.blockchain.precommits(&block_hash).iter().unwrap() {
-            precommits.iter().map(|p| p.raw().clone()).collect()
-        } else {
-            Vec::new()
-        };
+        let precommits =
+            if let Some(precommits) = self.blockchain.precommits(&block_hash).iter().unwrap() {
+                precommits.iter().map(|p| p.raw().clone()).collect()
+            } else {
+                Vec::new()
+            };
 
         for precommit in precommits {
             self.send_to_validator(msg.from(), &precommit);

@@ -16,7 +16,9 @@ fn test_send_propose_and_prevote() {
     sandbox.assert_state(0, 4);
 
     // ok, we are leader
-    let propose = Propose::new(0, 0, 4,
+    let propose = Propose::new(0,
+                               0,
+                               4,
                                sandbox.time(),
                                &sandbox.last_hash(),
                                &[],
@@ -30,7 +32,13 @@ fn test_send_propose_and_prevote() {
 fn test_send_prevote() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
+    let propose = Propose::new(1,
+                               0,
+                               1,
+                               sandbox.time(),
+                               &sandbox.last_hash(),
+                               &[],
+                               sandbox.s(1));
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
@@ -40,7 +48,13 @@ fn test_send_prevote() {
 fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
+    let propose = Propose::new(1,
+                               0,
+                               1,
+                               sandbox.time(),
+                               &sandbox.last_hash(),
+                               &[],
+                               sandbox.s(1));
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
@@ -55,7 +69,13 @@ fn test_get_lock_and_send_precommit() {
 fn test_commit() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(1, 0, 1, sandbox.time(), &sandbox.last_hash(), &[], sandbox.s(1));
+    let propose = Propose::new(1,
+                               0,
+                               1,
+                               sandbox.time(),
+                               &sandbox.last_hash(),
+                               &[],
+                               sandbox.s(1));
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));

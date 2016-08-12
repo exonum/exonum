@@ -8,7 +8,7 @@ use std::borrow::{Borrow, BorrowMut};
 use exonum::crypto::PublicKey;
 use exonum::storage::{Blockchain, Database};
 
-pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID : u16 = 128;
+pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
 
 message! {
     TimestampTx {
@@ -21,7 +21,7 @@ message! {
 }
 
 pub struct TimestampingBlockchain<D: Database> {
-    pub db: D
+    pub db: D,
 }
 
 impl<D: Database> Borrow<D> for TimestampingBlockchain<D> {
@@ -37,7 +37,9 @@ impl<D: Database> BorrowMut<D> for TimestampingBlockchain<D> {
 }
 
 
-impl<D> Blockchain for TimestampingBlockchain<D> where D: Database {
+impl<D> Blockchain for TimestampingBlockchain<D>
+    where D: Database
+{
     type Database = D;
     type Transaction = TimestampTx;
 }

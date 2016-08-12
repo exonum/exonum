@@ -23,8 +23,7 @@ pub struct OutgoingConnection {
 }
 
 impl IncomingConnection {
-    pub fn new(socket: TcpStream/*, address: SocketAddr*/)
-            -> IncomingConnection {
+    pub fn new(socket: TcpStream /* , address: SocketAddr */) -> IncomingConnection {
         IncomingConnection {
             socket: socket,
             // address: address,
@@ -44,11 +43,10 @@ impl IncomingConnection {
     fn read(&mut self) -> io::Result<Option<usize>> {
         // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
         // TODO: read into growable Vec, not into [u8]
-        if self.position == HEADER_SIZE &&
-           self.raw.actual_length() == HEADER_SIZE {
+        if self.position == HEADER_SIZE && self.raw.actual_length() == HEADER_SIZE {
             self.raw.allocate_payload();
         }
-        let buffer : &mut [u8] = self.raw.as_mut();
+        let buffer: &mut [u8] = self.raw.as_mut();
         self.socket.try_read(&mut buffer[self.position..])
     }
 
@@ -60,12 +58,11 @@ impl IncomingConnection {
                 None | Some(0) => return Ok(None),
                 Some(n) => {
                     self.position += n;
-                    if self.position >= HEADER_SIZE &&
-                       self.position == self.raw.total_length() {
+                    if self.position >= HEADER_SIZE && self.position == self.raw.total_length() {
                         let mut raw = MessageBuffer::empty();
                         swap(&mut raw, &mut self.raw);
                         self.position = 0;
-                        return Ok(Some(raw))
+                        return Ok(Some(raw));
                     }
                 }
             }
@@ -74,13 +71,12 @@ impl IncomingConnection {
 }
 
 impl OutgoingConnection {
-    pub fn new(socket: TcpStream, address: SocketAddr)
-            -> OutgoingConnection {
+    pub fn new(socket: TcpStream, address: SocketAddr) -> OutgoingConnection {
         OutgoingConnection {
             socket: socket,
             address: address,
             queue: VecDeque::new(),
-            position: 0
+            position: 0,
         }
     }
 
@@ -98,8 +94,8 @@ impl OutgoingConnection {
             match self.socket.try_write(message.as_ref().as_ref())? {
                 None | Some(0) => {
                     self.queue.push_front(message);
-                    break
-                },
+                    break;
+                }
                 Some(n) => {
                     // FIXME: What if we write less than message size?
                     self.position += n;
@@ -110,7 +106,7 @@ impl OutgoingConnection {
             }
         }
         // TODO: reregister
-        return Ok(())
+        return Ok(());
     }
 
     pub fn send(&mut self, message: RawMessage) {

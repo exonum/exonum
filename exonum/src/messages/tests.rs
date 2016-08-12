@@ -33,7 +33,12 @@ fn test_propose() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let propose = Propose::new(validator, height, round, time, &prev_hash, &txs,
+    let propose = Propose::new(validator,
+                               height,
+                               round,
+                               time,
+                               &prev_hash,
+                               &txs,
                                &secret_key);
     // read
     assert_eq!(propose.validator(), validator);
@@ -55,7 +60,11 @@ fn test_prevote() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let prevote = Prevote::new(validator, height, round, &propose_hash, locked_round,
+    let prevote = Prevote::new(validator,
+                               height,
+                               round,
+                               &propose_hash,
+                               locked_round,
                                &secret_key);
     // read
     assert_eq!(prevote.validator(), validator);
@@ -76,8 +85,11 @@ fn test_precommit() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let precommit = Precommit::new(validator, height, round,
-                                   &propose_hash, &block_hash,
+    let precommit = Precommit::new(validator,
+                                   height,
+                                   round,
+                                   &propose_hash,
+                                   &block_hash,
                                    &secret_key);
     // read
     assert_eq!(precommit.validator(), validator);
@@ -96,12 +108,10 @@ fn test_status() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let commit = Status::new(validator, height, &last_hash,
-                             &secret_key);
+    let commit = Status::new(validator, height, &last_hash, &secret_key);
     // read
     assert_eq!(commit.validator(), validator);
     assert_eq!(commit.height(), height);
     assert_eq!(commit.last_hash(), &last_hash);
     assert!(commit.verify(&public_key));
 }
-

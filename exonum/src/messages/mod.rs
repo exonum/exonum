@@ -1,5 +1,7 @@
-#[macro_use] mod spec;
-#[cfg(test)] mod tests;
+#[macro_use]
+mod spec;
+#[cfg(test)]
+mod tests;
 
 use std::fmt;
 
@@ -8,12 +10,12 @@ mod error;
 mod fields;
 mod protocol;
 
-use time::{Timespec};
+use time::Timespec;
 
 use super::crypto::PublicKey;
 
 pub use self::raw::{RawMessage, MessageBuffer, Message, HEADER_SIZE};
-pub use self::error::{Error};
+pub use self::error::Error;
 pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;
 
@@ -43,7 +45,7 @@ pub enum RequestMessage {
     Prevotes(RequestPrevotes),
     Precommits(RequestPrecommits),
     Commit(RequestCommit),
-    Peers(RequestPeers)
+    Peers(RequestPeers),
 }
 
 // #[derive(Clone, PartialEq)]
@@ -228,16 +230,34 @@ impl<Tx: Message> Any<Tx> {
             CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
             STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
 
-            PROPOSE_MESSAGE_ID => Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?)),
-            PREVOTE_MESSAGE_ID => Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?)),
-            PRECOMMIT_MESSAGE_ID => Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?)),
+            PROPOSE_MESSAGE_ID => {
+                Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
+            }
+            PREVOTE_MESSAGE_ID => {
+                Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?))
+            }
+            PRECOMMIT_MESSAGE_ID => {
+                Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?))
+            }
 
-            REQUEST_PROPOSE_MESSAGE_ID => Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?)),
-            REQUEST_TRANSACTIONS_MESSAGE_ID => Any::Request(RequestMessage::Transactions(RequestTransactions::from_raw(raw)?)),
-            REQUEST_PREVOTES_MESSAGE_ID => Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?)),
-            REQUEST_PRECOMMITS_MESSAGE_ID => Any::Request(RequestMessage::Precommits(RequestPrecommits::from_raw(raw)?)),
-            REQUEST_COMMIT_MESSAGE_ID => Any::Request(RequestMessage::Commit(RequestCommit::from_raw(raw)?)),
-            REQUEST_PEERS_MESSAGE_ID => Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?)),
+            REQUEST_PROPOSE_MESSAGE_ID => {
+                Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?))
+            }
+            REQUEST_TRANSACTIONS_MESSAGE_ID => {
+                Any::Request(RequestMessage::Transactions(RequestTransactions::from_raw(raw)?))
+            }
+            REQUEST_PREVOTES_MESSAGE_ID => {
+                Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?))
+            }
+            REQUEST_PRECOMMITS_MESSAGE_ID => {
+                Any::Request(RequestMessage::Precommits(RequestPrecommits::from_raw(raw)?))
+            }
+            REQUEST_COMMIT_MESSAGE_ID => {
+                Any::Request(RequestMessage::Commit(RequestCommit::from_raw(raw)?))
+            }
+            REQUEST_PEERS_MESSAGE_ID => {
+                Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))
+            }
             _ => Any::Transaction(Tx::from_raw(raw)?),
         })
     }
@@ -254,4 +274,3 @@ impl<Tx: Message> fmt::Debug for Any<Tx> {
         }
     }
 }
-

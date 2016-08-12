@@ -86,7 +86,9 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
     fn rebuild_hash(&mut self, mut index: K, bytes: &Vec<u8>) -> Result<(), Error> {
         // FIXME avoid reallocation
-        self.map.put(&Self::db_key(K::one(), index), bytes.hash().as_ref().to_vec())?;
+        self.map
+            .put(&Self::db_key(K::one(), index),
+                 bytes.hash().as_ref().to_vec())?;
         let mut current_height = K::one();
         while index != K::zero() {
             // Left leaf, Right leaf is empty
@@ -276,7 +278,7 @@ mod tests {
         let mut storage = MemoryDB::new();
         let mut table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
 
-        let h = hash(&[1, 2, 3 ,4]);
+        let h = hash(&[1, 2, 3, 4]);
         table.append(h).unwrap();
         assert_eq!(table.get(0u32).unwrap(), Some(h));
     }

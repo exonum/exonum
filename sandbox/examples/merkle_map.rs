@@ -11,7 +11,7 @@ use rand::{SeedableRng, XorShiftRng, Rng};
 use exonum::storage::{LevelDB, LevelDBOptions};
 use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Patch};
 
-/// usage 
+/// usage
 /// path  - Directory where database is situated
 /// count - Total amount of data items to write
 /// data_len - Length of data chunk
@@ -29,7 +29,8 @@ fn main() {
         (@arg data_len: -l --len +takes_value "Length of data chunk")
         (@arg seed: -s --seed +takes_value "Seed for rng")
         (@arg fork: -f --fork "Use fork to write data in one transaction")
-    ).get_matches();    
+    )
+        .get_matches();
 
     let path = matches.value_of("DIR").unwrap();
     let count: usize = matches.value_of("count").unwrap_or("100").parse().unwrap();
@@ -58,7 +59,7 @@ fn main() {
         {
             let mut fork = db.fork();
             {
-                let mut map = MerklePatriciaTable::new(MapTable::new(prefix, &mut fork));        
+                let mut map = MerklePatriciaTable::new(MapTable::new(prefix, &mut fork));
                 for item in (0..count).map(kv_generator) {
                     map.put(&item.0, item.1.clone()).unwrap();
                 }
@@ -67,7 +68,7 @@ fn main() {
         }
         db.merge(patch).unwrap();
     } else {
-        let mut map = MerklePatriciaTable::new(MapTable::new(prefix, &mut db));  
+        let mut map = MerklePatriciaTable::new(MapTable::new(prefix, &mut db));
         for item in (0..count).map(kv_generator) {
             map.put(&item.0, item.1.clone()).unwrap();
         }

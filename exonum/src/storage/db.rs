@@ -61,7 +61,7 @@ impl<'a, T> Map<[u8], Vec<u8>> for Fork<'a, T>
     }
 
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        //TODO merge with the same function in memorydb
+        // TODO merge with the same function in memorydb
         let out = {
             let mut it = self.changes.range::<[u8], [u8]>(Included(key), Unbounded);
             it.next().map(|x| x.0.to_vec())

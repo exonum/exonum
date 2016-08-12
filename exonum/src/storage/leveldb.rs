@@ -14,7 +14,7 @@ use leveldb::database::iterator::Iterable as LevelIterable;
 use leveldb::iterator::LevelDBIterator;
 
 use super::{Map, Database, Error, Patch, Change};
-//use super::{Iterable, Seekable}
+// use super::{Iterable, Seekable}
 
 struct BinaryKey(Vec<u8>);
 
@@ -76,7 +76,7 @@ impl Map<[u8], Vec<u8>> for LevelDB {
             return Ok(Some(key.0));
         }
         Ok(None)
-    }    
+    }
 }
 
 impl Database for LevelDB {

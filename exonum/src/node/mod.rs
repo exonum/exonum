@@ -3,10 +3,8 @@ use std::net::SocketAddr;
 use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
-use super::events::{
-    Reactor, Events, Event, Timeout, EventsConfiguration,
-    Network, NetworkConfiguration
-};
+use super::events::{Reactor, Events, Event, Timeout, EventsConfiguration, Network,
+                    NetworkConfiguration};
 use super::storage::{Blockchain, BlockStorage};
 use super::messages::{Any, Connect, RawMessage, Message};
 
@@ -48,9 +46,10 @@ pub struct Configuration {
 impl<B: Blockchain> Node<B> {
     pub fn new(blockchain: B, reactor: Box<Reactor>, config: Configuration) -> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
-        let id = config.validators.iter()
-                                  .position(|pk| pk == &config.public_key)
-                                  .unwrap();
+        let id = config.validators
+            .iter()
+            .position(|pk| pk == &config.public_key)
+            .unwrap();
         let connect = Connect::new(&config.public_key,
                                    reactor.address().clone(),
                                    reactor.get_time(),
@@ -72,7 +71,8 @@ impl<B: Blockchain> Node<B> {
     pub fn with_config(blockchain: B, config: Configuration) -> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let network = Network::with_config(config.network);
-        let reactor = Box::new(Events::with_config(config.events.clone(), network).unwrap()) as Box<Reactor>;
+        let reactor =
+            Box::new(Events::with_config(config.events.clone(), network).unwrap()) as Box<Reactor>;
         Self::new(blockchain, reactor, config)
     }
 
@@ -87,14 +87,19 @@ impl<B: Blockchain> Node<B> {
         let connect = self.state.our_connect_message().clone();
         for address in self.peer_discovery.clone().iter() {
             if address == &self.events.address() {
-                continue
+                continue;
             }
             self.send_to_addr(address, connect.raw());
         }
 
         // TODO: rewrite this bullshit
-        let time = self.blockchain.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0});
-        let round = 1 + (self.events.get_time() - time).num_milliseconds() / self.round_timeout as i64;
+        let time = self.blockchain
+            .last_propose()
+            .unwrap()
+            .map(|p| p.time())
+            .unwrap_or_else(|| Timespec { sec: 0, nsec: 0 });
+        let round = 1 +
+                    (self.events.get_time() - time).num_milliseconds() / self.round_timeout as i64;
         self.state.jump_round(round as u32);
 
         info!("Jump to round {}", round);
@@ -113,19 +118,13 @@ impl<B: Blockchain> Node<B> {
             match self.events.poll() {
                 Event::Incoming(message) => {
                     self.handle_message(message);
-                },
-                Event::Internal(_) => {
-
-                },
+                }
+                Event::Internal(_) => {}
                 Event::Timeout(timeout) => {
                     self.handle_timeout(timeout);
-                },
-                Event::Error(_) => {
-
-                },
-                Event::Terminate => {
-                    break
                 }
+                Event::Error(_) => {}
+                Event::Terminate => break,
             }
         }
     }
@@ -148,14 +147,10 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_timeout(&mut self, timeout: Timeout) {
         match timeout {
-            Timeout::Round(height, round) =>
-                self.handle_round_timeout(height, round),
-            Timeout::Request(data, validator) =>
-                self.handle_request_timeout(data, validator),
-            Timeout::Status =>
-                self.handle_status_timeout(),
-            Timeout::PeerExchange =>
-                self.handle_peer_exchange_timeout()
+            Timeout::Round(height, round) => self.handle_round_timeout(height, round),
+            Timeout::Request(data, validator) => self.handle_request_timeout(data, validator),
+            Timeout::Status => self.handle_status_timeout(),
+            Timeout::PeerExchange => self.handle_peer_exchange_timeout(),
         }
     }
 
@@ -187,8 +182,16 @@ impl<B: Blockchain> Node<B> {
 
     pub fn add_round_timeout(&mut self) {
         let ms = self.state.round() as i64 * self.round_timeout as i64;
-        let time = self.blockchain.last_propose().unwrap().map(|p| p.time()).unwrap_or_else(|| Timespec {sec: 0, nsec: 0}) + Duration::milliseconds(ms);
-        info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}", time, self.state.height(), self.state.round());
+        let time = self.blockchain
+            .last_propose()
+            .unwrap()
+            .map(|p| p.time())
+            .unwrap_or_else(|| Timespec { sec: 0, nsec: 0 }) +
+                   Duration::milliseconds(ms);
+        info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
+              time,
+              self.state.height(),
+              self.state.round());
         let timeout = Timeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
     }
@@ -198,9 +201,7 @@ impl<B: Blockchain> Node<B> {
         self.events.add_timeout(Timeout::Status, time);
     }
 
-    pub fn add_request_timeout(&mut self,
-                               data: RequestData,
-                               validator: ValidatorId) {
+    pub fn add_request_timeout(&mut self, data: RequestData, validator: ValidatorId) {
         let time = self.events.get_time() + data.timeout();
         self.events.add_timeout(Timeout::Request(data, validator), time);
     }

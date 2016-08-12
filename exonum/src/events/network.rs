@@ -7,13 +7,13 @@ use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
 use super::connection::{IncomingConnection, OutgoingConnection};
-use super::{EventLoop};
+use super::EventLoop;
 
 use super::super::messages::{MessageBuffer, RawMessage};
 
 pub type PeerId = Token;
 
-const SERVER_ID : PeerId = Token(1);
+const SERVER_ID: PeerId = Token(1);
 
 #[derive(Debug)]
 pub struct Network {
@@ -21,15 +21,14 @@ pub struct Network {
     listener: Option<TcpListener>,
     incoming: Slab<IncomingConnection>,
     outgoing: Slab<OutgoingConnection>,
-    addresses: HashMap<SocketAddr, PeerId>
+    addresses: HashMap<SocketAddr, PeerId>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
     pub listen_address: SocketAddr,
     pub max_incoming_connections: usize,
-    pub max_outgoing_connections: usize,
-    // TODO: think more about config parameters
+    pub max_outgoing_connections: usize, // TODO: think more about config parameters
 }
 
 impl Network {
@@ -37,15 +36,10 @@ impl Network {
         Network {
             listen_address: config.listen_address,
             listener: None,
-            incoming: Slab::new_starting_at(
-                Token(2),
-                config.max_incoming_connections
-            ),
-            outgoing: Slab::new_starting_at(
-                Token(config.max_incoming_connections + 2),
-                config.max_outgoing_connections
-            ),
-            addresses: HashMap::new()
+            incoming: Slab::new_starting_at(Token(2), config.max_incoming_connections),
+            outgoing: Slab::new_starting_at(Token(config.max_incoming_connections + 2),
+                                            config.max_outgoing_connections),
+            addresses: HashMap::new(),
         }
     }
 
@@ -55,20 +49,15 @@ impl Network {
 
     pub fn bind(&mut self, event_loop: &mut EventLoop) -> io::Result<()> {
         if let Some(_) = self.listener {
-            return Err(io::Error::new(io::ErrorKind::Other,
-                                      "Already binded"));
+            return Err(io::Error::new(io::ErrorKind::Other, "Already binded"));
         }
         let listener = TcpListener::bind(&self.listen_address)?;
-        let r = event_loop.register(
-            &listener, SERVER_ID,
-            EventSet::readable(),
-            PollOpt::edge()
-        );
+        let r = event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge());
         match r {
             Ok(()) => {
                 self.listener = Some(listener);
                 Ok(())
-            },
+            }
             Err(e) => Err(e),
         }
     }
@@ -76,19 +65,22 @@ impl Network {
     // TODO: Use ticks for fast reregistering sockets
     // TODO: Implement Connections collection with (re)registering
 
-    pub fn io(&mut self, event_loop: &mut EventLoop,
-             id: PeerId, set: EventSet) -> io::Result<Option<MessageBuffer>> {
+    pub fn io(&mut self,
+              event_loop: &mut EventLoop,
+              id: PeerId,
+              set: EventSet)
+              -> io::Result<Option<MessageBuffer>> {
         if set.is_error() {
             // TODO: TEMPORARY FIX, MAKE IT NORMAL
             self.addresses.remove(self.outgoing[id].address());
             self.outgoing.remove(id);
-            return Ok(None)
+            return Ok(None);
         }
 
         if set.is_hup() {
             // TODO: TEMPORARY FIX, MAKE IT NORMAL
             self.incoming.remove(id);
-            return Ok(None)
+            return Ok(None);
         }
 
         if id == SERVER_ID {
@@ -99,36 +91,33 @@ impl Network {
                 None => return Ok(None),
             };
             while let Some((socket, _)) = listener.accept()? {
-                let peer = IncomingConnection::new(socket/*, address*/);
+                let peer = IncomingConnection::new(socket /* , address */);
                 let id = match self.incoming.insert(peer) {
                     Ok(id) => id,
                     Err(_) => {
-                        return Err(io::Error::new(io::ErrorKind::Other,
-                                                  "Maximum connections"));
+                        return Err(io::Error::new(io::ErrorKind::Other, "Maximum connections"));
                     }
                 };
-                let r = event_loop.register(
-                    self.incoming[id].socket(), id,
-                    EventSet::readable() | EventSet::hup(),
-                    PollOpt::edge()
-                );
+                let r = event_loop.register(self.incoming[id].socket(),
+                                            id,
+                                            EventSet::readable() | EventSet::hup(),
+                                            PollOpt::edge());
                 if let Err(e) = r {
                     self.incoming.remove(id);
-                    return Err(e)
+                    return Err(e);
                 }
             }
-            return Ok(None)
+            return Ok(None);
         }
 
         if set.is_writable() {
             // Write data into socket
             self.outgoing[id].writable()?;
             if !self.outgoing[id].is_idle() {
-                let r = event_loop.reregister(
-                    self.outgoing[id].socket(), id,
-                    EventSet::writable() | EventSet::hup(),
-                    PollOpt::edge() | PollOpt::oneshot()
-                );
+                let r = event_loop.reregister(self.outgoing[id].socket(),
+                                              id,
+                                              EventSet::writable() | EventSet::hup(),
+                                              PollOpt::edge() | PollOpt::oneshot());
                 if let Err(e) = r {
                     self.addresses.remove(self.outgoing[id].address());
                     self.outgoing.remove(id);
@@ -152,29 +141,29 @@ impl Network {
             // }
         }
         // FIXME: Can we be here?
-        return Ok(None)
+        return Ok(None);
     }
 
-    pub fn get_peer(&mut self, event_loop: &mut EventLoop, address: &SocketAddr)
+    pub fn get_peer(&mut self,
+                    event_loop: &mut EventLoop,
+                    address: &SocketAddr)
                     -> io::Result<PeerId> {
         if let Some(id) = self.addresses.get(address) {
-            return Ok(*id)
+            return Ok(*id);
         };
         let socket = TcpStream::connect(&address)?;
         let peer = OutgoingConnection::new(socket, address.clone());
         let id = match self.outgoing.insert(peer) {
             Ok(id) => id,
             Err(_) => {
-                return Err(io::Error::new(io::ErrorKind::Other,
-                                          "Maximum connections"));
+                return Err(io::Error::new(io::ErrorKind::Other, "Maximum connections"));
             }
         };
         self.addresses.insert(address.clone(), id);
-        let r = event_loop.register(
-            self.outgoing[id].socket(), id,
-            EventSet::writable() | EventSet::hup(),
-            PollOpt::edge() | PollOpt::oneshot()
-        );
+        let r = event_loop.register(self.outgoing[id].socket(),
+                                    id,
+                                    EventSet::writable() | EventSet::hup(),
+                                    PollOpt::edge() | PollOpt::oneshot());
         match r {
             Ok(()) => Ok(id),
             Err(e) => {
@@ -188,14 +177,14 @@ impl Network {
     pub fn send_to(&mut self,
                    event_loop: &mut EventLoop,
                    address: &SocketAddr,
-                   message: RawMessage) -> io::Result<()> {
+                   message: RawMessage)
+                   -> io::Result<()> {
         let id = self.get_peer(event_loop, address)?;
         self.outgoing[id].send(message);
-        let r = event_loop.reregister(
-            self.outgoing[id].socket(), id,
-            EventSet::writable() | EventSet::hup(),
-            PollOpt::edge() | PollOpt::oneshot()
-        );
+        let r = event_loop.reregister(self.outgoing[id].socket(),
+                                      id,
+                                      EventSet::writable() | EventSet::hup(),
+                                      PollOpt::edge() | PollOpt::oneshot());
         if let Err(e) = r {
             self.outgoing.remove(id);
             return Err(e);
