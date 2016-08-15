@@ -28,15 +28,15 @@ use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 use timestamping::TimestampingBlockchain;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct KeyPair {
+struct TestnetValidator {
     public_key: PublicKey,
     secret_key: SecretKey,
     address: ::std::net::SocketAddr,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct TestNetConfiguration {
-    validators: Vec<KeyPair>,
+struct TestnetConfiguration {
+    validators: Vec<TestnetValidator>,
     round_timeout: u32,
     status_timeout: u32,
     peers_timeout: u32,
@@ -44,18 +44,12 @@ struct TestNetConfiguration {
     max_outgoing_connections: usize,
 }
 
-impl TestNetConfiguration {
-    fn from_file(path: &Path) -> Result<TestNetConfiguration, Box<Error>> {
+impl TestnetConfiguration {
+    fn from_file(path: &Path) -> Result<TestnetConfiguration, Box<Error>> {
         let mut file = File::open(path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
         let cfg = toml::decode_str(&toml);
-
-        // match cfg {
-        //     Some(value) => Ok(value),
-        //     None => Err(format!("Unable to decode toml file: {:?}", path))
-        // }
-
         return Ok(cfg.unwrap());
     }
 
@@ -72,12 +66,12 @@ impl TestNetConfiguration {
         Ok(())
     }
 
-    fn gen(validators_count: u8) -> TestNetConfiguration {
+    fn gen(validators_count: u8) -> TestnetConfiguration {
         let mut pairs = Vec::new();
         for i in 0..validators_count {
             let keys = gen_keypair_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap());
             let addr = format!("127.0.0.1:{}", 7000 + i as u32).parse().unwrap();
-            let pair = KeyPair {
+            let pair = TestnetValidator {
                 public_key: keys.0.clone(),
                 secret_key: keys.1.clone(),
                 address: addr,
@@ -85,17 +79,20 @@ impl TestNetConfiguration {
             pairs.push(pair);
         }
 
-        TestNetConfiguration {
+        TestnetConfiguration {
             validators: pairs,
             round_timeout: 1000,
             status_timeout: 5000,
             peers_timeout: 10000,
-            max_incoming_connections: validators_count as usize,
-            max_outgoing_connections: validators_count as usize,
+            max_incoming_connections: 128,
+            max_outgoing_connections: 128,
         }
     }
 
-    fn to_node_configuration(&self, idx: usize, known_peers: Vec<::std::net::SocketAddr>) -> Configuration {
+    fn to_node_configuration(&self,
+                             idx: usize,
+                             known_peers: Vec<::std::net::SocketAddr>)
+                             -> Configuration {
         let validator = self.validators[idx].clone();
         let validators: Vec<_> = self.validators
             .iter()
@@ -124,7 +121,7 @@ fn main() {
     ::std::env::set_var("RUST_LOG", "exonum=info");
     env_logger::init().unwrap();
 
-    let app = App::new("TestNet node")
+    let app = App::new("Testnet node")
         .version("0.1")
         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
         .about("Test network node")
@@ -169,13 +166,13 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = TestNetConfiguration::gen(count);
+            let cfg = TestnetConfiguration::gen(count);
             cfg.save_to_file(&path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
         }
         ("run", Some(matches)) => {
-            let cfg = TestNetConfiguration::from_file(path).unwrap();
+            let cfg = TestnetConfiguration::from_file(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {
                 Some(string) => {
@@ -193,15 +190,12 @@ fn main() {
             };
             println!("Known peers is {:#?}", peers);
             let node_cfg = cfg.to_node_configuration(idx, peers);
-            let db_path = matches.value_of("LEVELDB_PATH").map(|x| x.to_owned());
-
-
-            match db_path {
-                Some(db_path) => {
+            match matches.value_of("LEVELDB_PATH") {
+                Some(ref db_path) => {
                     println!("Using levedb storage with path: {}", db_path);
                     let mut options = LevelDBOptions::new();
                     options.create_if_missing = true;
-                    let leveldb = LevelDB::new(&Path::new(&db_path), options).unwrap();
+                    let leveldb = LevelDB::new(&Path::new(db_path), options).unwrap();
 
                     let blockchain = TimestampingBlockchain { db: leveldb };
                     Node::with_config(blockchain, node_cfg).run();
