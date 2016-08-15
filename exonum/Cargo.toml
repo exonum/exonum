@@ -17,6 +17,7 @@ clippy = {version="*", optional=true}
 
 [dev-dependencies]
 tempdir = "0.3.4"
+clippy = "0.0.81"
 
 [features]
 default = []
