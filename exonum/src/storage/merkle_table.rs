@@ -87,13 +87,12 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     fn rebuild_hash(&mut self, mut index: K, bytes: Hash) -> Result<(), Error> {
         // FIXME avoid reallocation
         self.map
-            .put(&Self::db_key(K::one(), index),
-                 bytes.as_ref().to_vec())?;
+            .put(&Self::db_key(K::one(), index), bytes.as_ref().to_vec())?;
         let mut current_height = K::one();
         while index != K::zero() {
             // Left leaf, Right leaf is empty
             let new_hash = if index.is_even() {
-                //TODO replace by error
+                // TODO replace by error
                 self.get_hash(current_height, index)?.unwrap()
             } else {
                 // Right leaf

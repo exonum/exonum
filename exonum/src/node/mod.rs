@@ -99,8 +99,7 @@ impl<B: Blockchain> Node<B> {
         let time = self.blockchain
             .last_propose()
             .unwrap()
-            .map_or_else(| | Timespec { sec: 0, nsec: 0 },
-                         |p| p.time());
+            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time());
         let round = 1 +
                     (self.events.get_time() - time).num_milliseconds() / self.round_timeout as i64;
         self.state.jump_round(round as u32);
@@ -188,8 +187,8 @@ impl<B: Blockchain> Node<B> {
         let time = self.blockchain
             .last_propose()
             .unwrap()
-            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time())
-             + Duration::milliseconds(ms);
+            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time()) +
+                   Duration::milliseconds(ms);
         info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
               time,
               self.state.height(),

@@ -179,10 +179,8 @@ impl<'a, T> Field<'a> for T
             });
         }
 
-        Self::check_data(unsafe {
-                                    ::std::slice::from_raw_parts(pos as *const u8, count as usize)
-                                },
-                                from as u32)
+        Self::check_data(unsafe { ::std::slice::from_raw_parts(pos as *const u8, count as usize) },
+                         from as u32)
     }
 }
 

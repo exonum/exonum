@@ -101,9 +101,8 @@ impl<B: Blockchain> Node<B> {
         }
 
         let precommits = if msg.height() == self.state.height() {
-            if let Some(precommits) = self.state.precommits(msg.round(),
-                                                            *msg.propose_hash(),
-                                                            *msg.block_hash()) {
+            if let Some(precommits) = self.state
+                .precommits(msg.round(), *msg.propose_hash(), *msg.block_hash()) {
                 precommits.values().map(|p| p.raw().clone()).collect()
             } else {
                 Vec::new()
