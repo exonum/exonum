@@ -139,7 +139,7 @@ impl OutgoingConnection {
             }
         }
         // TODO: reregister
-        return Ok(());
+        Ok(())
     }
 
     pub fn send(&mut self, message: RawMessage) {

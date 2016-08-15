@@ -6,6 +6,7 @@ use std::collections::Bound::{Included, Unbounded};
 use super::{Map, Database, Error, Patch, Change};
 // use super::{Iterable, Seekable}
 
+#[derive(Default)]
 pub struct MemoryDB {
     map: BTreeMap<Vec<u8>, Vec<u8>>,
 }
@@ -19,7 +20,7 @@ impl MemoryDB {
 
 impl Map<[u8], Vec<u8>> for MemoryDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        Ok(self.map.get(key).map(Clone::clone))
+        Ok(self.map.get(key).cloned())
     }
 
     fn put(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {

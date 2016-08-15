@@ -59,7 +59,7 @@ impl StorageValue for Hash {
     }
 
     fn hash(&self) -> Hash {
-        self.clone()
+        *self
     }
 }
 
@@ -103,6 +103,6 @@ impl StorageValue for Vec<u8> {
     }
 
     fn hash(&self) -> Hash {
-        hash(&self)
+        hash(self)
     }
 }

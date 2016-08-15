@@ -25,7 +25,7 @@ impl<B: Blockchain> Node<B> {
         match self.state.public_key_of(msg.validator()) {
             // Incorrect signature of message
             Some(public_key) => {
-                if !msg.verify(&public_key) {
+                if !msg.verify(public_key) {
                     return;
                 }
             }
@@ -144,7 +144,7 @@ impl<B: Blockchain> Node<B> {
         // Remove request info
         self.remove_request(RequestData::Precommits(round, *propose_hash, *block_hash));
         // Commit
-        if self.state.propose(&propose_hash).is_some() {
+        if self.state.propose(propose_hash).is_some() {
             // FIXME: проверка что у нас есть все транзакции
 
             // Execute block and get state hash
@@ -302,8 +302,8 @@ impl<B: Blockchain> Node<B> {
         if let Some(validator) = self.state.retry(&data, validator) {
             self.add_request_timeout(data.clone(), validator);
 
-            let message = match &data {
-                &RequestData::Propose(ref propose_hash) => {
+            let message = match data {
+                RequestData::Propose(ref propose_hash) => {
                     RequestPropose::new(self.state.id(),
                                         validator,
                                         self.events.get_time(),
@@ -313,13 +313,13 @@ impl<B: Blockchain> Node<B> {
                         .raw()
                         .clone()
                 }
-                &RequestData::Transactions(ref propose_hash) => {
+                RequestData::Transactions(ref propose_hash) => {
                     let txs: Vec<_> = self.state
                         .propose(propose_hash)
                         .unwrap()
                         .unknown_txs()
                         .iter()
-                        .map(|tx| *tx)
+                        .cloned()
                         .collect();
                     RequestTransactions::new(self.state.id(),
                                              validator,
@@ -329,7 +329,7 @@ impl<B: Blockchain> Node<B> {
                         .raw()
                         .clone()
                 }
-                &RequestData::Prevotes(round, ref propose_hash) => {
+                RequestData::Prevotes(round, ref propose_hash) => {
                     RequestPrevotes::new(self.state.id(),
                                          validator,
                                          self.events.get_time(),
@@ -340,7 +340,7 @@ impl<B: Blockchain> Node<B> {
                         .raw()
                         .clone()
                 }
-                &RequestData::Precommits(round, ref propose_hash, ref block_hash) => {
+                RequestData::Precommits(round, ref propose_hash, ref block_hash) => {
                     RequestPrecommits::new(self.state.id(),
                                            validator,
                                            self.events.get_time(),
@@ -352,7 +352,7 @@ impl<B: Blockchain> Node<B> {
                         .raw()
                         .clone()
                 }
-                &RequestData::Commit => {
+                RequestData::Commit => {
                     RequestCommit::new(self.state.id(),
                                        validator,
                                        self.events.get_time(),
@@ -392,7 +392,7 @@ impl<B: Blockchain> Node<B> {
         // Save patch
         self.state.propose(hash).unwrap().set_patch(fork.into());
 
-        hash.clone()
+        *hash
     }
 
     pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) {
@@ -427,7 +427,7 @@ impl<B: Blockchain> Node<B> {
         let txs: Vec<Hash> = self.state
             .transactions()
             .keys()
-            .map(|h| h.clone())
+            .cloned()
             .collect();
         let propose =
             Propose::new(self.state.id(),

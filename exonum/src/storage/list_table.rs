@@ -84,7 +84,7 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
         }
 
         let v = self.map.get(&[])?;
-        let c = v.map(K::deserialize).unwrap_or(K::zero());
+        let c = v.map_or_else(K::zero, K::deserialize);
         self.count.set(Some(c));
         Ok(c)
     }

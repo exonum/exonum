@@ -141,7 +141,7 @@ impl Network {
             // }
         }
         // FIXME: Can we be here?
-        return Ok(None);
+        Ok(None)
     }
 
     pub fn get_peer(&mut self,
@@ -151,15 +151,15 @@ impl Network {
         if let Some(id) = self.addresses.get(address) {
             return Ok(*id);
         };
-        let socket = TcpStream::connect(&address)?;
-        let peer = OutgoingConnection::new(socket, address.clone());
+        let socket = TcpStream::connect(address)?;
+        let peer = OutgoingConnection::new(socket, *address);
         let id = match self.outgoing.insert(peer) {
             Ok(id) => id,
             Err(_) => {
                 return Err(io::Error::new(io::ErrorKind::Other, "Maximum connections"));
             }
         };
-        self.addresses.insert(address.clone(), id);
+        self.addresses.insert(*address, id);
         let r = event_loop.register(self.outgoing[id].socket(),
                                     id,
                                     EventSet::writable() | EventSet::hup(),

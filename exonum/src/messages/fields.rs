@@ -67,7 +67,7 @@ impl<'a> Field<'a> for &'a Hash {
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-        &mut buffer[from..to].copy_from_slice(self.as_ref());
+        buffer[from..to].copy_from_slice(self.as_ref());
     }
 }
 
@@ -77,7 +77,7 @@ impl<'a> Field<'a> for &'a PublicKey {
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-        &mut buffer[from..to].copy_from_slice(self.as_ref());
+        buffer[from..to].copy_from_slice(self.as_ref());
     }
 }
 
@@ -109,7 +109,7 @@ impl<'a> Field<'a> for SocketAddr {
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
         match *self {
             SocketAddr::V4(addr) => {
-                &mut buffer[from..to - 2].copy_from_slice(&addr.ip().octets());
+                buffer[from..to - 2].copy_from_slice(&addr.ip().octets());
             }
             SocketAddr::V6(_) => {
                 // FIXME: Supporting Ipv6
@@ -179,10 +179,10 @@ impl<'a, T> Field<'a> for T
             });
         }
 
-        return Self::check_data(unsafe {
+        Self::check_data(unsafe {
                                     ::std::slice::from_raw_parts(pos as *const u8, count as usize)
                                 },
-                                from as u32);
+                                from as u32)
     }
 }
 

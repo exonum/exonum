@@ -51,7 +51,7 @@ impl<B: Blockchain> Node<B> {
             .position(|pk| pk == &config.public_key)
             .unwrap();
         let connect = Connect::new(&config.public_key,
-                                   reactor.address().clone(),
+                                   reactor.address(),
                                    reactor.get_time(),
                                    &config.secret_key);
 
@@ -88,7 +88,7 @@ impl<B: Blockchain> Node<B> {
         self.events.bind().unwrap();
 
         let connect = self.state.our_connect_message().clone();
-        for address in self.peer_discovery.clone().iter() {
+        for address in &self.peer_discovery.clone() {
             if address == &self.events.address() {
                 continue;
             }
@@ -99,8 +99,8 @@ impl<B: Blockchain> Node<B> {
         let time = self.blockchain
             .last_propose()
             .unwrap()
-            .map(|p| p.time())
-            .unwrap_or_else(|| Timespec { sec: 0, nsec: 0 });
+            .map_or_else(| | Timespec { sec: 0, nsec: 0 },
+                         |p| p.time());
         let round = 1 +
                     (self.events.get_time() - time).num_milliseconds() / self.round_timeout as i64;
         self.state.jump_round(round as u32);
@@ -188,9 +188,8 @@ impl<B: Blockchain> Node<B> {
         let time = self.blockchain
             .last_propose()
             .unwrap()
-            .map(|p| p.time())
-            .unwrap_or_else(|| Timespec { sec: 0, nsec: 0 }) +
-                   Duration::milliseconds(ms);
+            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time())
+             + Duration::milliseconds(ms);
         info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
               time,
               self.state.height(),

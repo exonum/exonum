@@ -313,6 +313,8 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
+type Entry<V> = (Vec<u8>, Node<V>);
+
 // TODO avoid reallocations where is possible.
 impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaTable<T, K, V> {
     pub fn new(map: T) -> Self {
@@ -334,7 +336,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn root_node(&self) -> Result<Option<(Vec<u8>, Node<V>)>, Error> {
+    fn root_node(&self) -> Result<Option<Entry<V>>, Error> {
         let out = match self.root_prefix()? {
             Some(prefix) => {
                 let node = self.read_node(&prefix)?;
@@ -345,7 +347,8 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         Ok(out)
     }
 
-    fn insert(&mut self, key: &Vec<u8>, value: V) -> Result<(), Error> {
+    fn insert<A: AsRef<[u8]>>(&mut self, key: A, value: V) -> Result<(), Error> {
+        let key = key.as_ref();
         debug_assert_eq!(key.len(), KEY_SIZE);
 
         let key_slice = BitSlice::from_bytes(key);
@@ -415,7 +418,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
             // check that child is leaf to avoid unnecessary read
             if child_slice.is_leaf_key() {
                 // there is a leaf in branch and we needs to update its value
-                let hash = self.insert_leaf(&key_slice, value)?;
+                let hash = self.insert_leaf(key_slice, value)?;
                 Ok((None, hash))
             } else {
                 match self.read_node(child_slice.to_db_key())? {

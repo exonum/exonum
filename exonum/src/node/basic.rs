@@ -17,7 +17,7 @@ impl<B: Blockchain> Node<B> {
         }
 
         // Check if we have another connect message from peer with the given public_key
-        let public_key = message.pub_key().clone();
+        let public_key = *message.pub_key();
         let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
@@ -50,7 +50,7 @@ impl<B: Blockchain> Node<B> {
             match self.state.public_key_of(msg.validator()) {
                 // Incorrect signature of message
                 Some(public_key) => {
-                    if !msg.verify(&public_key) {
+                    if !msg.verify(public_key) {
                         return;
                     }
                 }
@@ -104,17 +104,15 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_peer_exchange_timeout(&mut self) {
         let to = self.state.validators().len() as ValidatorId - 1;
-        let gen_validator = || {
+        let gen_validator_id = || {
             let mut rng = rand::thread_rng();
-            let validator = rng.gen_range(0, to);
-            validator
+            rng.gen_range(0, to)
         };
 
-        let mut validator = gen_validator();
+        let mut validator = gen_validator_id();
         while validator == self.state.id() {
-            validator = gen_validator();
+            validator = gen_validator_id();
         }
-
 
         let msg = RequestPeers::new(self.state.id(),
                                     validator,

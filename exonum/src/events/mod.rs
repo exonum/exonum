@@ -133,7 +133,7 @@ impl Reactor for Events {
     }
 
     fn address(&self) -> SocketAddr {
-        self.queue.network.address().clone()
+        *self.queue.network.address()
     }
 
     fn add_timeout(&mut self, timeout: Timeout, time: Timespec) {

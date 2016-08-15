@@ -6,7 +6,7 @@ use super::{Map, Error};
 // TODO In this implementation there are extra memory allocations when key is passed into specific database.
 // Think about key type. Maybe we can use keys with fixed length?
 pub trait Database: Map<[u8], Vec<u8>> + Sized {
-    fn fork<'a>(&'a self) -> Fork<'a, Self> {
+    fn fork(&self) -> Fork<Self> {
         Fork {
             database: self,
             changes: BTreeMap::new(),
@@ -67,9 +67,9 @@ impl<'a, T> Map<[u8], Vec<u8>> for Fork<'a, T>
             it.next().map(|x| x.0.to_vec())
         };
         if out.is_none() {
-            return self.database.find_key(key);
+            self.database.find_key(key)
         } else {
-            return Ok(out);
+            Ok(out)
         }
     }
 }

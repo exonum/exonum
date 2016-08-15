@@ -118,12 +118,12 @@ impl RequestState {
         self.known_nodes.remove(validator);
     }
 
-    fn is_empty(&mut self) -> bool {
+    fn is_empty(&self) -> bool {
         self.known_nodes.is_empty()
     }
 
     fn peek(&self) -> Option<ValidatorId> {
-        self.known_nodes.iter().next().map(|v| *v)
+        self.known_nodes.iter().next().cloned()
     }
 }
 
@@ -292,7 +292,7 @@ impl<Tx> State<Tx> {
 
         {
             let state = self.proposes
-                .get(&propose_hash)
+                .get(propose_hash)
                 .expect("Trying to commit unknown propose");
             for tx in state.propose.transactions() {
                 self.transactions.remove(tx);
@@ -323,14 +323,14 @@ impl<Tx> State<Tx> {
 
     pub fn add_transaction(&mut self, hash: Hash, msg: Tx) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
-        for (hash, state) in self.proposes.iter_mut() {
-            state.unknown_txs.remove(&hash);
+        for (hash, state) in &mut self.proposes {
+            state.unknown_txs.remove(hash);
             if state.unknown_txs.is_empty() {
                 full_proposes.push((*hash, state.message().round()));
             }
         }
         self.transactions.insert(hash, msg);
-        return full_proposes;
+        full_proposes
     }
 
     pub fn prevotes(&self,
@@ -370,7 +370,7 @@ impl<Tx> State<Tx> {
                 let unknown_txs = msg.transactions()
                     .iter()
                     .filter(|tx| !txs.contains_key(tx))
-                    .map(|tx| *tx)
+                    .cloned()
                     .collect(): BTreeSet<Hash>;
                 for tx in &unknown_txs {
                     self.unknown_txs
@@ -397,7 +397,7 @@ impl<Tx> State<Tx> {
         }
 
         let key = (msg.round(), *msg.propose_hash());
-        let map = self.prevotes.entry(key).or_insert_with(|| HashMap::new());
+        let map = self.prevotes.entry(key).or_insert_with(HashMap::new);
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
         map.len() >= majority_count
@@ -419,7 +419,7 @@ impl<Tx> State<Tx> {
         }
 
         let key = (msg.round(), *msg.propose_hash(), *msg.block_hash());
-        let map = self.precommits.entry(key).or_insert_with(|| HashMap::new());
+        let map = self.precommits.entry(key).or_insert_with(HashMap::new);
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
         map.len() >= majority_count
@@ -475,7 +475,7 @@ impl<Tx> State<Tx> {
             .or_insert_with(RequestState::new);
         let is_new = state.is_empty();
         state.insert(validator);
-        return is_new;
+        is_new
     }
 
     pub fn retry(&mut self, data: &RequestData, validator: ValidatorId) -> Option<ValidatorId> {
@@ -488,8 +488,7 @@ impl<Tx> State<Tx> {
         if next.is_none() {
             self.requests.remove(data);
         };
-
-        return next;
+        next
     }
 
     pub fn remove_request(&mut self, data: &RequestData) -> HashSet<ValidatorId> {

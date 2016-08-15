@@ -29,7 +29,7 @@ impl<B: Blockchain> Node<B> {
         match self.state.public_key_of(msg.from()) {
             // Incorrect signature of message
             Some(public_key) => {
-                if !msg.verify(&public_key) {
+                if !msg.verify(public_key) {
                     return;
                 }
             }
@@ -69,7 +69,7 @@ impl<B: Blockchain> Node<B> {
             let tx = self.state
                 .transactions()
                 .get(hash)
-                .map(|tx| tx.clone())
+                .cloned()
                 .or_else(|| self.blockchain.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {
@@ -84,7 +84,7 @@ impl<B: Blockchain> Node<B> {
         }
 
         let prevotes = if let Some(prevotes) = self.state
-            .prevotes(msg.round(), msg.propose_hash().clone()) {
+            .prevotes(msg.round(), *msg.propose_hash()) {
             prevotes.values().map(|p| p.raw().clone()).collect()
         } else {
             Vec::new()
@@ -102,8 +102,8 @@ impl<B: Blockchain> Node<B> {
 
         let precommits = if msg.height() == self.state.height() {
             if let Some(precommits) = self.state.precommits(msg.round(),
-                                                            msg.propose_hash().clone(),
-                                                            msg.block_hash().clone()) {
+                                                            *msg.propose_hash(),
+                                                            *msg.block_hash()) {
                 precommits.values().map(|p| p.raw().clone()).collect()
             } else {
                 Vec::new()
