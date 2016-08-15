@@ -17,7 +17,7 @@
 apt install build-essential git libsodium-dev
 ```
 
-### MacOS
+### macOS
 
 Прежде всего необходимо установить и настроить homebrew согласно его [инструкции](http://brew.sh/). После чего установить следующие пакеты:
 ```
