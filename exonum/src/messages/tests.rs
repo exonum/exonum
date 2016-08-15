@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use super::super::crypto::{hash, gen_keypair};
+use super::super::crypto::{hash, Hash, gen_keypair};
 
 use super::{Message, Connect, Propose, Prevote, Precommit, Status};
 
@@ -28,8 +28,7 @@ fn test_propose() {
     let round = 321_321_312;
     let time = ::time::get_time();
     let prev_hash = hash(&[1, 2, 3]);
-    // TODO: check with real transactions
-    let txs = vec![];
+    let txs = vec![hash(&[1]), hash(&[2]), hash(&[2])];
     let (public_key, secret_key) = gen_keypair();
 
     // write
@@ -46,7 +45,10 @@ fn test_propose() {
     assert_eq!(propose.round(), round);
     assert_eq!(propose.time(), time);
     assert_eq!(propose.prev_hash(), &prev_hash);
-    // assert_eq!(propose.transactions(), &txs);
+    assert_eq!(propose.transactions().len(), 3);
+    assert_eq!(propose.transactions()[0], txs[0]);
+    assert_eq!(propose.transactions()[1], txs[1]);
+    assert_eq!(propose.transactions()[2], txs[2]);
     assert!(propose.verify(&public_key));
 }
 

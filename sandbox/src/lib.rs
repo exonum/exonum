@@ -1,5 +1,6 @@
 #![feature(type_ascription)]
 
+extern crate rand;
 extern crate time;
 extern crate exonum;
 extern crate timestamping;
@@ -11,4 +12,6 @@ mod sandbox;
 #[cfg(test)]
 mod tests;
 
-// mod tx_generator;
+mod tx_generator;
+
+pub use tx_generator::{TimestampingTxGenerator};

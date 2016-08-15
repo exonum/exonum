@@ -8,6 +8,10 @@ use super::sandbox::timestamping_sandbox;
 fn test_send_propose_and_prevote() {
     let sandbox = timestamping_sandbox();
 
+    // get some tx
+    let tx = sandbox.gen_tx();
+    sandbox.recv(tx.clone());
+
     // round happens
     sandbox.set_time(1, 0);
     sandbox.set_time(2, 0);
@@ -21,7 +25,7 @@ fn test_send_propose_and_prevote() {
                                4,
                                sandbox.time(),
                                &sandbox.last_hash(),
-                               &[],
+                               &[tx.hash()],
                                sandbox.s(0));
 
     sandbox.broadcast(propose.clone());

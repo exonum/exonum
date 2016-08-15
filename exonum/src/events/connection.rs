@@ -3,15 +3,49 @@ use std::mem::swap;
 use std::net::SocketAddr;
 use std::collections::VecDeque;
 
+use byteorder::{ByteOrder, LittleEndian};
+
 use mio::tcp::TcpStream;
 use mio::{TryWrite, TryRead};
 
 use super::super::messages::{RawMessage, MessageBuffer, HEADER_SIZE};
 
+#[derive(Debug, PartialEq)]
+pub struct MessageReader {
+    raw: Vec<u8>,
+}
+
+impl MessageReader {
+    pub fn empty() -> MessageReader {
+        MessageReader { raw: vec![0; HEADER_SIZE] }
+    }
+
+    pub fn actual_len(&self) -> usize {
+        self.raw.len()
+    }
+
+    pub fn total_len(&self) -> usize {
+        LittleEndian::read_u32(&self.raw[4..8]) as usize
+    }
+
+    pub fn allocate(&mut self) {
+        let size = self.total_len();
+        self.raw.resize(size, 0);
+    }
+
+    pub fn buffer(&mut self) -> &mut [u8] {
+        &mut self.raw
+    }
+
+    pub fn into_raw(self) -> MessageBuffer {
+        MessageBuffer::from_vec(self.raw)
+    }
+}
+
 pub struct IncomingConnection {
     socket: TcpStream,
     // address: SocketAddr,
-    raw: MessageBuffer,
+    raw: MessageReader,
     position: usize,
 }
 
@@ -27,7 +61,7 @@ impl IncomingConnection {
         IncomingConnection {
             socket: socket,
             // address: address,
-            raw: MessageBuffer::empty(),
+            raw: MessageReader::empty(),
             position: 0,
         }
     }
@@ -43,11 +77,10 @@ impl IncomingConnection {
     fn read(&mut self) -> io::Result<Option<usize>> {
         // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
         // TODO: read into growable Vec, not into [u8]
-        if self.position == HEADER_SIZE && self.raw.actual_length() == HEADER_SIZE {
-            self.raw.allocate_payload();
+        if self.position == HEADER_SIZE && self.raw.actual_len() == HEADER_SIZE {
+            self.raw.allocate();
         }
-        let buffer: &mut [u8] = self.raw.as_mut();
-        self.socket.try_read(&mut buffer[self.position..])
+        self.socket.try_read(&mut self.raw.buffer()[self.position..])
     }
 
     pub fn readable(&mut self) -> io::Result<Option<MessageBuffer>> {
@@ -58,11 +91,11 @@ impl IncomingConnection {
                 None | Some(0) => return Ok(None),
                 Some(n) => {
                     self.position += n;
-                    if self.position >= HEADER_SIZE && self.position == self.raw.total_length() {
-                        let mut raw = MessageBuffer::empty();
+                    if self.position >= HEADER_SIZE && self.position == self.raw.total_len() {
+                        let mut raw = MessageReader::empty();
                         swap(&mut raw, &mut self.raw);
                         self.position = 0;
-                        return Ok(Some(raw));
+                        return Ok(Some(raw.into_raw()));
                     }
                 }
             }
@@ -99,7 +132,7 @@ impl OutgoingConnection {
                 Some(n) => {
                     // FIXME: What if we write less than message size?
                     self.position += n;
-                    if n == message.actual_length() {
+                    if n == message.len() {
                         self.position = 0;
                     }
                 }

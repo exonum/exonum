@@ -16,6 +16,8 @@ use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 use timestamping::TimestampingBlockchain;
 
+use super::TimestampingTxGenerator;
+
 struct SandboxInner {
     address: SocketAddr,
     time: Timespec,
@@ -40,9 +42,10 @@ impl Ord for TimerPair {
 }
 
 
-pub struct Sandbox<B: Blockchain> {
+pub struct Sandbox<B: Blockchain, G: Iterator<Item=B::Transaction>> {
     inner: Arc<RefCell<SandboxInner>>,
     node: RefCell<Node<B>>,
+    tx_generator: RefCell<G>,
     validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
 }
@@ -51,8 +54,8 @@ pub struct SandboxReactor {
     inner: Arc<RefCell<SandboxInner>>,
 }
 
-impl<B: Blockchain> Sandbox<B> {
-    pub fn new(b: B) -> Sandbox<B> {
+impl<B: Blockchain, G: Iterator<Item=B::Transaction>> Sandbox<B, G> {
+    pub fn new(b: B, g: G) -> Sandbox<B, G> {
         let validators = vec![
             gen_keypair(),
             gen_keypair(),
@@ -98,6 +101,7 @@ impl<B: Blockchain> Sandbox<B> {
         let sandbox = Sandbox {
             inner: inner,
             node: RefCell::new(node),
+            tx_generator: RefCell::new(g),
             validators: validators,
             addresses: addresses,
         };
@@ -136,7 +140,7 @@ impl Reactor for SandboxReactor {
     }
 }
 
-impl<B: Blockchain> Sandbox<B> {
+impl<B, G> Sandbox<B, G> where B: Blockchain, G: Iterator<Item=B::Transaction> {
     fn initialize(&self) {
         self.node.borrow_mut().initialize();
 
@@ -161,6 +165,19 @@ impl<B: Blockchain> Sandbox<B> {
                 .expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
+    }
+
+    pub fn gen_tx(&self) -> B::Transaction {
+        self.tx_generator.borrow_mut().next().unwrap()
+    }
+
+    pub fn gen_txs(&self, count: usize) -> Vec<B::Transaction> {
+        let mut v = Vec::new();
+        let mut tx_generator = self.tx_generator.borrow_mut();
+        for _ in 0..count {
+            v.push(tx_generator.next().unwrap())
+        }
+        v
     }
 
     pub fn p(&self, id: usize) -> &PublicKey {
@@ -296,7 +313,7 @@ impl<B: Blockchain> Sandbox<B> {
     }
 }
 
-impl<B: Blockchain> Drop for Sandbox<B> {
+impl<B, G> Drop for Sandbox<B, G> where B: Blockchain, G: Iterator<Item=B::Transaction> {
     fn drop(&mut self) {
         if !::std::thread::panicking() {
             self.check_unexpected_message();
@@ -304,8 +321,9 @@ impl<B: Blockchain> Drop for Sandbox<B> {
     }
 }
 
-pub fn timestamping_sandbox() -> Sandbox<TimestampingBlockchain<MemoryDB>> {
-    Sandbox::new(TimestampingBlockchain { db: MemoryDB::new() })
+pub fn timestamping_sandbox() -> Sandbox<TimestampingBlockchain<MemoryDB>, TimestampingTxGenerator> {
+    Sandbox::new(TimestampingBlockchain { db: MemoryDB::new() },
+                 TimestampingTxGenerator::new(64))
 }
 
 #[test]

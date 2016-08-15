@@ -78,9 +78,6 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
-        // Remove request info
-        self.remove_request(RequestData::Transactions(hash.clone()));
-
         // Send prevote
         if self.state.locked_round() == 0 {
             self.send_prevote(propose_round, &hash);
@@ -91,7 +88,7 @@ impl<B: Blockchain> Node<B> {
         let start_round = ::std::cmp::max(self.state.locked_round() + 1, propose_round);
         for round in start_round...self.state.round() {
             if self.state.has_majority_prevotes(round, hash) {
-                self.has_majority_prevotes(round, &hash);
+                self.lock(round, hash);
             }
         }
 
@@ -264,6 +261,7 @@ impl<B: Blockchain> Node<B> {
 
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
+            self.remove_request(RequestData::Transactions(hash.clone()));
             self.has_full_propose(hash, round);
         }
     }
@@ -299,6 +297,7 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_request_timeout(&mut self, data: RequestData, validator: ValidatorId) {
+        // FIXME: check height?
         info!("REQUEST TIMEOUT");
         if let Some(validator) = self.state.retry(&data, validator) {
             self.add_request_timeout(data.clone(), validator);
@@ -367,6 +366,7 @@ impl<B: Blockchain> Node<B> {
         }
     }
 
+    // TODO: move this to state
     pub fn is_leader(&self) -> bool {
         self.state.leader(self.state.round()) == self.state.id()
     }

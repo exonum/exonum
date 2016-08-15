@@ -14,7 +14,7 @@ use time::Timespec;
 
 use super::crypto::PublicKey;
 
-pub use self::raw::{RawMessage, MessageBuffer, Message, HEADER_SIZE};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::Error;
 pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;

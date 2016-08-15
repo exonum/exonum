@@ -12,22 +12,13 @@ macro_rules! message {
         }
 
         impl $crate::messages::Message for $name {
-            // const MESSAGE_TYPE : u16 = $id;
-            // const BODY_LENGTH : usize = $body;
-            // const PAYLOAD_LENGTH : usize =
-            //     $body + $crate::crypto::SIGNATURE_LENGTH;
-            // const TOTAL_LENGTH : usize =
-            //     $body + $crate::crypto::SIGNATURE_LENGTH
-            //           + $crate::messages::HEADER_SIZE;
-
             fn raw(&self) -> &$crate::messages::RawMessage {
                 &self.raw
             }
 
             fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::messages::Error> {
-                use $crate::messages::Field;
-                $(<$field_type>::check(raw.payload(), $from, $to)?;)*
+                $(raw.check::<$field_type>($from, $to)?;)*
                 Ok($name { raw: raw })
             }
         }
@@ -35,25 +26,13 @@ macro_rules! message {
         impl $name {
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
-                use $crate::messages::{
-                    RawMessage, MessageBuffer, Field
-                };
-                let mut raw = MessageBuffer::new($id,
-                                                 $body + $crate::crypto::SIGNATURE_LENGTH);
-                {
-                    let mut buffer = raw.as_mut();
-                    $(
-                    let from = $from + $crate::messages::HEADER_SIZE;
-                    let to = $to + $crate::messages::HEADER_SIZE;
-                    $field_name.write(&mut buffer, from, to);
-                    )*
-                }
-                raw.sign(secret_key);
-                $name { raw: RawMessage::new(raw) }
+                use $crate::messages::{RawMessage, MessageWriter};
+                let mut writer = MessageWriter::new($id, $body);
+                $(writer.write($field_name, $from, $to);)*
+                $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
             $(pub fn $field_name(&self) -> $field_type {
-                use $crate::messages::Field;
-                <$field_type>::read(self.raw.payload(), $from, $to)
+                self.raw.read::<$field_type>($from, $to)
             })*
         }
 

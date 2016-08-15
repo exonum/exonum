@@ -139,9 +139,10 @@ impl<'a, T> Field<'a> for T
     fn read(buffer: &'a [u8], from: usize, to: usize) -> T {
         unsafe {
             let pos = LittleEndian::read_u32(&buffer[from..from + 4]);
-            let len = LittleEndian::read_u32(&buffer[from + 4..to]);
+            let count = LittleEndian::read_u32(&buffer[from + 4..to]);
             let ptr = buffer.as_ptr().offset(pos as isize);
-            Self::from_slice(::std::slice::from_raw_parts(ptr as *const u8, len as usize))
+            let len = (count as usize) * Self::ITEM_SIZE;
+            Self::from_slice(::std::slice::from_raw_parts(ptr as *const u8, len))
         }
     }
 

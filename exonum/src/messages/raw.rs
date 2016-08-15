@@ -6,7 +6,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use super::super::crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash,
                            SIGNATURE_LENGTH};
 
-use super::Error;
+use super::{Field, Error};
 
 pub const HEADER_SIZE: usize = 8; // TODO: rename to HEADER_LENGTH?
 
@@ -15,6 +15,8 @@ pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
 
 pub type RawMessage = sync::Arc<MessageBuffer>;
 
+// TODO: reduce `to` argument from `write`, `read` and `check` methods
+// TODO: payload_length as a first value into message header
 // TODO: make sure that message length is enougth when using mem::transmute
 
 #[derive(Debug, PartialEq)]
@@ -23,22 +25,14 @@ pub struct MessageBuffer {
 }
 
 impl MessageBuffer {
-    pub fn empty() -> MessageBuffer {
-        MessageBuffer { raw: vec![0; HEADER_SIZE] }
-    }
-
-    pub fn new(message_type: u16, payload_length: usize) -> MessageBuffer {
-        let mut raw = MessageBuffer { raw: vec![0; HEADER_SIZE + payload_length] };
-        raw.set_network_id(TEST_NETWORK_ID);
-        raw.set_version(PROTOCOL_MAJOR_VERSION);
-        raw.set_message_type(message_type);
-        raw.set_payload_length(payload_length);
-        raw
-    }
-
     pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
         // TODO: check that size >= HEADER_SIZE
+        // TODO: check that payload_length == raw.len()
         MessageBuffer { raw: raw }
+    }
+
+    pub fn len(&self) -> usize {
+        self.raw.len()
     }
 
     pub fn network_id(&self) -> u8 {
@@ -53,66 +47,25 @@ impl MessageBuffer {
         LittleEndian::read_u16(&self.raw[2..4])
     }
 
-    pub fn payload_length(&self) -> usize {
-        LittleEndian::read_u32(&self.raw[4..8]) as usize
+    fn body(&self) -> &[u8] {
+        &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
-    pub fn set_network_id(&mut self, network_id: u8) {
-        self.raw[0] = network_id
+    pub fn check<'a, F: Field<'a>>(&'a self, from: usize, to: usize) -> Result<(), Error> {
+        F::check(self.body(), from + HEADER_SIZE, to + HEADER_SIZE)
     }
 
-    pub fn set_version(&mut self, version: u8) {
-        self.raw[1] = version
-    }
-
-    pub fn set_message_type(&mut self, message_type: u16) {
-        LittleEndian::write_u16(&mut self.raw[2..4], message_type)
-    }
-
-    pub fn set_payload_length(&mut self, length: usize) {
-        LittleEndian::write_u32(&mut self.raw[4..8], length as u32)
-    }
-
-    pub fn actual_length(&self) -> usize {
-        self.raw.len()
-    }
-
-    pub fn total_length(&self) -> usize {
-        HEADER_SIZE + self.payload_length()
-    }
-
-    pub fn payload(&self) -> &[u8] {
-        &self.raw[HEADER_SIZE..]
-    }
-
-    pub fn payload_mut(&mut self) -> &mut [u8] {
-        &mut self.raw[HEADER_SIZE..]
+    pub fn read<'a, F: Field<'a>>(&'a self, from: usize, to: usize) -> F {
+        F::read(self.body(), from + HEADER_SIZE, to + HEADER_SIZE)
     }
 
     pub fn signature(&self) -> &Signature {
-        let sign_idx = self.total_length() - SIGNATURE_LENGTH;
+        let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         unsafe { mem::transmute(&self.raw[sign_idx]) }
     }
 
-    pub fn signature_mut(&mut self) -> &mut Signature {
-        let sign_idx = self.total_length() - SIGNATURE_LENGTH;
-        unsafe { mem::transmute(&mut self.raw[sign_idx]) }
-    }
-
-    pub fn allocate_payload(&mut self) {
-        let size = self.total_length();
-        self.raw.resize(size, 0);
-    }
-
-    pub fn sign(&mut self, secret_key: &SecretKey) {
-        let sign_idx = self.total_length() - SIGNATURE_LENGTH;
-        let signature = sign(&self.raw[..sign_idx], secret_key);
-        self.signature_mut().clone_from(&signature);
-    }
-
     pub fn verify(&self, pub_key: &PublicKey) -> bool {
-        let sign_idx = self.total_length() - SIGNATURE_LENGTH;
-        verify(self.signature(), &self.raw[..sign_idx], pub_key)
+        verify(self.signature(), self.body(), pub_key)
     }
 }
 
@@ -122,24 +75,50 @@ impl convert::AsRef<[u8]> for MessageBuffer {
     }
 }
 
-impl convert::AsMut<[u8]> for MessageBuffer {
-    fn as_mut(&mut self) -> &mut [u8] {
-        &mut self.raw
-    }
+#[derive(Debug, PartialEq)]
+pub struct MessageWriter {
+    raw: Vec<u8>,
 }
 
-impl convert::AsMut<Vec<u8>> for MessageBuffer {
-    fn as_mut(&mut self) -> &mut Vec<u8> {
-        &mut self.raw
+impl MessageWriter {
+    pub fn new(message_type: u16, payload_length: usize) -> MessageWriter {
+        let mut raw = MessageWriter { raw: vec![0; HEADER_SIZE + payload_length] };
+        raw.set_network_id(TEST_NETWORK_ID);
+        raw.set_version(PROTOCOL_MAJOR_VERSION);
+        raw.set_message_type(message_type);
+        raw
+    }
+
+    fn set_network_id(&mut self, network_id: u8) {
+        self.raw[0] = network_id
+    }
+
+    fn set_version(&mut self, version: u8) {
+        self.raw[1] = version
+    }
+
+    fn set_message_type(&mut self, message_type: u16) {
+        LittleEndian::write_u16(&mut self.raw[2..4], message_type)
+    }
+
+    fn set_payload_length(&mut self, length: usize) {
+        LittleEndian::write_u32(&mut self.raw[4..8], length as u32)
+    }
+
+    pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: usize, to: usize) {
+        field.write(&mut self.raw, from + HEADER_SIZE, to + HEADER_SIZE);
+    }
+
+    pub fn sign(mut self, secret_key: &SecretKey) -> MessageBuffer {
+        let payload_length = self.raw.len() + SIGNATURE_LENGTH;
+        self.set_payload_length(payload_length);
+        let signature = sign(&self.raw, secret_key);
+        self.raw.extend_from_slice(signature.as_ref());
+        MessageBuffer { raw: self.raw }
     }
 }
 
 pub trait Message: Debug + Clone + PartialEq + Sized {
-    // const MESSAGE_TYPE : u16;
-    // const BODY_LENGTH : usize;
-    // const PAYLOAD_LENGTH : usize;
-    // const TOTAL_LENGTH : usize;
-
     fn raw(&self) -> &RawMessage;
     fn from_raw(raw: RawMessage) -> Result<Self, Error>;
 
@@ -152,14 +131,14 @@ pub trait Message: Debug + Clone + PartialEq + Sized {
     }
 }
 
-#[test]
-fn test_empty_message() {
-    let raw = MessageBuffer::empty();
-    assert_eq!(raw.network_id(), 0);
-    assert_eq!(raw.version(), 0);
-    assert_eq!(raw.message_type(), 0);
-    assert_eq!(raw.payload_length(), 0);
-}
+// #[test]
+// fn test_empty_message() {
+//     let raw = MessageBuffer::empty();
+//     assert_eq!(raw.network_id(), 0);
+//     assert_eq!(raw.version(), 0);
+//     assert_eq!(raw.message_type(), 0);
+//     assert_eq!(raw.payload_length(), 0);
+// }
 
 // #[test]
 // fn test_as_mut() {
