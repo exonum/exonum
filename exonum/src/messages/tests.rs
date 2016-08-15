@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use super::super::crypto::{hash, Hash, gen_keypair};
+use super::super::crypto::{hash, gen_keypair};
 
 use super::{Message, Connect, Propose, Prevote, Precommit, Status};
 
