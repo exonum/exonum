@@ -102,7 +102,7 @@ pub enum RequestMessage {
 // }
 
 impl RequestMessage {
-    pub fn from(&self) -> u32 {
+    pub fn from(&self) -> &PublicKey {
         match *self {
             RequestMessage::Propose(ref msg) => msg.from(),
             RequestMessage::Transactions(ref msg) => msg.from(),
@@ -113,7 +113,7 @@ impl RequestMessage {
         }
     }
 
-    pub fn to(&self) -> u32 {
+    pub fn to(&self) -> &PublicKey {
         match *self {
             RequestMessage::Propose(ref msg) => msg.to(),
             RequestMessage::Transactions(ref msg) => msg.to(),

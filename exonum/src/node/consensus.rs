@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::super::crypto::Hash;
+use super::super::crypto::{Hash, PublicKey};
 use super::super::storage::{Blockchain, TxStorage, BlockStorage};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
@@ -68,7 +68,8 @@ impl<B: Blockchain> Node<B> {
         let known_nodes = self.remove_request(RequestData::Propose(hash));
 
         if has_unknown_txs {
-            self.request(RequestData::Transactions(hash), msg.validator());
+            let key = self.public_key_of(msg.validator());
+            self.request(RequestData::Transactions(hash), key);
             for node in known_nodes {
                 self.request(RequestData::Transactions(hash), node);
             }
@@ -115,8 +116,9 @@ impl<B: Blockchain> Node<B> {
 
         // Request prevotes
         if prevote.locked_round() > self.state.locked_round() {
+            let key = self.public_key_of(prevote.validator());
             self.request(RequestData::Prevotes(prevote.locked_round(), *prevote.propose_hash()),
-                         prevote.validator());
+                         key);
         }
 
         // Lock to propose
@@ -193,9 +195,10 @@ impl<B: Blockchain> Node<B> {
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
 
+        let peer = self.public_key_of(msg.validator());
         // Request propose
         if let None = self.state.propose(msg.propose_hash()) {
-            self.request(RequestData::Propose(*msg.propose_hash()), msg.validator());
+            self.request(RequestData::Propose(*msg.propose_hash()), peer);
         }
 
         // Request prevotes
@@ -204,7 +207,7 @@ impl<B: Blockchain> Node<B> {
         // отправки RequestPrevotes?
         if msg.round() > self.state.locked_round() {
             self.request(RequestData::Prevotes(msg.round(), *msg.propose_hash()),
-                         msg.validator());
+                        peer);
         }
 
         // Has majority precommits
@@ -238,7 +241,8 @@ impl<B: Blockchain> Node<B> {
 
         // Request commits
         for validator in self.state.validator_heights() {
-            self.request(RequestData::Commit, validator)
+            let peer = self.public_key_of(validator);
+            self.request(RequestData::Commit, peer)
         }
     }
 
@@ -296,16 +300,16 @@ impl<B: Blockchain> Node<B> {
         }
     }
 
-    pub fn handle_request_timeout(&mut self, data: RequestData, validator: ValidatorId) {
+    pub fn handle_request_timeout(&mut self, data: RequestData, peer: PublicKey) {
         // FIXME: check height?
         info!("REQUEST TIMEOUT");
-        if let Some(validator) = self.state.retry(&data, validator) {
-            self.add_request_timeout(data.clone(), validator);
+        if let Some(peer) = self.state.retry(&data, peer) {
+            self.add_request_timeout(data.clone(), peer);
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    RequestPropose::new(self.state.id(),
-                                        validator,
+                    RequestPropose::new(&self.public_key,
+                                        &peer,
                                         self.events.get_time(),
                                         self.state.height(),
                                         propose_hash,
@@ -321,8 +325,8 @@ impl<B: Blockchain> Node<B> {
                         .iter()
                         .cloned()
                         .collect();
-                    RequestTransactions::new(self.state.id(),
-                                             validator,
+                    RequestTransactions::new(&self.public_key,
+                                             &peer,
                                              self.events.get_time(),
                                              &txs,
                                              &self.secret_key)
@@ -330,8 +334,8 @@ impl<B: Blockchain> Node<B> {
                         .clone()
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    RequestPrevotes::new(self.state.id(),
-                                         validator,
+                    RequestPrevotes::new(&self.public_key,
+                                         &peer,
                                          self.events.get_time(),
                                          self.state.height(),
                                          round,
@@ -341,8 +345,8 @@ impl<B: Blockchain> Node<B> {
                         .clone()
                 }
                 RequestData::Precommits(round, ref propose_hash, ref block_hash) => {
-                    RequestPrecommits::new(self.state.id(),
-                                           validator,
+                    RequestPrecommits::new(&self.public_key,
+                                           &peer,
                                            self.events.get_time(),
                                            self.state.height(),
                                            round,
@@ -353,8 +357,8 @@ impl<B: Blockchain> Node<B> {
                         .clone()
                 }
                 RequestData::Commit => {
-                    RequestCommit::new(self.state.id(),
-                                       validator,
+                    RequestCommit::new(&self.public_key,
+                                       &peer,
                                        self.events.get_time(),
                                        self.state.height(),
                                        &self.secret_key)
@@ -362,7 +366,7 @@ impl<B: Blockchain> Node<B> {
                         .clone()
                 }
             };
-            self.send_to_validator(validator, &message);
+            self.send_to_peer(peer, &message);
         }
     }
 
@@ -412,11 +416,12 @@ impl<B: Blockchain> Node<B> {
         };
 
         if let Some(data) = requested_data {
-            self.request(data, validator);
+            let key = self.public_key_of(validator);
+            self.request(data, key);
         }
     }
 
-    pub fn remove_request(&mut self, data: RequestData) -> HashSet<ValidatorId> {
+    pub fn remove_request(&mut self, data: RequestData) -> HashSet<PublicKey> {
         // TODO: clear timeout
         self.state.remove_request(&data)
     }
@@ -469,5 +474,9 @@ impl<B: Blockchain> Node<B> {
                                        &self.secret_key);
         self.state.add_precommit(&precommit);
         self.broadcast(precommit.raw());
+    }
+
+    fn public_key_of(&self, id: ValidatorId) -> PublicKey {
+        *self.state.public_key_of(id).unwrap()
     }
 }

@@ -78,45 +78,43 @@ message! {
     }
 }
 
-// TODO: видимо поля `from` и `to` должны быть PublicKey, поскольку узлы
-// могут находиться на разных высотах и вообще не быть валидаторами
 
 message! {
     RequestPropose {
         const ID = REQUEST_PROPOSE_MESSAGE_ID;
-        const SIZE = 56;
+        const SIZE = 112;
 
-        from:           u32         [00 => 04]
-        to:             u32         [04 => 08]
-        time:           Timespec    [08 => 16]
-        height:         u64         [16 => 24]
-        propose_hash:   &Hash       [24 => 56]
+        from:           &PublicKey  [00 => 32]
+        to:             &PublicKey  [32 => 64]
+        time:           Timespec    [64 => 72]
+        height:         u64         [72 => 80]
+        propose_hash:   &Hash       [80 => 112]
     }
 }
 
 message! {
     RequestTransactions {
         const ID = REQUEST_TRANSACTIONS_MESSAGE_ID;
-        const SIZE = 24;
+        const SIZE = 80;
 
-        from:           u32         [00 => 04]
-        to:             u32         [04 => 08]
-        time:           Timespec    [08 => 16]
-        txs:            &[Hash]     [16 => 24]
+        from:           &PublicKey  [00 => 32]
+        to:             &PublicKey  [32 => 64]
+        time:           Timespec    [64 => 72]
+        txs:            &[Hash]     [72 => 80]
     }
 }
 
 message! {
     RequestPrevotes {
         const ID = REQUEST_PREVOTES_MESSAGE_ID;
-        const SIZE = 60;
+        const SIZE = 116;
 
-        from:           u32         [00 => 04]
-        to:             u32         [04 => 08]
-        time:           Timespec    [08 => 16]
-        height:         u64         [16 => 24]
-        round:          u32         [24 => 28]
-        propose_hash:   &Hash       [28 => 60]
+        from:           &PublicKey  [00 => 32]
+        to:             &PublicKey  [32 => 64]
+        time:           Timespec    [64 => 72]
+        height:         u64         [72 => 80]
+        round:          u32         [80 => 84]
+        propose_hash:   &Hash       [84 => 116]
         // validators:     &Bitset     [60 => 68]
     }
 }
@@ -124,15 +122,15 @@ message! {
 message! {
     RequestPrecommits {
         const ID = REQUEST_PRECOMMITS_MESSAGE_ID;
-        const SIZE = 92;
+        const SIZE = 148;
 
-        from:           u32         [00 => 04]
-        to:             u32         [04 => 08]
-        time:           Timespec    [08 => 16]
-        height:         u64         [16 => 24]
-        round:          u32         [24 => 28]
-        propose_hash:   &Hash       [28 => 60]
-        block_hash:     &Hash       [60 => 92]
+        from:           &PublicKey  [00 => 32]
+        to:             &PublicKey  [32 => 64]
+        time:           Timespec    [64 => 72]
+        height:         u64         [72 => 80]
+        round:          u32         [80 => 84]
+        propose_hash:   &Hash       [84 => 116]
+        block_hash:     &Hash       [116 => 148]
         // validators:     &Bitset     [60 => 68]
     }
 }
@@ -140,23 +138,23 @@ message! {
 message! {
     RequestCommit {
         const ID = REQUEST_COMMIT_MESSAGE_ID;
-        const SIZE = 24;
+        const SIZE = 80;
 
-        from:           u32         [00 => 04]
-        to:             u32         [04 => 08]
-        time:           Timespec    [08 => 16]
-        height:         u64         [16 => 24]
+        from:           &PublicKey  [00 => 32]
+        to:             &PublicKey  [32 => 64]
+        time:           Timespec    [64 => 72]
+        height:         u64         [72 => 80]
     }
 }
 
 message! {
     RequestPeers {
         const ID = REQUEST_PEERS_MESSAGE_ID;
-        const SIZE = 16;
+        const SIZE = 72;
 
-        from:           u32         [00 => 04]
-        to:             u32         [04 => 08]
-        time:           Timespec    [08 => 16]
+        from:           &PublicKey  [00 => 32]
+        to:             &PublicKey  [32 => 64]
+        time:           Timespec    [64 => 72]
     }
 }
 
