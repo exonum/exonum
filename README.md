@@ -14,22 +14,24 @@
 
 Для debian based систем понадобятся следующие пакеты:
 ```
-apt install build-essential git libsodium-dev
+$ apt install build-essential git libsodium-dev
 ```
 
 ### macOS
 
 Прежде всего необходимо установить и настроить homebrew согласно его [инструкции](http://brew.sh/). После чего установить следующие пакеты:
 ```
-brew install libsodium
+$ brew install libsodium
 ```
+
+_В принципе данную инструкцию можно использовать и для любых linux-based дистрибутивов, если заменить homebrew на [linuxbrew](http://linuxbrew.sh/)_
 
 ## Rust
 
 В проекте используется нестабильная ветка, для управления которой существует утилита [rustup](https://www.rustup.rs/).
 Для того, чтобы установить ее и заодно нужный для сборки проекта `toolchain` достаточно выполнить следующую команду:
 ```
-curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly
+$ curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly
 ```
 
 # Build instruction
@@ -41,14 +43,14 @@ curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly
 
 ### Пример команды для сборки exonum:
 ```
-cargo build --manifest-path exonum/Cargo.toml
+$ cargo build --manifest-path exonum/Cargo.toml
 ```
 
 ### Сборка тестовых приложений:
 
 Пример для сборки узла тестовой сети:
 ```
-cargo build --manifest-path sandbox/Cargo.toml --example merkle_map
+$ cargo build --manifest-path sandbox/Cargo.toml --example test_node
 ```
 
 # Развертка тестовой сети
@@ -76,13 +78,64 @@ $ test_node --config ~/.config/exonum/test.toml run --leveldb-path "/var/tmp/exo
 ```
 Опции можно комбинировать, для получения более подробной информации можно вызвать `help`
 ```
-test_node --help
+$ test_node --help
 ```
 Или конкретно для команды:
 ```
-test_node run --help
+$ test_node run --help
 ```
 
 ## Автоматически
 
-TODO
+Для быстрого разворачивания тестовой сети применяется [supervisord](http://supervisord.org/), который можно установить следуя инструкции на сайте.
+Чтобы развернуть сеть в первую очередь нужно собрать бинарник `test_node` и сделать так, чтобы директория, содержащая его, попала в `$PATH`.
+
+Например вот так:
+```
+$ cargo build --release --manifest-path sandbox/Cargo.toml --example test_node
+    Finished release [optimized] target(s) in 0.0 secs
+$ export PATH=./sandbox/target/release/examples:$PATH
+$ test_node --version
+Testnet node 0.1
+```
+
+После чего необходимо создать новую конфигурацию:
+```
+$ ./sandbox/supervisord/create_testnet.sh
+```
+
+Сама конфигурация для нашего testnet'а будет создана в директории `/tmp/exonum`.
+Если мы хотим изменить параметры сети, то нам достаточно отредактировать файл `/tmp/exonum/testnet.conf`.
+
+После чего просто запускаем `supervisord`
+```
+supervisord -c ./sandbox/supervisord/etc/supervisord.conf
+```
+
+Для управления сетью используется утилита `supervisorctl`, которая запускается следующим образом:
+```
+supervisorctl -c ./sandbox/supervisord/etc/supervisord.conf
+```
+
+В данной утилите есть несколько групп узлов:
+ - `simple` - узлы используют хранилище в оперативной памяти
+ - `leveldb` - узлы используют `leveldb` хранилище
+ - `peers_exchange` - узлы используют `leveldb` хранилище и для них эмулируется необходимость обмениваться пирами.
+   По умолчанию не все узлы знают обо всех и им нужно как-то связаться друг с другом для достижения консенсуса
+
+Команда по запуску всей группы:
+```
+start simple:*
+```
+
+Запуск отдельной ноды:
+```
+start simple:simple_testnet_03
+```
+
+Перезапуск ноды:
+```
+restart simple:simple_testnet_03
+```
+
+Более подробную информацию о командах можно найти в `man supervisorctl`
