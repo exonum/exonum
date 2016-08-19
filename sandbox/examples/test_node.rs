@@ -1,130 +1,28 @@
-#![feature(custom_derive)]
-#![feature(plugin)]
-#![plugin(serde_macros)]
-#![feature(question_mark)]
 
 extern crate exonum;
 extern crate timestamping;
+extern crate sandbox;
 extern crate env_logger;
 extern crate clap;
-extern crate toml;
-extern crate serde;
 
 use std::path::Path;
-use std::fs;
-use std::error::Error;
-use std::io::prelude::*;
-use std::fs::File;
 
 use clap::{Arg, App, SubCommand};
-use toml::Encoder;
-use serde::Serialize;
 
-use exonum::node::{Node, Configuration};
-use exonum::events::{NetworkConfiguration, EventsConfiguration};
-use exonum::crypto::{gen_keypair_from_seed, Seed, PublicKey, SecretKey};
+use exonum::node::{Node};
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 
+use sandbox::testnet::{ConfigEntry, TestnetConfiguration};
 use timestamping::TimestampingBlockchain;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct TestnetValidator {
-    public_key: PublicKey,
-    secret_key: SecretKey,
-    address: ::std::net::SocketAddr,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct TestnetConfiguration {
-    validators: Vec<TestnetValidator>,
-    round_timeout: u32,
-    status_timeout: u32,
-    peers_timeout: u32,
-    max_incoming_connections: usize,
-    max_outgoing_connections: usize,
-}
-
-impl TestnetConfiguration {
-    fn from_file(path: &Path) -> Result<TestnetConfiguration, Box<Error>> {
-        let mut file = File::open(path)?;
-        let mut toml = String::new();
-        file.read_to_string(&mut toml)?;
-        let cfg = toml::decode_str(&toml);
-        return Ok(cfg.unwrap());
-    }
-
-    fn save_to_file(&self, path: &Path) -> Result<(), Box<Error>> {
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).unwrap();
-        }
-
-        let mut e = Encoder::new();
-        self.serialize(&mut e).unwrap();
-        let mut file = File::create(path).unwrap();
-        file.write_all(toml::encode_str(&e.toml).as_bytes())?;
-
-        Ok(())
-    }
-
-    fn gen(validators_count: u8) -> TestnetConfiguration {
-        let mut pairs = Vec::new();
-        for i in 0..validators_count {
-            let keys = gen_keypair_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap());
-            let addr = format!("127.0.0.1:{}", 7000 + i as u32).parse().unwrap();
-            let pair = TestnetValidator {
-                public_key: keys.0.clone(),
-                secret_key: keys.1.clone(),
-                address: addr,
-            };
-            pairs.push(pair);
-        }
-
-        TestnetConfiguration {
-            validators: pairs,
-            round_timeout: 1000,
-            status_timeout: 5000,
-            peers_timeout: 10000,
-            max_incoming_connections: 128,
-            max_outgoing_connections: 128,
-        }
-    }
-
-    fn to_node_configuration(&self,
-                             idx: usize,
-                             known_peers: Vec<::std::net::SocketAddr>)
-                             -> Configuration {
-        let validator = self.validators[idx].clone();
-        let validators: Vec<_> = self.validators
-            .iter()
-            .map(|v| v.public_key)
-            .collect();
-
-        Configuration {
-            public_key: validator.public_key,
-            secret_key: validator.secret_key,
-            round_timeout: self.round_timeout,
-            status_timeout: self.status_timeout,
-            peers_timeout: self.peers_timeout,
-            network: NetworkConfiguration {
-                listen_address: validator.address,
-                max_incoming_connections: self.max_incoming_connections,
-                max_outgoing_connections: self.max_outgoing_connections,
-            },
-            events: EventsConfiguration::new(),
-            peer_discovery: known_peers,
-            validators: validators,
-        }
-    }
-}
 
 fn main() {
     ::std::env::set_var("RUST_LOG", "exonum=info");
     env_logger::init().unwrap();
 
-    let app = App::new("Testnet node")
+    let app = App::new("Testnet validator node")
         .version("0.1")
         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
-        .about("Test network node")
+        .about("Test network validator")
         .arg(Arg::with_name("CONFIG")
             .short("c")
             .long("config")

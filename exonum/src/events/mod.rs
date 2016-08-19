@@ -97,6 +97,7 @@ pub trait Reactor {
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) -> io::Result<()>;
     fn address(&self) -> SocketAddr;
     fn add_timeout(&mut self, timeout: Timeout, time: Timespec);
+    fn shutdown(&mut self);
 }
 
 impl Events {
@@ -146,5 +147,9 @@ impl Reactor for Events {
             // TODO: use mio::Timeout
             self.event_loop.timeout_ms(timeout, ms as u64).unwrap();
         }
+    }
+
+    fn shutdown(&mut self) {
+        self.event_loop.shutdown();
     }
 }

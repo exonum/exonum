@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re>"]
 
 [dependencies]
+log = "0.3"
 exonum = {version="0.1", path="../exonum"}
 timestamping = {version="0.1", path="../timestamping"}
 env_logger = "0.3"
