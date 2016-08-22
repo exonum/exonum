@@ -12,7 +12,8 @@ use clap::{Arg, App, SubCommand};
 use exonum::node::{Node};
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 
-use sandbox::testnet::{ConfigEntry, TestnetConfiguration};
+use sandbox::{ConfigFile};
+use sandbox::testnet::{TestNodeConfig};
 use timestamping::TimestampingBlockchain;
 
 fn main() {
@@ -64,13 +65,13 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = TestnetConfiguration::gen(count);
-            cfg.save_to_file(&path).unwrap();
+            let cfg = TestNodeConfig::gen(count);
+            ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
         }
         ("run", Some(matches)) => {
-            let cfg = TestnetConfiguration::from_file(path).unwrap();
+            let cfg: TestNodeConfig = ConfigFile::load(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {
                 Some(string) => {

@@ -1,69 +1,86 @@
-use std::path::Path;
-use std::fs;
-use std::error::Error;
-use std::io::prelude::*;
-use std::fs::File;
 use std::net::SocketAddr;
 use std::collections::HashMap;
 use std::cmp::min;
 
-use time::{Duration};
-use serde::{Serialize, Deserialize};
-use toml;
-use toml::Encoder;
+use time::Duration;
 
-use exonum::crypto::{gen_keypair_from_seed, Seed, PublicKey, SecretKey};
-use exonum::node::{Configuration};
+use exonum::crypto::{gen_keypair, gen_keypair_from_seed, Seed, PublicKey, SecretKey};
+use exonum::node::Configuration;
 use exonum::events::{NetworkConfiguration, EventsConfiguration};
 use exonum::events::{Reactor, Events, Event, Timeout, Network};
-use exonum::storage::{Blockchain};
+use exonum::storage::Blockchain;
 use exonum::messages::{Any, Message, Connect, RawMessage};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TestnetValidator {
+pub struct Listener {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub address: SocketAddr,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NetworkConfig {
+    pub max_incoming_connections: usize,
+    pub max_outgoing_connections: usize,
+    pub listener: Option<Listener>,
+}
+
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TestnetConfiguration {
-    pub validators: Vec<TestnetValidator>,
+pub struct TestNodeConfig {
+    pub validators: Vec<Listener>,
     pub round_timeout: u32,
     pub status_timeout: u32,
     pub peers_timeout: u32,
-    pub max_incoming_connections: usize,
-    pub max_outgoing_connections: usize,
+    pub network: NetworkConfig,
 }
 
-impl TestnetConfiguration {
-    pub fn gen(validators_count: u8) -> TestnetConfiguration {
+impl Listener {
+    pub fn gen_from_seed(seed: &Seed, addr: SocketAddr) -> Listener {
+        let keys = gen_keypair_from_seed(seed);
+        Listener {
+            public_key: keys.0.clone(),
+            secret_key: keys.1.clone(),
+            address: addr,
+        }
+    }
+
+    pub fn gen(addr: SocketAddr) -> Listener {
+        let keys = gen_keypair();
+        Listener {
+            public_key: keys.0.clone(),
+            secret_key: keys.1.clone(),
+            address: addr,
+        }
+    }
+}
+
+impl TestNodeConfig {
+    pub fn gen(validators_count: u8) -> TestNodeConfig {
         let mut pairs = Vec::new();
         for i in 0..validators_count {
-            let keys = gen_keypair_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap());
             let addr = format!("127.0.0.1:{}", 7000 + i as u32).parse().unwrap();
-            let pair = TestnetValidator {
-                public_key: keys.0.clone(),
-                secret_key: keys.1.clone(),
-                address: addr,
-            };
+            let pair = Listener::gen_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap(), addr);
             pairs.push(pair);
         }
 
-        TestnetConfiguration {
+        TestNodeConfig {
             validators: pairs,
             round_timeout: 1000,
             status_timeout: 5000,
             peers_timeout: 10000,
-            max_incoming_connections: 128,
-            max_outgoing_connections: 128,
+            network: NetworkConfig {
+                max_incoming_connections: 128,
+                max_outgoing_connections: 128,
+                listener: None,
+            },
         }
     }
 
     pub fn to_node_configuration(&self,
-                             idx: usize,
-                             known_peers: Vec<::std::net::SocketAddr>)
-                             -> Configuration {
+                                 idx: usize,
+                                 known_peers: Vec<::std::net::SocketAddr>)
+                                 -> Configuration {
         let validator = self.validators[idx].clone();
         let validators: Vec<_> = self.validators
             .iter()
@@ -78,8 +95,8 @@ impl TestnetConfiguration {
             peers_timeout: self.peers_timeout,
             network: NetworkConfiguration {
                 listen_address: validator.address,
-                max_incoming_connections: self.max_incoming_connections,
-                max_outgoing_connections: self.max_outgoing_connections,
+                max_incoming_connections: self.network.max_incoming_connections,
+                max_outgoing_connections: self.network.max_outgoing_connections,
             },
             events: EventsConfiguration::new(),
             peer_discovery: known_peers,
@@ -88,56 +105,11 @@ impl TestnetConfiguration {
     }
 }
 
-pub trait ConfigEntry : Serialize {
-    type Entry: Deserialize;
-
-    fn from_file(path: &Path) -> Result<Self::Entry, Box<Error>> {
-        let mut file = File::open(path)?;
-        let mut toml = String::new();
-        file.read_to_string(&mut toml)?;
-        let cfg = toml::decode_str(&toml);
-        return Ok(cfg.unwrap());
-    }
-
-    fn save_to_file(&self, path: &Path) -> Result<(), Box<Error>> {
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).unwrap();
-        }
-
-        let mut e = Encoder::new();
-        self.serialize(&mut e).unwrap();
-        let mut file = File::create(path).unwrap();
-        file.write_all(toml::encode_str(&e.toml).as_bytes())?;
-
-        Ok(())
-    }
-}
-
-impl ConfigEntry for TestnetConfiguration {
-    type Entry = Self;
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxGeneratorConfiguration {
-    pub network: TestnetValidator,
+    pub network: NetworkConfig,
     pub tx_timeout: u32,
-    pub tx_package_size: usize
-}
-
-impl TxGeneratorConfiguration {
-    pub fn new() -> TxGeneratorConfiguration {
-        let keys = gen_keypair_from_seed(&Seed::from_slice(&vec![188; 32]).unwrap());
-
-        TxGeneratorConfiguration {
-            network: TestnetValidator {
-                public_key: keys.0,
-                secret_key: keys.1,
-                address: "127.0.0.1:8000".parse().unwrap()
-            },
-            tx_timeout: 1000,
-            tx_package_size: 1000
-        }
-    }
+    pub tx_package_size: usize,
 }
 
 pub struct TxGeneratorNode<B: Blockchain> {
@@ -149,35 +121,36 @@ pub struct TxGeneratorNode<B: Blockchain> {
     pub peers: HashMap<PublicKey, Connect>,
     pub tx_queue: Vec<(SocketAddr, B::Transaction)>,
     pub tx_timeout: u32,
-    pub tx_package_size: usize
+    pub tx_package_size: usize,
 }
 
 impl<B: Blockchain> TxGeneratorNode<B> {
     pub fn new(cfg: TxGeneratorConfiguration) -> TxGeneratorNode<B> {
+        let listener = cfg.network.listener.unwrap();
         let network = NetworkConfiguration {
-                listen_address: cfg.network.address,
-                max_incoming_connections: 128,
-                max_outgoing_connections: 128,
+            listen_address: listener.address,
+            max_incoming_connections: cfg.network.max_incoming_connections,
+            max_outgoing_connections: cfg.network.max_outgoing_connections,
         };
+
         let events = EventsConfiguration::new();
         let network = Network::with_config(network);
-        let reactor =
-            Box::new(Events::with_config(events, network).unwrap()) as Box<Reactor>;
+        let reactor = Box::new(Events::with_config(events, network).unwrap()) as Box<Reactor>;
 
-        let connect = Connect::new(&cfg.network.public_key,
-                                   cfg.network.address,
-                                   reactor.get_time(),
-                                   &cfg.network.secret_key);
+        let connect_msg = Connect::new(&listener.public_key,
+                                       listener.address,
+                                       reactor.get_time(),
+                                       &listener.secret_key);
 
         TxGeneratorNode {
-            public_key: cfg.network.public_key,
-            secret_key: cfg.network.secret_key,
+            public_key: listener.public_key,
+            secret_key: listener.secret_key,
             events: reactor,
-            our_connect: connect,
+            our_connect: connect_msg,
             peers: HashMap::new(),
             tx_queue: Vec::new(),
             tx_timeout: cfg.tx_timeout,
-            tx_package_size: cfg.tx_package_size
+            tx_package_size: cfg.tx_package_size,
         }
     }
 
@@ -213,7 +186,7 @@ impl<B: Blockchain> TxGeneratorNode<B> {
     }
 
     pub fn append_transactions<I>(&mut self, iter: I)
-        where I: IntoIterator<Item=(SocketAddr, B::Transaction)>
+        where I: IntoIterator<Item = (SocketAddr, B::Transaction)>
     {
         self.tx_queue.extend(iter);
     }
@@ -260,10 +233,10 @@ impl<B: Blockchain> TxGeneratorNode<B> {
 
         match Any::from_raw(raw).unwrap() {
             Any::Connect(msg) => self.handle_connect(msg),
-            Any::Status(_) => {},
-            Any::Transaction(message) => { self.handle_tx(message) },
-            Any::Consensus(_) => {},
-            Any::Request(_) => {},
+            Any::Status(_) => {}
+            Any::Transaction(message) => self.handle_tx(message),
+            Any::Consensus(_) => {}
+            Any::Request(_) => {}
         }
     }
 
@@ -280,9 +253,7 @@ impl<B: Blockchain> TxGeneratorNode<B> {
         }
     }
 
-    fn handle_tx(&mut self, msg: B::Transaction) {
-
-    }
+    fn handle_tx(&mut self, _: B::Transaction) {}
 
     fn send_transactions(&mut self) -> bool {
         let to = min(self.tx_queue.len(), self.tx_package_size);

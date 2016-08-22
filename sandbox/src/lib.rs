@@ -22,5 +22,7 @@ mod tests;
 
 mod tx_generator;
 pub mod testnet;
+mod config_file;
 
-pub use tx_generator::{TimestampingTxGenerator};
+pub use tx_generator::TimestampingTxGenerator;
+pub use config_file::ConfigFile;

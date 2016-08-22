@@ -12,7 +12,8 @@ use clap::{Arg, App, SubCommand};
 use rand::{thread_rng, Rng};
 
 use exonum::storage::{MemoryDB};
-use sandbox::testnet::{ConfigEntry, TxGeneratorConfiguration, TestnetConfiguration, TxGeneratorNode};
+use sandbox::{ConfigFile};
+use sandbox::testnet::{TxGeneratorConfiguration, TestNodeConfig, TxGeneratorNode, Listener};
 use sandbox::TimestampingTxGenerator;
 use timestamping::TimestampingBlockchain;
 
@@ -46,6 +47,11 @@ fn main() {
                 .long("tx-package-size")
                 .value_name("TX_PACKAGE")
                 .help("A size of one package"))
+            .arg(Arg::with_name("ADDRESS")
+                .short("l")
+                .long("listen-address")
+                .value_name("ADDRESS")
+                .help("Node local address"))
             .arg(Arg::with_name("TX_TIMEOUT")
                 .short("t")
                 .long("tx-timeout")
@@ -65,7 +71,7 @@ fn main() {
     let path = Path::new(matches.value_of("CONFIG").unwrap());
     match matches.subcommand() {
         ("run", Some(matches)) => {
-            let cfg = TestnetConfiguration::from_file(path).unwrap();
+            let cfg: TestNodeConfig = ConfigFile::load(path).unwrap();
             let count: usize = matches.value_of("COUNT").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {
                 Some(string) => {
@@ -82,16 +88,22 @@ fn main() {
                 }
             };
 
-            let mut node_cfg = TxGeneratorConfiguration::new();
-            node_cfg.tx_package_size = matches.value_of("TX_PACKAGE").unwrap_or("1000").parse().unwrap();
-            node_cfg.tx_timeout = matches.value_of("TX_TIMEOUT").unwrap_or("1000").parse().unwrap();
+            let addr = matches.value_of("ADDRESS").unwrap_or("127.0.0.1:8000").parse().unwrap();
+            let mut net_cfg = cfg.network.clone();
+            net_cfg.listener = Some(Listener::gen(addr));
+
+            let cfg = TxGeneratorConfiguration {
+                network: net_cfg,
+                tx_package_size: matches.value_of("TX_PACKAGE").unwrap_or("1000").parse().unwrap(),
+                tx_timeout: matches.value_of("TX_TIMEOUT").unwrap_or("1000").parse().unwrap()
+            };
             let tx_size = matches.value_of("TX_SIZE").unwrap_or("64").parse().unwrap();
 
-            let mut node: TxGeneratorNode<TimestampingBlockchain<MemoryDB>> = TxGeneratorNode::new(node_cfg);
-            let node_gen = TimestampingTxGenerator::new(tx_size)
+            let mut node: TxGeneratorNode<TimestampingBlockchain<MemoryDB>> = TxGeneratorNode::new(cfg);
+            let transactions = TimestampingTxGenerator::new(tx_size)
                 .map(|x| (*thread_rng().choose(peers.as_slice()).unwrap(), x))
                 .take(count);
-            node.append_transactions(node_gen);
+            node.append_transactions(transactions);
             node.run(&peers);
         }
         _ => {

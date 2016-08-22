@@ -42,7 +42,7 @@ impl Ord for TimerPair {
 }
 
 
-pub struct Sandbox<B: Blockchain, G: Iterator<Item=B::Transaction>> {
+pub struct Sandbox<B: Blockchain, G: Iterator<Item = B::Transaction>> {
     inner: Arc<RefCell<SandboxInner>>,
     node: RefCell<Node<B>>,
     tx_generator: RefCell<G>,
@@ -54,7 +54,7 @@ pub struct SandboxReactor {
     inner: Arc<RefCell<SandboxInner>>,
 }
 
-impl<B: Blockchain, G: Iterator<Item=B::Transaction>> Sandbox<B, G> {
+impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
     pub fn new(b: B, g: G) -> Sandbox<B, G> {
         let validators = vec![
             gen_keypair(),
@@ -139,12 +139,13 @@ impl Reactor for SandboxReactor {
         self.inner.borrow_mut().timers.push(TimerPair(time, timeout));
     }
 
-    fn shutdown(&mut self) {
-
-    }
+    fn shutdown(&mut self) {}
 }
 
-impl<B, G> Sandbox<B, G> where B: Blockchain, G: Iterator<Item=B::Transaction> {
+impl<B, G> Sandbox<B, G>
+    where B: Blockchain,
+          G: Iterator<Item = B::Transaction>
+{
     fn initialize(&self) {
         self.node.borrow_mut().initialize();
 
@@ -317,7 +318,10 @@ impl<B, G> Sandbox<B, G> where B: Blockchain, G: Iterator<Item=B::Transaction> {
     }
 }
 
-impl<B, G> Drop for Sandbox<B, G> where B: Blockchain, G: Iterator<Item=B::Transaction> {
+impl<B, G> Drop for Sandbox<B, G>
+    where B: Blockchain,
+          G: Iterator<Item = B::Transaction>
+{
     fn drop(&mut self) {
         if !::std::thread::panicking() {
             self.check_unexpected_message();
@@ -325,7 +329,10 @@ impl<B, G> Drop for Sandbox<B, G> where B: Blockchain, G: Iterator<Item=B::Trans
     }
 }
 
-pub fn timestamping_sandbox() -> Sandbox<TimestampingBlockchain<MemoryDB>, TimestampingTxGenerator> {
+pub fn timestamping_sandbox
+    ()
+    -> Sandbox<TimestampingBlockchain<MemoryDB>, TimestampingTxGenerator>
+{
     Sandbox::new(TimestampingBlockchain { db: MemoryDB::new() },
                  TimestampingTxGenerator::new(64))
 }
