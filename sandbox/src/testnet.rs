@@ -155,7 +155,7 @@ impl<B: Blockchain> TxGeneratorNode<B> {
     }
 
     pub fn initialize(&mut self, peer_discovery: &Vec<SocketAddr>) {
-        info!("Start listening...");
+        info!("Starting transaction sending...");
         self.events.bind().unwrap();
 
         let connect = self.our_connect.clone();
@@ -177,10 +177,12 @@ impl<B: Blockchain> TxGeneratorNode<B> {
                 }
                 Event::Internal(_) => {}
                 Event::Timeout(timeout) => {
-                    self.handle_timeout(timeout);
+                    if !self.handle_timeout(timeout) {
+                        break;
+                    }
                 }
                 Event::Error(_) => {}
-                Event::Terminate => break,
+                Event::Terminate => break
             }
         }
     }
@@ -195,7 +197,7 @@ impl<B: Blockchain> TxGeneratorNode<B> {
         if let Some(conn) = self.peers.get(&public_key) {
             self.events.send_to(&conn.addr(), message.clone()).unwrap();
         } else {
-            // TODO: warning - hasn't connection with peer
+            warn!("attempt to send data to a peer: {:?} that is not connected", public_key);
         }
     }
 
@@ -215,22 +217,17 @@ impl<B: Blockchain> TxGeneratorNode<B> {
         self.events.add_timeout(Timeout::PeerExchange, time);
     }
 
-    fn handle_timeout(&mut self, _: Timeout) {
+    fn handle_timeout(&mut self, _: Timeout) -> bool {
         if self.send_transactions() {
             self.add_timeout();
+            true
         } else {
-            info!("Transaction sending finished");
-            self.events.shutdown();
+            info!("Transactions sending finished");
+            false
         }
     }
 
     fn handle_message(&mut self, raw: RawMessage) {
-        // TODO: check message headers (network id, protocol version)
-        // FIXME: call message.verify method
-        //     if !raw.verify() {
-        //         return;
-        //     }
-
         match Any::from_raw(raw).unwrap() {
             Any::Connect(msg) => self.handle_connect(msg),
             Any::Status(_) => {}

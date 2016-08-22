@@ -138,8 +138,6 @@ impl Reactor for SandboxReactor {
         // assert!(time < self.inner.borrow().time, "Tring to add timeout for the past");
         self.inner.borrow_mut().timers.push(TimerPair(time, timeout));
     }
-
-    fn shutdown(&mut self) {}
 }
 
 impl<B, G> Sandbox<B, G>
