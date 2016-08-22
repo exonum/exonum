@@ -93,6 +93,7 @@ impl<B: Blockchain> Node<B> {
                 continue;
             }
             self.send_to_addr(address, connect.raw());
+            info!("Try to connect with peer {}", address);
         }
 
         // TODO: rewrite this bullshit
@@ -137,8 +138,9 @@ impl<B: Blockchain> Node<B> {
         //     if !raw.verify() {
         //         return;
         //     }
-
-        match Any::from_raw(raw).unwrap() {
+        let msg = Any::from_raw(raw).unwrap();
+        debug!("Handle message: {:#?}", msg);
+        match msg {
             Any::Connect(msg) => self.handle_connect(msg),
             Any::Status(msg) => self.handle_status(msg),
             Any::Transaction(message) => self.handle_tx(message),
@@ -166,7 +168,7 @@ impl<B: Blockchain> Node<B> {
         if let Some(conn) = self.state.peers().get(&public_key) {
             self.events.send_to(&conn.addr(), message.clone()).unwrap();
         } else {
-            // TODO: warning - hasn't connection with peer
+            warn!("Hasn't connection with peer {:?}", public_key);
         }
     }
 

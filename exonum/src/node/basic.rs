@@ -10,17 +10,17 @@ impl<B: Blockchain> Node<B> {
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO add spam protection
         let address = message.addr();
-        info!("recv connect message from {}", address);
         if address == self.state.our_connect_message().addr() {
             return;
         }
+        info!("Received connect message from {}", address);
 
         // Check if we have another connect message from peer with the given public_key
         let public_key = *message.pub_key();
         let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
-                info!("Received weird connection message from {}", address);
+                warn!("Received weird connection message from {}", address);
                 return;
             }
             need_connect = !(saved_message.addr() == message.addr()
@@ -37,7 +37,6 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_status(&mut self, msg: Status) {
-        info!("recv status");
         // Handle message from future height
         if msg.height() > self.state.height() {
             // Check validator height info
@@ -82,7 +81,6 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_request_peers(&mut self, msg: RequestPeers) {
-        info!("recv peers request from peer {:?}", msg.from());
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         for peer in peers {
             self.send_to_peer(*msg.from(), peer.raw());
@@ -91,13 +89,13 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_status_timeout(&mut self) {
         if let Some(hash) = self.blockchain.last_hash().unwrap() {
-            info!("send status");
             // Send status
             let status = Status::new(self.state.id(),
                                      self.state.height(),
                                      &hash,
                                      &self.secret_key);
             self.broadcast(status.raw());
+            debug!("Send status: {:?}", status);
         }
         self.add_status_timeout();
     }
@@ -128,7 +126,7 @@ impl<B: Blockchain> Node<B> {
                                         &self.secret_key);
             self.send_to_peer(*peer.pub_key(), msg.raw());
 
-            info!("request peers from peer with addr {:?}", peer.addr());
+            debug!("request peers from peer with addr {:?}", peer.addr());
         }
         self.add_peer_exchange_timeout();
     }

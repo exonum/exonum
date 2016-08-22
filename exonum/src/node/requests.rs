@@ -30,6 +30,7 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
+        debug!("Handle request: {:?}", msg);
         match msg {
             RequestMessage::Propose(msg) => self.handle_request_propose(msg),
             RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
