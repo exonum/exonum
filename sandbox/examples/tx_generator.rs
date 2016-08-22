@@ -4,12 +4,10 @@ extern crate timestamping;
 extern crate sandbox;
 extern crate env_logger;
 extern crate clap;
-extern crate rand;
 
 use std::path::Path;
 
 use clap::{Arg, App, SubCommand};
-use rand::{thread_rng, Rng};
 
 use exonum::storage::{MemoryDB};
 use sandbox::{ConfigFile};
@@ -97,13 +95,13 @@ fn main() {
                 tx_timeout: matches.value_of("TX_TIMEOUT").unwrap_or("1000").parse().unwrap()
             };
             let tx_size = matches.value_of("TX_SIZE").unwrap_or("64").parse().unwrap();
-
-            let mut node: TxGeneratorNode<TimestampingBlockchain<MemoryDB>> = TxGeneratorNode::new(cfg);
-            let transactions = TimestampingTxGenerator::new(tx_size)
-                .map(|x| (*thread_rng().choose(peers.as_slice()).unwrap(), x))
-                .take(count);
-            node.append_transactions(transactions);
-            node.run(&peers);
+            let mut gen = TimestampingTxGenerator::new(tx_size);
+            let mut node: TxGeneratorNode<TimestampingBlockchain<MemoryDB>> = TxGeneratorNode::new(cfg,
+                peers,
+                count,
+                &mut gen,
+                );
+            node.run();
         }
         _ => {
             unreachable!("Wrong subcommand");

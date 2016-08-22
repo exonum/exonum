@@ -1,8 +1,10 @@
 use std::net::SocketAddr;
 use std::collections::HashMap;
 use std::cmp::min;
+use std::marker::PhantomData;
 
 use time::Duration;
+use rand::{thread_rng, Rng};
 
 use exonum::crypto::{gen_keypair, gen_keypair_from_seed, Seed, PublicKey, SecretKey};
 use exonum::node::Configuration;
@@ -10,6 +12,10 @@ use exonum::events::{NetworkConfiguration, EventsConfiguration};
 use exonum::events::{Reactor, Events, Event, Timeout, Network};
 use exonum::storage::Blockchain;
 use exonum::messages::{Any, Message, Connect, RawMessage};
+
+use timestamping::TimestampTx;
+
+use super::TimestampingTxGenerator;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Listener {
@@ -112,20 +118,25 @@ pub struct TxGeneratorConfiguration {
     pub tx_package_size: usize,
 }
 
-pub struct TxGeneratorNode<B: Blockchain> {
+pub struct TxGeneratorNode<'a, B: Blockchain> {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub events: Box<Reactor>,
 
     pub our_connect: Connect,
     pub peers: HashMap<PublicKey, Connect>,
-    pub tx_queue: Vec<(SocketAddr, B::Transaction)>,
+
     pub tx_timeout: u32,
     pub tx_package_size: usize,
+    pub tx_remaining: usize,
+    pub tx_receivers: Vec<SocketAddr>,
+    pub tx_gen: &'a mut TimestampingTxGenerator,
+
+    _b: PhantomData<B>
 }
 
-impl<B: Blockchain> TxGeneratorNode<B> {
-    pub fn new(cfg: TxGeneratorConfiguration) -> TxGeneratorNode<B> {
+impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
+    pub fn new(cfg: TxGeneratorConfiguration, receivers: Vec<SocketAddr>, remaining: usize, gen: &'a mut TimestampingTxGenerator) -> TxGeneratorNode<'a, B> {
         let listener = cfg.network.listener.unwrap();
         let network = NetworkConfiguration {
             listen_address: listener.address,
@@ -148,28 +159,31 @@ impl<B: Blockchain> TxGeneratorNode<B> {
             events: reactor,
             our_connect: connect_msg,
             peers: HashMap::new(),
-            tx_queue: Vec::new(),
             tx_timeout: cfg.tx_timeout,
             tx_package_size: cfg.tx_package_size,
+            tx_receivers: receivers,
+            tx_remaining: remaining,
+            tx_gen: gen,
+            _b: PhantomData
         }
     }
 
-    pub fn initialize(&mut self, peer_discovery: &Vec<SocketAddr>) {
+    pub fn initialize(&mut self) {
         info!("Starting transaction sending...");
         self.events.bind().unwrap();
 
         let connect = self.our_connect.clone();
-        for address in peer_discovery.iter() {
-            if address == &self.events.address() {
+        for address in self.tx_receivers.clone() {
+            if address == self.events.address() {
                 continue;
             }
-            self.send_to_addr(address, connect.raw());
+            self.send_to_addr(&address, connect.raw());
         }
         self.add_timeout();
     }
 
-    pub fn run(&mut self, peer_discovery: &Vec<SocketAddr>) {
-        self.initialize(peer_discovery);
+    pub fn run(&mut self) {
+        self.initialize();
         loop {
             match self.events.poll() {
                 Event::Incoming(message) => {
@@ -185,12 +199,6 @@ impl<B: Blockchain> TxGeneratorNode<B> {
                 Event::Terminate => break,
             }
         }
-    }
-
-    pub fn append_transactions<I>(&mut self, iter: I)
-        where I: IntoIterator<Item = (SocketAddr, B::Transaction)>
-    {
-        self.tx_queue.extend(iter);
     }
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
@@ -254,16 +262,19 @@ impl<B: Blockchain> TxGeneratorNode<B> {
     fn handle_tx(&mut self, _: B::Transaction) {}
 
     fn send_transactions(&mut self) -> bool {
-        let to = min(self.tx_queue.len(), self.tx_package_size);
-        let head = self.tx_queue
-            .drain(0..to)
-            .collect::<Vec<(SocketAddr, B::Transaction)>>();
+        let count = min(self.tx_remaining, self.tx_package_size);
+        let receivers = self.tx_receivers.clone();
+        let transactions = self.tx_gen
+            .map(|x| (*thread_rng().choose(receivers.as_slice()).unwrap(), x))
+            .take(count)
+            .collect::<Vec<(SocketAddr, TimestampTx)>>();
 
-        for entry in &head {
+        for entry in transactions {
             self.send_to_addr(&entry.0, entry.1.raw());
         }
+        self.tx_remaining -= count;
 
-        debug!("There are {} transactions in the pool", self.tx_queue.len());
-        !self.tx_queue.is_empty()
+        debug!("There are {} transactions in the pool", self.tx_remaining);
+        self.tx_remaining != 0
     }
 }
