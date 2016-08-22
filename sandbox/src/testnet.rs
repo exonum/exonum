@@ -182,7 +182,7 @@ impl<B: Blockchain> TxGeneratorNode<B> {
                     }
                 }
                 Event::Error(_) => {}
-                Event::Terminate => break
+                Event::Terminate => break,
             }
         }
     }
@@ -197,7 +197,8 @@ impl<B: Blockchain> TxGeneratorNode<B> {
         if let Some(conn) = self.peers.get(&public_key) {
             self.events.send_to(&conn.addr(), message.clone()).unwrap();
         } else {
-            warn!("attempt to send data to a peer: {:?} that is not connected", public_key);
+            warn!("attempt to send data to a peer: {:?} that is not connected",
+                  public_key);
         }
     }
 
