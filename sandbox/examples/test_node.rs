@@ -17,7 +17,6 @@ use sandbox::testnet::{TestNodeConfig};
 use timestamping::TimestampingBlockchain;
 
 fn main() {
-    ::std::env::set_var("RUST_LOG", "exonum=info");
     env_logger::init().unwrap();
 
     let app = App::new("Testnet validator node")

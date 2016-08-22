@@ -18,8 +18,6 @@ use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Patch};
 /// seed - seed for rng
 
 fn main() {
-    ::std::env::set_var("RUST_LOG", "da=info");
-
     let matches = clap_app!(merkle_map =>
         (version: "0.1")
         (author: "Aleksey S. <aleksei.sidorov@xdev.re>")

@@ -18,7 +18,6 @@ use sandbox::TimestampingTxGenerator;
 use timestamping::TimestampingBlockchain;
 
 fn main() {
-    ::std::env::set_var("RUST_LOG", "sandbox=debug");
     env_logger::init().unwrap();
 
     let app = App::new("Testnet transaction generator")
