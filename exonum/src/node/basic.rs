@@ -104,12 +104,8 @@ impl<B: Blockchain> Node<B> {
         if !self.state.peers().is_empty() {
             let to = self.state.peers().len();
             let gen_peer_id = || -> usize {
-                if to > 1 {
-                    let mut rng = rand::thread_rng();
-                    rng.gen_range(0, to - 1)
-                } else {
-                    0
-                }
+                let mut rng = rand::thread_rng();
+                rng.gen_range(0, to)
             };
 
             let peer = self.state
