@@ -93,6 +93,7 @@ impl<B: Blockchain> Node<B> {
                 continue;
             }
             self.send_to_addr(address, connect.raw());
+            info!("Try to connect with peer {}", address);
         }
 
         // TODO: rewrite this bullshit
@@ -137,8 +138,9 @@ impl<B: Blockchain> Node<B> {
         //     if !raw.verify() {
         //         return;
         //     }
-
-        match Any::from_raw(raw).unwrap() {
+        let msg = Any::from_raw(raw).unwrap();
+        debug!("Handle message: {:#?}", msg);
+        match msg {
             Any::Connect(msg) => self.handle_connect(msg),
             Any::Status(msg) => self.handle_status(msg),
             Any::Transaction(message) => self.handle_tx(message),
@@ -150,7 +152,7 @@ impl<B: Blockchain> Node<B> {
     pub fn handle_timeout(&mut self, timeout: Timeout) {
         match timeout {
             Timeout::Round(height, round) => self.handle_round_timeout(height, round),
-            Timeout::Request(data, validator) => self.handle_request_timeout(data, validator),
+            Timeout::Request(data, peer) => self.handle_request_timeout(data, peer),
             Timeout::Status => self.handle_status_timeout(),
             Timeout::PeerExchange => self.handle_peer_exchange_timeout(),
         }
@@ -166,7 +168,7 @@ impl<B: Blockchain> Node<B> {
         if let Some(conn) = self.state.peers().get(&public_key) {
             self.events.send_to(&conn.addr(), message.clone()).unwrap();
         } else {
-            // TODO: warning - hasn't connection with peer
+            warn!("Hasn't connection with peer {:?}", public_key);
         }
     }
 
@@ -174,11 +176,11 @@ impl<B: Blockchain> Node<B> {
         self.events.send_to(address, message.clone()).unwrap();
     }
 
-    pub fn request(&mut self, data: RequestData, validator: ValidatorId) {
-        let is_new = self.state.request(data.clone(), validator);
+    pub fn request(&mut self, data: RequestData, peer: PublicKey) {
+        let is_new = self.state.request(data.clone(), peer);
 
         if is_new {
-            self.add_request_timeout(data, validator);
+            self.add_request_timeout(data, peer);
         }
     }
 
@@ -202,9 +204,9 @@ impl<B: Blockchain> Node<B> {
         self.events.add_timeout(Timeout::Status, time);
     }
 
-    pub fn add_request_timeout(&mut self, data: RequestData, validator: ValidatorId) {
+    pub fn add_request_timeout(&mut self, data: RequestData, peer: PublicKey) {
         let time = self.events.get_time() + data.timeout();
-        self.events.add_timeout(Timeout::Request(data, validator), time);
+        self.events.add_timeout(Timeout::Request(data, peer), time);
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {

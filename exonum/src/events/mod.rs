@@ -7,7 +7,8 @@ use mio;
 
 use super::messages::RawMessage;
 
-use super::node::{RequestData, ValidatorId};
+use super::node::RequestData;
+use super::crypto::PublicKey;
 
 mod network;
 mod connection;
@@ -23,7 +24,7 @@ pub type EventLoop = mio::EventLoop<MioAdapter>;
 pub enum Timeout {
     Status,
     Round(u64, u32),
-    Request(RequestData, ValidatorId),
+    Request(RequestData, PublicKey),
     PeerExchange,
 }
 

@@ -8,7 +8,7 @@ const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 impl<B: Blockchain> Node<B> {
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
-        if msg.to() != self.state.id() {
+        if msg.to() != &self.public_key {
             return;
         }
 
@@ -26,17 +26,11 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
-        match self.state.public_key_of(msg.from()) {
-            // Incorrect signature of message
-            Some(public_key) => {
-                if !msg.verify(public_key) {
-                    return;
-                }
-            }
-            // Incorrect validator id
-            None => return,
+        if !msg.verify(msg.from()) {
+            return;
         }
 
+        debug!("Handle request: {:?}", msg);
         match msg {
             RequestMessage::Propose(msg) => self.handle_request_propose(msg),
             RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
@@ -60,7 +54,7 @@ impl<B: Blockchain> Node<B> {
         };
 
         if let Some(propose) = propose {
-            self.send_to_validator(msg.from(), &propose);
+            self.send_to_peer(*msg.from(), &propose);
         }
     }
 
@@ -73,7 +67,7 @@ impl<B: Blockchain> Node<B> {
                 .or_else(|| self.blockchain.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {
-                self.send_to_validator(msg.from(), tx.raw());
+                self.send_to_peer(*msg.from(), tx.raw());
             }
         }
     }
@@ -91,7 +85,7 @@ impl<B: Blockchain> Node<B> {
         };
 
         for prevote in prevotes {
-            self.send_to_validator(msg.from(), &prevote);
+            self.send_to_peer(*msg.from(), &prevote);
         }
     }
 
@@ -117,7 +111,7 @@ impl<B: Blockchain> Node<B> {
         };
 
         for precommit in precommits {
-            self.send_to_validator(msg.from(), &precommit);
+            self.send_to_peer(*msg.from(), &precommit);
         }
     }
 
@@ -136,7 +130,7 @@ impl<B: Blockchain> Node<B> {
             };
 
         for precommit in precommits {
-            self.send_to_validator(msg.from(), &precommit);
+            self.send_to_peer(*msg.from(), &precommit);
         }
     }
 }

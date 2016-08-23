@@ -71,7 +71,7 @@ struct RequestState {
     // К-во попыток, которые уже произошли
     retries: u16,
     // Узлы, которые имеют интересующую нас информацию
-    known_nodes: HashSet<ValidatorId>,
+    known_nodes: HashSet<PublicKey>,
 }
 
 pub struct ProposeState {
@@ -109,20 +109,20 @@ impl RequestState {
         }
     }
 
-    fn insert(&mut self, validator: ValidatorId) {
-        self.known_nodes.insert(validator);
+    fn insert(&mut self, peer: PublicKey) {
+        self.known_nodes.insert(peer);
     }
 
-    fn remove(&mut self, validator: &ValidatorId) {
+    fn remove(&mut self, peer: &PublicKey) {
         self.retries += 1;
-        self.known_nodes.remove(validator);
+        self.known_nodes.remove(peer);
     }
 
     fn is_empty(&self) -> bool {
         self.known_nodes.is_empty()
     }
 
-    fn peek(&self) -> Option<ValidatorId> {
+    fn peek(&self) -> Option<PublicKey> {
         self.known_nodes.iter().next().cloned()
     }
 }
@@ -163,7 +163,8 @@ impl<Tx> State<Tx> {
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
                connect: Connect,
-               last_hash: Hash) -> State<Tx> {
+               last_hash: Hash)
+               -> State<Tx> {
         let validators_len = validators.len();
 
         State {
@@ -351,12 +352,13 @@ impl<Tx> State<Tx> {
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
         debug_assert_eq!(msg.validator(), self.id);
         let propose_hash = msg.hash();
-        self.proposes.insert(propose_hash, ProposeState {
-            hash: propose_hash,
-            propose: msg,
-            patch: None,
-            unknown_txs: BTreeSet::new()
-        });
+        self.proposes.insert(propose_hash,
+                             ProposeState {
+                                 hash: propose_hash,
+                                 propose: msg,
+                                 patch: None,
+                                 unknown_txs: BTreeSet::new(),
+                             });
 
         propose_hash
     }
@@ -469,19 +471,19 @@ impl<Tx> State<Tx> {
         false
     }
 
-    pub fn request(&mut self, data: RequestData, validator: ValidatorId) -> bool {
+    pub fn request(&mut self, data: RequestData, peer: PublicKey) -> bool {
         let mut state = self.requests
             .entry(data)
             .or_insert_with(RequestState::new);
         let is_new = state.is_empty();
-        state.insert(validator);
+        state.insert(peer);
         is_new
     }
 
-    pub fn retry(&mut self, data: &RequestData, validator: ValidatorId) -> Option<ValidatorId> {
+    pub fn retry(&mut self, data: &RequestData, peer: PublicKey) -> Option<PublicKey> {
         let next = {
             let mut state = self.requests.get_mut(data).unwrap();
-            state.remove(&validator);
+            state.remove(&peer);
             state.peek()
         };
 
@@ -491,7 +493,7 @@ impl<Tx> State<Tx> {
         next
     }
 
-    pub fn remove_request(&mut self, data: &RequestData) -> HashSet<ValidatorId> {
+    pub fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
         let state = self.requests.remove(data);
         state.map(|s| s.known_nodes).unwrap_or_default()
     }
