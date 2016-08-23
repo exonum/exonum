@@ -23,8 +23,8 @@ impl<B: Blockchain> Node<B> {
                 warn!("Received weird connection message from {}", address);
                 return;
             }
-            need_connect = !(saved_message.addr() == message.addr()
-                && saved_message.time() == message.time());
+            need_connect = !(saved_message.addr() == message.addr() &&
+                             saved_message.time() == message.time());
         }
         self.state.add_peer(public_key, message);
 

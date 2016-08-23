@@ -163,7 +163,8 @@ impl<Tx> State<Tx> {
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
                connect: Connect,
-               last_hash: Hash) -> State<Tx> {
+               last_hash: Hash)
+               -> State<Tx> {
         let validators_len = validators.len();
 
         State {
@@ -351,12 +352,13 @@ impl<Tx> State<Tx> {
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
         debug_assert_eq!(msg.validator(), self.id);
         let propose_hash = msg.hash();
-        self.proposes.insert(propose_hash, ProposeState {
-            hash: propose_hash,
-            propose: msg,
-            patch: None,
-            unknown_txs: BTreeSet::new()
-        });
+        self.proposes.insert(propose_hash,
+                             ProposeState {
+                                 hash: propose_hash,
+                                 propose: msg,
+                                 patch: None,
+                                 unknown_txs: BTreeSet::new(),
+                             });
 
         propose_hash
     }

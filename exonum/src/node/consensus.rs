@@ -35,8 +35,7 @@ impl<B: Blockchain> Node<B> {
         match msg {
             ConsensusMessage::Propose(msg) => {
                 // Check prev_hash
-                if msg.prev_hash() !=
-                   self.state.last_hash() {
+                if msg.prev_hash() != self.state.last_hash() {
                     return;
                 }
 
@@ -59,7 +58,7 @@ impl<B: Blockchain> Node<B> {
         // Add propose
         let (hash, has_unknown_txs) = match self.state.add_propose(msg.clone()) {
             Some(state) => (state.hash(), state.has_unknown_txs()),
-            None => return
+            None => return,
         };
 
         // Remove request info
@@ -203,7 +202,7 @@ impl<B: Blockchain> Node<B> {
         // отправки RequestPrevotes?
         if msg.round() > self.state.locked_round() {
             self.request(RequestData::Prevotes(msg.round(), *msg.propose_hash()),
-                        peer);
+                         peer);
         }
 
         // Has majority precommits
@@ -428,14 +427,13 @@ impl<B: Blockchain> Node<B> {
             .keys()
             .cloned()
             .collect();
-        let propose =
-            Propose::new(self.state.id(),
-                         self.state.height(),
-                         round,
-                         self.events.get_time(),
-                         self.state.last_hash(),
-                         &txs,
-                         &self.secret_key);
+        let propose = Propose::new(self.state.id(),
+                                   self.state.height(),
+                                   round,
+                                   self.events.get_time(),
+                                   self.state.last_hash(),
+                                   &txs,
+                                   &self.secret_key);
         self.broadcast(propose.raw());
         debug!("Send propose: {:?}", propose);
 

@@ -99,7 +99,7 @@ impl<'a> Field<'a> for Timespec {
 impl<'a> Field<'a> for SocketAddr {
     fn read(buffer: &'a [u8], from: usize, to: usize) -> SocketAddr {
         let mut octets = [0u8; 4];
-        octets.copy_from_slice(&buffer[from..from+4]);
+        octets.copy_from_slice(&buffer[from..from + 4]);
         let ip = Ipv4Addr::from(octets);
         let port = LittleEndian::read_u16(&buffer[from + 4..to]);
         SocketAddr::V4(SocketAddrV4::new(ip, port))

@@ -7,8 +7,8 @@ use mio;
 
 use super::messages::RawMessage;
 
-use super::node::{RequestData};
-use super::crypto::{PublicKey};
+use super::node::RequestData;
+use super::crypto::PublicKey;
 
 mod network;
 mod connection;
