@@ -6,18 +6,26 @@ use std::collections::VecDeque;
 use byteorder::{ByteOrder, LittleEndian};
 
 use mio::tcp::TcpStream;
-use mio::{TryWrite, TryRead};
+use mio::{TryWrite, TryRead, EventSet};
 
 use super::super::messages::{RawMessage, MessageBuffer, HEADER_SIZE};
 
 #[derive(Debug, PartialEq)]
 pub struct MessageReader {
     raw: Vec<u8>,
+    position: usize,
 }
 
 impl MessageReader {
     pub fn empty() -> MessageReader {
-        MessageReader { raw: vec![0; HEADER_SIZE] }
+        MessageReader {
+            raw: vec![0; HEADER_SIZE],
+            position: 0,
+        }
+    }
+
+    pub fn read_finished(&self) -> bool {
+        self.position >= HEADER_SIZE && self.position == self.total_len()
     }
 
     pub fn actual_len(&self) -> usize {
@@ -33,83 +41,80 @@ impl MessageReader {
         self.raw.resize(size, 0);
     }
 
-    pub fn buffer(&mut self) -> &mut [u8] {
-        &mut self.raw
-    }
-
     pub fn into_raw(self) -> MessageBuffer {
         MessageBuffer::from_vec(self.raw)
     }
+
+    pub fn read(&mut self, socket: &mut TcpStream) -> io::Result<Option<usize>> {
+        // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
+        // TODO: read into growable Vec, not into [u8]
+        if self.position == HEADER_SIZE && self.actual_len() == HEADER_SIZE {
+            self.allocate();
+        }
+        let pos = self.position;
+        let r = socket.try_read(&mut self.raw[pos..])?;
+        if let Some(n) = r {
+            self.position += n;
+        }
+        Ok(r)
+    }
 }
 
-pub struct IncomingConnection {
-    socket: TcpStream,
-    // address: SocketAddr,
-    raw: MessageReader,
-    position: usize,
-}
-
-pub struct OutgoingConnection {
-    socket: TcpStream,
-    address: SocketAddr,
+pub struct MessageWriter {
     queue: VecDeque<RawMessage>,
     position: usize,
 }
 
-impl IncomingConnection {
-    pub fn new(socket: TcpStream /* , address: SocketAddr */) -> IncomingConnection {
-        IncomingConnection {
-            socket: socket,
-            // address: address,
-            raw: MessageReader::empty(),
+impl MessageWriter {
+    pub fn empty() -> MessageWriter {
+        MessageWriter {
+            queue: VecDeque::new(),
             position: 0,
         }
     }
 
-    pub fn socket(&self) -> &TcpStream {
-        &self.socket
-    }
-
-    // pub fn  address(&self) -> &SocketAddr {
-    //     &self.address
-    // }
-
-    fn read(&mut self) -> io::Result<Option<usize>> {
-        // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
-        // TODO: read into growable Vec, not into [u8]
-        if self.position == HEADER_SIZE && self.raw.actual_len() == HEADER_SIZE {
-            self.raw.allocate();
-        }
-        self.socket.try_read(&mut self.raw.buffer()[self.position..])
-    }
-
-    pub fn readable(&mut self) -> io::Result<Option<MessageBuffer>> {
-        // TODO: raw length == 0?
-        // TODO: maximum raw length?
-        loop {
-            match self.read()? {
-                None | Some(0) => return Ok(None),
+    pub fn write(&mut self, socket: &mut TcpStream) -> io::Result<()> {
+        // TODO: use try_write_buf
+        while let Some(message) = self.queue.front().cloned() {
+            let buf = message.as_ref().as_ref();
+            match socket.try_write(&buf[self.position..])? {
+                None | Some(0) => {
+                    break;
+                }
                 Some(n) => {
                     self.position += n;
-                    if self.position >= HEADER_SIZE && self.position == self.raw.total_len() {
-                        let mut raw = MessageReader::empty();
-                        swap(&mut raw, &mut self.raw);
+                    if n == message.len() {
+                        self.queue.pop_front();
                         self.position = 0;
-                        return Ok(Some(raw.into_raw()));
                     }
                 }
             }
         }
+
+        Ok(())
+    }
+
+    pub fn is_idle(&self) -> bool {
+        self.queue.is_empty()
     }
 }
 
-impl OutgoingConnection {
-    pub fn new(socket: TcpStream, address: SocketAddr) -> OutgoingConnection {
-        OutgoingConnection {
+pub struct Connection {
+    socket: TcpStream,
+    address: SocketAddr,
+
+    reader: MessageReader,
+    writer: MessageWriter,
+}
+
+impl Connection {
+    pub fn new(socket: TcpStream, address: SocketAddr) -> Connection {
+        Connection {
             socket: socket,
             address: address,
-            queue: VecDeque::new(),
-            position: 0,
+
+            reader: MessageReader::empty(),
+            writer: MessageWriter::empty(),
         }
     }
 
@@ -122,33 +127,42 @@ impl OutgoingConnection {
     }
 
     pub fn writable(&mut self) -> io::Result<()> {
-        // TODO: use try_write_buf
-        while let Some(message) = self.queue.pop_front() {
-            match self.socket.try_write(message.as_ref().as_ref())? {
-                None | Some(0) => {
-                    self.queue.push_front(message);
-                    break;
-                }
-                Some(n) => {
-                    // FIXME: What if we write less than message size?
-                    self.position += n;
-                    if n == message.len() {
-                        self.position = 0;
+        // TODO: reregister
+        self.writer.write(&mut self.socket)
+    }
+
+    pub fn readable(&mut self) -> io::Result<Option<MessageBuffer>> {
+        // TODO: raw length == 0?
+        // TODO: maximum raw length?
+        loop {
+            match self.reader.read(&mut self.socket)? {
+                None | Some(0) => return Ok(None),
+                Some(_) => {
+                    if self.reader.read_finished() {
+                        let mut raw = MessageReader::empty();
+                        swap(&mut raw, &mut self.reader);
+                        return Ok(Some(raw.into_raw()));
                     }
                 }
             }
         }
-        // TODO: reregister
-        Ok(())
     }
 
     pub fn send(&mut self, message: RawMessage) {
         // TODO: capacity overflow
         // TODO: reregister
-        self.queue.push_back(message);
+        self.writer.queue.push_back(message);
     }
 
     pub fn is_idle(&self) -> bool {
-        self.queue.is_empty()
+        self.writer.is_idle()
+    }
+
+    pub fn interest(&self) -> EventSet {
+        let mut set = EventSet::hup() | EventSet::error() | EventSet::readable();
+        if !self.writer.is_idle() {
+            set = set | EventSet::writable();
+        }
+        set
     }
 }

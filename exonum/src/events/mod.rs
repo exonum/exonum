@@ -88,6 +88,10 @@ impl mio::Handler for MioAdapter {
     fn interrupted(&mut self, _: &mut EventLoop) {
         self.push(Event::Terminate);
     }
+
+    fn tick(&mut self, event_loop: &mut EventLoop) {
+        self.network.tick(event_loop);
+    }
 }
 
 pub trait Reactor {
@@ -167,7 +171,7 @@ mod tests {
             let network = Network::with_config(NetworkConfiguration {
                 listen_address: addr,
                 max_incoming_connections: 128,
-                max_outgoing_connections: 128
+                max_outgoing_connections: 128,
             });
             Events::with_config(EventsConfiguration::new(), network).unwrap()
         }
@@ -187,7 +191,19 @@ mod tests {
 
         fn wait_for_bind(&mut self) {
             self.bind().unwrap();
-            thread::sleep(time::Duration::from_millis(100));
+            thread::sleep(time::Duration::from_millis(1000));
+        }
+
+        fn process_events(&mut self) {
+            let time = self.get_time() + Duration::milliseconds(100);
+            self.add_timeout(Timeout::Status, time);
+            loop {
+                match self.poll() {
+                    Event::Timeout(_) => break,
+                    Event::Error(_) => return,
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -198,10 +214,8 @@ mod tests {
 
     #[test]
     fn big_data() {
-        let addrs: [SocketAddr; 2] = [
-            "127.0.0.1:8200".parse().unwrap(),
-            "127.0.0.1:8201".parse().unwrap()
-        ];
+        let addrs: [SocketAddr; 2] = ["127.0.0.1:8200".parse().unwrap(),
+                                      "127.0.0.1:8201".parse().unwrap()];
 
         let m1 = gen_message(15, 1000000);
         let m2 = gen_message(16, 400);
@@ -236,10 +250,8 @@ mod tests {
 
     #[test]
     fn reconnect() {
-        let addrs: [SocketAddr; 2] = [
-            "127.0.0.1:9000".parse().unwrap(),
-            "127.0.0.1:9001".parse().unwrap()
-        ];
+        let addrs: [SocketAddr; 2] = ["127.0.0.1:9000".parse().unwrap(),
+                                      "127.0.0.1:9001".parse().unwrap()];
 
         let m1 = gen_message(15, 250);
         let m2 = gen_message(16, 400);
@@ -260,6 +272,7 @@ mod tests {
                     println!("t1: wait for m2");
                     assert_eq!(e.wait_for_msg(), Some(m2));
                     println!("t1: received m2 from t2");
+                    e.process_events();
                     drop(e);
                 }
                 println!("t1: connection closed");
@@ -271,8 +284,10 @@ mod tests {
                     e.send_to(&addrs[1], m3.clone()).unwrap();
                     println!("t1: wait for m3");
                     assert_eq!(e.wait_for_msg(), Some(m3));
+                    e.process_events();
                     println!("t1: received m3 from t2");
                 }
+                println!("t1: connection closed");
             });
         }
 
@@ -294,6 +309,7 @@ mod tests {
                     println!("t2: wait for m3");
                     assert_eq!(e.wait_for_msg(), Some(m3.clone()));
                     println!("t2: received m3 from t1");
+                    e.process_events();
                     drop(e);
                 }
                 println!("t2: connection closed");
@@ -302,8 +318,10 @@ mod tests {
                     let mut e = Events::with_addr(addrs[1].clone());
                     e.wait_for_bind();
                     println!("t2: send m3 to t1");
-                    e.send_to(&addrs[1], m3).unwrap();
+                    e.send_to(&addrs[0], m3.clone()).unwrap();
+                    e.process_events();
                 }
+                println!("t2: connection closed");
             });
         }
 
