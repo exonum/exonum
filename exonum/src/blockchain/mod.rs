@@ -1,3 +1,4 @@
+mod block;
 mod storages;
 
 use std::borrow::{Borrow, BorrowMut};
