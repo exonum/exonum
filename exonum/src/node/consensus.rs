@@ -1,11 +1,11 @@
 use std::collections::HashSet;
 
 use super::super::crypto::{Hash, PublicKey};
-use super::super::blockchain::{Blockchain, TxStorage, BlockStorage};
+use super::super::blockchain::{Blockchain, TxStorage};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
                              RequestPrecommits, RequestCommit};
-use super::super::storage::{Map, List};
+use super::super::storage::{Map};
 use super::{Node, Round, Height, RequestData, ValidatorId};
 
 impl<B: Blockchain> Node<B> {
@@ -52,8 +52,18 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_propose(&mut self, msg: Propose) {
+        debug!("Handle propose {:?}", msg);
         // TODO: check time
         // TODO: check that transactions are not commited yet
+        if self.state.propose(&msg.hash()).is_some() {
+            return;
+        }
+
+        for hash in msg.transactions() {
+            if self.blockchain.transactions().get(hash).unwrap().is_some() {
+                return;
+            }
+        }
 
         // Add propose
         let (hash, has_unknown_txs) = match self.state.add_propose(msg.clone()) {
@@ -65,6 +75,7 @@ impl<B: Blockchain> Node<B> {
         let known_nodes = self.remove_request(RequestData::Propose(hash));
 
         if has_unknown_txs {
+            debug!("REQUEST TRANSACTIONS!!!");
             let key = self.public_key_of(msg.validator());
             self.request(RequestData::Transactions(hash), key);
             for node in known_nodes {
@@ -78,7 +89,10 @@ impl<B: Blockchain> Node<B> {
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
         if self.state.locked_round() == 0 {
-            self.send_prevote(propose_round, &hash);
+            // TODO: what if we HAVE prevote for the propose round?
+            if !self.state.have_prevote(propose_round) {
+                self.send_prevote(propose_round, &hash);
+            }
         }
 
         // Lock to propose
@@ -91,7 +105,7 @@ impl<B: Blockchain> Node<B> {
         }
 
         // Commit propose
-        for (_, block_hash) in self.state.unknown_propose_with_precommits(&hash) {
+        for (round, block_hash) in self.state.unknown_propose_with_precommits(&hash) {
             // Execute block and get state hash
             let our_block_hash = self.execute(&hash);
 
@@ -99,11 +113,12 @@ impl<B: Blockchain> Node<B> {
                 panic!("We are fucked up...");
             }
 
-            self.commit(&hash);
+            self.commit(round, &hash);
         }
     }
 
     pub fn handle_prevote(&mut self, prevote: Prevote) {
+        debug!("Handle prevote {:?}", prevote);
         // Add prevote
         let has_consensus = self.state.add_prevote(&prevote);
 
@@ -152,14 +167,14 @@ impl<B: Blockchain> Node<B> {
                 panic!("We are fucked up...");
             }
 
-            self.commit(propose_hash);
+            self.commit(round, propose_hash);
         } else {
             self.state.add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
         }
     }
 
     pub fn lock(&mut self, round: Round, propose_hash: Hash) {
-        info!("MAKE LOCK");
+        info!("MAKE LOCK {:?} {:?}", round, propose_hash);
         // Change lock
         self.state.lock(round, propose_hash);
 
@@ -187,6 +202,7 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_precommit(&mut self, msg: Precommit) {
+        debug!("Handle precommit {:?}", msg);
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
 
@@ -212,14 +228,23 @@ impl<B: Blockchain> Node<B> {
     }
 
     // FIXME: push precommits into storage
-    pub fn commit(&mut self, hash: &Hash) {
-        info!("COMMIT");
+    pub fn commit(&mut self, round: Round, hash: &Hash) {
+        info!("COMMIT {:?} {:?}", round, hash);
         // Merge changes into storage
-        // FIXME: remove unwrap here, merge patch into storage
-        self.blockchain.merge(self.state.propose(hash).unwrap().patch().unwrap()).is_ok();
+        {
+            // FIXME: remove unwrap here
+            let block_hash = self.state.propose(hash).unwrap().block_hash().unwrap();
+            let patch = self.state.propose(hash).unwrap().patch().unwrap();
+            let precommits = self.state.precommits(round, *hash, block_hash).unwrap().values();
+            self.blockchain.commit(block_hash, patch, precommits).unwrap();
+        }
 
         // Update state to new height
         self.state.new_height(hash);
+
+        info!("========== commited = {}, pool = {}",
+              self.state.commited_txs,
+              self.state.transactions().len());
 
         // Handle queued messages
         for msg in self.state.queued() {
@@ -242,7 +267,8 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_tx(&mut self, msg: B::Transaction) {
-        let hash = msg.hash();
+        debug!("Handle tx {:?}", msg);
+        let hash = Message::hash(&msg);
 
         // Make sure that it is new transaction
         // TODO: use contains instead of get?
@@ -294,10 +320,11 @@ impl<B: Blockchain> Node<B> {
         }
     }
 
-    pub fn handle_request_timeout(&mut self, data: RequestData, peer: PublicKey) {
+    pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
+        debug!("!!!!!!!!!!!!!!!!!!! HANDLE REQUEST TIMEOUT");
         // FIXME: check height?
         if let Some(peer) = self.state.retry(&data, peer) {
-            self.add_request_timeout(data.clone(), peer);
+            self.add_request_timeout(data.clone(), Some(peer));
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
@@ -360,7 +387,7 @@ impl<B: Blockchain> Node<B> {
                 }
             };
             self.send_to_peer(peer, &message);
-            debug!("Send request {:?} to peer {:?}", message, peer);
+            debug!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}", message, peer);
         }
     }
 
@@ -371,26 +398,13 @@ impl<B: Blockchain> Node<B> {
 
     // FIXME: remove this bull shit
     pub fn execute(&mut self, hash: &Hash) -> Hash {
-        let mut fork = self.blockchain.fork();
-
         let msg = self.state.propose(hash).unwrap().message().clone();
-
-        // Update height
-        fork.heights().append(*hash).is_ok();
-        // Save propose
-        fork.proposes().put(hash, msg.clone()).is_ok();
-        // Save transactions
-        for hash in msg.transactions() {
-            fork.transactions()
-                .put(hash, self.state.transactions().get(hash).unwrap().clone())
-                .is_ok();
-        }
-        // FIXME: put precommits
+        let (block_hash, patch) = self.blockchain.create_patch(&msg, self.state.transactions()).unwrap();
 
         // Save patch
-        self.state.propose(hash).unwrap().set_patch(fork.into());
+        self.state.propose(hash).unwrap().set_patch(block_hash, patch);
 
-        *hash
+        block_hash
     }
 
     pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) {
@@ -421,6 +435,7 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn send_propose(&mut self) {
+        debug!("I AM LEADER!!! pool = {}", self.state.transactions().len());
         let round = self.state.round();
         let txs: Vec<Hash> = self.state
             .transactions()

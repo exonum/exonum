@@ -9,11 +9,11 @@ use super::super::storage::Patch;
 
 // TODO: move request timeouts into node configuration
 
-const REQUEST_PROPOSE_WAIT: u64 = 1_000_000; // milliseconds
-const REQUEST_TRANSACTIONS_WAIT: u64 = 1_000_000;
-const REQUEST_PREVOTES_WAIT: u64 = 1_000_000;
-const REQUEST_PRECOMMITS_WAIT: u64 = 1_000_000;
-const REQUEST_COMMIT_WAIT: u64 = 1_000_000;
+const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
+const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
+const REQUEST_PREVOTES_WAIT: u64 = 100;
+const REQUEST_PRECOMMITS_WAIT: u64 = 100;
+const REQUEST_COMMIT_WAIT: u64 = 100;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -53,6 +53,9 @@ pub struct State<Tx> {
     // Максимальная высота, на которой
     // "засветились" другие валидаторы
     validator_heights: Vec<Height>,
+
+    // FIXME: temp, to remove
+    pub commited_txs: u64
 }
 
 // Данные, которые нас интересуют,
@@ -80,7 +83,7 @@ pub struct ProposeState {
     // Тело предложения
     propose: Propose,
     // Вычисленный хеш блока (из предложения)
-    // block_hash:     Option<Hash>,
+    block_hash:     Option<Hash>,
     // Набор изменений, которые нужно внести в состояние для применения блока
     patch: Option<Patch>,
     // Множество неизвестных транзакций из этого предложения
@@ -145,12 +148,11 @@ impl ProposeState {
     }
 
     pub fn block_hash(&self) -> Option<Hash> {
-        // FIXME: here we should return block hash
-        // self.block_hash
-        Some(self.propose.hash())
+        self.block_hash
     }
 
-    pub fn set_patch(&mut self, patch: Patch) {
+    pub fn set_patch(&mut self, block_hash: Hash, patch: Patch) {
+        self.block_hash = Some(block_hash);
         self.patch = Some(patch);
     }
 
@@ -195,6 +197,8 @@ impl<Tx> State<Tx> {
             our_connect_message: connect,
 
             requests: HashMap::new(),
+
+            commited_txs: 0,
         }
     }
 
@@ -288,6 +292,7 @@ impl<Tx> State<Tx> {
         self.height += 1;
         self.round = 1;
         self.locked_round = 0;
+        self.locked_propose = None;
         // TODO: use block hash instead
         self.last_hash = propose_hash.clone();
 
@@ -295,6 +300,7 @@ impl<Tx> State<Tx> {
             let state = self.proposes
                 .get(propose_hash)
                 .expect("Trying to commit unknown propose");
+            self.commited_txs += state.propose.transactions().len() as u64;
             for tx in state.propose.transactions() {
                 self.transactions.remove(tx);
             }
@@ -356,6 +362,7 @@ impl<Tx> State<Tx> {
                              ProposeState {
                                  hash: propose_hash,
                                  propose: msg,
+                                 block_hash: None,
                                  patch: None,
                                  unknown_txs: BTreeSet::new(),
                              });
@@ -383,6 +390,7 @@ impl<Tx> State<Tx> {
                 Some(e.insert(ProposeState {
                     hash: propose_hash,
                     propose: msg.clone(),
+                    block_hash: None,
                     patch: None,
                     unknown_txs: unknown_txs,
                 }))
@@ -480,10 +488,12 @@ impl<Tx> State<Tx> {
         is_new
     }
 
-    pub fn retry(&mut self, data: &RequestData, peer: PublicKey) -> Option<PublicKey> {
+    pub fn retry(&mut self, data: &RequestData, peer: Option<PublicKey>) -> Option<PublicKey> {
         let next = {
             let mut state = self.requests.get_mut(data).unwrap();
-            state.remove(&peer);
+            if let Some(peer) = peer {
+                state.remove(&peer);
+            }
             state.peek()
         };
 

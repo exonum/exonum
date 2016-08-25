@@ -24,7 +24,7 @@ pub type EventLoop = mio::EventLoop<MioAdapter>;
 pub enum Timeout {
     Status,
     Round(u64, u32),
-    Request(RequestData, PublicKey),
+    Request(RequestData, Option<PublicKey>),
     PeerExchange,
 }
 

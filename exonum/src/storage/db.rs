@@ -28,6 +28,15 @@ pub struct Fork<'a, T: Database + 'a> {
     changes: Patch,
 }
 
+impl<'a, T: Database + 'a> Fork<'a, T> {
+    pub fn new(database: &'a T, changes: Patch) -> Fork<'a, T> {
+        Fork {
+            database: database,
+            changes: changes
+        }
+    }
+}
+
 impl<'a, T: Database + 'a> From<Fork<'a, T>> for Patch {
     fn from(fork: Fork<'a, T>) -> Patch {
         fork.changes

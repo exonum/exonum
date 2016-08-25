@@ -31,7 +31,6 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
-        debug!("Handle request: {:?}", msg);
         match msg {
             RequestMessage::Propose(msg) => self.handle_request_propose(msg),
             RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
@@ -43,7 +42,7 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_request_propose(&mut self, msg: RequestPropose) {
-        if msg.height() > self.state.height() {
+        if msg.height() != self.state.height() {
             return;
         }
 
@@ -54,12 +53,14 @@ impl<B: Blockchain> Node<B> {
             self.blockchain.proposes().get(msg.propose_hash()).unwrap().map(|p| p.raw().clone())
         };
 
+
         if let Some(propose) = propose {
             self.send_to_peer(*msg.from(), &propose);
         }
     }
 
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
+        debug!("HANDLE TRANSACTIONS REQUEST!!!");
         for hash in msg.txs() {
             let tx = self.state
                 .transactions()

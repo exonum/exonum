@@ -1,7 +1,8 @@
 use time::Timespec;
 
 use super::super::messages::Field;
-use super::super::crypto::Hash;
+use super::super::crypto::{Hash, hash};
+use super::super::storage::StorageValue;
 
 pub const BLOCK_SIZE : usize = 80;
 
@@ -15,7 +16,7 @@ pub struct Block {
     raw: Vec<u8>
 }
 
-// TODO: add netowork_id and propose_round?
+// TODO: add netowork_id, propose_round, block version?
 impl Block {
     pub fn new(height: u64,
            time: Timespec,
@@ -54,12 +55,26 @@ impl Block {
     }
 }
 
+impl StorageValue for Block {
+    fn serialize(self) -> Vec<u8> {
+        self.raw
+    }
+
+    fn deserialize(v: Vec<u8>) -> Self {
+        Block::from_raw(v)
+    }
+
+    fn hash(&self) -> Hash {
+        hash(&self.raw)
+    }
+}
+
 #[test]
 fn test_block() {
     let height = 123_345;
     let time = ::time::get_time();
-    let prev_hash = super::super::crypto::hash(&[1,2,3]);
-    let state_hash = super::super::crypto::hash(&[4,5,6]);
+    let prev_hash = hash(&[1,2,3]);
+    let state_hash = hash(&[4,5,6]);
     let block = Block::new(height, time, &prev_hash, &state_hash);
 
     assert_eq!(block.height(), height);

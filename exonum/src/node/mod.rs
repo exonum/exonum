@@ -5,7 +5,7 @@ use time::{Duration, Timespec};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, Timeout, EventsConfiguration, Network,
                     NetworkConfiguration};
-use super::blockchain::{Blockchain, BlockStorage};
+use super::blockchain::{Blockchain};
 use super::messages::{Any, Connect, RawMessage, Message};
 
 mod state;
@@ -98,7 +98,7 @@ impl<B: Blockchain> Node<B> {
 
         // TODO: rewrite this bullshit
         let time = self.blockchain
-            .last_propose()
+            .last_block()
             .unwrap()
             .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time());
         let round = 1 +
@@ -139,7 +139,6 @@ impl<B: Blockchain> Node<B> {
         //         return;
         //     }
         let msg = Any::from_raw(raw).unwrap();
-        debug!("Handle message: {:#?}", msg);
         match msg {
             Any::Connect(msg) => self.handle_connect(msg),
             Any::Status(msg) => self.handle_status(msg),
@@ -180,14 +179,15 @@ impl<B: Blockchain> Node<B> {
         let is_new = self.state.request(data.clone(), peer);
 
         if is_new {
-            self.add_request_timeout(data, peer);
+            info!("ADD REQUEST TIMEOUT");
+            self.add_request_timeout(data, None);
         }
     }
 
     pub fn add_round_timeout(&mut self) {
         let ms = self.state.round() as i64 * self.round_timeout as i64;
         let time = self.blockchain
-            .last_propose()
+            .last_block()
             .unwrap()
             .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time()) +
                    Duration::milliseconds(ms);
@@ -204,7 +204,7 @@ impl<B: Blockchain> Node<B> {
         self.events.add_timeout(Timeout::Status, time);
     }
 
-    pub fn add_request_timeout(&mut self, data: RequestData, peer: PublicKey) {
+    pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         let time = self.events.get_time() + data.timeout();
         self.events.add_timeout(Timeout::Request(data, peer), time);
     }

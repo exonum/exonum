@@ -10,7 +10,7 @@ use exonum::crypto::{gen_keypair, gen_keypair_from_seed, Seed, PublicKey, Secret
 use exonum::node::Configuration;
 use exonum::events::{NetworkConfiguration, EventsConfiguration};
 use exonum::events::{Reactor, Events, Event, Timeout, Network};
-use exonum::storage::Blockchain;
+use exonum::blockchain::Blockchain;
 use exonum::messages::{Any, Message, Connect, RawMessage};
 
 use timestamping::TimestampTx;
