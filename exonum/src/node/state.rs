@@ -490,7 +490,11 @@ impl<Tx> State<Tx> {
 
     pub fn retry(&mut self, data: &RequestData, peer: Option<PublicKey>) -> Option<PublicKey> {
         let next = {
-            let mut state = self.requests.get_mut(data).unwrap();
+            let mut state = if let Some(state) = self.requests.get_mut(data) {
+                state
+            } else {
+                return None
+            };
             if let Some(peer) = peer {
                 state.remove(&peer);
             }

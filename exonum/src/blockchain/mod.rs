@@ -30,6 +30,7 @@ pub trait Blockchain: Sized
 
     }
 
+    fn verify_tx(tx: &Self::Transaction) -> bool;
     fn state_hash(fork: &mut Fork<Self::Database>) -> Hash;
     fn execute(fork: &mut Fork<Self::Database>, tx: &Self::Transaction) -> Result<(), Error>;
 

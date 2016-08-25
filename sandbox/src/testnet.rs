@@ -274,7 +274,7 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
         }
         self.tx_remaining -= count;
 
-        debug!("There are {} transactions in the pool", self.tx_remaining);
+        debug!("{:?}, There are {} transactions in the pool", self.events.get_time(), self.tx_remaining);
         self.tx_remaining != 0
     }
 }

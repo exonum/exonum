@@ -5,6 +5,7 @@ extern crate exonum;
 
 use std::borrow::{Borrow, BorrowMut};
 
+use exonum::messages::Message;
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::{Database, Fork, Error};
 use exonum::blockchain::Blockchain;
@@ -43,6 +44,10 @@ impl<D> Blockchain for TimestampingBlockchain<D>
 {
     type Database = D;
     type Transaction = TimestampTx;
+
+    fn verify_tx(tx: &Self::Transaction) -> bool {
+        tx.verify(tx.pub_key())
+    }
 
     fn state_hash(_: &mut Fork<Self::Database>) -> Hash {
         hash(&[])

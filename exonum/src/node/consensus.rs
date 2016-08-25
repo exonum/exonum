@@ -174,7 +174,7 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn lock(&mut self, round: Round, propose_hash: Hash) {
-        info!("MAKE LOCK {:?} {:?}", round, propose_hash);
+        debug!("MAKE LOCK {:?} {:?}", round, propose_hash);
         // Change lock
         self.state.lock(round, propose_hash);
 
@@ -229,7 +229,7 @@ impl<B: Blockchain> Node<B> {
 
     // FIXME: push precommits into storage
     pub fn commit(&mut self, round: Round, hash: &Hash) {
-        info!("COMMIT {:?} {:?}", round, hash);
+        debug!("COMMIT {:?} {:?}", round, hash);
         // Merge changes into storage
         {
             // FIXME: remove unwrap here
@@ -242,7 +242,8 @@ impl<B: Blockchain> Node<B> {
         // Update state to new height
         self.state.new_height(hash);
 
-        info!("========== commited = {}, pool = {}",
+        info!("{:?} ========== commited = {}, pool = {}",
+              self.events.get_time(),
               self.state.commited_txs,
               self.state.transactions().len());
 
@@ -272,11 +273,15 @@ impl<B: Blockchain> Node<B> {
 
         // Make sure that it is new transaction
         // TODO: use contains instead of get?
+        if self.state.transactions().contains_key(&hash) {
+            return;
+        }
+
         if self.blockchain.transactions().get(&hash).unwrap().is_some() {
             return;
         }
 
-        if self.state.transactions().contains_key(&hash) {
+        if !B::verify_tx(&msg) {
             return;
         }
 
@@ -291,7 +296,7 @@ impl<B: Blockchain> Node<B> {
     }
 
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
-        info!("ROUND TIMEOUT height={}, round={}", height, round);
+        debug!("ROUND TIMEOUT height={}, round={}", height, round);
         if height != self.state.height() {
             return;
         }

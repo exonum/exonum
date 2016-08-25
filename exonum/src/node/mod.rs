@@ -179,7 +179,7 @@ impl<B: Blockchain> Node<B> {
         let is_new = self.state.request(data.clone(), peer);
 
         if is_new {
-            info!("ADD REQUEST TIMEOUT");
+            debug!("ADD REQUEST TIMEOUT");
             self.add_request_timeout(data, None);
         }
     }
@@ -191,7 +191,7 @@ impl<B: Blockchain> Node<B> {
             .unwrap()
             .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time()) +
                    Duration::milliseconds(ms);
-        info!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
+        debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
               time,
               self.state.height(),
               self.state.round());
