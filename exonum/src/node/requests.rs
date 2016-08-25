@@ -1,6 +1,7 @@
 use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
                              RequestPrevotes, RequestPrecommits, RequestCommit};
-use super::super::storage::{Blockchain, TxStorage, BlockStorage, Map, List};
+use super::super::blockchain::{Blockchain, TxStorage, BlockStorage};
+use super::super::storage::{Map, List};
 use super::Node;
 
 const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds

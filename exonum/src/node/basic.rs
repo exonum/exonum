@@ -2,7 +2,7 @@ extern crate rand;
 
 use rand::Rng;
 
-use super::super::storage::{Blockchain, BlockStorage};
+use super::super::blockchain::{Blockchain, BlockStorage};
 use super::super::messages::{Connect, Status, Message, RequestPeers};
 use super::{Node, RequestData};
 

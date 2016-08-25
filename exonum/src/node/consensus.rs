@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::super::crypto::{Hash, PublicKey};
-use super::super::storage::{Blockchain, TxStorage, BlockStorage};
+use super::super::blockchain::{Blockchain, TxStorage, BlockStorage};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
                              RequestPrecommits, RequestCommit};
