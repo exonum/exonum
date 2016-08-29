@@ -105,12 +105,14 @@ fn merkle_patricia_table_insertion_large_map<T: Database>(b: &mut Bencher, mut d
     });
 }
 
+#[cfg(feature = "long_benchmarks")]
 #[bench]
 fn bench_merkle_table_append_memorydb(b: &mut Bencher) {
     let db = MemoryDB::new();
     merkle_table_insertion(b, db);
 }
 
+#[cfg(feature = "long_benchmarks")]
 #[bench]
 fn bench_merkle_table_append_leveldb(b: &mut Bencher) {
     let mut options = LevelDBOptions::new();
@@ -120,12 +122,14 @@ fn bench_merkle_table_append_leveldb(b: &mut Bencher) {
     merkle_table_insertion(b, db);
 }
 
+#[cfg(feature = "long_benchmarks")]
 #[bench]
 fn bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
     let db = MemoryDB::new();
     merkle_patricia_table_insertion(b, db);
 }
 
+#[cfg(feature = "long_benchmarks")]
 #[bench]
 fn bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
     let mut options = LevelDBOptions::new();
@@ -135,6 +139,7 @@ fn bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
     merkle_patricia_table_insertion(b, db);
 }
 
+#[cfg(feature = "long_benchmarks")]
 #[bench]
 fn bench_merkle_patricia_table_insertion_fork_leveldb(b: &mut Bencher) {
     let mut options = LevelDBOptions::new();
@@ -144,12 +149,14 @@ fn bench_merkle_patricia_table_insertion_fork_leveldb(b: &mut Bencher) {
     merkle_patricia_table_insertion_fork(b, db);
 }
 
+#[cfg(feature = "long_benchmarks")]
 #[bench]
 fn long_bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
     let db = MemoryDB::new();
     merkle_patricia_table_insertion_large_map(b, db);
 }
 
+#[cfg(feature = "long_benchmarks")]
 #[bench]
 fn long_bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
     let mut options = LevelDBOptions::new();

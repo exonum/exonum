@@ -152,10 +152,11 @@ impl Connection {
         }
     }
 
-    pub fn send(&mut self, message: RawMessage) {
+    pub fn send(&mut self, message: RawMessage) -> io::Result<()> {
         // TODO: capacity overflow
         // TODO: reregister
         self.writer.queue.push_back(message);
+        self.writable()
     }
 
     pub fn is_idle(&self) -> bool {

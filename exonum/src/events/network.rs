@@ -159,7 +159,7 @@ impl Network {
                id.0,
                message.clone().len());
 
-        self.connections[id].send(message);
+        self.connections[id].send(message)?;
         let r = event_loop.reregister(self.connections[id].socket(),
                                       id,
                                       self.connections[id].interest(),
