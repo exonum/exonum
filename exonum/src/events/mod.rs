@@ -231,7 +231,7 @@ mod tests {
                 e.wait_for_bind();
                 e.send_to(&addrs[1], m1).unwrap();
                 assert_eq!(e.wait_for_msg(Duration::milliseconds(1000)), Some(m2));
-                e.process_events(Duration::milliseconds(5000));
+                e.process_events(Duration::milliseconds(10000));
             });
         }
 
