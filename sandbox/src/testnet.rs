@@ -26,9 +26,10 @@ pub struct Listener {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NetworkConfig {
-    pub max_incoming_connections: usize,
-    pub max_outgoing_connections: usize,
+    pub max_connections: usize,
     pub listener: Option<Listener>,
+    pub tcp_nodelay: bool,
+    pub tcp_keep_alive: Option<u32>,
 }
 
 
@@ -76,8 +77,9 @@ impl TestNodeConfig {
             status_timeout: 5000,
             peers_timeout: 10000,
             network: NetworkConfig {
-                max_incoming_connections: 128,
-                max_outgoing_connections: 128,
+                max_connections: 256,
+                tcp_keep_alive: None,
+                tcp_nodelay: false,
                 listener: None,
             },
         }
@@ -101,8 +103,9 @@ impl TestNodeConfig {
             peers_timeout: self.peers_timeout,
             network: NetworkConfiguration {
                 listen_address: validator.address,
-                max_incoming_connections: self.network.max_incoming_connections,
-                max_outgoing_connections: self.network.max_outgoing_connections,
+                max_connections: self.network.max_connections,
+                tcp_nodelay: self.network.tcp_nodelay,
+                tcp_keep_alive: self.network.tcp_keep_alive,
             },
             events: EventsConfiguration::new(),
             peer_discovery: known_peers,
@@ -140,8 +143,9 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
         let listener = cfg.network.listener.unwrap();
         let network = NetworkConfiguration {
             listen_address: listener.address,
-            max_incoming_connections: cfg.network.max_incoming_connections,
-            max_outgoing_connections: cfg.network.max_outgoing_connections,
+            max_connections: cfg.network.max_connections,
+            tcp_nodelay: cfg.network.tcp_nodelay,
+            tcp_keep_alive: cfg.network.tcp_keep_alive,
         };
 
         let events = EventsConfiguration::new();

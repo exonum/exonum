@@ -15,40 +15,41 @@ pub type PeerId = Token;
 
 const SERVER_ID: PeerId = Token(1);
 
+#[derive(Debug, Clone, Copy)]
+pub struct NetworkConfiguration {
+    pub listen_address: SocketAddr,
+    pub max_connections: usize, // TODO: think more about config parameters
+    pub tcp_nodelay: bool,
+    pub tcp_keep_alive: Option<u32>
+}
+
 #[derive(Debug)]
 pub struct Network {
-    listen_address: SocketAddr,
+    config: NetworkConfiguration,
     listener: Option<TcpListener>,
     connections: Slab<Connection>,
     addresses: HashMap<SocketAddr, PeerId>,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct NetworkConfiguration {
-    pub listen_address: SocketAddr,
-    pub max_incoming_connections: usize,
-    pub max_outgoing_connections: usize, // TODO: think more about config parameters
-}
-
 impl Network {
     pub fn with_config(config: NetworkConfiguration) -> Network {
         Network {
-            listen_address: config.listen_address,
+            config: config,
             listener: None,
-            connections: Slab::new_starting_at(Token(2), config.max_outgoing_connections),
+            connections: Slab::new_starting_at(Token(2), config.max_connections),
             addresses: HashMap::new(),
         }
     }
 
     pub fn address(&self) -> &SocketAddr {
-        &self.listen_address
+        &self.config.listen_address
     }
 
     pub fn bind(&mut self, event_loop: &mut EventLoop) -> io::Result<()> {
         if let Some(_) = self.listener {
             return Err(io::Error::new(io::ErrorKind::Other, "Already binded"));
         }
-        let listener = TcpListener::bind(&self.listen_address)?;
+        let listener = TcpListener::bind(&self.config.listen_address)?;
         let r = event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge());
         match r {
             Ok(()) => {
@@ -69,7 +70,7 @@ impl Network {
               -> io::Result<Option<MessageBuffer>> {
         if set.is_error() | set.is_hup() {
             trace!("{}: connection {} will be closed, id: {}",
-                   self.listen_address,
+                   self.address(),
                    self.connections[id].address(),
                    id.0);
             self.remove_connection(id);
@@ -79,65 +80,43 @@ impl Network {
         if id == SERVER_ID {
             // Accept new connections
             // FIXME: Fail-safe accepting of new connections?
-            let listener = match self.listener {
-                Some(ref listener) => listener,
-                None => return Ok(None),
+            let pair = match self.listener {
+                    Some(ref listener) => listener.accept()?,
+                    None => None,
             };
-            while let Some((socket, address)) = listener.accept()? {
+            if let Some((socket, address)) = pair {
                 let peer = Connection::new(socket, address);
+                self.add_connection(event_loop, peer)?;
 
-                let id = match self.connections.insert(peer) {
-                    Ok(id) => id,
-                    Err(_) => {
-                        return Err(io::Error::new(io::ErrorKind::Other, "Maximum connections"));
-                    }
-                };
-                self.addresses.insert(address, id);
-
-                let r = event_loop.register(self.connections[id].socket(),
-                                            id,
-                                            self.connections[id].interest(),
-                                            PollOpt::edge());
-                if let Err(e) = r {
-                    self.connections.remove(id);
-                    return Err(e);
-                }
                 trace!("{}: Accepted incoming connection from {} id: {}",
-                       self.listen_address,
-                       address,
-                       id.0);
+                        self.address(),
+                        address,
+                        id.0);
             }
             return Ok(None);
         }
 
         if set.is_writable() {
             trace!("{}: Socket is writable {} id: {}",
-                   self.listen_address,
+                   self.address(),
                    self.connections[id].address(),
                    id.0);
             // Write data into socket
             self.connections[id].writable()?;
             if !self.connections[id].is_idle() {
                 trace!("{}: Socket is blocked {} id: {}",
-                       self.listen_address,
+                       self.address(),
                        self.connections[id].address(),
                        id.0);
 
-                let r = event_loop.reregister(self.connections[id].socket(),
-                                              id,
-                                              self.connections[id].interest(),
-                                              PollOpt::edge());
-                if let Err(e) = r {
-                    self.remove_connection(id);
-                    return Err(e);
-                }
+                self.reregister_connection(event_loop, id, PollOpt::edge())?;
             }
             return Ok(None);
         }
 
         if set.is_readable() {
             trace!("{}: Socket is readable {} id: {}",
-                   self.listen_address,
+                   self.address(),
                    self.connections[id].address(),
                    id.0);
             // Read new data from socket
@@ -158,22 +137,13 @@ impl Network {
         };
 
         let peer = Connection::new(TcpStream::connect(address)?, *address);
-        let id = self.add_connection(peer)?;
-        let r = event_loop.register(self.connections[id].socket(),
-                                    id,
-                                    self.connections[id].interest(),
-                                    PollOpt::edge());
+        let id = self.add_connection(event_loop, peer)?;
+
         trace!("{}: Establish connection with {}, id: {}",
-               self.listen_address,
+               self.address(),
                address,
                id.0);
-        match r {
-            Ok(()) => Ok(id),
-            Err(e) => {
-                self.remove_connection(id);
-                Err(e)
-            }
-        }
+        Ok(id)
     }
 
     pub fn send_to(&mut self,
@@ -182,15 +152,18 @@ impl Network {
                    message: RawMessage)
                    -> io::Result<()> {
         let id = self.get_peer(event_loop, address)?;
+
+        trace!("{}: Send message to outgoing {}, id: {}, size: {}",
+               self.address(),
+               address,
+               id.0,
+               message.clone().len());
+
         self.connections[id].send(message);
         let r = event_loop.reregister(self.connections[id].socket(),
                                       id,
                                       self.connections[id].interest(),
                                       PollOpt::edge());
-        trace!("{}: Send message to outgoing {}, id: {}",
-               self.listen_address,
-               address,
-               id.0);
         if let Err(e) = r {
             self.remove_connection(id);
             return Err(e);
@@ -204,12 +177,39 @@ impl Network {
         self.connections.remove(id);
     }
 
-    fn add_connection(&mut self, connection: Connection) -> io::Result<PeerId> {
+    fn add_connection(&mut self, event_loop: &mut EventLoop, mut connection: Connection) -> io::Result<PeerId> {
+        self.configure_stream(connection.socket_mut())?;
         let address = *connection.address();
         let id = self.connections
             .insert(connection)
             .map_err(|_| io::Error::new(io::ErrorKind::Other, "Maximum connections"))?;
         self.addresses.insert(address, id);
+
+        self.register_connection(event_loop, id, PollOpt::edge())?;
         Ok(id)
+    }
+
+    fn register_connection(&mut self, event_loop: &mut EventLoop, id: Token, opts: PollOpt) -> io::Result<()> {
+        event_loop
+            .register(self.connections[id].socket(), id, self.connections[id].interest(), opts)
+            .or_else(|e| {
+                self.remove_connection(id);
+                Err(e)
+            })
+    }
+
+    fn reregister_connection(&mut self, event_loop: &mut EventLoop, id: Token, opts: PollOpt) -> io::Result<()> {
+        event_loop
+            .reregister(self.connections[id].socket(), id, self.connections[id].interest(), opts)
+            .or_else(|e| {
+                self.remove_connection(id);
+                Err(e)
+            })
+    }
+
+    fn configure_stream(&self, stream: &mut TcpStream) -> io::Result<()> {
+        stream.set_keepalive(self.config.tcp_keep_alive)?;
+        stream.set_nodelay(self.config.tcp_nodelay)?;
+        Ok(())
     }
 }

@@ -87,8 +87,9 @@ impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
             // TODO: remove events and network config from node::Configuration
             network: NetworkConfiguration {
                 listen_address: addresses[0].clone(),
-                max_incoming_connections: 8,
-                max_outgoing_connections: 8,
+                max_connections: 16,
+                tcp_nodelay: false,
+                tcp_keep_alive: None
             },
             events: EventsConfiguration::new(),
             validators: validators.iter().map(|&(p, _)| p.clone()).collect(),
