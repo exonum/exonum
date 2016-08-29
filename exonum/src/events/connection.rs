@@ -156,7 +156,11 @@ impl Connection {
         // TODO: capacity overflow
         // TODO: reregister
         self.writer.queue.push_back(message);
-        self.writable()
+        // TODO proper test that we can write immediately
+        self.writable().or_else(|e| {
+            warn!("Unable to write to socket {}, error is {:?}", self.address, e);
+            Ok(())
+        })
     }
 
     pub fn is_idle(&self) -> bool {

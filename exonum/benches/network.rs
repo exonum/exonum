@@ -223,9 +223,9 @@ fn bench_msg_short_10000_nodelay(b: &mut Bencher) {
 
 #[cfg(feature = "long_benchmarks")]
 #[bench]
-fn bench_msg_long_1000(b: &mut Bencher) {
+fn bench_msg_long_1000_nodelay(b: &mut Bencher) {
     let cfg = BenchConfig {
-        tcp_nodelay: false,
+        tcp_nodelay: true,
         len: 100000,
         times: 1000
     };
