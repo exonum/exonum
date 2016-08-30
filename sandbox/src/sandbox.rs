@@ -12,7 +12,7 @@ use exonum::node::{Node, Configuration};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
-use exonum::events::{Reactor, Event, Timeout, EventsConfiguration, NetworkConfiguration};
+use exonum::events::{Reactor, Event, NodeTimeout, EventsConfiguration, NetworkConfiguration};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 use timestamping::TimestampingBlockchain;
@@ -27,7 +27,7 @@ struct SandboxInner {
 }
 
 #[derive(PartialEq, Eq)]
-struct TimerPair(Timespec, Timeout);
+struct TimerPair(Timespec, NodeTimeout);
 
 impl PartialOrd for TimerPair {
     fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
@@ -89,7 +89,9 @@ impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
                 listen_address: addresses[0].clone(),
                 max_connections: 16,
                 tcp_nodelay: false,
-                tcp_keep_alive: None
+                tcp_keep_alive: None,
+                tcp_reconnect_timeout: 5000,
+                tcp_reconnect_timeout_max: 600000,
             },
             events: EventsConfiguration::new(),
             validators: validators.iter().map(|&(p, _)| p.clone()).collect(),
@@ -127,16 +129,15 @@ impl Reactor for SandboxReactor {
         Ok(())
     }
 
-    fn send_to(&mut self, address: &SocketAddr, message: RawMessage) -> io::Result<()> {
+    fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
         self.inner.borrow_mut().sended.push_back((address.clone(), message));
-        Ok(())
     }
 
     fn address(&self) -> SocketAddr {
         self.inner.borrow().address
     }
 
-    fn add_timeout(&mut self, timeout: Timeout, time: Timespec) {
+    fn add_timeout(&mut self, timeout: NodeTimeout, time: Timespec) {
         // assert!(time < self.inner.borrow().time, "Tring to add timeout for the past");
         self.inner.borrow_mut().timers.push(TimerPair(time, timeout));
     }

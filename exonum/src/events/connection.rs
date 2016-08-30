@@ -113,19 +113,28 @@ impl MessageWriter {
     }
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum Direction {
+    Incoming,
+    Outgoing
+}
+
 pub struct Connection {
     socket: TcpStream,
     address: SocketAddr,
 
     reader: MessageReader,
     writer: MessageWriter,
+
+    direction: Direction,
 }
 
 impl Connection {
-    pub fn new(socket: TcpStream, address: SocketAddr) -> Connection {
+    pub fn new(socket: TcpStream, address: SocketAddr, direction: Direction) -> Connection {
         Connection {
             socket: socket,
             address: address,
+            direction: direction,
 
             reader: MessageReader::empty(),
             writer: MessageWriter::empty(),
@@ -144,12 +153,26 @@ impl Connection {
         &self.address
     }
 
-    pub fn writable(&mut self) -> io::Result<()> {
-        // TODO: reregister
-        self.writer.write(&mut self.socket)
+    pub fn direction(&self) -> &Direction {
+        &self.direction
     }
 
-    pub fn readable(&mut self) -> io::Result<Option<MessageBuffer>> {
+    pub fn try_write(&mut self) -> io::Result<()> {
+        // TODO: reregister
+        self.writer.write(&mut self.socket).or_else(|e| {
+            match e.kind() {
+                io::ErrorKind::WouldBlock |
+                io::ErrorKind::WriteZero => {
+                    warn!("Unable to write to socket {}, socket is blocked",
+                          self.address);
+                    Ok(())
+                }
+                _ => Err(e),
+            }
+        })
+    }
+
+    pub fn try_read(&mut self) -> io::Result<Option<MessageBuffer>> {
         // TODO: raw length == 0?
         // TODO: maximum raw length?
         loop {
@@ -171,12 +194,7 @@ impl Connection {
         // TODO: reregister
         self.writer.queue.push_back(message);
         // TODO proper test that we can write immediately
-        self.writable().or_else(|e| {
-            warn!("Unable to write to socket {}, error is {:?}",
-                  self.address,
-                  e);
-            Ok(())
-        })
+        self.try_write()
     }
 
     pub fn is_idle(&self) -> bool {

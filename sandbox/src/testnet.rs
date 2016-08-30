@@ -9,7 +9,7 @@ use rand::{thread_rng, Rng};
 use exonum::crypto::{gen_keypair, gen_keypair_from_seed, Seed, PublicKey, SecretKey};
 use exonum::node::Configuration;
 use exonum::events::{NetworkConfiguration, EventsConfiguration};
-use exonum::events::{Reactor, Events, Event, Timeout, Network};
+use exonum::events::{Reactor, Events, Event, NodeTimeout, Network};
 use exonum::blockchain::Blockchain;
 use exonum::messages::{Any, Message, Connect, RawMessage};
 
@@ -30,6 +30,8 @@ pub struct NetworkConfig {
     pub listener: Option<Listener>,
     pub tcp_nodelay: bool,
     pub tcp_keep_alive: Option<u32>,
+    pub tcp_reconnect_timeout: u64,
+    pub tcp_reconnect_timeout_max: u64,
 }
 
 
@@ -80,6 +82,8 @@ impl TestNodeConfig {
                 max_connections: 256,
                 tcp_keep_alive: None,
                 tcp_nodelay: false,
+                tcp_reconnect_timeout: 5000,
+                tcp_reconnect_timeout_max: 600000,
                 listener: None,
             },
         }
@@ -106,6 +110,8 @@ impl TestNodeConfig {
                 max_connections: self.network.max_connections,
                 tcp_nodelay: self.network.tcp_nodelay,
                 tcp_keep_alive: self.network.tcp_keep_alive,
+                tcp_reconnect_timeout: self.network.tcp_reconnect_timeout,
+                tcp_reconnect_timeout_max: self.network.tcp_reconnect_timeout_max,
             },
             events: EventsConfiguration::new(),
             peer_discovery: known_peers,
@@ -146,6 +152,8 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
             max_connections: cfg.network.max_connections,
             tcp_nodelay: cfg.network.tcp_nodelay,
             tcp_keep_alive: cfg.network.tcp_keep_alive,
+            tcp_reconnect_timeout: cfg.network.tcp_reconnect_timeout,
+            tcp_reconnect_timeout_max: cfg.network.tcp_reconnect_timeout_max,
         };
 
         let events = EventsConfiguration::new();
@@ -207,7 +215,7 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.peers.get(&public_key) {
-            self.events.send_to(&conn.addr(), message.clone()).unwrap();
+            self.events.send_to(&conn.addr(), message.clone());
         } else {
             warn!("attempt to send data to a peer: {:?} that is not connected",
                   public_key);
@@ -215,22 +223,22 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
     }
 
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        self.events.send_to(address, message.clone()).unwrap();
+        self.events.send_to(address, message.clone());
     }
 
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.peers.values() {
-            self.events.send_to(&conn.addr(), message.clone()).unwrap();
+            self.events.send_to(&conn.addr(), message.clone());
         }
     }
 
     fn add_timeout(&mut self) {
         let time = self.events.get_time() + Duration::milliseconds(self.tx_timeout as i64);
-        self.events.add_timeout(Timeout::PeerExchange, time);
+        self.events.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
-    fn handle_timeout(&mut self, _: Timeout) -> bool {
+    fn handle_timeout(&mut self, _: NodeTimeout) -> bool {
         if self.send_transactions() {
             self.add_timeout();
             true

@@ -1,13 +1,15 @@
 use std::io;
-use std::collections::HashMap;
+use std::collections::{HashMap};
 use std::net::SocketAddr;
+use std::cmp::min;
 
 pub use mio::{EventSet, PollOpt, Token};
+use mio::Timeout as MioTimeout;
 use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
-use super::connection::Connection;
-use super::EventLoop;
+use super::connection::{Connection, Direction};
+use super::{Timeout, InternalTimeout, EventLoop};
 
 use super::super::messages::{MessageBuffer, RawMessage};
 
@@ -21,14 +23,16 @@ pub struct NetworkConfiguration {
     pub max_connections: usize, // TODO: think more about config parameters
     pub tcp_nodelay: bool,
     pub tcp_keep_alive: Option<u32>,
+    pub tcp_reconnect_timeout: u64,
+    pub tcp_reconnect_timeout_max: u64,
 }
 
-#[derive(Debug)]
 pub struct Network {
     config: NetworkConfiguration,
     listener: Option<TcpListener>,
     connections: Slab<Connection>,
     addresses: HashMap<SocketAddr, PeerId>,
+    reconnects: HashMap<SocketAddr, MioTimeout>
 }
 
 impl Network {
@@ -38,6 +42,7 @@ impl Network {
             listener: None,
             connections: Slab::new_starting_at(Token(2), config.max_connections),
             addresses: HashMap::new(),
+            reconnects: HashMap::new()
         }
     }
 
@@ -68,11 +73,21 @@ impl Network {
               id: PeerId,
               set: EventSet)
               -> io::Result<Option<MessageBuffer>> {
-        if set.is_error() | set.is_hup() {
-            trace!("{}: connection {} will be closed, id: {}",
+        if set.is_error() {
+            warn!("{}: connection {} closed with error",
                    self.address(),
-                   self.connections[id].address(),
-                   id.0);
+                   self.connections[id].address());
+
+            let addr = *self.connections[id].address();
+            self.try_reconnect(event_loop, id)?;
+            self.remove_connection(id);
+            return Ok(None);
+        }
+
+        if set.is_hup() {
+            let addr = *self.connections[id].address();
+            println!("hup {}", addr);
+            self.try_reconnect(event_loop, id)?;
             self.remove_connection(id);
             return Ok(None);
         }
@@ -85,10 +100,10 @@ impl Network {
                 None => None,
             };
             if let Some((socket, address)) = pair {
-                let peer = Connection::new(socket, address);
+                let peer = Connection::new(socket, address, Direction::Incoming);
                 self.add_connection(event_loop, peer)?;
 
-                trace!("{}: Accepted incoming connection from {} id: {}",
+                println!("{}: Accepted incoming connection from {} id: {}",
                        self.address(),
                        address,
                        id.0);
@@ -97,36 +112,52 @@ impl Network {
         }
 
         if set.is_writable() {
+            let address = *self.connections[id].address();
+
             trace!("{}: Socket is writable {} id: {}",
                    self.address(),
-                   self.connections[id].address(),
+                   address,
                    id.0);
-            // Write data into socket
-            self.connections[id].writable()?;
-            if !self.connections[id].is_idle() {
-                trace!("{}: Socket is blocked {} id: {}",
-                       self.address(),
-                       self.connections[id].address(),
-                       id.0);
 
+            // Write data into socket
+            let r = self.connections[id].try_write();
+            if let Err(e) = r {
+                warn!("An error when write to socket {} occured, error: {}", address, e);
+                self.remove_connection(id);
+                return Ok(None);
+            }
+            if !self.connections[id].is_idle() {
                 self.reregister_connection(event_loop, id, PollOpt::edge())?;
             }
+            self.mark_connected(event_loop, id);
             return Ok(None);
         }
 
         if set.is_readable() {
+            let address = *self.connections[id].address();
+            self.mark_connected(event_loop, id);
+
             trace!("{}: Socket is readable {} id: {}",
                    self.address(),
-                   self.connections[id].address(),
+                   address,
                    id.0);
-            // Read new data from socket
-            return self.connections[id].readable();
+
+            return match self.connections[id].try_read() {
+                Ok(buffer) => Ok(buffer),
+                Err(e) => {
+                    warn!("An error when read from socket {} occured, error: {}", address, e);
+                    self.try_reconnect(event_loop, id)?;
+                    self.remove_connection(id);
+                    Ok(None)
+                }
+            };
         }
         // FIXME: Can we be here?
         Ok(None)
     }
 
-    pub fn tick(&mut self, _: &mut EventLoop) {}
+    pub fn tick(&mut self, _: &mut EventLoop) {
+    }
 
     pub fn get_peer(&mut self,
                     event_loop: &mut EventLoop,
@@ -136,10 +167,10 @@ impl Network {
             return Ok(*id);
         };
 
-        let peer = Connection::new(TcpStream::connect(address)?, *address);
+        let peer = Connection::new(TcpStream::connect(address)?, *address, Direction::Outgoing);
         let id = self.add_connection(event_loop, peer)?;
 
-        trace!("{}: Establish connection with {}, id: {}",
+        println!("{}: Establish connection with {}, id: {}",
                self.address(),
                address,
                id.0);
@@ -149,32 +180,83 @@ impl Network {
     pub fn send_to(&mut self,
                    event_loop: &mut EventLoop,
                    address: &SocketAddr,
-                   message: RawMessage)
-                   -> io::Result<()> {
-        let id = self.get_peer(event_loop, address)?;
+                   message: RawMessage) {
+        let r = match self.get_peer(event_loop, address) {
+            Ok(id) => {
+                self.connections[id]
+                    .send(message)
+                    .and_then(|_| {
+                        event_loop.reregister(self.connections[id].socket(),
+                                              id,
+                                              self.connections[id].interest(),
+                                              PollOpt::edge())?;
+                        self.mark_connected(event_loop, id);
+                        Ok(())
+                    })
+                    .or_else(|e| {
+                        self.try_reconnect(event_loop, id)?;
+                        self.remove_connection(id);
+                        Err(e)
+                    })
+            }
+            Err(e) => Err(e),
+        };
 
-        trace!("{}: Send message to outgoing {}, id: {}, size: {}",
-               self.address(),
-               address,
-               id.0,
-               message.clone().len());
-
-        self.connections[id].send(message)?;
-        let r = event_loop.reregister(self.connections[id].socket(),
-                                      id,
-                                      self.connections[id].interest(),
-                                      PollOpt::edge());
         if let Err(e) = r {
-            self.remove_connection(id);
-            return Err(e);
-        } else {
-            Ok(())
+            warn!("An error occured when try to send a message (address: {}, error: {:?})",
+                   address,
+                   e);
+            return;
+        }
+    }
+
+    pub fn handle_timeout(&mut self, event_loop: &mut EventLoop, timeout: InternalTimeout)  {
+        match timeout {
+            InternalTimeout::Reconnect(addr, delay) => {
+                println!("Handle reconnect timeout for {}", addr);
+                if self.reconnects.contains_key(&addr) {
+                    self.get_peer(event_loop, &addr);
+
+                    let delay = min(delay * 2, self.config.tcp_reconnect_timeout_max);
+                    println!("Try to reconnect with delay {}", delay);
+                    //TODO Fail-safe timeout error handling
+                    self.add_reconnect_timeout(event_loop, addr, delay).unwrap();
+                }
+            }
         }
     }
 
     fn remove_connection(&mut self, id: Token) {
-        self.addresses.remove(self.connections[id].address());
+        let address = *self.connections[id].address();
+        self.addresses.remove(&address);
         self.connections.remove(id);
+    }
+
+    fn try_reconnect(&mut self, event_loop: &mut EventLoop, id: Token) -> io::Result<()> {
+        if self.connections[id].direction() == &Direction::Outgoing {
+            let addr = *self.connections[id].address();
+            self.try_reconnect_addr(event_loop, addr)?;
+        }
+        Ok(())
+    }
+
+    fn try_reconnect_addr(&mut self, event_loop: &mut EventLoop, address: SocketAddr) -> io::Result<()> {
+        if !self.reconnects.contains_key(&address) {
+            let delay = self.config.tcp_reconnect_timeout;
+            return self.add_reconnect_timeout(event_loop, address, delay);
+        }
+        Ok(())
+    }
+
+    fn add_reconnect_timeout(&mut self, event_loop: &mut EventLoop, address: SocketAddr, delay: u64) -> io::Result<()> {
+        let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
+        let timeout = event_loop
+            .timeout_ms(reconnect, delay)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("A mio error occured {:?}", e)))?;
+        self.reconnects.insert(address, timeout);
+
+        println!("Add reconnect timeout {}", delay);
+        Ok(())
     }
 
     fn add_connection(&mut self,
@@ -189,9 +271,23 @@ impl Network {
         self.addresses.insert(address, id);
 
         self.register_connection(event_loop, id, PollOpt::edge())?;
+        //self.clear_reconnect_request(event_loop, &address);
         Ok(id)
     }
 
+    fn mark_connected(&mut self, event_loop: &mut EventLoop, id: Token) {
+        let address = *self.connections[id].address();
+        self.clear_reconnect_request(event_loop, &address)
+    }
+
+    fn clear_reconnect_request(&mut self, event_loop: &mut EventLoop, addr: &SocketAddr) {
+        if let Some(timeout) = self.reconnects.remove(addr) {
+            println!("Clear reconnect timeout for {}", addr);
+            event_loop.clear_timeout(timeout);
+        }
+    }
+
+    // FIXME I think reconnect useless there
     fn register_connection(&mut self,
                            event_loop: &mut EventLoop,
                            id: Token,
@@ -207,6 +303,7 @@ impl Network {
             })
     }
 
+    // FIXME I think reconnect useless there
     fn reregister_connection(&mut self,
                              event_loop: &mut EventLoop,
                              id: Token,
@@ -227,4 +324,9 @@ impl Network {
         stream.set_nodelay(self.config.tcp_nodelay)?;
         Ok(())
     }
+}
+
+#[cfg(test)]
+mod tests {
+
 }

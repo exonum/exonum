@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
-use super::events::{Reactor, Events, Event, Timeout, EventsConfiguration, Network,
+use super::events::{Reactor, Events, Event, NodeTimeout, EventsConfiguration, Network,
                     NetworkConfiguration};
 use super::blockchain::{Blockchain};
 use super::messages::{Any, Connect, RawMessage, Message};
@@ -148,12 +148,12 @@ impl<B: Blockchain> Node<B> {
         }
     }
 
-    pub fn handle_timeout(&mut self, timeout: Timeout) {
+    pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
         match timeout {
-            Timeout::Round(height, round) => self.handle_round_timeout(height, round),
-            Timeout::Request(data, peer) => self.handle_request_timeout(data, peer),
-            Timeout::Status => self.handle_status_timeout(),
-            Timeout::PeerExchange => self.handle_peer_exchange_timeout(),
+            NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
+            NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
+            NodeTimeout::Status => self.handle_status_timeout(),
+            NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
         }
     }
 
@@ -165,14 +165,14 @@ impl<B: Blockchain> Node<B> {
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
-            self.events.send_to(&conn.addr(), message.clone()).unwrap();
+            self.events.send_to(&conn.addr(), message.clone());
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
     }
 
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        self.events.send_to(address, message.clone()).unwrap();
+        self.events.send_to(address, message.clone());
     }
 
     pub fn request(&mut self, data: RequestData, peer: PublicKey) {
@@ -195,29 +195,29 @@ impl<B: Blockchain> Node<B> {
               time,
               self.state.height(),
               self.state.round());
-        let timeout = Timeout::Round(self.state.height(), self.state.round());
+        let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
     }
 
     pub fn add_status_timeout(&mut self) {
         let time = self.events.get_time() + Duration::milliseconds(self.status_timeout as i64);
-        self.events.add_timeout(Timeout::Status, time);
+        self.events.add_timeout(NodeTimeout::Status, time);
     }
 
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         let time = self.events.get_time() + data.timeout();
-        self.events.add_timeout(Timeout::Request(data, peer), time);
+        self.events.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
         let time = self.events.get_time() + Duration::milliseconds(self.peers_timeout as i64);
-        self.events.add_timeout(Timeout::PeerExchange, time);
+        self.events.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
-            self.events.send_to(&conn.addr(), message.clone()).unwrap();
+            self.events.send_to(&conn.addr(), message.clone());
         }
     }
 }
