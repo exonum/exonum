@@ -6,14 +6,16 @@
 
 extern crate rand;
 extern crate time;
-extern crate exonum;
-extern crate timestamping;
 extern crate serde;
 extern crate toml;
 #[macro_use]
 extern crate log;
 
 extern crate clap;
+
+extern crate exonum;
+extern crate timestamping;
+extern crate cryptocurrency;
 
 #[cfg(test)]
 mod sandbox;

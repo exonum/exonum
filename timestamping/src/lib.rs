@@ -49,8 +49,8 @@ impl<D> Blockchain for TimestampingBlockchain<D>
         tx.verify(tx.pub_key())
     }
 
-    fn state_hash(_: &mut Fork<Self::Database>) -> Hash {
-        hash(&[])
+    fn state_hash(_: &mut Fork<Self::Database>) -> Result<Hash, Error> {
+        Ok(hash(&[]))
     }
 
     fn execute(_: &mut Fork<Self::Database>, _: &Self::Transaction) -> Result<(), Error> {

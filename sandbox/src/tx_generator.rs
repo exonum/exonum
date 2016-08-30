@@ -2,6 +2,7 @@ use rand::{XorShiftRng, Rng, SeedableRng};
 
 use exonum::crypto::{PublicKey, SecretKey, gen_keypair};
 
+use cryptocurrency::{CurrencyTx, TxIssue, TxTransfer};
 use timestamping::TimestampTx;
 
 pub struct TimestampingTxGenerator {
@@ -35,48 +36,49 @@ impl Iterator for TimestampingTxGenerator {
     }
 }
 
-// pub struct CurrencyTxGenerator {
-//     rand: XorShiftRng,
-//     clients: Vec<((PublicKey, SecretKey), &'static str)>
-// }
+const WALLETS_COUNT : usize = 100_000;
 
-// impl CurrencyTxGenerator {
-//     pub fn new() -> CurrencyTxGenerator {
-//         let mut rand = XorShiftRng::from_seed([192, 168, 56, 1]);
+pub struct CurrencyTxGenerator {
+    rand: XorShiftRng,
+    clients: Vec<(PublicKey, SecretKey)>
+}
 
-//         let clients = vec![
-//             (gen_keypair(), "USD"),
-//             (gen_keypair(), "EUR"),
-//             (gen_keypair(), "UAH"),
-//             (gen_keypair(), "RUB"),
-//         ];
+impl CurrencyTxGenerator {
+    pub fn new() -> CurrencyTxGenerator {
+        let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
 
-//         CurrencyTxGenerator {
-//             rand: rand,
-//             clients: clients
-//         }
-//     }
-// }
+        let mut clients = Vec::new();
 
-// impl Iterator for CurrencyTxGenerator {
-//     type Item = TxMessage;
+        for _ in 0..WALLETS_COUNT {
+            clients.push(gen_keypair());
+        }
 
-//     fn next(&mut self) -> Option<TxMessage> {
-//         let &((ref public_key, ref secret_key), ref name) =
-//             self.rand.choose(&self.clients).unwrap();
-//         if self.rand.gen_weighted_bool(10) {
-//             let seed = self.rand.gen();
-//             let amount = self.rand.gen_range(0, 100_000);
-//             Some(TxMessage::Issue(TxIssue::new(
-//                 seed, public_key, name, amount, secret_key
-//             )))
-//         } else {
-//             let seed = self.rand.gen();
-//             let ref reciever = (self.rand.choose(&self.clients).unwrap().0).0;
-//             let amount = self.rand.gen_range(0, 1_000);
-//             Some(TxMessage::Transfer(TxTransfer::new(
-//                 seed, public_key, reciever, amount, secret_key
-//             )))
-//         }
-//     }
-// }
+        CurrencyTxGenerator {
+            rand: rand,
+            clients: clients
+        }
+    }
+}
+
+impl Iterator for CurrencyTxGenerator {
+    type Item = CurrencyTx;
+
+    fn next(&mut self) -> Option<CurrencyTx> {
+        let &(ref public_key, ref secret_key) =
+            self.rand.choose(&self.clients).unwrap();
+        if self.rand.gen_weighted_bool(10) {
+            let seed = self.rand.gen();
+            let amount = self.rand.gen_range(0, 100_000);
+            Some(CurrencyTx::Issue(TxIssue::new(
+                public_key, amount, seed, secret_key
+            )))
+        } else {
+            let seed = self.rand.gen();
+            let ref reciever = self.rand.choose(&self.clients).unwrap().0;
+            let amount = self.rand.gen_range(0, 1_000);
+            Some(CurrencyTx::Transfer(TxTransfer::new(
+                public_key, reciever, amount, seed, secret_key
+            )))
+        }
+    }
+}

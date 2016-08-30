@@ -1,0 +1,9 @@
+[package]
+name = "cryptocurrency"
+version = "0.1.0"
+authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re"]
+
+[dependencies]
+exonum = {version="0.1", path="../exonum"}
+env_logger = "0.3"
+

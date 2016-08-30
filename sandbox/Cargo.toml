@@ -7,6 +7,7 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re>"]
 log = "0.3"
 exonum = {version="0.1", path="../exonum"}
 timestamping = {version="0.1", path="../timestamping"}
+cryptocurrency = {version="0.1", path="../cryptocurrency"}
 env_logger = "0.3"
 clap = {version="2.10.0", features=["unstable"]}
 rand = "0.3"
