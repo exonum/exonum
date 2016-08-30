@@ -4,7 +4,7 @@ use super::super::messages::Field;
 use super::super::crypto::{Hash, hash};
 use super::super::storage::StorageValue;
 
-pub const BLOCK_SIZE : usize = 80;
+pub const BLOCK_SIZE : usize = 112;
 
 pub struct Block {
     // Идентификатор сети, к которой принадлежит этот блок
@@ -16,18 +16,20 @@ pub struct Block {
     raw: Vec<u8>
 }
 
-// TODO: add netowork_id, propose_round, block version?
+// TODO: add network_id, propose_round, block version?
 impl Block {
     pub fn new(height: u64,
            time: Timespec,
            prev_hash: &Hash,
+           tx_hash: &Hash,
            state_hash: &Hash) -> Block {
         let mut block = Block { raw: vec![0; 80] };
 
         Field::write(&height, &mut block.raw, 0, 8);
         Field::write(&time, &mut block.raw, 8, 16);
         Field::write(&prev_hash, &mut block.raw, 16, 48);
-        Field::write(&state_hash, &mut block.raw, 48, 80);
+        Field::write(&tx_hash, &mut block.raw, 48, 80);
+        Field::write(&state_hash, &mut block.raw, 80, 112);
 
         block
     }
@@ -50,8 +52,12 @@ impl Block {
         Field::read(&self.raw, 16, 48)
     }
 
-    pub fn state_hash(&self) -> &Hash {
+    pub fn tx_hash(&self) -> &Hash {
         Field::read(&self.raw, 48, 80)
+    }
+
+    pub fn state_hash(&self) -> &Hash {
+        Field::read(&self.raw, 80, 112)
     }
 }
 

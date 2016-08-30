@@ -31,7 +31,7 @@ pub trait Blockchain: Sized
     }
 
     fn verify_tx(tx: &Self::Transaction) -> bool;
-    fn state_hash(fork: &mut Fork<Self::Database>) -> Hash;
+    fn state_hash(fork: &mut Fork<Self::Database>) -> Result<Hash, Error>;
     fn execute(fork: &mut Fork<Self::Database>, tx: &Self::Transaction) -> Result<(), Error>;
 
     fn create_patch(&mut self,
@@ -41,30 +41,32 @@ pub trait Blockchain: Sized
         let last_hash = self.last_hash()?.unwrap_or(hash(&[]));
         // Create fork
         let mut fork = self.fork();
-        // FIXME: apply txs here
-        // Get state hash
-        let state_hash = Self::state_hash(&mut fork);
-        // Create block
-        let block = Block::new(propose.height(), propose.time(), &last_hash, &state_hash);
-        // Eval block hash
-        let block_hash = block.hash();
-        // Update height
-        fork.heights().append(block_hash).is_ok();
-        // Save block
-        fork.blocks().put(&block_hash, block).is_ok();
-        // Save propose (FIXME: remove)
-        fork.proposes().put(&Message::hash(propose), propose.clone()).is_ok();
-        // Save transactions
+        // Save & execute transactions
         for hash in propose.transactions() {
             let tx = txs.get(hash).unwrap().clone();
             Self::execute(&mut fork, &tx)?;
             fork.transactions()
                 .put(hash, tx)
                 .unwrap();
-            fork.block_txs(&block_hash)
+            fork.block_txs(propose.height())
                 .append(*hash)
                 .unwrap();
         }
+        // Get tx hash
+        let tx_hash = fork.block_txs(propose.height()).root_hash()?.unwrap();
+        // Get state hash
+        let state_hash = Self::state_hash(&mut fork)?;
+        // Create block
+        let block = Block::new(propose.height(), propose.time(), &last_hash, &tx_hash, &state_hash);
+        // Eval block hash
+        let block_hash = block.hash();
+        // Update height
+        // TODO: check that height == propose.height
+        fork.heights().append(block_hash).is_ok();
+        // Save block
+        fork.blocks().put(&block_hash, block).is_ok();
+        // Save propose (FIXME: remove)
+        fork.proposes().put(&Message::hash(propose), propose.clone()).is_ok();
 
         Ok((block_hash, fork.into()))
     }

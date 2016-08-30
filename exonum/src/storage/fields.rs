@@ -49,6 +49,25 @@ impl StorageValue for u64 {
     }
 }
 
+impl StorageValue for i64 {
+    fn serialize(self) -> Vec<u8> {
+        let mut v = vec![0; mem::size_of::<i64>()];
+        BigEndian::write_i64(&mut v, self);
+        v
+    }
+
+    fn deserialize(v: Vec<u8>) -> Self {
+        BigEndian::read_i64(&v)
+    }
+
+    fn hash(&self) -> Hash {
+        let mut v = vec![0; mem::size_of::<i64>()];
+        BigEndian::write_i64(&mut v, *self);
+        hash(&v)
+    }
+}
+
+
 impl StorageValue for Hash {
     fn serialize(self) -> Vec<u8> {
         self.as_ref().to_vec()

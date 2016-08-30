@@ -61,6 +61,16 @@ impl<'a> Field<'a> for u64 {
     }
 }
 
+impl<'a> Field<'a> for i64 {
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> i64 {
+        LittleEndian::read_i64(&buffer[from..to])
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        LittleEndian::write_i64(&mut buffer[from..to], *self)
+    }
+}
+
 impl<'a> Field<'a> for &'a Hash {
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
         unsafe { mem::transmute(&buffer[from]) }

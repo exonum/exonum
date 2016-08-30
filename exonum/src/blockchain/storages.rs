@@ -4,7 +4,7 @@ use std::borrow::{Borrow, BorrowMut};
 
 use ::crypto::Hash;
 use ::messages::{Precommit, Propose, Message};
-use ::storage::{StorageValue, Database, Fork, ListTable, MapTable};
+use ::storage::{StorageValue, Database, Fork, ListTable, MapTable, MerkleTable};
 
 use super::{Block, Blockchain};
 
@@ -32,8 +32,8 @@ pub trait BlockStorage<D: Database>
         ListTable::new(MapTable::new(vec![02], self.borrow_mut()))
     }
 
-    fn block_txs(&mut self, hash: &Hash) -> ListTable<MapTable<D, [u8], Vec<u8>>, u32, Hash> {
-        ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.borrow_mut()))
+    fn block_txs(&mut self, height: u64) -> MerkleTable<MapTable<D, [u8], Vec<u8>>, u32, Hash> {
+        MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.borrow_mut()))
     }
 
     fn precommits(&mut self, hash: &Hash) -> ListTable<MapTable<D, [u8], Vec<u8>>, u32, Precommit> {
