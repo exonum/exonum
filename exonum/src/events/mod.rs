@@ -172,8 +172,7 @@ mod tests {
                 listen_address: addr,
                 max_connections: 256,
                 tcp_nodelay: true,
-                tcp_keep_alive: None
-
+                tcp_keep_alive: None,
             });
             Events::with_config(EventsConfiguration::new(), network).unwrap()
         }
@@ -219,7 +218,7 @@ mod tests {
         let addrs: [SocketAddr; 2] = ["127.0.0.1:8200".parse().unwrap(),
                                       "127.0.0.1:8201".parse().unwrap()];
 
-        let m1 = gen_message(15, 10000000);
+        let m1 = gen_message(15, 1000000);
         let m2 = gen_message(16, 400);
 
         let t1;
@@ -309,7 +308,8 @@ mod tests {
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m1));
                     println!("t2: received m1 from t1");
                     println!("t2: wait for m3");
-                    assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m3.clone()));
+                    assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)),
+                               Some(m3.clone()));
                     println!("t2: received m3 from t1");
                     e.process_events(Duration::milliseconds(100));
                     drop(e);

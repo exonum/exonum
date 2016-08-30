@@ -10,6 +10,8 @@ use mio::{TryWrite, TryRead, EventSet};
 
 use super::super::messages::{RawMessage, MessageBuffer, HEADER_SIZE};
 
+const MAX_MESSAGE_LEN: usize = 1024 * 1024; //1 MB
+
 #[derive(Debug, PartialEq)]
 pub struct MessageReader {
     raw: Vec<u8>,
@@ -36,9 +38,15 @@ impl MessageReader {
         LittleEndian::read_u32(&self.raw[4..8]) as usize
     }
 
-    pub fn allocate(&mut self) {
+    pub fn allocate(&mut self) -> io::Result<()> {
         let size = self.total_len();
-        self.raw.resize(size, 0);
+        if size > MAX_MESSAGE_LEN {
+            Err(io::Error::new(io::ErrorKind::Other,
+                               format!("Received message is too long: {}", size)))
+        } else {
+            self.raw.resize(size, 0);
+            Ok(())
+        }
     }
 
     pub fn into_raw(self) -> MessageBuffer {
@@ -49,7 +57,7 @@ impl MessageReader {
         // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
         // TODO: read into growable Vec, not into [u8]
         if self.position == HEADER_SIZE && self.actual_len() == HEADER_SIZE {
-            self.allocate();
+            self.allocate()?;
         }
         let pos = self.position;
         let r = socket.try_read(&mut self.raw[pos..])?;
@@ -77,6 +85,12 @@ impl MessageWriter {
         // TODO: use try_write_buf
         while let Some(message) = self.queue.front().cloned() {
             let buf = message.as_ref().as_ref();
+            if buf.len() > MAX_MESSAGE_LEN {
+                self.queue.pop_front();
+                return Err(io::Error::new(io::ErrorKind::Other,
+                                          format!("Attempted to send too long message. It will \
+                                                   be dropped.")));
+            }
             match socket.try_write(&buf[self.position..])? {
                 None | Some(0) => {
                     break;
@@ -158,7 +172,9 @@ impl Connection {
         self.writer.queue.push_back(message);
         // TODO proper test that we can write immediately
         self.writable().or_else(|e| {
-            warn!("Unable to write to socket {}, error is {:?}", self.address, e);
+            warn!("Unable to write to socket {}, error is {:?}",
+                  self.address,
+                  e);
             Ok(())
         })
     }

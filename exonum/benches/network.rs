@@ -163,6 +163,30 @@ fn bench_msg_short_10000(b: &mut Bencher) {
 
 #[cfg(feature = "long_benchmarks")]
 #[bench]
+fn bench_msg_short_100_nodelay(b: &mut Bencher) {
+    let cfg = BenchConfig {
+        tcp_nodelay: true,
+        len: 100,
+        times: 100
+    };
+    let addrs = ["127.0.0.1:9990".parse().unwrap(), "127.0.0.1:9991".parse().unwrap()];
+    bench_network(b, addrs, cfg);
+}
+
+#[cfg(feature = "long_benchmarks")]
+#[bench]
+fn bench_msg_short_10000_nodelay(b: &mut Bencher) {
+    let cfg = BenchConfig {
+        tcp_nodelay: true,
+        len: 100,
+        times: 10000
+    };
+    let addrs = ["127.0.0.1:9990".parse().unwrap(), "127.0.0.1:9991".parse().unwrap()];
+    bench_network(b, addrs, cfg);
+}
+
+#[cfg(feature = "long_benchmarks")]
+#[bench]
 fn bench_msg_long_10(b: &mut Bencher) {
     let cfg = BenchConfig {
         tcp_nodelay: false,
@@ -194,30 +218,6 @@ fn bench_msg_long_1000(b: &mut Bencher) {
         times: 1000
     };
     let addrs = ["127.0.0.1:9998".parse().unwrap(), "127.0.0.1:9999".parse().unwrap()];
-    bench_network(b, addrs, cfg);
-}
-
-#[cfg(feature = "long_benchmarks")]
-#[bench]
-fn bench_msg_short_100_nodelay(b: &mut Bencher) {
-    let cfg = BenchConfig {
-        tcp_nodelay: true,
-        len: 100,
-        times: 100
-    };
-    let addrs = ["127.0.0.1:9990".parse().unwrap(), "127.0.0.1:9991".parse().unwrap()];
-    bench_network(b, addrs, cfg);
-}
-
-#[cfg(feature = "long_benchmarks")]
-#[bench]
-fn bench_msg_short_10000_nodelay(b: &mut Bencher) {
-    let cfg = BenchConfig {
-        tcp_nodelay: true,
-        len: 100,
-        times: 10000
-    };
-    let addrs = ["127.0.0.1:9990".parse().unwrap(), "127.0.0.1:9991".parse().unwrap()];
     bench_network(b, addrs, cfg);
 }
 

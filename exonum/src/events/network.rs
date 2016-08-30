@@ -20,7 +20,7 @@ pub struct NetworkConfiguration {
     pub listen_address: SocketAddr,
     pub max_connections: usize, // TODO: think more about config parameters
     pub tcp_nodelay: bool,
-    pub tcp_keep_alive: Option<u32>
+    pub tcp_keep_alive: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -81,17 +81,17 @@ impl Network {
             // Accept new connections
             // FIXME: Fail-safe accepting of new connections?
             let pair = match self.listener {
-                    Some(ref listener) => listener.accept()?,
-                    None => None,
+                Some(ref listener) => listener.accept()?,
+                None => None,
             };
             if let Some((socket, address)) = pair {
                 let peer = Connection::new(socket, address);
                 self.add_connection(event_loop, peer)?;
 
                 trace!("{}: Accepted incoming connection from {} id: {}",
-                        self.address(),
-                        address,
-                        id.0);
+                       self.address(),
+                       address,
+                       id.0);
             }
             return Ok(None);
         }
@@ -177,7 +177,10 @@ impl Network {
         self.connections.remove(id);
     }
 
-    fn add_connection(&mut self, event_loop: &mut EventLoop, mut connection: Connection) -> io::Result<PeerId> {
+    fn add_connection(&mut self,
+                      event_loop: &mut EventLoop,
+                      mut connection: Connection)
+                      -> io::Result<PeerId> {
         self.configure_stream(connection.socket_mut())?;
         let address = *connection.address();
         let id = self.connections
@@ -189,18 +192,30 @@ impl Network {
         Ok(id)
     }
 
-    fn register_connection(&mut self, event_loop: &mut EventLoop, id: Token, opts: PollOpt) -> io::Result<()> {
-        event_loop
-            .register(self.connections[id].socket(), id, self.connections[id].interest(), opts)
+    fn register_connection(&mut self,
+                           event_loop: &mut EventLoop,
+                           id: Token,
+                           opts: PollOpt)
+                           -> io::Result<()> {
+        event_loop.register(self.connections[id].socket(),
+                      id,
+                      self.connections[id].interest(),
+                      opts)
             .or_else(|e| {
                 self.remove_connection(id);
                 Err(e)
             })
     }
 
-    fn reregister_connection(&mut self, event_loop: &mut EventLoop, id: Token, opts: PollOpt) -> io::Result<()> {
-        event_loop
-            .reregister(self.connections[id].socket(), id, self.connections[id].interest(), opts)
+    fn reregister_connection(&mut self,
+                             event_loop: &mut EventLoop,
+                             id: Token,
+                             opts: PollOpt)
+                             -> io::Result<()> {
+        event_loop.reregister(self.connections[id].socket(),
+                        id,
+                        self.connections[id].interest(),
+                        opts)
             .or_else(|e| {
                 self.remove_connection(id);
                 Err(e)
