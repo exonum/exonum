@@ -9,7 +9,8 @@ use std::ops::Drop;
 use time::Timespec;
 
 use exonum::node::{Node, Configuration};
-use exonum::storage::{Blockchain, MemoryDB};
+use exonum::blockchain::Blockchain;
+use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, Timeout, EventsConfiguration, NetworkConfiguration};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};

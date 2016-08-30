@@ -23,7 +23,7 @@ impl Block {
            prev_hash: &Hash,
            tx_hash: &Hash,
            state_hash: &Hash) -> Block {
-        let mut block = Block { raw: vec![0; 80] };
+        let mut block = Block { raw: vec![0; BLOCK_SIZE] };
 
         Field::write(&height, &mut block.raw, 0, 8);
         Field::write(&time, &mut block.raw, 8, 16);
@@ -80,11 +80,13 @@ fn test_block() {
     let height = 123_345;
     let time = ::time::get_time();
     let prev_hash = hash(&[1,2,3]);
-    let state_hash = hash(&[4,5,6]);
-    let block = Block::new(height, time, &prev_hash, &state_hash);
+    let tx_hash = hash(&[4,5,6]);
+    let state_hash = hash(&[7,8,9]);
+    let block = Block::new(height, time, &prev_hash, &tx_hash, &state_hash);
 
     assert_eq!(block.height(), height);
     assert_eq!(block.time(), time);
     assert_eq!(block.prev_hash(), &prev_hash);
+    assert_eq!(block.tx_hash(), &tx_hash);
     assert_eq!(block.state_hash(), &state_hash);
 }
