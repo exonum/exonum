@@ -11,7 +11,7 @@ use std::net::SocketAddr;
 use time::Duration;
 use test::Bencher;
 
-use exonum::events::{Events, Reactor, EventsConfiguration, Event, Timeout};
+use exonum::events::{Events, Reactor, EventsConfiguration, Event, NodeTimeout};
 use exonum::events::{Network, NetworkConfiguration};
 use exonum::messages::{MessageWriter, RawMessage};
 use exonum::crypto::gen_keypair;
@@ -37,13 +37,15 @@ impl EventsBench for Events {
             max_connections: 128,
             tcp_nodelay: cfg.tcp_nodelay,
             tcp_keep_alive: None,
+            tcp_reconnect_timeout: 1000,
+            tcp_reconnect_timeout_max: 600000,
         });
         Events::with_config(EventsConfiguration::new(), network).unwrap()
     }
 
     fn wait_for_msg(&mut self) -> Option<RawMessage> {
         let time = self.get_time() + Duration::milliseconds(10000);
-        self.add_timeout(Timeout::Status, time);
+        self.add_timeout(NodeTimeout::Status, time);
         loop {
             match self.poll() {
                 Event::Incoming(msg) => return Some(msg),
@@ -56,7 +58,7 @@ impl EventsBench for Events {
 
     fn wait_for_messages(&mut self, mut count: usize, timeout: Duration) -> Result<(), String> {
         let time = self.get_time() + timeout;
-        self.add_timeout(Timeout::Status, time);
+        self.add_timeout(NodeTimeout::Status, time);
         loop {
             match self.poll() {
                 Event::Incoming(_) => {
@@ -83,7 +85,7 @@ impl EventsBench for Events {
 
     fn process_events(&mut self, timeout: Duration) {
         let time = self.get_time() + timeout;
-        self.add_timeout(Timeout::Status, time);
+        self.add_timeout(NodeTimeout::Status, time);
         loop {
             match self.poll() {
                 Event::Timeout(_) => break,
@@ -107,7 +109,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
         let t1 = thread::spawn(move || {
             for _ in 0..times {
                 let msg = Events::gen_message(0, len);
-                e1.send_to(&addrs[1], msg).unwrap();
+                e1.send_to(&addrs[1], msg);
                 e1.wait_for_messages(1, timeout).unwrap();
             }
             e1.process_events(Duration::milliseconds(0));
@@ -115,7 +117,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
         let t2 = thread::spawn(move || {
             for _ in 0..times {
                 let msg = Events::gen_message(1, len);
-                e2.send_to(&addrs[0], msg).unwrap();
+                e2.send_to(&addrs[0], msg);
                 e2.wait_for_messages(1, timeout).unwrap();
             }
             e2.process_events(Duration::milliseconds(0));
