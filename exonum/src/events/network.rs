@@ -18,6 +18,13 @@ pub type PeerId = Token;
 const SERVER_ID: PeerId = Token(1);
 const RECONNECT_GROW_FACTOR: f32 = 2.0;
 
+#[derive(Debug)]
+pub enum Output {
+    Data(MessageBuffer),
+    Connected(SocketAddr),
+    Disconnected(SocketAddr)
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
     pub listen_address: SocketAddr,
@@ -73,7 +80,7 @@ impl Network {
               event_loop: &mut EventLoop,
               id: PeerId,
               set: EventSet)
-              -> io::Result<Option<MessageBuffer>> {
+              -> io::Result<Option<Output>> {
         if id == SERVER_ID {
             // Accept new connections
             // FIXME: Fail-safe accepting of new connections?
@@ -90,28 +97,37 @@ impl Network {
                        address,
                        id.0);
 
-                // TODO send event to node
+                return Ok(Some(Output::Connected(address)))
             }
             return Ok(None);
         }
 
-        if set.is_error() {
-            trace!("{}: connection with {} closed with error",
-                  self.address(),
-                  self.connections[id].address());
-
-            self.try_reconnect(event_loop, id);
+        if !self.connections.contains(id) {
             return Ok(None);
         }
 
+        if set.is_error() {
+            let address = *self.connections[id].address();
+
+            trace!("{}: connection with {} closed with error",
+                  self.address(),
+                  address);
+
+            self.try_reconnect(event_loop, id);
+            return Ok(Some(Output::Disconnected(address)));
+        }
+
         if set.is_hup() {
+            let address = *self.connections[id].address();
+
             trace!("{}: connection with addr {} closed",
                    self.address(),
                    self.connections[id].address());
 
-            self.try_reconnect(event_loop, id); // for debug only
+            // FIXME What we do with connections which closed without errors?
+            self.try_reconnect(event_loop, id);
             //self.remove_connection(id);
-            return Ok(None);
+            return Ok(Some(Output::Disconnected(address)));
         }
 
         if set.is_writable() {
@@ -147,7 +163,8 @@ impl Network {
                    id.0);
 
             return match self.connections[id].try_read() {
-                Ok(buffer) => Ok(buffer),
+                Ok(Some(buffer)) => Ok(Some(Output::Data(buffer))),
+                Ok(None) => Ok(None),
                 Err(e) => {
                     warn!("{}: An error when read from socket {} occured, error: {}",
                           self.address(),
@@ -190,7 +207,7 @@ impl Network {
             info!("{}: An attempt to send data socket {} which is not online.",
                   self.address(),
                   address);
-            return;
+            // return;
         }
 
         let r = match self.get_peer(event_loop, address) {

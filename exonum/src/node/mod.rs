@@ -127,6 +127,14 @@ impl<B: Blockchain> Node<B> {
                     self.handle_timeout(timeout);
                 }
                 Event::Error(_) => {}
+                Event::Connected(addr) => {
+                    let message = self.state.our_connect_message().clone();
+                    self.send_to_addr(&addr, message.raw());
+                }
+                Event::Disconnected(addr) => {
+                    //TODO
+                    let _ = addr;
+                }
                 Event::Terminate => break,
             }
         }

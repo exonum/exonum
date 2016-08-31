@@ -13,7 +13,7 @@ use super::crypto::PublicKey;
 mod network;
 mod connection;
 
-pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
+pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet, Output};
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 
@@ -44,6 +44,8 @@ pub struct InternalMessage;
 pub enum Event {
     Incoming(RawMessage),
     Internal(InternalMessage),
+    Connected(SocketAddr),
+    Disconnected(SocketAddr),
     Timeout(NodeTimeout),
     Error(io::Error),
     Terminate,
@@ -83,8 +85,13 @@ impl mio::Handler for MioAdapter {
 
     fn ready(&mut self, event_loop: &mut EventLoop, token: mio::Token, events: mio::EventSet) {
         // TODO: remove unwrap here
-        while let Some(buf) = self.network.io(event_loop, token, events).unwrap() {
-            self.push(Event::Incoming(RawMessage::new(buf)));
+        while let Some(output) = self.network.io(event_loop, token, events).unwrap() {
+            let event = match output {
+                Output::Data(buf) => Event::Incoming(RawMessage::new(buf)),
+                Output::Connected(addr) => Event::Connected(addr),
+                Output::Disconnected(addr) => Event::Disconnected(addr),
+            };
+            self.push(event);
         }
     }
 

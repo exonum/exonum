@@ -208,6 +208,8 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
                     }
                 }
                 Event::Error(_) => {}
+                Event::Connected(_) => {}
+                Event::Disconnected(_) => {}
                 Event::Terminate => break,
             }
         }
