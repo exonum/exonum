@@ -16,6 +16,7 @@ use super::super::messages::{MessageBuffer, RawMessage};
 pub type PeerId = Token;
 
 const SERVER_ID: PeerId = Token(1);
+const RECONNECT_GROW_FACTOR: f32 = 2.0;
 
 #[derive(Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
@@ -104,8 +105,8 @@ impl Network {
         }
 
         if set.is_hup() {
-            trace!("{}: connection with addr {} closed", 
-                   self.address(), 
+            trace!("{}: connection with addr {} closed",
+                   self.address(),
                    self.connections[id].address());
 
             self.try_reconnect(event_loop, id); // for debug only
@@ -123,14 +124,15 @@ impl Network {
 
             // Write data into socket
             if let Err(e) = self.connections[id].try_write() {
-                warn!("An error when write to socket {} occured, error: {}",
+                warn!("{}: An error when write to socket {} occured, error: {}",
+                      self.address(),
                       address,
                       e);
                 self.try_reconnect(event_loop, id);
                 return Ok(None);
             }
             self.reregister_connection(event_loop, id, PollOpt::edge())?;
-            
+
             self.mark_connected(event_loop, id);
             return Ok(None);
         }
@@ -147,7 +149,8 @@ impl Network {
             return match self.connections[id].try_read() {
                 Ok(buffer) => Ok(buffer),
                 Err(e) => {
-                    warn!("An error when read from socket {} occured, error: {}",
+                    warn!("{}: An error when read from socket {} occured, error: {}",
+                          self.address(),
                           address,
                           e);
                     self.try_reconnect(event_loop, id);
@@ -183,6 +186,13 @@ impl Network {
                    event_loop: &mut EventLoop,
                    address: &SocketAddr,
                    message: RawMessage) {
+        if self.reconnects.contains_key(address) {
+            info!("{}: An attempt to send data socket {} which is not online.",
+                  self.address(),
+                  address);
+            return;
+        }
+
         let r = match self.get_peer(event_loop, address) {
             Ok(id) => {
                 self.connections[id]
@@ -204,7 +214,8 @@ impl Network {
         };
 
         if let Err(e) = r {
-            warn!("An error occured when try to send a message (address: {}, error: {:?})",
+            warn!("{}: An error occured when try to send a message (address: {}, error: {:?})",
+                  self.address(),
                   address,
                   e);
             return;
@@ -215,13 +226,18 @@ impl Network {
         match timeout {
             InternalTimeout::Reconnect(addr, delay) => {
                 if self.reconnects.contains_key(&addr) {
-                    self.get_peer(event_loop, &addr);
+                    if let Err(e) = self.get_peer(event_loop, &addr) {
+                        error!("{}: Unable to create connection to addr {}, error {:?}",
+                               self.address(),
+                               addr,
+                               e);
+                    }
 
-                    let delay = min(delay * 2, self.config.tcp_reconnect_timeout_max);
+                    let delay = min((delay as f32 * RECONNECT_GROW_FACTOR) as u64, self.config.tcp_reconnect_timeout_max);
                     // TODO Fail-safe timeout error handling
                     self.add_reconnect_timeout(event_loop, addr, delay).unwrap();
 
-                    trace!("Try to reconnect with delay {}", delay);                
+                    trace!("Try to reconnect with delay {}", delay);
                 }
             }
         }
@@ -245,7 +261,7 @@ impl Network {
                 Ok(_) => {}
             }
         }
-        self.remove_connection(id);        
+        self.remove_connection(id);
     }
 
     fn try_reconnect_addr(&mut self,
@@ -309,7 +325,7 @@ impl Network {
                            -> io::Result<()> {
         event_loop.register(self.connections[id].socket(),
                       id,
-                      self.connections[id].interest(),
+                      self.connections[id].interest() | EventSet::writable(),
                       opts)
             .or_else(|e| {
                 self.remove_connection(id);
