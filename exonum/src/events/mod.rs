@@ -30,13 +30,13 @@ pub enum NodeTimeout {
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum InternalTimeout {
-    Reconnect(SocketAddr, u64)
+    Reconnect(SocketAddr, u64),
 }
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum Timeout {
     Node(NodeTimeout),
-    Internal(InternalTimeout)
+    Internal(InternalTimeout),
 }
 
 pub struct InternalMessage;
@@ -193,7 +193,7 @@ mod tests {
                 tcp_nodelay: true,
                 tcp_keep_alive: None,
                 tcp_reconnect_timeout: 1000,
-                tcp_reconnect_timeout_max: 600000
+                tcp_reconnect_timeout_max: 600000,
             });
             Events::with_config(EventsConfiguration::new(), network).unwrap()
         }

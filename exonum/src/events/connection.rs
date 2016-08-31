@@ -116,7 +116,7 @@ impl MessageWriter {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub enum Direction {
     Incoming,
-    Outgoing
+    Outgoing,
 }
 
 pub struct Connection {
@@ -203,7 +203,7 @@ impl Connection {
 
     pub fn interest(&self) -> EventSet {
         let mut set = EventSet::hup() | EventSet::error() | EventSet::readable();
-        if !self.writer.is_idle() {
+        if !self.is_idle() {
             set = set | EventSet::writable();
         }
         set
