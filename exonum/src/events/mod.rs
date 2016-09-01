@@ -133,6 +133,7 @@ pub trait Reactor {
     fn poll(&mut self) -> Event;
     fn bind(&mut self) -> ::std::io::Result<()>;
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage);
+    fn connect(&mut self, address: &SocketAddr);
     fn address(&self) -> SocketAddr;
     fn add_timeout(&mut self, timeout: NodeTimeout, time: Timespec);
 }
@@ -169,6 +170,12 @@ impl Reactor for Events {
 
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
         self.queue.network.send_to(&mut self.event_loop, address, message)
+    }
+
+    fn connect(&mut self, address: &SocketAddr) {
+        if let Err(e) = self.queue.network.connect(&mut self.event_loop, address) {
+            error!("{}: An error occured {:?}", self.queue.network.address(), e);
+        }
     }
 
     fn address(&self) -> SocketAddr {
@@ -229,6 +236,15 @@ mod tests {
         fn wait_for_bind(&mut self, addr: &SocketAddr) {
             self.bind().unwrap();
             thread::sleep(time::Duration::from_millis(1000));
+
+            //TODO timeout
+            self.connect(addr);
+            loop {
+                match self.poll() {
+                    Event::Connected(_) => return,
+                    _ => {}
+                }
+            }
         }
 
         fn process_events(&mut self, timeout: Duration) {
@@ -314,6 +330,7 @@ mod tests {
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m2));
                     println!("t1: received m2 from t2");
                     e.process_events(Duration::milliseconds(100));
+                    drop(e);
                 }
                 println!("t1: connection closed");
                 {

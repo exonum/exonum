@@ -133,6 +133,10 @@ impl Reactor for SandboxReactor {
         self.inner.borrow_mut().sended.push_back((address.clone(), message));
     }
 
+    fn connect(&mut self, _: &SocketAddr) {
+
+    }
+
     fn address(&self) -> SocketAddr {
         self.inner.borrow().address
     }

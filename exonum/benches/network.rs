@@ -24,6 +24,8 @@ struct BenchConfig {
 
 trait EventsBench {
     fn with_addr(addr: SocketAddr, cfg: &BenchConfig) -> Events;
+
+    fn wait_for_connect(&mut self, address: &SocketAddr);
     fn wait_for_msg(&mut self) -> Option<RawMessage>;
     fn gen_message(id: u16, len: usize) -> RawMessage;
     fn wait_for_messages(&mut self, mut count: usize, timeout: Duration) -> Result<(), String>;
@@ -41,6 +43,20 @@ impl EventsBench for Events {
             tcp_reconnect_timeout_max: 600000,
         });
         Events::with_config(EventsConfiguration::new(), network).unwrap()
+    }
+
+    fn wait_for_connect(&mut self, address: &SocketAddr) {
+        self.connect(address);
+
+        let time = self.get_time() + Duration::milliseconds(10000);
+        self.add_timeout(NodeTimeout::Status, time);
+        loop {
+            match self.poll() {
+                Event::Connected(_) => return,
+                Event::Timeout(_) => panic!("Unable to connect with addr {}", address),
+                _ => {}
+            }
+        }
     }
 
     fn wait_for_msg(&mut self) -> Option<RawMessage> {
@@ -107,20 +123,24 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
         let len = cfg.len;
         let times = cfg.times;
         let t1 = thread::spawn(move || {
+            e1.wait_for_connect(&addrs[1]);
             for _ in 0..times {
                 let msg = Events::gen_message(0, len);
                 e1.send_to(&addrs[1], msg);
                 e1.wait_for_messages(1, timeout).unwrap();
             }
             e1.process_events(Duration::milliseconds(0));
+            drop(e1);
         });
         let t2 = thread::spawn(move || {
+            e2.wait_for_connect(&addrs[0]);
             for _ in 0..times {
                 let msg = Events::gen_message(1, len);
                 e2.send_to(&addrs[0], msg);
                 e2.wait_for_messages(1, timeout).unwrap();
             }
             e2.process_events(Duration::milliseconds(0));
+            drop(e2);
         });
         t1.join().unwrap();
         t2.join().unwrap();

@@ -87,12 +87,11 @@ impl<B: Blockchain> Node<B> {
         info!("Start listening...");
         self.events.bind().unwrap();
 
-        let connect = self.state.our_connect_message().clone();
         for address in &self.peer_discovery.clone() {
             if address == &self.events.address() {
                 continue;
             }
-            self.send_to_addr(address, connect.raw());
+            self.connect(address);
             info!("Try to connect with peer {}", address);
         }
 
@@ -128,12 +127,13 @@ impl<B: Blockchain> Node<B> {
                 }
                 Event::Error(_) => {}
                 Event::Connected(addr) => {
+                    debug!("Connected to: {}", addr);
                     let message = self.state.our_connect_message().clone();
                     self.send_to_addr(&addr, message.raw());
                 }
                 Event::Disconnected(addr) => {
-                    //TODO
-                    let _ = addr;
+                    debug!("Disconnected from: {}", addr);
+                    self.connect(&addr);
                 }
                 Event::Terminate => break,
             }
@@ -181,6 +181,10 @@ impl<B: Blockchain> Node<B> {
 
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         self.events.send_to(address, message.clone());
+    }
+
+    pub fn connect(&mut self, address: &SocketAddr) {
+        self.events.connect(address);
     }
 
     pub fn request(&mut self, data: RequestData, peer: PublicKey) {

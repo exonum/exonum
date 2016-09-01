@@ -31,8 +31,7 @@ impl<B: Blockchain> Node<B> {
         if need_connect {
             // TODO: reduce double sending of connect message
             info!("Establish connection with {}", address);
-            let message = self.state.our_connect_message().clone();
-            self.send_to_addr(&address, message.raw());
+            self.connect(&address);
         }
     }
 
