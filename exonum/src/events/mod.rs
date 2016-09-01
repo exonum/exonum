@@ -84,14 +84,22 @@ impl mio::Handler for MioAdapter {
     type Message = InternalMessage;
 
     fn ready(&mut self, event_loop: &mut EventLoop, token: mio::Token, events: mio::EventSet) {
-        // TODO: remove unwrap here
-        while let Some(output) = self.network.io(event_loop, token, events).unwrap() {
-            let event = match output {
-                Output::Data(buf) => Event::Incoming(RawMessage::new(buf)),
-                Output::Connected(addr) => Event::Connected(addr),
-                Output::Disconnected(addr) => Event::Disconnected(addr),
-            };
-            self.push(event);
+        loop {
+            match self.network.io(event_loop, token, events) {
+                Ok(Some(output)) => {
+                    let event = match output {
+                        Output::Data(buf) => Event::Incoming(RawMessage::new(buf)),
+                        Output::Connected(addr) => Event::Connected(addr),
+                        Output::Disconnected(addr) => Event::Disconnected(addr),
+                    };
+                    self.push(event);
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    error!("{}: An error occured {:?}", self.network.address(), e);
+                    break;
+                }
+            }
         }
     }
 
@@ -218,7 +226,7 @@ mod tests {
             }
         }
 
-        fn wait_for_bind(&mut self) {
+        fn wait_for_bind(&mut self, addr: &SocketAddr) {
             self.bind().unwrap();
             thread::sleep(time::Duration::from_millis(1000));
         }
@@ -255,7 +263,8 @@ mod tests {
             let m2 = m2.clone();
             t1 = thread::spawn(move || {
                 let mut e = Events::with_addr(addrs[0].clone());
-                e.wait_for_bind();
+                e.wait_for_bind(&addrs[1]);
+
                 e.send_to(&addrs[1], m1);
                 assert_eq!(e.wait_for_msg(Duration::milliseconds(1000)), Some(m2));
                 e.process_events(Duration::milliseconds(10000));
@@ -268,7 +277,8 @@ mod tests {
             let m2 = m2.clone();
             t2 = thread::spawn(move || {
                 let mut e = Events::with_addr(addrs[1].clone());
-                e.wait_for_bind();
+                e.wait_for_bind(&addrs[0]);
+
                 e.send_to(&addrs[0], m2);
                 assert_eq!(e.wait_for_msg(Duration::milliseconds(30000)), Some(m1));
             });
@@ -295,7 +305,8 @@ mod tests {
             t1 = thread::spawn(move || {
                 {
                     let mut e = Events::with_addr(addrs[0].clone());
-                    e.wait_for_bind();
+                    e.wait_for_bind(&addrs[1]);
+
                     println!("t1: connection opened");
                     println!("t1: send m1 to t2");
                     e.send_to(&addrs[1], m1);
@@ -307,7 +318,8 @@ mod tests {
                 println!("t1: connection closed");
                 {
                     let mut e = Events::with_addr(addrs[0].clone());
-                    e.wait_for_bind();
+                    e.wait_for_bind(&addrs[1]);
+
                     println!("t1: connection reopened");
                     println!("t1: send m3 to t2");
                     e.send_to(&addrs[1], m3.clone());
@@ -328,7 +340,8 @@ mod tests {
             t2 = thread::spawn(move || {
                 {
                     let mut e = Events::with_addr(addrs[1].clone());
-                    e.wait_for_bind();
+                    e.wait_for_bind(&addrs[0]);
+
                     println!("t2: connection opened");
                     println!("t2: send m2 to t1");
                     e.send_to(&addrs[0], m2);
@@ -346,7 +359,8 @@ mod tests {
                 {
                     println!("t2: connection reopened");
                     let mut e = Events::with_addr(addrs[1].clone());
-                    e.wait_for_bind();
+                    e.wait_for_bind(&addrs[0]);
+
                     println!("t2: send m3 to t1");
                     e.send_to(&addrs[0], m3.clone());
                     e.process_events(Duration::milliseconds(100));
