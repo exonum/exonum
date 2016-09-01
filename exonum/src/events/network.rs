@@ -8,7 +8,7 @@ use mio::Timeout as MioTimeout;
 use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
-use super::connection::{Connection, Direction};
+use super::connection::{Connection};
 use super::{Timeout, InternalTimeout, EventLoop};
 
 use super::super::messages::{MessageBuffer, RawMessage};
@@ -89,7 +89,7 @@ impl Network {
                 None => None,
             };
             if let Some((socket, address)) = pair {
-                let peer = Connection::new(socket, address, Direction::Incoming);
+                let peer = Connection::new(socket, address);
                 self.add_connection(event_loop, peer)?;
 
                 trace!("{}: Accepted incoming connection from {} id: {}",
@@ -113,7 +113,7 @@ impl Network {
                   self.address(),
                   address);
 
-            self.try_reconnect(event_loop, id);
+            self.remove_connection(id);
             return Ok(Some(Output::Disconnected(address)));
         }
 
@@ -124,9 +124,7 @@ impl Network {
                    self.address(),
                    self.connections[id].address());
 
-            // FIXME What we do with connections which closed without errors?
-            self.try_reconnect(event_loop, id);
-            //self.remove_connection(id);
+            self.remove_connection(id);
             return Ok(Some(Output::Disconnected(address)));
         }
 
@@ -144,7 +142,7 @@ impl Network {
                       self.address(),
                       address,
                       e);
-                self.try_reconnect(event_loop, id);
+                self.remove_connection(id);
                 return Ok(None);
             }
             self.reregister_connection(event_loop, id, PollOpt::edge())?;
@@ -170,7 +168,7 @@ impl Network {
                           self.address(),
                           address,
                           e);
-                    self.try_reconnect(event_loop, id);
+                    self.remove_connection(id);
                     Ok(None)
                 }
             };
@@ -189,8 +187,9 @@ impl Network {
             return Ok(*id);
         };
 
-        let peer = Connection::new(TcpStream::connect(address)?, *address, Direction::Outgoing);
+        let peer = Connection::new(TcpStream::connect(address)?, *address);
         let id = self.add_connection(event_loop, peer)?;
+        self.try_reconnect_addr(event_loop, *address)?;
 
         trace!("{}: Establish connection with {}, id: {}",
                self.address(),
@@ -223,7 +222,7 @@ impl Network {
                         Ok(())
                     })
                     .or_else(|e| {
-                        self.try_reconnect(event_loop, id);
+                        self.remove_connection(id);
                         Err(e)
                     })
             }
@@ -264,21 +263,6 @@ impl Network {
         let address = *self.connections[id].address();
         self.addresses.remove(&address);
         self.connections.remove(id);
-    }
-
-    fn try_reconnect(&mut self, event_loop: &mut EventLoop, id: Token) {
-        if self.connections[id].direction() == &Direction::Outgoing {
-            let addr = *self.connections[id].address();
-            match self.try_reconnect_addr(event_loop, addr) {
-                Err(e) => {
-                    error!("{}: An error during reconnect occured: {:?}",
-                           self.address(),
-                           e);
-                }
-                Ok(_) => {}
-            }
-        }
-        self.remove_connection(id);
     }
 
     fn try_reconnect_addr(&mut self,

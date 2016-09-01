@@ -113,28 +113,19 @@ impl MessageWriter {
     }
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub enum Direction {
-    Incoming,
-    Outgoing,
-}
-
 pub struct Connection {
     socket: TcpStream,
     address: SocketAddr,
 
     reader: MessageReader,
     writer: MessageWriter,
-
-    direction: Direction,
 }
 
 impl Connection {
-    pub fn new(socket: TcpStream, address: SocketAddr, direction: Direction) -> Connection {
+    pub fn new(socket: TcpStream, address: SocketAddr) -> Connection {
         Connection {
             socket: socket,
             address: address,
-            direction: direction,
 
             reader: MessageReader::empty(),
             writer: MessageWriter::empty(),
@@ -151,10 +142,6 @@ impl Connection {
 
     pub fn address(&self) -> &SocketAddr {
         &self.address
-    }
-
-    pub fn direction(&self) -> &Direction {
-        &self.direction
     }
 
     pub fn try_write(&mut self) -> io::Result<()> {
