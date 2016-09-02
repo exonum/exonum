@@ -189,9 +189,6 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
         self.events.bind().unwrap();
 
         for address in self.tx_receivers.clone() {
-            if address == self.events.address() {
-                continue;
-            }
             self.events.connect(&address);
         }
         self.add_timeout();
@@ -208,6 +205,7 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
                 Event::Internal(internal) => {
                     match internal {
                         InternalEvent::Connected(addr) => self.handle_connected(&addr),
+                        InternalEvent::Disconnected(addr) => self.handle_disconnected(&addr),
                         _ => {}
                     }
                 }
@@ -224,6 +222,10 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
         let connect = self.our_connect.clone();
         self.send_to_addr(&addr, connect.raw());
+    }
+
+    pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
+        self.events.connect(addr);
     }
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {

@@ -91,7 +91,9 @@ impl mio::Handler for MioAdapter {
                     let event = match output {
                         Output::Data(buf) => Event::Incoming(RawMessage::new(buf)),
                         Output::Connected(addr) => Event::Internal(InternalEvent::Connected(addr)),
-                        Output::Disconnected(addr) => Event::Internal(InternalEvent::Disconnected(addr)),
+                        Output::Disconnected(addr) => {
+                            Event::Internal(InternalEvent::Disconnected(addr))
+                        }
                     };
                     self.push(event);
                 }

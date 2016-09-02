@@ -111,7 +111,7 @@ impl Network {
                    self.address(),
                    address);
 
-            self.remove_connection(id);
+            self.remove_connection(event_loop, id);
             return Ok(None);
         }
 
@@ -122,7 +122,7 @@ impl Network {
                    self.address(),
                    self.connections[id].address());
 
-            self.remove_connection(id);
+            self.remove_connection(event_loop, id);
             if self.reconnects.contains_key(&address) {
                 return Ok(None);
             }
@@ -143,7 +143,7 @@ impl Network {
                       self.address(),
                       address,
                       e);
-                self.remove_connection(id);
+                self.remove_connection(event_loop, id);
                 return Ok(None);
             }
             self.reregister_connection(event_loop, id, PollOpt::edge())?;
@@ -168,7 +168,7 @@ impl Network {
                           self.address(),
                           address,
                           e);
-                    self.remove_connection(id);
+                    self.remove_connection(event_loop, id);
                     Ok(None)
                 }
             };
@@ -203,7 +203,7 @@ impl Network {
                         Ok(())
                     })
                     .or_else(|e| {
-                        self.remove_connection(id);
+                        self.remove_connection(event_loop, id);
                         Err(e)
                     })
             }
@@ -238,8 +238,10 @@ impl Network {
         match timeout {
             InternalTimeout::Reconnect(addr, delay) => {
                 if self.reconnects.contains_key(&addr) {
+                    trace!("Try to reconnect with delay {}", delay);
+
                     if let Err(e) = self.connect(event_loop, &addr) {
-                        error!("{}: Unable to create connection to addr {}, error {:?}",
+                        error!("{}: Unable to create connection to addr {}, error: {:?}",
                                self.address(),
                                addr,
                                e);
@@ -247,17 +249,24 @@ impl Network {
 
                     let delay = min((delay as f32 * RECONNECT_GROW_FACTOR) as u64,
                                     self.config.tcp_reconnect_timeout_max);
-                    // TODO Fail-safe timeout error handling
-                    self.add_reconnect_timeout(event_loop, addr, delay).unwrap();
-                    trace!("Try to reconnect with delay {}", delay);
+
+                    if let Err(e) = self.add_reconnect_timeout(event_loop, addr, delay) {
+                        error!("{}: Unable to add timeout, error: {:?}", self.address(), e);
+                    }
                 }
             }
         }
     }
 
-    fn remove_connection(&mut self, id: Token) {
+    fn remove_connection(&mut self, event_loop: &mut EventLoop, id: Token) {
         let address = *self.connections[id].address();
         self.addresses.remove(&address);
+        if let Err(e) = self.deregister_connection(event_loop, id) {
+            error!("{}: Unable to deregister connection {}, error: {}",
+                   self.address(),
+                   address,
+                   e);
+        }
         self.connections.remove(id);
     }
 
@@ -329,7 +338,7 @@ impl Network {
                       self.connections[id].interest() | EventSet::writable(),
                       opts)
             .or_else(|e| {
-                self.remove_connection(id);
+                self.remove_connection(event_loop, id);
                 Err(e)
             })
     }
@@ -344,9 +353,13 @@ impl Network {
                         self.connections[id].interest(),
                         opts)
             .or_else(|e| {
-                self.remove_connection(id);
+                self.remove_connection(event_loop, id);
                 Err(e)
             })
+    }
+
+    fn deregister_connection(&mut self, event_loop: &mut EventLoop, id: Token) -> io::Result<()> {
+        event_loop.deregister(self.connections[id].socket())
     }
 
     fn configure_stream(&self, stream: &mut TcpStream) -> io::Result<()> {

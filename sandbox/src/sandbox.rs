@@ -2,7 +2,6 @@ use std::collections::{VecDeque, BinaryHeap, HashSet};
 use std::iter::FromIterator;
 use std::cell::RefCell;
 use std::sync::Arc;
-use std::io;
 use std::net::SocketAddr;
 use std::ops::Drop;
 

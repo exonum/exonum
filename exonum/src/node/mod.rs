@@ -121,7 +121,7 @@ impl<B: Blockchain> Node<B> {
             let event = self.events.poll();
             match event {
                 Event::Terminate => break,
-                _ => self.handle_event(event)
+                _ => self.handle_event(event),
             }
         }
     }
@@ -138,10 +138,10 @@ impl<B: Blockchain> Node<B> {
                 match internal {
                     InternalEvent::Error(_) => {}
                     InternalEvent::Connected(addr) => self.handle_connected(&addr),
-                    InternalEvent::Disconnected(addr) => self.handle_disconnected(&addr)
+                    InternalEvent::Disconnected(addr) => self.handle_disconnected(&addr),
                 }
             }
-            Event::Terminate => {},
+            Event::Terminate => {}
         }
     }
 
