@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
+use std::net::SocketAddr;
 
 use time::Duration;
 
@@ -25,6 +26,7 @@ pub struct State<Tx> {
     id: u32,
     peers: HashMap<PublicKey, Connect>,
     validators: Vec<PublicKey>,
+    connections: HashMap<SocketAddr, PublicKey>,
     height: u64,
     round: Round,
     locked_round: Round,
@@ -173,6 +175,7 @@ impl<Tx> State<Tx> {
             id: id,
 
             peers: HashMap::new(),
+            connections: HashMap::new(),
             validators: validators,
             height: 0,
             round: 1,
@@ -211,7 +214,16 @@ impl<Tx> State<Tx> {
     }
 
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
+        self.connections.insert(msg.addr(), pubkey);
         self.peers.insert(pubkey, msg).is_none()
+    }
+
+    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
+        if let Some(pubkey) = self.connections.remove(addr) {
+            self.peers.remove(&pubkey);
+            return self.validators.contains(&pubkey);
+        }
+        false
     }
 
     pub fn peers(&self) -> &HashMap<PublicKey, Connect> {

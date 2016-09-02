@@ -133,7 +133,10 @@ impl<B: Blockchain> Node<B> {
                 }
                 Event::Disconnected(addr) => {
                     debug!("Disconnected from: {}", addr);
-                    self.connect(&addr);
+                    let need_reconnect = self.state.remove_peer_with_addr(&addr);
+                    if need_reconnect {
+                        self.connect(&addr);
+                    }
                 }
                 Event::Terminate => break,
             }
