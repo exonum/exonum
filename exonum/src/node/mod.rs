@@ -4,8 +4,8 @@ use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, NodeTimeout, EventsConfiguration, Network,
-                    NetworkConfiguration};
-use super::blockchain::{Blockchain};
+                    NetworkConfiguration, InternalEvent};
+use super::blockchain::{Blockchain, BlockStorage};
 use super::messages::{Any, Connect, RawMessage, Message};
 
 mod state;
@@ -117,23 +117,31 @@ impl<B: Blockchain> Node<B> {
             if self.state.height() == 1000 {
                 break;
             }
-            match self.events.poll() {
-                Event::Incoming(message) => {
-                    self.handle_message(message);
-                }
-                Event::Internal(_) => {}
-                Event::Timeout(timeout) => {
-                    self.handle_timeout(timeout);
-                }
-                Event::Error(_) => {}
-                Event::Connected(addr) => {
-                    self.handle_connected(&addr);
-                }
-                Event::Disconnected(addr) => {
-                    self.handle_disconnected(&addr);
-                }
+
+            let event = self.events.poll();
+            match event {
                 Event::Terminate => break,
+                _ => self.handle_event(event)
             }
+        }
+    }
+
+    pub fn handle_event(&mut self, event: Event) {
+        match event {
+            Event::Incoming(message) => {
+                self.handle_message(message);
+            }
+            Event::Timeout(timeout) => {
+                self.handle_timeout(timeout);
+            }
+            Event::Internal(internal) => {
+                match internal {
+                    InternalEvent::Error(_) => {}
+                    InternalEvent::Connected(addr) => self.handle_connected(&addr),
+                    InternalEvent::Disconnected(addr) => self.handle_disconnected(&addr)
+                }
+            }
+            Event::Terminate => {},
         }
     }
 

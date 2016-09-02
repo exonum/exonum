@@ -12,7 +12,7 @@ use exonum::node::{Node, Configuration};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
-use exonum::events::{Reactor, Event, NodeTimeout, EventsConfiguration, NetworkConfiguration};
+use exonum::events::{Reactor, Event, NodeTimeout, EventsConfiguration, NetworkConfiguration, InternalEvent};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 use timestamping::TimestampingBlockchain;
@@ -23,6 +23,7 @@ struct SandboxInner {
     address: SocketAddr,
     time: Timespec,
     sended: VecDeque<(SocketAddr, RawMessage)>,
+    events: VecDeque<Event>,
     timers: BinaryHeap<TimerPair>,
 }
 
@@ -75,6 +76,7 @@ impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
             address: addresses[0].clone(),
             time: Timespec { sec: 0, nsec: 0 },
             sended: VecDeque::new(),
+            events: VecDeque::new(),
             timers: BinaryHeap::new(),
         }));
 
@@ -133,8 +135,10 @@ impl Reactor for SandboxReactor {
         self.inner.borrow_mut().sended.push_back((address.clone(), message));
     }
 
-    fn connect(&mut self, _: &SocketAddr) {
-
+    fn connect(&mut self, addr: &SocketAddr) {
+        println!("{}: Connect to {}", self.address(), addr);
+        let message = InternalEvent::Connected(*addr);
+        self.inner.borrow_mut().events.push_back(Event::Internal(message));
     }
 
     fn address(&self) -> SocketAddr {
@@ -214,6 +218,7 @@ impl<B, G> Sandbox<B, G>
     pub fn recv<T: Message>(&self, msg: T) {
         self.check_unexpected_message();
         self.node.borrow_mut().handle_message(msg.raw().clone());
+        self.process_events();
     }
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
@@ -320,6 +325,21 @@ impl<B, G> Sandbox<B, G>
                 "Incorrect round, actual={:?}, expected={:?}",
                 actual_hash,
                 hash);
+    }
+
+    pub fn process_events(&self) {
+        loop {
+            let event;
+            {
+                event = self.inner.borrow_mut().events.pop_front();
+            }
+            if let Some(event) = event {
+                println!("Process event");
+                self.node.borrow_mut().handle_event(event);
+            } else {
+                break;
+            }
+        }
     }
 }
 

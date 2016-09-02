@@ -11,7 +11,7 @@ use std::net::SocketAddr;
 use time::Duration;
 use test::Bencher;
 
-use exonum::events::{Events, Reactor, EventsConfiguration, Event, NodeTimeout};
+use exonum::events::{Events, Reactor, EventsConfiguration, Event, InternalEvent, NodeTimeout};
 use exonum::events::{Network, NetworkConfiguration};
 use exonum::messages::{MessageWriter, RawMessage};
 use exonum::crypto::gen_keypair;
@@ -52,7 +52,7 @@ impl EventsBench for Events {
         self.add_timeout(NodeTimeout::Status, time);
         loop {
             match self.poll() {
-                Event::Connected(_) => return,
+                Event::Internal(InternalEvent::Connected(_)) => return,
                 Event::Timeout(_) => panic!("Unable to connect with addr {}", address),
                 _ => {}
             }
@@ -66,7 +66,7 @@ impl EventsBench for Events {
             match self.poll() {
                 Event::Incoming(msg) => return Some(msg),
                 Event::Timeout(_) => return None,
-                Event::Error(_) => return None,
+                Event::Internal(InternalEvent::Error(_)) => return None,
                 _ => {}
             }
         }
@@ -83,7 +83,7 @@ impl EventsBench for Events {
                 Event::Timeout(_) => {
                     return Err(format!("Timeout exceeded, {} messages is not received", count))
                 }
-                Event::Error(_) => {
+                Event::Internal(InternalEvent::Error(_)) => {
                     return Err(format!("An error occured, {} messages is not received", count))
                 }
                 _ => {}
@@ -105,7 +105,7 @@ impl EventsBench for Events {
         loop {
             match self.poll() {
                 Event::Timeout(_) => break,
-                Event::Error(_) => return,
+                Event::Internal(InternalEvent::Error(_)) => return,
                 _ => {}
             }
         }

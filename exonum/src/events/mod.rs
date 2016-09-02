@@ -39,15 +39,16 @@ pub enum Timeout {
     Internal(InternalTimeout),
 }
 
-pub struct InternalMessage;
+pub enum InternalEvent {
+    Connected(SocketAddr),
+    Disconnected(SocketAddr),
+    Error(io::Error),
+}
 
 pub enum Event {
     Incoming(RawMessage),
-    Internal(InternalMessage),
-    Connected(SocketAddr),
-    Disconnected(SocketAddr),
+    Internal(InternalEvent),
     Timeout(NodeTimeout),
-    Error(io::Error),
     Terminate,
 }
 
@@ -81,7 +82,7 @@ impl MioAdapter {
 
 impl mio::Handler for MioAdapter {
     type Timeout = Timeout;
-    type Message = InternalMessage;
+    type Message = InternalEvent;
 
     fn ready(&mut self, event_loop: &mut EventLoop, token: mio::Token, events: mio::EventSet) {
         loop {
@@ -89,8 +90,8 @@ impl mio::Handler for MioAdapter {
                 Ok(Some(output)) => {
                     let event = match output {
                         Output::Data(buf) => Event::Incoming(RawMessage::new(buf)),
-                        Output::Connected(addr) => Event::Connected(addr),
-                        Output::Disconnected(addr) => Event::Disconnected(addr),
+                        Output::Connected(addr) => Event::Internal(InternalEvent::Connected(addr)),
+                        Output::Disconnected(addr) => Event::Internal(InternalEvent::Disconnected(addr)),
                     };
                     self.push(event);
                 }
@@ -159,7 +160,7 @@ impl Reactor for Events {
                 return event;
             }
             if let Err(err) = self.event_loop.run_once(&mut self.queue, None) {
-                self.queue.push(Event::Error(err))
+                self.queue.push(Event::Internal(InternalEvent::Error(err)))
             }
         }
     }
@@ -201,7 +202,7 @@ mod tests {
 
     use time::Duration;
 
-    use super::{Events, Reactor, EventsConfiguration, Event, NodeTimeout};
+    use super::{Events, Reactor, EventsConfiguration, Event, NodeTimeout, InternalEvent};
     use super::{Network, NetworkConfiguration};
 
     use ::messages::{MessageWriter, RawMessage};
@@ -227,7 +228,7 @@ mod tests {
                 match self.poll() {
                     Event::Incoming(msg) => return Some(msg),
                     Event::Timeout(_) => return None,
-                    Event::Error(_) => return None,
+                    Event::Internal(InternalEvent::Error(_)) => return None,
                     _ => {}
                 }
             }
@@ -241,7 +242,7 @@ mod tests {
             self.connect(addr);
             loop {
                 match self.poll() {
-                    Event::Connected(_) => return,
+                    Event::Internal(InternalEvent::Connected(_)) => return,
                     _ => {}
                 }
             }
@@ -253,7 +254,7 @@ mod tests {
             loop {
                 match self.poll() {
                     Event::Timeout(_) => break,
-                    Event::Error(_) => return,
+                    Event::Internal(InternalEvent::Error(_)) => return,
                     _ => {}
                 }
             }

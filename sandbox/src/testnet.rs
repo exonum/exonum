@@ -9,7 +9,7 @@ use rand::{thread_rng, Rng};
 use exonum::crypto::{gen_keypair, gen_keypair_from_seed, Seed, PublicKey, SecretKey};
 use exonum::node::Configuration;
 use exonum::events::{NetworkConfiguration, EventsConfiguration};
-use exonum::events::{Reactor, Events, Event, NodeTimeout, Network};
+use exonum::events::{Reactor, Events, Event, NodeTimeout, Network, InternalEvent};
 use exonum::blockchain::Blockchain;
 use exonum::messages::{Any, Message, Connect, RawMessage};
 
@@ -141,11 +141,15 @@ pub struct TxGeneratorNode<'a, B: Blockchain> {
     pub tx_receivers: Vec<SocketAddr>,
     pub tx_gen: &'a mut TimestampingTxGenerator,
 
-    _b: PhantomData<B>
+    _b: PhantomData<B>,
 }
 
 impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
-    pub fn new(cfg: TxGeneratorConfiguration, receivers: Vec<SocketAddr>, remaining: usize, gen: &'a mut TimestampingTxGenerator) -> TxGeneratorNode<'a, B> {
+    pub fn new(cfg: TxGeneratorConfiguration,
+               receivers: Vec<SocketAddr>,
+               remaining: usize,
+               gen: &'a mut TimestampingTxGenerator)
+               -> TxGeneratorNode<'a, B> {
         let listener = cfg.network.listener.unwrap();
         let network = NetworkConfiguration {
             listen_address: listener.address,
@@ -176,7 +180,7 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
             tx_receivers: receivers,
             tx_remaining: remaining,
             tx_gen: gen,
-            _b: PhantomData
+            _b: PhantomData,
         }
     }
 
@@ -184,12 +188,11 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
         info!("Starting transaction sending...");
         self.events.bind().unwrap();
 
-        let connect = self.our_connect.clone();
         for address in self.tx_receivers.clone() {
             if address == self.events.address() {
                 continue;
             }
-            self.send_to_addr(&address, connect.raw());
+            self.events.connect(&address);
         }
         self.add_timeout();
     }
@@ -197,22 +200,30 @@ impl<'a, B: Blockchain> TxGeneratorNode<'a, B> {
     pub fn run(&mut self) {
         self.initialize();
         loop {
-            match self.events.poll() {
+            let event = self.events.poll();
+            match event {
                 Event::Incoming(message) => {
                     self.handle_message(message);
                 }
-                Event::Internal(_) => {}
+                Event::Internal(internal) => {
+                    match internal {
+                        InternalEvent::Connected(addr) => self.handle_connected(&addr),
+                        _ => {}
+                    }
+                }
                 Event::Timeout(timeout) => {
                     if !self.handle_timeout(timeout) {
                         break;
                     }
                 }
-                Event::Error(_) => {}
-                Event::Connected(_) => {}
-                Event::Disconnected(_) => {}
                 Event::Terminate => break,
             }
         }
+    }
+
+    pub fn handle_connected(&mut self, addr: &SocketAddr) {
+        let connect = self.our_connect.clone();
+        self.send_to_addr(&addr, connect.raw());
     }
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
