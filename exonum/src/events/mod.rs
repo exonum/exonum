@@ -237,7 +237,7 @@ mod tests {
             self.bind().unwrap();
             thread::sleep(time::Duration::from_millis(1000));
 
-            //TODO timeout
+            // TODO timeout
             self.connect(addr);
             loop {
                 match self.poll() {

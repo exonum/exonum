@@ -8,7 +8,7 @@ use mio::Timeout as MioTimeout;
 use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
-use super::connection::{Connection};
+use super::connection::Connection;
 use super::{Timeout, InternalTimeout, EventLoop};
 
 use super::super::messages::{MessageBuffer, RawMessage};
@@ -22,7 +22,7 @@ const RECONNECT_GROW_FACTOR: f32 = 2.0;
 pub enum Output {
     Data(MessageBuffer),
     Connected(SocketAddr),
-    Disconnected(SocketAddr)
+    Disconnected(SocketAddr),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -108,8 +108,8 @@ impl Network {
             let address = *self.connections[id].address();
 
             trace!("{}: connection with {} closed with error",
-                  self.address(),
-                  address);
+                   self.address(),
+                   address);
 
             self.remove_connection(id);
             return Ok(None);
@@ -148,7 +148,7 @@ impl Network {
             }
             self.reregister_connection(event_loop, id, PollOpt::edge())?;
 
-            return Ok(self.mark_connected(event_loop, id))
+            return Ok(self.mark_connected(event_loop, id));
         }
 
         if set.is_readable() {
@@ -179,9 +179,7 @@ impl Network {
 
     pub fn tick(&mut self, _: &mut EventLoop) {}
 
-    pub fn get_peer(&mut self,
-                    address: &SocketAddr)
-                    -> io::Result<PeerId> {
+    pub fn get_peer(&mut self, address: &SocketAddr) -> io::Result<PeerId> {
         if let Some(id) = self.addresses.get(address) {
             return Ok(*id);
         };
@@ -229,9 +227,9 @@ impl Network {
             self.try_reconnect_addr(event_loop, *address)?;
 
             trace!("{}: Establish connection with {}, id: {}",
-                self.address(),
-                address,
-                id.0);
+                   self.address(),
+                   address,
+                   id.0);
         }
         Ok(())
     }
@@ -247,7 +245,8 @@ impl Network {
                                e);
                     }
 
-                    let delay = min((delay as f32 * RECONNECT_GROW_FACTOR) as u64, self.config.tcp_reconnect_timeout_max);
+                    let delay = min((delay as f32 * RECONNECT_GROW_FACTOR) as u64,
+                                    self.config.tcp_reconnect_timeout_max);
                     // TODO Fail-safe timeout error handling
                     self.add_reconnect_timeout(event_loop, addr, delay).unwrap();
                     trace!("Try to reconnect with delay {}", delay);
@@ -309,7 +308,10 @@ impl Network {
         self.clear_reconnect_request(event_loop, &address)
     }
 
-    fn clear_reconnect_request(&mut self, event_loop: &mut EventLoop, addr: &SocketAddr) -> Option<Output> {
+    fn clear_reconnect_request(&mut self,
+                               event_loop: &mut EventLoop,
+                               addr: &SocketAddr)
+                               -> Option<Output> {
         if let Some(timeout) = self.reconnects.remove(addr) {
             event_loop.clear_timeout(timeout);
             return Some(Output::Connected(*addr));

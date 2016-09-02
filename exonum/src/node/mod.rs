@@ -127,16 +127,10 @@ impl<B: Blockchain> Node<B> {
                 }
                 Event::Error(_) => {}
                 Event::Connected(addr) => {
-                    debug!("Connected to: {}", addr);
-                    let message = self.state.our_connect_message().clone();
-                    self.send_to_addr(&addr, message.raw());
+                    self.handle_connected(&addr);
                 }
                 Event::Disconnected(addr) => {
-                    debug!("Disconnected from: {}", addr);
-                    let need_reconnect = self.state.remove_peer_with_addr(&addr);
-                    if need_reconnect {
-                        self.connect(&addr);
-                    }
+                    self.handle_disconnected(&addr);
                 }
                 Event::Terminate => break,
             }
@@ -165,6 +159,20 @@ impl<B: Blockchain> Node<B> {
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
             NodeTimeout::Status => self.handle_status_timeout(),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
+        }
+    }
+
+    pub fn handle_connected(&mut self, addr: &SocketAddr) {
+        debug!("Connected to: {}", addr);
+        let message = self.state.our_connect_message().clone();
+        self.send_to_addr(&addr, message.raw());
+    }
+
+    pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
+        debug!("Disconnected from: {}", addr);
+        let need_reconnect = self.state.remove_peer_with_addr(&addr);
+        if need_reconnect {
+            self.connect(&addr);
         }
     }
 
