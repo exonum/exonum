@@ -172,7 +172,9 @@ impl Reactor for Events {
     }
 
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
-        self.queue.network.send_to(&mut self.event_loop, address, message)
+        if let Err(e) = self.queue.network.send_to(&mut self.event_loop, address, message) {
+            error!("{}: An error occured {:?}", self.queue.network.address(), e);
+        }
     }
 
     fn connect(&mut self, address: &SocketAddr) {
@@ -214,7 +216,8 @@ mod tests {
         fn with_addr(addr: SocketAddr) -> Events {
             let network = Network::with_config(NetworkConfiguration {
                 listen_address: addr,
-                max_connections: 256,
+                max_incoming_connections: 128,
+                max_outgoing_connections: 128,
                 tcp_nodelay: true,
                 tcp_keep_alive: None,
                 tcp_reconnect_timeout: 1000,
