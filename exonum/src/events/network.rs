@@ -122,6 +122,10 @@ impl Network {
                 return Ok(None);
             }
             PeerKind::Incoming => {
+                if !self.incoming.contains(id) {
+                    return Ok(None)
+                }
+
                 if set.is_hup() | set.is_error() {
                     debug!("{}: incoming connection with addr {} closed",
                            self.address(),
@@ -150,6 +154,10 @@ impl Network {
                 }
             }
             PeerKind::Outgoing => {
+                if !self.outgoing.contains(id) {
+                    return Ok(None)
+                }
+
                 if set.is_hup() | set.is_error() {
                     let address = *self.outgoing[id].address();
 
