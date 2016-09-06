@@ -38,12 +38,15 @@ pub struct NetworkConfiguration {
     pub tcp_reconnect_timeout_max: u64,
 }
 
+// TODO Implement generic ConnectionPool struct to avoid copy paste.
+// Write proper code to configure outgoing streams
 pub struct Network {
     config: NetworkConfiguration,
     listener: Option<TcpListener>,
 
     incoming: Slab<IncomingConnection>,
     outgoing: Slab<OutgoingConnection>,
+    //FIXME addresses only needs for outgoing connections
     addresses: HashMap<SocketAddr, PeerId>,
 
     reconnects: HashMap<SocketAddr, MioTimeout>,
