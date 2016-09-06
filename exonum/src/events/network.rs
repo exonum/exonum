@@ -230,7 +230,7 @@ impl Network {
     }
 
     pub fn connect(&mut self, event_loop: &mut EventLoop, address: &SocketAddr) -> io::Result<()> {
-        if !self.addresses.contains_key(address) {
+        if !self.is_connected(address) {
             let peer = OutgoingConnection::new(TcpStream::connect(address)?, *address);
             let id = self.add_outgoing_connection(event_loop, peer)?;
             self.try_reconnect_addr(event_loop, *address)?;
@@ -241,6 +241,10 @@ impl Network {
                    id.0);
         }
         Ok(())
+    }
+
+    pub fn is_connected(&self, address: &SocketAddr) -> bool {
+        self.addresses.contains_key(address)
     }
 
     pub fn handle_timeout(&mut self, event_loop: &mut EventLoop, timeout: InternalTimeout) {
