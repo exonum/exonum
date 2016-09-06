@@ -206,7 +206,7 @@ pub struct IncomingConnection {
 pub struct OutgoingConnection {
     socket: TcpStream,
     address: SocketAddr,
-    writer: MessageWriter,   
+    writer: MessageWriter,
 }
 
 impl IncomingConnection {
@@ -266,9 +266,10 @@ impl OutgoingConnection {
         &self.socket
     }
 
-    pub fn socket_mut(&mut self) -> &mut TcpStream {
-        &mut self.socket
-    }
+    // TODO think about configuring outgoing sockets
+    // pub fn socket_mut(&mut self) -> &mut TcpStream {
+    //     &mut self.socket
+    // }
 
     pub fn address(&self) -> &SocketAddr {
         &self.address

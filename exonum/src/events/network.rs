@@ -30,7 +30,7 @@ pub enum Output {
 pub struct NetworkConfiguration {
     // TODO: think more about config parameters
     pub listen_address: SocketAddr,
-    pub max_incoming_connections: usize, 
+    pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
     pub tcp_keep_alive: Option<u32>,
@@ -46,13 +46,13 @@ pub struct Network {
     outgoing: Slab<OutgoingConnection>,
     addresses: HashMap<SocketAddr, PeerId>,
 
-    reconnects: HashMap<SocketAddr, MioTimeout>
+    reconnects: HashMap<SocketAddr, MioTimeout>,
 }
 
 enum PeerKind {
     Server,
     Incoming,
-    Outgoing
+    Outgoing,
 }
 
 fn make_error<T: Borrow<str>>(s: T) -> io::Error {
@@ -66,9 +66,10 @@ impl Network {
             listener: None,
 
             incoming: Slab::new_starting_at(Token(2), config.max_incoming_connections),
-            outgoing: Slab::new_starting_at(Token(2 + config.max_incoming_connections), config.max_outgoing_connections),
+            outgoing: Slab::new_starting_at(Token(2 + config.max_incoming_connections),
+                                            config.max_outgoing_connections),
             addresses: HashMap::new(),
-            
+
             reconnects: HashMap::new(),
         }
     }
@@ -77,6 +78,7 @@ impl Network {
         &self.config.listen_address
     }
 
+    // TODO use error trait
     pub fn bind(&mut self, event_loop: &mut EventLoop) -> io::Result<()> {
         if let Some(_) = self.listener {
             return Err(make_error("Already binded"));
@@ -92,17 +94,13 @@ impl Network {
         }
     }
 
-//     // TODO: Use ticks for fast reregistering sockets
-//     // TODO: Implement Connections collection with (re)registering
+    // TODO: Use ticks for fast reregistering sockets
+    // TODO: Implement Connections collection with (re)registering
     pub fn io(&mut self,
               event_loop: &mut EventLoop,
               id: PeerId,
               set: EventSet)
               -> io::Result<Option<Output>> {
-
-        if set.is_error() {
-            return Err(make_error("An error in event_set occured"));
-        }
 
         match self.peer_kind(id) {
             PeerKind::Server => {
@@ -116,30 +114,30 @@ impl Network {
                     let peer = IncomingConnection::new(socket, address);
                     self.add_incoming_connection(event_loop, peer)?;
 
-                    trace!("{}: Accepted incoming connection from {} id: {}",
-                        self.address(),
-                        address,
-                        id.0);
+                    debug!("{}: Accepted incoming connection from {} id: {}",
+                           self.address(),
+                           address,
+                           id.0);
                 }
                 return Ok(None);
             }
-            PeerKind::Incoming => {            
-                if set.is_hup() {
-                    trace!("{}: connection with addr {} closed",
-                        self.address(),
-                        self.incoming[id].address());
+            PeerKind::Incoming => {
+                if set.is_hup() | set.is_error() {
+                    debug!("{}: incoming connection with addr {} closed",
+                           self.address(),
+                           self.incoming[id].address());
 
                     self.remove_incoming_connection(event_loop, id);
-                    return Ok(None)
+                    return Ok(None);
                 }
 
                 if set.is_readable() {
                     let address = *self.incoming[id].address();
 
                     trace!("{}: Socket is readable {} id: {}",
-                        self.address(),
-                        address,
-                        id.0);
+                           self.address(),
+                           address,
+                           id.0);
 
                     return match self.incoming[id].try_read() {
                         Ok(Some(buffer)) => Ok(Some(Output::Data(buffer))),
@@ -152,12 +150,12 @@ impl Network {
                 }
             }
             PeerKind::Outgoing => {
-                if set.is_hup() {
+                if set.is_hup() | set.is_error() {
                     let address = *self.outgoing[id].address();
 
-                    trace!("{}: connection with addr {} closed",
-                        self.address(),
-                        self.outgoing[id].address());
+                    debug!("{}: outgoing connection with addr {} closed",
+                           self.address(),
+                           self.outgoing[id].address());
 
                     self.remove_outgoing_connection(event_loop, id);
                     if self.reconnects.contains_key(&address) {
@@ -170,21 +168,24 @@ impl Network {
                     let address = *self.outgoing[id].address();
 
                     trace!("{}: Socket is writable {} id: {}",
-                        self.address(),
-                        address,
-                        id.0);
+                           self.address(),
+                           address,
+                           id.0);
 
-                    // Write data into socket
-                    if let Err(e) = self.outgoing[id].try_write() {
-                        self.remove_outgoing_connection(event_loop, id);
-                        return Err(e);
-                    }
-
-                    event_loop.reregister(self.outgoing[id].socket(),
+                    let r = {
+                        self.outgoing[id].try_write()?;
+                        event_loop.reregister(self.outgoing[id].socket(),
                                         id,
                                         self.outgoing[id].interest(),
                                         PollOpt::edge())?;
+                        Ok(())
+                    };
 
+                    // Write data into socket
+                    if let Err(e) = r {
+                        self.remove_outgoing_connection(event_loop, id);
+                        return Err(e);
+                    }
                     return Ok(self.mark_connected(event_loop, id));
                 }
             }
@@ -193,15 +194,13 @@ impl Network {
         Ok(None)
     }
 
-    pub fn tick(&mut self, _: &mut EventLoop) {
-
-    }
+    pub fn tick(&mut self, _: &mut EventLoop) {}
 
     pub fn send_to(&mut self,
                    event_loop: &mut EventLoop,
                    address: &SocketAddr,
-                   message: RawMessage) -> io::Result<()> {
-
+                   message: RawMessage)
+                   -> io::Result<()> {
         let r = match self.get_outgoing_peer(address) {
             Ok(id) => {
                 self.outgoing[id]
@@ -230,7 +229,7 @@ impl Network {
             let id = self.add_outgoing_connection(event_loop, peer)?;
             self.try_reconnect_addr(event_loop, *address)?;
 
-            trace!("{}: Establish connection with {}, id: {}",
+            debug!("{}: Establish connection with {}, id: {}",
                    self.address(),
                    address,
                    id.0);
@@ -242,7 +241,7 @@ impl Network {
         match timeout {
             InternalTimeout::Reconnect(addr, delay) => {
                 if self.reconnects.contains_key(&addr) {
-                    trace!("Try to reconnect with delay {}", delay);
+                    debug!("Try to reconnect with delay {}", delay);
 
                     if let Err(e) = self.connect(event_loop, &addr) {
                         error!("{}: Unable to create connection to addr {}, error: {:?}",
@@ -276,10 +275,13 @@ impl Network {
         if let Some(id) = self.addresses.get(addr) {
             return Ok(*id);
         };
-        Err(make_error(format!("Peer not found {}", addr)))
+        Err(make_error(format!("{}: Outgoing peer not found {}", self.address(), addr)))
     }
 
-    fn add_incoming_connection(&mut self, event_loop: &mut EventLoop, mut connection: IncomingConnection) -> io::Result<PeerId> {
+    fn add_incoming_connection(&mut self,
+                               event_loop: &mut EventLoop,
+                               mut connection: IncomingConnection)
+                               -> io::Result<PeerId> {
         self.configure_stream(connection.socket_mut())?;
         let address = *connection.address();
         let id = self.incoming
@@ -288,9 +290,9 @@ impl Network {
         self.addresses.insert(address, id);
 
         let r = event_loop.register(self.incoming[id].socket(),
-                        id,
-                        self.incoming[id].interest(),
-                        PollOpt::edge());
+                                    id,
+                                    self.incoming[id].interest(),
+                                    PollOpt::edge());
 
         if let Err(e) = r {
             self.remove_incoming_connection(event_loop, id);
@@ -299,8 +301,10 @@ impl Network {
         Ok(id)
     }
 
-    fn add_outgoing_connection(&mut self, event_loop: &mut EventLoop, mut connection: OutgoingConnection) -> io::Result<PeerId> {
-        self.configure_stream(connection.socket_mut())?;
+    fn add_outgoing_connection(&mut self,
+                               event_loop: &mut EventLoop,
+                               connection: OutgoingConnection)
+                               -> io::Result<PeerId> {
         let address = *connection.address();
         let id = self.outgoing
             .insert(connection)
@@ -308,9 +312,9 @@ impl Network {
         self.addresses.insert(address, id);
 
         let r = event_loop.register(self.outgoing[id].socket(),
-                        id,
-                        self.outgoing[id].interest() | EventSet::writable(),
-                        PollOpt::edge());
+                                    id,
+                                    self.outgoing[id].interest() | EventSet::writable(),
+                                    PollOpt::edge());
 
         if let Err(e) = r {
             self.remove_outgoing_connection(event_loop, id);
@@ -319,16 +323,30 @@ impl Network {
         Ok(id)
     }
 
-    fn remove_incoming_connection(&mut self, _: &mut EventLoop, id: PeerId) {
+    fn remove_incoming_connection(&mut self, event_loop: &mut EventLoop, id: PeerId) {
         let addr = *self.incoming[id].address();
         self.addresses.remove(&addr);
-        self.incoming.remove(id);
+        if let Some(connection) = self.incoming.remove(id) {
+            if let Err(e) = event_loop.deregister(connection.socket()) {
+                error!("{}: Unable to deregister incoming connection, id: {}, error: {:?}",
+                       self.address(),
+                       id.0,
+                       e);
+            }
+        }
     }
 
-    fn remove_outgoing_connection(&mut self, _: &mut EventLoop, id: PeerId) {
+    fn remove_outgoing_connection(&mut self, event_loop: &mut EventLoop, id: PeerId) {
         let addr = *self.outgoing[id].address();
         self.addresses.remove(&addr);
-        self.outgoing.remove(id);
+        if let Some(connection) = self.outgoing.remove(id) {
+            if let Err(e) = event_loop.deregister(connection.socket()) {
+                error!("{}: Unable to deregister outgoing connection, id: {}, error: {:?}",
+                       self.address(),
+                       id.0,
+                       e);
+            }
+        }
     }
 
     fn configure_stream(&self, stream: &mut TcpStream) -> io::Result<()> {
@@ -355,12 +373,8 @@ impl Network {
                              -> io::Result<()> {
         let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
         let timeout = event_loop.timeout_ms(reconnect, delay)
-            .map_err(|e| {
-                make_error(format!("A mio error occured {:?}", e))
-            })?;
+            .map_err(|e| make_error(format!("A mio error occured {:?}", e)))?;
         self.reconnects.insert(address, timeout);
-
-        trace!("Add reconnect timeout {}", delay);
         Ok(())
     }
 

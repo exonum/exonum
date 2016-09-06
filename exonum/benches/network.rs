@@ -36,7 +36,8 @@ impl EventsBench for Events {
     fn with_addr(addr: SocketAddr, cfg: &BenchConfig) -> Events {
         let network = Network::with_config(NetworkConfiguration {
             listen_address: addr,
-            max_connections: 128,
+            max_incoming_connections: 128,
+            max_outgoing_connections: 128,
             tcp_nodelay: cfg.tcp_nodelay,
             tcp_keep_alive: None,
             tcp_reconnect_timeout: 1000,
