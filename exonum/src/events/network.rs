@@ -84,14 +84,9 @@ impl Network {
             return Err(make_error("Already binded"));
         }
         let listener = TcpListener::bind(&self.config.listen_address)?;
-        let r = event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge());
-        match r {
-            Ok(()) => {
-                self.listener = Some(listener);
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
+        event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge())?;
+        self.listener = Some(listener);
+        Ok(())
     }
 
     // TODO: Use ticks for fast reregistering sockets
@@ -123,7 +118,7 @@ impl Network {
             }
             PeerKind::Incoming => {
                 if !self.incoming.contains(id) {
-                    return Ok(None)
+                    return Ok(None);
                 }
 
                 if set.is_hup() | set.is_error() {
@@ -155,7 +150,7 @@ impl Network {
             }
             PeerKind::Outgoing => {
                 if !self.outgoing.contains(id) {
-                    return Ok(None)
+                    return Ok(None);
                 }
 
                 if set.is_hup() | set.is_error() {
@@ -359,8 +354,7 @@ impl Network {
 
     fn configure_stream(&self, stream: &mut TcpStream) -> io::Result<()> {
         stream.set_keepalive(self.config.tcp_keep_alive)?;
-        stream.set_nodelay(self.config.tcp_nodelay)?;
-        Ok(())
+        stream.set_nodelay(self.config.tcp_nodelay)
     }
 
     fn try_reconnect_addr(&mut self,
