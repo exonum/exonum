@@ -182,11 +182,6 @@ impl OutgoingConnection {
         &self.socket
     }
 
-    // TODO think about configuring outgoing sockets
-    // pub fn socket_mut(&mut self) -> &mut TcpStream {
-    //     &mut self.socket
-    // }
-
     pub fn address(&self) -> &SocketAddr {
         &self.address
     }

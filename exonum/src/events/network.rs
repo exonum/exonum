@@ -230,9 +230,12 @@ impl Network {
 
     pub fn connect(&mut self, event_loop: &mut EventLoop, address: &SocketAddr) -> io::Result<()> {
         if !self.is_connected(address) {
-            let peer = OutgoingConnection::new(TcpStream::connect(address)?, *address);
+            self.add_reconnect_request(event_loop, *address)?;
+
+            let mut stream = TcpStream::connect(address)?;
+            self.configure_stream(&mut stream)?;
+            let peer = OutgoingConnection::new(stream, *address);
             let id = self.add_outgoing_connection(event_loop, peer)?;
-            self.try_reconnect_addr(event_loop, *address)?;
 
             debug!("{}: Establish connection with {}, id: {}",
                    self.address(),
@@ -359,11 +362,12 @@ impl Network {
     }
 
     fn configure_stream(&self, stream: &mut TcpStream) -> io::Result<()> {
+        stream.take_socket_error()?;        
         stream.set_keepalive(self.config.tcp_keep_alive)?;
         stream.set_nodelay(self.config.tcp_nodelay)
     }
 
-    fn try_reconnect_addr(&mut self,
+    fn add_reconnect_request(&mut self,
                           event_loop: &mut EventLoop,
                           address: SocketAddr)
                           -> io::Result<()> {
