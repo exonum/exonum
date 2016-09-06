@@ -46,7 +46,7 @@ pub struct Network {
 
     incoming: Slab<IncomingConnection>,
     outgoing: Slab<OutgoingConnection>,
-    //FIXME addresses only needs for outgoing connections
+    // FIXME addresses only needs for outgoing connections
     addresses: HashMap<SocketAddr, PeerId>,
 
     reconnects: HashMap<SocketAddr, MioTimeout>,
@@ -207,7 +207,7 @@ impl Network {
                    address: &SocketAddr,
                    message: RawMessage)
                    -> io::Result<()> {
-        let r = match self.get_outgoing_peer(address) {
+        match self.get_outgoing_peer(address) {
             Ok(id) => {
                 self.outgoing[id]
                     .send(message)
@@ -225,8 +225,7 @@ impl Network {
                     })
             }
             Err(e) => Err(e),
-        };
-        r
+        }
     }
 
     pub fn connect(&mut self, event_loop: &mut EventLoop, address: &SocketAddr) -> io::Result<()> {

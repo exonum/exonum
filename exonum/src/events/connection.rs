@@ -88,8 +88,8 @@ impl MessageWriter {
             if buf.len() > MAX_MESSAGE_LEN {
                 self.queue.pop_front();
                 return Err(io::Error::new(io::ErrorKind::Other,
-                                          format!("Attempted to send too long message. It will \
-                                                   be dropped.")));
+                                          "Attempted to send too long message. It will be \
+                                           dropped."));
             }
             match socket.try_write(&buf[self.position..])? {
                 None | Some(0) => {
@@ -112,90 +112,6 @@ impl MessageWriter {
         self.queue.is_empty()
     }
 }
-
-// pub struct Connection {
-//     socket: TcpStream,
-//     address: SocketAddr,
-
-//     reader: MessageReader,
-//     writer: MessageWriter,
-// }
-
-// impl Connection {
-//     pub fn new(socket: TcpStream, address: SocketAddr) -> Connection {
-//         Connection {
-//             socket: socket,
-//             address: address,
-
-//             reader: MessageReader::empty(),
-//             writer: MessageWriter::empty(),
-//         }
-//     }
-
-//     pub fn socket(&self) -> &TcpStream {
-//         &self.socket
-//     }
-
-//     pub fn socket_mut(&mut self) -> &mut TcpStream {
-//         &mut self.socket
-//     }
-
-//     pub fn address(&self) -> &SocketAddr {
-//         &self.address
-//     }
-
-//     pub fn try_write(&mut self) -> io::Result<()> {
-//         // TODO: reregister
-//         self.writer.write(&mut self.socket).or_else(|e| {
-//             match e.kind() {
-//                 io::ErrorKind::WouldBlock |
-//                 io::ErrorKind::WriteZero => {
-//                     warn!("Unable to write to socket {}, socket is blocked",
-//                           self.address);
-//                     Ok(())
-//                 }
-//                 _ => Err(e),
-//             }
-//         })
-//     }
-
-//     pub fn try_read(&mut self) -> io::Result<Option<MessageBuffer>> {
-//         // TODO: raw length == 0?
-//         // TODO: maximum raw length?
-//         loop {
-//             match self.reader.read(&mut self.socket)? {
-//                 None | Some(0) => return Ok(None),
-//                 Some(_) => {
-//                     if self.reader.read_finished() {
-//                         let mut raw = MessageReader::empty();
-//                         swap(&mut raw, &mut self.reader);
-//                         return Ok(Some(raw.into_raw()));
-//                     }
-//                 }
-//             }
-//         }
-//     }
-
-//     pub fn send(&mut self, message: RawMessage) -> io::Result<()> {
-//         // TODO: capacity overflow
-//         // TODO: reregister
-//         self.writer.queue.push_back(message);
-//         // TODO proper test that we can write immediately
-//         self.try_write()
-//     }
-
-//     pub fn is_idle(&self) -> bool {
-//         self.writer.is_idle()
-//     }
-
-//     pub fn interest(&self) -> EventSet {
-//         let mut set = EventSet::hup() | EventSet::error() | EventSet::readable();
-//         if !self.is_idle() {
-//             set = set | EventSet::writable();
-//         }
-//         set
-//     }
-// }
 
 pub struct IncomingConnection {
     socket: TcpStream,

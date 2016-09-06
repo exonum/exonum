@@ -306,7 +306,7 @@ impl<Tx> State<Tx> {
         self.locked_round = 0;
         self.locked_propose = None;
         // TODO: use block hash instead
-        self.last_hash = propose_hash.clone();
+        self.last_hash = *propose_hash;
 
         {
             let state = self.proposes
@@ -478,14 +478,11 @@ impl<Tx> State<Tx> {
 
     pub fn have_incompatible_prevotes(&self) -> bool {
         for round in self.locked_round + 1...self.round {
-            match self.our_prevotes.get(&round) {
-                Some(msg) => {
-                    // TODO: unefficient
-                    if Some(*msg.propose_hash()) != self.locked_propose {
-                        return true;
-                    }
+            if let Some(msg) = self.our_prevotes.get(&round) {
+                // TODO: unefficient
+                if Some(*msg.propose_hash()) != self.locked_propose {
+                    return true;
                 }
-                None => (),
             }
         }
         false

@@ -173,12 +173,12 @@ impl Reactor for Events {
 
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
         if self.queue.network.is_connected(address) {
-        if let Err(e) = self.queue.network.send_to(&mut self.event_loop, address, message) {
-            error!("{}: An error during send_to occured {:?}",
-                   self.queue.network.address(),
-                   e);
-            self.queue.push(Event::Internal(InternalEvent::Disconnected(*address)));
-        }
+            if let Err(e) = self.queue.network.send_to(&mut self.event_loop, address, message) {
+                error!("{}: An error during send_to occured {:?}",
+                       self.queue.network.address(),
+                       e);
+                self.queue.push(Event::Internal(InternalEvent::Disconnected(*address)));
+            }
         } else {
             warn!("{}: Unable to send message to {}, connection does not established",
                   self.queue.network.address(),

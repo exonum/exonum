@@ -291,7 +291,7 @@ impl<B: Blockchain> Node<B> {
 
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
-            self.remove_request(RequestData::Transactions(hash.clone()));
+            self.remove_request(RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
     }

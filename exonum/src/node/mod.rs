@@ -173,14 +173,14 @@ impl<B: Blockchain> Node<B> {
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
         debug!("Connected to: {}", addr);
         let message = self.state.our_connect_message().clone();
-        self.send_to_addr(&addr, message.raw());
+        self.send_to_addr(addr, message.raw());
     }
 
     pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
         debug!("Disconnected from: {}", addr);
-        let need_reconnect = self.state.remove_peer_with_addr(&addr);
+        let need_reconnect = self.state.remove_peer_with_addr(addr);
         if need_reconnect {
-            self.connect(&addr);
+            self.connect(addr);
         }
     }
 
