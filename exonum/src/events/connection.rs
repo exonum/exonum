@@ -113,6 +113,12 @@ impl MessageWriter {
     }
 }
 
+pub trait Connection {
+    fn socket(&self) -> &TcpStream;
+    fn address(&self) -> &SocketAddr;
+    fn interest(&self) -> EventSet;
+}
+
 pub struct IncomingConnection {
     socket: TcpStream,
     address: SocketAddr,
@@ -135,18 +141,6 @@ impl IncomingConnection {
         }
     }
 
-    pub fn socket(&self) -> &TcpStream {
-        &self.socket
-    }
-
-    pub fn socket_mut(&mut self) -> &mut TcpStream {
-        &mut self.socket
-    }
-
-    pub fn address(&self) -> &SocketAddr {
-        &self.address
-    }
-
     pub fn try_read(&mut self) -> io::Result<Option<MessageBuffer>> {
         // TODO: raw length == 0?
         // TODO: maximum raw length?
@@ -163,10 +157,6 @@ impl IncomingConnection {
             }
         }
     }
-
-    pub fn interest(&self) -> EventSet {
-        EventSet::hup() | EventSet::error() | EventSet::readable()
-    }
 }
 
 impl OutgoingConnection {
@@ -176,14 +166,6 @@ impl OutgoingConnection {
             address: address,
             writer: MessageWriter::empty(),
         }
-    }
-
-    pub fn socket(&self) -> &TcpStream {
-        &self.socket
-    }
-
-    pub fn address(&self) -> &SocketAddr {
-        &self.address
     }
 
     pub fn try_write(&mut self) -> io::Result<()> {
@@ -212,8 +194,31 @@ impl OutgoingConnection {
     pub fn is_idle(&self) -> bool {
         self.writer.is_idle()
     }
+}
 
-    pub fn interest(&self) -> EventSet {
+impl Connection for IncomingConnection {
+    fn socket(&self) -> &TcpStream {
+        &self.socket
+    }
+
+    fn address(&self) -> &SocketAddr {
+        &self.address
+    }
+
+    fn interest(&self) -> EventSet {
+        EventSet::hup() | EventSet::error() | EventSet::readable()
+    }
+}
+impl Connection for OutgoingConnection {
+    fn socket(&self) -> &TcpStream {
+        &self.socket
+    }
+
+    fn address(&self) -> &SocketAddr {
+        &self.address
+    }
+
+    fn interest(&self) -> EventSet {
         let mut set = EventSet::hup() | EventSet::error();
         if !self.is_idle() {
             set = set | EventSet::writable();
@@ -221,10 +226,3 @@ impl OutgoingConnection {
         set
     }
 }
-
-// pub trait Connection {
-//     fn address(&self) -> &SocketAddr;
-//     fn interest(&self) -> EventSet;
-// }
-// impl Connection for IncomingConnection {}
-// impl Connection for OutgoingConnection {}

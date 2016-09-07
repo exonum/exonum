@@ -1,5 +1,7 @@
 extern crate rand;
 
+use std::net::SocketAddr;
+
 use rand::Rng;
 
 use super::super::blockchain::{Blockchain};
@@ -7,6 +9,20 @@ use super::super::messages::{Connect, Status, Message, RequestPeers};
 use super::{Node, RequestData};
 
 impl<B: Blockchain> Node<B> {
+    pub fn handle_connected(&mut self, addr: &SocketAddr) {
+        debug!("Connected to: {}", addr);
+        let message = self.state.our_connect_message().clone();
+        self.send_to_addr(addr, message.raw());
+    }
+
+    pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
+        debug!("Disconnected from: {}", addr);
+        let need_reconnect = self.state.remove_peer_with_addr(addr);
+        if need_reconnect {
+            self.connect(addr);
+        }
+    }
+
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO add spam protection
         let address = message.addr();

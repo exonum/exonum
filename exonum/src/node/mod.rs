@@ -6,7 +6,7 @@ use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, NodeTimeout, EventsConfiguration, Network,
                     NetworkConfiguration, InternalEvent};
 use super::blockchain::{Blockchain, BlockStorage};
-use super::messages::{Any, Connect, RawMessage, Message};
+use super::messages::{Any, Connect, RawMessage};
 
 mod state;
 mod basic;
@@ -167,20 +167,6 @@ impl<B: Blockchain> Node<B> {
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
             NodeTimeout::Status => self.handle_status_timeout(),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
-        }
-    }
-
-    pub fn handle_connected(&mut self, addr: &SocketAddr) {
-        debug!("Connected to: {}", addr);
-        let message = self.state.our_connect_message().clone();
-        self.send_to_addr(addr, message.raw());
-    }
-
-    pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
-        debug!("Disconnected from: {}", addr);
-        let need_reconnect = self.state.remove_peer_with_addr(addr);
-        if need_reconnect {
-            self.connect(addr);
         }
     }
 

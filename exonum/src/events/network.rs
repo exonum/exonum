@@ -9,7 +9,7 @@ use mio::Timeout as MioTimeout;
 use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
-use super::connection::{IncomingConnection, OutgoingConnection};
+use super::connection::{Connection, IncomingConnection, OutgoingConnection};
 use super::{Timeout, InternalTimeout, EventLoop};
 
 use super::super::messages::{MessageBuffer, RawMessage};
@@ -108,8 +108,9 @@ impl Network {
                     Some(ref listener) => listener.accept()?,
                     None => None,
                 };
-                if let Some((socket, address)) = pair {
-                    let peer = IncomingConnection::new(socket, address);
+                if let Some((mut stream, address)) = pair {
+                    self.configure_stream(&mut stream)?;
+                    let peer = IncomingConnection::new(stream, address);
                     self.add_incoming_connection(event_loop, peer)?;
 
                     debug!("{}: Accepted incoming connection from {} id: {}",
@@ -292,9 +293,8 @@ impl Network {
 
     fn add_incoming_connection(&mut self,
                                event_loop: &mut EventLoop,
-                               mut connection: IncomingConnection)
+                               connection: IncomingConnection)
                                -> io::Result<PeerId> {
-        self.configure_stream(connection.socket_mut())?;
         let address = *connection.address();
         let id = self.incoming
             .insert(connection)
