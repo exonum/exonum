@@ -26,7 +26,6 @@ trait EventsBench {
     fn with_addr(addr: SocketAddr, cfg: &BenchConfig) -> Events;
 
     fn wait_for_connect(&mut self, address: &SocketAddr);
-    fn wait_for_msg(&mut self) -> Option<RawMessage>;
     fn gen_message(id: u16, len: usize) -> RawMessage;
     fn wait_for_messages(&mut self, mut count: usize, timeout: Duration) -> Result<(), String>;
     fn process_events(&mut self, timeout: Duration);
@@ -55,19 +54,6 @@ impl EventsBench for Events {
             match self.poll() {
                 Event::Internal(InternalEvent::Connected(_)) => return,
                 Event::Timeout(_) => panic!("Unable to connect with addr {}", address),
-                _ => {}
-            }
-        }
-    }
-
-    fn wait_for_msg(&mut self) -> Option<RawMessage> {
-        let time = self.get_time() + Duration::milliseconds(10000);
-        self.add_timeout(NodeTimeout::Status, time);
-        loop {
-            match self.poll() {
-                Event::Incoming(msg) => return Some(msg),
-                Event::Timeout(_) => return None,
-                Event::Internal(InternalEvent::Error(_)) => return None,
                 _ => {}
             }
         }
