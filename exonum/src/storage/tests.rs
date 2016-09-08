@@ -26,7 +26,7 @@ fn test_map_simple<T: Map<[u8], Vec<u8>>>(db: T) -> Result<(), Error> {
     Ok(())
 }
 
-fn test_database_merge<T: Database>(mut db: T) -> Result<(), Error> {
+fn test_database_merge<T: Database>(db: T) -> Result<(), Error> {
     db.put(b"ab", vec![1, 2, 3])?;
     db.put(b"aba", vec![14, 22, 3])?;
     db.put(b"caba", vec![34, 2, 3])?;

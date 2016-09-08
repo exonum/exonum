@@ -11,7 +11,7 @@ use tempdir::TempDir;
 use rand::{SeedableRng, XorShiftRng, Rng};
 
 use exonum::storage::{MerkleTable, MerklePatriciaTable};
-use exonum::storage::{Database, Map, List, MapTable, Patch};
+use exonum::storage::{Database, Map, List, MapTable, Fork};
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 
 fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
@@ -31,7 +31,7 @@ fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<
 fn merkle_table_insertion<T: Database>(b: &mut Bencher, mut db: T) {
     let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
     let map = MapTable::new(vec![123], &mut db);
-    let mut table = MerkleTable::new(map);
+    let table = MerkleTable::new(map);
     table.get(0u32).unwrap();
     b.iter(|| {
         let v_generator = |_| {
@@ -51,7 +51,7 @@ fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, mut db: T) {
     let data = generate_random_kv(&mut rng, 200);
 
     let map = MapTable::new(vec![234], &mut db);
-    let mut table = MerklePatriciaTable::new(map);
+    let table = MerklePatriciaTable::new(map);
     b.iter(|| {
         for item in &data {
             table.put(&item.0, item.1.clone()).unwrap();
@@ -59,7 +59,7 @@ fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, mut db: T) {
     });
 }
 
-fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, mut db: T) {
+fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: T) {
     let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
     let data = generate_random_kv(&mut rng, 200);
 
@@ -69,12 +69,12 @@ fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, mut db: T)
             let mut fork = db.fork();
             {
                 let map = MapTable::new(vec![234], &mut fork);
-                let mut table = MerklePatriciaTable::new(map);
+                let table = MerklePatriciaTable::new(map);
                 for item in &data {
                     table.put(&item.0, item.1.clone()).unwrap();
                 }
             }
-            patch = Patch::from(fork);
+            patch = fork.changes();
         }
         db.merge(patch).unwrap();
     });
@@ -93,7 +93,7 @@ fn merkle_patricia_table_insertion_large_map<T: Database>(b: &mut Bencher, mut d
     };
 
     let map = MapTable::new(vec![134], &mut db);
-    let mut table = MerklePatriciaTable::new(map);
+    let table = MerklePatriciaTable::new(map);
     for item in (0..10000).map(kv_generator) {
         table.put(&item.0, item.1.clone()).unwrap();
     }

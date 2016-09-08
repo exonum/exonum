@@ -9,7 +9,7 @@ use std::path::Path;
 use rand::{SeedableRng, XorShiftRng, Rng};
 
 use exonum::storage::{LevelDB, LevelDBOptions};
-use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Patch};
+use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Fork};
 
 /// usage
 /// path  - Directory where database is situated
@@ -57,16 +57,16 @@ fn main() {
         {
             let mut fork = db.fork();
             {
-                let mut map = MerklePatriciaTable::new(MapTable::new(prefix, &mut fork));
+                let map = MerklePatriciaTable::new(MapTable::new(prefix, &mut fork));
                 for item in (0..count).map(kv_generator) {
                     map.put(&item.0, item.1.clone()).unwrap();
                 }
             }
-            patch = Patch::from(fork);
+            patch = fork.changes();
         }
         db.merge(patch).unwrap();
     } else {
-        let mut map = MerklePatriciaTable::new(MapTable::new(prefix, &mut db));
+        let map = MerklePatriciaTable::new(MapTable::new(prefix, &mut db));
         for item in (0..count).map(kv_generator) {
             map.put(&item.0, item.1.clone()).unwrap();
         }

@@ -3,6 +3,7 @@ mod storages;
 
 use std::collections::HashMap;
 use std::borrow::{Borrow};
+use std::ops::Deref;
 
 use ::crypto::{Hash, hash};
 use ::messages::{Propose, Precommit, Message};
@@ -12,17 +13,17 @@ pub use self::block::Block;
 pub use self::storages::{View};
 
 pub trait Blockchain: Sized
-    where Self: Borrow<<Self as Blockchain>::Database>,
+    where Self: Deref<Target=<Self as Blockchain>::Database>,
 {
     type View: View<<<Self as Blockchain>::Database as Database>::Fork, Transaction=Self::Transaction>;
     type Database: Database;
     type Transaction: Message + StorageValue;
 
-    fn last_hash(&mut self) -> Result<Option<Hash>, Error> {
+    fn last_hash(&self) -> Result<Option<Hash>, Error> {
         self.view().heights().last()
     }
 
-    fn last_block(&mut self) -> Result<Option<Block>, Error> {
+    fn last_block(&self) -> Result<Option<Block>, Error> {
         Ok(match self.last_hash()? {
             Some(hash) => Some(self.view().blocks().get(&hash)?.unwrap()),
             None => None,
@@ -31,10 +32,10 @@ pub trait Blockchain: Sized
     }
 
     fn verify_tx(tx: &Self::Transaction) -> bool;
-    fn state_hash(fork: &mut Self::View) -> Result<Hash, Error>;
-    fn execute(fork: &mut Self::View, tx: &Self::Transaction) -> Result<(), Error>;
+    fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
+    fn execute(fork: &Self::View, tx: &Self::Transaction) -> Result<(), Error>;
 
-    fn create_patch(&mut self,
+    fn create_patch(&self,
                     propose: &Propose,
                     txs: &HashMap<Hash, Self::Transaction>)
                     -> Result<(Hash, Patch), Error> {
@@ -76,7 +77,7 @@ pub trait Blockchain: Sized
         Ok((block_hash, fork.changes()))
     }
 
-    fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
+    fn commit<'a, I: Iterator<Item = &'a Precommit>>(&self,
                                                      block_hash: Hash,
                                                      patch: Patch,
                                                      precommits: I)
@@ -100,6 +101,6 @@ pub trait Blockchain: Sized
     }
 
     fn merge(&self, patch: Patch) -> Result<(), Error> {
-        self.borrow().merge(patch)
+        self.deref().merge(patch)
     }
 }

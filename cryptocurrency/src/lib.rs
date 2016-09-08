@@ -3,7 +3,6 @@
 #[macro_use(message)]
 extern crate exonum;
 
-use std::borrow::{Borrow};
 use std::ops::Deref;
 
 use exonum::messages::{RawMessage, Message, Error as MessageError};
@@ -113,18 +112,15 @@ impl<F> Deref for CurrencyView<F>
     }
 }
 
-impl<D: Database> Borrow<D> for CurrencyBlockchain<D> {
-    fn borrow(&self) -> &D {
+impl<D: Database> Deref for CurrencyBlockchain<D> {
+    type Target = D;
+
+    fn deref(&self) -> &D {
         &self.db
     }
 }
 
-trait WalletStorage<F: Fork>
-{
-    fn wallets(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, i64>;
-}
-
-impl<F> WalletStorage<F> for CurrencyView<F>
+impl<F> CurrencyView<F> 
     where F: Fork
 {
     fn wallets(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, i64> {
@@ -143,11 +139,11 @@ impl<D> Blockchain for CurrencyBlockchain<D>
         tx.verify(tx.pub_key())
     }
 
-    fn state_hash(view: &mut Self::View) -> Result<Hash, Error> {
+    fn state_hash(view: &Self::View) -> Result<Hash, Error> {
         view.wallets().root_hash().map(|o| o.unwrap_or(hash(&[])))
     }
 
-    fn execute(view: &mut Self::View, tx: &Self::Transaction) -> Result<(), Error> {
+    fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
         match *tx {
             CurrencyTx::Transfer(ref msg) => {
                 let from_amount = {

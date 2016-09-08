@@ -44,7 +44,7 @@ pub struct Configuration {
 }
 
 impl<B: Blockchain> Node<B> {
-    pub fn new(mut blockchain: B, reactor: Box<Reactor>, config: Configuration) -> Node<B> {
+    pub fn new(blockchain: B, reactor: Box<Reactor>, config: Configuration) -> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let id = config.validators
             .iter()

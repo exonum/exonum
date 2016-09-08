@@ -39,7 +39,7 @@ pub struct LevelDB {
 }
 
 pub struct LevelDBView {
-    db: Arc<LevelDatabase<BinaryKey>>,
+    _db: Arc<LevelDatabase<BinaryKey>>,
     snap: LevelSnapshot<'static, BinaryKey>,
     changes: RefCell<Patch>
 }
@@ -94,7 +94,7 @@ impl Map<[u8], Vec<u8>> for LevelDB {
 impl LevelDBView {
     pub fn new(from: &LevelDB) -> LevelDBView {
         LevelDBView {
-            db: from.db.clone(),
+            _db: from.db.clone(),
             snap: unsafe { mem::transmute(from.db.snapshot()) },
             changes: RefCell::default()
         }
@@ -154,12 +154,6 @@ impl Fork for LevelDBView {
     }
     fn merge(&self, patch: Patch) {
         self.changes.borrow_mut().extend(patch);
-    }
-}
-
-impl From<LevelDBView> for Patch {
-    fn from(view: LevelDBView) -> Patch {
-        view.changes()
     }
 }
 

@@ -4,7 +4,6 @@
 extern crate exonum;
 
 use std::ops::Deref;
-use std::borrow::{Borrow};
 
 use exonum::messages::Message;
 use exonum::crypto::{PublicKey, Hash, hash};
@@ -53,8 +52,10 @@ impl<F> Deref for TimestampingView<F>
     }
 }
 
-impl<D: Database> Borrow<D> for TimestampingBlockchain<D> {
-    fn borrow(&self) -> &D {
+impl<D: Database> Deref for TimestampingBlockchain<D> {
+    type Target = D;
+
+    fn deref(&self) -> &D {
         &self.db
     }
 }
@@ -70,11 +71,11 @@ impl<D> Blockchain for TimestampingBlockchain<D>
         tx.verify(tx.pub_key())
     }
 
-    fn state_hash(_: &mut Self::View) -> Result<Hash, Error> {
+    fn state_hash(_: &Self::View) -> Result<Hash, Error> {
         Ok(hash(&[]))
     }
 
-    fn execute(_: &mut Self::View, _: &Self::Transaction) -> Result<(), Error> {
+    fn execute(_: &Self::View, _: &Self::Transaction) -> Result<(), Error> {
         Ok(())
     }
 }
