@@ -271,7 +271,6 @@ impl<B, G> Sandbox<B, G>
                        set);
             }
         }
-
     }
 
     pub fn set_time(&self, sec: i64, nsec: i32) {
@@ -298,6 +297,7 @@ impl<B, G> Sandbox<B, G>
                 }
             };
             self.node.borrow_mut().handle_timeout(timeout);
+            self.process_events();
         }
     }
 
