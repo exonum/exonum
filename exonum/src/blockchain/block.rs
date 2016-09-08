@@ -6,6 +6,7 @@ use super::super::storage::StorageValue;
 
 pub const BLOCK_SIZE : usize = 112;
 
+#[derive(Debug)]
 pub struct Block {
     // Идентификатор сети, к которой принадлежит этот блок
     // Высота блока
@@ -59,6 +60,10 @@ impl Block {
     pub fn state_hash(&self) -> &Hash {
         Field::read(&self.raw, 80, 112)
     }
+
+    pub fn hash(&self) -> Hash {
+        hash(&self.raw)
+    }
 }
 
 impl StorageValue for Block {
@@ -71,7 +76,7 @@ impl StorageValue for Block {
     }
 
     fn hash(&self) -> Hash {
-        hash(&self.raw)
+        Block::hash(self)
     }
 }
 

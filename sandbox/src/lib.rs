@@ -17,10 +17,7 @@ extern crate exonum;
 extern crate timestamping;
 extern crate cryptocurrency;
 
-#[cfg(test)]
 mod sandbox;
-#[cfg(test)]
-mod tests;
 
 mod tx_generator;
 pub mod testnet;
@@ -28,3 +25,4 @@ mod config_file;
 
 pub use tx_generator::TimestampingTxGenerator;
 pub use config_file::ConfigFile;
+pub use self::sandbox::{timestamping_sandbox};

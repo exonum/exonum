@@ -16,6 +16,7 @@ impl<B: Blockchain> Node<B> {
         }
 
         // Queued messages from next height or round
+        // TODO: shoud we ignore messages from far rounds?
         if msg.height() == self.state.height() + 1 || msg.round() > self.state.round() {
             self.state.add_queued(msg);
             return;

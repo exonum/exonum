@@ -53,7 +53,7 @@ pub trait Blockchain: Sized
                 .unwrap();
         }
         // Get tx hash
-        let tx_hash = fork.block_txs(propose.height()).root_hash()?.unwrap();
+        let tx_hash = fork.block_txs(propose.height()).root_hash()?.unwrap_or(hash(&[]));
         // Get state hash
         let state_hash = Self::state_hash(&mut fork)?;
         // Create block
