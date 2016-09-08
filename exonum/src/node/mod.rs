@@ -5,7 +5,7 @@ use time::{Duration, Timespec};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, NodeTimeout, EventsConfiguration, Network,
                     NetworkConfiguration, InternalEvent};
-use super::blockchain::{Blockchain, BlockStorage};
+use super::blockchain::{Blockchain};
 use super::messages::{Any, Connect, RawMessage};
 
 mod state;
