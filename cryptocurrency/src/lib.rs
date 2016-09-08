@@ -5,13 +5,13 @@ extern crate exonum;
 
 use std::borrow::{Borrow, BorrowMut};
 
-use exonum::messages::{RawMessage, Message, Error as MessageError} ;
+use exonum::messages::{RawMessage, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable};
 use exonum::blockchain::Blockchain;
 
-pub const TX_TRANSFER_ID : u16 = 128;
-pub const TX_ISSUE_ID : u16 = 129;
+pub const TX_TRANSFER_ID: u16 = 128;
+pub const TX_ISSUE_ID: u16 = 129;
 
 message! {
     TxTransfer {
@@ -39,7 +39,7 @@ message! {
 #[derive(PartialEq, Debug, Clone)]
 pub enum CurrencyTx {
     Transfer(TxTransfer),
-    Issue(TxIssue)
+    Issue(TxIssue),
 }
 
 impl Message for CurrencyTx {
@@ -54,7 +54,7 @@ impl Message for CurrencyTx {
         Ok(match raw.message_type() {
             TX_TRANSFER_ID => CurrencyTx::Transfer(TxTransfer::from_raw(raw)?),
             TX_ISSUE_ID => CurrencyTx::Issue(TxIssue::from_raw(raw)?),
-            _ => panic!("Undefined message type")
+            _ => panic!("Undefined message type"),
         })
     }
 
@@ -131,25 +131,28 @@ impl<D> Blockchain for CurrencyBlockchain<D>
 
                 fork.wallets().put(msg.from(), from_amount - msg.amount())?;
                 fork.wallets().put(msg.to(), to_amount + msg.amount())?;
-            },
+            }
             CurrencyTx::Issue(ref msg) => {
                 let amount = {
                     fork.wallets().get(msg.wallet())?.unwrap_or(0) + msg.amount()
                 };
                 fork.wallets().put(msg.wallet(), amount)?;
-            },
+            }
         };
         Ok(())
     }
 }
 
-trait WalletStorage<Db: Database> where Self: Borrow<Db> + BorrowMut<Db> {
+trait WalletStorage<Db: Database>
+    where Self: Borrow<Db> + BorrowMut<Db>
+{
     fn wallets(&mut self) -> MerklePatriciaTable<MapTable<Db, [u8], Vec<u8>>, PublicKey, i64>;
 }
 
-impl<'a, Db> WalletStorage<Fork<'a, Db>> for Fork<'a, Db> where Db: Database {
+impl<'a, Db> WalletStorage<Fork<'a, Db>> for Fork<'a, Db>
+    where Db: Database
+{
     fn wallets(&mut self) -> MerklePatriciaTable<MapTable<Self, [u8], Vec<u8>>, PublicKey, i64> {
         MerklePatriciaTable::new(MapTable::new(vec![09], self))
     }
 }
-

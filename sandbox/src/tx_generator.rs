@@ -36,11 +36,11 @@ impl Iterator for TimestampingTxGenerator {
     }
 }
 
-const WALLETS_COUNT : usize = 100_000;
+const WALLETS_COUNT: usize = 100_000;
 
 pub struct CurrencyTxGenerator {
     rand: XorShiftRng,
-    clients: Vec<(PublicKey, SecretKey)>
+    clients: Vec<(PublicKey, SecretKey)>,
 }
 
 impl CurrencyTxGenerator {
@@ -55,7 +55,7 @@ impl CurrencyTxGenerator {
 
         CurrencyTxGenerator {
             rand: rand,
-            clients: clients
+            clients: clients,
         }
     }
 }
@@ -64,21 +64,20 @@ impl Iterator for CurrencyTxGenerator {
     type Item = CurrencyTx;
 
     fn next(&mut self) -> Option<CurrencyTx> {
-        let &(ref public_key, ref secret_key) =
-            self.rand.choose(&self.clients).unwrap();
+        let &(ref public_key, ref secret_key) = self.rand.choose(&self.clients).unwrap();
         if self.rand.gen_weighted_bool(10) {
             let seed = self.rand.gen();
             let amount = self.rand.gen_range(0, 100_000);
-            Some(CurrencyTx::Issue(TxIssue::new(
-                public_key, amount, seed, secret_key
-            )))
+            Some(CurrencyTx::Issue(TxIssue::new(public_key, amount, seed, secret_key)))
         } else {
             let seed = self.rand.gen();
             let ref reciever = self.rand.choose(&self.clients).unwrap().0;
             let amount = self.rand.gen_range(0, 1_000);
-            Some(CurrencyTx::Transfer(TxTransfer::new(
-                public_key, reciever, amount, seed, secret_key
-            )))
+            Some(CurrencyTx::Transfer(TxTransfer::new(public_key,
+                                                      reciever,
+                                                      amount,
+                                                      seed,
+                                                      secret_key)))
         }
     }
 }

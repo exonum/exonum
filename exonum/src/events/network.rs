@@ -362,15 +362,15 @@ impl Network {
     }
 
     fn configure_stream(&self, stream: &mut TcpStream) -> io::Result<()> {
-        stream.take_socket_error()?;        
+        stream.take_socket_error()?;
         stream.set_keepalive(self.config.tcp_keep_alive)?;
         stream.set_nodelay(self.config.tcp_nodelay)
     }
 
     fn add_reconnect_request(&mut self,
-                          event_loop: &mut EventLoop,
-                          address: SocketAddr)
-                          -> io::Result<()> {
+                             event_loop: &mut EventLoop,
+                             address: SocketAddr)
+                             -> io::Result<()> {
         if !self.reconnects.contains_key(&address) {
             let delay = self.config.tcp_reconnect_timeout;
             return self.add_reconnect_timeout(event_loop, address, delay);

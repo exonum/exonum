@@ -32,7 +32,7 @@ impl<'a, T: Database + 'a> Fork<'a, T> {
     pub fn new(database: &'a T, changes: Patch) -> Fork<'a, T> {
         Fork {
             database: database,
-            changes: changes
+            changes: changes,
         }
     }
 }

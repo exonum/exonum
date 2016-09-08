@@ -4,7 +4,7 @@ use super::super::messages::Field;
 use super::super::crypto::{Hash, hash};
 use super::super::storage::StorageValue;
 
-pub const BLOCK_SIZE : usize = 112;
+pub const BLOCK_SIZE: usize = 112;
 
 #[derive(Debug)]
 pub struct Block {
@@ -14,16 +14,17 @@ pub struct Block {
     // Время создания блока предлагающим лидером*
     // Хеш предыдущего блока
     // Хеш состояния после применения этого блока
-    raw: Vec<u8>
+    raw: Vec<u8>,
 }
 
 // TODO: add network_id, propose_round, block version?
 impl Block {
     pub fn new(height: u64,
-           time: Timespec,
-           prev_hash: &Hash,
-           tx_hash: &Hash,
-           state_hash: &Hash) -> Block {
+               time: Timespec,
+               prev_hash: &Hash,
+               tx_hash: &Hash,
+               state_hash: &Hash)
+               -> Block {
         let mut block = Block { raw: vec![0; BLOCK_SIZE] };
 
         Field::write(&height, &mut block.raw, 0, 8);
@@ -84,9 +85,9 @@ impl StorageValue for Block {
 fn test_block() {
     let height = 123_345;
     let time = ::time::get_time();
-    let prev_hash = hash(&[1,2,3]);
-    let tx_hash = hash(&[4,5,6]);
-    let state_hash = hash(&[7,8,9]);
+    let prev_hash = hash(&[1, 2, 3]);
+    let tx_hash = hash(&[4, 5, 6]);
+    let state_hash = hash(&[7, 8, 9]);
     let block = Block::new(height, time, &prev_hash, &tx_hash, &state_hash);
 
     assert_eq!(block.height(), height);

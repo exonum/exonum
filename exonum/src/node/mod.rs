@@ -5,7 +5,7 @@ use time::{Duration, Timespec};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, NodeTimeout, EventsConfiguration, Network,
                     NetworkConfiguration, InternalEvent};
-use super::blockchain::{Blockchain};
+use super::blockchain::Blockchain;
 use super::messages::{Any, Connect, RawMessage};
 
 mod state;
@@ -209,9 +209,9 @@ impl<B: Blockchain> Node<B> {
             .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time()) +
                    Duration::milliseconds(ms);
         debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
-              time,
-              self.state.height(),
-              self.state.round());
+               time,
+               self.state.height(),
+               self.state.round());
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.events.add_timeout(timeout, time);
     }

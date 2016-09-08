@@ -5,7 +5,7 @@ use super::super::blockchain::{Blockchain, TxStorage};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
                              RequestPrecommits, RequestCommit};
-use super::super::storage::{Map};
+use super::super::storage::Map;
 use super::{Node, Round, Height, RequestData, ValidatorId};
 
 impl<B: Blockchain> Node<B> {
@@ -393,7 +393,9 @@ impl<B: Blockchain> Node<B> {
                 }
             };
             self.send_to_peer(peer, &message);
-            debug!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}", message, peer);
+            debug!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}",
+                   message,
+                   peer);
         }
     }
 
@@ -405,7 +407,8 @@ impl<B: Blockchain> Node<B> {
     // FIXME: remove this bull shit
     pub fn execute(&mut self, hash: &Hash) -> Hash {
         let msg = self.state.propose(hash).unwrap().message().clone();
-        let (block_hash, patch) = self.blockchain.create_patch(&msg, self.state.transactions()).unwrap();
+        let (block_hash, patch) =
+            self.blockchain.create_patch(&msg, self.state.transactions()).unwrap();
 
         // Save patch
         self.state.propose(hash).unwrap().set_patch(block_hash, patch);

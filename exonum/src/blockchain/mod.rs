@@ -36,7 +36,8 @@ pub trait Blockchain: Sized
 
     fn create_patch(&mut self,
                     propose: &Propose,
-                    txs: &HashMap<Hash, Self::Transaction>) -> Result<(Hash, Patch), Error> {
+                    txs: &HashMap<Hash, Self::Transaction>)
+                    -> Result<(Hash, Patch), Error> {
         // Get last hash
         let last_hash = self.last_hash()?.unwrap_or(hash(&[]));
         // Create fork
@@ -57,7 +58,11 @@ pub trait Blockchain: Sized
         // Get state hash
         let state_hash = Self::state_hash(&mut fork)?;
         // Create block
-        let block = Block::new(propose.height(), propose.time(), &last_hash, &tx_hash, &state_hash);
+        let block = Block::new(propose.height(),
+                               propose.time(),
+                               &last_hash,
+                               &tx_hash,
+                               &state_hash);
         // Eval block hash
         let block_hash = block.hash();
         // Update height
@@ -71,18 +76,19 @@ pub trait Blockchain: Sized
         Ok((block_hash, fork.into()))
     }
 
-    fn commit<'a, I: Iterator<Item=&'a Precommit>>(&mut self,
-              block_hash: Hash,
-              patch: Patch,
-              precommits: I) -> Result<(), Error> {
+    fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
+                                                     block_hash: Hash,
+                                                     patch: Patch,
+                                                     precommits: I)
+                                                     -> Result<(), Error> {
         let patch = {
-          let mut fork = Fork::new(self.borrow_mut(), patch);
+            let mut fork = Fork::new(self.borrow_mut(), patch);
 
-          for precommit in precommits {
-              fork.precommits(&block_hash).append(precommit.clone())?;
-          }
+            for precommit in precommits {
+                fork.precommits(&block_hash).append(precommit.clone())?;
+            }
 
-          fork.into()
+            fork.into()
         };
 
         self.merge(patch)

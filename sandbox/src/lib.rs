@@ -25,4 +25,4 @@ mod config_file;
 
 pub use tx_generator::TimestampingTxGenerator;
 pub use config_file::ConfigFile;
-pub use self::sandbox::{timestamping_sandbox};
+pub use self::sandbox::timestamping_sandbox;

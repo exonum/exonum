@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use rand::Rng;
 
-use super::super::blockchain::{Blockchain};
+use super::super::blockchain::Blockchain;
 use super::super::messages::{Connect, Status, Message, RequestPeers};
 use super::{Node, RequestData};
 

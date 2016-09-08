@@ -57,7 +57,7 @@ pub struct State<Tx> {
     validator_heights: Vec<Height>,
 
     // FIXME: temp, to remove
-    pub commited_txs: u64
+    pub commited_txs: u64,
 }
 
 // Данные, которые нас интересуют,
@@ -85,7 +85,7 @@ pub struct ProposeState {
     // Тело предложения
     propose: Propose,
     // Вычисленный хеш блока (из предложения)
-    block_hash:     Option<Hash>,
+    block_hash: Option<Hash>,
     // Набор изменений, которые нужно внести в состояние для применения блока
     patch: Option<Patch>,
     // Множество неизвестных транзакций из этого предложения
@@ -502,7 +502,7 @@ impl<Tx> State<Tx> {
             let mut state = if let Some(state) = self.requests.get_mut(data) {
                 state
             } else {
-                return None
+                return None;
             };
             if let Some(peer) = peer {
                 state.remove(&peer);

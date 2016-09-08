@@ -33,7 +33,8 @@ pub trait BlockStorage<D: Database>
     }
 
     fn block_txs(&mut self, height: u64) -> MerkleTable<MapTable<D, [u8], Vec<u8>>, u32, Hash> {
-        MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.borrow_mut()))
+        MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(),
+                                       self.borrow_mut()))
     }
 
     fn precommits(&mut self, hash: &Hash) -> ListTable<MapTable<D, [u8], Vec<u8>>, u32, Precommit> {
@@ -62,4 +63,3 @@ impl<T, Db, Tx> BlockStorage<Db> for T
 }
 
 impl<'a, Db> BlockStorage<Fork<'a, Db>> for Fork<'a, Db> where Db: Database {}
-

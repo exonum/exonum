@@ -11,7 +11,8 @@ use exonum::node::{Node, Configuration};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
-use exonum::events::{Reactor, Event, NodeTimeout, EventsConfiguration, NetworkConfiguration, InternalEvent};
+use exonum::events::{Reactor, Event, NodeTimeout, EventsConfiguration, NetworkConfiguration,
+                     InternalEvent};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 use timestamping::TimestampingBlockchain;
