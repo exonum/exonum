@@ -1,3 +1,4 @@
+use std::sync::RwLock;
 use std::collections::BTreeMap;
 use std::collections::btree_map;
 use std::collections::Bound::{Included, Unbounded};
@@ -8,46 +9,48 @@ use super::{Map, Database, Error, Patch, Change};
 
 #[derive(Default)]
 pub struct MemoryDB {
-    map: BTreeMap<Vec<u8>, Vec<u8>>,
+    map: RwLock<BTreeMap<Vec<u8>, Vec<u8>>>,
 }
 pub type MemoryDBIterator<'a> = btree_map::Iter<'a, Vec<u8>, Vec<u8>>;
 
 impl MemoryDB {
     pub fn new() -> MemoryDB {
-        MemoryDB { map: BTreeMap::new() }
+        MemoryDB { map: RwLock::new(BTreeMap::new()) }
     }
 }
 
 impl Map<[u8], Vec<u8>> for MemoryDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        Ok(self.map.get(key).cloned())
+        Ok(self.map.read().unwrap().get(key).cloned())
     }
 
-    fn put(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        self.map.insert(key.to_vec(), value);
+    fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        self.map.write().unwrap().insert(key.to_vec(), value);
         Ok(())
     }
 
-    fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
-        self.map.remove(key);
+    fn delete(&self, key: &[u8]) -> Result<(), Error> {
+        self.map.write().unwrap().remove(key);
         Ok(())
     }
     // TODO optimize me
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        let mut it = self.map.range::<[u8], [u8]>(Included(key), Unbounded);
+        let map = self.map.read().unwrap();
+        let mut it = map.range::<[u8], [u8]>(Included(key), Unbounded);
         Ok(it.next().map(|x| x.0.to_vec()))
     }
 }
 
 impl Database for MemoryDB {
     fn merge(&mut self, patch: Patch) -> Result<(), Error> {
+        let mut map = self.map.write().unwrap();
         for (key, change) in patch.into_iter() {
             match change {
                 Change::Put(ref v) => {
-                    self.map.insert(key.clone(), v.clone());
+                    map.insert(key.clone(), v.clone());
                 }
                 Change::Delete => {
-                    self.map.remove(&key);
+                    map.remove(&key);
                 }
             }
         }

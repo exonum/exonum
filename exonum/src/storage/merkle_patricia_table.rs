@@ -347,7 +347,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         Ok(out)
     }
 
-    fn insert<A: AsRef<[u8]>>(&mut self, key: A, value: V) -> Result<(), Error> {
+    fn insert<A: AsRef<[u8]>>(&self, key: A, value: V) -> Result<(), Error> {
         let key = key.as_ref();
         debug_assert_eq!(key.len(), KEY_SIZE);
 
@@ -405,7 +405,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
     // Inserts a new node as child of current branch and returns updated hash
     // or if a new node has more short key returns a new key length
-    fn do_insert_branch(&mut self,
+    fn do_insert_branch(&self,
                         parent: &BranchNode,
                         key_slice: &BitSlice,
                         value: V)
@@ -462,7 +462,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         hash(&[key.data, value.hash().as_ref()].concat())
     }
 
-    fn remove(&mut self, key_slice: BitSlice) -> Result<(), Error> {
+    fn remove(&self, key_slice: BitSlice) -> Result<(), Error> {
         match self.root_node()? {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -503,7 +503,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn do_remove_node(&mut self,
+    fn do_remove_node(&self,
                       parent: &BranchNode,
                       key_slice: &BitSlice)
                       -> Result<RemoveResult, Error> {
@@ -572,7 +572,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn insert_leaf(&mut self, key: &BitSlice, value: V) -> Result<Hash, Error> {
+    fn insert_leaf(&self, key: &BitSlice, value: V) -> Result<Hash, Error> {
         debug_assert!(key.is_leaf_key());
 
         let hash = Self::hash_leaf(key, &value);
@@ -582,7 +582,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         Ok(hash)
     }
 
-    fn insert_branch(&mut self, key: &BitSlice, branch: BranchNode) -> Result<(), Error> {
+    fn insert_branch(&self, key: &BitSlice, branch: BranchNode) -> Result<(), Error> {
         let db_key = key.to_db_key();
         self.map.put(&db_key, branch.serialize())
     }
@@ -626,12 +626,12 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
         Ok(v.map(StorageValue::deserialize))
     }
 
-    fn put(&mut self, key: &K, value: V) -> Result<(), Error> {
+    fn put(&self, key: &K, value: V) -> Result<(), Error> {
         // FIXME avoid reallocation
         self.insert(&key.as_ref().to_vec(), value)
     }
 
-    fn delete(&mut self, key: &K) -> Result<(), Error> {
+    fn delete(&self, key: &K) -> Result<(), Error> {
         self.remove(BitSlice::from_bytes(key.as_ref()))
     }
 

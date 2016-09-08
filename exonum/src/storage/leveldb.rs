@@ -59,12 +59,12 @@ impl Map<[u8], Vec<u8>> for LevelDB {
             .map_err(LevelDB::to_storage_error)
     }
 
-    fn put(&mut self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
         let result = self.db.put(LEVELDB_WRITE_OPTIONS, BinaryKey(key.to_vec()), &value);
         result.map_err(LevelDB::to_storage_error)
     }
 
-    fn delete(&mut self, key: &[u8]) -> Result<(), Error> {
+    fn delete(&self, key: &[u8]) -> Result<(), Error> {
         let result = self.db.delete(LEVELDB_WRITE_OPTIONS, BinaryKey(key.to_vec()));
         result.map_err(LevelDB::to_storage_error)
     }

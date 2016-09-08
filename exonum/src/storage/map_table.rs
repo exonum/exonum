@@ -32,11 +32,11 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
         Ok(v.map(StorageValue::deserialize))
     }
 
-    fn put(&mut self, key: &K, value: V) -> Result<(), Error> {
+    fn put(&self, key: &K, value: V) -> Result<(), Error> {
         self.storage.put(&[&self.prefix, key.as_ref()].concat(), value.serialize())
     }
 
-    fn delete(&mut self, key: &K) -> Result<(), Error> {
+    fn delete(&self, key: &K) -> Result<(), Error> {
         self.storage.delete(&[&self.prefix, key.as_ref()].concat())
     }
     fn find_key(&self, origin_key: &K) -> Result<Option<Vec<u8>>, Error> {

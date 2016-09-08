@@ -63,7 +63,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         i
     }
 
-    fn set_len(&mut self, len: K) -> Result<(), Error> {
+    fn set_len(&self, len: K) -> Result<(), Error> {
         self.count.set(Some(len));
         self.map.put(&[], len.serialize())
     }
@@ -84,7 +84,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         Ok(hash)
     }
 
-    fn rebuild_hash(&mut self, mut index: K, bytes: Hash) -> Result<(), Error> {
+    fn rebuild_hash(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
         // FIXME avoid reallocation
         self.map
             .put(&Self::db_key(K::one(), index), bytes.as_ref().to_vec())?;
@@ -113,7 +113,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
           K: Integer + Copy + Clone + ToPrimitive + StorageValue,
           V: StorageValue
 {
-    fn append(&mut self, value: V) -> Result<(), Error> {
+    fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.rebuild_hash(len, value.hash())?;
 
@@ -122,7 +122,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
         Ok(())
     }
 
-    fn extend<I>(&mut self, iter: I) -> Result<(), Error>
+    fn extend<I>(&self, iter: I) -> Result<(), Error>
         where I: IntoIterator<Item = V>
     {
         for value in iter {
