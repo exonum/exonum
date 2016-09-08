@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::super::crypto::{Hash, PublicKey};
-use super::super::blockchain::{Blockchain, TxStorage};
+use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
                              RequestPrecommits, RequestCommit};
@@ -61,7 +61,7 @@ impl<B: Blockchain> Node<B> {
         }
 
         for hash in msg.transactions() {
-            if self.blockchain.transactions().get(hash).unwrap().is_some() {
+            if self.blockchain.view().transactions().get(hash).unwrap().is_some() {
                 return;
             }
         }
@@ -278,7 +278,7 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
-        if self.blockchain.transactions().get(&hash).unwrap().is_some() {
+        if self.blockchain.view().transactions().get(&hash).unwrap().is_some() {
             return;
         }
 

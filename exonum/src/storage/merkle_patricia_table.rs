@@ -959,11 +959,11 @@ mod tests {
         let map1 = MapTable::new(vec![255], &mut storage1);
         let map2 = MapTable::new(vec![255], &mut storage2);
 
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![255; 32], vec![1]).unwrap();
         table1.put(&vec![254; 32], vec![2]).unwrap();
 
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![254; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![1]).unwrap();
 
@@ -975,7 +975,7 @@ mod tests {
     fn insert_same_key() {
         let mut storage = MemoryDB::new();
         let map = MapTable::new(vec![255], &mut storage);
-        let mut table = MerklePatriciaTable::new(map);
+        let table = MerklePatriciaTable::new(map);
         let hash = hash([vec![255; 32].as_ref(), hash(&vec![2]).as_ref()].concat().as_ref());
 
         table.put(&vec![255; 32], vec![1]).unwrap();
@@ -990,13 +990,13 @@ mod tests {
         let map1 = MapTable::new(vec![255], &mut storage1);
         let map2 = MapTable::new(vec![255], &mut storage2);
 
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![255; 32], vec![3]).unwrap();
         table1.put(&vec![254; 32], vec![2]).unwrap();
         table1.put(&vec![250; 32], vec![1]).unwrap();
         table1.put(&vec![254; 32], vec![5]).unwrap();
 
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![250; 32], vec![1]).unwrap();
         table2.put(&vec![254; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![3]).unwrap();
@@ -1010,7 +1010,7 @@ mod tests {
     fn insert_reverse() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![42; 32], vec![1]).unwrap();
         table1.put(&vec![64; 32], vec![2]).unwrap();
         table1.put(&vec![240; 32], vec![3]).unwrap();
@@ -1020,7 +1020,7 @@ mod tests {
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.put(&vec![250; 32], vec![5]).unwrap();
         table2.put(&vec![245; 32], vec![4]).unwrap();
@@ -1036,13 +1036,13 @@ mod tests {
     fn remove_trivial() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![255; 32], vec![6]).unwrap();
         table1.delete(&vec![255; 32]).unwrap();
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.delete(&vec![255; 32]).unwrap();
 
@@ -1054,7 +1054,7 @@ mod tests {
     fn remove_simple() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![255; 32], vec![1]).unwrap();
         table1.put(&vec![250; 32], vec![2]).unwrap();
         table1.put(&vec![245; 32], vec![3]).unwrap();
@@ -1064,7 +1064,7 @@ mod tests {
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![250; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![1]).unwrap();
         table2.put(&vec![245; 32], vec![3]).unwrap();
@@ -1079,7 +1079,7 @@ mod tests {
     fn remove_reverse() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![42; 32], vec![1]).unwrap();
         table1.put(&vec![64; 32], vec![2]).unwrap();
         table1.put(&vec![240; 32], vec![3]).unwrap();
@@ -1096,7 +1096,7 @@ mod tests {
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.put(&vec![250; 32], vec![5]).unwrap();
         table2.put(&vec![245; 32], vec![4]).unwrap();
@@ -1121,14 +1121,14 @@ mod tests {
 
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         for item in &data {
             table1.put(&item.0, item.1.clone()).unwrap();
         }
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         rng.shuffle(&mut data);
         for item in &data {
             table2.put(&item.0, item.1.clone()).unwrap();
@@ -1156,14 +1156,14 @@ mod tests {
 
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         for item in &data {
             table1.put(&item.0, item.1.clone()).unwrap();
         }
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         rng.shuffle(&mut data);
         for item in &data {
             table2.put(&item.0, item.1.clone()).unwrap();
@@ -1203,7 +1203,7 @@ mod tests {
     fn fuzz_insert_after_delete() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
 
         let data = generate_random_data(100);
 

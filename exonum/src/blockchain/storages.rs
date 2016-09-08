@@ -1,65 +1,40 @@
 use std::slice::SliceConcatExt;
-use std::borrow::{Borrow, BorrowMut};
-// use std::iter::Iterator;
+use std::ops::Deref;
 
 use ::crypto::Hash;
 use ::messages::{Precommit, Propose, Message};
-use ::storage::{StorageValue, Database, Fork, ListTable, MapTable, MerkleTable};
+use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable};
 
-use super::{Block, Blockchain};
+use super::{Block};
 
-pub trait TxStorage<D: Database, T: Message + StorageValue>
-    where Self: Borrow<D> + BorrowMut<D>
-{
-    fn transactions(&mut self) -> MapTable<D, Hash, T> {
-        MapTable::new(vec![00], self.borrow_mut())
+pub trait View<F: Fork> : Deref<Target=F> {
+    type Transaction: Message + StorageValue;
+
+    fn from_fork(fork: F) -> Self;
+
+    fn transactions(&self) -> MapTable<F, Hash, Self::Transaction> {
+        MapTable::new(vec![00], self)
     }
-}
 
-pub trait BlockStorage<D: Database>
-    where Self: Borrow<D> + BorrowMut<D>
-{
-    fn blocks(&mut self) -> MapTable<D, Hash, Block> {
-        MapTable::new(vec![01], self.borrow_mut())
+    fn blocks(&self) -> MapTable<F, Hash, Block> {
+        MapTable::new(vec![01], self)
     }
 
     // FIXME: remove this!
-    fn proposes(&mut self) -> MapTable<D, Hash, Propose> {
-        MapTable::new(vec![10], self.borrow_mut())
+    fn proposes(&self) -> MapTable<F, Hash, Propose> {
+        MapTable::new(vec![10], self)
     }
 
-    fn heights(&mut self) -> ListTable<MapTable<D, [u8], Vec<u8>>, u64, Hash> {
-        ListTable::new(MapTable::new(vec![02], self.borrow_mut()))
+    fn heights(&self) -> ListTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
+        ListTable::new(MapTable::new(vec![02], self))
     }
 
-    fn block_txs(&mut self, height: u64) -> MerkleTable<MapTable<D, [u8], Vec<u8>>, u32, Hash> {
+    fn block_txs(&self, height: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u32, Hash> {
         MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(),
-                                       self.borrow_mut()))
+                                       self))
     }
 
-    fn precommits(&mut self, hash: &Hash) -> ListTable<MapTable<D, [u8], Vec<u8>>, u32, Precommit> {
-        ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.borrow_mut()))
+    fn precommits(&self, hash: &Hash) -> ListTable<MapTable<F, [u8], Vec<u8>>, u32, Precommit> {
+        ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self))
     }
 }
-
-impl<T, Tx, Db> TxStorage<Db, Tx> for T
-    where T: Blockchain<Database = Db, Transaction = Tx>,
-          Db: Database,
-          Tx: Message + StorageValue
-{
-}
-
-impl<'a, Tx, Db> TxStorage<Fork<'a, Db>, Tx> for Fork<'a, Db>
-    where Db: Database,
-          Tx: Message + StorageValue
-{
-}
-
-impl<T, Db, Tx> BlockStorage<Db> for T
-    where T: Blockchain<Database = Db, Transaction = Tx>,
-          Db: Database,
-          Tx: Message + StorageValue
-{
-}
-
-impl<'a, Db> BlockStorage<Fork<'a, Db>> for Fork<'a, Db> where Db: Database {}

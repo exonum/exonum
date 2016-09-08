@@ -3,12 +3,13 @@
 #[macro_use(message)]
 extern crate exonum;
 
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::{Borrow};
+use std::ops::Deref;
 
 use exonum::messages::{RawMessage, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable};
-use exonum::blockchain::Blockchain;
+use exonum::blockchain::{Blockchain, View};
 
 pub const TX_TRANSFER_ID: u16 = 128;
 pub const TX_ISSUE_ID: u16 = 129;
@@ -82,9 +83,34 @@ impl CurrencyTx {
     }
 }
 
-
 pub struct CurrencyBlockchain<D: Database> {
     pub db: D,
+}
+
+pub struct CurrencyView<F: Fork> {
+    pub fork: F
+}
+
+impl<F> View<F> for CurrencyView<F>
+    where F: Fork
+{
+    type Transaction = CurrencyTx;
+
+    fn from_fork(fork: F) -> Self {
+        CurrencyView {
+            fork: fork
+        }
+    }
+}
+
+impl<F> Deref for CurrencyView<F> 
+    where F: Fork
+{
+    type Target = F;
+
+    fn deref(&self) -> &Self::Target {
+        &self.fork
+    }
 }
 
 impl<D: Database> Borrow<D> for CurrencyBlockchain<D> {
@@ -93,32 +119,39 @@ impl<D: Database> Borrow<D> for CurrencyBlockchain<D> {
     }
 }
 
-impl<D: Database> BorrowMut<D> for CurrencyBlockchain<D> {
-    fn borrow_mut(&mut self) -> &mut D {
-        &mut self.db
-    }
+trait WalletStorage<F: Fork>
+{
+    fn wallets(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, i64>;
 }
 
+impl<F> WalletStorage<F> for CurrencyView<F>
+    where F: Fork
+{
+    fn wallets(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, i64> {
+        MerklePatriciaTable::new(MapTable::new(vec![09], &self))
+    }
+}
 
 impl<D> Blockchain for CurrencyBlockchain<D>
     where D: Database
 {
     type Database = D;
     type Transaction = CurrencyTx;
+    type View = CurrencyView<D::Fork>;
 
     fn verify_tx(tx: &Self::Transaction) -> bool {
         tx.verify(tx.pub_key())
     }
 
-    fn state_hash(fork: &mut Fork<Self::Database>) -> Result<Hash, Error> {
-        fork.wallets().root_hash().map(|o| o.unwrap_or(hash(&[])))
+    fn state_hash(view: &mut Self::View) -> Result<Hash, Error> {
+        view.wallets().root_hash().map(|o| o.unwrap_or(hash(&[])))
     }
 
-    fn execute(fork: &mut Fork<Self::Database>, tx: &Self::Transaction) -> Result<(), Error> {
+    fn execute(view: &mut Self::View, tx: &Self::Transaction) -> Result<(), Error> {
         match *tx {
             CurrencyTx::Transfer(ref msg) => {
                 let from_amount = {
-                    fork.wallets().get(msg.from())?.unwrap_or(0)
+                    view.wallets().get(msg.from())?.unwrap_or(0)
                 };
 
                 // if from_amount < msg.amount() {
@@ -126,33 +159,19 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                 // }
 
                 let to_amount = {
-                    fork.wallets().get(msg.to())?.unwrap_or(0)
+                    view.wallets().get(msg.to())?.unwrap_or(0)
                 };
 
-                fork.wallets().put(msg.from(), from_amount - msg.amount())?;
-                fork.wallets().put(msg.to(), to_amount + msg.amount())?;
+                view.wallets().put(msg.from(), from_amount - msg.amount())?;
+                view.wallets().put(msg.to(), to_amount + msg.amount())?;
             }
             CurrencyTx::Issue(ref msg) => {
                 let amount = {
-                    fork.wallets().get(msg.wallet())?.unwrap_or(0) + msg.amount()
+                    view.wallets().get(msg.wallet())?.unwrap_or(0) + msg.amount()
                 };
-                fork.wallets().put(msg.wallet(), amount)?;
+                view.wallets().put(msg.wallet(), amount)?;
             }
         };
         Ok(())
-    }
-}
-
-trait WalletStorage<Db: Database>
-    where Self: Borrow<Db> + BorrowMut<Db>
-{
-    fn wallets(&mut self) -> MerklePatriciaTable<MapTable<Db, [u8], Vec<u8>>, PublicKey, i64>;
-}
-
-impl<'a, Db> WalletStorage<Fork<'a, Db>> for Fork<'a, Db>
-    where Db: Database
-{
-    fn wallets(&mut self) -> MerklePatriciaTable<MapTable<Self, [u8], Vec<u8>>, PublicKey, i64> {
-        MerklePatriciaTable::new(MapTable::new(vec![09], self))
     }
 }

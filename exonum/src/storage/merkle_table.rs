@@ -174,7 +174,7 @@ mod tests {
     #[test]
     fn list_methods() {
         let mut storage = MemoryDB::new();
-        let mut table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
+        let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
 
         assert!(table.is_empty().unwrap());
         assert_eq!(table.len().unwrap(), 0);
@@ -196,7 +196,7 @@ mod tests {
     #[test]
     fn height() {
         let mut storage = MemoryDB::new();
-        let mut table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
+        let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
 
         table.append(vec![1]).unwrap();
         assert_eq!(table.height().unwrap(), 1);
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn hashes() {
         let mut storage = MemoryDB::new();
-        let mut table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
+        let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
         assert_eq!(table.root_hash().unwrap(), None);
 
         let h1 = hash(&vec![1]);
@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn hash_in_values() {
         let mut storage = MemoryDB::new();
-        let mut table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
+        let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
 
         let h = hash(&[1, 2, 3, 4]);
         table.append(h).unwrap();

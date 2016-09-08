@@ -1,10 +1,11 @@
 use super::{Map, List, MapTable, MerkleTable};
 use super::{Database, StorageValue, Error};
-use super::{MemoryDB, LevelDB, Patch};
+use super::{MemoryDB, LevelDB};
 // use super::{Iterable, Seekable};
 
 use tempdir::TempDir;
 use leveldb::options::Options;
+use storage::db::Fork;
 
 fn leveldb_database() -> LevelDB {
     let mut options = Options::new();
@@ -12,7 +13,7 @@ fn leveldb_database() -> LevelDB {
     LevelDB::new(TempDir::new("da").unwrap().path(), options).unwrap()
 }
 
-fn test_map_simple<T: Map<[u8], Vec<u8>>>(mut db: T) -> Result<(), Error> {
+fn test_map_simple<T: Map<[u8], Vec<u8>>>(db: T) -> Result<(), Error> {
     db.put(b"aba", vec![1, 2, 3])?;
     assert_eq!(db.get(b"aba")?, Some(vec![1, 2, 3]));
     assert_eq!(db.get(b"caba")?, None);
@@ -33,7 +34,7 @@ fn test_database_merge<T: Database>(mut db: T) -> Result<(), Error> {
 
     let patch;
     {
-        let mut fork = db.fork();
+        let fork = db.fork();
         fork.delete(b"ab")?;
         fork.put(b"abacaba", vec![18, 34])?;
         fork.put(b"caba", vec![10])?;
@@ -47,7 +48,7 @@ fn test_database_merge<T: Database>(mut db: T) -> Result<(), Error> {
         assert_eq!(fork.get(b"aba")?, Some(vec![14, 22, 3]));
         assert_eq!(fork.get(b"abacaba")?, None);
 
-        patch = Patch::from(fork);
+        patch = fork.changes();
     }
     assert_eq!(db.get(b"ab")?, Some(vec![1, 2, 3]));
     assert_eq!(db.get(b"aba")?, Some(vec![14, 22, 3]));
@@ -64,7 +65,7 @@ fn test_database_merge<T: Database>(mut db: T) -> Result<(), Error> {
 }
 
 fn test_table_list<T: Database>(prefix: Vec<u8>, db: &mut T) -> Result<(), Error> {
-    let mut list = MerkleTable::new(MapTable::new(prefix, db));
+    let list = MerkleTable::new(MapTable::new(prefix, db));
     assert_eq!(list.len()?, 0 as u64);
     list.append(vec![10])?;
     assert_eq!(list.get(0)?, Some(vec![10]));
@@ -103,10 +104,10 @@ fn test_map_find_keys<T: Map<[u8], Vec<u8>>>(db: &mut T) {
 
 fn test_map_table_different_prefixes<T: Database>(db: &mut T) {
     {
-        let mut map2 = MapTable::new(b"abc".to_vec(), db);
+        let map2 = MapTable::new(b"abc".to_vec(), db);
         map2.put(&b"abac".to_vec(), b"12345".to_vec()).unwrap();
     }
-    let mut map1 = MapTable::new(b"bcd".to_vec(), db);
+    let map1 = MapTable::new(b"bcd".to_vec(), db);
     map1.put(&b"baca".to_vec(), b"1".to_vec()).unwrap();
 
     assert_eq!(map1.find_key(&b"abd".to_vec()).unwrap(), None);

@@ -1,19 +1,25 @@
+use std::mem;
 use std::path::Path;
 use std::fmt::Debug;
+use std::sync::Arc;
+use std::cell::RefCell;
+use std::collections::Bound::{Included, Unbounded};
 // use std::iter::Iterator;
 
 use db_key::Key;
 use leveldb::database::Database as LevelDatabase;
 use leveldb::error::Error as LevelError;
+use leveldb::database::iterator::Iterable as LevelIterable;
+use leveldb::database::snapshots::Snapshot as LevelSnapshot;
 use leveldb::options::{Options, WriteOptions, ReadOptions};
 use leveldb::database::kv::KV;
 use leveldb::database::batch::Writebatch;
 use leveldb::batch::Batch;
+use leveldb::snapshots::Snapshots;
 // use leveldb::database::iterator::Iterator as LevelIterator;
-use leveldb::database::iterator::Iterable as LevelIterable;
 use leveldb::iterator::LevelDBIterator;
 
-use super::{Map, Database, Error, Patch, Change};
+use super::{Map, Database, Error, Patch, Change, Fork};
 // use super::{Iterable, Seekable}
 
 struct BinaryKey(Vec<u8>);
@@ -29,7 +35,13 @@ impl Key for BinaryKey {
 }
 
 pub struct LevelDB {
-    db: LevelDatabase<BinaryKey>,
+    db: Arc<LevelDatabase<BinaryKey>>,
+}
+
+pub struct LevelDBView {
+    db: Arc<LevelDatabase<BinaryKey>>,
+    snap: LevelSnapshot<'static, BinaryKey>,
+    changes: RefCell<Patch>
 }
 
 const LEVELDB_READ_OPTIONS: ReadOptions<'static, BinaryKey> = ReadOptions {
@@ -42,7 +54,7 @@ const LEVELDB_WRITE_OPTIONS: WriteOptions = WriteOptions { sync: false };
 impl LevelDB {
     pub fn new(path: &Path, options: Options) -> Result<LevelDB, Error> {
         match LevelDatabase::open(path, options) {
-            Ok(database) => Ok(LevelDB { db: database }),
+            Ok(database) => Ok(LevelDB { db: Arc::new(database) }),
             Err(e) => Err(Self::to_storage_error(e)),
         }
     }
@@ -79,8 +91,86 @@ impl Map<[u8], Vec<u8>> for LevelDB {
     }
 }
 
+impl LevelDBView {
+    pub fn new(from: &LevelDB) -> LevelDBView {
+        LevelDBView {
+            db: from.db.clone(),
+            snap: unsafe { mem::transmute(from.db.snapshot()) },
+            changes: RefCell::default()
+        }
+    }
+}
+
+impl Map<[u8], Vec<u8>> for LevelDBView {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        match self.changes.borrow().get(key) {
+            Some(change) => {
+                let v = match *change {
+                    Change::Put(ref v) => Some(v.clone()),
+                    Change::Delete => None,
+                };
+                Ok(v)
+            }
+            None => self.snap
+                        .get(LEVELDB_READ_OPTIONS, BinaryKey(key.to_vec()))
+                        .map_err(LevelDB::to_storage_error),
+        }
+    }
+
+    fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        self.changes.borrow_mut().insert(key.to_vec(), Change::Put(value));
+        Ok(())
+    }
+
+    fn delete(&self, key: &[u8]) -> Result<(), Error> {
+        self.changes.borrow_mut().insert(key.to_vec(), Change::Delete);
+        Ok(())
+    }
+
+    fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        // TODO merge with the same function in memorydb
+        let out = {
+            let map = self.changes.borrow();
+            let mut it = map.range::<[u8], [u8]>(Included(key), Unbounded);
+            it.next().map(|x| x.0.to_vec())
+        };
+        if out.is_none() {
+            let it = self.snap.keys_iter(LEVELDB_READ_OPTIONS);
+            it.seek(&BinaryKey(key.to_vec()));
+            if it.valid() {
+                let key = it.key();
+                return Ok(Some(key.0));
+            }
+            Ok(None)
+        } else {
+            Ok(out)
+        }
+    }
+}
+
+impl Fork for LevelDBView {
+    fn changes(&self) -> Patch {
+        self.changes.borrow().clone()
+    }
+    fn merge(&self, patch: Patch) {
+        self.changes.borrow_mut().extend(patch);
+    }
+}
+
+impl From<LevelDBView> for Patch {
+    fn from(view: LevelDBView) -> Patch {
+        view.changes()
+    }
+}
+
 impl Database for LevelDB {
-    fn merge(&mut self, patch: Patch) -> Result<(), Error> {
+    type Fork = LevelDBView;
+
+    fn fork(&self) -> Self::Fork {
+        LevelDBView::new(self)
+    }
+
+    fn merge(&self, patch: Patch) -> Result<(), Error> {
         let mut batch = Writebatch::new();
         for (key, change) in patch.into_iter() {
             match change {
