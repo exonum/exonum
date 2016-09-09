@@ -2,7 +2,7 @@ mod block;
 mod storages;
 
 use std::collections::HashMap;
-use std::borrow::{Borrow};
+use std::borrow::Borrow;
 use std::ops::Deref;
 
 use ::crypto::{Hash, hash};
@@ -10,10 +10,10 @@ use ::messages::{Propose, Precommit, Message};
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
 pub use self::block::Block;
-pub use self::storages::{View};
+pub use self::storages::View;
 
-pub trait Blockchain: Sized
-    where Self: Deref<Target=<Self as Blockchain>::Database>,
+pub trait Blockchain: Sized + Clone + Send + 'static
+    where Self: Deref<Target = <Self as Blockchain>::Database>
 {
     type View: View<<<Self as Blockchain>::Database as Database>::Fork, Transaction=Self::Transaction>;
     type Database: Database;

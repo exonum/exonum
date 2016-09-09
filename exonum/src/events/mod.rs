@@ -17,7 +17,7 @@ pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet, Output}
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 
-pub type EventLoop = mio::EventLoop<MioAdapter>;
+pub type EventLoop<E> = mio::EventLoop<MioAdapter<E>>;
 
 // FIXME: move this into node module
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -37,33 +37,34 @@ pub enum InternalTimeout {
 pub enum Timeout {
     Node(NodeTimeout),
     Internal(InternalTimeout),
-}
+} 
 
-pub enum InternalEvent {
+pub enum InternalEvent<E: Send> {
     Connected(SocketAddr),
     Disconnected(SocketAddr),
     Error(io::Error),
+    External(E),
 }
 
-pub enum Event {
+pub enum Event<E: Send> {
     Incoming(RawMessage),
-    Internal(InternalEvent),
+    Internal(InternalEvent<E>),
     Timeout(NodeTimeout),
     Terminate,
 }
 
-pub struct Events {
-    event_loop: EventLoop,
-    queue: MioAdapter,
+pub struct Events<E: Send> {
+    event_loop: EventLoop<E>,
+    queue: MioAdapter<E>,
 }
 
-pub struct MioAdapter {
-    events: VecDeque<Event>,
+pub struct MioAdapter<E: Send> {
+    events: VecDeque<Event<E>>,
     network: Network,
 }
 
-impl MioAdapter {
-    fn new(network: Network) -> MioAdapter {
+impl<E: Send> MioAdapter<E> {
+    fn new(network: Network) -> MioAdapter<E> {
         MioAdapter {
             // FIXME: configurable capacity?
             events: VecDeque::new(),
@@ -71,20 +72,20 @@ impl MioAdapter {
         }
     }
 
-    fn push(&mut self, event: Event) {
+    fn push(&mut self, event: Event<E>) {
         self.events.push_back(event)
     }
 
-    fn pop(&mut self) -> Option<Event> {
+    fn pop(&mut self) -> Option<Event<E>> {
         self.events.pop_front()
     }
 }
 
-impl mio::Handler for MioAdapter {
+impl<E: Send> mio::Handler for MioAdapter<E> {
     type Timeout = Timeout;
-    type Message = InternalEvent;
+    type Message = InternalEvent<E>;
 
-    fn ready(&mut self, event_loop: &mut EventLoop, token: mio::Token, events: mio::EventSet) {
+    fn ready(&mut self, event_loop: &mut EventLoop<E>, token: mio::Token, events: mio::EventSet) {
         loop {
             match self.network.io(event_loop, token, events) {
                 Ok(Some(output)) => {
@@ -106,11 +107,11 @@ impl mio::Handler for MioAdapter {
         }
     }
 
-    fn notify(&mut self, _: &mut EventLoop, msg: Self::Message) {
+    fn notify(&mut self, _: &mut EventLoop<E>, msg: Self::Message) {
         self.push(Event::Internal(msg));
     }
 
-    fn timeout(&mut self, event_loop: &mut EventLoop, timeout: Self::Timeout) {
+    fn timeout(&mut self, event_loop: &mut EventLoop<E>, timeout: Self::Timeout) {
         match timeout {
             Timeout::Node(timeout) => {
                 self.push(Event::Timeout(timeout));
@@ -122,27 +123,32 @@ impl mio::Handler for MioAdapter {
 
     }
 
-    fn interrupted(&mut self, _: &mut EventLoop) {
+    fn interrupted(&mut self, _: &mut EventLoop<E>) {
         self.push(Event::Terminate);
     }
 
-    fn tick(&mut self, event_loop: &mut EventLoop) {
+    fn tick(&mut self, event_loop: &mut EventLoop<E>) {
         self.network.tick(event_loop);
     }
 }
 
-pub trait Reactor {
+pub trait Sender<Message: Send> : Send {
+    fn send(&self, msg: Message) -> ::std::io::Result<()>;
+}
+
+pub trait Reactor<E: Send> {
     fn get_time(&self) -> Timespec;
-    fn poll(&mut self) -> Event;
+    fn poll(&mut self) -> Event<E>;
     fn bind(&mut self) -> ::std::io::Result<()>;
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage);
     fn connect(&mut self, address: &SocketAddr);
     fn address(&self) -> SocketAddr;
     fn add_timeout(&mut self, timeout: NodeTimeout, time: Timespec);
+    fn channel(&self) -> Box<Sender<InternalEvent<E>>>;
 }
 
-impl Events {
-    pub fn with_config(config: EventsConfiguration, network: Network) -> io::Result<Events> {
+impl<E: Send> Events<E> {
+    pub fn with_config(config: EventsConfiguration, network: Network) -> io::Result<Events<E>> {
         // TODO: using EventLoopConfig + capacity of queue
         Ok(Events {
             event_loop: EventLoop::configured(config)?,
@@ -151,12 +157,21 @@ impl Events {
     }
 }
 
-impl Reactor for Events {
+type MioSender<E> = mio::Sender<InternalEvent<E>>;
+
+impl<E: Send + 'static> Sender<InternalEvent<E>> for MioSender<E> {
+    fn send(&self, msg: InternalEvent<E>) -> io::Result<()> {
+        let r = self.send(msg);
+        r.map_err(|_| io::Error::new(io::ErrorKind::Other, "Unable to send message to reactor"))
+    }
+} 
+
+impl<E: Send + 'static> Reactor<E> for Events<E> {
     fn get_time(&self) -> Timespec {
         get_time()
     }
 
-    fn poll(&mut self) -> Event {
+    fn poll(&mut self) -> Event<E> {
         loop {
             if let Some(event) = self.queue.pop() {
                 return event;
@@ -208,6 +223,10 @@ impl Reactor for Events {
             self.event_loop.timeout_ms(Timeout::Node(timeout), ms as u64).unwrap();
         }
     }
+
+    fn channel(&self) -> Box<Sender<InternalEvent<E>>> {
+        Box::new(self.event_loop.channel())
+    }
 }
 
 #[cfg(test)]
@@ -223,8 +242,8 @@ mod tests {
     use ::messages::{MessageWriter, RawMessage};
     use ::crypto::gen_keypair;
 
-    impl Events {
-        fn with_addr(addr: SocketAddr) -> Events {
+    impl<E: Send + 'static> Events<E> {
+        fn with_addr(addr: SocketAddr) -> Events<E> {
             let network = Network::with_config(NetworkConfiguration {
                 listen_address: addr,
                 max_incoming_connections: 128,
@@ -295,7 +314,7 @@ mod tests {
             let m1 = m1.clone();
             let m2 = m2.clone();
             t1 = thread::spawn(move || {
-                let mut e = Events::with_addr(addrs[0].clone());
+                let mut e = Events::<u32>::with_addr(addrs[0].clone());
                 e.wait_for_bind(&addrs[1]);
 
                 e.send_to(&addrs[1], m1);
@@ -309,7 +328,7 @@ mod tests {
             let m1 = m1.clone();
             let m2 = m2.clone();
             t2 = thread::spawn(move || {
-                let mut e = Events::with_addr(addrs[1].clone());
+                let mut e = Events::<u32>::with_addr(addrs[1].clone());
                 e.wait_for_bind(&addrs[0]);
 
                 e.send_to(&addrs[0], m2);
@@ -337,7 +356,7 @@ mod tests {
             let m3 = m3.clone();
             t1 = thread::spawn(move || {
                 {
-                    let mut e = Events::with_addr(addrs[0].clone());
+                    let mut e = Events::<u32>::with_addr(addrs[0].clone());
                     e.wait_for_bind(&addrs[1]);
 
                     println!("t1: connection opened");
@@ -351,7 +370,7 @@ mod tests {
                 }
                 println!("t1: connection closed");
                 {
-                    let mut e = Events::with_addr(addrs[0].clone());
+                    let mut e = Events::<u32>::with_addr(addrs[0].clone());
                     e.wait_for_bind(&addrs[1]);
 
                     println!("t1: connection reopened");
@@ -373,7 +392,7 @@ mod tests {
             let m3 = m3.clone();
             t2 = thread::spawn(move || {
                 {
-                    let mut e = Events::with_addr(addrs[1].clone());
+                    let mut e = Events::<u32>::with_addr(addrs[1].clone());
                     e.wait_for_bind(&addrs[0]);
 
                     println!("t2: connection opened");
@@ -392,7 +411,7 @@ mod tests {
                 println!("t2: connection closed");
                 {
                     println!("t2: connection reopened");
-                    let mut e = Events::with_addr(addrs[1].clone());
+                    let mut e = Events::<u32>::with_addr(addrs[1].clone());
                     e.wait_for_bind(&addrs[0]);
 
                     println!("t2: send m3 to t1");

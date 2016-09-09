@@ -1,4 +1,3 @@
-
 extern crate exonum;
 extern crate timestamping;
 extern crate sandbox;
@@ -9,12 +8,18 @@ use std::path::Path;
 
 use clap::{Arg, App, SubCommand};
 
-use exonum::node::{Node};
+use exonum::node::{Node, Configuration};
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
+use exonum::blockchain::Blockchain;
 
 use sandbox::{ConfigFile};
 use sandbox::testnet::{TestNodeConfig};
 use timestamping::TimestampingBlockchain;
+
+fn run_node<B: Blockchain>(blockchain: B, node_cfg: Configuration) {
+    let mut node = Node::with_config(blockchain, node_cfg);
+    node.run();
+}
 
 fn main() {
     env_logger::init().unwrap();
@@ -96,12 +101,13 @@ fn main() {
                     let leveldb = LevelDB::new(&Path::new(db_path), options).unwrap();
 
                     let blockchain = TimestampingBlockchain { db: leveldb };
-                    Node::with_config(blockchain, node_cfg).run();
+                    run_node(blockchain, node_cfg);
                 }
                 None => {
                     println!("Using memorydb storage");
+
                     let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
-                    Node::with_config(blockchain, node_cfg).run();
+                    run_node(blockchain, node_cfg);                    
                 }
             };
         }

@@ -5,9 +5,9 @@ use ::crypto::Hash;
 use ::messages::{Precommit, Propose, Message};
 use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable};
 
-use super::{Block};
+use super::Block;
 
-pub trait View<F: Fork> : Deref<Target=F> {
+pub trait View<F: Fork>: Deref<Target = F> {
     type Transaction: Message + StorageValue;
 
     fn from_fork(fork: F) -> Self;
@@ -30,8 +30,7 @@ pub trait View<F: Fork> : Deref<Target=F> {
     }
 
     fn block_txs(&self, height: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u32, Hash> {
-        MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(),
-                                       self))
+        MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self))
     }
 
     fn precommits(&self, hash: &Hash) -> ListTable<MapTable<F, [u8], Vec<u8>>, u32, Precommit> {

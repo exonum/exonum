@@ -22,6 +22,7 @@ message! {
     }
 }
 
+#[derive(Clone)]
 pub struct TimestampingBlockchain<D: Database> {
     pub db: D,
 }

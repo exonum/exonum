@@ -34,6 +34,7 @@ impl Key for BinaryKey {
     }
 }
 
+#[derive(Clone)]
 pub struct LevelDB {
     db: Arc<LevelDatabase<BinaryKey>>,
 }
@@ -41,7 +42,7 @@ pub struct LevelDB {
 pub struct LevelDBView {
     _db: Arc<LevelDatabase<BinaryKey>>,
     snap: LevelSnapshot<'static, BinaryKey>,
-    changes: RefCell<Patch>
+    changes: RefCell<Patch>,
 }
 
 const LEVELDB_READ_OPTIONS: ReadOptions<'static, BinaryKey> = ReadOptions {
@@ -96,7 +97,7 @@ impl LevelDBView {
         LevelDBView {
             _db: from.db.clone(),
             snap: unsafe { mem::transmute(from.db.snapshot()) },
-            changes: RefCell::default()
+            changes: RefCell::default(),
         }
     }
 }
@@ -111,9 +112,11 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
                 };
                 Ok(v)
             }
-            None => self.snap
-                        .get(LEVELDB_READ_OPTIONS, BinaryKey(key.to_vec()))
-                        .map_err(LevelDB::to_storage_error),
+            None => {
+                self.snap
+                    .get(LEVELDB_READ_OPTIONS, BinaryKey(key.to_vec()))
+                    .map_err(LevelDB::to_storage_error)
+            }
         }
     }
 

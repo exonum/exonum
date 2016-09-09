@@ -1,3 +1,4 @@
+use std::clone::Clone;
 use std::sync::RwLock;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -16,7 +17,13 @@ pub type MemoryDBIterator<'a> = btree_map::Iter<'a, Vec<u8>, Vec<u8>>;
 
 pub struct MemoryDBView {
     map: MemoryDB,
-    changes: RefCell<Patch>
+    changes: RefCell<Patch>,
+}
+
+impl Clone for MemoryDB {
+    fn clone(&self) -> MemoryDB {
+        MemoryDB { map: RwLock::new(self.map.read().unwrap().clone()) }
+    }
 }
 
 impl MemoryDB {
@@ -50,10 +57,8 @@ impl Map<[u8], Vec<u8>> for MemoryDB {
 impl MemoryDBView {
     fn new(from: &MemoryDB) -> MemoryDBView {
         MemoryDBView {
-            map: MemoryDB {
-                map: RwLock::new(from.map.write().unwrap().clone())
-            },
-            changes: RefCell::default()
+            map: from.clone(),
+            changes: RefCell::default(),
         }
     }
 }

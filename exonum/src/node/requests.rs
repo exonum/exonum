@@ -50,7 +50,12 @@ impl<B: Blockchain> Node<B> {
             self.state.propose(msg.propose_hash()).map(|p| p.message().raw().clone())
         } else {
             // msg.height < state.height
-            self.blockchain.view().proposes().get(msg.propose_hash()).unwrap().map(|p| p.raw().clone())
+            self.blockchain
+                .view()
+                .proposes()
+                .get(msg.propose_hash())
+                .unwrap()
+                .map(|p| p.raw().clone())
         };
 
 
@@ -105,7 +110,11 @@ impl<B: Blockchain> Node<B> {
             }
         } else {
             // msg.height < state.height
-            if let Some(precommits) = self.blockchain.view().precommits(msg.block_hash()).iter().unwrap() {
+            if let Some(precommits) = self.blockchain
+                .view()
+                .precommits(msg.block_hash())
+                .iter()
+                .unwrap() {
                 precommits.iter().map(|p| p.raw().clone()).collect()
             } else {
                 Vec::new()
@@ -124,12 +133,15 @@ impl<B: Blockchain> Node<B> {
 
         let block_hash = self.blockchain.view().heights().get(msg.height()).unwrap().unwrap();
 
-        let precommits =
-            if let Some(precommits) = self.blockchain.view().precommits(&block_hash).iter().unwrap() {
-                precommits.iter().map(|p| p.raw().clone()).collect()
-            } else {
-                Vec::new()
-            };
+        let precommits = if let Some(precommits) = self.blockchain
+            .view()
+            .precommits(&block_hash)
+            .iter()
+            .unwrap() {
+            precommits.iter().map(|p| p.raw().clone()).collect()
+        } else {
+            Vec::new()
+        };
 
         for precommit in precommits {
             self.send_to_peer(*msg.from(), &precommit);

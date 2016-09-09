@@ -82,6 +82,7 @@ impl CurrencyTx {
     }
 }
 
+#[derive(Clone)]
 pub struct CurrencyBlockchain<D: Database> {
     pub db: D,
 }

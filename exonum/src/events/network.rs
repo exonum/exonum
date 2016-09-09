@@ -82,7 +82,7 @@ impl Network {
     }
 
     // TODO use error trait
-    pub fn bind(&mut self, event_loop: &mut EventLoop) -> io::Result<()> {
+    pub fn bind<E: Send>(&mut self, event_loop: &mut EventLoop<E>) -> io::Result<()> {
         if let Some(_) = self.listener {
             return Err(make_error("Already binded"));
         }
@@ -94,8 +94,8 @@ impl Network {
 
     // TODO: Use ticks for fast reregistering sockets
     // TODO: Implement Connections collection with (re)registering
-    pub fn io(&mut self,
-              event_loop: &mut EventLoop,
+    pub fn io<E: Send>(&mut self,
+              event_loop: &mut EventLoop<E>,
               id: PeerId,
               set: EventSet)
               -> io::Result<Option<Output>> {
@@ -201,10 +201,10 @@ impl Network {
         Ok(None)
     }
 
-    pub fn tick(&mut self, _: &mut EventLoop) {}
+    pub fn tick<E: Send>(&mut self, _: &mut EventLoop<E>) {}
 
-    pub fn send_to(&mut self,
-                   event_loop: &mut EventLoop,
+    pub fn send_to<E: Send>(&mut self,
+                   event_loop: &mut EventLoop<E>,
                    address: &SocketAddr,
                    message: RawMessage)
                    -> io::Result<()> {
@@ -229,7 +229,7 @@ impl Network {
         }
     }
 
-    pub fn connect(&mut self, event_loop: &mut EventLoop, address: &SocketAddr) -> io::Result<()> {
+    pub fn connect<E: Send>(&mut self, event_loop: &mut EventLoop<E>, address: &SocketAddr) -> io::Result<()> {
         if !self.is_connected(address) {
             self.add_reconnect_request(event_loop, *address)?;
 
@@ -250,7 +250,7 @@ impl Network {
         self.addresses.contains_key(address)
     }
 
-    pub fn handle_timeout(&mut self, event_loop: &mut EventLoop, timeout: InternalTimeout) {
+    pub fn handle_timeout<E: Send>(&mut self, event_loop: &mut EventLoop<E>, timeout: InternalTimeout) {
         match timeout {
             InternalTimeout::Reconnect(addr, delay) => {
                 if self.reconnects.contains_key(&addr) {
@@ -291,8 +291,8 @@ impl Network {
         Err(make_error(format!("{}: Outgoing peer not found {}", self.address(), addr)))
     }
 
-    fn add_incoming_connection(&mut self,
-                               event_loop: &mut EventLoop,
+    fn add_incoming_connection<E: Send>(&mut self,
+                               event_loop: &mut EventLoop<E>,
                                connection: IncomingConnection)
                                -> io::Result<PeerId> {
         let address = *connection.address();
@@ -313,8 +313,8 @@ impl Network {
         Ok(id)
     }
 
-    fn add_outgoing_connection(&mut self,
-                               event_loop: &mut EventLoop,
+    fn add_outgoing_connection<E: Send>(&mut self,
+                               event_loop: &mut EventLoop<E>,
                                connection: OutgoingConnection)
                                -> io::Result<PeerId> {
         let address = *connection.address();
@@ -335,7 +335,7 @@ impl Network {
         Ok(id)
     }
 
-    fn remove_incoming_connection(&mut self, event_loop: &mut EventLoop, id: PeerId) {
+    fn remove_incoming_connection<E: Send>(&mut self, event_loop: &mut EventLoop<E>, id: PeerId) {
         let addr = *self.incoming[id].address();
         self.addresses.remove(&addr);
         if let Some(connection) = self.incoming.remove(id) {
@@ -348,7 +348,7 @@ impl Network {
         }
     }
 
-    fn remove_outgoing_connection(&mut self, event_loop: &mut EventLoop, id: PeerId) {
+    fn remove_outgoing_connection<E: Send>(&mut self, event_loop: &mut EventLoop<E>, id: PeerId) {
         let addr = *self.outgoing[id].address();
         self.addresses.remove(&addr);
         if let Some(connection) = self.outgoing.remove(id) {
@@ -367,8 +367,8 @@ impl Network {
         stream.set_nodelay(self.config.tcp_nodelay)
     }
 
-    fn add_reconnect_request(&mut self,
-                             event_loop: &mut EventLoop,
+    fn add_reconnect_request<E: Send>(&mut self,
+                             event_loop: &mut EventLoop<E>,
                              address: SocketAddr)
                              -> io::Result<()> {
         if !self.reconnects.contains_key(&address) {
@@ -378,8 +378,8 @@ impl Network {
         Ok(())
     }
 
-    fn add_reconnect_timeout(&mut self,
-                             event_loop: &mut EventLoop,
+    fn add_reconnect_timeout<E: Send>(&mut self,
+                             event_loop: &mut EventLoop<E>,
                              address: SocketAddr,
                              delay: u64)
                              -> io::Result<()> {
@@ -390,13 +390,13 @@ impl Network {
         Ok(())
     }
 
-    fn mark_connected(&mut self, event_loop: &mut EventLoop, id: Token) -> Option<Output> {
+    fn mark_connected<E: Send>(&mut self, event_loop: &mut EventLoop<E>, id: Token) -> Option<Output> {
         let address = *self.outgoing[id].address();
         self.clear_reconnect_request(event_loop, &address)
     }
 
-    fn clear_reconnect_request(&mut self,
-                               event_loop: &mut EventLoop,
+    fn clear_reconnect_request<E: Send>(&mut self,
+                               event_loop: &mut EventLoop<E>,
                                addr: &SocketAddr)
                                -> Option<Output> {
         if let Some(timeout) = self.reconnects.remove(addr) {

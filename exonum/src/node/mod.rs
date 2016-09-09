@@ -4,7 +4,7 @@ use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, NodeTimeout, EventsConfiguration, Network,
-                    NetworkConfiguration, InternalEvent};
+                    NetworkConfiguration, InternalEvent, Sender};
 use super::blockchain::Blockchain;
 use super::messages::{Any, Connect, RawMessage};
 
@@ -15,13 +15,21 @@ mod requests;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 
+pub enum ExternalMessage<B: Blockchain> {
+    Transaction(B::Transaction)
+}
+
+pub struct TxSender<B: Blockchain> {
+    inner: Box<Sender<InternalEvent<ExternalMessage<B>>>>
+}
+
 // TODO: avoid recursion calls?
 
 pub struct Node<B: Blockchain> {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub state: State<B::Transaction>,
-    pub events: Box<Reactor>,
+    pub events: Box<Reactor<ExternalMessage<B>>>,
     pub blockchain: B,
     pub round_timeout: u32,
     pub status_timeout: u32,
@@ -44,7 +52,7 @@ pub struct Configuration {
 }
 
 impl<B: Blockchain> Node<B> {
-    pub fn new(blockchain: B, reactor: Box<Reactor>, config: Configuration) -> Node<B> {
+    pub fn new(blockchain: B, reactor: Box<Reactor<ExternalMessage<B>>>, config: Configuration) -> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let id = config.validators
             .iter()
@@ -75,7 +83,8 @@ impl<B: Blockchain> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let network = Network::with_config(config.network);
         let reactor =
-            Box::new(Events::with_config(config.events.clone(), network).unwrap()) as Box<Reactor>;
+            Box::new(Events::with_config(config.events.clone(), network).unwrap()) 
+                as Box<Reactor<ExternalMessage<B>>>;
         Self::new(blockchain, reactor, config)
     }
 
@@ -126,7 +135,7 @@ impl<B: Blockchain> Node<B> {
         }
     }
 
-    pub fn handle_event(&mut self, event: Event) {
+    pub fn handle_event(&mut self, event: Event<ExternalMessage<B>>) {
         match event {
             Event::Incoming(message) => {
                 self.handle_message(message);
@@ -139,6 +148,13 @@ impl<B: Blockchain> Node<B> {
                     InternalEvent::Error(_) => {}
                     InternalEvent::Connected(addr) => self.handle_connected(&addr),
                     InternalEvent::Disconnected(addr) => self.handle_disconnected(&addr),
+                    InternalEvent::External(external) => {
+                        match external {
+                            ExternalMessage::Transaction(tx) => {
+                                self.handle_incoming_tx(tx);
+                            }
+                        }
+                    }
                 }
             }
             Event::Terminate => {}
@@ -237,4 +253,24 @@ impl<B: Blockchain> Node<B> {
             self.events.send_to(&conn.addr(), message.clone());
         }
     }
+
+    pub fn channel(&self) -> TxSender<B> {
+        TxSender::new(self.events.channel())
+    }
 }
+
+impl<B: Blockchain> TxSender<B> {
+    pub fn new(event_sender: Box<Sender<InternalEvent<ExternalMessage<B>>>>) -> TxSender<B> {
+        TxSender {
+            inner: event_sender
+        }
+    }
+
+    //TODO handle error
+    pub fn send(&self, tx: B::Transaction) {
+        if B::verify_tx(&tx) {
+        let msg = InternalEvent::External(ExternalMessage::Transaction(tx));
+        self.inner.send(msg).unwrap();
+        }
+    }
+} 
