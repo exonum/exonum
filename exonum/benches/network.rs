@@ -22,8 +22,8 @@ struct BenchConfig {
     tcp_nodelay: bool
 }
 
-trait EventsBench {
-    fn with_addr(addr: SocketAddr, cfg: &BenchConfig) -> Events;
+trait EventsBench<E: Send + 'static> {
+    fn with_addr(addr: SocketAddr, cfg: &BenchConfig) -> Events<E>;
 
     fn wait_for_connect(&mut self, address: &SocketAddr);
     fn gen_message(id: u16, len: usize) -> RawMessage;
@@ -31,8 +31,8 @@ trait EventsBench {
     fn process_events(&mut self, timeout: Duration);
 }
 
-impl EventsBench for Events {
-    fn with_addr(addr: SocketAddr, cfg: &BenchConfig) -> Events {
+impl<E: Send + 'static> EventsBench<E> for Events<E> {
+    fn with_addr(addr: SocketAddr, cfg: &BenchConfig) -> Events<E> {
         let network = Network::with_config(NetworkConfiguration {
             listen_address: addr,
             max_incoming_connections: 128,
@@ -101,8 +101,8 @@ impl EventsBench for Events {
 
 fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
     b.iter(|| {
-        let mut e1 = Events::with_addr(addrs[0], &cfg);
-        let mut e2 = Events::with_addr(addrs[1], &cfg);
+        let mut e1 = Events::<u32>::with_addr(addrs[0], &cfg);
+        let mut e2 = Events::<u32>::with_addr(addrs[1], &cfg);
         e1.bind().unwrap();
         e2.bind().unwrap();
 
@@ -112,7 +112,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
         let t1 = thread::spawn(move || {
             e1.wait_for_connect(&addrs[1]);
             for _ in 0..times {
-                let msg = Events::gen_message(0, len);
+                let msg = Events::<u32>::gen_message(0, len);
                 e1.send_to(&addrs[1], msg);
                 e1.wait_for_messages(1, timeout).unwrap();
             }
@@ -122,7 +122,7 @@ fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
         let t2 = thread::spawn(move || {
             e2.wait_for_connect(&addrs[0]);
             for _ in 0..times {
-                let msg = Events::gen_message(1, len);
+                let msg = Events::<u32>::gen_message(1, len);
                 e2.send_to(&addrs[0], msg);
                 e2.wait_for_messages(1, timeout).unwrap();
             }

@@ -14,7 +14,7 @@ use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, NodeTimeout, EventsConfiguration, NetworkConfiguration,
-                     InternalEvent, Sender};
+                     InternalEvent, Sender, EventHandler};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 use timestamping::{TimestampingBlockchain, TimestampTx};
@@ -354,8 +354,14 @@ impl<B, G> Sandbox<B, G>
                 event = self.inner.borrow_mut().events.pop_front();
             }
             if let Some(event) = event {
-                println!("Process event");
-                self.node.borrow_mut().handle_event(event);
+                println!("Process event");                
+                let mut node = self.node.borrow_mut();
+                match event {
+                    Event::Terminate => break,
+                    Event::Timeout(t) => node.handle_timeout(t),
+                    Event::Incoming(msg) => node.handle_message(msg),
+                    Event::Internal(event) => node.handle_event(event),
+                }
             } else {
                 break;
             }
