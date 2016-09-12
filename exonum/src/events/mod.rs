@@ -63,6 +63,15 @@ pub struct MioAdapter<E: Send> {
     network: Network,
 }
 
+pub trait EventHandler {
+    type Timeout: Send;
+    type ExternalEvent: Send;
+
+    fn handle_message(&mut self, RawMessage);
+    fn handle_event(&mut self, event: InternalEvent<Self::ExternalEvent>);
+    fn handle_timeout(&mut self, timeout: Self::Timeout);
+}
+
 impl<E: Send> MioAdapter<E> {
     fn new(network: Network) -> MioAdapter<E> {
         MioAdapter {

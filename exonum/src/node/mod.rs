@@ -4,7 +4,7 @@ use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Reactor, Events, Event, NodeTimeout, EventsConfiguration, Network,
-                    NetworkConfiguration, InternalEvent, Sender};
+                    NetworkConfiguration, InternalEvent, Sender, EventHandler};
 use super::blockchain::Blockchain;
 use super::messages::{Any, Connect, RawMessage};
 
@@ -127,62 +127,12 @@ impl<B: Blockchain> Node<B> {
                 break;
             }
 
-            let event = self.events.poll();
-            match event {
+            match self.events.poll() {
                 Event::Terminate => break,
-                _ => self.handle_event(event),
+                Event::Timeout(t) => self.handle_timeout(t),
+                Event::Incoming(msg) => self.handle_message(msg),
+                Event::Internal(event) => self.handle_event(event),
             }
-        }
-    }
-
-    pub fn handle_event(&mut self, event: Event<ExternalMessage<B>>) {
-        match event {
-            Event::Incoming(message) => {
-                self.handle_message(message);
-            }
-            Event::Timeout(timeout) => {
-                self.handle_timeout(timeout);
-            }
-            Event::Internal(internal) => {
-                match internal {
-                    InternalEvent::Error(_) => {}
-                    InternalEvent::Connected(addr) => self.handle_connected(&addr),
-                    InternalEvent::Disconnected(addr) => self.handle_disconnected(&addr),
-                    InternalEvent::External(external) => {
-                        match external {
-                            ExternalMessage::Transaction(tx) => {
-                                self.handle_incoming_tx(tx);
-                            }
-                        }
-                    }
-                }
-            }
-            Event::Terminate => {}
-        }
-    }
-
-    pub fn handle_message(&mut self, raw: RawMessage) {
-        // TODO: check message headers (network id, protocol version)
-        // FIXME: call message.verify method
-        //     if !raw.verify() {
-        //         return;
-        //     }
-        let msg = Any::from_raw(raw).unwrap();
-        match msg {
-            Any::Connect(msg) => self.handle_connect(msg),
-            Any::Status(msg) => self.handle_status(msg),
-            Any::Transaction(message) => self.handle_tx(message),
-            Any::Consensus(message) => self.handle_consensus(message),
-            Any::Request(message) => self.handle_request(message),
-        }
-    }
-
-    pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
-        match timeout {
-            NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
-            NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
-            NodeTimeout::Status => self.handle_status_timeout(),
-            NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
         }
     }
 
@@ -256,6 +206,51 @@ impl<B: Blockchain> Node<B> {
 
     pub fn channel(&self) -> TxSender<B> {
         TxSender::new(self.events.channel())
+    }
+}
+
+impl<B: Blockchain> EventHandler for Node<B> {
+    type Timeout = NodeTimeout;
+    type ExternalEvent = ExternalMessage<B>;
+
+    fn handle_message(&mut self, raw: RawMessage) {
+        // TODO: check message headers (network id, protocol version)
+        // FIXME: call message.verify method
+        //     if !raw.verify() {
+        //         return;
+        //     }
+        let msg = Any::from_raw(raw).unwrap();
+        match msg {
+            Any::Connect(msg) => self.handle_connect(msg),
+            Any::Status(msg) => self.handle_status(msg),
+            Any::Transaction(message) => self.handle_tx(message),
+            Any::Consensus(message) => self.handle_consensus(message),
+            Any::Request(message) => self.handle_request(message),
+        }
+    }
+
+    fn handle_event(&mut self, event: InternalEvent<Self::ExternalEvent>) {
+        match event {
+            InternalEvent::Error(_) => {}
+            InternalEvent::Connected(addr) => self.handle_connected(&addr),
+            InternalEvent::Disconnected(addr) => self.handle_disconnected(&addr),
+            InternalEvent::External(external) => {
+                match external {
+                    ExternalMessage::Transaction(tx) => {
+                        self.handle_incoming_tx(tx);
+                    }
+                }
+            }
+        }
+    }
+
+    fn handle_timeout(&mut self, timeout: Self::Timeout) {
+        match timeout {
+            NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
+            NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
+            NodeTimeout::Status => self.handle_status_timeout(),
+            NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
+        }
     }
 }
 
