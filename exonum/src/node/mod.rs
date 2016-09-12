@@ -269,4 +269,4 @@ impl<B: Blockchain> TxSender<B> {
             self.inner.send(msg).unwrap();
         }
     }
-} 
+}

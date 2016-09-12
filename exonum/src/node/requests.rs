@@ -66,12 +66,13 @@ impl<B: Blockchain> Node<B> {
 
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
         debug!("HANDLE TRANSACTIONS REQUEST!!!");
+        let view = self.blockchain.view();
         for hash in msg.txs() {
             let tx = self.state
                 .transactions()
                 .get(hash)
                 .cloned()
-                .or_else(|| self.blockchain.view().transactions().get(hash).unwrap());
+                .or_else(|| view.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), tx.raw());
@@ -131,11 +132,11 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
-        let block_hash = self.blockchain.view().heights().get(msg.height()).unwrap().unwrap();
+        let view = self.blockchain.view();
 
-        let precommits = if let Some(precommits) = self.blockchain
-            .view()
-            .precommits(&block_hash)
+        let block_hash = view.heights().get(msg.height()).unwrap().unwrap();
+
+        let precommits = if let Some(precommits) = view.precommits(&block_hash)
             .iter()
             .unwrap() {
             precommits.iter().map(|p| p.raw().clone()).collect()

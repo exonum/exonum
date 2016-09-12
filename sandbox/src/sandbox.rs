@@ -66,7 +66,7 @@ pub struct SandboxSender {
 
 impl<E: Send> Sender<InternalEvent<E>> for SandboxSender {
     fn send(&self, msg: InternalEvent<E>) -> io::Result<()> {
-        Ok(())
+        unimplemented!();
     }
 }
 

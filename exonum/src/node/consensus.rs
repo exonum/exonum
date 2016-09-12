@@ -8,6 +8,7 @@ use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Mess
 use super::super::storage::Map;
 use super::{Node, Round, Height, RequestData, ValidatorId};
 
+// TODO reduce view invokations
 impl<B: Blockchain> Node<B> {
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
@@ -60,8 +61,9 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
+        let view = self.blockchain.view();
         for hash in msg.transactions() {
-            if self.blockchain.view().transactions().get(hash).unwrap().is_some() {
+            if view.transactions().get(hash).unwrap().is_some() {
                 return;
             }
         }
@@ -278,7 +280,8 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
-        if self.blockchain.view().transactions().get(&hash).unwrap().is_some() {
+        let view = self.blockchain.view();
+        if view.transactions().get(&hash).unwrap().is_some() {
             return;
         }
 
@@ -306,7 +309,8 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
-        if self.blockchain.view().transactions().get(&hash).unwrap().is_some() {
+        let view = self.blockchain.view();
+        if view.transactions().get(&hash).unwrap().is_some() {
             return;
         }
 
