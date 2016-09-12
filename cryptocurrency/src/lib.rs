@@ -88,7 +88,7 @@ pub struct CurrencyBlockchain<D: Database> {
 }
 
 pub struct CurrencyView<F: Fork> {
-    pub fork: F
+    pub fork: F,
 }
 
 impl<F> View<F> for CurrencyView<F>
@@ -97,13 +97,11 @@ impl<F> View<F> for CurrencyView<F>
     type Transaction = CurrencyTx;
 
     fn from_fork(fork: F) -> Self {
-        CurrencyView {
-            fork: fork
-        }
+        CurrencyView { fork: fork }
     }
 }
 
-impl<F> Deref for CurrencyView<F> 
+impl<F> Deref for CurrencyView<F>
     where F: Fork
 {
     type Target = F;
@@ -121,7 +119,7 @@ impl<D: Database> Deref for CurrencyBlockchain<D> {
     }
 }
 
-impl<F> CurrencyView<F> 
+impl<F> CurrencyView<F>
     where F: Fork
 {
     fn wallets(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, i64> {

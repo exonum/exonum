@@ -21,8 +21,7 @@ use timestamping::{TimestampingBlockchain, TimestampTx};
 
 use super::TimestampingTxGenerator;
 
-struct SandboxInner<B: Blockchain> 
-{
+struct SandboxInner<B: Blockchain> {
     address: SocketAddr,
     time: Timespec,
     sended: VecDeque<(SocketAddr, RawMessage)>,
@@ -69,7 +68,7 @@ impl<E: Send> Sender<InternalEvent<E>> for SandboxSender {
     fn send(&self, msg: InternalEvent<E>) -> io::Result<()> {
         Ok(())
     }
-} 
+}
 
 impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
     pub fn new(b: B, g: G) -> Sandbox<B, G> {
@@ -116,8 +115,8 @@ impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
             peer_discovery: Vec::new(),
         };
 
-        let reactor = Box::new(SandboxReactor { inner: inner.clone() }) 
-            as Box<Reactor<ExternalMessage<B>>>;
+        let reactor =
+            Box::new(SandboxReactor { inner: inner.clone() }) as Box<Reactor<ExternalMessage<B>>>;
 
         let node = Node::new(b, reactor, config);
 
@@ -153,7 +152,7 @@ impl<B: Blockchain, E: Send> Reactor<E> for SandboxReactor<B> {
     }
 
     fn connect(&mut self, addr: &SocketAddr) {
-        //println!("{}: Connect to {}", self.address(), addr);
+        // println!("{}: Connect to {}", self.address(), addr);
         let message = InternalEvent::Connected(*addr);
         self.inner.borrow_mut().events.push_back(Event::Internal(message));
     }

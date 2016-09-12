@@ -7,7 +7,7 @@ use time::Duration;
 use rand::{thread_rng, Rng};
 
 use exonum::crypto::{gen_keypair, gen_keypair_from_seed, Seed, PublicKey, SecretKey};
-use exonum::node::{Configuration};
+use exonum::node::Configuration;
 use exonum::events::{NetworkConfiguration, EventsConfiguration};
 use exonum::events::{Reactor, Events, Event, NodeTimeout, Network, InternalEvent};
 use exonum::blockchain::Blockchain;

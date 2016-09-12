@@ -16,11 +16,11 @@ mod requests;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 
 pub enum ExternalMessage<B: Blockchain> {
-    Transaction(B::Transaction)
+    Transaction(B::Transaction),
 }
 
 pub struct TxSender<B: Blockchain> {
-    inner: Box<Sender<InternalEvent<ExternalMessage<B>>>>
+    inner: Box<Sender<InternalEvent<ExternalMessage<B>>>>,
 }
 
 // TODO: avoid recursion calls?
@@ -52,7 +52,10 @@ pub struct Configuration {
 }
 
 impl<B: Blockchain> Node<B> {
-    pub fn new(blockchain: B, reactor: Box<Reactor<ExternalMessage<B>>>, config: Configuration) -> Node<B> {
+    pub fn new(blockchain: B,
+               reactor: Box<Reactor<ExternalMessage<B>>>,
+               config: Configuration)
+               -> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let id = config.validators
             .iter()
@@ -82,9 +85,9 @@ impl<B: Blockchain> Node<B> {
     pub fn with_config(blockchain: B, config: Configuration) -> Node<B> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let network = Network::with_config(config.network);
-        let reactor =
-            Box::new(Events::with_config(config.events.clone(), network).unwrap()) 
-                as Box<Reactor<ExternalMessage<B>>>;
+        let reactor = Box::new(Events::with_config(config.events.clone(),
+                                                   network)
+            .unwrap()) as Box<Reactor<ExternalMessage<B>>>;
         Self::new(blockchain, reactor, config)
     }
 
@@ -256,16 +259,14 @@ impl<B: Blockchain> EventHandler for Node<B> {
 
 impl<B: Blockchain> TxSender<B> {
     pub fn new(event_sender: Box<Sender<InternalEvent<ExternalMessage<B>>>>) -> TxSender<B> {
-        TxSender {
-            inner: event_sender
-        }
+        TxSender { inner: event_sender }
     }
 
-    //TODO handle error
+    // TODO handle error
     pub fn send(&self, tx: B::Transaction) {
         if B::verify_tx(&tx) {
-        let msg = InternalEvent::External(ExternalMessage::Transaction(tx));
-        self.inner.send(msg).unwrap();
+            let msg = InternalEvent::External(ExternalMessage::Transaction(tx));
+            self.inner.send(msg).unwrap();
         }
     }
 } 

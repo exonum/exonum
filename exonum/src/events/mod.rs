@@ -37,7 +37,7 @@ pub enum InternalTimeout {
 pub enum Timeout {
     Node(NodeTimeout),
     Internal(InternalTimeout),
-} 
+}
 
 pub enum InternalEvent<E: Send> {
     Connected(SocketAddr),
@@ -141,7 +141,7 @@ impl<E: Send> mio::Handler for MioAdapter<E> {
     }
 }
 
-pub trait Sender<Message: Send> : Send {
+pub trait Sender<Message: Send>: Send {
     fn send(&self, msg: Message) -> ::std::io::Result<()>;
 }
 
@@ -173,7 +173,7 @@ impl<E: Send + 'static> Sender<InternalEvent<E>> for MioSender<E> {
         let r = self.send(msg);
         r.map_err(|_| io::Error::new(io::ErrorKind::Other, "Unable to send message to reactor"))
     }
-} 
+}
 
 impl<E: Send + 'static> Reactor<E> for Events<E> {
     fn get_time(&self) -> Timespec {

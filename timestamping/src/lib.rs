@@ -28,7 +28,7 @@ pub struct TimestampingBlockchain<D: Database> {
 }
 
 pub struct TimestampingView<F: Fork> {
-    pub fork: F
+    pub fork: F,
 }
 
 impl<F> View<F> for TimestampingView<F>
@@ -37,13 +37,11 @@ impl<F> View<F> for TimestampingView<F>
     type Transaction = TimestampTx;
 
     fn from_fork(fork: F) -> Self {
-        TimestampingView {
-            fork: fork
-        }
+        TimestampingView { fork: fork }
     }
 }
 
-impl<F> Deref for TimestampingView<F> 
+impl<F> Deref for TimestampingView<F>
     where F: Fork
 {
     type Target = F;
