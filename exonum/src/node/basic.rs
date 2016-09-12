@@ -5,10 +5,32 @@ use std::net::SocketAddr;
 use rand::Rng;
 
 use super::super::blockchain::Blockchain;
-use super::super::messages::{Connect, Status, Message, RequestPeers};
+use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
 use super::{Node, RequestData};
 
-impl<B: Blockchain> Node<B> {
+use super::super::events::{Channel};
+use super::{ExternalMessage, NodeTimeout};
+
+impl<B, S> Node<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+{
+    pub fn handle_message(&mut self, raw: RawMessage) {
+        // TODO: check message headers (network id, protocol version)
+        // FIXME: call message.verify method
+        //     if !raw.verify() {
+        //         return;
+        //     }
+        let msg = Any::from_raw(raw).unwrap();
+        match msg {
+            Any::Connect(msg) => self.handle_connect(msg),
+            Any::Status(msg) => self.handle_status(msg),
+            Any::Transaction(message) => self.handle_tx(message),
+            Any::Consensus(message) => self.handle_consensus(message),
+            Any::Request(message) => self.handle_request(message),
+        }
+    }
+
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
         debug!("Connected to: {}", addr);
         let message = self.state.our_connect_message().clone();
@@ -133,7 +155,7 @@ impl<B: Blockchain> Node<B> {
             let peer = peer.clone();
             let msg = RequestPeers::new(&self.public_key,
                                         peer.pub_key(),
-                                        self.events.get_time(),
+                                        self.channel.get_time(),
                                         &self.secret_key);
             self.send_to_peer(*peer.pub_key(), msg.raw());
 

@@ -2,11 +2,16 @@ use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTra
                              RequestPrevotes, RequestPrecommits, RequestCommit};
 use super::super::blockchain::{Blockchain, View};
 use super::super::storage::{Map, List};
-use super::Node;
+use super::super::events::Channel;
+use super::{Node, ExternalMessage, NodeTimeout};
+
 
 const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
-impl<B: Blockchain> Node<B> {
+impl<B, S> Node<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+{
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
         if msg.to() != &self.public_key {
@@ -14,7 +19,7 @@ impl<B: Blockchain> Node<B> {
         }
 
         // FIXME: we should use some epsilon for checking lifetime < 0
-        let lifetime = match (self.events.get_time() - msg.time()).num_nanoseconds() {
+        let lifetime = match (self.channel.get_time() - msg.time()).num_nanoseconds() {
             Some(nanos) => nanos,
             None => {
                 // Incorrect time into message
