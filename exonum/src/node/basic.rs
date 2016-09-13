@@ -8,7 +8,7 @@ use super::super::blockchain::Blockchain;
 use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
 use super::{Node, RequestData};
 
-use super::super::events::{Channel};
+use super::super::events::Channel;
 use super::{ExternalMessage, NodeTimeout};
 
 impl<B, S> Node<B, S>

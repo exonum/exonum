@@ -71,7 +71,7 @@ pub trait Channel: Send {
 }
 
 pub trait Reactor<H: EventHandler> {
-    type Channel: Channel<ApplicationEvent=H::ApplicationEvent, Timeout=H::Timeout>;
+    type Channel: Channel<ApplicationEvent = H::ApplicationEvent, Timeout = H::Timeout>;
 
     fn bind(&mut self) -> ::std::io::Result<()>;
     fn run(&mut self) -> ::std::io::Result<()>;
@@ -96,7 +96,7 @@ pub struct MioChannel<H: EventHandler> {
     inner: mio::Sender<InternalEvent<H::ApplicationEvent, H::Timeout>>,
 }
 
-//TODO remove unwrap
+// TODO remove unwrap
 impl<H: EventHandler> Channel for MioChannel<H> {
     type ApplicationEvent = H::ApplicationEvent;
     type Timeout = H::Timeout;
@@ -142,7 +142,7 @@ impl<H: EventHandler> Events<H> {
                 network: network,
                 handler: handler,
             },
-            event_loop: event_loop
+            event_loop: event_loop,
         };
         Ok(events)
     }
@@ -151,13 +151,16 @@ impl<H: EventHandler> Events<H> {
 impl<H: EventHandler> MioAdapter<H> {
     fn handle_invoke(&mut self, event_loop: &mut EventLoop<H>, method: Invoke<H::Timeout>) {
         match method {
-            Invoke::Connect(address) => self.connect(event_loop, &address),
-            Invoke::SendTo(address, message) => self.send_to(event_loop, &address, message),
-            Invoke::AddTimeout(timeout, time) => self.add_timeout(event_loop, timeout, time) 
+            Invoke::Connect(address) => self.handle_connect(event_loop, &address),
+            Invoke::SendTo(address, message) => self.handle_send_to(event_loop, &address, message),
+            Invoke::AddTimeout(timeout, time) => self.handle_add_timeout(event_loop, timeout, time),
         }
     }
 
-    fn send_to(&mut self, event_loop: &mut EventLoop<H>, address: &SocketAddr, message: RawMessage) {
+    fn handle_send_to(&mut self,
+                      event_loop: &mut EventLoop<H>,
+                      address: &SocketAddr,
+                      message: RawMessage) {
         if self.network.is_connected(address) {
             if let Err(e) = self.network.send_to(event_loop, address, message) {
                 error!("{}: An error during send_to occured {:?}",
@@ -172,7 +175,7 @@ impl<H: EventHandler> MioAdapter<H> {
         }
     }
 
-    fn connect(&mut self, event_loop: &mut EventLoop<H>, address: &SocketAddr) {
+    fn handle_connect(&mut self, event_loop: &mut EventLoop<H>, address: &SocketAddr) {
         if let Err(e) = self.network.connect(event_loop, address) {
             error!("{}: An error during connect occured {:?}",
                    self.network.address(),
@@ -180,7 +183,10 @@ impl<H: EventHandler> MioAdapter<H> {
         }
     }
 
-    fn add_timeout(&mut self, event_loop: &mut EventLoop<H>, timeout: H::Timeout, time: Timespec) {
+    fn handle_add_timeout(&mut self,
+                          event_loop: &mut EventLoop<H>,
+                          timeout: H::Timeout,
+                          time: Timespec) {
         let ms = (time - get_time()).num_milliseconds();
         if ms < 0 {
             self.handler.handle_timeout(timeout);
@@ -203,7 +209,7 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
                     let event = match output {
                         Output::Data(buf) => Event::Incoming(RawMessage::new(buf)),
                         Output::Connected(addr) => Event::Connected(addr),
-                        Output::Disconnected(addr) => Event::Disconnected(addr)
+                        Output::Disconnected(addr) => Event::Disconnected(addr),
                     };
                     self.handler.handle_event(event);
                 }
@@ -220,7 +226,7 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
         match msg {
             InternalEvent::Node(event) => self.handler.handle_event(event),
             InternalEvent::Invoke(args) => self.handle_invoke(event_loop, args),
-            InternalEvent::Application(event) => self.handler.handle_application_event(event)
+            InternalEvent::Application(event) => self.handler.handle_application_event(event),
         }
     }
 
@@ -260,17 +266,16 @@ impl<H: EventHandler> Reactor<H> for Events<H> {
     fn get_time(&self) -> Timespec {
         get_time()
     }
-    fn channel(&self) -> MioChannel<H>
-    {
+    fn channel(&self) -> MioChannel<H> {
         MioChannel {
             inner: self.event_loop.channel(),
-            address: *self.inner.network.address()
+            address: *self.inner.network.address(),
         }
     }
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use std::{time, thread};
     use std::net::SocketAddr;
     use std::collections::VecDeque;
@@ -295,16 +300,14 @@ mod tests {
 
     impl TestHandler {
         pub fn new() -> TestHandler {
-            TestHandler {
-                events: VecDeque::new(),
-            }
+            TestHandler { events: VecDeque::new() }
         }
-    } 
+    }
 
     impl TestPoller for TestHandler {
         fn poll(&mut self) -> Option<TestEvent> {
             self.events.pop_front()
-        }      
+        }
     }
 
     impl EventHandler for TestHandler {
@@ -314,8 +317,7 @@ mod tests {
         fn handle_event(&mut self, event: Event) {
             self.events.push_back(InternalEvent::Node(event));
         }
-        fn handle_timeout(&mut self, _: Self::Timeout) {
-        }
+        fn handle_timeout(&mut self, _: Self::Timeout) {}
         fn handle_application_event(&mut self, event: Self::ApplicationEvent) {
             self.events.push_back(InternalEvent::Application(event));
         }

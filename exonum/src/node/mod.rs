@@ -4,8 +4,7 @@ use std::marker::PhantomData;
 use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
-use super::events::{Event, EventsConfiguration, NetworkConfiguration,
-                    Channel, EventHandler};
+use super::events::{Event, EventsConfiguration, NetworkConfiguration, Channel, EventHandler};
 use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
 
