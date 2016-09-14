@@ -118,7 +118,7 @@ impl MessageWriter {
     }
 }
 
-pub trait Message: Debug + Clone + PartialEq + Sized {
+pub trait Message: Debug + Clone + PartialEq + Sized + Send {
     fn raw(&self) -> &RawMessage;
     fn from_raw(raw: RawMessage) -> Result<Self, Error>;
 

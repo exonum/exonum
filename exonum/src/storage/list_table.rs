@@ -39,7 +39,7 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
           K: Integer + Copy + Clone + ToPrimitive + StorageValue,
           V: StorageValue
 {
-    fn append(&mut self, value: V) -> Result<(), Error> {
+    fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.map.put(&len.serialize(), value.serialize())?;
         self.map.put(&[], (len + K::one()).serialize())?;
@@ -47,7 +47,7 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
         Ok(())
     }
 
-    fn extend<I>(&mut self, iter: I) -> Result<(), Error>
+    fn extend<I>(&self, iter: I) -> Result<(), Error>
         where I: IntoIterator<Item = V>
     {
         let mut len = self.len()?;

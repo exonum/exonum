@@ -6,13 +6,13 @@ use super::{Map, Error, StorageValue};
 
 pub struct MapTable<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> {
     prefix: Vec<u8>,
-    storage: &'a mut T,
+    storage: &'a T,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
 
 impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> MapTable<'a, T, K, V> {
-    pub fn new(prefix: Vec<u8>, storage: &'a mut T) -> Self {
+    pub fn new(prefix: Vec<u8>, storage: &'a T) -> Self {
         MapTable {
             prefix: prefix,
             storage: storage,
@@ -32,11 +32,11 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
         Ok(v.map(StorageValue::deserialize))
     }
 
-    fn put(&mut self, key: &K, value: V) -> Result<(), Error> {
+    fn put(&self, key: &K, value: V) -> Result<(), Error> {
         self.storage.put(&[&self.prefix, key.as_ref()].concat(), value.serialize())
     }
 
-    fn delete(&mut self, key: &K) -> Result<(), Error> {
+    fn delete(&self, key: &K) -> Result<(), Error> {
         self.storage.delete(&[&self.prefix, key.as_ref()].concat())
     }
     fn find_key(&self, origin_key: &K) -> Result<Option<Vec<u8>>, Error> {

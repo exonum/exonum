@@ -1,13 +1,14 @@
 use std::collections::HashSet;
 
 use super::super::crypto::{Hash, PublicKey};
-use super::super::blockchain::{Blockchain, TxStorage};
+use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
                              RequestPrecommits, RequestCommit};
 use super::super::storage::Map;
 use super::{Node, Round, Height, RequestData, ValidatorId};
 
+// TODO reduce view invokations
 impl<B: Blockchain> Node<B> {
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
@@ -60,8 +61,9 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
+        let view = self.blockchain.view();
         for hash in msg.transactions() {
-            if self.blockchain.transactions().get(hash).unwrap().is_some() {
+            if view.transactions().get(hash).unwrap().is_some() {
                 return;
             }
         }
@@ -278,7 +280,8 @@ impl<B: Blockchain> Node<B> {
             return;
         }
 
-        if self.blockchain.transactions().get(&hash).unwrap().is_some() {
+        let view = self.blockchain.view();
+        if view.transactions().get(&hash).unwrap().is_some() {
             return;
         }
 
@@ -294,6 +297,32 @@ impl<B: Blockchain> Node<B> {
             self.remove_request(RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
+    }
+
+    pub fn handle_incoming_tx(&mut self, msg: B::Transaction) {
+        debug!("Handle incoming tx {:?}", msg);
+        let hash = Message::hash(&msg);
+
+        // Make sure that it is new transaction
+        // TODO: use contains instead of get?
+        if self.state.transactions().contains_key(&hash) {
+            return;
+        }
+
+        let view = self.blockchain.view();
+        if view.transactions().get(&hash).unwrap().is_some() {
+            return;
+        }
+
+        let full_proposes = self.state.add_transaction(hash, msg.clone());
+        // Go to has full propose if we get last transaction
+        for (hash, round) in full_proposes {
+            self.remove_request(RequestData::Transactions(hash));
+            self.has_full_propose(hash, round);
+        }
+
+        // broadcast transaction to validators
+        self.broadcast(msg.raw());
     }
 
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {

@@ -4,26 +4,28 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use std::net::SocketAddr;
 use std::ops::Drop;
+use std::marker::PhantomData;
+use std::io;
 
 use time::Timespec;
 
-use exonum::node::{Node, Configuration};
+use exonum::node::{Node, Configuration, ExternalMessage};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, NodeTimeout, EventsConfiguration, NetworkConfiguration,
-                     InternalEvent};
+                     InternalEvent, Sender, EventHandler};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
-use timestamping::TimestampingBlockchain;
+use timestamping::{TimestampingBlockchain, TimestampTx};
 
 use super::TimestampingTxGenerator;
 
-struct SandboxInner {
+struct SandboxInner<B: Blockchain> {
     address: SocketAddr,
     time: Timespec,
     sended: VecDeque<(SocketAddr, RawMessage)>,
-    events: VecDeque<Event>,
+    events: VecDeque<Event<ExternalMessage<B>>>,
     timers: BinaryHeap<TimerPair>,
 }
 
@@ -45,15 +47,27 @@ impl Ord for TimerPair {
 
 
 pub struct Sandbox<B: Blockchain, G: Iterator<Item = B::Transaction>> {
-    inner: Arc<RefCell<SandboxInner>>,
+    inner: Arc<RefCell<SandboxInner<B>>>,
     node: RefCell<Node<B>>,
     tx_generator: RefCell<G>,
     validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
 }
 
-pub struct SandboxReactor {
-    inner: Arc<RefCell<SandboxInner>>,
+pub struct SandboxReactor<B: Blockchain> {
+    inner: Arc<RefCell<SandboxInner<B>>>,
+}
+
+#[derive(Clone)]
+pub struct SandboxSender {
+    //TODO
+    //_m: PhantomData<M>
+}
+
+impl<E: Send> Sender<InternalEvent<E>> for SandboxSender {
+    fn send(&self, msg: InternalEvent<E>) -> io::Result<()> {
+        unimplemented!();
+    }
 }
 
 impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
@@ -101,7 +115,8 @@ impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
             peer_discovery: Vec::new(),
         };
 
-        let reactor = Box::new(SandboxReactor { inner: inner.clone() }) as Box<Reactor>;
+        let reactor =
+            Box::new(SandboxReactor { inner: inner.clone() }) as Box<Reactor<ExternalMessage<B>>>;
 
         let node = Node::new(b, reactor, config);
 
@@ -119,12 +134,12 @@ impl<B: Blockchain, G: Iterator<Item = B::Transaction>> Sandbox<B, G> {
     }
 }
 
-impl Reactor for SandboxReactor {
+impl<B: Blockchain, E: Send> Reactor<E> for SandboxReactor<B> {
     fn get_time(&self) -> Timespec {
         self.inner.borrow().time
     }
 
-    fn poll(&mut self) -> Event {
+    fn poll(&mut self) -> Event<E> {
         unreachable!();
     }
 
@@ -137,7 +152,7 @@ impl Reactor for SandboxReactor {
     }
 
     fn connect(&mut self, addr: &SocketAddr) {
-        println!("{}: Connect to {}", self.address(), addr);
+        // println!("{}: Connect to {}", self.address(), addr);
         let message = InternalEvent::Connected(*addr);
         self.inner.borrow_mut().events.push_back(Event::Internal(message));
     }
@@ -149,6 +164,10 @@ impl Reactor for SandboxReactor {
     fn add_timeout(&mut self, timeout: NodeTimeout, time: Timespec) {
         // assert!(time < self.inner.borrow().time, "Tring to add timeout for the past");
         self.inner.borrow_mut().timers.push(TimerPair(time, timeout));
+    }
+
+    fn channel(&self) -> Box<Sender<InternalEvent<E>>> {
+        Box::new(SandboxSender {})
     }
 }
 
@@ -335,8 +354,14 @@ impl<B, G> Sandbox<B, G>
                 event = self.inner.borrow_mut().events.pop_front();
             }
             if let Some(event) = event {
-                println!("Process event");
-                self.node.borrow_mut().handle_event(event);
+                println!("Process event");                
+                let mut node = self.node.borrow_mut();
+                match event {
+                    Event::Terminate => break,
+                    Event::Timeout(t) => node.handle_timeout(t),
+                    Event::Incoming(msg) => node.handle_message(msg),
+                    Event::Internal(event) => node.handle_event(event),
+                }
             } else {
                 break;
             }

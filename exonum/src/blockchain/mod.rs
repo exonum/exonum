@@ -1,47 +1,48 @@
 mod block;
-mod storages;
+mod view;
 
 use std::collections::HashMap;
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::Borrow;
+use std::ops::Deref;
 
 use ::crypto::{Hash, hash};
 use ::messages::{Propose, Precommit, Message};
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
 pub use self::block::Block;
-pub use self::storages::{TxStorage, BlockStorage};
+pub use self::view::View;
 
-pub trait Blockchain: Sized
-    where Self: Borrow<<Self as Blockchain>::Database>,
-          Self: BorrowMut<<Self as Blockchain>::Database>
+pub trait Blockchain: Sized + Clone + Send + 'static
+    where Self: Deref<Target = <Self as Blockchain>::Database>
 {
+    type View: View<<<Self as Blockchain>::Database as Database>::Fork, Transaction=Self::Transaction>;
     type Database: Database;
     type Transaction: Message + StorageValue;
 
-    fn last_hash(&mut self) -> Result<Option<Hash>, Error> {
-        self.heights().last()
+    fn last_hash(&self) -> Result<Option<Hash>, Error> {
+        self.view().heights().last()
     }
 
-    fn last_block(&mut self) -> Result<Option<Block>, Error> {
+    fn last_block(&self) -> Result<Option<Block>, Error> {
         Ok(match self.last_hash()? {
-            Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
+            Some(hash) => Some(self.view().blocks().get(&hash)?.unwrap()),
             None => None,
         })
 
     }
 
     fn verify_tx(tx: &Self::Transaction) -> bool;
-    fn state_hash(fork: &mut Fork<Self::Database>) -> Result<Hash, Error>;
-    fn execute(fork: &mut Fork<Self::Database>, tx: &Self::Transaction) -> Result<(), Error>;
+    fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
+    fn execute(fork: &Self::View, tx: &Self::Transaction) -> Result<(), Error>;
 
-    fn create_patch(&mut self,
+    fn create_patch(&self,
                     propose: &Propose,
                     txs: &HashMap<Hash, Self::Transaction>)
                     -> Result<(Hash, Patch), Error> {
         // Get last hash
         let last_hash = self.last_hash()?.unwrap_or(hash(&[]));
         // Create fork
-        let mut fork = self.fork();
+        let mut fork = self.view();
         // Save & execute transactions
         for hash in propose.transactions() {
             let tx = txs.get(hash).unwrap().clone();
@@ -73,32 +74,33 @@ pub trait Blockchain: Sized
         // Save propose (FIXME: remove)
         fork.proposes().put(&Message::hash(propose), propose.clone()).is_ok();
 
-        Ok((block_hash, fork.into()))
+        Ok((block_hash, fork.changes()))
     }
 
-    fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
+    fn commit<'a, I: Iterator<Item = &'a Precommit>>(&self,
                                                      block_hash: Hash,
                                                      patch: Patch,
                                                      precommits: I)
                                                      -> Result<(), Error> {
         let patch = {
-            let mut fork = Fork::new(self.borrow_mut(), patch);
+            let view = self.view();
+            view.merge(patch);
 
             for precommit in precommits {
-                fork.precommits(&block_hash).append(precommit.clone())?;
+                view.precommits(&block_hash).append(precommit.clone())?;
             }
 
-            fork.into()
+            view.changes()
         };
 
         self.merge(patch)
     }
 
-    fn fork(&self) -> Fork<Self::Database> {
-        self.borrow().fork()
+    fn view(&self) -> Self::View {
+        Self::View::from_fork(self.borrow().fork())
     }
 
-    fn merge(&mut self, patch: Patch) -> Result<(), Error> {
-        self.borrow_mut().merge(patch)
+    fn merge(&self, patch: Patch) -> Result<(), Error> {
+        self.deref().merge(patch)
     }
 }

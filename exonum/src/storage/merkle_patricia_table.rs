@@ -347,7 +347,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         Ok(out)
     }
 
-    fn insert<A: AsRef<[u8]>>(&mut self, key: A, value: V) -> Result<(), Error> {
+    fn insert<A: AsRef<[u8]>>(&self, key: A, value: V) -> Result<(), Error> {
         let key = key.as_ref();
         debug_assert_eq!(key.len(), KEY_SIZE);
 
@@ -405,7 +405,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
     // Inserts a new node as child of current branch and returns updated hash
     // or if a new node has more short key returns a new key length
-    fn do_insert_branch(&mut self,
+    fn do_insert_branch(&self,
                         parent: &BranchNode,
                         key_slice: &BitSlice,
                         value: V)
@@ -462,7 +462,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         hash(&[key.data, value.hash().as_ref()].concat())
     }
 
-    fn remove(&mut self, key_slice: BitSlice) -> Result<(), Error> {
+    fn remove(&self, key_slice: BitSlice) -> Result<(), Error> {
         match self.root_node()? {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -503,7 +503,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn do_remove_node(&mut self,
+    fn do_remove_node(&self,
                       parent: &BranchNode,
                       key_slice: &BitSlice)
                       -> Result<RemoveResult, Error> {
@@ -572,7 +572,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn insert_leaf(&mut self, key: &BitSlice, value: V) -> Result<Hash, Error> {
+    fn insert_leaf(&self, key: &BitSlice, value: V) -> Result<Hash, Error> {
         debug_assert!(key.is_leaf_key());
 
         let hash = Self::hash_leaf(key, &value);
@@ -582,7 +582,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         Ok(hash)
     }
 
-    fn insert_branch(&mut self, key: &BitSlice, branch: BranchNode) -> Result<(), Error> {
+    fn insert_branch(&self, key: &BitSlice, branch: BranchNode) -> Result<(), Error> {
         let db_key = key.to_db_key();
         self.map.put(&db_key, branch.serialize())
     }
@@ -626,12 +626,12 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
         Ok(v.map(StorageValue::deserialize))
     }
 
-    fn put(&mut self, key: &K, value: V) -> Result<(), Error> {
+    fn put(&self, key: &K, value: V) -> Result<(), Error> {
         // FIXME avoid reallocation
         self.insert(&key.as_ref().to_vec(), value)
     }
 
-    fn delete(&mut self, key: &K) -> Result<(), Error> {
+    fn delete(&self, key: &K) -> Result<(), Error> {
         self.remove(BitSlice::from_bytes(key.as_ref()))
     }
 
@@ -959,11 +959,11 @@ mod tests {
         let map1 = MapTable::new(vec![255], &mut storage1);
         let map2 = MapTable::new(vec![255], &mut storage2);
 
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![255; 32], vec![1]).unwrap();
         table1.put(&vec![254; 32], vec![2]).unwrap();
 
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![254; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![1]).unwrap();
 
@@ -975,7 +975,7 @@ mod tests {
     fn insert_same_key() {
         let mut storage = MemoryDB::new();
         let map = MapTable::new(vec![255], &mut storage);
-        let mut table = MerklePatriciaTable::new(map);
+        let table = MerklePatriciaTable::new(map);
         let hash = hash([vec![255; 32].as_ref(), hash(&vec![2]).as_ref()].concat().as_ref());
 
         table.put(&vec![255; 32], vec![1]).unwrap();
@@ -990,13 +990,13 @@ mod tests {
         let map1 = MapTable::new(vec![255], &mut storage1);
         let map2 = MapTable::new(vec![255], &mut storage2);
 
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![255; 32], vec![3]).unwrap();
         table1.put(&vec![254; 32], vec![2]).unwrap();
         table1.put(&vec![250; 32], vec![1]).unwrap();
         table1.put(&vec![254; 32], vec![5]).unwrap();
 
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![250; 32], vec![1]).unwrap();
         table2.put(&vec![254; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![3]).unwrap();
@@ -1010,7 +1010,7 @@ mod tests {
     fn insert_reverse() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![42; 32], vec![1]).unwrap();
         table1.put(&vec![64; 32], vec![2]).unwrap();
         table1.put(&vec![240; 32], vec![3]).unwrap();
@@ -1020,7 +1020,7 @@ mod tests {
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.put(&vec![250; 32], vec![5]).unwrap();
         table2.put(&vec![245; 32], vec![4]).unwrap();
@@ -1036,13 +1036,13 @@ mod tests {
     fn remove_trivial() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![255; 32], vec![6]).unwrap();
         table1.delete(&vec![255; 32]).unwrap();
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.delete(&vec![255; 32]).unwrap();
 
@@ -1054,7 +1054,7 @@ mod tests {
     fn remove_simple() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![255; 32], vec![1]).unwrap();
         table1.put(&vec![250; 32], vec![2]).unwrap();
         table1.put(&vec![245; 32], vec![3]).unwrap();
@@ -1064,7 +1064,7 @@ mod tests {
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![250; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![1]).unwrap();
         table2.put(&vec![245; 32], vec![3]).unwrap();
@@ -1079,7 +1079,7 @@ mod tests {
     fn remove_reverse() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         table1.put(&vec![42; 32], vec![1]).unwrap();
         table1.put(&vec![64; 32], vec![2]).unwrap();
         table1.put(&vec![240; 32], vec![3]).unwrap();
@@ -1096,7 +1096,7 @@ mod tests {
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.put(&vec![250; 32], vec![5]).unwrap();
         table2.put(&vec![245; 32], vec![4]).unwrap();
@@ -1121,14 +1121,14 @@ mod tests {
 
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         for item in &data {
             table1.put(&item.0, item.1.clone()).unwrap();
         }
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         rng.shuffle(&mut data);
         for item in &data {
             table2.put(&item.0, item.1.clone()).unwrap();
@@ -1156,14 +1156,14 @@ mod tests {
 
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
         for item in &data {
             table1.put(&item.0, item.1.clone()).unwrap();
         }
 
         let mut storage2 = MemoryDB::new();
         let map2 = MapTable::new(vec![255], &mut storage2);
-        let mut table2 = MerklePatriciaTable::new(map2);
+        let table2 = MerklePatriciaTable::new(map2);
         rng.shuffle(&mut data);
         for item in &data {
             table2.put(&item.0, item.1.clone()).unwrap();
@@ -1203,7 +1203,7 @@ mod tests {
     fn fuzz_insert_after_delete() {
         let mut storage1 = MemoryDB::new();
         let map1 = MapTable::new(vec![255], &mut storage1);
-        let mut table1 = MerklePatriciaTable::new(map1);
+        let table1 = MerklePatriciaTable::new(map1);
 
         let data = generate_random_data(100);
 

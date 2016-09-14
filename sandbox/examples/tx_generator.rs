@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate log;
 
 extern crate exonum;
 extern crate timestamping;
@@ -6,14 +8,19 @@ extern crate env_logger;
 extern crate clap;
 
 use std::path::Path;
+use std::{thread, time};
+use std::cmp::min;
 
 use clap::{Arg, App, SubCommand};
 
+use exonum::node::{Node};
 use exonum::storage::{MemoryDB};
+
+use timestamping::TimestampingBlockchain; 
+
 use sandbox::{ConfigFile};
-use sandbox::testnet::{TxGeneratorConfiguration, TestNodeConfig, TxGeneratorNode, Listener};
+use sandbox::testnet::{TestNodeConfig};
 use sandbox::TimestampingTxGenerator;
-use timestamping::TimestampingBlockchain;
 
 fn main() {
     env_logger::init().unwrap();
@@ -44,11 +51,6 @@ fn main() {
                 .long("tx-package-size")
                 .value_name("TX_PACKAGE")
                 .help("A size of one package"))
-            .arg(Arg::with_name("ADDRESS")
-                .short("l")
-                .long("listen-address")
-                .value_name("ADDRESS")
-                .help("Node local address"))
             .arg(Arg::with_name("TX_TIMEOUT")
                 .short("t")
                 .long("tx-timeout")
@@ -59,16 +61,21 @@ fn main() {
                 .long("tx-data-size")
                 .value_name("TX_SIZE")
                 .help("A transaction data size"))
+            .arg(Arg::with_name("VALIDATOR")
+                .help("Sets a validator id")
+                .required(true)
+                .index(1))
             .arg(Arg::with_name("COUNT")
                 .help("transactions count")
                 .required(true)
-                .index(1)));
+                .index(2)));
 
     let matches = app.get_matches();
     let path = Path::new(matches.value_of("CONFIG").unwrap());
     match matches.subcommand() {
         ("run", Some(matches)) => {
             let cfg: TestNodeConfig = ConfigFile::load(path).unwrap();
+            let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let count: usize = matches.value_of("COUNT").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {
                 Some(string) => {
@@ -85,23 +92,37 @@ fn main() {
                 }
             };
 
-            let addr = matches.value_of("ADDRESS").unwrap_or("127.0.0.1:8000").parse().unwrap();
-            let mut net_cfg = cfg.network.clone();
-            net_cfg.listener = Some(Listener::gen(addr));
+            let node_cfg = cfg.to_node_configuration(idx, peers);
 
-            let cfg = TxGeneratorConfiguration {
-                network: net_cfg,
-                tx_package_size: matches.value_of("TX_PACKAGE").unwrap_or("1000").parse().unwrap(),
-                tx_timeout: matches.value_of("TX_TIMEOUT").unwrap_or("1000").parse().unwrap()
-            };
+            let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
+            let mut node = Node::with_config(blockchain.clone(), node_cfg);
+            let chan = node.channel();
+
+            let tx_package_size: usize = matches.value_of("TX_PACKAGE").unwrap_or("1000").parse().unwrap();
+            let tx_timeout: u64 = matches.value_of("TX_TIMEOUT").unwrap_or("1000").parse().unwrap();
             let tx_size = matches.value_of("TX_SIZE").unwrap_or("64").parse().unwrap();
-            let mut gen = TimestampingTxGenerator::new(tx_size);
-            let mut node: TxGeneratorNode<TimestampingBlockchain<MemoryDB>> = TxGeneratorNode::new(cfg,
-                peers,
-                count,
-                &mut gen,
-                );
+            let mut tx_gen = TimestampingTxGenerator::new(tx_size);
+
+            let handle = thread::spawn(move || {
+                let gen = &mut tx_gen;
+                let mut tx_remaining = count;
+                while tx_remaining > 0 {                    
+                    let count = min(tx_remaining, tx_package_size);
+                    for tx in gen.take(count) {
+                        chan.send(tx);
+                    }
+                    tx_remaining -= count;
+                    
+                    println!("There are {} transactions in the pool",
+                        tx_remaining);
+
+                    let timeout = time::Duration::from_millis(tx_timeout);
+                    thread::sleep(timeout);   
+                }                 
+            });
+
             node.run();
+            handle.join().unwrap();
         }
         _ => {
             unreachable!("Wrong subcommand");

@@ -44,14 +44,14 @@ pub type Error = Box<Debug>;
 
 pub trait Map<K: ?Sized, V> {
     fn get(&self, key: &K) -> Result<Option<V>, Error>;
-    fn put(&mut self, key: &K, value: V) -> Result<(), Error>;
-    fn delete(&mut self, key: &K) -> Result<(), Error>;
+    fn put(&self, key: &K, value: V) -> Result<(), Error>;
+    fn delete(&self, key: &K) -> Result<(), Error>;
     fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>, Error>;
 }
 
 pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
-    fn append(&mut self, value: V) -> Result<(), Error>;
-    fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) -> Result<(), Error>;
+    fn append(&self, value: V) -> Result<(), Error>;
+    fn extend<I: IntoIterator<Item = V>>(&self, iter: I) -> Result<(), Error>;
     fn get(&self, index: K) -> Result<Option<V>, Error>;
     fn last(&self) -> Result<Option<V>, Error>;
     fn is_empty(&self) -> Result<bool, Error>;
