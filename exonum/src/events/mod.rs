@@ -275,7 +275,7 @@ impl<H: EventHandler> Reactor<H> for Events<H> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use std::{time, thread};
     use std::net::SocketAddr;
     use std::collections::VecDeque;
