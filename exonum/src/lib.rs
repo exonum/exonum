@@ -9,6 +9,8 @@
 #![feature(slice_concat_ext)]
 #![feature(btree_range, collections_bound)]
 
+#![feature(test)]
+
 #[macro_use]
 extern crate log;
 extern crate time;
@@ -21,6 +23,8 @@ extern crate rand;
 
 #[cfg(test)]
 extern crate tempdir;
+#[cfg(test)]
+extern crate test;
 
 #[macro_use]
 pub mod messages;

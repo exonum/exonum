@@ -281,6 +281,7 @@ mod tests {
     use std::collections::VecDeque;
 
     use time::{get_time, Duration};
+    use test::Bencher;
 
     use super::{Events, Reactor, Event, InternalEvent, Channel};
     use super::{Network, NetworkConfiguration, EventHandler};
@@ -326,7 +327,7 @@ mod tests {
     pub struct TestEvents(Events<TestHandler>);
 
     impl TestEvents {
-        pub fn with_addr(addr: SocketAddr) -> TestEvents {
+        fn with_addr(addr: SocketAddr) -> TestEvents {
             let network = Network::with_config(NetworkConfiguration {
                 listen_address: addr,
                 max_incoming_connections: 128,
@@ -341,10 +342,17 @@ mod tests {
             TestEvents(Events::new(network, handler).unwrap())
         }
 
-        pub fn wait_for_bind(&mut self, addr: &SocketAddr) {
+        fn bind(&mut self) -> ::io::Result<()> {
+            self.0.bind()
+        }
+
+        fn wait_for_bind(&mut self, addr: &SocketAddr) {
             self.0.bind().unwrap();
             thread::sleep(time::Duration::from_millis(1000));
+            self.wait_for_connect(addr);
+        }
 
+        fn wait_for_connect(&mut self, addr: &SocketAddr) {
             self.0.channel().connect(addr);
 
             let start = get_time();
@@ -363,7 +371,7 @@ mod tests {
             }
         }
 
-        pub fn wait_for_msg(&mut self, duration: Duration) -> Option<RawMessage> {
+        fn wait_for_msg(&mut self, duration: Duration) -> Option<RawMessage> {
             let start = get_time();
             loop {
                 self.0.run_once(Some(100)).unwrap();
@@ -381,7 +389,11 @@ mod tests {
             }
         }
 
-        pub fn process_events(&mut self, duration: Duration) {
+        fn wait_for_messages(&mut self, usize count) -> Option<()> {
+            
+        }
+
+        fn process_events(&mut self, duration: Duration) {
             let start = get_time();
             loop {
                 self.0.run_once(Some(100)).unwrap();
@@ -392,15 +404,56 @@ mod tests {
             }
         }
 
-        pub fn send_to(&mut self, addr: &SocketAddr, msg: RawMessage) {
+        fn send_to(&mut self, addr: &SocketAddr, msg: RawMessage) {
             self.0.channel().send_to(addr, msg);
             self.0.run_once(None).unwrap();
         }
     }
 
-    pub fn gen_message(id: u16, len: usize) -> RawMessage {
+    fn gen_message(id: u16, len: usize) -> RawMessage {
         let writer = MessageWriter::new(id, len);
         RawMessage::new(writer.sign(&gen_keypair().1))
+    }
+
+    struct BenchConfig {
+        times: usize,
+        len: usize,
+        tcp_nodelay: bool
+    }
+
+    fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
+        b.iter(|| {
+            let mut e1 = TestEvents::with_addr(addrs[0], &cfg);
+            let mut e2 = TestEvents::with_addr(addrs[1], &cfg);
+            e1.bind().unwrap();
+            e2.bind().unwrap();
+
+            let timeout = Duration::seconds(30);
+            let len = cfg.len;
+            let times = cfg.times;
+            let t1 = thread::spawn(move || {
+                e1.wait_for_connect(&addrs[1]);
+                for _ in 0..times {
+                    let msg = Events::<u32>::gen_message(0, len);
+                    e1.send_to(&addrs[1], msg);
+                    e1.wait_for_messages(1, timeout).unwrap();
+                }
+                e1.process_events(Duration::milliseconds(0));
+                drop(e1);
+            });
+            let t2 = thread::spawn(move || {
+                e2.wait_for_connect(&addrs[0]);
+                for _ in 0..times {
+                    let msg = Events::<u32>::gen_message(1, len);
+                    e2.send_to(&addrs[0], msg);
+                    e2.wait_for_messages(1, timeout).unwrap();
+                }
+                e2.process_events(Duration::milliseconds(0));
+                drop(e2);
+            });
+            t1.join().unwrap();
+            t2.join().unwrap();
+        })
     }
 
     #[test]
