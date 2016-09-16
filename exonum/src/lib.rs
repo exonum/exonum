@@ -24,6 +24,8 @@ extern crate rand;
 extern crate tempdir;
 #[cfg(test)]
 extern crate test;
+#[cfg(test)]
+extern crate env_logger;
 
 #[macro_use]
 pub mod messages;

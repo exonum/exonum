@@ -290,11 +290,13 @@ impl<H: EventHandler> Reactor<H> for Events<H> {
 
 #[cfg(test)]
 mod tests {
+    use std::io;
     use std::{time, thread};
     use std::net::SocketAddr;
     use std::collections::VecDeque;
 
     use time::{get_time, Duration};
+    use env_logger;
 
     use super::{Events, Reactor, Event, InternalEvent, Channel};
     use super::{Network, NetworkConfiguration, EventHandler};
@@ -329,6 +331,7 @@ mod tests {
         type ApplicationEvent = ();
 
         fn handle_event(&mut self, event: Event) {
+            trace!("handle event: {:?}", event);
             self.events.push_back(InternalEvent::Node(event));
         }
         fn handle_timeout(&mut self, _: Self::Timeout) {}
@@ -346,7 +349,7 @@ mod tests {
                 max_incoming_connections: 128,
                 max_outgoing_connections: 128,
                 tcp_nodelay: true,
-                tcp_keep_alive: None,
+                tcp_keep_alive: Some(1),
                 tcp_reconnect_timeout: 1000,
                 tcp_reconnect_timeout_max: 600000,
             });
@@ -359,7 +362,7 @@ mod tests {
             self.0.bind().unwrap();
             thread::sleep(time::Duration::from_millis(100));
             let r = self.wait_for_connect(addr);
-            thread::sleep(time::Duration::from_millis(100)); //TODO it maybe be a bug
+            thread::sleep(time::Duration::from_millis(500)); //TODO it maybe be a bug
             r
         }
 
@@ -368,7 +371,7 @@ mod tests {
 
             let start = get_time();
             loop {
-                self.0.run_once(Some(500)).unwrap();
+                self.process_events().unwrap();
 
                 if start + Duration::milliseconds(10000) < get_time() {
                     return None;
@@ -385,7 +388,7 @@ mod tests {
         pub fn wait_for_msg(&mut self, duration: Duration) -> Option<RawMessage> {
             let start = get_time();
             loop {
-                self.0.run_once(Some(500)).unwrap();
+                self.process_events().unwrap();
 
                 if start + duration < get_time() {
                     return None;
@@ -400,17 +403,17 @@ mod tests {
             }
         }
 
-        pub fn wait_for_disconnect(&mut self) -> Option<()> {
+        pub fn wait_for_disconnect(&mut self) -> bool {
             let start = get_time();
             loop {
-                self.0.run_once(Some(500)).unwrap();
+                self.process_events().unwrap();
 
-                if start + Duration::milliseconds(10000) < get_time() {
-                    return None;
+                if start + Duration::milliseconds(100) < get_time() {
+                    return false;
                 }
                 while let Some(e) = self.0.inner.handler.poll() {
                     match e {
-                        InternalEvent::Node(Event::Disconnected(_)) => return Some(()),
+                        InternalEvent::Node(Event::Disconnected(_)) => return true,
                         _ => {}
                     }
                 }
@@ -419,7 +422,11 @@ mod tests {
 
         pub fn send_to(&mut self, addr: &SocketAddr, msg: RawMessage) {
             self.0.channel().send_to(addr, msg);
-            self.0.run_once(None).unwrap();
+            self.process_events().unwrap();
+        }
+
+        pub fn process_events(&mut self) -> io::Result<()> {
+            self.0.run_once(Some(100))
         }
     }
 
@@ -430,6 +437,7 @@ mod tests {
 
     #[test]
     fn big_message() {
+        let _ = env_logger::init();
         let addrs: [SocketAddr; 2] = ["127.0.0.1:7200".parse().unwrap(),
                                       "127.0.0.1:7201".parse().unwrap()];
 
@@ -446,7 +454,7 @@ mod tests {
 
                 e.send_to(&addrs[1], m1);
                 assert_eq!(e.wait_for_msg(Duration::milliseconds(10000)), Some(m2));
-                e.wait_for_disconnect().unwrap();
+                e.wait_for_disconnect();
             });
         }
 
@@ -469,6 +477,7 @@ mod tests {
 
     #[test]
     fn reconnect() {
+        let _ = env_logger::init();
         let addrs: [SocketAddr; 2] = ["127.0.0.1:9100".parse().unwrap(),
                                       "127.0.0.1:9101".parse().unwrap()];
 
@@ -492,7 +501,6 @@ mod tests {
                     debug!("t1: wait for m2");
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m2));
                     debug!("t1: received m2 from t2");
-                    drop(e);
                 }
                 debug!("t1: connection closed");
                 {
@@ -505,6 +513,7 @@ mod tests {
                     debug!("t1: wait for m3");
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m3));
                     debug!("t1: received m3 from t2");
+                    e.process_events().unwrap();
                 }
                 debug!("t1: finished");
             });
@@ -530,7 +539,6 @@ mod tests {
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)),
                                Some(m3.clone()));
                     debug!("t2: received m3 from t1");
-                    drop(e);
                 }
                 debug!("t2: connection closed");
                 {
@@ -540,7 +548,7 @@ mod tests {
 
                     debug!("t2: send m3 to t1");
                     e.send_to(&addrs[0], m3.clone());
-                    e.wait_for_disconnect().unwrap();
+                    e.wait_for_disconnect();
                 }
                 debug!("t2: finished");
             });
@@ -578,7 +586,7 @@ mod benches {
                 max_incoming_connections: 128,
                 max_outgoing_connections: 128,
                 tcp_nodelay: cfg.tcp_nodelay,
-                tcp_keep_alive: None,
+                tcp_keep_alive: Some(1),
                 tcp_reconnect_timeout: 1000,
                 tcp_reconnect_timeout_max: 600000,
             });
@@ -616,17 +624,6 @@ mod benches {
                 }
             }
         }
-
-        pub fn process_events(&mut self, duration: Duration) {
-            let start = get_time();
-            loop {
-                self.0.run_once(Some(500)).unwrap();
-
-                if start + duration < get_time() {
-                    return;
-                }
-            }
-        }
     }
 
     fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
@@ -646,7 +643,7 @@ mod benches {
                     e1.send_to(&addrs[1], msg);
                     e1.wait_for_messages(1, timeout).unwrap();
                 }
-                e1.wait_for_disconnect().unwrap();
+                e1.wait_for_disconnect();
             });
             let t2 = thread::spawn(move || {
                 e2.wait_for_connect(&addrs[0]).unwrap();
