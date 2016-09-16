@@ -7,7 +7,7 @@ use time::{Duration, Timespec};
 use super::crypto::{PublicKey, SecretKey};
 use super::events::{Events, MioChannel, EventLoop, Reactor,
                     Network, NetworkConfiguration,
-                    Event, EventsConfiguration, 
+                    Event, EventsConfiguration,
                     Channel, EventHandler};
 use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
@@ -255,9 +255,9 @@ impl<B, S> TxSender<B, S>
     }
 }
 
-type NodeChannel<B> = MioChannel<ExternalMessage<B>, NodeTimeout>;
+pub type NodeChannel<B> = MioChannel<ExternalMessage<B>, NodeTimeout>;
 
-pub struct Node<B> 
+pub struct Node<B>
     where B: Blockchain
 {
     reactor: Events<NodeHandler<B, NodeChannel<B>>>
@@ -279,6 +279,7 @@ impl<B> Node<B>
     }
 
     pub fn run(&mut self) -> io::Result<()> {
+        self.reactor.bind()?;
         self.reactor.handler_mut().initialize();
         self.reactor.run()
     }
