@@ -1,5 +1,6 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(test, feature(test))]
 
 #![feature(associated_consts)]
 #![feature(associated_type_defaults)]
@@ -8,8 +9,6 @@
 #![feature(type_ascription)]
 #![feature(slice_concat_ext)]
 #![feature(btree_range, collections_bound)]
-
-#![feature(test)]
 
 #[macro_use]
 extern crate log;
