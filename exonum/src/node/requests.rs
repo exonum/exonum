@@ -3,12 +3,12 @@ use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTra
 use super::super::blockchain::{Blockchain, View};
 use super::super::storage::{Map, List};
 use super::super::events::Channel;
-use super::{Node, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
 
 const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
-impl<B, S> Node<B, S>
+impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {

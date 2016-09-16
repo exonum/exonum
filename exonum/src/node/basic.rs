@@ -6,12 +6,12 @@ use rand::Rng;
 
 use super::super::blockchain::Blockchain;
 use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
-use super::{Node, RequestData};
+use super::{NodeHandler, RequestData};
 
 use super::super::events::Channel;
 use super::{ExternalMessage, NodeTimeout};
 
-impl<B, S> Node<B, S>
+impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {

@@ -1,10 +1,14 @@
+use std::io;
 use std::net::SocketAddr;
 use std::marker::PhantomData;
 
 use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
-use super::events::{Event, EventsConfiguration, NetworkConfiguration, Channel, EventHandler};
+use super::events::{Events, MioChannel, EventLoop, Reactor,
+                    Network, NetworkConfiguration,
+                    Event, EventsConfiguration, 
+                    Channel, EventHandler};
 use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
 
@@ -15,7 +19,7 @@ mod requests;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ExternalMessage<B: Blockchain> {
     Transaction(B::Transaction),
 }
@@ -38,7 +42,7 @@ pub struct TxSender<B, S>
 
 // TODO: avoid recursion calls?
 
-pub struct Node<B, S>
+pub struct NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
 {
@@ -67,11 +71,11 @@ pub struct Configuration {
     pub validators: Vec<PublicKey>,
 }
 
-impl<B, S> Node<B, S>
+impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
-    pub fn new(blockchain: B, sender: S, config: Configuration) -> Node<B, S> {
+    pub fn new(blockchain: B, sender: S, config: Configuration) -> NodeHandler<B, S> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let id = config.validators
             .iter()
@@ -85,7 +89,7 @@ impl<B, S> Node<B, S>
         let last_hash = blockchain.last_hash().unwrap().unwrap_or_else(|| super::crypto::hash(&[]));
 
         let state = State::new(id as u32, config.validators, connect, last_hash);
-        Node {
+        NodeHandler {
             public_key: config.public_key,
             secret_key: config.secret_key,
             state: state,
@@ -195,13 +199,9 @@ impl<B, S> Node<B, S>
             self.channel.send_to(&conn.addr(), message.clone());
         }
     }
-
-    pub fn channel(&self) -> TxSender<B, S> {
-        TxSender::new(self.channel.clone())
-    }
 }
 
-impl<B, S> EventHandler for Node<B, S>
+impl<B, S> EventHandler for NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
@@ -252,5 +252,42 @@ impl<B, S> TxSender<B, S>
             let msg = ExternalMessage::Transaction(tx);
             self.inner.post_event(msg).unwrap();
         }
+    }
+}
+
+type NodeChannel<B> = MioChannel<ExternalMessage<B>, NodeTimeout>;
+
+pub struct Node<B> 
+    where B: Blockchain
+{
+    reactor: Events<NodeHandler<B, NodeChannel<B>>>
+}
+
+impl<B> Node<B>
+    where B: Blockchain
+{
+    pub fn new(blockchain: B, config: Configuration) -> Node<B> {
+        let network = Network::with_config(config.network.clone());
+        let event_loop = EventLoop::configured(config.events.clone()).unwrap();
+        let channel = MioChannel::new(config.network.listen_address, event_loop.channel());
+
+        let worker = NodeHandler::new(blockchain, channel, config);
+
+        Node {
+            reactor: Events::with_event_loop(network, worker, event_loop)
+        }
+    }
+
+    pub fn run(&mut self) -> io::Result<()> {
+        self.reactor.handler_mut().initialize();
+        self.reactor.run()
+    }
+
+    pub fn state(&self) -> &State<B::Transaction> {
+        self.reactor.handler().state()
+    }
+
+    pub fn channel(&self) -> TxSender<B, NodeChannel<B>> {
+        TxSender::new(self.reactor.handler().channel.clone())
     }
 }

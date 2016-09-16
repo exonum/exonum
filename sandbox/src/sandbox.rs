@@ -8,7 +8,7 @@ use std::io;
 
 use time::Timespec;
 
-use exonum::node::{Node, Configuration, ExternalMessage, NodeTimeout};
+use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
@@ -46,7 +46,7 @@ struct SandboxInner<B: Blockchain> {
 
 pub struct SandboxReactor<B: Blockchain> {
     inner: Arc<Mutex<SandboxInner<B>>>,
-    handler: Node<B, SandboxChannel<B>>,
+    handler: NodeHandler<B, SandboxChannel<B>>,
 }
 
 #[derive(Clone)]
@@ -101,7 +101,7 @@ impl<B> Channel for SandboxChannel<B>
     }
 }
 
-impl<B> Reactor<Node<B, SandboxChannel<B>>> for SandboxReactor<B>
+impl<B> Reactor<NodeHandler<B, SandboxChannel<B>>> for SandboxReactor<B>
     where B: Blockchain
 {
     type Channel = SandboxChannel<B>;
@@ -409,7 +409,7 @@ pub fn timestamping_sandbox
     }));
 
     let channel = SandboxChannel { inner: inner.clone() };
-    let node = Node::new(blockchain.clone(), channel, config);
+    let node = NodeHandler::new(blockchain.clone(), channel, config);
 
     let mut reactor = SandboxReactor {
         inner: inner.clone(),

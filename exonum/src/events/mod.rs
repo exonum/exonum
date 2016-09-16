@@ -91,15 +91,24 @@ pub struct Events<H: EventHandler> {
 }
 
 #[derive(Clone)]
-pub struct MioChannel<H: EventHandler> {
+pub struct MioChannel<E: Send, T: Send> {
     address: SocketAddr,
-    inner: mio::Sender<InternalEvent<H::ApplicationEvent, H::Timeout>>,
+    inner: mio::Sender<InternalEvent<E, T>>,
+}
+
+impl<E: Send, T: Send> MioChannel<E, T> {
+    pub fn new(addr: SocketAddr, inner: mio::Sender<InternalEvent<E, T>>) -> MioChannel<E, T> {
+        MioChannel {
+            address: addr,
+            inner: inner
+        }
+    }
 }
 
 // TODO remove unwrap
-impl<H: EventHandler> Channel for MioChannel<H> {
-    type ApplicationEvent = H::ApplicationEvent;
-    type Timeout = H::Timeout;
+impl<E: Send, T: Send> Channel for MioChannel<E, T> {
+    type ApplicationEvent = E;
+    type Timeout = T;
 
     fn address(&self) -> SocketAddr {
         self.address
@@ -145,6 +154,24 @@ impl<H: EventHandler> Events<H> {
             event_loop: event_loop,
         };
         Ok(events)
+    }
+
+    pub fn with_event_loop(network: Network, handler: H, event_loop: EventLoop<H>) -> Events<H> {
+         Events {
+            inner: MioAdapter {
+                network: network,
+                handler: handler,
+            },
+            event_loop: event_loop,
+        }
+    }
+
+    pub fn handler(&self) -> &H {
+        &self.inner.handler
+    }
+
+    pub fn handler_mut(&mut self) -> &mut H {
+        &mut self.inner.handler
     }
 }
 
@@ -252,7 +279,7 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
 }
 
 impl<H: EventHandler> Reactor<H> for Events<H> {
-    type Channel = MioChannel<H>;
+    type Channel = MioChannel<H::ApplicationEvent, H::Timeout>;
 
     fn bind(&mut self) -> ::std::io::Result<()> {
         self.inner.network.bind(&mut self.event_loop)
@@ -266,7 +293,7 @@ impl<H: EventHandler> Reactor<H> for Events<H> {
     fn get_time(&self) -> Timespec {
         get_time()
     }
-    fn channel(&self) -> MioChannel<H> {
+    fn channel(&self) -> MioChannel<H::ApplicationEvent, H::Timeout> {
         MioChannel {
             inner: self.event_loop.channel(),
             address: *self.inner.network.address(),
@@ -535,7 +562,7 @@ mod tests {
 #[cfg(feature = "long_benchmarks")]
 #[cfg(test)]
 mod benches {
-    use std::{thread};
+    use std::thread;
     use std::net::SocketAddr;
 
     use time::{get_time, Duration};
@@ -549,7 +576,7 @@ mod benches {
     struct BenchConfig {
         times: usize,
         len: usize,
-        tcp_nodelay: bool
+        tcp_nodelay: bool,
     }
 
     impl TestEvents {
@@ -568,7 +595,10 @@ mod benches {
             TestEvents(Events::new(network, handler).unwrap())
         }
 
-        fn wait_for_messages(&mut self, mut count: usize, duration: Duration) -> Result<(), String> {
+        fn wait_for_messages(&mut self,
+                             mut count: usize,
+                             duration: Duration)
+                             -> Result<(), String> {
             let start = get_time();
             loop {
                 self.0.run_once(Some(100)).unwrap();
@@ -582,13 +612,14 @@ mod benches {
                             count = count - 1;
                         }
                         InternalEvent::Node(Event::Error(_)) => {
-                            return Err(format!("An error occured, {} messages is not received", count))
+                            return Err(format!("An error occured, {} messages is not received",
+                                               count))
                         }
                         _ => {}
                     }
 
                     if count == 0 {
-                        return Ok(())
+                        return Ok(());
                     }
                 }
             }
@@ -635,7 +666,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: false,
             len: 100,
-            times: 100
+            times: 100,
         };
         let addrs = ["127.0.0.1:6990".parse().unwrap(), "127.0.0.1:6991".parse().unwrap()];
         bench_network(b, addrs, cfg);
@@ -646,7 +677,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: false,
             len: 100,
-            times: 1000
+            times: 1000,
         };
         let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
         bench_network(b, addrs, cfg);
@@ -657,7 +688,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: false,
             len: 100,
-            times: 10000
+            times: 10000,
         };
         let addrs = ["127.0.0.1:9982".parse().unwrap(), "127.0.0.1:9983".parse().unwrap()];
         bench_network(b, addrs, cfg);
@@ -668,7 +699,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: true,
             len: 100,
-            times: 100
+            times: 100,
         };
         let addrs = ["127.0.0.1:4990".parse().unwrap(), "127.0.0.1:4991".parse().unwrap()];
         bench_network(b, addrs, cfg);
@@ -679,7 +710,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: true,
             len: 100,
-            times: 10000
+            times: 10000,
         };
         let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
         bench_network(b, addrs, cfg);
@@ -690,7 +721,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: false,
             len: 100000,
-            times: 10
+            times: 10,
         };
         let addrs = ["127.0.0.1:9984".parse().unwrap(), "127.0.0.1:9985".parse().unwrap()];
         bench_network(b, addrs, cfg);
@@ -701,7 +732,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: false,
             len: 100000,
-            times: 100
+            times: 100,
         };
         let addrs = ["127.0.0.1:9946".parse().unwrap(), "127.0.0.1:9947".parse().unwrap()];
         bench_network(b, addrs, cfg);
@@ -712,7 +743,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: false,
             len: 100000,
-            times: 1000
+            times: 1000,
         };
         let addrs = ["127.0.0.1:9918".parse().unwrap(), "127.0.0.1:9919".parse().unwrap()];
         bench_network(b, addrs, cfg);
@@ -723,7 +754,7 @@ mod benches {
         let cfg = BenchConfig {
             tcp_nodelay: true,
             len: 100000,
-            times: 1000
+            times: 1000,
         };
         let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
         bench_network(b, addrs, cfg);

@@ -6,13 +6,13 @@ use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Mess
                              RequestPropose, RequestTransactions, RequestPrevotes,
                              RequestPrecommits, RequestCommit};
 use super::super::storage::Map;
-use super::{Node, Round, Height, RequestData, ValidatorId};
+use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
 use super::super::events::Channel;
 use super::{ExternalMessage, NodeTimeout};
 
 // TODO reduce view invokations
-impl<B, S> Node<B, S>
+impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
