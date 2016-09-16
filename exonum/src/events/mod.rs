@@ -357,8 +357,10 @@ mod tests {
 
         pub fn wait_for_bind(&mut self, addr: &SocketAddr) -> Option<()> {
             self.0.bind().unwrap();
-            thread::sleep(time::Duration::from_millis(1000));
-            self.wait_for_connect(addr)
+            thread::sleep(time::Duration::from_millis(100));
+            let r = self.wait_for_connect(addr);
+            thread::sleep(time::Duration::from_millis(100)); //TODO it maybe be a bug
+            r
         }
 
         pub fn wait_for_connect(&mut self, addr: &SocketAddr) -> Option<()> {
@@ -366,7 +368,7 @@ mod tests {
 
             let start = get_time();
             loop {
-                self.0.run_once(Some(100)).unwrap();
+                self.0.run_once(Some(500)).unwrap();
 
                 if start + Duration::milliseconds(10000) < get_time() {
                     return None;
@@ -383,7 +385,7 @@ mod tests {
         pub fn wait_for_msg(&mut self, duration: Duration) -> Option<RawMessage> {
             let start = get_time();
             loop {
-                self.0.run_once(Some(100)).unwrap();
+                self.0.run_once(Some(500)).unwrap();
 
                 if start + duration < get_time() {
                     return None;
@@ -398,19 +400,24 @@ mod tests {
             }
         }
 
-        pub fn process_events(&mut self, duration: Duration) {
+        pub fn wait_for_disconnect(&mut self) -> Option<()> {
             let start = get_time();
             loop {
-                self.0.run_once(Some(100)).unwrap();
+                self.0.run_once(Some(500)).unwrap();
 
-                if start + duration < get_time() {
-                    return;
+                if start + Duration::milliseconds(10000) < get_time() {
+                    return None;
+                }
+                while let Some(e) = self.0.inner.handler.poll() {
+                    match e {
+                        InternalEvent::Node(Event::Disconnected(_)) => return Some(()),
+                        _ => {}
+                    }
                 }
             }
         }
 
         pub fn send_to(&mut self, addr: &SocketAddr, msg: RawMessage) {
-            self.0.channel().connect(addr);
             self.0.channel().send_to(addr, msg);
             self.0.run_once(None).unwrap();
         }
@@ -438,8 +445,8 @@ mod tests {
                 e.wait_for_bind(&addrs[1]);
 
                 e.send_to(&addrs[1], m1);
-                assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m2));
-                e.process_events(Duration::milliseconds(1000));
+                assert_eq!(e.wait_for_msg(Duration::milliseconds(10000)), Some(m2));
+                e.wait_for_disconnect().unwrap();
             });
         }
 
@@ -452,7 +459,7 @@ mod tests {
                 e.wait_for_bind(&addrs[0]);
 
                 e.send_to(&addrs[0], m2);
-                assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m1));
+                assert_eq!(e.wait_for_msg(Duration::milliseconds(10000)), Some(m1));
             });
         }
 
@@ -523,7 +530,6 @@ mod tests {
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)),
                                Some(m3.clone()));
                     debug!("t2: received m3 from t1");
-                    e.process_events(Duration::milliseconds(1000));
                     drop(e);
                 }
                 debug!("t2: connection closed");
@@ -534,7 +540,7 @@ mod tests {
 
                     debug!("t2: send m3 to t1");
                     e.send_to(&addrs[0], m3.clone());
-                    e.process_events(Duration::milliseconds(1000));
+                    e.wait_for_disconnect().unwrap();
                 }
                 debug!("t2: finished");
             });
@@ -610,6 +616,17 @@ mod benches {
                 }
             }
         }
+
+        pub fn process_events(&mut self, duration: Duration) {
+            let start = get_time();
+            loop {
+                self.0.run_once(Some(500)).unwrap();
+
+                if start + duration < get_time() {
+                    return;
+                }
+            }
+        }
     }
 
     fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
@@ -623,24 +640,21 @@ mod benches {
             let len = cfg.len;
             let times = cfg.times;
             let t1 = thread::spawn(move || {
-                e1.wait_for_connect(&addrs[1]);
+                e1.wait_for_connect(&addrs[1]).unwrap();
                 for _ in 0..times {
                     let msg = gen_message(0, len);
                     e1.send_to(&addrs[1], msg);
                     e1.wait_for_messages(1, timeout).unwrap();
                 }
-                e1.process_events(Duration::milliseconds(0));
-                drop(e1);
+                e1.wait_for_disconnect().unwrap();
             });
             let t2 = thread::spawn(move || {
-                e2.wait_for_connect(&addrs[0]);
+                e2.wait_for_connect(&addrs[0]).unwrap();
                 for _ in 0..times {
                     let msg = gen_message(1, len);
                     e2.send_to(&addrs[0], msg);
                     e2.wait_for_messages(1, timeout).unwrap();
                 }
-                e2.process_events(Duration::milliseconds(0));
-                drop(e2);
             });
             t1.join().unwrap();
             t2.join().unwrap();
