@@ -9,7 +9,7 @@ use super::messages::RawMessage;
 mod network;
 mod connection;
 
-pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet, Output};
+pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 
@@ -100,7 +100,7 @@ impl<E: Send, T: Send> MioChannel<E, T> {
     pub fn new(addr: SocketAddr, inner: mio::Sender<InternalEvent<E, T>>) -> MioChannel<E, T> {
         MioChannel {
             address: addr,
-            inner: inner
+            inner: inner,
         }
     }
 }
@@ -157,7 +157,7 @@ impl<H: EventHandler> Events<H> {
     }
 
     pub fn with_event_loop(network: Network, handler: H, event_loop: EventLoop<H>) -> Events<H> {
-         Events {
+        Events {
             inner: MioAdapter {
                 network: network,
                 handler: handler,
@@ -230,22 +230,9 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
     type Message = InternalEvent<H::ApplicationEvent, H::Timeout>;
 
     fn ready(&mut self, event_loop: &mut EventLoop<H>, token: mio::Token, events: mio::EventSet) {
-        loop {
-            match self.network.io(event_loop, token, events) {
-                Ok(Some(output)) => {
-                    let event = match output {
-                        Output::Data(buf) => Event::Incoming(RawMessage::new(buf)),
-                        Output::Connected(addr) => Event::Connected(addr),
-                        Output::Disconnected(addr) => Event::Disconnected(addr),
-                    };
-                    self.handler.handle_event(event);
-                }
-                Ok(None) => break,
-                Err(e) => {
-                    error!("{}: An error occured {:?}", self.network.address(), e);
-                    break;
-                }
-            }
+        let r = self.network.io(event_loop, &mut self.handler, token, events);
+        if let Err(e) = r {
+            error!("{}: An error occured {:?}", self.network.address(), e);
         }
     }
 
@@ -368,25 +355,25 @@ mod tests {
             TestEvents(Events::new(network, handler).unwrap())
         }
 
-        pub fn wait_for_bind(&mut self, addr: &SocketAddr) {
+        pub fn wait_for_bind(&mut self, addr: &SocketAddr) -> Option<()> {
             self.0.bind().unwrap();
             thread::sleep(time::Duration::from_millis(1000));
-            self.wait_for_connect(addr);
+            self.wait_for_connect(addr)
         }
 
-        pub fn wait_for_connect(&mut self, addr: &SocketAddr) {
+        pub fn wait_for_connect(&mut self, addr: &SocketAddr) -> Option<()> {
             self.0.channel().connect(addr);
 
             let start = get_time();
             loop {
                 self.0.run_once(Some(100)).unwrap();
 
-                if start + Duration::milliseconds(100) < get_time() {
-                    return;
+                if start + Duration::milliseconds(10000) < get_time() {
+                    return None;
                 }
                 while let Some(e) = self.0.inner.handler.poll() {
                     match e {
-                        InternalEvent::Node(Event::Connected(_)) => return,
+                        InternalEvent::Node(Event::Connected(_)) => return Some(()),
                         _ => {}
                     }
                 }
@@ -423,6 +410,7 @@ mod tests {
         }
 
         pub fn send_to(&mut self, addr: &SocketAddr, msg: RawMessage) {
+            self.0.channel().connect(addr);
             self.0.channel().send_to(addr, msg);
             self.0.run_once(None).unwrap();
         }
@@ -450,8 +438,8 @@ mod tests {
                 e.wait_for_bind(&addrs[1]);
 
                 e.send_to(&addrs[1], m1);
-                assert_eq!(e.wait_for_msg(Duration::milliseconds(1000)), Some(m2));
-                e.process_events(Duration::milliseconds(5000));
+                assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m2));
+                e.process_events(Duration::milliseconds(1000));
             });
         }
 
@@ -464,7 +452,7 @@ mod tests {
                 e.wait_for_bind(&addrs[0]);
 
                 e.send_to(&addrs[0], m2);
-                assert_eq!(e.wait_for_msg(Duration::milliseconds(30000)), Some(m1));
+                assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m1));
             });
         }
 
@@ -489,31 +477,29 @@ mod tests {
             t1 = thread::spawn(move || {
                 {
                     let mut e = TestEvents::with_addr(addrs[0].clone());
-                    e.wait_for_bind(&addrs[1]);
+                    e.wait_for_bind(&addrs[1]).unwrap();
 
-                    info!("t1: connection opened");
-                    info!("t1: send m1 to t2");
+                    debug!("t1: connection opened");
+                    debug!("t1: send m1 to t2");
                     e.send_to(&addrs[1], m1);
-                    info!("t1: wait for m2");
+                    debug!("t1: wait for m2");
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m2));
-                    info!("t1: received m2 from t2");
-                    e.process_events(Duration::milliseconds(500));
+                    debug!("t1: received m2 from t2");
                     drop(e);
                 }
-                info!("t1: connection closed");
+                debug!("t1: connection closed");
                 {
                     let mut e = TestEvents::with_addr(addrs[0].clone());
-                    e.wait_for_bind(&addrs[1]);
+                    e.wait_for_bind(&addrs[1]).unwrap();
 
-                    info!("t1: connection reopened");
-                    info!("t1: send m3 to t2");
+                    debug!("t1: connection reopened");
+                    debug!("t1: send m3 to t2");
                     e.send_to(&addrs[1], m3.clone());
-                    info!("t1: wait for m3");
+                    debug!("t1: wait for m3");
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m3));
-                    e.process_events(Duration::milliseconds(500));
-                    info!("t1: received m3 from t2");
+                    debug!("t1: received m3 from t2");
                 }
-                info!("t1: connection closed");
+                debug!("t1: finished");
             });
         }
 
@@ -525,32 +511,32 @@ mod tests {
             t2 = thread::spawn(move || {
                 {
                     let mut e = TestEvents::with_addr(addrs[1].clone());
-                    e.wait_for_bind(&addrs[0]);
+                    e.wait_for_bind(&addrs[0]).unwrap();
 
-                    info!("t2: connection opened");
-                    info!("t2: send m2 to t1");
+                    debug!("t2: connection opened");
+                    debug!("t2: send m2 to t1");
                     e.send_to(&addrs[0], m2);
-                    info!("t2: wait for m1");
+                    debug!("t2: wait for m1");
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m1));
-                    info!("t2: received m1 from t1");
-                    info!("t2: wait for m3");
+                    debug!("t2: received m1 from t1");
+                    debug!("t2: wait for m3");
                     assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)),
                                Some(m3.clone()));
-                    info!("t2: received m3 from t1");
-                    e.process_events(Duration::milliseconds(500));
+                    debug!("t2: received m3 from t1");
+                    e.process_events(Duration::milliseconds(1000));
                     drop(e);
                 }
-                info!("t2: connection closed");
+                debug!("t2: connection closed");
                 {
-                    info!("t2: connection reopened");
+                    debug!("t2: connection reopened");
                     let mut e = TestEvents::with_addr(addrs[1].clone());
-                    e.wait_for_bind(&addrs[0]);
+                    e.wait_for_bind(&addrs[0]).unwrap();
 
-                    info!("t2: send m3 to t1");
+                    debug!("t2: send m3 to t1");
                     e.send_to(&addrs[0], m3.clone());
-                    e.process_events(Duration::milliseconds(500));
+                    e.process_events(Duration::milliseconds(1000));
                 }
-                info!("t2: connection closed");
+                debug!("t2: finished");
             });
         }
 

@@ -10,21 +10,14 @@ use mio::tcp::{TcpListener, TcpStream};
 use mio::util::Slab;
 
 use super::connection::{Connection, IncomingConnection, OutgoingConnection};
-use super::{Timeout, InternalTimeout, EventLoop, EventHandler};
+use super::{Timeout, InternalTimeout, EventLoop, EventHandler, Event};
 
-use super::super::messages::{MessageBuffer, RawMessage};
+use super::super::messages::RawMessage;
 
 pub type PeerId = Token;
 
 const SERVER_ID: PeerId = Token(1);
 const RECONNECT_GROW_FACTOR: f32 = 2.0;
-
-#[derive(Debug)]
-pub enum Output {
-    Data(MessageBuffer),
-    Connected(SocketAddr),
-    Disconnected(SocketAddr),
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
@@ -96,9 +89,10 @@ impl Network {
     // TODO: Implement Connections collection with (re)registering
     pub fn io<H: EventHandler>(&mut self,
                                event_loop: &mut EventLoop<H>,
+                               handler: &mut H,
                                id: PeerId,
                                set: EventSet)
-                               -> io::Result<Option<Output>> {
+                               -> io::Result<()> {
 
         match self.peer_kind(id) {
             PeerKind::Server => {
@@ -118,11 +112,11 @@ impl Network {
                            address,
                            id.0);
                 }
-                return Ok(None);
+                return Ok(());
             }
             PeerKind::Incoming => {
                 if !self.incoming.contains(id) {
-                    return Ok(None);
+                    return Ok(());
                 }
 
                 if set.is_hup() | set.is_error() {
@@ -131,7 +125,7 @@ impl Network {
                            self.incoming[id].address());
 
                     self.remove_incoming_connection(event_loop, id);
-                    return Ok(None);
+                    return Ok(());
                 }
 
                 if set.is_readable() {
@@ -143,8 +137,12 @@ impl Network {
                            id.0);
 
                     return match self.incoming[id].try_read() {
-                        Ok(Some(buffer)) => Ok(Some(Output::Data(buffer))),
-                        Ok(None) => Ok(None),
+                        Ok(Some(buf)) => {
+                            let msg = RawMessage::new(buf);
+                            handler.handle_event(Event::Incoming(msg));
+                            Ok(())
+                        }
+                        Ok(None) => Ok(()),
                         Err(e) => {
                             self.remove_incoming_connection(event_loop, id);
                             Err(e)
@@ -154,7 +152,7 @@ impl Network {
             }
             PeerKind::Outgoing => {
                 if !self.outgoing.contains(id) {
-                    return Ok(None);
+                    return Ok(());
                 }
 
                 if set.is_hup() | set.is_error() {
@@ -165,10 +163,10 @@ impl Network {
                            self.outgoing[id].address());
 
                     self.remove_outgoing_connection(event_loop, id);
-                    if self.reconnects.contains_key(&address) {
-                        return Ok(None);
+                    if !self.reconnects.contains_key(&address) {
+                        handler.handle_event(Event::Disconnected(address));
                     }
-                    return Ok(Some(Output::Disconnected(address)));
+                    return Ok(());
                 }
 
                 if set.is_writable() {
@@ -191,14 +189,16 @@ impl Network {
                     // Write data into socket
                     if let Err(e) = r {
                         self.remove_outgoing_connection(event_loop, id);
+                        handler.handle_event(Event::Disconnected(address));
                         return Err(e);
                     }
-                    return Ok(self.mark_connected(event_loop, id));
+                    if self.mark_connected(event_loop, id) {
+                        handler.handle_event(Event::Connected(address));
+                    }
                 }
             }
         }
-        // FIXME: Can we be here?
-        Ok(None)
+        Ok(())
     }
 
     pub fn tick<H: EventHandler>(&mut self, _: &mut EventLoop<H>) {}
@@ -402,7 +402,7 @@ impl Network {
     fn mark_connected<H: EventHandler>(&mut self,
                                        event_loop: &mut EventLoop<H>,
                                        id: Token)
-                                       -> Option<Output> {
+                                       -> bool {
         let address = *self.outgoing[id].address();
         self.clear_reconnect_request(event_loop, &address)
     }
@@ -410,12 +410,12 @@ impl Network {
     fn clear_reconnect_request<H: EventHandler>(&mut self,
                                                 event_loop: &mut EventLoop<H>,
                                                 addr: &SocketAddr)
-                                                -> Option<Output> {
+                                                -> bool {
         if let Some(timeout) = self.reconnects.remove(addr) {
             event_loop.clear_timeout(timeout);
-            return Some(Output::Connected(*addr));
+            return true;
         }
-        None
+        false
     }
 }
 

@@ -5,10 +5,8 @@ use std::marker::PhantomData;
 use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
-use super::events::{Events, MioChannel, EventLoop, Reactor,
-                    Network, NetworkConfiguration,
-                    Event, EventsConfiguration,
-                    Channel, EventHandler};
+use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
+                    EventsConfiguration, Channel, EventHandler};
 use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
 
@@ -260,7 +258,7 @@ pub type NodeChannel<B> = MioChannel<ExternalMessage<B>, NodeTimeout>;
 pub struct Node<B>
     where B: Blockchain
 {
-    reactor: Events<NodeHandler<B, NodeChannel<B>>>
+    reactor: Events<NodeHandler<B, NodeChannel<B>>>,
 }
 
 impl<B> Node<B>
@@ -273,9 +271,7 @@ impl<B> Node<B>
 
         let worker = NodeHandler::new(blockchain, channel, config);
 
-        Node {
-            reactor: Events::with_event_loop(network, worker, event_loop)
-        }
+        Node { reactor: Events::with_event_loop(network, worker, event_loop) }
     }
 
     pub fn run(&mut self) -> io::Result<()> {
