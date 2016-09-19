@@ -51,7 +51,7 @@ enum PeerKind {
     Outgoing,
 }
 
-fn make_error<T: Borrow<str>>(s: T) -> io::Error {
+fn make_io_error<T: Borrow<str>>(s: T) -> io::Error {
     io::Error::new(io::ErrorKind::Other, s.borrow())
 }
 
@@ -77,7 +77,7 @@ impl Network {
     // TODO use error trait
     pub fn bind<H: EventHandler>(&mut self, event_loop: &mut EventLoop<H>) -> io::Result<()> {
         if let Some(_) = self.listener {
-            return Err(make_error("Already binded"));
+            return Err(make_io_error("Already binded"));
         }
         let listener = TcpListener::bind(&self.config.listen_address)?;
         event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge())?;
@@ -293,7 +293,7 @@ impl Network {
         if let Some(id) = self.addresses.get(addr) {
             return Ok(*id);
         };
-        Err(make_error(format!("{}: Outgoing peer not found {}", self.address(), addr)))
+        Err(make_io_error(format!("{}: Outgoing peer not found {}", self.address(), addr)))
     }
 
     fn add_incoming_connection<H: EventHandler>(&mut self,
@@ -303,7 +303,7 @@ impl Network {
         let address = *connection.address();
         let id = self.incoming
             .insert(connection)
-            .map_err(|_| make_error("Maximum incoming onnections"))?;
+            .map_err(|_| make_io_error("Maximum incoming onnections"))?;
         self.addresses.insert(address, id);
 
         let r = event_loop.register(self.incoming[id].socket(),
@@ -325,7 +325,7 @@ impl Network {
         let address = *connection.address();
         let id = self.outgoing
             .insert(connection)
-            .map_err(|_| make_error("Maximum outgoing onnections"))?;
+            .map_err(|_| make_io_error("Maximum outgoing onnections"))?;
         self.addresses.insert(address, id);
 
         let r = event_loop.register(self.outgoing[id].socket(),
@@ -394,7 +394,7 @@ impl Network {
                                               -> io::Result<()> {
         let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
         let timeout = event_loop.timeout_ms(reconnect, delay)
-            .map_err(|e| make_error(format!("A mio error occured {:?}", e)))?;
+            .map_err(|e| make_io_error(format!("A mio error occured {:?}", e)))?;
         self.reconnects.insert(address, timeout);
         Ok(())
     }

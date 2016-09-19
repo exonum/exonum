@@ -1,4 +1,5 @@
 use std::io;
+use std::fmt::Display;
 use std::net::SocketAddr;
 use time::{get_time, Timespec};
 
@@ -64,7 +65,7 @@ pub trait Channel: Send {
     fn get_time(&self) -> Timespec;
     fn address(&self) -> SocketAddr;
 
-    fn post_event(&self, msg: Self::ApplicationEvent) -> ::std::io::Result<()>;
+    fn post_event(&self, msg: Self::ApplicationEvent);
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage);
     fn connect(&mut self, address: &SocketAddr);
     fn add_timeout(&mut self, timeout: Self::Timeout, time: Timespec);
@@ -118,28 +119,28 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
         get_time()
     }
 
-    fn post_event(&self, event: Self::ApplicationEvent) -> io::Result<()> {
+    fn post_event(&self, event: Self::ApplicationEvent) {
         let msg = InternalEvent::Application(event);
-        let r = self.inner.send(msg);
-        r.map_err(|_| io::Error::new(io::ErrorKind::Other, "Unable to send message to reactor"))
+        self.inner.send(msg)
+                  .log_error("Unable to post event");
     }
 
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
         self.inner
             .send(InternalEvent::Invoke(Invoke::SendTo(*address, message)))
-            .unwrap();
+            .log_error("Unable to send to");
     }
 
     fn connect(&mut self, address: &SocketAddr) {
         self.inner
             .send(InternalEvent::Invoke(Invoke::Connect(*address)))
-            .unwrap();
+            .log_error("Unable to connect");
     }
 
     fn add_timeout(&mut self, timeout: Self::Timeout, time: Timespec) {
         self.inner
             .send(InternalEvent::Invoke(Invoke::AddTimeout(timeout, time)))
-            .unwrap();
+            .log_error("Unable to add timeout");
     }
 }
 
@@ -288,10 +289,24 @@ impl<H: EventHandler> Reactor<H> for Events<H> {
     }
 }
 
+trait LogError {
+    fn log_error<S: AsRef<str>>(self, msg: S);
+}
+
+impl<R, E> LogError for Result<R, E> 
+    where E: Display
+{
+    fn log_error<S: AsRef<str>>(self, msg: S) {
+        if let Err(error) = self {
+            error!("{}, an error occured: {}", msg.as_ref(), error);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::io;
-    use std::{thread};
+    use std::thread;
     use std::net::SocketAddr;
     use std::collections::VecDeque;
 
@@ -320,7 +335,7 @@ mod tests {
         pub fn new() -> TestHandler {
             TestHandler {
                 events: VecDeque::new(),
-                messages: VecDeque::new()
+                messages: VecDeque::new(),
             }
         }
     }
@@ -341,9 +356,7 @@ mod tests {
         fn handle_event(&mut self, event: Event) {
             info!("handle event: {:?}", event);
             match event {
-                Event::Incoming(raw) => {
-                    self.messages.push_back(raw)
-                }
+                Event::Incoming(raw) => self.messages.push_back(raw),
                 _ => {
                     self.events.push_back(InternalEvent::Node(event));
                 }
@@ -639,8 +652,10 @@ mod benches {
                 while let Some(e) = self.0.inner.handler.event() {
                     match e {
                         InternalEvent::Node(Event::Error(e)) => {
-                            return Err(format!("An error {:?} occured, {} messages is not received",
-                                               e, count));
+                            return Err(format!("An error {:?} occured, {} messages is not \
+                                                received",
+                                               e,
+                                               count));
                         }
                         _ => {}
                     }

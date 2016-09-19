@@ -244,11 +244,10 @@ impl<B, S> TxSender<B, S>
         }
     }
 
-    // TODO handle error
     pub fn send(&self, tx: B::Transaction) {
         if B::verify_tx(&tx) {
             let msg = ExternalMessage::Transaction(tx);
-            self.inner.post_event(msg).unwrap();
+            self.inner.post_event(msg);
         }
     }
 }
