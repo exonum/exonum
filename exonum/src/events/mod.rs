@@ -422,17 +422,17 @@ mod tests {
             }
         }
 
-        pub fn wait_for_disconnect(&mut self) -> bool {
+        pub fn wait_for_disconnect(&mut self) -> Option<()> {
             let start = get_time();
             loop {
                 self.process_events().unwrap();
 
-                if start + Duration::milliseconds(100) < get_time() {
-                    return false;
+                if start + Duration::milliseconds(1000) < get_time() {
+                    return None;
                 }
                 while let Some(e) = self.0.inner.handler.event() {
                     match e {
-                        InternalEvent::Node(Event::Disconnected(_)) => return true,
+                        InternalEvent::Node(Event::Disconnected(_)) => return Some(()),
                         _ => {}
                     }
                 }
@@ -478,7 +478,7 @@ mod tests {
 
                 e.send_to(&addrs[1], m1);
                 assert_eq!(e.wait_for_msg(Duration::milliseconds(10000)), Some(m2));
-                e.wait_for_disconnect();
+                e.wait_for_disconnect().unwrap();
             });
         }
 
@@ -577,7 +577,7 @@ mod tests {
 
                     debug!("t2: send m3 to t1");
                     e.send_to(&addrs[0], m3.clone());
-                    e.wait_for_disconnect();
+                    e.wait_for_disconnect().unwrap();
                 }
                 debug!("t2: finished");
             });
@@ -673,7 +673,7 @@ mod benches {
                     e1.send_to(&addrs[1], msg);
                     e1.wait_for_messages(1, timeout).unwrap();
                 }
-                e1.wait_for_disconnect();
+                e1.wait_for_disconnect().unwrap();
             });
             let t2 = thread::spawn(move || {
                 e2.wait_for_connect(&addrs[0]).unwrap();

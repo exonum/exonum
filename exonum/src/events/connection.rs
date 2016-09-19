@@ -219,7 +219,7 @@ impl Connection for OutgoingConnection {
     }
 
     fn interest(&self) -> EventSet {
-        let mut set = EventSet::hup() | EventSet::error();
+        let mut set = EventSet::readable() | EventSet::hup() | EventSet::error();
         if !self.is_idle() {
             set = set | EventSet::writable();
         }
