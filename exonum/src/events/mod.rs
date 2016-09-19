@@ -609,8 +609,7 @@ mod benches {
 
     use time::{get_time, Duration};
 
-    use super::{Network, NetworkConfiguration, Events};
-    use super::{Reactor, Event, InternalEvent};
+    use super::{Network, NetworkConfiguration, Events, Reactor};
     use super::tests::{gen_message, TestEvents, TestPoller, TestHandler};
 
     use test::Bencher;
@@ -647,18 +646,6 @@ mod benches {
 
                 if start + duration < get_time() {
                     return Err(format!("Timeout exceeded, {} messages is not received", count));
-                }
-
-                while let Some(e) = self.0.inner.handler.event() {
-                    match e {
-                        InternalEvent::Node(Event::Error(e)) => {
-                            return Err(format!("An error {:?} occured, {} messages is not \
-                                                received",
-                                               e,
-                                               count));
-                        }
-                        _ => {}
-                    }
                 }
 
                 if let Some(_) = self.0.inner.handler.message() {
