@@ -291,7 +291,7 @@ impl<H: EventHandler> Reactor<H> for Events<H> {
 #[cfg(test)]
 mod tests {
     use std::io;
-    use std::{time, thread};
+    use std::{thread};
     use std::net::SocketAddr;
     use std::collections::VecDeque;
 
@@ -308,21 +308,29 @@ mod tests {
 
     pub struct TestHandler {
         events: VecDeque<TestEvent>,
+        messages: VecDeque<RawMessage>,
     }
 
     pub trait TestPoller {
-        fn poll(&mut self) -> Option<TestEvent>;
+        fn event(&mut self) -> Option<TestEvent>;
+        fn message(&mut self) -> Option<RawMessage>;
     }
 
     impl TestHandler {
         pub fn new() -> TestHandler {
-            TestHandler { events: VecDeque::new() }
+            TestHandler { 
+                events: VecDeque::new(),
+                messages: VecDeque::new()
+            }
         }
     }
 
     impl TestPoller for TestHandler {
-        fn poll(&mut self) -> Option<TestEvent> {
+        fn event(&mut self) -> Option<TestEvent> {
             self.events.pop_front()
+        }
+        fn message(&mut self) -> Option<RawMessage> {
+            self.messages.pop_front()
         }
     }
 
@@ -331,8 +339,15 @@ mod tests {
         type ApplicationEvent = ();
 
         fn handle_event(&mut self, event: Event) {
-            trace!("handle event: {:?}", event);
-            self.events.push_back(InternalEvent::Node(event));
+            info!("handle event: {:?}", event);
+            match event {
+                Event::Incoming(raw) => {
+                    self.messages.push_back(raw)
+                }
+                _ => {
+                    self.events.push_back(InternalEvent::Node(event));
+                }
+            }
         }
         fn handle_timeout(&mut self, _: Self::Timeout) {}
         fn handle_application_event(&mut self, event: Self::ApplicationEvent) {
@@ -360,9 +375,7 @@ mod tests {
 
         pub fn wait_for_bind(&mut self, addr: &SocketAddr) -> Option<()> {
             self.0.bind().unwrap();
-            thread::sleep(time::Duration::from_millis(100));
             let r = self.wait_for_connect(addr);
-            thread::sleep(time::Duration::from_millis(500)); //TODO it maybe be a bug
             r
         }
 
@@ -376,7 +389,7 @@ mod tests {
                 if start + Duration::milliseconds(10000) < get_time() {
                     return None;
                 }
-                while let Some(e) = self.0.inner.handler.poll() {
+                while let Some(e) = self.0.inner.handler.event() {
                     match e {
                         InternalEvent::Node(Event::Connected(_)) => return Some(()),
                         _ => {}
@@ -393,12 +406,18 @@ mod tests {
                 if start + duration < get_time() {
                     return None;
                 }
-                while let Some(e) = self.0.inner.handler.poll() {
+
+                while let Some(e) = self.0.inner.handler.event() {
                     match e {
-                        InternalEvent::Node(Event::Incoming(msg)) => return Some(msg),
-                        InternalEvent::Node(Event::Error(_)) => return None,
+                        InternalEvent::Node(Event::Error(_)) | InternalEvent::Node(Event::Disconnected(_)) => {
+                            return None;
+                        }
                         _ => {}
                     }
+                }
+                
+                if let Some(msg) = self.0.inner.handler.message() {
+                    return Some(msg);
                 }
             }
         }
@@ -411,7 +430,7 @@ mod tests {
                 if start + Duration::milliseconds(100) < get_time() {
                     return false;
                 }
-                while let Some(e) = self.0.inner.handler.poll() {
+                while let Some(e) = self.0.inner.handler.event() {
                     match e {
                         InternalEvent::Node(Event::Disconnected(_)) => return true,
                         _ => {}
@@ -444,13 +463,18 @@ mod tests {
         let m1 = gen_message(15, 1000000);
         let m2 = gen_message(16, 400);
 
+        let mut e1 = TestEvents::with_addr(addrs[0].clone());
+        let mut e2 = TestEvents::with_addr(addrs[1].clone());
+        e1.0.bind().unwrap();
+        e2.0.bind().unwrap();
+
         let t1;
         {
             let m1 = m1.clone();
             let m2 = m2.clone();
             t1 = thread::spawn(move || {
-                let mut e = TestEvents::with_addr(addrs[0].clone());
-                e.wait_for_bind(&addrs[1]);
+                let mut e = e1;
+                e.wait_for_connect(&addrs[1]);
 
                 e.send_to(&addrs[1], m1);
                 assert_eq!(e.wait_for_msg(Duration::milliseconds(10000)), Some(m2));
@@ -463,8 +487,8 @@ mod tests {
             let m1 = m1.clone();
             let m2 = m2.clone();
             t2 = thread::spawn(move || {
-                let mut e = TestEvents::with_addr(addrs[1].clone());
-                e.wait_for_bind(&addrs[0]);
+                let mut e = e2;
+                e.wait_for_connect(&addrs[0]);
 
                 e.send_to(&addrs[0], m2);
                 assert_eq!(e.wait_for_msg(Duration::milliseconds(10000)), Some(m1));
@@ -485,6 +509,11 @@ mod tests {
         let m2 = gen_message(16, 400);
         let m3 = gen_message(17, 600);
 
+        let mut e1 = TestEvents::with_addr(addrs[0].clone());
+        let mut e2 = TestEvents::with_addr(addrs[1].clone());
+        e1.0.bind().unwrap();
+        e2.0.bind().unwrap();
+
         let t1;
         {
             let m1 = m1.clone();
@@ -492,8 +521,8 @@ mod tests {
             let m3 = m3.clone();
             t1 = thread::spawn(move || {
                 {
-                    let mut e = TestEvents::with_addr(addrs[0].clone());
-                    e.wait_for_bind(&addrs[1]).unwrap();
+                    let mut e = e1;
+                    e.wait_for_connect(&addrs[1]).unwrap();
 
                     debug!("t1: connection opened");
                     debug!("t1: send m1 to t2");
@@ -526,8 +555,8 @@ mod tests {
             let m3 = m3.clone();
             t2 = thread::spawn(move || {
                 {
-                    let mut e = TestEvents::with_addr(addrs[1].clone());
-                    e.wait_for_bind(&addrs[0]).unwrap();
+                    let mut e = e2;
+                    e.wait_for_connect(&addrs[0]).unwrap();
 
                     debug!("t2: connection opened");
                     debug!("t2: send m2 to t1");
@@ -606,18 +635,20 @@ mod benches {
                 if start + duration < get_time() {
                     return Err(format!("Timeout exceeded, {} messages is not received", count));
                 }
-                while let Some(e) = self.0.inner.handler.poll() {
+
+                while let Some(e) = self.0.inner.handler.event() {
                     match e {
-                        InternalEvent::Node(Event::Incoming(_)) => {
-                            count = count - 1;
-                        }
-                        InternalEvent::Node(Event::Error(_)) => {
+                        InternalEvent::Node(Event::Error(_)) 
+                        | InternalEvent::Node(Event::Disconnected(_)) => {
                             return Err(format!("An error occured, {} messages is not received",
-                                               count))
+                                               count));
                         }
                         _ => {}
                     }
+                }
 
+                if let Some(_) = self.0.inner.handler.message() {
+                    count = count - 1;
                     if count == 0 {
                         return Ok(());
                     }
