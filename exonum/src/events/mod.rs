@@ -121,8 +121,9 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
 
     fn post_event(&self, event: Self::ApplicationEvent) {
         let msg = InternalEvent::Application(event);
-        self.inner.send(msg)
-                  .log_error("Unable to post event");
+        self.inner
+            .send(msg)
+            .log_error("Unable to post event");
     }
 
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
@@ -219,9 +220,10 @@ impl<H: EventHandler> MioAdapter<H> {
         if ms < 0 {
             self.handler.handle_timeout(timeout);
         } else {
-            // FIXME: remove unwrap here
             // TODO: use mio::Timeout
-            event_loop.timeout_ms(Timeout::Node(timeout), ms as u64).unwrap();
+            event_loop.timeout_ms(Timeout::Node(timeout), ms as u64)
+                .map_err(|x| format!("{:?}", x))
+                .log_error("Unable to add timeout to event loop");
         }
     }
 }
@@ -293,7 +295,7 @@ trait LogError {
     fn log_error<S: AsRef<str>>(self, msg: S);
 }
 
-impl<R, E> LogError for Result<R, E> 
+impl<R, E> LogError for Result<R, E>
     where E: Display
 {
     fn log_error<S: AsRef<str>>(self, msg: S) {
