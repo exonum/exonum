@@ -318,7 +318,7 @@ mod tests {
 
     impl TestHandler {
         pub fn new() -> TestHandler {
-            TestHandler { 
+            TestHandler {
                 events: VecDeque::new(),
                 messages: VecDeque::new()
             }
@@ -409,13 +409,13 @@ mod tests {
 
                 while let Some(e) = self.0.inner.handler.event() {
                     match e {
-                        InternalEvent::Node(Event::Error(_)) | InternalEvent::Node(Event::Disconnected(_)) => {
-                            return None;
+                        InternalEvent::Node(Event::Error(e)) => {
+                            error!("An error during wait occured {:?}", e);
                         }
                         _ => {}
                     }
                 }
-                
+
                 if let Some(msg) = self.0.inner.handler.message() {
                     return Some(msg);
                 }
@@ -638,10 +638,9 @@ mod benches {
 
                 while let Some(e) = self.0.inner.handler.event() {
                     match e {
-                        InternalEvent::Node(Event::Error(_)) 
-                        | InternalEvent::Node(Event::Disconnected(_)) => {
-                            return Err(format!("An error occured, {} messages is not received",
-                                               count));
+                        InternalEvent::Node(Event::Error(e)) => {
+                            return Err(format!("An error {:?} occured, {} messages is not received",
+                                               e, count));
                         }
                         _ => {}
                     }
