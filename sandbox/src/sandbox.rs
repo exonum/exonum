@@ -4,7 +4,6 @@ use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use std::net::SocketAddr;
 use std::ops::Drop;
-use std::io;
 
 use time::Timespec;
 
@@ -78,10 +77,9 @@ impl<B> Channel for SandboxChannel<B>
         self.inner.lock().unwrap().time
     }
 
-    fn post_event(&self, event: Self::ApplicationEvent) -> io::Result<()> {
+    fn post_event(&self, event: Self::ApplicationEvent) {
         let msg = InternalEvent::Application(event);
         self.send_event(msg);
-        Ok(())
     }
 
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {

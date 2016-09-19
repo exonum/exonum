@@ -205,11 +205,9 @@ impl<H: EventHandler> MioAdapter<H> {
     }
 
     fn handle_connect(&mut self, event_loop: &mut EventLoop<H>, address: &SocketAddr) {
-        if let Err(e) = self.network.connect(event_loop, address) {
-            error!("{}: An error during connect occured {:?}",
-                   self.network.address(),
-                   e);
-        }
+        self.network
+            .connect(event_loop, address)
+            .log_error(format!("Unable to connect with {}", address));
     }
 
     fn handle_add_timeout(&mut self,
@@ -222,6 +220,7 @@ impl<H: EventHandler> MioAdapter<H> {
         } else {
             // TODO: use mio::Timeout
             event_loop.timeout_ms(Timeout::Node(timeout), ms as u64)
+                .map(|_| ())
                 .map_err(|x| format!("{:?}", x))
                 .log_error("Unable to add timeout to event loop");
         }
@@ -233,10 +232,9 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
     type Message = InternalEvent<H::ApplicationEvent, H::Timeout>;
 
     fn ready(&mut self, event_loop: &mut EventLoop<H>, token: mio::Token, events: mio::EventSet) {
-        let r = self.network.io(event_loop, &mut self.handler, token, events);
-        if let Err(e) = r {
-            error!("{}: An error occured {:?}", self.network.address(), e);
-        }
+        self.network
+            .io(event_loop, &mut self.handler, token, events)
+            .log_error(format!("{}", self.network.address()));
     }
 
     fn notify(&mut self, event_loop: &mut EventLoop<H>, msg: Self::Message) {
@@ -295,7 +293,7 @@ trait LogError {
     fn log_error<S: AsRef<str>>(self, msg: S);
 }
 
-impl<R, E> LogError for Result<R, E>
+impl<E> LogError for Result<(), E>
     where E: Display
 {
     fn log_error<S: AsRef<str>>(self, msg: S) {
