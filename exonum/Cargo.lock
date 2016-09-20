@@ -6,7 +6,7 @@ dependencies = [
  "clippy 0.0.81 (registry+https://github.com/rust-lang/crates.io-index)",
  "db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "leveldb 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "leveldb 0.8.2 (git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb.git)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.34 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -91,18 +91,18 @@ dependencies = [
 
 [[package]]
 name = "leveldb"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "0.8.2"
+source = "git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb.git#811ebf531323b814ffe1217ded48007bbf00fa72"
 dependencies = [
  "db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "leveldb-sys 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb-sys.git)",
  "libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "leveldb-sys"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
+version = "3.0.0"
+source = "git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb-sys.git#062390385e65dd64b66c55646b7c4d991a0b5b93"
 dependencies = [
  "libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -409,8 +409,8 @@ dependencies = [
 "checksum db-key 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "b72465f46d518f6015d9cf07f7f3013a95dd6b9c2747c3d65ae0cce43929d14f"
 "checksum env_logger 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "82dcb9ceed3868a03b335657b85a159736c961900f7e7747d3b0b97b9ccb5ccb"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
-"checksum leveldb 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)" = "9a8daea72c723e01c4a2f84090bb7bd11457e3d5c1997280b89f0699252d8228"
-"checksum leveldb-sys 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2926fa1abaf634edeac4762060c8e23e8c888f460ede8105bd9d2718fe016d5f"
+"checksum leveldb 0.8.2 (git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb.git)" = "<none>"
+"checksum leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb-sys.git)" = "<none>"
 "checksum libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)" = "23e3757828fa702a20072c37ff47938e9dd331b92fac6e223d26d4b7a55f7ee2"
 "checksum libsodium-sys 0.0.12 (registry+https://github.com/rust-lang/crates.io-index)" = "44e9986c330611ccd26ea74e502c70e5ebab2874c4c23f2f5f3c5a6ed3fbfbc6"
 "checksum log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "ab83497bf8bf4ed2a74259c1c802351fcd67a65baa86394b6ba73c36f4838054"
