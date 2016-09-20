@@ -8,7 +8,6 @@ log = "0.3"
 mio = "0.5"
 time = "0.1"
 byteorder = "0.5"
-db-key = "0.0.5"
 num = "0.1"
 sodiumoxide = {version="0.0.12"}
 rand = "0.3"
