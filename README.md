@@ -10,18 +10,25 @@
 
 ## System Libraries
 
+Временно мы используем собственную копию `leveldb`, которая клонируется из внутреннего репозитория по ssh,
+поэтому поддерживается работа с gitlab только через ssh.
+
 ### Linux
 
 Для debian based систем понадобятся следующие пакеты:
 ```
-$ apt install build-essential git libsodium-dev
+$ apt install build-essential git libsodium-dev libleveldb-dev
 ```
 
 ### macOS
 
 Прежде всего необходимо установить и настроить homebrew согласно его [инструкции](http://brew.sh/). После чего установить следующие пакеты:
 ```
-$ brew install libsodium
+$ brew install libsodium leveldb
+```
+Возможно придется выполнить команду:
+```
+ssh-add ~/.ssh/id_rsa.pub
 ```
 
 _В принципе данную инструкцию можно использовать и для любых linux-based дистрибутивов, если заменить homebrew на [linuxbrew](http://linuxbrew.sh/)_
