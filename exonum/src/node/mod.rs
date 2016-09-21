@@ -38,8 +38,6 @@ pub struct TxSender<B, S>
     _b: PhantomData<B>,
 }
 
-// TODO: avoid recursion calls?
-
 pub struct NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
@@ -56,6 +54,7 @@ pub struct NodeHandler<B, S>
     pub peer_discovery: Vec<SocketAddr>,
 }
 
+// TODO extract node handler configuration
 #[derive(Debug, Clone)]
 pub struct Configuration {
     pub public_key: PublicKey,

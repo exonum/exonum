@@ -106,7 +106,6 @@ impl<E: Send, T: Send> MioChannel<E, T> {
     }
 }
 
-// TODO remove unwrap
 impl<E: Send, T: Send> Channel for MioChannel<E, T> {
     type ApplicationEvent = E;
     type Timeout = T;
@@ -144,6 +143,8 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
             .log_error("Unable to add timeout");
     }
 }
+
+// TODO think about more ergonomic design with ChannelFactory or other solution
 
 impl<H: EventHandler> Events<H> {
     pub fn new(network: Network, handler: H) -> io::Result<Events<H>> {
@@ -256,7 +257,7 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
         }
     }
 
-    // TODO rewrite it
+    // TODO think about interrupted handlers
     // fn interrupted(&mut self, _: &mut EventLoop) {
     //     self.push(Event::Terminate);
     // }
@@ -627,7 +628,7 @@ mod benches {
                 max_incoming_connections: 128,
                 max_outgoing_connections: 128,
                 tcp_nodelay: cfg.tcp_nodelay,
-                tcp_keep_alive: Some(1),
+                tcp_keep_alive: None,
                 tcp_reconnect_timeout: 1000,
                 tcp_reconnect_timeout_max: 600000,
             });
@@ -768,22 +769,11 @@ mod benches {
     }
 
     #[bench]
-    fn bench_msg_long_1000(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: false,
-            len: 100000,
-            times: 1000,
-        };
-        let addrs = ["127.0.0.1:9918".parse().unwrap(), "127.0.0.1:9919".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
-
-    #[bench]
-    fn bench_msg_long_1000_nodelay(b: &mut Bencher) {
+    fn bench_msg_long_100_nodelay(b: &mut Bencher) {
         let cfg = BenchConfig {
             tcp_nodelay: true,
             len: 100000,
-            times: 1000,
+            times: 100,
         };
         let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
         bench_network(b, addrs, cfg);
