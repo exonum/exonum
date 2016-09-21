@@ -14,14 +14,14 @@
 
 Для debian based систем понадобятся следующие пакеты:
 ```
-$ apt install build-essential git libsodium-dev
+$ apt install build-essential git libsodium-dev libleveldb-dev
 ```
 
 ### macOS
 
 Прежде всего необходимо установить и настроить homebrew согласно его [инструкции](http://brew.sh/). После чего установить следующие пакеты:
 ```
-$ brew install libsodium
+$ brew install libsodium leveldb
 ```
 
 _В принципе данную инструкцию можно использовать и для любых linux-based дистрибутивов, если заменить homebrew на [linuxbrew](http://linuxbrew.sh/)_
@@ -33,7 +33,15 @@ _В принципе данную инструкцию можно использ
 ```
 $ curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly
 ```
-_Возможны ситуации, когда сборка проекта сломана в текущей версии nightly, если такое происходит, то попробуйте откатиться на более старую версию_
+На данный момент гарантировано все работает на nightly версии от 15 сентября, для того,
+чтобы перейти на ее использование, нужно в корне проекта выполнить команду:
+```
+rustup override set nightly-2016-09-15
+```
+Чтобы отменить переназначение версии в той же самой директории выполните:
+```
+rustup override unset
+```
 
 # Build instruction
 

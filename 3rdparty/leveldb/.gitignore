@@ -1,0 +1,5 @@
+build
+testdbs
+target
+*sw*
+Cargo.lock

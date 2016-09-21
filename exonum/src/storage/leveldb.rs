@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use std::collections::Bound::{Included, Unbounded};
 // use std::iter::Iterator;
 
-use db_key::Key;
 use leveldb::database::Database as LevelDatabase;
 use leveldb::error::Error as LevelError;
 use leveldb::database::iterator::Iterable as LevelIterable;
@@ -22,30 +21,18 @@ use leveldb::iterator::LevelDBIterator;
 use super::{Map, Database, Error, Patch, Change, Fork};
 // use super::{Iterable, Seekable}
 
-struct BinaryKey(Vec<u8>);
-
-impl Key for BinaryKey {
-    fn from_u8(key: &[u8]) -> BinaryKey {
-        BinaryKey(key.to_vec())
-    }
-
-    fn as_slice<T, F: Fn(&[u8]) -> T>(&self, f: F) -> T {
-        f(&self.0)
-    }
-}
-
 #[derive(Clone)]
 pub struct LevelDB {
-    db: Arc<LevelDatabase<BinaryKey>>,
+    db: Arc<LevelDatabase>,
 }
 
 pub struct LevelDBView {
-    _db: Arc<LevelDatabase<BinaryKey>>,
-    snap: LevelSnapshot<'static, BinaryKey>,
+    _db: Arc<LevelDatabase>,
+    snap: LevelSnapshot<'static>,
     changes: RefCell<Patch>,
 }
 
-const LEVELDB_READ_OPTIONS: ReadOptions<'static, BinaryKey> = ReadOptions {
+const LEVELDB_READ_OPTIONS: ReadOptions<'static> = ReadOptions {
     verify_checksums: false,
     fill_cache: true,
     snapshot: None,
@@ -68,25 +55,25 @@ impl LevelDB {
 impl Map<[u8], Vec<u8>> for LevelDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         self.db
-            .get(LEVELDB_READ_OPTIONS, BinaryKey(key.to_vec()))
+            .get(LEVELDB_READ_OPTIONS, key)
             .map_err(LevelDB::to_storage_error)
     }
 
     fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-        let result = self.db.put(LEVELDB_WRITE_OPTIONS, BinaryKey(key.to_vec()), &value);
+        let result = self.db.put(LEVELDB_WRITE_OPTIONS, key, &value);
         result.map_err(LevelDB::to_storage_error)
     }
 
     fn delete(&self, key: &[u8]) -> Result<(), Error> {
-        let result = self.db.delete(LEVELDB_WRITE_OPTIONS, BinaryKey(key.to_vec()));
+        let result = self.db.delete(LEVELDB_WRITE_OPTIONS, key);
         result.map_err(LevelDB::to_storage_error)
     }
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let it = self.db.keys_iter(LEVELDB_READ_OPTIONS);
-        it.seek(&BinaryKey(key.to_vec()));
+        it.seek(key);
         if it.valid() {
             let key = it.key();
-            return Ok(Some(key.0));
+            return Ok(Some(key.to_vec()));
         }
         Ok(None)
     }
@@ -114,7 +101,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
             }
             None => {
                 self.snap
-                    .get(LEVELDB_READ_OPTIONS, BinaryKey(key.to_vec()))
+                    .get(LEVELDB_READ_OPTIONS, key)
                     .map_err(LevelDB::to_storage_error)
             }
         }
@@ -139,10 +126,10 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
         };
         if out.is_none() {
             let it = self.snap.keys_iter(LEVELDB_READ_OPTIONS);
-            it.seek(&BinaryKey(key.to_vec()));
+            it.seek(key.to_vec());
             if it.valid() {
                 let key = it.key();
-                return Ok(Some(key.0));
+                return Ok(Some(key.to_vec()));
             }
             Ok(None)
         } else {
@@ -172,10 +159,10 @@ impl Database for LevelDB {
         for (key, change) in patch.into_iter() {
             match change {
                 Change::Put(ref v) => {
-                    batch.put(BinaryKey(key.to_vec()), v);
+                    batch.put(key, v);
                 }
                 Change::Delete => {
-                    batch.delete(BinaryKey(key.to_vec()));
+                    batch.delete(key);
                 }
             }
         }
