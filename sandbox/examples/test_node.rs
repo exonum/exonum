@@ -17,8 +17,8 @@ use sandbox::testnet::{TestNodeConfig};
 use timestamping::TimestampingBlockchain;
 
 fn run_node<B: Blockchain>(blockchain: B, node_cfg: Configuration) {
-    let mut node = Node::with_config(blockchain, node_cfg);
-    node.run();
+    let mut node = Node::new(blockchain, node_cfg);
+    node.run().unwrap();
 }
 
 fn main() {

@@ -1,5 +1,6 @@
 #![cfg_attr(feature="clippy", feature(plugin))]
 #![cfg_attr(feature="clippy", plugin(clippy))]
+#![cfg_attr(test, feature(test))]
 
 #![feature(associated_consts)]
 #![feature(associated_type_defaults)]
@@ -21,6 +22,10 @@ extern crate rand;
 
 #[cfg(test)]
 extern crate tempdir;
+#[cfg(test)]
+extern crate test;
+#[cfg(test)]
+extern crate env_logger;
 
 #[macro_use]
 pub mod messages;

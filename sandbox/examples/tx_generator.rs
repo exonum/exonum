@@ -95,7 +95,7 @@ fn main() {
             let node_cfg = cfg.to_node_configuration(idx, peers);
 
             let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
-            let mut node = Node::with_config(blockchain.clone(), node_cfg);
+            let mut node = Node::new(blockchain.clone(), node_cfg);
             let chan = node.channel();
 
             let tx_package_size: usize = matches.value_of("TX_PACKAGE").unwrap_or("1000").parse().unwrap();
@@ -121,7 +121,7 @@ fn main() {
                 }                 
             });
 
-            node.run();
+            node.run().unwrap();
             handle.join().unwrap();
         }
         _ => {

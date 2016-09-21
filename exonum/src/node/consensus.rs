@@ -6,10 +6,16 @@ use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Mess
                              RequestPropose, RequestTransactions, RequestPrevotes,
                              RequestPrecommits, RequestCommit};
 use super::super::storage::Map;
-use super::{Node, Round, Height, RequestData, ValidatorId};
+use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
+
+use super::super::events::Channel;
+use super::{ExternalMessage, NodeTimeout};
 
 // TODO reduce view invokations
-impl<B: Blockchain> Node<B> {
+impl<B, S> NodeHandler<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+{
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
@@ -246,7 +252,7 @@ impl<B: Blockchain> Node<B> {
         self.state.new_height(hash);
 
         info!("{:?} ========== commited = {}, pool = {}",
-              self.events.get_time(),
+              self.channel.get_time(),
               self.state.commited_txs,
               self.state.transactions().len());
 
@@ -365,7 +371,7 @@ impl<B: Blockchain> Node<B> {
                 RequestData::Propose(ref propose_hash) => {
                     RequestPropose::new(&self.public_key,
                                         &peer,
-                                        self.events.get_time(),
+                                        self.channel.get_time(),
                                         self.state.height(),
                                         propose_hash,
                                         &self.secret_key)
@@ -382,7 +388,7 @@ impl<B: Blockchain> Node<B> {
                         .collect();
                     RequestTransactions::new(&self.public_key,
                                              &peer,
-                                             self.events.get_time(),
+                                             self.channel.get_time(),
                                              &txs,
                                              &self.secret_key)
                         .raw()
@@ -391,7 +397,7 @@ impl<B: Blockchain> Node<B> {
                 RequestData::Prevotes(round, ref propose_hash) => {
                     RequestPrevotes::new(&self.public_key,
                                          &peer,
-                                         self.events.get_time(),
+                                         self.channel.get_time(),
                                          self.state.height(),
                                          round,
                                          propose_hash,
@@ -402,7 +408,7 @@ impl<B: Blockchain> Node<B> {
                 RequestData::Precommits(round, ref propose_hash, ref block_hash) => {
                     RequestPrecommits::new(&self.public_key,
                                            &peer,
-                                           self.events.get_time(),
+                                           self.channel.get_time(),
                                            self.state.height(),
                                            round,
                                            propose_hash,
@@ -414,7 +420,7 @@ impl<B: Blockchain> Node<B> {
                 RequestData::Commit => {
                     RequestCommit::new(&self.public_key,
                                        &peer,
-                                       self.events.get_time(),
+                                       self.channel.get_time(),
                                        self.state.height(),
                                        &self.secret_key)
                         .raw()
@@ -483,7 +489,7 @@ impl<B: Blockchain> Node<B> {
         let propose = Propose::new(self.state.id(),
                                    self.state.height(),
                                    round,
-                                   self.events.get_time(),
+                                   self.channel.get_time(),
                                    self.state.last_hash(),
                                    &txs,
                                    &self.secret_key);

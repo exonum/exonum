@@ -219,7 +219,8 @@ impl Connection for OutgoingConnection {
     }
 
     fn interest(&self) -> EventSet {
-        let mut set = EventSet::hup() | EventSet::error();
+        // readable interest is needed to receive hup event on macos if socket closed by other side.
+        let mut set = EventSet::readable() | EventSet::hup() | EventSet::error();
         if !self.is_idle() {
             set = set | EventSet::writable();
         }

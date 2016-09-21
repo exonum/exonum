@@ -1,12 +1,14 @@
+use std::io;
 use std::net::SocketAddr;
+use std::marker::PhantomData;
 
 use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey};
-use super::events::{Reactor, Events, Event, NodeTimeout, EventsConfiguration, Network,
-                    NetworkConfiguration, InternalEvent, Sender, EventHandler};
+use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
+                    EventsConfiguration, Channel, EventHandler};
 use super::blockchain::Blockchain;
-use super::messages::{Any, Connect, RawMessage};
+use super::messages::{Connect, RawMessage};
 
 mod state;
 mod basic;
@@ -15,21 +17,35 @@ mod requests;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 
+#[derive(Clone, Debug)]
 pub enum ExternalMessage<B: Blockchain> {
     Transaction(B::Transaction),
 }
 
-pub struct TxSender<B: Blockchain> {
-    inner: Box<Sender<InternalEvent<ExternalMessage<B>>>>,
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum NodeTimeout {
+    Status,
+    Round(u64, u32),
+    Request(RequestData, Option<PublicKey>),
+    PeerExchange,
 }
 
-// TODO: avoid recursion calls?
+pub struct TxSender<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
+{
+    inner: S,
+    _b: PhantomData<B>,
+}
 
-pub struct Node<B: Blockchain> {
+pub struct NodeHandler<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
+{
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub state: State<B::Transaction>,
-    pub events: Box<Reactor<ExternalMessage<B>>>,
+    pub channel: S,
     pub blockchain: B,
     pub round_timeout: u32,
     pub status_timeout: u32,
@@ -38,6 +54,7 @@ pub struct Node<B: Blockchain> {
     pub peer_discovery: Vec<SocketAddr>,
 }
 
+// TODO extract node handler configuration
 #[derive(Debug, Clone)]
 pub struct Configuration {
     pub public_key: PublicKey,
@@ -51,29 +68,29 @@ pub struct Configuration {
     pub validators: Vec<PublicKey>,
 }
 
-impl<B: Blockchain> Node<B> {
-    pub fn new(blockchain: B,
-               reactor: Box<Reactor<ExternalMessage<B>>>,
-               config: Configuration)
-               -> Node<B> {
+impl<B, S> NodeHandler<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+{
+    pub fn new(blockchain: B, sender: S, config: Configuration) -> NodeHandler<B, S> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let id = config.validators
             .iter()
             .position(|pk| pk == &config.public_key)
             .unwrap();
         let connect = Connect::new(&config.public_key,
-                                   reactor.address(),
-                                   reactor.get_time(),
+                                   sender.address(),
+                                   sender.get_time(),
                                    &config.secret_key);
 
         let last_hash = blockchain.last_hash().unwrap().unwrap_or_else(|| super::crypto::hash(&[]));
 
         let state = State::new(id as u32, config.validators, connect, last_hash);
-        Node {
+        NodeHandler {
             public_key: config.public_key,
             secret_key: config.secret_key,
             state: state,
-            events: reactor,
+            channel: sender,
             blockchain: blockchain,
             round_timeout: config.round_timeout,
             status_timeout: config.status_timeout,
@@ -82,25 +99,14 @@ impl<B: Blockchain> Node<B> {
         }
     }
 
-    pub fn with_config(blockchain: B, config: Configuration) -> Node<B> {
-        // FIXME: remove unwraps here, use FATAL log level instead
-        let network = Network::with_config(config.network);
-        let reactor = Box::new(Events::with_config(config.events.clone(),
-                                                   network)
-            .unwrap()) as Box<Reactor<ExternalMessage<B>>>;
-        Self::new(blockchain, reactor, config)
-    }
-
     pub fn state(&self) -> &State<B::Transaction> {
         &self.state
     }
 
     pub fn initialize(&mut self) {
         info!("Start listening...");
-        self.events.bind().unwrap();
-
         for address in &self.peer_discovery.clone() {
-            if address == &self.events.address() {
+            if address == &self.channel.address() {
                 continue;
             }
             self.connect(address);
@@ -113,7 +119,7 @@ impl<B: Blockchain> Node<B> {
             .unwrap()
             .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time());
         let round = 1 +
-                    (self.events.get_time() - time).num_milliseconds() / self.round_timeout as i64;
+                    (self.channel.get_time() - time).num_milliseconds() / self.round_timeout as i64;
         self.state.jump_round(round as u32);
 
         info!("Jump to round {}", round);
@@ -121,22 +127,6 @@ impl<B: Blockchain> Node<B> {
         self.add_round_timeout();
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
-    }
-
-    pub fn run(&mut self) {
-        self.initialize();
-        loop {
-            if self.state.height() == 1000 {
-                break;
-            }
-
-            match self.events.poll() {
-                Event::Terminate => break,
-                Event::Timeout(t) => self.handle_timeout(t),
-                Event::Incoming(msg) => self.handle_message(msg),
-                Event::Internal(event) => self.handle_event(event),
-            }
-        }
     }
 
     pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
@@ -147,18 +137,18 @@ impl<B: Blockchain> Node<B> {
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
-            self.events.send_to(&conn.addr(), message.clone());
+            self.channel.send_to(&conn.addr(), message.clone());
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
     }
 
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        self.events.send_to(address, message.clone());
+        self.channel.send_to(address, message.clone());
     }
 
     pub fn connect(&mut self, address: &SocketAddr) {
-        self.events.connect(address);
+        self.channel.connect(address);
     }
 
     pub fn request(&mut self, data: RequestData, peer: PublicKey) {
@@ -182,67 +172,52 @@ impl<B: Blockchain> Node<B> {
                self.state.height(),
                self.state.round());
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
-        self.events.add_timeout(timeout, time);
+        self.channel.add_timeout(timeout, time);
     }
 
     pub fn add_status_timeout(&mut self) {
-        let time = self.events.get_time() + Duration::milliseconds(self.status_timeout as i64);
-        self.events.add_timeout(NodeTimeout::Status, time);
+        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout as i64);
+        self.channel.add_timeout(NodeTimeout::Status, time);
     }
 
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
-        let time = self.events.get_time() + data.timeout();
-        self.events.add_timeout(NodeTimeout::Request(data, peer), time);
+        let time = self.channel.get_time() + data.timeout();
+        self.channel.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
-        let time = self.events.get_time() + Duration::milliseconds(self.peers_timeout as i64);
-        self.events.add_timeout(NodeTimeout::PeerExchange, time);
+        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout as i64);
+        self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
-            self.events.send_to(&conn.addr(), message.clone());
+            self.channel.send_to(&conn.addr(), message.clone());
         }
-    }
-
-    pub fn channel(&self) -> TxSender<B> {
-        TxSender::new(self.events.channel())
     }
 }
 
-impl<B: Blockchain> EventHandler for Node<B> {
+impl<B, S> EventHandler for NodeHandler<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+{
     type Timeout = NodeTimeout;
-    type ExternalEvent = ExternalMessage<B>;
+    type ApplicationEvent = ExternalMessage<B>;
 
-    fn handle_message(&mut self, raw: RawMessage) {
-        // TODO: check message headers (network id, protocol version)
-        // FIXME: call message.verify method
-        //     if !raw.verify() {
-        //         return;
-        //     }
-        let msg = Any::from_raw(raw).unwrap();
-        match msg {
-            Any::Connect(msg) => self.handle_connect(msg),
-            Any::Status(msg) => self.handle_status(msg),
-            Any::Transaction(message) => self.handle_tx(message),
-            Any::Consensus(message) => self.handle_consensus(message),
-            Any::Request(message) => self.handle_request(message),
+    fn handle_event(&mut self, event: Event) {
+        match event {
+            Event::Connected(addr) => self.handle_connected(&addr),
+            Event::Disconnected(addr) => self.handle_disconnected(&addr),
+            Event::Incoming(raw) => self.handle_message(raw),
+            Event::Error(_) => {}
         }
     }
 
-    fn handle_event(&mut self, event: InternalEvent<Self::ExternalEvent>) {
+    fn handle_application_event(&mut self, event: Self::ApplicationEvent) {
         match event {
-            InternalEvent::Error(_) => {}
-            InternalEvent::Connected(addr) => self.handle_connected(&addr),
-            InternalEvent::Disconnected(addr) => self.handle_disconnected(&addr),
-            InternalEvent::External(external) => {
-                match external {
-                    ExternalMessage::Transaction(tx) => {
-                        self.handle_incoming_tx(tx);
-                    }
-                }
+            ExternalMessage::Transaction(tx) => {
+                self.handle_incoming_tx(tx);
             }
         }
     }
@@ -257,16 +232,57 @@ impl<B: Blockchain> EventHandler for Node<B> {
     }
 }
 
-impl<B: Blockchain> TxSender<B> {
-    pub fn new(event_sender: Box<Sender<InternalEvent<ExternalMessage<B>>>>) -> TxSender<B> {
-        TxSender { inner: event_sender }
+impl<B, S> TxSender<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
+{
+    pub fn new(inner: S) -> TxSender<B, S> {
+        TxSender {
+            inner: inner,
+            _b: PhantomData,
+        }
     }
 
-    // TODO handle error
     pub fn send(&self, tx: B::Transaction) {
         if B::verify_tx(&tx) {
-            let msg = InternalEvent::External(ExternalMessage::Transaction(tx));
-            self.inner.send(msg).unwrap();
+            let msg = ExternalMessage::Transaction(tx);
+            self.inner.post_event(msg);
         }
+    }
+}
+
+pub type NodeChannel<B> = MioChannel<ExternalMessage<B>, NodeTimeout>;
+
+pub struct Node<B>
+    where B: Blockchain
+{
+    reactor: Events<NodeHandler<B, NodeChannel<B>>>,
+}
+
+impl<B> Node<B>
+    where B: Blockchain
+{
+    pub fn new(blockchain: B, config: Configuration) -> Node<B> {
+        let network = Network::with_config(config.network.clone());
+        let event_loop = EventLoop::configured(config.events.clone()).unwrap();
+        let channel = MioChannel::new(config.network.listen_address, event_loop.channel());
+
+        let worker = NodeHandler::new(blockchain, channel, config);
+
+        Node { reactor: Events::with_event_loop(network, worker, event_loop) }
+    }
+
+    pub fn run(&mut self) -> io::Result<()> {
+        self.reactor.bind()?;
+        self.reactor.handler_mut().initialize();
+        self.reactor.run()
+    }
+
+    pub fn state(&self) -> &State<B::Transaction> {
+        self.reactor.handler().state()
+    }
+
+    pub fn channel(&self) -> TxSender<B, NodeChannel<B>> {
+        TxSender::new(self.reactor.handler().channel.clone())
     }
 }
