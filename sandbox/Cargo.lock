@@ -95,7 +95,7 @@ name = "exonum"
 version = "0.1.0"
 dependencies = [
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "leveldb 0.8.2 (git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb.git)",
+ "leveldb 0.9.0",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -115,17 +115,15 @@ dependencies = [
 
 [[package]]
 name = "leveldb"
-version = "0.8.2"
-source = "git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb.git#b21bbfd3e0ffd61b15a0090de45beafe7168ff59"
+version = "0.9.0"
 dependencies = [
- "leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb-sys.git)",
+ "leveldb-sys 3.0.0",
  "libc 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "leveldb-sys"
 version = "3.0.0"
-source = "git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb-sys.git#062390385e65dd64b66c55646b7c4d991a0b5b93"
 dependencies = [
  "libc 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -480,8 +478,6 @@ dependencies = [
 "checksum clap 2.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2887ae5b606c1fa314b9238e25a8be3fa673378415c32efc5749464f3365ee9d"
 "checksum env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "15abd780e45b3ea4f76b4e9a26ff4843258dd8a3eed2775a0e7368c2e7936c2f"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
-"checksum leveldb 0.8.2 (git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb.git)" = "<none>"
-"checksum leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/aleksei.sidorov/leveldb-sys.git)" = "<none>"
 "checksum libc 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)" = "408014cace30ee0f767b1c4517980646a573ec61a57957aeeabcac8ac0a02e8d"
 "checksum libsodium-sys 0.0.12 (registry+https://github.com/rust-lang/crates.io-index)" = "44e9986c330611ccd26ea74e502c70e5ebab2874c4c23f2f5f3c5a6ed3fbfbc6"
 "checksum log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "ab83497bf8bf4ed2a74259c1c802351fcd67a65baa86394b6ba73c36f4838054"
