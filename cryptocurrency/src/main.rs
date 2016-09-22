@@ -9,12 +9,13 @@ extern crate rustless;
 extern crate iron;
 extern crate hyper;
 extern crate valico;
-extern crate exonum;
-extern crate cryptocurrency;
-
 extern crate env_logger;
 extern crate clap;
 extern crate serde;
+extern crate time;
+
+extern crate exonum;
+extern crate cryptocurrency;
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -26,6 +27,7 @@ use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning};
 use valico::json_dsl;
 use hyper::status::StatusCode;
+use serde::{Serialize, Serializer};
 
 use exonum::node::{Node, NodeChannel, Configuration};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions,
@@ -37,18 +39,44 @@ use cryptocurrency::config::{NodeConfig};
 use cryptocurrency::CurrencyBlockchain;
 
 pub trait BlockchainExplorer {
-    fn blocks_range(&self, from: u64, to: Option<u64>) -> Result<Vec<Block>, Error>;
-    fn get_block(&self, idx: u64) -> Result<Option<Block>, Error> {
+    type BlockInfo : Serialize;
+
+    fn blocks_range(&self, from: u64, to: Option<u64>) -> Result<Vec<Self::BlockInfo>, Error>;
+    fn get_block(&self, idx: u64) -> Result<Option<Self::BlockInfo>, Error> {
         let range = self.blocks_range(idx, Some(idx + 1))?;
         Ok(range.into_iter().next())
     }
 }
 
+pub struct BlockInfo {
+    inner: Block,
+    tx_count: u32,
+}
+
+impl Serialize for BlockInfo {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error> where S: Serializer {
+        let b = &self.inner;
+        // TODO think about timespec serialize
+        let tm = ::time::at(b.time()).rfc3339().to_string();
+        let mut state = serializer.serialize_struct("block", 7)?;
+        serializer.serialize_struct_elt(&mut state, "height", b.height())?;
+        serializer.serialize_struct_elt(&mut state, "hash", b.hash())?;
+        serializer.serialize_struct_elt(&mut state, "prev_hash", b.prev_hash())?;
+        serializer.serialize_struct_elt(&mut state, "state_hash", b.state_hash())?;
+        serializer.serialize_struct_elt(&mut state, "time", tm)?;
+        serializer.serialize_struct_elt(&mut state, "tx_hash", b.tx_hash())?;
+        serializer.serialize_struct_elt(&mut state, "tx_count", self.tx_count)?;
+        serializer.serialize_struct_end(state)
+    }
+}
+
 impl<D: Database> BlockchainExplorer for CurrencyBlockchain<D> {
-    fn blocks_range(&self, from: u64, to: Option<u64>) -> Result<Vec<Block>, Error> {
-        let v = self.view();
-        let heights = v.heights();
-        let blocks = v.blocks();
+    type BlockInfo = BlockInfo;
+
+    fn blocks_range(&self, from: u64, to: Option<u64>) -> Result<Vec<Self::BlockInfo>, Error> {
+        let view = self.view();
+        let heights = view.heights();
+        let blocks = view.blocks();
 
         let max_len = heights.len()?;
         let len = min(max_len, to.unwrap_or(max_len));
@@ -56,33 +84,17 @@ impl<D: Database> BlockchainExplorer for CurrencyBlockchain<D> {
         let mut v = Vec::new();
         for i in from..len {
             if let Some(ref h) = heights.get(i)? {
+                let tx_count = view.block_txs(i).len()?;
                 if let Some(block) = blocks.get(h)? {
-                    v.push(block);
+                    v.push(BlockInfo { 
+                        inner: block,
+                        tx_count: tx_count
+                    });
                 }
             }
         }
         Ok(v)
     }
-}
-
-fn get_blocks<D: Database>(b: &CurrencyBlockchain<D>, from: u64, to: Option<u64>) -> Result<Vec<Block>, Error> {
-    let v = b.view();
-
-    let heights = v.heights();
-    let blocks = v.blocks();
-
-    let max_len = heights.len()?;
-    let len = min(max_len, to.unwrap_or(max_len));
-
-    let mut v = Vec::new();
-    for i in from..len {
-        if let Some(ref h) = heights.get(i)? {
-            if let Some(block) = blocks.get(h)? {
-                v.push(block);
-            }
-        }
-    }
-    Ok(v)
 }
 
 fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>, node_cfg: Configuration, port: Option<u16>) {
