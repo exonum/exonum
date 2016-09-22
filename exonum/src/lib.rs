@@ -19,6 +19,7 @@ extern crate sodiumoxide;
 extern crate leveldb;
 extern crate num;
 extern crate rand;
+extern crate serde;
 
 #[cfg(test)]
 extern crate tempdir;

@@ -12,7 +12,7 @@ num = "0.1"
 sodiumoxide = {git = "https://github.com/dnaq/sodiumoxide.git", rev="0c9f41f"}
 rand = "0.3"
 leveldb = {version="0.9", path="../3rdparty/leveldb"}
-clippy = {version="0.0.81", optional=true}
+serde = "0.8"
 
 [dev-dependencies]
 tempdir = "0.3"

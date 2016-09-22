@@ -1,4 +1,15 @@
+#![feature(type_ascription)]
+#![feature(custom_derive)]
+#![feature(plugin)]
+#![plugin(serde_macros)]
 #![feature(question_mark)]
+
+extern crate rand;
+extern crate time;
+extern crate serde;
+extern crate toml;
+#[macro_use]
+extern crate log;
 
 #[macro_use(message)]
 extern crate exonum;
@@ -12,6 +23,9 @@ use exonum::blockchain::{Blockchain, View};
 
 pub const TX_TRANSFER_ID: u16 = 128;
 pub const TX_ISSUE_ID: u16 = 129;
+
+pub mod config;
+pub mod config_file;
 
 message! {
     TxTransfer {

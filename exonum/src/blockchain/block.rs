@@ -1,4 +1,5 @@
 use time::Timespec;
+use serde::{Serialize, Serializer};
 
 use super::super::messages::Field;
 use super::super::crypto::{Hash, hash};
@@ -78,6 +79,21 @@ impl StorageValue for Block {
 
     fn hash(&self) -> Hash {
         Block::hash(self)
+    }
+}
+
+impl Serialize for Block {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error> where S: Serializer {
+        // TODO think about timespec serialize
+        let tm = ::time::at(self.time()).rfc3339().to_string();
+        let mut state = serializer.serialize_struct("block", 6)?;
+        serializer.serialize_struct_elt(&mut state, "height", self.height())?;
+        serializer.serialize_struct_elt(&mut state, "hash", self.hash())?;
+        serializer.serialize_struct_elt(&mut state, "prev_hash", self.prev_hash())?;
+        serializer.serialize_struct_elt(&mut state, "state_hash", self.state_hash())?;
+        serializer.serialize_struct_elt(&mut state, "time", tm)?;
+        serializer.serialize_struct_elt(&mut state, "tx_hash", self.tx_hash())?;
+        serializer.serialize_struct_end(state)
     }
 }
 

@@ -31,6 +31,7 @@ pub enum NodeTimeout {
     PeerExchange,
 }
 
+#[derive(Clone)]
 pub struct TxSender<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>

@@ -13,5 +13,5 @@ clap = {version="2.10.0", features=["unstable"]}
 rand = "0.3"
 time = "0.1"
 serde = "0.8"
-serde_macros = "0.8"
+serde_macros = "0.8.9"
 toml = {version="0.2", default-features=false, features=["serde"]}
