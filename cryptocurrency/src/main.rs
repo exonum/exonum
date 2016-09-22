@@ -19,6 +19,7 @@ extern crate serde;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
+use std::cmp::min;
 
 use clap::{Arg, App, SubCommand};
 use rustless::json::ToJson;
@@ -35,17 +36,52 @@ use cryptocurrency::config_file::{ConfigFile};
 use cryptocurrency::config::{NodeConfig};
 use cryptocurrency::CurrencyBlockchain;
 
-fn get_blocks<D: Database>(b: &CurrencyBlockchain<D>) -> Result<Vec<Block>, Error> {
+pub trait BlockchainExplorer {
+    fn blocks_range(&self, from: u64, to: Option<u64>) -> Result<Vec<Block>, Error>;
+    fn get_block(&self, idx: u64) -> Result<Option<Block>, Error> {
+        let range = self.blocks_range(idx, Some(idx + 1))?;
+        Ok(range.into_iter().next())
+    }
+}
+
+impl<D: Database> BlockchainExplorer for CurrencyBlockchain<D> {
+    fn blocks_range(&self, from: u64, to: Option<u64>) -> Result<Vec<Block>, Error> {
+        let v = self.view();
+        let heights = v.heights();
+        let blocks = v.blocks();
+
+        let max_len = heights.len()?;
+        let len = min(max_len, to.unwrap_or(max_len));
+
+        let mut v = Vec::new();
+        for i in from..len {
+            if let Some(ref h) = heights.get(i)? {
+                if let Some(block) = blocks.get(h)? {
+                    v.push(block);
+                }
+            }
+        }
+        Ok(v)
+    }
+}
+
+fn get_blocks<D: Database>(b: &CurrencyBlockchain<D>, from: u64, to: Option<u64>) -> Result<Vec<Block>, Error> {
     let v = b.view();
 
     let heights = v.heights();
     let blocks = v.blocks();
-    let len = heights.len()?;
 
-    let v = (0..len).map(|i| {
-        let h = heights.get(i).unwrap().unwrap();
-        blocks.get(&h).unwrap().unwrap()
-    }).collect::<Vec<_>>();
+    let max_len = heights.len()?;
+    let len = min(max_len, to.unwrap_or(max_len));
+
+    let mut v = Vec::new();
+    for i in from..len {
+        if let Some(ref h) = heights.get(i)? {
+            if let Some(block) = blocks.get(h)? {
+                v.push(block);
+            }
+        }
+    }
     Ok(v)
 }
 
@@ -65,19 +101,54 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>, node_cfg: Configurat
 
                 // Blockchain explorer api
                 api.get("blockchain", |endpoint| {
-                    endpoint.summary("Sends back blocks");
-                    endpoint.handle(move |client, _| {
+                    let blockchain = blockchain.clone();
+
+                    endpoint.summary("Returns block chain");
+                    endpoint.params(|params| {
+                        params.opt_typed("from", json_dsl::u64());
+                        params.opt_typed("to", json_dsl::u64())
+                    });
+
+                    endpoint.handle(move |client, params| {
+                        println!("{:?}", params);
                         let blockchain = blockchain.clone();
-                        let blocks = get_blocks(&blockchain).unwrap().to_json();
-                        client.json(&blocks)
+                        let from = params.find("from").map(|x| x.as_u64().unwrap()).unwrap_or(0);
+                        let to = params.find("to").map(|x| x.as_u64().unwrap());
+
+                        match blockchain.blocks_range(from, to) {
+                            Ok(blocks) => client.json(&blocks.to_json()),
+                            // TODO add error trait to blockchain errors
+                            Err(e) => Ok(client)
+                        }
+                    })
+                });
+                api.get("blockchain/:height", |endpoint| {
+                    let blockchain = blockchain.clone();
+
+                    endpoint.summary("Returns block with given height");
+                    endpoint.params(|params| {
+                        params.req_typed("height", json_dsl::u64());
+                    });
+
+                    endpoint.handle(move |client, params| {
+                        println!("{:?}", params);
+                        let blockchain = blockchain.clone();
+                        let height = params.find("height").unwrap().as_u64().unwrap();
+
+                        match blockchain.get_block(height) {
+                            Ok(Some(blocks)) => client.json(&blocks.to_json()),
+                            Ok(None) => Ok(client),
+                            // TODO add error trait to blockchain errors
+                            Err(e) => Ok(client)
+                        }
                     })
                 });
             });
 
-            let listen_address: SocketAddr = format!("localhost:{}", port).parse().unwrap();
+            let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
             println!("Cryptocurrency node server started on {}!", listen_address);
             let app = Application::new(api);
-            iron::Iron::new(app).http(listen_address).unwrap();   
+            iron::Iron::new(app).http(listen_address).unwrap();
         });
 
         node.run().unwrap();
@@ -180,12 +251,12 @@ fn main() {
                     println!("Using memorydb storage");
 
                     let blockchain = CurrencyBlockchain { db: MemoryDB::new() };
-                    run_node(blockchain, node_cfg, port);                    
+                    run_node(blockchain, node_cfg, port);
                 }
             };
         }
         _ => {
             unreachable!("Wrong subcommand");
         }
-    }    
+    }
 }
