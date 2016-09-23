@@ -3,7 +3,8 @@ mod tests;
 
 use num::{Integer, ToPrimitive};
 
-use std::fmt::Debug;
+use std::fmt;
+use std::error;
 
 mod leveldb;
 mod memorydb;
@@ -26,7 +27,10 @@ pub use self::merkle_table::MerkleTable;
 pub use self::fields::StorageValue;
 pub use self::merkle_patricia_table::MerklePatriciaTable;
 
-pub type Error = Box<Debug>;
+#[derive(Debug)]
+pub struct Error {
+    message: String,
+}
 
 // TODO We need to understand how to finish them
 // pub trait Iterable {
@@ -56,4 +60,24 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
     fn last(&self) -> Result<Option<V>, Error>;
     fn is_empty(&self) -> Result<bool, Error>;
     fn len(&self) -> Result<K, Error>;
+}
+
+impl Error {
+    pub fn new<T: Into<String>>(message: T) -> Error {
+        Error {
+            message: message.into()
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Storage error: {}", self.message)
+    }
+}
+
+impl error::Error for Error {
+    fn description(&self) -> &str {
+        &self.message
+    }
 }

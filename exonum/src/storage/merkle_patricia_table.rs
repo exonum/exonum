@@ -565,10 +565,10 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                 match db_key[0] {
                     LEAF_KEY_PREFIX => Ok(Node::Leaf(StorageValue::deserialize(data))),
                     BRANCH_KEY_PREFIX => Ok(Node::Branch(BranchNode::from_bytes(data))),
-                    other => Err(Box::new(format!("Wrong key prefix: {}", other))),
+                    other => Err(Error::new(format!("Wrong key prefix: {}", other))),
                 }
             }
-            None => Err(Box::new(format!("Unable to find node with db_key {:?}", db_key))),
+            None => Err(Error::new(format!("Unable to find node with db_key {:?}", db_key))),
         }
     }
 

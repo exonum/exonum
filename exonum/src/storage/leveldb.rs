@@ -1,6 +1,6 @@
 use std::mem;
 use std::path::Path;
-use std::fmt::Debug;
+use std::error;
 use std::sync::Arc;
 use std::cell::RefCell;
 use std::collections::Bound::{Included, Unbounded};
@@ -39,6 +39,12 @@ const LEVELDB_READ_OPTIONS: ReadOptions<'static> = ReadOptions {
 };
 const LEVELDB_WRITE_OPTIONS: WriteOptions = WriteOptions { sync: false };
 
+impl From<LevelError> for Error {
+    fn from(err: LevelError) -> Self {
+        Error::new(error::Error::description(&err))
+    }
+}
+
 impl LevelDB {
     pub fn new(path: &Path, options: Options) -> Result<LevelDB, Error> {
         match LevelDatabase::open(path, options) {
@@ -48,7 +54,7 @@ impl LevelDB {
     }
 
     fn to_storage_error(err: LevelError) -> Error {
-        Box::new(err) as Box<Debug>
+        Error::from(err)
     }
 }
 
