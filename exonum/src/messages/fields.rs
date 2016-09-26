@@ -226,7 +226,7 @@ impl<'a> SegmentField<'a> for &'a [Hash] {
 }
 
 impl<'a> SegmentField<'a> for &'a str {
-    const ITEM_SIZE: usize = 32;
+    const ITEM_SIZE: usize = 1;
 
     fn from_slice(slice: &'a [u8]) -> Self {
         unsafe { ::std::str::from_utf8_unchecked(slice) }
@@ -237,7 +237,7 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 
     fn count(&self) -> u32 {
-        self.len() as u32
+        self.as_bytes().len() as u32
     }
 
     fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
@@ -249,4 +249,13 @@ impl<'a> SegmentField<'a> for &'a str {
         }
         Ok(())
     }
+}
+
+#[test]
+fn test_unicode_string() {
+    let mut buf = vec![0; 8];
+    let s = "test юникодной строчки";
+    Field::write(&s, &mut buf, 0, 8);
+    let s2: &str = Field::read(&buf, 0, 8);
+    assert_eq!(s2, s);
 }
