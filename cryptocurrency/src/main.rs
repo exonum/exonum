@@ -6,6 +6,7 @@
 
 #[macro_use]
 extern crate rustless;
+extern crate jsonway;
 extern crate iron;
 extern crate hyper;
 extern crate valico;
@@ -33,15 +34,17 @@ use hyper::status::StatusCode;
 use serde::{Serialize, Serializer};
 use rand::{Rng, thread_rng};
 
-use exonum::node::{Node, NodeChannel, Configuration};
+use exonum::node::{Node, Configuration};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions, List, Map};
 use exonum::storage::Error as StorageError;
 use exonum::blockchain::{Block, Blockchain, View};
 use exonum::crypto::{Hash, gen_keypair, PublicKey, SecretKey};
+use exonum::messages::Message;
 
 use cryptocurrency::config_file::ConfigFile;
 use cryptocurrency::config::NodeConfig;
-use cryptocurrency::{CurrencyBlockchain, CurrencyTx, CurrencyView, TxIssue, TxTransfer};
+use cryptocurrency::{CurrencyBlockchain, CurrencyTx, CurrencyView, 
+                     TxIssue, TxTransfer, TxCreateWallet};
 
 pub type StorageResult<T> = Result<T, StorageError>;
 
@@ -173,6 +176,12 @@ impl Serialize for TxInfo {
                 serializer.serialize_struct_elt(&mut state, "amount", transfer.amount())?;
                 serializer.serialize_struct_elt(&mut state, "seed", transfer.seed())?;
             }
+            CurrencyTx::CreateWallet(ref wallet) => {
+                state = serializer.serialize_struct("transaction", 4)?;
+                serializer.serialize_struct_elt(&mut state, "type", "create_wallet")?;
+                serializer.serialize_struct_elt(&mut state, "pub_key", wallet.pub_key().to_base64())?;
+                serializer.serialize_struct_elt(&mut state, "name", wallet.name())?;
+            }
         }
         serializer.serialize_struct_end(state)
     }
@@ -270,9 +279,10 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                 api.prefix("api");
 
                 // Blockchain explorer api
+                let b1 = blockchain.clone();
                 api.namespace("blockchain", move |api| {
                     api.get("block", |endpoint| {
-                        let blockchain = blockchain.clone();
+                        let b1 = b1.clone();
 
                         endpoint.summary("Returns block chain");
                         endpoint.params(|params| {
@@ -282,7 +292,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 
                         endpoint.handle(move |client, params| {
                             println!("{:?}", params);
-                            let view: CurrencyView<D::Fork> = blockchain.clone().view();
+                            let view: CurrencyView<D::Fork> = b1.clone().view();
                             let from =
                                 params.find("from").map(|x| x.as_u64().unwrap()).unwrap_or(0);
                             let to = params.find("to").map(|x| x.as_u64().unwrap());
@@ -294,7 +304,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                         })
                     });
                     api.get("block/:height", |endpoint| {
-                        let blockchain = blockchain.clone();
+                        let b1 = b1.clone();
 
                         endpoint.summary("Returns block with given height");
                         endpoint.params(|params| {
@@ -303,7 +313,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 
                         endpoint.handle(move |client, params| {
                             println!("{:?}", params);
-                            let view = blockchain.clone().view();
+                            let view = b1.clone().view();
                             let height = params.find("height").unwrap().as_u64().unwrap();
 
                             match BlockchainExplorer::<D>::get_block_info(&view, height) {
@@ -314,7 +324,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                         })
                     });
                     api.get("transactions/:height", |endpoint| {
-                        let blockchain = blockchain.clone();
+                        let b1 = b1.clone();
 
                         endpoint.summary("Returns transactions for block with given height");
                         endpoint.params(|params| {
@@ -323,7 +333,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 
                         endpoint.handle(move |client, params| {
                             println!("{:?}", params);
-                            let view = blockchain.clone().view();
+                            let view = b1.clone().view();
                             let height = params.find("height").unwrap().as_u64().unwrap();
 
                             match BlockchainExplorer::<D>::get_txs_for_block(&view, height) {
@@ -333,7 +343,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                         })
                     });
                     api.get("transaction/:hash", |endpoint| {
-                        let blockchain = blockchain.clone();
+                        let b1 = b1.clone();
 
                         endpoint.summary("Returns transaction info");
                         endpoint.params(|params| {
@@ -342,7 +352,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 
                         endpoint.handle(move |client, params| {
                             println!("{:?}", params);
-                            let view = blockchain.clone().view();
+                            let view = b1.clone().view();
                             let hash = params.find("hash").unwrap().to_string();
                             match Hash::from_base64(hash) {
                                 Ok(hash) => {
@@ -360,15 +370,19 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                 });
 
                 // Cryptocurrency api
+                let b2 = blockchain.clone();                
                 api.namespace("wallets", move |api| {
+                    let channel = channel.clone();
+
+                    let ch = channel.clone();                                                    
                     api.post("create", move |endpoint| {
+                        
                         endpoint.summary("Create a new wallet for user with given name");
                         endpoint.params(|params| {
                             params.req_typed("name", json_dsl::string());
                         });
 
                         endpoint.handle(move |client, params| {
-                            println!("{:?}", params);
                             let name = params.find("name").unwrap().to_string();
                             // TODO make secure
                             let (public_key, secret_key) = gen_keypair();
@@ -376,19 +390,23 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                                 let mut cookies = client.request.cookies();
                                 save_keypair_in_cookies(&mut cookies, &public_key, &secret_key);
                             }
-                            Ok(client)
+                            let tx = TxCreateWallet::new(&public_key, &name, &secret_key);
+                            let wallet_hash = tx.hash().to_base64();
+                            ch.send(CurrencyTx::CreateWallet(tx));
+
+                            client.json(&jsonway::object(|json| {
+                                json.set("tx_hash", wallet_hash)
+                            }).unwrap())
                         })
                     });
 
-                    let channel = channel.clone();
+                    let ch2 = channel.clone();
                     api.post("issue", move |endpoint| {
                         endpoint.params(|params| {
                             params.req_typed("amount", json_dsl::i64());
                         });
 
                         endpoint.handle(move |client, params| {
-                            let channel = channel.clone();
-
                             let (public_key, secret_key) = {
                                 let r = {
                                     let cookies = client.request.cookies();
@@ -403,12 +421,55 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                             let amount = params.find("amount").unwrap().as_i64().unwrap();
                             let seed = thread_rng().gen::<u64>();
                             let tx = TxIssue::new(&public_key, amount, seed, &secret_key);
-                            channel.send(CurrencyTx::Issue(tx));
-                            println!("Issue with amount: {}", amount);
-                            Ok(client)
+                            let tx_hash = tx.hash().to_base64();
+
+                            ch2.send(CurrencyTx::Issue(tx));
+                            client.json(&jsonway::object(|json| {
+                                json.set("tx_hash", tx_hash)
+                            }).unwrap())
+                        })
+                    });
+
+                    let ch3 = channel.clone();
+                    api.post("transfer", move |endpoint| {
+                        endpoint.params(|params| {
+                            params.req_typed("amount", json_dsl::i64());
+                            params.req_typed("from", json_dsl::u64());
+                            params.req_typed("to", json_dsl::u64());
+                        });
+
+                        endpoint.handle(move |client, params| {
+                            let (public_key, secret_key) = {
+                                let r = {
+                                    let cookies = client.request.cookies();
+                                    load_keypair_from_cookies(&cookies)
+                                };
+                                match r {
+                                    Ok((p, s)) => (p, s),
+                                    Err(e) => return client.error(e)
+                                }
+                            };
+
+                            let amount = params.find("amount").unwrap().as_i64().unwrap();
+                            let to = params.find("to").unwrap().as_u64().unwrap();
+                            let seed = thread_rng().gen::<u64>();
+
+                            let b2 = b2.clone();
+                            let view = b2.view();
+                            let wallets = view.wallets();
+                            //TODO remove unwrap
+                            let to_wallet = wallets.get(to).unwrap().unwrap();
+
+                            let tx = TxTransfer::new(&public_key, &to_wallet.pub_key(), amount, seed, &secret_key);
+                            let tx_hash = tx.hash().to_base64();
+
+                            ch3.send(CurrencyTx::Transfer(tx));
+                            client.json(&jsonway::object(|json| {
+                                json.set("tx_hash", tx_hash)
+                            }).unwrap())
                         })
                     })
-                });
+                })
             });
 
             let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();

@@ -65,6 +65,13 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
         Ok(value.map(StorageValue::deserialize))
     }
 
+    fn set(&self, index: K, value: V) -> Result<(), Error> {
+        if index >= self.len()? {
+            return Err(Error::new("Wrong index!"));
+        }
+        self.map.put(&index.serialize(), value.serialize())
+    }
+
     fn last(&self) -> Result<Option<V>, Error> {
         let len = self.len()?;
         if len == K::zero() {
