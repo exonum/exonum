@@ -27,14 +27,15 @@ use std::cmp::min;
 use clap::{Arg, App, SubCommand};
 use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning};
-use rustless::batteries::cookie::{Cookie, CookieExt};
+use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use serde::{Serialize, Serializer};
 use rand::{Rng, thread_rng};
 
 use exonum::node::{Node, NodeChannel, Configuration};
-use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions, List, Map, Error};
+use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions, List, Map};
+use exonum::storage::Error as StorageError;
 use exonum::blockchain::{Block, Blockchain, View};
 use exonum::crypto::{Hash, gen_keypair, PublicKey, SecretKey};
 
@@ -42,19 +43,21 @@ use cryptocurrency::config_file::ConfigFile;
 use cryptocurrency::config::NodeConfig;
 use cryptocurrency::{CurrencyBlockchain, CurrencyTx, CurrencyView, TxIssue, TxTransfer};
 
+pub type StorageResult<T> = Result<T, StorageError>;
+
 pub trait BlockchainExplorer<D: Database> {
     type BlockInfo: Serialize;
     type TxInfo: Serialize;
 
-    fn blocks_range(&self, from: u64, to: Option<u64>) -> Result<Vec<Self::BlockInfo>, Error>;
-    fn get_tx_info(&self, hash: &Hash) -> Result<Option<Self::TxInfo>, Error>;
-    fn get_tx_hashes_from_block(&self, height: u64) -> Result<Vec<Hash>, Error>;
+    fn blocks_range(&self, from: u64, to: Option<u64>) -> StorageResult<Vec<Self::BlockInfo>>;
+    fn get_tx_info(&self, hash: &Hash) -> StorageResult<Option<Self::TxInfo>>;
+    fn get_tx_hashes_from_block(&self, height: u64) -> StorageResult<Vec<Hash>>;
 
-    fn get_block_info(&self, height: u64) -> Result<Option<Self::BlockInfo>, Error> {
+    fn get_block_info(&self, height: u64) -> StorageResult<Option<Self::BlockInfo>> {
         let range = self.blocks_range(height, Some(height + 1))?;
         Ok(range.into_iter().next())
     }
-    fn get_txs<H: AsRef<[Hash]>>(&self, hashes: H) -> Result<Vec<Self::TxInfo>, Error> {
+    fn get_txs<H: AsRef<[Hash]>>(&self, hashes: H) -> StorageResult<Vec<Self::TxInfo>> {
         let mut v = Vec::new();
         for h in hashes.as_ref() {
             if let Some(tx_info) = self.get_tx_info(h)? {
@@ -63,7 +66,7 @@ pub trait BlockchainExplorer<D: Database> {
         }
         Ok(v)
     }
-    fn get_txs_for_block(&self, height: u64) -> Result<Vec<Self::TxInfo>, Error> {
+    fn get_txs_for_block(&self, height: u64) -> StorageResult<Vec<Self::TxInfo>> {
         let hashes = self.get_tx_hashes_from_block(height)?;
         self.get_txs(&hashes)
     }
@@ -97,15 +100,33 @@ impl Base64Value for Hash {
     }
 }
 
-pub struct Base64<T>(T) where T: AsRef<[u8]>;
-
-impl<T> Serialize for Base64<T>
-    where T: AsRef<[u8]>
+impl Base64Value for PublicKey
 {
-    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        serializer.serialize_str(&base64::encode(self.0.as_ref()))
+    fn to_base64(&self) -> String {
+        base64::encode(self.as_ref())
+    }
+    fn from_base64<T: AsRef<str>>(v: T) -> Result<Self, base64::Base64Error> {
+        let bytes = base64::decode(v.as_ref())?;
+        if let Some(hash) = Self::from_slice(bytes.as_ref()) {
+            Ok(hash)
+        } else {
+            Err(base64::Base64Error::InvalidLength)
+        }
+    }
+}
+
+impl Base64Value for SecretKey
+{
+    fn to_base64(&self) -> String {
+        base64::encode(self.0.as_ref())
+    }
+    fn from_base64<T: AsRef<str>>(v: T) -> Result<Self, base64::Base64Error> {
+        let bytes = base64::decode(v.as_ref())?;
+        if let Some(hash) = Self::from_slice(bytes.as_ref()) {
+            Ok(hash)
+        } else {
+            Err(base64::Base64Error::InvalidLength)
+        }
     }
 }
 
@@ -119,10 +140,10 @@ impl Serialize for BlockInfo {
         let mut state = serializer.serialize_struct("block", 7)?;
         serializer.serialize_struct_elt(&mut state, "height", b.height())?;
 
-        serializer.serialize_struct_elt(&mut state, "hash", Base64(b.hash()))?;
-        serializer.serialize_struct_elt(&mut state, "prev_hash", Base64(b.prev_hash()))?;
-        serializer.serialize_struct_elt(&mut state, "state_hash", Base64(b.state_hash()))?;
-        serializer.serialize_struct_elt(&mut state, "tx_hash", Base64(b.tx_hash()))?;
+        serializer.serialize_struct_elt(&mut state, "hash", b.hash().to_base64())?;
+        serializer.serialize_struct_elt(&mut state, "prev_hash", b.prev_hash().to_base64())?;
+        serializer.serialize_struct_elt(&mut state, "state_hash", b.state_hash().to_base64())?;
+        serializer.serialize_struct_elt(&mut state, "tx_hash", b.tx_hash().to_base64())?;
 
         serializer.serialize_struct_elt(&mut state, "time", tm)?;
         serializer.serialize_struct_elt(&mut state, "tx_count", self.tx_count)?;
@@ -140,15 +161,15 @@ impl Serialize for TxInfo {
             CurrencyTx::Issue(ref issue) => {
                 state = serializer.serialize_struct("transaction", 4)?;
                 serializer.serialize_struct_elt(&mut state, "type", "issue")?;
-                serializer.serialize_struct_elt(&mut state, "wallet", Base64(issue.wallet()))?;
+                serializer.serialize_struct_elt(&mut state, "wallet", issue.wallet().to_base64())?;
                 serializer.serialize_struct_elt(&mut state, "amount", issue.amount())?;
                 serializer.serialize_struct_elt(&mut state, "seed", issue.seed())?;
             }
             CurrencyTx::Transfer(ref transfer) => {
                 state = serializer.serialize_struct("transaction", 5)?;
                 serializer.serialize_struct_elt(&mut state, "type", "transfer")?;
-                serializer.serialize_struct_elt(&mut state, "from", Base64(transfer.from()))?;
-                serializer.serialize_struct_elt(&mut state, "to", Base64(transfer.to()))?;
+                serializer.serialize_struct_elt(&mut state, "from", transfer.from().to_base64())?;
+                serializer.serialize_struct_elt(&mut state, "to", transfer.to().to_base64())?;
                 serializer.serialize_struct_elt(&mut state, "amount", transfer.amount())?;
                 serializer.serialize_struct_elt(&mut state, "seed", transfer.seed())?;
             }
@@ -163,7 +184,7 @@ impl<D> BlockchainExplorer<D> for CurrencyView<D::Fork>
     type BlockInfo = BlockInfo;
     type TxInfo = TxInfo;
 
-    fn blocks_range(&self, from: u64, to: Option<u64>) -> Result<Vec<Self::BlockInfo>, Error> {
+    fn blocks_range(&self, from: u64, to: Option<u64>) -> StorageResult<Vec<Self::BlockInfo>> {
         let heights = self.heights();
         let blocks = self.blocks();
 
@@ -185,12 +206,12 @@ impl<D> BlockchainExplorer<D> for CurrencyView<D::Fork>
         Ok(v)
     }
 
-    fn get_tx_info(&self, hash: &Hash) -> Result<Option<Self::TxInfo>, Error> {
+    fn get_tx_info(&self, hash: &Hash) -> StorageResult<Option<Self::TxInfo>> {
         let tx = self.transactions().get(hash)?;
         Ok(tx.map(|tx| TxInfo { inner: tx }))
     }
 
-    fn get_tx_hashes_from_block(&self, height: u64) -> Result<Vec<Hash>, Error> {
+    fn get_tx_hashes_from_block(&self, height: u64) -> StorageResult<Vec<Hash>> {
         let txs = self.block_txs(height);
         let tx_count = txs.len()?;
         let mut v = Vec::new();
@@ -201,6 +222,35 @@ impl<D> BlockchainExplorer<D> for CurrencyView<D::Fork>
         }
         Ok(v)
     }
+}
+
+fn save_keypair_in_cookies(storage: &mut CookieJar, public_key: &PublicKey, secret_key: &SecretKey) {
+    let p = storage.permanent();
+    let e = p.encrypted();
+
+    e.add(Cookie::new("public_key".to_string(), public_key.to_base64()));
+    e.add(Cookie::new("secret_key".to_string(), secret_key.to_base64()));
+}
+
+fn load_base64_value_from_cookie<'a>(storage: &'a CookieJar, key: &str) -> StorageResult<Vec<u8>> {
+    if let Some(cookie) = storage.find(key) {
+        if let Ok(value) = base64::decode(cookie.value.as_ref()) {
+            return Ok(value);
+        }
+    }
+    Err(StorageError::new(format!("Unable to find value with given key {}", key)))
+}
+
+fn load_keypair_from_cookies(storage: &CookieJar) -> StorageResult<(PublicKey, SecretKey)> {
+    let p = storage.permanent();
+    let e = p.encrypted();
+
+    let public_key = PublicKey::from_slice(load_base64_value_from_cookie(&e, "public_key")?.as_ref());
+    let secret_key = SecretKey::from_slice(load_base64_value_from_cookie(&e, "secret_key")?.as_ref());
+
+    let public_key = public_key.ok_or(StorageError::new("Unable to read public key"))?;
+    let secret_key = secret_key.ok_or(StorageError::new("Unable to read secret key"))?;
+    Ok((public_key, secret_key))
 }
 
 fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
@@ -302,7 +352,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                                     }
                                 }
                                 Err(_) => {
-                                    client.error(Error::new("Unable to decode transaction hash"))
+                                    client.error(StorageError::new("Unable to decode transaction hash"))
                                 }
                             }
                         })
@@ -323,13 +373,8 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                             // TODO make secure
                             let (public_key, secret_key) = gen_keypair();
                             {
-                                let cookies = client.request.cookies();
-                                let p = cookies.permanent();
-                                let c = p.encrypted();
-                                c.add(Cookie::new("public_key".to_string(),
-                                                  base64::encode(public_key.as_ref())));
-                                c.add(Cookie::new("secret_key".to_string(),
-                                                  base64::encode(secret_key.0.as_ref())));
+                                let mut cookies = client.request.cookies();
+                                save_keypair_in_cookies(&mut cookies, &public_key, &secret_key);
                             }
                             Ok(client)
                         })
@@ -344,41 +389,23 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                         endpoint.handle(move |client, params| {
                             let channel = channel.clone();
 
-                            let mut public_key = None;
-                            let mut secret_key = None;
-                            {
-                                let cookies = client.request.cookies();
-                                let p = cookies.permanent();
-                                let c = p.encrypted();
-                                if let Some(cookie) = c.find("public_key") {
-                                    match base64::decode(&cookie.value) {
-                                        Ok(data) => {
-                                            public_key = PublicKey::from_slice(data.as_ref());
-                                        }
-                                        Err(_) => {}
-                                    }
+                            let (public_key, secret_key) = {
+                                let r = {
+                                    let cookies = client.request.cookies();
+                                    load_keypair_from_cookies(&cookies)
+                                };
+                                match r {
+                                    Ok((p, s)) => (p, s),
+                                    Err(e) => return client.error(e)
                                 }
-                                if let Some(cookie) = c.find("secret_key") {
-                                    match base64::decode(&cookie.value) {
-                                        Ok(data) => {
-                                            secret_key = SecretKey::from_slice(data.as_ref());
-                                        }
-                                        Err(_) => {}
-                                    }
-                                }
-                            }
+                            };
 
-                            match (public_key, secret_key) {
-                                (Some(public_key), Some(secret_key)) => {
-                                    let amount = params.find("amount").unwrap().as_i64().unwrap();
-                                    let seed = thread_rng().gen::<u64>();
-                                    let tx = TxIssue::new(&public_key, amount, seed, &secret_key);
-                                    channel.send(CurrencyTx::Issue(tx));
-                                    println!("Issue with amount: {}", amount);
-                                    Ok(client)
-                                }
-                                _ => client.error(Error::new("Unable to read keypair")),
-                            }
+                            let amount = params.find("amount").unwrap().as_i64().unwrap();
+                            let seed = thread_rng().gen::<u64>();
+                            let tx = TxIssue::new(&public_key, amount, seed, &secret_key);
+                            channel.send(CurrencyTx::Issue(tx));
+                            println!("Issue with amount: {}", amount);
+                            Ok(client)
                         })
                     })
                 });

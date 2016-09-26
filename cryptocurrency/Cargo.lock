@@ -569,7 +569,7 @@ dependencies = [
 
 [[package]]
 name = "quasi"
-version = "0.20.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -679,7 +679,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "aster 0.27.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "quasi 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quasi 0.20.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "quasi_macros 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_codegen_internals 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -988,7 +988,7 @@ dependencies = [
 "checksum pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "8cee804ecc7eaf201a4a207241472cc870e825206f6c031e3ee2a72fa425f2fa"
 "checksum plugin 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "1a6a0dc3910bc8db877ffed8e457763b317cf880df4ae19109b9f77d277cf6e0"
 "checksum pnacl-build-helper 1.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "61c9231d31aea845007443d62fcbb58bb6949ab9c18081ee1e09920e0cf1118b"
-"checksum quasi 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)" = "50d83f9f141f12a586aae8eefa4fdb39a273fc1a1f4cfb252a4cb566a9ca8985"
+"checksum quasi 0.20.1 (registry+https://github.com/rust-lang/crates.io-index)" = "94a532453b931a4483a5b2e40f0fe04aee35b6bc2c0eeec876f1bd2358a134d3"
 "checksum quasi_codegen 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cfb4a9a5410fdbdacbeda8063ddb8add9838dfd4cf50ac486db98abb762d8bd6"
 "checksum quasi_macros 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)" = "adc2b36285ea5e54e4e267f83896267ff8c5aba4f66b2e7d186ed6d968f3715f"
 "checksum queryst 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d7b4b1ebfa90f26fd4394ff25ad6ebfd4bf39841687a2bbaa75ca71a3c893a27"
