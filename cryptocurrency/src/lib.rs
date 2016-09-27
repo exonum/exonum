@@ -163,13 +163,12 @@ impl<F> CurrencyView<F>
         MerkleTable::new(MapTable::new(vec![09], &self))
     }
 
-    pub fn wallets_by_pub_key(&self)
-         -> MapTable<F, PublicKey, u64> {
-        MapTable::new(vec![10], &self)
+    pub fn wallet_ids(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, u64> {
+        MerklePatriciaTable::new(MapTable::new(vec![10], &self))
     }
 
     pub fn wallet(&self, pub_key: &PublicKey) -> Result<Option<(WalletId, Wallet)>, Error> {
-        if let Some(id) = self.wallets_by_pub_key().get(pub_key)? {
+        if let Some(id) = self.wallet_ids().get(pub_key)? {
             let wallet_pair = self.wallets().get(id)?.map(|wallet| (id, wallet));
             return Ok(wallet_pair);
         }
@@ -179,7 +178,7 @@ impl<F> CurrencyView<F>
     pub fn wallet_history(&self,
                           id: WalletId)
                           -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
-        let mut prefix = vec![10; 9];
+        let mut prefix = vec![11; 9];
         LittleEndian::write_u64(&mut prefix[1..], id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
@@ -197,7 +196,27 @@ impl<D> Blockchain for CurrencyBlockchain<D>
     }
 
     fn state_hash(view: &Self::View) -> Result<Hash, Error> {
-        view.wallets().root_hash().map(|o| o.unwrap_or(hash(&[])))
+        let push_if_some = |vec: &mut Vec<Vec<u8>>, option: Option<Hash>| {
+            if let Some(hash) = option {
+                vec.push(hash.as_ref().to_vec());
+            }
+        };
+
+        let wallets = view.wallets();
+        let wallet_ids = view.wallet_ids();
+
+        let mut hashes = Vec::new();
+        push_if_some(&mut hashes, wallets.root_hash()?);
+        push_if_some(&mut hashes, wallet_ids.root_hash()?);
+        if let Some(items) = wallets.iter()? {
+            for item in items {
+                if let Some((id, _)) = view.wallet(item.pub_key())? {
+                    let history = view.wallet_history(id);
+                    push_if_some(&mut hashes, history.root_hash()?);
+                }
+            }
+        }
+        Ok(hash(&hashes.concat()))
     }
 
     fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
@@ -228,7 +247,7 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                 }
             }
             CurrencyTx::CreateWallet(ref msg) => {
-                if let Some(_) = view.wallets_by_pub_key().get(msg.pub_key())? {
+                if let Some(_) = view.wallet_ids().get(msg.pub_key())? {
                     return Ok(());
                 }
 
@@ -236,7 +255,7 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                 let id = view.wallets().len()?;
 
                 view.wallets().append(wallet)?;
-                view.wallets_by_pub_key().put(msg.pub_key(), id)?;
+                view.wallet_ids().put(msg.pub_key(), id)?;
                 view.wallet_history(id).append(tx_hash)?;
             }
         };
@@ -248,15 +267,12 @@ impl<D> Blockchain for CurrencyBlockchain<D>
 mod tests {
     use byteorder::{ByteOrder, LittleEndian};
 
-    use exonum::crypto::{gen_keypair};
+    use exonum::crypto::gen_keypair;
     use exonum::storage::MemoryDB;
-    use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable, MerkleTable, List};
-    use exonum::blockchain::{Blockchain, View};
-    use exonum::messages::{Message};
+    use exonum::blockchain::Blockchain;
+    use exonum::messages::Message;
 
-    use super::wallet::{WalletId, Wallet};
-    use super::{CurrencyView, CurrencyTx, CurrencyBlockchain, 
-                TxCreateWallet, TxIssue, TxTransfer};
+    use super::{CurrencyTx, CurrencyBlockchain, TxCreateWallet, TxIssue, TxTransfer};
 
     #[test]
     fn test_wallet_prefix() {
@@ -268,9 +284,7 @@ mod tests {
 
     #[test]
     fn test_wallet_history() {
-        let b = CurrencyBlockchain {
-            db: MemoryDB::new()
-        };
+        let b = CurrencyBlockchain { db: MemoryDB::new() };
         let v = b.view();
 
         let (p1, s1) = gen_keypair();
@@ -278,8 +292,10 @@ mod tests {
 
         let cw1 = TxCreateWallet::new(&p1, "tx1", &s1);
         let cw2 = TxCreateWallet::new(&p2, "tx2", &s2);
-        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::CreateWallet(cw1.clone())).unwrap();
-        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::CreateWallet(cw2.clone())).unwrap();
+        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::CreateWallet(cw1.clone()))
+            .unwrap();
+        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::CreateWallet(cw2.clone()))
+            .unwrap();
         let w1 = v.wallet(&p1).unwrap().unwrap();
         let w2 = v.wallet(&p2).unwrap().unwrap();
 

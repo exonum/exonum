@@ -27,7 +27,7 @@ impl Wallet {
 
     pub fn from_raw(raw: Vec<u8>) -> Wallet {
         // TODO: error instead of panic?
-        //assert_eq!(raw.len(), WALLET_SIZE);
+        // assert_eq!(raw.len(), WALLET_SIZE);
         Wallet { raw: raw }
     }
 

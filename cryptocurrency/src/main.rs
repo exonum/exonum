@@ -534,7 +534,9 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 
             let app = Application::new(api);
             let mut chain = iron::Chain::new(app);
-            let cookie = ::rustless::batteries::cookie::new("secretsecretsecretsecretsecretsecretsecret".as_bytes());
+            let cookie =
+                ::rustless::batteries::cookie::new("secretsecretsecretsecretsecretsecretsecret"
+                    .as_bytes());
             chain.link(cookie);
             iron::Iron::new(chain).http(listen_address).unwrap();
         });

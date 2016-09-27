@@ -595,7 +595,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     //             for i in [ChildKind::Left, ChildKind::Right].iter() {
     //                 let key = &branch.child_slice(*i);
     //                 println!("Key: {:#?}", key);
-    //                 self.print_node(self.read_node(&key).unwrap());
+    //                 self.print_node(self.read_node(&key.to_db_key()).unwrap());
     //             }
     //         }
     //         Node::Leaf(data) => {
@@ -622,6 +622,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
+        let key = BitSlice::from_bytes(key.as_ref()).to_db_key();        
         let v = self.map.get(key.as_ref())?;
         Ok(v.map(StorageValue::deserialize))
     }
@@ -967,6 +968,11 @@ mod tests {
         table2.put(&vec![254; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![1]).unwrap();
 
+        assert_eq!(table1.get(&vec![255; 32]).unwrap(), Some(vec![1]));
+        assert_eq!(table1.get(&vec![254; 32]).unwrap(), Some(vec![2]));
+        assert_eq!(table2.get(&vec![255; 32]).unwrap(), Some(vec![1]));
+        assert_eq!(table2.get(&vec![254; 32]).unwrap(), Some(vec![2]));
+
         assert!(table1.root_hash().unwrap() != None);
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
@@ -980,6 +986,7 @@ mod tests {
 
         table.put(&vec![255; 32], vec![1]).unwrap();
         table.put(&vec![255; 32], vec![2]).unwrap();
+        assert_eq!(table.get(&vec![255; 32]).unwrap(), Some(vec![2]));
         assert_eq!(table.root_hash().unwrap(), Some(hash));
     }
 
@@ -1071,6 +1078,9 @@ mod tests {
 
         table2.delete(&vec![255; 32]).unwrap();
         table2.delete(&vec![245; 32]).unwrap();
+
+        assert_eq!(table2.get(&vec![250; 32]).unwrap(), Some(vec![2]));
+        assert_eq!(table1.get(&vec![250; 32]).unwrap(), Some(vec![2]));
 
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
