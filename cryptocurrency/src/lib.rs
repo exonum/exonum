@@ -160,11 +160,11 @@ impl<F> CurrencyView<F>
     where F: Fork
 {
     pub fn wallets(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Wallet> {
-        MerkleTable::new(MapTable::new(vec![09], &self))
+        MerkleTable::new(MapTable::new(vec![20], &self))
     }
 
     pub fn wallet_ids(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, u64> {
-        MerklePatriciaTable::new(MapTable::new(vec![10], &self))
+        MerklePatriciaTable::new(MapTable::new(vec![21], &self))
     }
 
     pub fn wallet(&self, pub_key: &PublicKey) -> Result<Option<(WalletId, Wallet)>, Error> {
@@ -178,7 +178,7 @@ impl<F> CurrencyView<F>
     pub fn wallet_history(&self,
                           id: WalletId)
                           -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
-        let mut prefix = vec![11; 9];
+        let mut prefix = vec![22; 9];
         LittleEndian::write_u64(&mut prefix[1..], id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
