@@ -29,6 +29,7 @@ use clap::{Arg, App, SubCommand};
 use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
+use rustless::batteries::swagger;
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use serde::{Serialize, Serializer};
@@ -523,16 +524,34 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                 api.version("v1", Versioning::Path);
                 api.prefix("api");
 
-                // Blockchain explorer api
                 blockchain_explorer_api(api, blockchain.clone());
-                // Cryptocurrency api
                 cryptocurrency_api(api, blockchain.clone(), channel.clone());
+                api.mount(swagger::create_api("docs"));
             });
 
             let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
             println!("Cryptocurrency node server started on {}", listen_address);
 
-            let app = Application::new(api);
+            let mut app = Application::new(api);
+
+            swagger::enable(&mut app, swagger::Spec {
+                info: swagger::Info {
+                    title: "Cryptocurrency API".to_string(),
+                    description: Some("Simple API to demonstration".to_string()),
+                    contact: Some(swagger::Contact {
+                        name: "Aleksey Sidorov".to_string(),
+                        url: Some("aleksei.sidorov@xdev.re".to_string()),
+                        ..std::default::Default::default()
+                    }),
+                    license: Some(swagger::License {
+                        name: "Demo".to_string(),
+                        url: "http://exonum.com".to_string()
+                    }),
+                    ..std::default::Default::default()
+                },
+                ..std::default::Default::default()
+            });
+
             let mut chain = iron::Chain::new(app);
             let cookie =
                 ::rustless::batteries::cookie::new("secretsecretsecretsecretsecretsecretsecret"
