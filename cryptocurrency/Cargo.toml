@@ -16,6 +16,7 @@ time = "0.1"
 rand = "0.3"
 log = "0.3"
 base64 = "0.2"
+byteorder = "0.5"
 
 serde = "0.8"
 serde_macros = "0.8.9"

@@ -45,6 +45,7 @@ use cryptocurrency::config_file::ConfigFile;
 use cryptocurrency::config::NodeConfig;
 use cryptocurrency::{CurrencyBlockchain, CurrencyTx, CurrencyView, TxIssue, TxTransfer,
                      TxCreateWallet};
+use cryptocurrency::wallet::{Wallet, WalletId};
 
 pub type StorageResult<T> = Result<T, StorageError>;
 
@@ -79,11 +80,17 @@ pub trait BlockchainExplorer<D: Database> {
 
 pub struct BlockInfo {
     inner: Block,
-    tx_count: u32,
+    txs: Vec<TxInfo>,
 }
 
 pub struct TxInfo {
     inner: CurrencyTx,
+}
+
+pub struct WalletInfo {
+    inner: Wallet,
+    id: WalletId,
+    history: Vec<TxInfo>,
 }
 
 pub trait Base64Value: Sized {
@@ -149,7 +156,7 @@ impl Serialize for BlockInfo {
         serializer.serialize_struct_elt(&mut state, "tx_hash", b.tx_hash().to_base64())?;
 
         serializer.serialize_struct_elt(&mut state, "time", tm)?;
-        serializer.serialize_struct_elt(&mut state, "tx_count", self.tx_count)?;
+        serializer.serialize_struct_elt(&mut state, "txs", &self.txs)?;
         serializer.serialize_struct_end(state)
     }
 }
@@ -187,6 +194,19 @@ impl Serialize for TxInfo {
     }
 }
 
+impl Serialize for WalletInfo {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let mut state = ser.serialize_struct("wallet", 7)?;
+        ser.serialize_struct_elt(&mut state, "id", self.id)?;
+        ser.serialize_struct_elt(&mut state, "amount", self.inner.amount())?;
+        ser.serialize_struct_elt(&mut state, "name", self.inner.name())?;
+        ser.serialize_struct_elt(&mut state, "history", &self.history)?;
+        ser.serialize_struct_end(state)
+    }
+}
+
 impl<D> BlockchainExplorer<D> for CurrencyView<D::Fork>
     where D: Database
 {
@@ -201,13 +221,13 @@ impl<D> BlockchainExplorer<D> for CurrencyView<D::Fork>
         let len = min(max_len, to.unwrap_or(max_len));
 
         let mut v = Vec::new();
-        for i in from..len {
-            if let Some(ref h) = heights.get(i)? {
-                let tx_count = self.block_txs(i).len()?;
+        for height in from..len {
+            if let Some(ref h) = heights.get(height)? {
                 if let Some(block) = blocks.get(h)? {
+                    let txs = BlockchainExplorer::<D>::get_txs_for_block(self, height)?;
                     v.push(BlockInfo {
                         inner: block,
-                        tx_count: tx_count,
+                        txs: txs,
                     });
                 }
             }
@@ -309,25 +329,6 @@ fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: CurrencyBlockchain<D>
                 }
             })
         });
-        api.get("transactions/:height", |endpoint| {
-            let b1 = b1.clone();
-
-            endpoint.summary("Returns transactions for block with given height");
-            endpoint.params(|params| {
-                params.req_typed("height", json_dsl::u64());
-            });
-
-            endpoint.handle(move |client, params| {
-                println!("{:?}", params);
-                let view = b1.clone().view();
-                let height = params.find("height").unwrap().as_u64().unwrap();
-
-                match BlockchainExplorer::<D>::get_txs_for_block(&view, height) {
-                    Ok(txs) => client.json(&txs.to_json()),
-                    Err(e) => client.error(e),
-                }
-            })
-        });
         api.get("transaction/:hash", |endpoint| {
             let b1 = b1.clone();
 
@@ -354,10 +355,40 @@ fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: CurrencyBlockchain<D>
     })
 }
 
-fn cryptocurrency_api<D: Database>(api: &mut Api, 
-                                   blockchain: CurrencyBlockchain<D>, 
-                                   channel: CurrencyTxSender<CurrencyBlockchain<D>>)
+pub trait CryptocurrencyApi<D: Database> {
+    type WalletId;
+    type WalletInfo: Serialize;
+
+    fn wallet_info(&self, pub_key: &PublicKey) -> StorageResult<Option<Self::WalletInfo>>;
+}
+
+impl<D> CryptocurrencyApi<D> for CurrencyView<D::Fork>
+    where D: Database
 {
+    type WalletId = WalletId;
+    type WalletInfo = WalletInfo;
+
+    fn wallet_info(&self, pub_key: &PublicKey) -> StorageResult<Option<WalletInfo>> {
+        if let Some((id, wallet)) = self.wallet(pub_key)? {
+            let history = self.wallet_history(id);
+            let hashes = history.iter()?.unwrap_or(Vec::new());
+            let txs = BlockchainExplorer::<D>::get_txs(self, hashes)?;
+
+            let info = WalletInfo {
+                id: id,
+                inner: wallet,
+                history: txs,
+            };
+            Ok(Some(info))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+fn cryptocurrency_api<D: Database>(api: &mut Api,
+                                   blockchain: CurrencyBlockchain<D>,
+                                   channel: CurrencyTxSender<CurrencyBlockchain<D>>) {
     api.namespace("wallets", move |api| {
         let ch = channel.clone();
         api.post("create", move |endpoint| {
@@ -442,11 +473,8 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                 // TODO remove unwrap
                 let to_wallet = wallets.get(to).unwrap().unwrap();
 
-                let tx = TxTransfer::new(&public_key,
-                                            &to_wallet.pub_key(),
-                                            amount,
-                                            seed,
-                                            &secret_key);
+                let tx =
+                    TxTransfer::new(&public_key, &to_wallet.pub_key(), amount, seed, &secret_key);
 
                 let tx_hash = tx.hash().to_base64();
                 ch.send(CurrencyTx::Transfer(tx));
@@ -454,6 +482,28 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                 client.json(json)
             })
         });
+
+        let b = blockchain.clone();
+        api.post("info", move |endpoint| {
+            endpoint.handle(move |client, _| {
+                let (public_key, _) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_keypair_from_cookies(&cookies)
+                    };
+                    match r {
+                        Ok((p, s)) => (p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+                let view = b.view();
+                let r = CryptocurrencyApi::<D>::wallet_info(&view, &public_key);
+                match r {
+                    Ok(Some(info)) => client.json(&info.to_json()),
+                    _ => client.error(StorageError::new("Unable to get wallet info")),
+                }
+            })
+        })
     });
 }
 
@@ -484,7 +534,8 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 
             let app = Application::new(api);
             let mut chain = iron::Chain::new(app);
-            chain.link(::rustless::batteries::cookie::new("secretsecretsecretsecretsecretsecretsecret".as_bytes()));
+            let cookie = ::rustless::batteries::cookie::new("secretsecretsecretsecretsecretsecretsecret".as_bytes());
+            chain.link(cookie);
             iron::Iron::new(chain).http(listen_address).unwrap();
         });
 

@@ -8,6 +8,7 @@ extern crate rand;
 extern crate time;
 extern crate serde;
 extern crate toml;
+extern crate byteorder;
 #[macro_use]
 extern crate log;
 
@@ -15,6 +16,8 @@ extern crate log;
 extern crate exonum;
 
 use std::ops::Deref;
+
+use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::{RawMessage, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, hash};
@@ -160,18 +163,25 @@ impl<F> CurrencyView<F>
         MerkleTable::new(MapTable::new(vec![09], &self))
     }
 
-    pub fn wallets_by_pub_key
-        (&self)
-         -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, u64> {
-        MerklePatriciaTable::new(MapTable::new(vec![10], &self))
+    pub fn wallets_by_pub_key(&self)
+         -> MapTable<F, PublicKey, u64> {
+        MapTable::new(vec![10], &self)
     }
 
-    pub fn get_wallet(&self, pub_key: &PublicKey) -> Result<Option<(WalletId, Wallet)>, Error> {
+    pub fn wallet(&self, pub_key: &PublicKey) -> Result<Option<(WalletId, Wallet)>, Error> {
         if let Some(id) = self.wallets_by_pub_key().get(pub_key)? {
             let wallet_pair = self.wallets().get(id)?.map(|wallet| (id, wallet));
             return Ok(wallet_pair);
         }
         Ok(None)
+    }
+
+    pub fn wallet_history(&self,
+                          id: WalletId)
+                          -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
+        let mut prefix = vec![10; 9];
+        LittleEndian::write_u64(&mut prefix[1..], id);
+        MerkleTable::new(MapTable::new(prefix, &self))
     }
 }
 
@@ -191,10 +201,11 @@ impl<D> Blockchain for CurrencyBlockchain<D>
     }
 
     fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
+        let tx_hash = tx.hash();
         match *tx {
             CurrencyTx::Transfer(ref msg) => {
-                let from = view.get_wallet(msg.from())?;
-                let to = view.get_wallet(msg.to())?;
+                let from = view.wallet(msg.from())?;
+                let to = view.wallet(msg.to())?;
                 if let (Some(mut from), Some(mut to)) = (from, to) {
                     if from.1.amount() < msg.amount() {
                         return Ok(());
@@ -204,24 +215,102 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                     view.wallets().set(from.0, from.1)?;
                     view.wallets().set(to.0, to.1)?;
 
-                    // TODO add history
+                    view.wallet_history(from.0).append(tx_hash)?;
+                    view.wallet_history(to.0).append(tx_hash)?;
                 }
             }
             CurrencyTx::Issue(ref msg) => {
-                if let Some((id, mut wallet)) = view.get_wallet(msg.wallet())? {
+                if let Some((id, mut wallet)) = view.wallet(msg.wallet())? {
                     let new_amount = wallet.amount() + msg.amount();
                     wallet.set_amount(new_amount);
                     view.wallets().set(id, wallet)?;
+                    view.wallet_history(id).append(tx_hash)?;
                 }
             }
             CurrencyTx::CreateWallet(ref msg) => {
-                let wallet = Wallet::new(msg.pub_key(), msg.name(), 0);
+                if let Some(_) = view.wallets_by_pub_key().get(msg.pub_key())? {
+                    return Ok(());
+                }
 
-                let code = view.wallets().len()?;
+                let wallet = Wallet::new(msg.pub_key(), msg.name(), 0);
+                let id = view.wallets().len()?;
+
                 view.wallets().append(wallet)?;
-                view.wallets_by_pub_key().put(msg.pub_key(), code)?;
+                view.wallets_by_pub_key().put(msg.pub_key(), id)?;
+                view.wallet_history(id).append(tx_hash)?;
             }
         };
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use byteorder::{ByteOrder, LittleEndian};
+
+    use exonum::crypto::{gen_keypair};
+    use exonum::storage::MemoryDB;
+    use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable, MerkleTable, List};
+    use exonum::blockchain::{Blockchain, View};
+    use exonum::messages::{Message};
+
+    use super::wallet::{WalletId, Wallet};
+    use super::{CurrencyView, CurrencyTx, CurrencyBlockchain, 
+                TxCreateWallet, TxIssue, TxTransfer};
+
+    #[test]
+    fn test_wallet_prefix() {
+        let id = 4096;
+        let mut prefix = vec![10; 9];
+        LittleEndian::write_u64(&mut prefix[1..], id);
+        assert_eq!(prefix, vec![10, 0, 16, 0, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn test_wallet_history() {
+        let b = CurrencyBlockchain {
+            db: MemoryDB::new()
+        };
+        let v = b.view();
+
+        let (p1, s1) = gen_keypair();
+        let (p2, s2) = gen_keypair();
+
+        let cw1 = TxCreateWallet::new(&p1, "tx1", &s1);
+        let cw2 = TxCreateWallet::new(&p2, "tx2", &s2);
+        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::CreateWallet(cw1.clone())).unwrap();
+        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::CreateWallet(cw2.clone())).unwrap();
+        let w1 = v.wallet(&p1).unwrap().unwrap();
+        let w2 = v.wallet(&p2).unwrap().unwrap();
+
+        assert_eq!(w1.0, 0);
+        assert_eq!(w2.0, 1);
+        assert_eq!(w1.1.name(), "tx1");
+        assert_eq!(w1.1.amount(), 0);
+        assert_eq!(w2.1.name(), "tx2");
+        assert_eq!(w2.1.amount(), 0);
+
+        let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
+        let iw2 = TxIssue::new(&p2, 100, 2, &s2);
+        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::Issue(iw1.clone())).unwrap();
+        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::Issue(iw2.clone())).unwrap();
+        let w1 = v.wallet(&p1).unwrap().unwrap();
+        let w2 = v.wallet(&p2).unwrap().unwrap();
+
+        assert_eq!(w1.1.amount(), 1000);
+        assert_eq!(w2.1.amount(), 100);
+
+        let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
+        CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::Transfer(tw.clone())).unwrap();
+        let w1 = v.wallet(&p1).unwrap().unwrap();
+        let w2 = v.wallet(&p2).unwrap().unwrap();
+
+        assert_eq!(w1.1.amount(), 600);
+        assert_eq!(w2.1.amount(), 500);
+
+        let h1 = v.wallet_history(w1.0).iter().unwrap().unwrap();
+        let h2 = v.wallet_history(w2.0).iter().unwrap().unwrap();
+        assert_eq!(h1, vec![cw1.hash(), iw1.hash(), tw.hash()]);
+        assert_eq!(h2, vec![cw2.hash(), iw2.hash(), tw.hash()]);
     }
 }
