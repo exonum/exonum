@@ -18,8 +18,7 @@ use std::ops::Deref;
 
 use exonum::messages::{RawMessage, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, hash};
-use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, 
-                      MapTable, MerkleTable, List};
+use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable, MerkleTable, List};
 use exonum::blockchain::{Blockchain, View};
 
 use wallet::{Wallet, WalletId};
@@ -77,7 +76,7 @@ impl Message for CurrencyTx {
         match *self {
             CurrencyTx::Transfer(ref msg) => msg.raw(),
             CurrencyTx::Issue(ref msg) => msg.raw(),
-            CurrencyTx::CreateWallet(ref msg) => msg.raw()
+            CurrencyTx::CreateWallet(ref msg) => msg.raw(),
         }
     }
 
@@ -161,14 +160,16 @@ impl<F> CurrencyView<F>
         MerkleTable::new(MapTable::new(vec![09], &self))
     }
 
-    pub fn wallets_by_pub_key(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, u64> {
+    pub fn wallets_by_pub_key
+        (&self)
+         -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, u64> {
         MerklePatriciaTable::new(MapTable::new(vec![10], &self))
     }
 
     pub fn get_wallet(&self, pub_key: &PublicKey) -> Result<Option<(WalletId, Wallet)>, Error> {
         if let Some(id) = self.wallets_by_pub_key().get(pub_key)? {
             let wallet_pair = self.wallets().get(id)?.map(|wallet| (id, wallet));
-            return Ok(wallet_pair)
+            return Ok(wallet_pair);
         }
         Ok(None)
     }
@@ -194,7 +195,7 @@ impl<D> Blockchain for CurrencyBlockchain<D>
             CurrencyTx::Transfer(ref msg) => {
                 let from = view.get_wallet(msg.from())?;
                 let to = view.get_wallet(msg.to())?;
-                if let (Some(mut from), Some(mut to)) =(from, to) {
+                if let (Some(mut from), Some(mut to)) = (from, to) {
                     if from.1.amount() < msg.amount() {
                         return Ok(());
                     }
@@ -203,7 +204,7 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                     view.wallets().set(from.0, from.1)?;
                     view.wallets().set(to.0, to.1)?;
 
-                    //TODO add history
+                    // TODO add history
                 }
             }
             CurrencyTx::Issue(ref msg) => {
@@ -214,9 +215,7 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                 }
             }
             CurrencyTx::CreateWallet(ref msg) => {
-                let wallet = Wallet::new(msg.pub_key(),
-                                         msg.name(),
-                                         0);
+                let wallet = Wallet::new(msg.pub_key(), msg.name(), 0);
 
                 let code = view.wallets().len()?;
                 view.wallets().append(wallet)?;

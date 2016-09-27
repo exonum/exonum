@@ -1,5 +1,5 @@
 
-use exonum::messages::{Field};
+use exonum::messages::Field;
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::StorageValue;
 
@@ -16,10 +16,7 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new<S: AsRef<str>>(public_key: &PublicKey,  
-                              name: S,
-                              amount: i64)
-               -> Wallet {
+    pub fn new<S: AsRef<str>>(public_key: &PublicKey, name: S, amount: i64) -> Wallet {
         let mut wallet = Wallet { raw: vec![0; WALLET_SIZE] };
 
         Field::write(&public_key, &mut wallet.raw, 0, 32);
@@ -58,7 +55,7 @@ impl Wallet {
     }
 
     pub fn set_amount(&mut self, amount: i64) {
-        Field::write(&amount, &mut self.raw, 32, 40);        
+        Field::write(&amount, &mut self.raw, 32, 40);
     }
 }
 
@@ -79,7 +76,7 @@ impl StorageValue for Wallet {
 #[test]
 fn test_wallet() {
     let name = "foobar abacaba";
-    let pub_key = PublicKey::from_slice([1u8;32].as_ref()).unwrap();    
+    let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
     let wallet = Wallet::new(&pub_key, name, -100500);
 
     assert_eq!(wallet.pub_key(), &pub_key);
@@ -89,9 +86,9 @@ fn test_wallet() {
 
 #[test]
 fn test_amount_transfer() {
-    let pub_key = PublicKey::from_slice([1u8;32].as_ref()).unwrap();
-    let mut a = Wallet::new(&pub_key, "a", 100);    
-    let mut b = Wallet::new(&pub_key, "b", 0); 
+    let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
+    let mut a = Wallet::new(&pub_key, "a", 100);
+    let mut b = Wallet::new(&pub_key, "b", 0);
     a.transfer_to(&mut b, 50);
 
     assert_eq!(a.amount(), 50);
