@@ -1144,6 +1144,13 @@ mod tests {
             table2.put(&item.0, item.1.clone()).unwrap();
         }
 
+        for item in &data {
+            let v1 = table1.get(&item.0).unwrap();
+            let v2 = table2.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), Some(&item.1));
+            assert_eq!(v2.as_ref(), Some(&item.1));
+        }
+
         assert!(table2.root_hash().unwrap() != None);
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
 
@@ -1155,6 +1162,13 @@ mod tests {
         rng.shuffle(&mut data);
         for item in &data {
             table2.put(&item.0, vec![1]).unwrap();
+        }
+
+        for item in &data {
+            let v1 = table1.get(&item.0).unwrap();
+            let v2 = table2.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), Some(&vec![1]));
+            assert_eq!(v2.as_ref(), Some(&vec![1]));
         }
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
     }
@@ -1205,6 +1219,13 @@ mod tests {
         for item in &data {
             table2.put(&item.0, item.1.clone()).unwrap();
         }
+
+        for item in &data {
+            let v1 = table1.get(&item.0).unwrap();
+            let v2 = table2.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), Some(&item.1));
+            assert_eq!(v2.as_ref(), Some(&item.1));
+        }
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
         assert_eq!(table2.root_hash().unwrap(), saved_hash);
     }
@@ -1224,9 +1245,17 @@ mod tests {
         for item in &data[50..] {
             table1.put(&item.0, item.1.clone()).unwrap();
         }
-
         for item in &data[50..] {
             table1.delete(&item.0).unwrap();
+        }
+
+        for item in &data[0..50] {
+            let v1 = table1.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), Some(&item.1));
+        }
+        for item in &data[50..] {
+            let v1 = table1.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), None);
         }
         assert_eq!(table1.root_hash().unwrap(), saved_hash);
     }
