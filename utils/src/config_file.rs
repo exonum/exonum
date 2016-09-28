@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::io;
 use std::fs;
 use std::error::Error;
 use std::io::prelude::*;
@@ -15,8 +16,8 @@ impl ConfigFile {
         let mut file = File::open(path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
-        let cfg = toml::decode_str(&toml);
-        return Ok(cfg.unwrap());
+        let r = toml::decode_str(&toml);
+        r.ok_or(Box::new(io::Error::new(io::ErrorKind::InvalidData, "Unable to decode toml file")))
     }
 
     pub fn save<T: Serialize>(value: &T, path: &Path) -> Result<(), Box<Error>> {

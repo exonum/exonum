@@ -22,4 +22,3 @@ byteorder = "0.5"
 serde = "0.8"
 serde_macros = "0.8.9"
 jsonway = "1.0"
-toml = {version="0.2", default-features=false, features=["serde"]}

@@ -7,13 +7,16 @@
 extern crate rand;
 extern crate time;
 extern crate serde;
-extern crate toml;
 extern crate byteorder;
 #[macro_use]
 extern crate log;
 
 #[macro_use(message)]
 extern crate exonum;
+extern crate utils;
+
+pub mod api;
+pub mod wallet;
 
 use std::ops::Deref;
 
@@ -29,8 +32,6 @@ use wallet::{Wallet, WalletId};
 pub const TX_TRANSFER_ID: u16 = 128;
 pub const TX_ISSUE_ID: u16 = 129;
 pub const TX_WALLET_ID: u16 = 130;
-
-pub mod wallet;
 
 message! {
     TxTransfer {
@@ -206,12 +207,10 @@ impl<D> Blockchain for CurrencyBlockchain<D>
         let mut hashes = Vec::new();
         push_if_some(&mut hashes, wallets.root_hash()?);
         push_if_some(&mut hashes, wallet_ids.root_hash()?);
-        if let Some(items) = wallets.iter()? {
-            for item in items {
-                if let Some((id, _)) = view.wallet(item.pub_key())? {
-                    let history = view.wallet_history(id);
-                    push_if_some(&mut hashes, history.root_hash()?);
-                }
+        for item in wallets.values()? {
+            if let Some((id, _)) = view.wallet(item.pub_key())? {
+                let history = view.wallet_history(id);
+                push_if_some(&mut hashes, history.root_hash()?);
             }
         }
         Ok(hash(&hashes.concat()))
@@ -322,8 +321,8 @@ mod tests {
         assert_eq!(w1.1.amount(), 600);
         assert_eq!(w2.1.amount(), 500);
 
-        let h1 = v.wallet_history(w1.0).iter().unwrap().unwrap();
-        let h2 = v.wallet_history(w2.0).iter().unwrap().unwrap();
+        let h1 = v.wallet_history(w1.0).values().unwrap();
+        let h2 = v.wallet_history(w2.0).values().unwrap();
         assert_eq!(h1, vec![cw1.hash(), iw1.hash(), tw.hash()]);
         assert_eq!(h2, vec![cw2.hash(), iw2.hash(), tw.hash()]);
     }

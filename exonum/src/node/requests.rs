@@ -116,15 +116,14 @@ impl<B, S> NodeHandler<B, S>
             }
         } else {
             // msg.height < state.height
-            if let Some(precommits) = self.blockchain
+            self.blockchain
                 .view()
                 .precommits(msg.block_hash())
+                .values()
+                .unwrap()
                 .iter()
-                .unwrap() {
-                precommits.iter().map(|p| p.raw().clone()).collect()
-            } else {
-                Vec::new()
-            }
+                .map(|p| p.raw().clone())
+                .collect()
         };
 
         for precommit in precommits {
@@ -141,13 +140,12 @@ impl<B, S> NodeHandler<B, S>
 
         let block_hash = view.heights().get(msg.height()).unwrap().unwrap();
 
-        let precommits = if let Some(precommits) = view.precommits(&block_hash)
+        let precommits = view.precommits(&block_hash)
+            .values()
+            .unwrap()
             .iter()
-            .unwrap() {
-            precommits.iter().map(|p| p.raw().clone()).collect()
-        } else {
-            Vec::new()
-        };
+            .map(|p| p.raw().clone())
+            .collect::<Vec<_>>();
 
         for precommit in precommits {
             self.send_to_peer(*msg.from(), &precommit);

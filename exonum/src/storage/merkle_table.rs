@@ -34,11 +34,11 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     }
 
     // TODO: implement iterator for List
-    pub fn iter(&self) -> Result<Option<Vec<V>>, Error> {
+    pub fn values(&self) -> Result<Vec<V>, Error> {
         Ok(if self.is_empty()? {
-            None
+            Vec::new()
         } else {
-            Some(range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect())
+            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
         })
     }
 
