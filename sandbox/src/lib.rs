@@ -20,9 +20,8 @@ extern crate cryptocurrency;
 mod sandbox;
 
 mod tx_generator;
-pub mod testnet;
-mod config_file;
 
 pub use tx_generator::TimestampingTxGenerator;
-pub use config_file::ConfigFile;
 pub use self::sandbox::timestamping_sandbox;
+pub use cryptocurrency::config;
+pub use cryptocurrency::config_file;

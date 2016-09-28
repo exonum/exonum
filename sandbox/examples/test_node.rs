@@ -12,8 +12,8 @@ use exonum::node::{Node, Configuration};
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 use exonum::blockchain::Blockchain;
 
-use sandbox::{ConfigFile};
-use sandbox::testnet::{TestNodeConfig};
+use sandbox::config::NodeConfig;
+use sandbox::config_file::ConfigFile;
 use timestamping::TimestampingBlockchain;
 
 fn run_node<B: Blockchain>(blockchain: B, node_cfg: Configuration) {
@@ -69,13 +69,13 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = TestNodeConfig::gen(count);
+            let cfg = NodeConfig::gen(count);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
         }
         ("run", Some(matches)) => {
-            let cfg: TestNodeConfig = ConfigFile::load(path).unwrap();
+            let cfg: NodeConfig = ConfigFile::load(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {
                 Some(string) => {

@@ -18,8 +18,8 @@ use exonum::storage::{MemoryDB};
 
 use timestamping::TimestampingBlockchain; 
 
-use sandbox::{ConfigFile};
-use sandbox::testnet::{TestNodeConfig};
+use sandbox::config_file::ConfigFile;
+use sandbox::config::NodeConfig;
 use sandbox::TimestampingTxGenerator;
 
 fn main() {
@@ -74,7 +74,7 @@ fn main() {
     let path = Path::new(matches.value_of("CONFIG").unwrap());
     match matches.subcommand() {
         ("run", Some(matches)) => {
-            let cfg: TestNodeConfig = ConfigFile::load(path).unwrap();
+            let cfg: NodeConfig = ConfigFile::load(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let count: usize = matches.value_of("COUNT").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {
