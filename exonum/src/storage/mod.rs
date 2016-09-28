@@ -32,6 +32,8 @@ pub struct Error {
     message: String,
 }
 
+pub type Result<T> = ::std::result::Result<T, Error>;
+
 // TODO We need to understand how to finish them
 // pub trait Iterable {
 //     type Iter: Iterator;
@@ -47,20 +49,20 @@ pub struct Error {
 // }
 
 pub trait Map<K: ?Sized, V> {
-    fn get(&self, key: &K) -> Result<Option<V>, Error>;
-    fn put(&self, key: &K, value: V) -> Result<(), Error>;
-    fn delete(&self, key: &K) -> Result<(), Error>;
-    fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>, Error>;
+    fn get(&self, key: &K) -> Result<Option<V>>;
+    fn put(&self, key: &K, value: V) -> Result<()>;
+    fn delete(&self, key: &K) -> Result<()>;
+    fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>>;
 }
 
 pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
-    fn append(&self, value: V) -> Result<(), Error>;
-    fn extend<I: IntoIterator<Item = V>>(&self, iter: I) -> Result<(), Error>;
-    fn get(&self, index: K) -> Result<Option<V>, Error>;
-    fn set(&self, index: K, value: V) -> Result<(), Error>;
-    fn last(&self) -> Result<Option<V>, Error>;
-    fn is_empty(&self) -> Result<bool, Error>;
-    fn len(&self) -> Result<K, Error>;
+    fn append(&self, value: V) -> Result<()>;
+    fn extend<I: IntoIterator<Item = V>>(&self, iter: I) -> Result<()>;
+    fn get(&self, index: K) -> Result<Option<V>>;
+    fn set(&self, index: K, value: V) -> Result<()>;
+    fn last(&self) -> Result<Option<V>>;
+    fn is_empty(&self) -> Result<bool>;
+    fn len(&self) -> Result<K>;
 }
 
 impl Error {

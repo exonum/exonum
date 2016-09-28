@@ -53,6 +53,7 @@ dependencies = [
  "mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "sodiumoxide 0.0.12 (git+https://github.com/dnaq/sodiumoxide.git?rev=0c9f41f)",
  "time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

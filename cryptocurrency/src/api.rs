@@ -3,12 +3,11 @@ use std::cmp::min;
 use serde::{Serialize, Serializer};
 
 use exonum::crypto::{Hash, PublicKey};
-use exonum::storage::{Map, Database, List};
+use exonum::storage::{Map, Database, List, Result as StorageResult};
 use exonum::blockchain::{View, Block};
 use utils::Base64Value;
 use utils::blockchain_explorer::BlockchainExplorer;
 
-use utils::blockchain_explorer::Result as StorageResult;
 use super::{CurrencyView, CurrencyTx};
 use super::wallet::{Wallet, WalletId};
 
@@ -134,7 +133,7 @@ impl Serialize for WalletInfo {
     {
         let mut state = ser.serialize_struct("wallet", 7)?;
         ser.serialize_struct_elt(&mut state, "id", self.id)?;
-        ser.serialize_struct_elt(&mut state, "amount", self.inner.amount())?;
+        ser.serialize_struct_elt(&mut state, "balance", self.inner.balance())?;
         ser.serialize_struct_elt(&mut state, "name", self.inner.name())?;
         ser.serialize_struct_elt(&mut state, "history", &self.history)?;
         ser.serialize_struct_end(state)

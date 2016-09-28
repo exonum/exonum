@@ -166,6 +166,7 @@ impl<F> CurrencyView<F>
         MerklePatriciaTable::new(MapTable::new(vec![21], &self))
     }
 
+    // TODO move to api
     pub fn wallet(&self, pub_key: &PublicKey) -> Result<Option<(WalletId, Wallet)>, Error> {
         if let Some(id) = self.wallet_ids().get(pub_key)? {
             let wallet_pair = self.wallets().get(id)?.map(|wallet| (id, wallet));
@@ -195,25 +196,20 @@ impl<D> Blockchain for CurrencyBlockchain<D>
     }
 
     fn state_hash(view: &Self::View) -> Result<Hash, Error> {
-        let push_if_some = |vec: &mut Vec<Vec<u8>>, option: Option<Hash>| {
-            if let Some(hash) = option {
-                vec.push(hash.as_ref().to_vec());
-            }
-        };
-
         let wallets = view.wallets();
         let wallet_ids = view.wallet_ids();
 
         let mut hashes = Vec::new();
-        push_if_some(&mut hashes, wallets.root_hash()?);
-        push_if_some(&mut hashes, wallet_ids.root_hash()?);
+        hashes.extend_from_slice(wallets.root_hash()?.as_ref());
+        hashes.extend_from_slice(wallet_ids.root_hash()?.as_ref());
+
         for item in wallets.values()? {
             if let Some((id, _)) = view.wallet(item.pub_key())? {
                 let history = view.wallet_history(id);
-                push_if_some(&mut hashes, history.root_hash()?);
+                hashes.extend_from_slice(history.root_hash()?.as_ref());
             }
         }
-        Ok(hash(&hashes.concat()))
+        Ok(hash(&hashes))
     }
 
     fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
@@ -223,7 +219,7 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                 let from = view.wallet(msg.from())?;
                 let to = view.wallet(msg.to())?;
                 if let (Some(mut from), Some(mut to)) = (from, to) {
-                    if from.1.amount() < msg.amount() {
+                    if from.1.balance() < msg.amount() {
                         return Ok(());
                     }
 
@@ -237,8 +233,8 @@ impl<D> Blockchain for CurrencyBlockchain<D>
             }
             CurrencyTx::Issue(ref msg) => {
                 if let Some((id, mut wallet)) = view.wallet(msg.wallet())? {
-                    let new_amount = wallet.amount() + msg.amount();
-                    wallet.set_amount(new_amount);
+                    let new_amount = wallet.balance() + msg.amount();
+                    wallet.set_balance(new_amount);
                     view.wallets().set(id, wallet)?;
                     view.wallet_history(id).append(tx_hash)?;
                 }
@@ -299,9 +295,9 @@ mod tests {
         assert_eq!(w1.0, 0);
         assert_eq!(w2.0, 1);
         assert_eq!(w1.1.name(), "tx1");
-        assert_eq!(w1.1.amount(), 0);
+        assert_eq!(w1.1.balance(), 0);
         assert_eq!(w2.1.name(), "tx2");
-        assert_eq!(w2.1.amount(), 0);
+        assert_eq!(w2.1.balance(), 0);
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
@@ -310,16 +306,16 @@ mod tests {
         let w1 = v.wallet(&p1).unwrap().unwrap();
         let w2 = v.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.1.amount(), 1000);
-        assert_eq!(w2.1.amount(), 100);
+        assert_eq!(w1.1.balance(), 1000);
+        assert_eq!(w2.1.balance(), 100);
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
         CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::Transfer(tw.clone())).unwrap();
         let w1 = v.wallet(&p1).unwrap().unwrap();
         let w2 = v.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.1.amount(), 600);
-        assert_eq!(w2.1.amount(), 500);
+        assert_eq!(w1.1.balance(), 600);
+        assert_eq!(w2.1.balance(), 500);
 
         let h1 = v.wallet_history(w1.0).values().unwrap();
         let h2 = v.wallet_history(w2.0).values().unwrap();

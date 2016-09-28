@@ -42,8 +42,9 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         })
     }
 
-    pub fn root_hash(&self) -> Result<Option<Hash>, Error> {
+    pub fn root_hash(&self) -> Result<Hash, Error> {
         self.get_hash(self.height()?, K::zero())
+            .map(|h| h.unwrap_or(Hash([0; 32])))
     }
 
     fn height(&self) -> Result<K, Error> {
@@ -210,7 +211,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
 mod tests {
     extern crate rand;
 
-    use ::crypto::hash;
+    use ::crypto::{hash, Hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
 
 
@@ -267,7 +268,7 @@ mod tests {
     fn test_hashes() {
         let mut storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
-        assert_eq!(table.root_hash().unwrap(), None);
+        assert_eq!(table.root_hash().unwrap(), Hash([0; 32]));
 
         let h1 = hash(&vec![1]);
         let h2 = hash(&vec![2]);
@@ -291,28 +292,28 @@ mod tests {
         let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
         table.append(vec![1]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h1));
+        assert_eq!(table.root_hash().unwrap(), h1);
 
         table.append(vec![2]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h12));
+        assert_eq!(table.root_hash().unwrap(), h12);
 
         table.append(vec![3]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h123));
+        assert_eq!(table.root_hash().unwrap(), h123);
 
         table.append(vec![4]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h1234));
+        assert_eq!(table.root_hash().unwrap(), h1234);
 
         table.append(vec![5]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h12345));
+        assert_eq!(table.root_hash().unwrap(), h12345);
 
         table.append(vec![6]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h123456));
+        assert_eq!(table.root_hash().unwrap(), h123456);
 
         table.append(vec![7]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h1234567));
+        assert_eq!(table.root_hash().unwrap(), h1234567);
 
         table.append(vec![8]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h12345678));
+        assert_eq!(table.root_hash().unwrap(), h12345678);
 
         assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
     }
@@ -336,10 +337,10 @@ mod tests {
         let t = MerkleTable::new(MapTable::new(vec![255], &mut s));
         assert_eq!(t.get(0u32).unwrap(), None);
         t.append(vec![1]).unwrap();
-        assert_eq!(t.root_hash().unwrap(), Some(h1));
+        assert_eq!(t.root_hash().unwrap(), h1);
 
         t.set(0, vec![2]).unwrap();
-        assert_eq!(t.root_hash().unwrap(), Some(h2));
+        assert_eq!(t.root_hash().unwrap(), h2);
     }
 
     #[test] 
