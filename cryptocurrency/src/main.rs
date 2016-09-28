@@ -24,10 +24,11 @@ extern crate cryptocurrency;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
+use std::default::Default;
 
 use clap::{Arg, App, SubCommand};
 use rustless::json::ToJson;
-use rustless::{Application, Api, Nesting, Versioning};
+use rustless::{Application, Api, Nesting, Versioning, Response};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
 use rustless::batteries::swagger;
 use valico::json_dsl;
@@ -36,10 +37,11 @@ use rand::{Rng, thread_rng};
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions, List};
-use exonum::storage::Error as StorageError;
+use exonum::storage::{Result as StorageResult, Error as StorageError};
 use exonum::blockchain::{Blockchain};
 use exonum::crypto::{Hash, gen_keypair, PublicKey, SecretKey};
 use exonum::messages::Message;
+
 use utils::config_file::ConfigFile;
 use utils::config::NodeConfig;
 use utils::Base64Value;
@@ -48,8 +50,6 @@ use utils::blockchain_explorer::BlockchainExplorer;
 use cryptocurrency::{CurrencyBlockchain, CurrencyTx, CurrencyView, TxIssue, TxTransfer,
                      TxCreateWallet};
 use cryptocurrency::api::CryptocurrencyApi;
-
-pub type StorageResult<T> = Result<T, StorageError>;
 
 pub type CurrencyTxSender<B> = TxSender<B, NodeChannel<B>>;
 
@@ -92,14 +92,13 @@ fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: CurrencyBlockchain<D>
         api.get("block", |endpoint| {
             let b1 = b1.clone();
 
-            endpoint.summary("Returns block chain");
+            endpoint.summary("Returns blockchain info array");
             endpoint.params(|params| {
                 params.opt_typed("from", json_dsl::u64());
                 params.opt_typed("to", json_dsl::u64())
             });
 
             endpoint.handle(move |client, params| {
-                println!("{:?}", params);
                 let view: CurrencyView<D::Fork> = b1.clone().view();
                 let from = params.find("from").map(|x| x.as_u64().unwrap()).unwrap_or(0);
                 let to = params.find("to").map(|x| x.as_u64().unwrap());
@@ -119,12 +118,11 @@ fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: CurrencyBlockchain<D>
             });
 
             endpoint.handle(move |client, params| {
-                println!("{:?}", params);
                 let view = b1.clone().view();
                 let height = params.find("height").unwrap().as_u64().unwrap();
 
                 match BlockchainExplorer::<D>::get_block_info(&view, height) {
-                    Ok(Some(blocks)) => client.json(&blocks.to_json()),
+                    Ok(Some(block)) => client.json(&block.to_json()),
                     Ok(None) => Ok(client),
                     Err(e) => client.error(e),
                 }
@@ -133,13 +131,12 @@ fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: CurrencyBlockchain<D>
         api.get("transaction/:hash", |endpoint| {
             let b1 = b1.clone();
 
-            endpoint.summary("Returns transaction info");
+            endpoint.summary("Returns transaction info with given hash");
             endpoint.params(|params| {
                 params.req_typed("hash", json_dsl::string());
             });
 
             endpoint.handle(move |client, params| {
-                println!("{:?}", params);
                 let view = b1.clone().view();
                 let hash = params.find("hash").unwrap().to_string();
                 match Hash::from_base64(hash) {
@@ -254,7 +251,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
         });
 
         let b = blockchain.clone();
-        api.post("info", move |endpoint| {
+        api.get("info", move |endpoint| {
             endpoint.handle(move |client, _| {
                 let (public_key, _) = {
                     let r = {
@@ -293,6 +290,15 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                 api.version("v1", Versioning::Path);
                 api.prefix("api");
 
+                api.error_formatter(|err, _media| {
+                    if let Some(e) = err.downcast::<StorageError>() {
+                        let body = format!("An internal error occured: {}", e);
+                        Some(Response::from(StatusCode::InternalServerError, Box::new(body)))
+                    } else {
+                        None
+                    }
+                });
+
                 blockchain_explorer_api(api, blockchain.clone());
                 cryptocurrency_api(api, blockchain.clone(), channel.clone());
                 api.mount(swagger::create_api("docs"));
@@ -310,21 +316,21 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                     contact: Some(swagger::Contact {
                         name: "Aleksey Sidorov".to_string(),
                         url: Some("aleksei.sidorov@xdev.re".to_string()),
-                        ..std::default::Default::default()
+                        ..Default::default()
                     }),
                     license: Some(swagger::License {
                         name: "Demo".to_string(),
                         url: "http://exonum.com".to_string()
                     }),
-                    ..std::default::Default::default()
+                    ..Default::default()
                 },
-                ..std::default::Default::default()
+                ..Default::default()
             });
 
             let mut chain = iron::Chain::new(app);
+            let api_key = b"abacabasecretcoinblabla23nx8Hasojd8";
             let cookie =
-                ::rustless::batteries::cookie::new("secretsecretsecretsecretsecretsecretsecret"
-                    .as_bytes());
+                ::rustless::batteries::cookie::new(api_key);
             chain.link(cookie);
             iron::Iron::new(chain).http(listen_address).unwrap();
         });
@@ -412,7 +418,6 @@ fn main() {
                         .collect()
                 }
             };
-            println!("Known peers is {:#?}", peers);
             let node_cfg = cfg.to_node_configuration(idx, peers);
             match matches.value_of("LEVELDB_PATH") {
                 Some(ref db_path) => {

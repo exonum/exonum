@@ -136,6 +136,7 @@ impl Serialize for WalletInfo {
         ser.serialize_struct_elt(&mut state, "balance", self.inner.balance())?;
         ser.serialize_struct_elt(&mut state, "name", self.inner.name())?;
         ser.serialize_struct_elt(&mut state, "history", &self.history)?;
+        ser.serialize_struct_elt(&mut state, "history_hash", self.inner.history_hash())?;
         ser.serialize_struct_end(state)
     }
 }
