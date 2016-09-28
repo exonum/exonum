@@ -222,21 +222,28 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                     if from.1.balance() < msg.amount() {
                         return Ok(());
                     }
+                    let from_history = view.wallet_history(from.0);
+                    let to_history = view.wallet_history(to.0);
+                    from_history.append(tx_hash)?;
+                    to_history.append(tx_hash)?;
 
                     from.1.transfer_to(&mut to.1, msg.amount());
+                    from.1.set_history_hash(&from_history.root_hash()?);
+                    to.1.set_history_hash(&to_history.root_hash()?);
+
                     view.wallets().set(from.0, from.1)?;
                     view.wallets().set(to.0, to.1)?;
-
-                    view.wallet_history(from.0).append(tx_hash)?;
-                    view.wallet_history(to.0).append(tx_hash)?;
                 }
             }
             CurrencyTx::Issue(ref msg) => {
                 if let Some((id, mut wallet)) = view.wallet(msg.wallet())? {
+                    let history = view.wallet_history(id);
+                    history.append(tx_hash)?;
+                    
                     let new_amount = wallet.balance() + msg.amount();
                     wallet.set_balance(new_amount);
+                    wallet.set_history_hash(&history.root_hash()?);
                     view.wallets().set(id, wallet)?;
-                    view.wallet_history(id).append(tx_hash)?;
                 }
             }
             CurrencyTx::CreateWallet(ref msg) => {
@@ -244,12 +251,12 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                     return Ok(());
                 }
 
-                let wallet = Wallet::new(msg.pub_key(), msg.name(), 0);
                 let id = view.wallets().len()?;
+                view.wallet_history(id).append(tx_hash)?;                
 
+                let wallet = Wallet::new(msg.pub_key(), msg.name(), 0, &view.wallet_history(id).root_hash()?);
                 view.wallets().append(wallet)?;
                 view.wallet_ids().put(msg.pub_key(), id)?;
-                view.wallet_history(id).append(tx_hash)?;
             }
         };
         Ok(())
@@ -298,6 +305,10 @@ mod tests {
         assert_eq!(w1.1.balance(), 0);
         assert_eq!(w2.1.name(), "tx2");
         assert_eq!(w2.1.balance(), 0);
+        let rh1 = v.wallet_history(w1.0).root_hash().unwrap();
+        let rh2 = v.wallet_history(w2.0).root_hash().unwrap();
+        assert_eq!(&rh1, w1.1.history_hash());
+        assert_eq!(&rh2, w2.1.history_hash());
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
@@ -308,6 +319,10 @@ mod tests {
 
         assert_eq!(w1.1.balance(), 1000);
         assert_eq!(w2.1.balance(), 100);
+        let rh1 = v.wallet_history(w1.0).root_hash().unwrap();
+        let rh2 = v.wallet_history(w2.0).root_hash().unwrap();
+        assert_eq!(&rh1, w1.1.history_hash());
+        assert_eq!(&rh2, w2.1.history_hash());
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
         CurrencyBlockchain::<MemoryDB>::execute(&v, &CurrencyTx::Transfer(tw.clone())).unwrap();
@@ -316,6 +331,10 @@ mod tests {
 
         assert_eq!(w1.1.balance(), 600);
         assert_eq!(w2.1.balance(), 500);
+        let rh1 = v.wallet_history(w1.0).root_hash().unwrap();
+        let rh2 = v.wallet_history(w2.0).root_hash().unwrap();
+        assert_eq!(&rh1, w1.1.history_hash());
+        assert_eq!(&rh2, w2.1.history_hash());
 
         let h1 = v.wallet_history(w1.0).values().unwrap();
         let h2 = v.wallet_history(w2.0).values().unwrap();
