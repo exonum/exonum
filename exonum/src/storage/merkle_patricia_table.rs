@@ -332,7 +332,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                 Ok(Self::hash_leaf(&prefix_slice, &value))
             }
             Some((_, Node::Branch(branch))) => Ok(branch.hash()),
-            None => Ok(Hash([0; 32])),
+            None => Ok(hash(&[])),
         }
     }
 
@@ -973,7 +973,7 @@ mod tests {
         assert_eq!(table2.get(&vec![255; 32]).unwrap(), Some(vec![1]));
         assert_eq!(table2.get(&vec![254; 32]).unwrap(), Some(vec![2]));
 
-        assert!(table1.root_hash().unwrap() != Hash([0; 32]));
+        assert!(table1.root_hash().unwrap() != hash(&[]));
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
 
@@ -1009,7 +1009,7 @@ mod tests {
         table2.put(&vec![255; 32], vec![3]).unwrap();
         table2.put(&vec![254; 32], vec![5]).unwrap();
 
-        assert!(table1.root_hash().unwrap() != Hash([0; 32]));
+        assert!(table1.root_hash().unwrap() != hash(&[]));
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
 
@@ -1035,7 +1035,7 @@ mod tests {
         table2.put(&vec![64; 32], vec![2]).unwrap();
         table2.put(&vec![42; 32], vec![1]).unwrap();
 
-        assert!(table2.root_hash().unwrap() != Hash([0; 32]));
+        assert!(table2.root_hash().unwrap() != hash(&[]));
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
     }
 
@@ -1053,8 +1053,8 @@ mod tests {
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.delete(&vec![255; 32]).unwrap();
 
-        assert_eq!(table1.root_hash().unwrap(), Hash([0; 32]));
-        assert_eq!(table2.root_hash().unwrap(), Hash([0; 32]));
+        assert_eq!(table1.root_hash().unwrap(), hash(&[]));
+        assert_eq!(table2.root_hash().unwrap(), hash(&[]));
     }
 
     #[test]
@@ -1151,7 +1151,7 @@ mod tests {
             assert_eq!(v2.as_ref(), Some(&item.1));
         }
 
-        assert!(table2.root_hash().unwrap() != Hash([0; 32]));
+        assert!(table2.root_hash().unwrap() != hash(&[]));
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
 
         // Test same keys
@@ -1209,7 +1209,7 @@ mod tests {
             table2.delete(key).unwrap();
         }
 
-        assert!(table2.root_hash().unwrap() != Hash([0; 32]));
+        assert!(table2.root_hash().unwrap() != hash(&[]));
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
 
         for item in &data {

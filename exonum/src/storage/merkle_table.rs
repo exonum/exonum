@@ -44,7 +44,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
         self.get_hash(self.height()?, K::zero())
-            .map(|h| h.unwrap_or(Hash([0; 32])))
+            .map(|h| h.unwrap_or(hash(&[])))
     }
 
     fn height(&self) -> Result<K, Error> {
@@ -211,7 +211,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
 mod tests {
     extern crate rand;
 
-    use ::crypto::{hash, Hash};
+    use ::crypto::hash;
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
 
 
@@ -268,7 +268,7 @@ mod tests {
     fn test_hashes() {
         let mut storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
-        assert_eq!(table.root_hash().unwrap(), Hash([0; 32]));
+        assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
         let h1 = hash(&vec![1]);
         let h2 = hash(&vec![2]);
