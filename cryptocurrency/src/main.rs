@@ -18,6 +18,7 @@ extern crate base64;
 extern crate rand;
 
 extern crate exonum;
+extern crate utils;
 extern crate cryptocurrency;
 
 use std::net::SocketAddr;
@@ -41,9 +42,9 @@ use exonum::storage::Error as StorageError;
 use exonum::blockchain::{Block, Blockchain, View};
 use exonum::crypto::{Hash, gen_keypair, PublicKey, SecretKey};
 use exonum::messages::Message;
+use utils::config_file::ConfigFile;
+use utils::config::NodeConfig;
 
-use cryptocurrency::config_file::ConfigFile;
-use cryptocurrency::config::NodeConfig;
 use cryptocurrency::{CurrencyBlockchain, CurrencyTx, CurrencyView, TxIssue, TxTransfer,
                      TxCreateWallet};
 use cryptocurrency::wallet::{Wallet, WalletId};

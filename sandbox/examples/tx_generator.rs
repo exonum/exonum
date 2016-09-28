@@ -2,6 +2,7 @@
 extern crate log;
 
 extern crate exonum;
+extern crate utils;
 extern crate timestamping;
 extern crate sandbox;
 extern crate env_logger;
@@ -15,11 +16,10 @@ use clap::{Arg, App, SubCommand};
 
 use exonum::node::{Node};
 use exonum::storage::{MemoryDB};
-
 use timestamping::TimestampingBlockchain; 
+use utils::config_file::ConfigFile;
+use utils::config::NodeConfig;
 
-use sandbox::config_file::ConfigFile;
-use sandbox::config::NodeConfig;
 use sandbox::TimestampingTxGenerator;
 
 fn main() {

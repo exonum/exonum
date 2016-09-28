@@ -1,4 +1,5 @@
 extern crate exonum;
+extern crate utils;
 extern crate timestamping;
 extern crate sandbox;
 extern crate env_logger;
@@ -11,10 +12,9 @@ use clap::{Arg, App, SubCommand};
 use exonum::node::{Node, Configuration};
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 use exonum::blockchain::Blockchain;
-
-use sandbox::config::NodeConfig;
-use sandbox::config_file::ConfigFile;
 use timestamping::TimestampingBlockchain;
+use utils::config_file::ConfigFile;
+use utils::config::NodeConfig;
 
 fn run_node<B: Blockchain>(blockchain: B, node_cfg: Configuration) {
     let mut node = Node::new(blockchain, node_cfg);

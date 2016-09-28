@@ -8,17 +8,12 @@ extern crate rand;
 extern crate time;
 extern crate serde;
 extern crate toml;
+extern crate byteorder;
 #[macro_use]
 extern crate log;
 
-extern crate clap;
-
+#[macro_use(message)]
 extern crate exonum;
-extern crate timestamping;
-extern crate cryptocurrency;
 
-mod sandbox;
-mod tx_generator;
-
-pub use tx_generator::TimestampingTxGenerator;
-pub use self::sandbox::timestamping_sandbox;
+pub mod config;
+pub mod config_file;

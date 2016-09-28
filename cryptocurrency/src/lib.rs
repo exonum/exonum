@@ -30,8 +30,6 @@ pub const TX_TRANSFER_ID: u16 = 128;
 pub const TX_ISSUE_ID: u16 = 129;
 pub const TX_WALLET_ID: u16 = 130;
 
-pub mod config;
-pub mod config_file;
 pub mod wallet;
 
 message! {
