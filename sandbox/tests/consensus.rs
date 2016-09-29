@@ -1,5 +1,8 @@
 extern crate exonum;
 extern crate sandbox;
+extern crate time;
+
+use time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit};
 
@@ -14,7 +17,7 @@ fn test_queue_message_from_future_round() {
     let propose = Propose::new(2,
                                0,
                                2,
-                               sandbox.time(),
+                               sandbox.time() + Duration::milliseconds(sandbox.cfg().propose_timeout as i64),
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(2));

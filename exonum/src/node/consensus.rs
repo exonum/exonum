@@ -55,7 +55,8 @@ impl<B, S> NodeHandler<B, S>
                 }
 
                 // Check timeout
-                if msg.time() - self.last_block_time() < Duration::milliseconds(self.propose_timeout as i64) {
+                if msg.time() - self.last_block_time() <
+                   Duration::milliseconds(self.propose_timeout as i64) {
                     return;
                 }
 
@@ -270,7 +271,7 @@ impl<B, S> NodeHandler<B, S>
 
         // Send propose
         if self.is_leader() {
-           self.add_propose_timeout();
+            self.add_propose_timeout();
         }
 
         // Add timeout for first round

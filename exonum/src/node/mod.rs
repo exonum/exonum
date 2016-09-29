@@ -211,9 +211,9 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn last_block_time(&self) -> Timespec {
         self.blockchain
-                    .last_block()
-                    .unwrap()
-                    .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time())
+            .last_block()
+            .unwrap()
+            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time())
     }
 }
 
@@ -247,7 +247,7 @@ impl<B, S> EventHandler for NodeHandler<B, S>
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
             NodeTimeout::Status => self.handle_status_timeout(),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
-            NodeTimeout::Propose => self.handle_propose_timeout()
+            NodeTimeout::Propose => self.handle_propose_timeout(),
         }
     }
 }

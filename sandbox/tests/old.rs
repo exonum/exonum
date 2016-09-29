@@ -1,5 +1,8 @@
 extern crate exonum;
 extern crate sandbox;
+extern crate time;
+
+use time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit};
 use exonum::blockchain::Block;
@@ -27,7 +30,7 @@ fn test_send_propose_and_prevote() {
     let propose = Propose::new(0,
                                0,
                                4,
-                               sandbox.time(),
+                               sandbox.time() ,
                                &sandbox.last_hash(),
                                &[tx.hash()],
                                sandbox.s(0));
@@ -43,7 +46,7 @@ fn test_send_prevote() {
     let propose = Propose::new(1,
                                0,
                                1,
-                               sandbox.time(),
+                               sandbox.time() + Duration::milliseconds(sandbox.cfg().propose_timeout as i64),
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(1));
@@ -56,15 +59,16 @@ fn test_send_prevote() {
 fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
 
+    let propose_time = sandbox.time() + Duration::milliseconds(sandbox.cfg().propose_timeout as i64);
     let propose = Propose::new(1,
                                0,
                                1,
-                               sandbox.time(),
+                               propose_time,
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(1));
 
-    let block = Block::new(0, sandbox.time(), &hash(&[]), &hash(&[]), &hash(&[]));
+    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
@@ -79,15 +83,16 @@ fn test_get_lock_and_send_precommit() {
 fn test_commit() {
     let sandbox = timestamping_sandbox();
 
+    let propose_time = sandbox.time() + Duration::milliseconds(sandbox.cfg().propose_timeout as i64);
     let propose = Propose::new(1,
                                0,
                                1,
-                               sandbox.time(),
+                               propose_time,
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(1));
 
-    let block = Block::new(0, sandbox.time(), &hash(&[]), &hash(&[]), &hash(&[]));
+    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
@@ -97,4 +102,21 @@ fn test_commit() {
     sandbox.recv(Precommit::new(2, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(2)));
     sandbox.recv(Precommit::new(3, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(3)));
     sandbox.assert_state(0, 1);
+}
+
+#[test]
+#[should_panic(expected = "Expected to broadcast the message Prevote")]
+fn received_unexpected_propose() {
+    let sandbox = timestamping_sandbox();
+
+    let propose = Propose::new(1,
+                               0,
+                               1,
+                               sandbox.time(),
+                               &sandbox.last_hash(),
+                               &[],
+                               sandbox.s(1));
+
+    sandbox.recv(propose.clone());
+    sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
 }
