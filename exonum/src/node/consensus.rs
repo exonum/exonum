@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use time::Duration;
+
 use super::super::crypto::{Hash, PublicKey};
 use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
@@ -53,6 +55,9 @@ impl<B, S> NodeHandler<B, S>
                 }
 
                 // Check timeout
+                if msg.time() - self.last_block_time() < Duration::milliseconds(self.propose_timeout as i64) {
+                    return;
+                }
 
                 self.handle_propose(msg)
             }
