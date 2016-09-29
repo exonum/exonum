@@ -27,6 +27,7 @@ pub enum NodeTimeout {
     Status,
     Round(u64, u32),
     Request(RequestData, Option<PublicKey>),
+    Propose,
     PeerExchange,
 }
 
@@ -48,6 +49,7 @@ pub struct NodeHandler<B, S>
     pub channel: S,
     pub blockchain: B,
     pub round_timeout: u32,
+    pub propose_timeout: u32,
     pub status_timeout: u32,
     pub peers_timeout: u32,
     // TODO: move this into peer exchange service
@@ -62,6 +64,7 @@ pub struct Configuration {
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
     pub round_timeout: u32,
+    pub propose_timeout: u32,
     pub status_timeout: u32,
     pub peers_timeout: u32,
     pub peer_discovery: Vec<SocketAddr>,
@@ -93,6 +96,7 @@ impl<B, S> NodeHandler<B, S>
             channel: sender,
             blockchain: blockchain,
             round_timeout: config.round_timeout,
+            propose_timeout: config.propose_timeout,
             status_timeout: config.status_timeout,
             peers_timeout: config.peers_timeout,
             peer_discovery: config.peer_discovery,
@@ -162,17 +166,25 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn add_round_timeout(&mut self) {
         let ms = self.state.round() as i64 * self.round_timeout as i64;
-        let time = self.blockchain
-            .last_block()
-            .unwrap()
-            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time()) +
-                   Duration::milliseconds(ms);
+        let time = self.last_block_time() + Duration::milliseconds(ms);
         debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
                time,
                self.state.height(),
                self.state.round());
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
+    }
+
+    pub fn add_propose_timeout(&mut self) {
+        let duration = Duration::milliseconds(self.propose_timeout as i64);
+        let current_time = self.channel.get_time();
+        let time = ::std::cmp::max(current_time, self.last_block_time() + duration);
+
+        debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
+               time,
+               self.state.height(),
+               self.state.round());
+        self.channel.add_timeout(NodeTimeout::Propose, time);
     }
 
     pub fn add_status_timeout(&mut self) {
@@ -195,6 +207,13 @@ impl<B, S> NodeHandler<B, S>
         for conn in self.state.peers().values() {
             self.channel.send_to(&conn.addr(), message.clone());
         }
+    }
+
+    pub fn last_block_time(&self) -> Timespec {
+        self.blockchain
+                    .last_block()
+                    .unwrap()
+                    .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time())
     }
 }
 
@@ -228,6 +247,7 @@ impl<B, S> EventHandler for NodeHandler<B, S>
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
             NodeTimeout::Status => self.handle_status_timeout(),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
+            NodeTimeout::Propose => self.handle_propose_timeout()
         }
     }
 }
