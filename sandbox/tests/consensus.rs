@@ -79,6 +79,7 @@ fn ignore_propose_with_commited_transaction() {
 //     - not only leader, also prevotes
 //     - not only leader, alto precommiters
 // - request tx from propose with unkwnown tx
+// - ignore propose that sends before than timeout exceeded 
 
 // HAS FULL PROPOSE
 
@@ -161,7 +162,7 @@ fn ignore_propose_with_commited_transaction() {
 // - send propose if we are leader
 // - handle queued messages
 
-// HANDLE REQUEST TIMEOUT
+// HANDLE REQUEST TIMEOUT:
 
 // - check height?
 // - Propose/Tx/Prevotes/Precommits/Commit
