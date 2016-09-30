@@ -7,58 +7,69 @@
 extern crate time;
 extern crate serde;
 extern crate toml;
-extern crate base64;
 extern crate exonum;
+extern crate hex;
 
 pub mod config;
 pub mod config_file;
 pub mod blockchain_explorer;
 
 use exonum::crypto::{Hash, PublicKey, SecretKey};
+use hex::{ToHex, FromHex, FromHexError};
 
-pub trait Base64Value: Sized {
-    fn to_base64(&self) -> String;
-    fn from_base64<T: AsRef<str>>(v: T) -> Result<Self, base64::Base64Error>;
+pub trait HexValue: Sized {
+    fn to_hex(&self) -> String;
+    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError>;
 }
 
-impl Base64Value for Hash {
-    fn to_base64(&self) -> String {
-        base64::encode(self.as_ref())
+impl HexValue for Vec<u8> {
+    fn to_hex(&self) -> String {
+        let r: &[u8] = self.as_ref();
+        r.to_hex()
     }
-    fn from_base64<T: AsRef<str>>(v: T) -> Result<Self, base64::Base64Error> {
-        let bytes = base64::decode(v.as_ref())?;
+    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
+        FromHex::from_hex(v.as_ref())
+    }
+}
+
+impl HexValue for Hash {
+    fn to_hex(&self) -> String {
+        self.as_ref().to_hex()
+    }
+    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
+        let bytes: Vec<u8> = FromHex::from_hex(v.as_ref())?;
         if let Some(hash) = Hash::from_slice(bytes.as_ref()) {
             Ok(hash)
         } else {
-            Err(base64::Base64Error::InvalidLength)
+            Err(FromHexError::InvalidHexLength)
         }
     }
 }
 
-impl Base64Value for PublicKey {
-    fn to_base64(&self) -> String {
-        base64::encode(self.as_ref())
+impl HexValue for PublicKey {
+    fn to_hex(&self) -> String {
+        self.as_ref().to_hex()
     }
-    fn from_base64<T: AsRef<str>>(v: T) -> Result<Self, base64::Base64Error> {
-        let bytes = base64::decode(v.as_ref())?;
+    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
+        let bytes: Vec<u8> = FromHex::from_hex(v.as_ref())?;
         if let Some(hash) = Self::from_slice(bytes.as_ref()) {
             Ok(hash)
         } else {
-            Err(base64::Base64Error::InvalidLength)
+            Err(FromHexError::InvalidHexLength)
         }
     }
 }
 
-impl Base64Value for SecretKey {
-    fn to_base64(&self) -> String {
-        base64::encode(self.0.as_ref())
+impl HexValue for SecretKey {
+    fn to_hex(&self) -> String {
+        self.0.as_ref().to_hex()
     }
-    fn from_base64<T: AsRef<str>>(v: T) -> Result<Self, base64::Base64Error> {
-        let bytes = base64::decode(v.as_ref())?;
+    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
+        let bytes: Vec<u8> = FromHex::from_hex(v.as_ref())?;
         if let Some(hash) = Self::from_slice(bytes.as_ref()) {
             Ok(hash)
         } else {
-            Err(base64::Base64Error::InvalidLength)
+            Err(FromHexError::InvalidHexLength)
         }
     }
 }
@@ -66,20 +77,20 @@ impl Base64Value for SecretKey {
 #[cfg(test)]
 mod tests {
     use exonum::crypto::{hash, gen_keypair, Hash, PublicKey, SecretKey};
-    use super::Base64Value;
+    use super::HexValue;
 
     #[test]
     fn test_hash() {
         let h = hash(&[]);
-        let h1 = Hash::from_base64(h.to_base64()).unwrap();
+        let h1 = Hash::from_hex(h.to_hex()).unwrap();
         assert_eq!(h1, h);
     }
 
     #[test]
     fn test_keys() {
         let (p, s) = gen_keypair();
-        let p1 = PublicKey::from_base64(p.to_base64()).unwrap();
-        let s1 = SecretKey::from_base64(s.to_base64()).unwrap();
+        let p1 = PublicKey::from_hex(p.to_hex()).unwrap();
+        let s1 = SecretKey::from_hex(s.to_hex()).unwrap();
         assert_eq!(p1, p);
         assert_eq!(s1, s);
     }

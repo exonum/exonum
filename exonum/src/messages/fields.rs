@@ -188,8 +188,11 @@ impl<'a, T> Field<'a> for T
             });
         }
 
-        Self::check_data(unsafe { ::std::slice::from_raw_parts(pos as *const u8, count as usize) },
-                         from as u32)
+        unsafe {
+            let ptr = buffer.as_ptr().offset(pos as isize);
+            let len = (count as usize) * Self::ITEM_SIZE;
+            Self::check_data(::std::slice::from_raw_parts(ptr as *const u8, len), from as u32)
+        }
     }
 }
 
@@ -256,7 +259,10 @@ fn test_unicode_string() {
     let mut buf = vec![0; 8];
     let s = "test юникодной строчки efw_adqq ss/adfq";
     Field::write(&s, &mut buf, 0, 8);
+    <&str as Field>::check(&buf, 0, 8).unwrap();
+
     let buf2 = buf.clone();
+    <&str as Field>::check(&buf2, 0, 8).unwrap();    
     let s2: &str = Field::read(&buf2, 0, 8);
     assert_eq!(s2, s);
 }

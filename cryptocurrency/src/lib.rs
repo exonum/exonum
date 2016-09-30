@@ -275,6 +275,20 @@ mod tests {
     use super::{CurrencyTx, CurrencyBlockchain, TxCreateWallet, TxIssue, TxTransfer};
 
     #[test]
+    fn test_tx_create_wallet() {
+        let (p, s) = gen_keypair();
+        let n = "babd, Юникод еще работает";
+
+        let tx = TxCreateWallet::new(&p, n, &s);
+        assert_eq!(tx.pub_key(), &p);
+        assert_eq!(tx.name(), n);
+
+        let tx2 = TxCreateWallet::from_raw(tx.raw().clone()).unwrap();
+        assert_eq!(tx2.pub_key(), &p);
+        assert_eq!(tx2.name(), n);
+    }
+
+    #[test]
     fn test_wallet_prefix() {
         let id = 4096;
         let mut prefix = vec![10; 9];

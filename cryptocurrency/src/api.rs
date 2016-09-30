@@ -5,7 +5,7 @@ use serde::{Serialize, Serializer};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::storage::{Map, Database, List, Result as StorageResult};
 use exonum::blockchain::{View, Block};
-use utils::Base64Value;
+use utils::HexValue;
 use utils::blockchain_explorer::BlockchainExplorer;
 
 use super::{CurrencyView, CurrencyTx};
@@ -30,10 +30,10 @@ impl Serialize for BlockInfo {
         let mut state = serializer.serialize_struct("block", 7)?;
         serializer.serialize_struct_elt(&mut state, "height", b.height())?;
 
-        serializer.serialize_struct_elt(&mut state, "hash", b.hash().to_base64())?;
-        serializer.serialize_struct_elt(&mut state, "prev_hash", b.prev_hash().to_base64())?;
-        serializer.serialize_struct_elt(&mut state, "state_hash", b.state_hash().to_base64())?;
-        serializer.serialize_struct_elt(&mut state, "tx_hash", b.tx_hash().to_base64())?;
+        serializer.serialize_struct_elt(&mut state, "hash", b.hash().to_hex())?;
+        serializer.serialize_struct_elt(&mut state, "prev_hash", b.prev_hash().to_hex())?;
+        serializer.serialize_struct_elt(&mut state, "state_hash", b.state_hash().to_hex())?;
+        serializer.serialize_struct_elt(&mut state, "tx_hash", b.tx_hash().to_hex())?;
 
         serializer.serialize_struct_elt(&mut state, "time", tm)?;
         serializer.serialize_struct_elt(&mut state, "txs", &self.txs)?;
@@ -51,22 +51,22 @@ impl Serialize for TxInfo {
             CurrencyTx::Issue(ref issue) => {
                 state = ser.serialize_struct("transaction", 4)?;
                 ser.serialize_struct_elt(&mut state, "type", "issue")?;
-                ser.serialize_struct_elt(&mut state, "wallet", issue.wallet().to_base64())?;
+                ser.serialize_struct_elt(&mut state, "wallet", issue.wallet().to_hex())?;
                 ser.serialize_struct_elt(&mut state, "amount", issue.amount())?;
                 ser.serialize_struct_elt(&mut state, "seed", issue.seed())?;
             }
             CurrencyTx::Transfer(ref transfer) => {
                 state = ser.serialize_struct("transaction", 5)?;
                 ser.serialize_struct_elt(&mut state, "type", "transfer")?;
-                ser.serialize_struct_elt(&mut state, "from", transfer.from().to_base64())?;
-                ser.serialize_struct_elt(&mut state, "to", transfer.to().to_base64())?;
+                ser.serialize_struct_elt(&mut state, "from", transfer.from().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "to", transfer.to().to_hex())?;
                 ser.serialize_struct_elt(&mut state, "amount", transfer.amount())?;
                 ser.serialize_struct_elt(&mut state, "seed", transfer.seed())?;
             }
             CurrencyTx::CreateWallet(ref wallet) => {
                 state = ser.serialize_struct("transaction", 3)?;
                 ser.serialize_struct_elt(&mut state, "type", "create_wallet")?;
-                ser.serialize_struct_elt(&mut state, "pub_key", wallet.pub_key().to_base64())?;
+                ser.serialize_struct_elt(&mut state, "pub_key", wallet.pub_key().to_hex())?;
                 ser.serialize_struct_elt(&mut state, "name", wallet.name())?;
             }
         }
@@ -136,7 +136,7 @@ impl Serialize for WalletInfo {
         ser.serialize_struct_elt(&mut state, "balance", self.inner.balance())?;
         ser.serialize_struct_elt(&mut state, "name", self.inner.name())?;
         ser.serialize_struct_elt(&mut state, "history", &self.history)?;
-        ser.serialize_struct_elt(&mut state, "history_hash", self.inner.history_hash().to_base64())?;
+        ser.serialize_struct_elt(&mut state, "history_hash", self.inner.history_hash().to_hex())?;
         ser.serialize_struct_end(state)
     }
 }

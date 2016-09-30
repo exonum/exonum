@@ -2,8 +2,8 @@
 name = "utils"
 version = "0.1.0"
 dependencies = [
- "base64 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "exonum 0.1.0",
+ "hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_macros 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -13,11 +13,6 @@ dependencies = [
 [[package]]
 name = "aster"
 version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "base64"
-version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -54,6 +49,11 @@ dependencies = [
  "sodiumoxide 0.0.12 (git+https://github.com/dnaq/sodiumoxide.git?rev=0c9f41f)",
  "time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "hex"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "kernel32-sys"
@@ -334,11 +334,11 @@ dependencies = [
 
 [metadata]
 "checksum aster 0.27.0 (registry+https://github.com/rust-lang/crates.io-index)" = "258989846dd255a1e0eeef92d425d345477c9999433cecc9f0879f4549d5e5c9"
-"checksum base64 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2015e3793554aa5b6007e3a72959e84c1070039e74f13dde08fa64afe1ddd892"
 "checksum bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
 "checksum byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0fc10e8cc6b2580fda3f36eb6dc5316657f812a3df879a44a66fc9f0fdbc4855"
 "checksum bytes 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c129aff112dcc562970abb69e2508b40850dd24c274761bb50fb8a0067ba6c27"
 "checksum cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "de1e760d7b6535af4241fca8bd8adf68e2e7edacc6b29f5d399050c5e48cf88c"
+"checksum hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d6a22814455d41612f41161581c2883c0c6a1c41852729b17d5ed88f01e153aa"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum libc 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)" = "408014cace30ee0f767b1c4517980646a573ec61a57957aeeabcac8ac0a02e8d"
 "checksum libsodium-sys 0.0.12 (registry+https://github.com/rust-lang/crates.io-index)" = "44e9986c330611ccd26ea74e502c70e5ebab2874c4c23f2f5f3c5a6ed3fbfbc6"

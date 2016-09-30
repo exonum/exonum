@@ -8,7 +8,7 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re",
 exonum = {version="0.1", path="../exonum"}
 
 time = "0.1"
-base64 = "0.2"
+hex = "0.2"
 serde = "0.8"
 serde_macros = "0.8.9"
 toml = {version="0.2", default-features=false, features=["serde"]}
