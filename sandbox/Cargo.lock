@@ -8,8 +8,8 @@ dependencies = [
  "exonum 0.1.0",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_macros 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.8.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_macros 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "timestamping 0.1.0",
  "toml 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -30,7 +30,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "aster"
-version = "0.26.1"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -276,23 +276,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "quasi"
-version = "0.19.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "quasi_codegen"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "aster 0.26.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "aster 0.27.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "quasi_macros"
-version = "0.19.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "quasi_codegen 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quasi_codegen 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -327,31 +327,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "serde"
-version = "0.8.8"
+version = "0.8.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "serde_codegen"
-version = "0.8.8"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "aster 0.26.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "quasi 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "quasi_macros 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_codegen_internals 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "aster 0.27.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quasi 0.20.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quasi_macros 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_codegen_internals 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "serde_codegen_internals"
-version = "0.8.0"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "serde_macros"
-version = "0.8.8"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "serde_codegen 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_codegen 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -366,7 +366,7 @@ source = "git+https://github.com/dnaq/sodiumoxide.git?rev=0c9f41f#0c9f41f0dfc085
 dependencies = [
  "libc 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "libsodium-sys 0.0.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.8.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -424,7 +424,7 @@ name = "toml"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "serde 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.8.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -469,7 +469,7 @@ dependencies = [
 [metadata]
 "checksum aho-corasick 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ca972c2ea5f742bfce5687b9aef75506a764f61d37f8f649047846a9686ddb66"
 "checksum ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
-"checksum aster 0.26.1 (registry+https://github.com/rust-lang/crates.io-index)" = "baa18cafee9499ac766e76117577b84efa98f43b81964cf167cd800b29176db3"
+"checksum aster 0.27.0 (registry+https://github.com/rust-lang/crates.io-index)" = "258989846dd255a1e0eeef92d425d345477c9999433cecc9f0879f4549d5e5c9"
 "checksum bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
 "checksum byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0fc10e8cc6b2580fda3f36eb6dc5316657f812a3df879a44a66fc9f0fdbc4855"
@@ -494,17 +494,17 @@ dependencies = [
 "checksum num-rational 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)" = "54ff603b8334a72fbb27fe66948aac0abaaa40231b3cecd189e76162f6f38aaf"
 "checksum num-traits 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)" = "8359ea48994f253fa958b5b90b013728b06f54872e5a58bce39540fcdd0f2527"
 "checksum pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "8cee804ecc7eaf201a4a207241472cc870e825206f6c031e3ee2a72fa425f2fa"
-"checksum quasi 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f9b160391362abca7c0e30cead65872b01b03f8371dee7441e130601c9b4d173"
-"checksum quasi_codegen 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bcc10982c4b09697fb79d7725ea5e33ef2b1ff934fdddefa3e83d4f8c50b8d34"
-"checksum quasi_macros 0.19.0 (registry+https://github.com/rust-lang/crates.io-index)" = "f4debfba7bd3bfb3d93439a758e0fd9a6ba8c9b8fc0296bf989fe8f8e30de765"
+"checksum quasi 0.20.1 (registry+https://github.com/rust-lang/crates.io-index)" = "94a532453b931a4483a5b2e40f0fe04aee35b6bc2c0eeec876f1bd2358a134d3"
+"checksum quasi_codegen 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cfb4a9a5410fdbdacbeda8063ddb8add9838dfd4cf50ac486db98abb762d8bd6"
+"checksum quasi_macros 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)" = "adc2b36285ea5e54e4e267f83896267ff8c5aba4f66b2e7d186ed6d968f3715f"
 "checksum rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)" = "2791d88c6defac799c3f20d74f094ca33b9332612d9aef9078519c82e4fe04a5"
 "checksum regex 0.1.77 (registry+https://github.com/rust-lang/crates.io-index)" = "64b03446c466d35b42f2a8b203c8e03ed8b91c0f17b56e1f84f7210a257aa665"
 "checksum regex-syntax 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "279401017ae31cf4e15344aa3f085d0e2e5c1e70067289ef906906fdbe92c8fd"
 "checksum rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)" = "6159e4e6e559c81bd706afe9c8fd68f547d3e851ce12e76b1de7914bab61691b"
-"checksum serde 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)" = "8523fd515099dac5b5abd25b0b9f9709d40eedf03f72ca519903bf138a6577be"
-"checksum serde_codegen 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3c1b749326ac14ace12e5117d3e14a4509853ba0bea54c335d27dad66bd9fdfa"
-"checksum serde_codegen_internals 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8488640b7caaa438eb05c74466f9fa91a61bb4e4e7520f3c1cfcf77fb10bdb61"
-"checksum serde_macros 0.8.8 (registry+https://github.com/rust-lang/crates.io-index)" = "9cda78202a0f6d28fdbac9565789ae8e90025ed10f324284271a02265975271e"
+"checksum serde 0.8.10 (registry+https://github.com/rust-lang/crates.io-index)" = "7a1687e7258b35aa6117cb52d65aa8f289d544fdad0c7a31822973b4465e4066"
+"checksum serde_codegen 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)" = "da68810d845f8e33a80243c28794650397056cbe7aea4c9c7516f55d1061c94e"
+"checksum serde_codegen_internals 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)" = "1b0115c5c602e81c61b787fb0f0fa76a614f8dbe9100b2b59b7d590155672c80"
+"checksum serde_macros 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)" = "c3cf1c01933271e1e72bb788e0499d1bca8af2c09efcc3ddc0b04ff22d080b83"
 "checksum slab 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "d807fd58c4181bbabed77cb3b891ba9748241a552bcc5be698faaebefc54f46e"
 "checksum sodiumoxide 0.0.12 (git+https://github.com/dnaq/sodiumoxide.git?rev=0c9f41f)" = "<none>"
 "checksum strsim 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "50c069df92e4b01425a8bf3576d5d417943a6a7272fbabaf5bd80b1aaa76442e"

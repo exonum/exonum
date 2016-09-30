@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use time::Duration;
+
 use super::super::crypto::{Hash, PublicKey};
 use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
@@ -49,6 +51,12 @@ impl<B, S> NodeHandler<B, S>
 
                 // Check leader
                 if msg.validator() != self.state.leader(msg.round()) {
+                    return;
+                }
+
+                // Check timeout
+                if msg.time() - self.last_block_time() <
+                   Duration::milliseconds(self.propose_timeout as i64) {
                     return;
                 }
 
@@ -263,7 +271,7 @@ impl<B, S> NodeHandler<B, S>
 
         // Send propose
         if self.is_leader() {
-            self.send_propose();
+            self.add_propose_timeout();
         }
 
         // Add timeout for first round
@@ -352,13 +360,38 @@ impl<B, S> NodeHandler<B, S>
             let round = self.state.round();
             self.send_prevote(round, &hash);
         } else if self.is_leader() {
-            self.send_propose();
+            self.add_propose_timeout();
         }
 
         // Handle queued messages
         for msg in self.state.queued() {
             self.handle_consensus(msg);
         }
+    }
+
+    pub fn handle_propose_timeout(&mut self) {
+        debug!("I AM LEADER!!! pool = {}", self.state.transactions().len());
+        let round = self.state.round();
+        let txs: Vec<Hash> = self.state
+            .transactions()
+            .keys()
+            .cloned()
+            .collect();
+        let propose = Propose::new(self.state.id(),
+                                   self.state.height(),
+                                   round,
+                                   self.channel.get_time(),
+                                   self.state.last_hash(),
+                                   &txs,
+                                   &self.secret_key);
+        self.broadcast(propose.raw());
+        debug!("Send propose: {:?}", propose);
+
+        // Save our propose into state
+        let hash = self.state.add_self_propose(propose);
+
+        // Send prevote
+        self.send_prevote(round, &hash);
     }
 
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
@@ -478,31 +511,6 @@ impl<B, S> NodeHandler<B, S>
         self.state.remove_request(&data)
     }
 
-    pub fn send_propose(&mut self) {
-        debug!("I AM LEADER!!! pool = {}", self.state.transactions().len());
-        let round = self.state.round();
-        let txs: Vec<Hash> = self.state
-            .transactions()
-            .keys()
-            .cloned()
-            .collect();
-        let propose = Propose::new(self.state.id(),
-                                   self.state.height(),
-                                   round,
-                                   self.channel.get_time(),
-                                   self.state.last_hash(),
-                                   &txs,
-                                   &self.secret_key);
-        self.broadcast(propose.raw());
-        debug!("Send propose: {:?}", propose);
-
-        // Save our propose into state
-        let hash = self.state.add_self_propose(propose);
-
-        // Send prevote
-        self.send_prevote(round, &hash);
-    }
-
     pub fn send_prevote(&mut self, round: Round, propose_hash: &Hash) {
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(self.state.id(),
@@ -511,9 +519,12 @@ impl<B, S> NodeHandler<B, S>
                                    propose_hash,
                                    locked_round,
                                    &self.secret_key);
-        self.state.add_prevote(&prevote);
+        let has_majority_prevotes = self.state.add_prevote(&prevote);
         self.broadcast(prevote.raw());
         debug!("Send prevote: {:?}", prevote);
+        if has_majority_prevotes {
+            self.lock(round, *propose_hash);
+        }
     }
 
     pub fn send_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {

@@ -159,6 +159,7 @@ pub struct Sandbox<B, G>
     tx_generator: RefCell<G>,
     validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
+    cfg: Configuration,
 }
 
 impl<B, G> Sandbox<B, G>
@@ -221,6 +222,10 @@ impl<B, G> Sandbox<B, G>
     pub fn last_hash(&self) -> Hash {
         // FIXME: temporary hack
         hash(&[])
+    }
+
+    pub fn cfg(&self) -> &Configuration {
+        &self.cfg
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -381,6 +386,7 @@ pub fn timestamping_sandbox
         round_timeout: 1000,
         status_timeout: 5000,
         peers_timeout: 10000,
+        propose_timeout: 200,
         // TODO: remove events and network config from node::Configuration
         network: NetworkConfiguration {
             listen_address: addresses[0].clone(),
@@ -407,7 +413,7 @@ pub fn timestamping_sandbox
     }));
 
     let channel = SandboxChannel { inner: inner.clone() };
-    let node = NodeHandler::new(blockchain.clone(), channel, config);
+    let node = NodeHandler::new(blockchain.clone(), channel, config.clone());
 
     let mut reactor = SandboxReactor {
         inner: inner.clone(),
@@ -422,6 +428,7 @@ pub fn timestamping_sandbox
         tx_generator: RefCell::new(tx_gen),
         validators: validators,
         addresses: addresses,
+        cfg: config,
     };
 
     sandbox.initialize();
