@@ -30,6 +30,7 @@ pub struct NodeConfig {
     pub round_timeout: u32,
     pub status_timeout: u32,
     pub peers_timeout: u32,
+    pub propose_timeout: u32,
     pub network: NetworkConfig,
 }
 
@@ -67,6 +68,7 @@ impl NodeConfig {
             round_timeout: 1000,
             status_timeout: 5000,
             peers_timeout: 10000,
+            propose_timeout: 200,
             network: NetworkConfig {
                 max_incoming_connections: 128,
                 max_outgoing_connections: 128,
@@ -95,6 +97,7 @@ impl NodeConfig {
             round_timeout: self.round_timeout,
             status_timeout: self.status_timeout,
             peers_timeout: self.peers_timeout,
+            propose_timeout: self.propose_timeout,
             network: NetworkConfiguration {
                 listen_address: validator.address,
                 max_incoming_connections: self.network.max_incoming_connections,
