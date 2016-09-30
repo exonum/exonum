@@ -14,7 +14,7 @@ pub type WalletId = u64;
 //     history_hash: Hash
 //     name: String,
 // }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Wallet {
     // Публичный ключ владельца кошелька
     // Текущий баланс
@@ -92,10 +92,11 @@ impl StorageValue for Wallet {
 #[test]
 fn test_wallet() {
     let hash = Hash([2; 32]);
-    let name = "foobar abacaba";
+    let name = "foobar abacaba Юникод всяуи";
     let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
     let wallet = Wallet::new(&pub_key, name, -100500, &hash);
 
+    let wallet = wallet.clone();
     assert_eq!(wallet.pub_key(), &pub_key);
     assert_eq!(wallet.name(), name);
     assert_eq!(wallet.balance(), -100500);

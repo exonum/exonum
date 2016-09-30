@@ -254,8 +254,9 @@ impl<'a> SegmentField<'a> for &'a str {
 #[test]
 fn test_unicode_string() {
     let mut buf = vec![0; 8];
-    let s = "test юникодной строчки";
+    let s = "test юникодной строчки efw_adqq ss/adfq";
     Field::write(&s, &mut buf, 0, 8);
-    let s2: &str = Field::read(&buf, 0, 8);
+    let buf2 = buf.clone();
+    let s2: &str = Field::read(&buf2, 0, 8);
     assert_eq!(s2, s);
 }

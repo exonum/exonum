@@ -36,7 +36,7 @@ use hyper::status::StatusCode;
 use rand::{Rng, thread_rng};
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
-use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions, List};
+use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
 use exonum::blockchain::{Blockchain};
 use exonum::crypto::{Hash, gen_keypair, PublicKey, SecretKey};
@@ -211,16 +211,14 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
         });
 
         let ch = channel.clone();
-        let b = blockchain.clone();
         api.post("transfer", move |endpoint| {
             endpoint.params(|params| {
                 params.req_typed("amount", json_dsl::i64());
-                params.req_typed("from", json_dsl::u64());
-                params.req_typed("to", json_dsl::u64());
+                params.req_typed("to", json_dsl::string());
             });
 
             endpoint.handle(move |client, params| {
-                let (public_key, secret_key) = {
+                let (from_key, secret_key) = {
                     let r = {
                         let cookies = client.request.cookies();
                         load_keypair_from_cookies(&cookies)
@@ -231,22 +229,21 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                     }
                 };
 
-                let amount = params.find("amount").unwrap().as_i64().unwrap();
-                let to = params.find("to").unwrap().as_u64().unwrap();
-                let seed = thread_rng().gen::<u64>();
-
-                let view = b.view();
-                let wallets = view.wallets();
                 // TODO remove unwrap
-                let to_wallet = wallets.get(to).unwrap().unwrap();
+                let amount = params.find("amount").unwrap().as_i64().unwrap();
+                let to = params.find("to").unwrap().to_string();
+                let seed = thread_rng().gen::<u64>();
+                match PublicKey::from_base64(to) {
+                    Ok(to_key) => {
+                        let tx = TxTransfer::new(&from_key, &to_key, amount, seed, &secret_key);
 
-                let tx =
-                    TxTransfer::new(&public_key, &to_wallet.pub_key(), amount, seed, &secret_key);
-
-                let tx_hash = tx.hash().to_base64();
-                ch.send(CurrencyTx::Transfer(tx));
-                let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
-                client.json(json)
+                        let tx_hash = tx.hash().to_base64();
+                        ch.send(CurrencyTx::Transfer(tx));
+                        let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
+                        client.json(json)
+                    }
+                    Err(e) => return client.error(e),
+                }
             })
         });
 

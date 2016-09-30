@@ -62,3 +62,25 @@ impl Base64Value for SecretKey {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use exonum::crypto::{hash, gen_keypair, Hash, PublicKey, SecretKey};
+    use super::Base64Value;
+
+    #[test]
+    fn test_hash() {
+        let h = hash(&[]);
+        let h1 = Hash::from_base64(h.to_base64()).unwrap();
+        assert_eq!(h1, h);
+    }
+
+    #[test]
+    fn test_keys() {
+        let (p, s) = gen_keypair();
+        let p1 = PublicKey::from_base64(p.to_base64()).unwrap();
+        let s1 = SecretKey::from_base64(s.to_base64()).unwrap();
+        assert_eq!(p1, p);
+        assert_eq!(s1, s);
+    }
+}
