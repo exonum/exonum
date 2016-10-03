@@ -14,7 +14,9 @@ mod state;
 mod basic;
 mod consensus;
 mod requests;
+pub mod config;
 
+pub use self::config::{ListenerConfig, ConsensusConfig};
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 
 #[derive(Clone, Debug)]
@@ -60,14 +62,10 @@ pub struct NodeHandler<B, S>
 // TODO extract node handler configuration
 #[derive(Debug, Clone)]
 pub struct Configuration {
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
+    pub listener: ListenerConfig,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
-    pub round_timeout: u32,
-    pub propose_timeout: u32,
-    pub status_timeout: u32,
-    pub peers_timeout: u32,
+    pub consensus: ConsensusConfig,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
 }
@@ -80,26 +78,26 @@ impl<B, S> NodeHandler<B, S>
         // FIXME: remove unwraps here, use FATAL log level instead
         let id = config.validators
             .iter()
-            .position(|pk| pk == &config.public_key)
+            .position(|pk| pk == &config.listener.public_key)
             .unwrap();
-        let connect = Connect::new(&config.public_key,
+        let connect = Connect::new(&config.listener.public_key,
                                    sender.address(),
                                    sender.get_time(),
-                                   &config.secret_key);
+                                   &config.listener.secret_key);
 
         let last_hash = blockchain.last_hash().unwrap().unwrap_or_else(|| super::crypto::hash(&[]));
 
         let state = State::new(id as u32, config.validators, connect, last_hash);
         NodeHandler {
-            public_key: config.public_key,
-            secret_key: config.secret_key,
+            public_key: config.listener.public_key,
+            secret_key: config.listener.secret_key,
             state: state,
             channel: sender,
             blockchain: blockchain,
-            round_timeout: config.round_timeout,
-            propose_timeout: config.propose_timeout,
-            status_timeout: config.status_timeout,
-            peers_timeout: config.peers_timeout,
+            round_timeout: config.consensus.round_timeout,
+            propose_timeout: config.consensus.propose_timeout,
+            status_timeout: config.consensus.status_timeout,
+            peers_timeout: config.consensus.peers_timeout,
             peer_discovery: config.peer_discovery,
         }
     }
@@ -284,12 +282,10 @@ impl<B> Node<B>
     where B: Blockchain
 {
     pub fn new(blockchain: B, config: Configuration) -> Node<B> {
-        let network = Network::with_config(config.network.clone());
+        let network = Network::with_config(config.listener.address, config.network.clone());
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
-        let channel = MioChannel::new(config.network.listen_address, event_loop.channel());
-
+        let channel = MioChannel::new(config.listener.address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);
-
         Node { reactor: Events::with_event_loop(network, worker, event_loop) }
     }
 

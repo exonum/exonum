@@ -7,7 +7,8 @@ use std::ops::Drop;
 
 use time::Timespec;
 
-use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout};
+use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout,
+                   ListenerConfig, ConsensusConfig};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
@@ -224,8 +225,8 @@ impl<B, G> Sandbox<B, G>
         hash(&[])
     }
 
-    pub fn cfg(&self) -> &Configuration {
-        &self.cfg
+    pub fn propose_timeout(&self) -> i64 {
+        self.cfg.consensus.propose_timeout as i64
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -381,15 +382,18 @@ pub fn timestamping_sandbox
     let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
 
     let config = Configuration {
-        public_key: validators[0].0.clone(),
-        secret_key: validators[0].1.clone(),
-        round_timeout: 1000,
-        status_timeout: 5000,
-        peers_timeout: 10000,
-        propose_timeout: 200,
-        // TODO: remove events and network config from node::Configuration
+        listener: ListenerConfig {
+            address: addresses[0].clone(),            
+            public_key: validators[0].0.clone(),
+            secret_key: validators[0].1.clone(),
+        },
+        consensus: ConsensusConfig {
+            round_timeout: 1000,
+            status_timeout: 5000,
+            peers_timeout: 10000,
+            propose_timeout: 200,
+        },
         network: NetworkConfiguration {
-            listen_address: addresses[0].clone(),
             max_incoming_connections: 8,
             max_outgoing_connections: 8,
             tcp_nodelay: false,

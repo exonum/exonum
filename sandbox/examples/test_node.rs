@@ -1,5 +1,4 @@
 extern crate exonum;
-extern crate utils;
 extern crate timestamping;
 extern crate sandbox;
 extern crate env_logger;
@@ -9,12 +8,12 @@ use std::path::Path;
 
 use clap::{Arg, App, SubCommand};
 
+use exonum::config::ConfigFile;
 use exonum::node::{Node, Configuration};
+use exonum::node::config::GenesisConfig;
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 use exonum::blockchain::Blockchain;
 use timestamping::TimestampingBlockchain;
-use utils::config_file::ConfigFile;
-use utils::config::NodeConfig;
 
 fn run_node<B: Blockchain>(blockchain: B, node_cfg: Configuration) {
     let mut node = Node::new(blockchain, node_cfg);
@@ -69,13 +68,13 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = NodeConfig::gen(count);
+            let cfg = GenesisConfig::gen(count);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
         }
         ("run", Some(matches)) => {
-            let cfg: NodeConfig = ConfigFile::load(path).unwrap();
+            let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {
                 Some(string) => {

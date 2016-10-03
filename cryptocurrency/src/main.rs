@@ -17,7 +17,7 @@ extern crate time;
 extern crate rand;
 
 extern crate exonum;
-extern crate utils;
+extern crate blockchain_explorer;
 extern crate cryptocurrency;
 
 use std::net::SocketAddr;
@@ -37,13 +37,10 @@ use rand::{Rng, thread_rng};
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
-use exonum::crypto::{gen_keypair, PublicKey, SecretKey};
+use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue};
 use exonum::messages::Message;
-
-use utils::config_file::ConfigFile;
-use utils::config::NodeConfig;
-use utils::HexValue;
-use utils::blockchain_explorer;
+use exonum::config::ConfigFile;
+use exonum::node::config::GenesisConfig;
 
 use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer,
                      TxCreateWallet};
@@ -324,13 +321,13 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = NodeConfig::gen(count);
+            let cfg = GenesisConfig::gen(count);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
         }
         ("run", Some(matches)) => {
-            let cfg: NodeConfig = ConfigFile::load(path).unwrap();
+            let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let port: Option<u16> = matches.value_of("HTTP_PORT").map(|x| x.parse().unwrap());
             let peers = match matches.value_of("PEERS") {

@@ -2,7 +2,6 @@
 extern crate log;
 
 extern crate exonum;
-extern crate utils;
 extern crate timestamping;
 extern crate sandbox;
 extern crate env_logger;
@@ -15,10 +14,10 @@ use std::cmp::min;
 use clap::{Arg, App, SubCommand};
 
 use exonum::node::{Node};
+use exonum::config::ConfigFile;
+use exonum::node::config::GenesisConfig;
 use exonum::storage::{MemoryDB};
 use timestamping::TimestampingBlockchain; 
-use utils::config_file::ConfigFile;
-use utils::config::NodeConfig;
 
 use sandbox::TimestampingTxGenerator;
 
@@ -74,7 +73,7 @@ fn main() {
     let path = Path::new(matches.value_of("CONFIG").unwrap());
     match matches.subcommand() {
         ("run", Some(matches)) => {
-            let cfg: NodeConfig = ConfigFile::load(path).unwrap();
+            let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let count: usize = matches.value_of("COUNT").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {

@@ -7,12 +7,10 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re>"]
 exonum = {version="0.1", path="../exonum"}
 timestamping = {version="0.1", path="../timestamping"}
 cryptocurrency = {version="0.1", path="../cryptocurrency"}
-utils = {version="0.1", path="../utils"}
+
 log = "0.3"
 env_logger = "0.3"
 clap = {version="2.10.0", features=["unstable"]}
 rand = "0.3"
 time = "0.1"
 serde = "0.8"
-serde_macros = "0.8.9"
-toml = {version="0.2", default-features=false, features=["serde"]}

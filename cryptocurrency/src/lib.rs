@@ -13,7 +13,7 @@ extern crate log;
 
 #[macro_use(message)]
 extern crate exonum;
-extern crate utils;
+extern crate blockchain_explorer;
 
 pub mod api;
 pub mod wallet;

@@ -9,6 +9,9 @@
 #![feature(type_ascription)]
 #![feature(slice_concat_ext)]
 #![feature(btree_range, collections_bound)]
+#![feature(custom_derive)]
+#![feature(plugin)]
+#![plugin(serde_macros)]
 
 #[macro_use]
 extern crate log;
@@ -20,6 +23,8 @@ extern crate leveldb;
 extern crate num;
 extern crate rand;
 extern crate serde;
+extern crate toml;
+extern crate hex;
 
 #[cfg(test)]
 extern crate tempdir;
@@ -35,3 +40,4 @@ pub mod crypto;
 pub mod node;
 pub mod storage;
 pub mod blockchain;
+pub mod config;

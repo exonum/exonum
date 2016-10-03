@@ -1,10 +1,9 @@
 use serde::{Serialize, Serializer};
 
-use exonum::crypto::{PublicKey};
+use exonum::crypto::{HexValue, PublicKey};
 use exonum::storage::{Database, Result as StorageResult};
 use exonum::blockchain::Blockchain;
-use utils::HexValue;
-use utils::blockchain_explorer::{BlockchainExplorer, TransactionInfo};
+use blockchain_explorer::{BlockchainExplorer, TransactionInfo};
 
 use super::{CurrencyTx, CurrencyBlockchain};
 use super::wallet::{Wallet, WalletId};

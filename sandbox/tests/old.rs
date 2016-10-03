@@ -46,7 +46,7 @@ fn test_send_prevote() {
     let propose = Propose::new(1,
                                0,
                                1,
-                               sandbox.time() + Duration::milliseconds(sandbox.cfg().propose_timeout as i64),
+                               sandbox.time() + Duration::milliseconds(sandbox.propose_timeout()),
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(1));
@@ -59,7 +59,7 @@ fn test_send_prevote() {
 fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
 
-    let propose_time = sandbox.time() + Duration::milliseconds(sandbox.cfg().propose_timeout as i64);
+    let propose_time = sandbox.time() + Duration::milliseconds(sandbox.propose_timeout());
     let propose = Propose::new(1,
                                0,
                                1,
@@ -83,7 +83,7 @@ fn test_get_lock_and_send_precommit() {
 fn test_commit() {
     let sandbox = timestamping_sandbox();
 
-    let propose_time = sandbox.time() + Duration::milliseconds(sandbox.cfg().propose_timeout as i64);
+    let propose_time = sandbox.time() + Duration::milliseconds(sandbox.propose_timeout());
     let propose = Propose::new(1,
                                0,
                                1,
