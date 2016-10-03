@@ -25,11 +25,11 @@ impl<'a, T, K, V> ListTable<T, K, V>
     }
 
     // TODO: implement iterator for List
-    pub fn iter(&self) -> Result<Option<Vec<V>>, Error> {
+    pub fn values(&self) -> Result<Vec<V>, Error> {
         Ok(if self.is_empty()? {
-            None
+            Vec::new()
         } else {
-            Some(range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect())
+            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
         })
     }
 }
@@ -63,6 +63,13 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
     fn get(&self, index: K) -> Result<Option<V>, Error> {
         let value = self.map.get(&index.serialize())?;
         Ok(value.map(StorageValue::deserialize))
+    }
+
+    fn set(&self, index: K, value: V) -> Result<(), Error> {
+        if index >= self.len()? {
+            return Err(Error::new("Wrong index!"));
+        }
+        self.map.put(&index.serialize(), value.serialize())
     }
 
     fn last(&self) -> Result<Option<V>, Error> {

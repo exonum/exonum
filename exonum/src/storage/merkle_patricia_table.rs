@@ -325,14 +325,14 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    pub fn root_hash(&self) -> Result<Option<Hash>, Error> {
+    pub fn root_hash(&self) -> Result<Hash, Error> {
         match self.root_node()? {
             Some((prefix, Node::Leaf(value))) => {
                 let prefix_slice = BitSlice::from_db_key(&prefix);
-                Ok(Some(Self::hash_leaf(&prefix_slice, &value)))
+                Ok(Self::hash_leaf(&prefix_slice, &value))
             }
-            Some((_, Node::Branch(branch))) => Ok(Some(branch.hash())),
-            None => Ok(None),
+            Some((_, Node::Branch(branch))) => Ok(branch.hash()),
+            None => Ok(hash(&[])),
         }
     }
 
@@ -565,10 +565,10 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                 match db_key[0] {
                     LEAF_KEY_PREFIX => Ok(Node::Leaf(StorageValue::deserialize(data))),
                     BRANCH_KEY_PREFIX => Ok(Node::Branch(BranchNode::from_bytes(data))),
-                    other => Err(Box::new(format!("Wrong key prefix: {}", other))),
+                    other => Err(Error::new(format!("Wrong key prefix: {}", other))),
                 }
             }
-            None => Err(Box::new(format!("Unable to find node with db_key {:?}", db_key))),
+            None => Err(Error::new(format!("Unable to find node with db_key {:?}", db_key))),
         }
     }
 
@@ -595,7 +595,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     //             for i in [ChildKind::Left, ChildKind::Right].iter() {
     //                 let key = &branch.child_slice(*i);
     //                 println!("Key: {:#?}", key);
-    //                 self.print_node(self.read_node(&key).unwrap());
+    //                 self.print_node(self.read_node(&key.to_db_key()).unwrap());
     //             }
     //         }
     //         Node::Leaf(data) => {
@@ -622,6 +622,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
+        let key = BitSlice::from_bytes(key.as_ref()).to_db_key();        
         let v = self.map.get(key.as_ref())?;
         Ok(v.map(StorageValue::deserialize))
     }
@@ -967,7 +968,12 @@ mod tests {
         table2.put(&vec![254; 32], vec![2]).unwrap();
         table2.put(&vec![255; 32], vec![1]).unwrap();
 
-        assert!(table1.root_hash().unwrap() != None);
+        assert_eq!(table1.get(&vec![255; 32]).unwrap(), Some(vec![1]));
+        assert_eq!(table1.get(&vec![254; 32]).unwrap(), Some(vec![2]));
+        assert_eq!(table2.get(&vec![255; 32]).unwrap(), Some(vec![1]));
+        assert_eq!(table2.get(&vec![254; 32]).unwrap(), Some(vec![2]));
+
+        assert!(table1.root_hash().unwrap() != hash(&[]));
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
 
@@ -980,7 +986,8 @@ mod tests {
 
         table.put(&vec![255; 32], vec![1]).unwrap();
         table.put(&vec![255; 32], vec![2]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(hash));
+        assert_eq!(table.get(&vec![255; 32]).unwrap(), Some(vec![2]));
+        assert_eq!(table.root_hash().unwrap(), hash);
     }
 
     #[test]
@@ -1002,7 +1009,7 @@ mod tests {
         table2.put(&vec![255; 32], vec![3]).unwrap();
         table2.put(&vec![254; 32], vec![5]).unwrap();
 
-        assert!(table1.root_hash().unwrap() != None);
+        assert!(table1.root_hash().unwrap() != hash(&[]));
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
 
@@ -1028,7 +1035,7 @@ mod tests {
         table2.put(&vec![64; 32], vec![2]).unwrap();
         table2.put(&vec![42; 32], vec![1]).unwrap();
 
-        assert!(table2.root_hash().unwrap() != None);
+        assert!(table2.root_hash().unwrap() != hash(&[]));
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
     }
 
@@ -1046,8 +1053,8 @@ mod tests {
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.delete(&vec![255; 32]).unwrap();
 
-        assert_eq!(table1.root_hash().unwrap(), None);
-        assert_eq!(table2.root_hash().unwrap(), None);
+        assert_eq!(table1.root_hash().unwrap(), hash(&[]));
+        assert_eq!(table2.root_hash().unwrap(), hash(&[]));
     }
 
     #[test]
@@ -1071,6 +1078,9 @@ mod tests {
 
         table2.delete(&vec![255; 32]).unwrap();
         table2.delete(&vec![245; 32]).unwrap();
+
+        assert_eq!(table2.get(&vec![250; 32]).unwrap(), Some(vec![2]));
+        assert_eq!(table1.get(&vec![250; 32]).unwrap(), Some(vec![2]));
 
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
@@ -1134,7 +1144,14 @@ mod tests {
             table2.put(&item.0, item.1.clone()).unwrap();
         }
 
-        assert!(table2.root_hash().unwrap() != None);
+        for item in &data {
+            let v1 = table1.get(&item.0).unwrap();
+            let v2 = table2.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), Some(&item.1));
+            assert_eq!(v2.as_ref(), Some(&item.1));
+        }
+
+        assert!(table2.root_hash().unwrap() != hash(&[]));
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
 
         // Test same keys
@@ -1145,6 +1162,13 @@ mod tests {
         rng.shuffle(&mut data);
         for item in &data {
             table2.put(&item.0, vec![1]).unwrap();
+        }
+
+        for item in &data {
+            let v1 = table1.get(&item.0).unwrap();
+            let v2 = table2.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), Some(&vec![1]));
+            assert_eq!(v2.as_ref(), Some(&vec![1]));
         }
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
     }
@@ -1185,7 +1209,7 @@ mod tests {
             table2.delete(key).unwrap();
         }
 
-        assert!(table2.root_hash().unwrap() != None);
+        assert!(table2.root_hash().unwrap() != hash(&[]));
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
 
         for item in &data {
@@ -1194,6 +1218,13 @@ mod tests {
         rng.shuffle(&mut data);
         for item in &data {
             table2.put(&item.0, item.1.clone()).unwrap();
+        }
+
+        for item in &data {
+            let v1 = table1.get(&item.0).unwrap();
+            let v2 = table2.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), Some(&item.1));
+            assert_eq!(v2.as_ref(), Some(&item.1));
         }
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
         assert_eq!(table2.root_hash().unwrap(), saved_hash);
@@ -1214,9 +1245,17 @@ mod tests {
         for item in &data[50..] {
             table1.put(&item.0, item.1.clone()).unwrap();
         }
-
         for item in &data[50..] {
             table1.delete(&item.0).unwrap();
+        }
+
+        for item in &data[0..50] {
+            let v1 = table1.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), Some(&item.1));
+        }
+        for item in &data[50..] {
+            let v1 = table1.get(&item.0).unwrap();
+            assert_eq!(v1.as_ref(), None);
         }
         assert_eq!(table1.root_hash().unwrap(), saved_hash);
     }

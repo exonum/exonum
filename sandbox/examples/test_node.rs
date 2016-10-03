@@ -8,12 +8,11 @@ use std::path::Path;
 
 use clap::{Arg, App, SubCommand};
 
+use exonum::config::ConfigFile;
 use exonum::node::{Node, Configuration};
+use exonum::node::config::GenesisConfig;
 use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 use exonum::blockchain::Blockchain;
-
-use sandbox::{ConfigFile};
-use sandbox::testnet::{TestNodeConfig};
 use timestamping::TimestampingBlockchain;
 
 fn run_node<B: Blockchain>(blockchain: B, node_cfg: Configuration) {
@@ -69,13 +68,13 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = TestNodeConfig::gen(count);
+            let cfg = GenesisConfig::gen(count);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
         }
         ("run", Some(matches)) => {
-            let cfg: TestNodeConfig = ConfigFile::load(path).unwrap();
+            let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let peers = match matches.value_of("PEERS") {
                 Some(string) => {

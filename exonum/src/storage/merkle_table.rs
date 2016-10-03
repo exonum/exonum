@@ -34,16 +34,17 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     }
 
     // TODO: implement iterator for List
-    pub fn iter(&self) -> Result<Option<Vec<V>>, Error> {
+    pub fn values(&self) -> Result<Vec<V>, Error> {
         Ok(if self.is_empty()? {
-            None
+            Vec::new()
         } else {
-            Some(range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect())
+            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
         })
     }
 
-    pub fn root_hash(&self) -> Result<Option<Hash>, Error> {
+    pub fn root_hash(&self) -> Result<Hash, Error> {
         self.get_hash(self.height()?, K::zero())
+            .map(|h| h.unwrap_or(hash(&[])))
     }
 
     fn height(&self) -> Result<K, Error> {
@@ -84,10 +85,15 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         Ok(hash)
     }
 
-    fn rebuild_hash(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
+    fn set_hash(&self, height: K, index: K, bytes: Hash) -> Result<(), Error> {
         // FIXME avoid reallocation
-        self.map
-            .put(&Self::db_key(K::one(), index), bytes.as_ref().to_vec())?;
+        let vec = bytes.as_ref().to_vec();
+        let key = Self::db_key(height, index);
+        self.map.put(&key, vec)
+    }
+
+    fn append_hash(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
+        self.set_hash(K::one(), index, bytes)?;
         let mut current_height = K::one();
         while index != K::zero() {
             // Left leaf, Right leaf is empty
@@ -102,10 +108,38 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
             };
             current_height = current_height + K::one();
             index = index / (K::one() + K::one());
-            self.map.put(&Self::db_key(current_height, index), new_hash.serialize())?;
+            self.set_hash(current_height, index, new_hash)?;
         }
         Ok(())
     }
+
+    fn update_hash_subtree(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
+        self.set_hash(K::one(), index, bytes)?;
+
+        let height = self.height()?;
+        let mut current_height = K::one();
+        while current_height != height {
+            let i = if !index.is_even() {
+                index - K::one()
+            } else {
+                index
+            };
+
+            let h1 = self.get_hash(current_height, i)?.unwrap();
+            let h2 = self.get_hash(current_height, i + K::one())?;
+            let new_hash = if let Some(h2) = h2 {
+                hash(&[h1.as_ref(), h2.as_ref()].concat())
+            } else {
+                h1
+            };
+
+            current_height = current_height + K::one();
+            index = index / (K::one() + K::one());
+            self.set_hash(current_height, index, new_hash)?;
+        }
+        Ok(())
+    }
+
 }
 
 impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
@@ -115,7 +149,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
 {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
-        self.rebuild_hash(len, value.hash())?;
+        self.append_hash(len, value.hash())?;
 
         self.map.put(&Self::db_key(K::zero(), len), value.serialize())?;
         self.set_len(len + K::one())?;
@@ -135,6 +169,16 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
         let value = self.map.get(&Self::db_key(K::zero(), index))?;
         Ok(value.map(StorageValue::deserialize))
     }
+
+    fn set(&self, index: K, value: V) -> Result<(), Error> {
+        if index >= self.len()? {
+            return Err(Error::new("Wrong index!"));
+        }
+
+        self.update_hash_subtree(index, value.hash())?;
+        self.map.put(&Self::db_key(K::zero(), index), value.serialize())
+    }
+
 
     fn last(&self) -> Result<Option<V>, Error> {
         let len = self.len()?;
@@ -172,7 +216,7 @@ mod tests {
 
 
     #[test]
-    fn list_methods() {
+    fn test_list_methods() {
         let mut storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
 
@@ -194,7 +238,7 @@ mod tests {
     }
 
     #[test]
-    fn height() {
+    fn test_height() {
         let mut storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
 
@@ -215,13 +259,16 @@ mod tests {
         assert_eq!(table.get(1).unwrap(), Some(vec![2]));
         assert_eq!(table.get(2).unwrap(), Some(vec![3]));
         assert_eq!(table.get(3).unwrap(), Some(vec![4]));
+
+        table.set(1, vec![10]).unwrap();
+        assert_eq!(table.get(1).unwrap(), Some(vec![10]));
     }
 
     #[test]
-    fn hashes() {
+    fn test_hashes() {
         let mut storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
-        assert_eq!(table.root_hash().unwrap(), None);
+        assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
         let h1 = hash(&vec![1]);
         let h2 = hash(&vec![2]);
@@ -245,39 +292,80 @@ mod tests {
         let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
         table.append(vec![1]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h1));
+        assert_eq!(table.root_hash().unwrap(), h1);
 
         table.append(vec![2]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h12));
+        assert_eq!(table.root_hash().unwrap(), h12);
 
         table.append(vec![3]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h123));
+        assert_eq!(table.root_hash().unwrap(), h123);
 
         table.append(vec![4]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h1234));
+        assert_eq!(table.root_hash().unwrap(), h1234);
 
         table.append(vec![5]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h12345));
+        assert_eq!(table.root_hash().unwrap(), h12345);
 
         table.append(vec![6]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h123456));
+        assert_eq!(table.root_hash().unwrap(), h123456);
 
         table.append(vec![7]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h1234567));
+        assert_eq!(table.root_hash().unwrap(), h1234567);
 
         table.append(vec![8]).unwrap();
-        assert_eq!(table.root_hash().unwrap(), Some(h12345678));
+        assert_eq!(table.root_hash().unwrap(), h12345678);
 
         assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
     }
 
     #[test]
-    fn hash_in_values() {
+    fn test_hash_in_values() {
         let mut storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
 
         let h = hash(&[1, 2, 3, 4]);
         table.append(h).unwrap();
         assert_eq!(table.get(0u32).unwrap(), Some(h));
+    }
+
+    #[test]
+    fn test_hash_set_value_simple() {
+        let h1 = hash(&vec![1]);
+        let h2 = hash(&vec![2]);
+
+        let mut s = MemoryDB::new();
+        let t = MerkleTable::new(MapTable::new(vec![255], &mut s));
+        assert_eq!(t.get(0u32).unwrap(), None);
+        t.append(vec![1]).unwrap();
+        assert_eq!(t.root_hash().unwrap(), h1);
+
+        t.set(0, vec![2]).unwrap();
+        assert_eq!(t.root_hash().unwrap(), h2);
+    }
+
+    #[test] 
+    fn test_hash_set_value() {
+        let mut s1 = MemoryDB::new();
+        let t1 = MerkleTable::new(MapTable::new(vec![255], &mut s1));
+        assert_eq!(t1.get(0u32).unwrap(), None);
+        t1.append(vec![1]).unwrap();
+        t1.append(vec![2]).unwrap();
+        t1.append(vec![3]).unwrap();
+        t1.append(vec![4]).unwrap();
+        
+        t1.set(0, vec![4]).unwrap();
+        t1.set(1, vec![7]).unwrap();
+        t1.set(2, vec![5]).unwrap();
+        t1.set(3, vec![1]).unwrap();
+
+        let mut s2 = MemoryDB::new();
+        let t2 = MerkleTable::new(MapTable::new(vec![255], &mut s2));
+        assert_eq!(t2.get(0u32).unwrap(), None);
+        t2.append(vec![4]).unwrap();
+        t2.append(vec![7]).unwrap();
+        t2.append(vec![5]).unwrap();
+        t2.append(vec![1]).unwrap();
+
+        assert_eq!(t1.root_hash().unwrap(), t2.root_hash().unwrap());
     }
 }

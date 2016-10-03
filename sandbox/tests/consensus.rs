@@ -17,7 +17,7 @@ fn test_queue_message_from_future_round() {
     let propose = Propose::new(2,
                                0,
                                2,
-                               sandbox.time() + Duration::milliseconds(sandbox.cfg().propose_timeout as i64),
+                               sandbox.time() + Duration::milliseconds(sandbox.propose_timeout()),
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(2));

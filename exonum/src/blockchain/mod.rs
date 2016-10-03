@@ -12,7 +12,7 @@ use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 pub use self::block::Block;
 pub use self::view::View;
 
-pub trait Blockchain: Sized + Clone + Send + 'static
+pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     where Self: Deref<Target = <Self as Blockchain>::Database>
 {
     type View: View<<<Self as Blockchain>::Database as Database>::Fork, Transaction=Self::Transaction>;
@@ -55,7 +55,7 @@ pub trait Blockchain: Sized + Clone + Send + 'static
                 .unwrap();
         }
         // Get tx hash
-        let tx_hash = fork.block_txs(propose.height()).root_hash()?.unwrap_or(hash(&[]));
+        let tx_hash = fork.block_txs(propose.height()).root_hash()?;
         // Get state hash
         let state_hash = Self::state_hash(&mut fork)?;
         // Create block

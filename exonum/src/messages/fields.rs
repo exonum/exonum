@@ -188,8 +188,11 @@ impl<'a, T> Field<'a> for T
             });
         }
 
-        Self::check_data(unsafe { ::std::slice::from_raw_parts(pos as *const u8, count as usize) },
-                         from as u32)
+        unsafe {
+            let ptr = buffer.as_ptr().offset(pos as isize);
+            let len = (count as usize) * Self::ITEM_SIZE;
+            Self::check_data(::std::slice::from_raw_parts(ptr as *const u8, len), from as u32)
+        }
     }
 }
 
@@ -226,7 +229,7 @@ impl<'a> SegmentField<'a> for &'a [Hash] {
 }
 
 impl<'a> SegmentField<'a> for &'a str {
-    const ITEM_SIZE: usize = 32;
+    const ITEM_SIZE: usize = 1;
 
     fn from_slice(slice: &'a [u8]) -> Self {
         unsafe { ::std::str::from_utf8_unchecked(slice) }
@@ -237,7 +240,7 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 
     fn count(&self) -> u32 {
-        self.len() as u32
+        self.as_bytes().len() as u32
     }
 
     fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
@@ -249,4 +252,17 @@ impl<'a> SegmentField<'a> for &'a str {
         }
         Ok(())
     }
+}
+
+#[test]
+fn test_unicode_string() {
+    let mut buf = vec![0; 8];
+    let s = "test юникодной строчки efw_adqq ss/adfq";
+    Field::write(&s, &mut buf, 0, 8);
+    <&str as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <&str as Field>::check(&buf2, 0, 8).unwrap();    
+    let s2: &str = Field::read(&buf2, 0, 8);
+    assert_eq!(s2, s);
 }

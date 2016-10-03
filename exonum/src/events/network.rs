@@ -19,10 +19,9 @@ pub type PeerId = Token;
 const SERVER_ID: PeerId = Token(1);
 const RECONNECT_GROW_FACTOR: f32 = 2.0;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
     // TODO: think more about config parameters
-    pub listen_address: SocketAddr,
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
@@ -35,6 +34,7 @@ pub struct NetworkConfiguration {
 // Write proper code to configure outgoing streams
 pub struct Network {
     config: NetworkConfiguration,
+    listen_address: SocketAddr,
     listener: Option<TcpListener>,
 
     incoming: Slab<IncomingConnection>,
@@ -56,9 +56,10 @@ fn make_io_error<T: Borrow<str>>(s: T) -> io::Error {
 }
 
 impl Network {
-    pub fn with_config(config: NetworkConfiguration) -> Network {
+    pub fn with_config(address: SocketAddr, config: NetworkConfiguration) -> Network {
         Network {
             config: config,
+            listen_address: address,
             listener: None,
 
             incoming: Slab::new_starting_at(Token(2), config.max_incoming_connections),
@@ -71,7 +72,7 @@ impl Network {
     }
 
     pub fn address(&self) -> &SocketAddr {
-        &self.config.listen_address
+        &self.listen_address
     }
 
     // TODO use error trait
@@ -79,7 +80,7 @@ impl Network {
         if let Some(_) = self.listener {
             return Err(make_io_error("Already binded"));
         }
-        let listener = TcpListener::bind(&self.config.listen_address)?;
+        let listener = TcpListener::bind(&self.listen_address)?;
         event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge())?;
         self.listener = Some(listener);
         Ok(())

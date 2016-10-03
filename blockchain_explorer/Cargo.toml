@@ -1,0 +1,14 @@
+[package]
+name = "blockchain_explorer"
+version = "0.1.0"
+authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re",
+           "Aleksey Sidorov <aleksei.sidorov@xdev.re>"]
+
+[dependencies]
+exonum = {version="0.1", path="../exonum"}
+
+time = "0.1"
+serde = "0.8"
+serde_macros = "0.8.9"
+rustless = "0.9"
+valico = "1.0"
