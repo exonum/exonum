@@ -622,7 +622,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
-        let key = BitSlice::from_bytes(key.as_ref()).to_db_key();        
+        let key = BitSlice::from_bytes(key.as_ref()).to_db_key();
         let v = self.map.get(key.as_ref())?;
         Ok(v.map(StorageValue::deserialize))
     }

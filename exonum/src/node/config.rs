@@ -51,7 +51,8 @@ impl GenesisConfig {
         let mut pairs = Vec::new();
         for i in 0..validators_count {
             let addr = format!("127.0.0.1:{}", 7000 + i as u32).parse().unwrap();
-            let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap(), addr);
+            let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap(),
+                                                     addr);
             pairs.push(pair);
         }
 

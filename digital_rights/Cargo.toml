@@ -1,0 +1,9 @@
+[package]
+name = "digital_rights"
+version = "0.1.0"
+authors = ["Aleksey Sidorov <aleksei.sidorov@xdev.re", "Ivan Ivashchenko <ivan.ivashchenko@xdev.re"]
+
+[dependencies]
+exonum = {version="0.1", path="../exonum"}
+env_logger = "0.3"
+time = "0.1"

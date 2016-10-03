@@ -139,7 +139,6 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         }
         Ok(())
     }
-
 }
 
 impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
@@ -343,7 +342,7 @@ mod tests {
         assert_eq!(t.root_hash().unwrap(), h2);
     }
 
-    #[test] 
+    #[test]
     fn test_hash_set_value() {
         let mut s1 = MemoryDB::new();
         let t1 = MerkleTable::new(MapTable::new(vec![255], &mut s1));
@@ -352,7 +351,7 @@ mod tests {
         t1.append(vec![2]).unwrap();
         t1.append(vec![3]).unwrap();
         t1.append(vec![4]).unwrap();
-        
+
         t1.set(0, vec![4]).unwrap();
         t1.set(1, vec![7]).unwrap();
         t1.set(2, vec![5]).unwrap();

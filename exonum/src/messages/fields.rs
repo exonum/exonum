@@ -13,6 +13,7 @@ pub trait Field<'a> {
     // TODO: debug_assert_eq!(to-from == size of Self)
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Self;
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize);
+    fn field_size() -> usize;
 
     #[allow(unused_variables)]
     fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
@@ -21,6 +22,10 @@ pub trait Field<'a> {
 }
 
 impl<'a> Field<'a> for bool {
+    fn field_size() -> usize {
+        1
+    }
+
     fn read(buffer: &'a [u8], from: usize, _: usize) -> bool {
         buffer[from] == 1
     }
@@ -41,7 +46,25 @@ impl<'a> Field<'a> for bool {
     }
 }
 
+impl<'a> Field<'a> for u16 {
+    fn field_size() -> usize {
+        2
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> u16 {
+        LittleEndian::read_u16(&buffer[from..to])
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        LittleEndian::write_u16(&mut buffer[from..to], *self)
+    }
+}
+
 impl<'a> Field<'a> for u32 {
+    fn field_size() -> usize {
+        4
+    }
+
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u32 {
         LittleEndian::read_u32(&buffer[from..to])
     }
@@ -52,6 +75,10 @@ impl<'a> Field<'a> for u32 {
 }
 
 impl<'a> Field<'a> for u64 {
+    fn field_size() -> usize {
+        8
+    }
+
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u64 {
         LittleEndian::read_u64(&buffer[from..to])
     }
@@ -62,6 +89,10 @@ impl<'a> Field<'a> for u64 {
 }
 
 impl<'a> Field<'a> for i64 {
+    fn field_size() -> usize {
+        8
+    }
+
     fn read(buffer: &'a [u8], from: usize, to: usize) -> i64 {
         LittleEndian::read_i64(&buffer[from..to])
     }
@@ -72,6 +103,10 @@ impl<'a> Field<'a> for i64 {
 }
 
 impl<'a> Field<'a> for &'a Hash {
+    fn field_size() -> usize {
+        32
+    }
+
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
         unsafe { mem::transmute(&buffer[from]) }
     }
@@ -82,6 +117,10 @@ impl<'a> Field<'a> for &'a Hash {
 }
 
 impl<'a> Field<'a> for &'a PublicKey {
+    fn field_size() -> usize {
+        32
+    }
+
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a PublicKey {
         unsafe { mem::transmute(&buffer[from]) }
     }
@@ -92,6 +131,10 @@ impl<'a> Field<'a> for &'a PublicKey {
 }
 
 impl<'a> Field<'a> for Timespec {
+    fn field_size() -> usize {
+        8
+    }
+
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Timespec {
         let nsec = LittleEndian::read_u64(&buffer[from..to]);
         Timespec {
@@ -107,6 +150,10 @@ impl<'a> Field<'a> for Timespec {
 }
 
 impl<'a> Field<'a> for SocketAddr {
+    fn field_size() -> usize {
+        32
+    }
+
     fn read(buffer: &'a [u8], from: usize, to: usize) -> SocketAddr {
         let mut octets = [0u8; 4];
         octets.copy_from_slice(&buffer[from..from + 4]);
@@ -130,11 +177,10 @@ impl<'a> Field<'a> for SocketAddr {
 }
 
 pub trait SegmentField<'a> {
-    const ITEM_SIZE: usize;
-
     fn from_slice(slice: &'a [u8]) -> Self;
     fn as_slice(&self) -> &'a [u8];
     fn count(&self) -> u32;
+    fn item_size() -> usize;
 
     #[allow(unused_variables)]
     fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
@@ -145,12 +191,16 @@ pub trait SegmentField<'a> {
 impl<'a, T> Field<'a> for T
     where T: SegmentField<'a>
 {
+    fn field_size() -> usize {
+        1
+    }
+
     fn read(buffer: &'a [u8], from: usize, to: usize) -> T {
         unsafe {
             let pos = LittleEndian::read_u32(&buffer[from..from + 4]);
             let count = LittleEndian::read_u32(&buffer[from + 4..to]);
             let ptr = buffer.as_ptr().offset(pos as isize);
-            let len = (count as usize) * Self::ITEM_SIZE;
+            let len = (count as usize) * Self::item_size();
             Self::from_slice(::std::slice::from_raw_parts(ptr as *const u8, len))
         }
     }
@@ -179,7 +229,7 @@ impl<'a, T> Field<'a> for T
             });
         }
 
-        let end = start + Self::ITEM_SIZE * (count as usize);
+        let end = start + Self::item_size() * (count as usize);
 
         if end > buffer.len() {
             return Err(Error::IncorrectSegmentSize {
@@ -190,14 +240,17 @@ impl<'a, T> Field<'a> for T
 
         unsafe {
             let ptr = buffer.as_ptr().offset(pos as isize);
-            let len = (count as usize) * Self::ITEM_SIZE;
-            Self::check_data(::std::slice::from_raw_parts(ptr as *const u8, len), from as u32)
+            let len = (count as usize) * Self::item_size();
+            Self::check_data(::std::slice::from_raw_parts(ptr as *const u8, len),
+                             from as u32)
         }
     }
 }
 
 impl<'a> SegmentField<'a> for &'a [u8] {
-    const ITEM_SIZE: usize = 1;
+    fn item_size() -> usize {
+        1
+    }
 
     fn from_slice(slice: &'a [u8]) -> Self {
         slice
@@ -213,14 +266,21 @@ impl<'a> SegmentField<'a> for &'a [u8] {
 }
 
 impl<'a> SegmentField<'a> for &'a [Hash] {
-    const ITEM_SIZE: usize = 32;
+    fn item_size() -> usize {
+        32
+    }
 
     fn from_slice(slice: &'a [u8]) -> Self {
-        unsafe { ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash, slice.len() / 32) }
+        unsafe {
+            ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
+                                         slice.len() / Self::item_size())
+        }
     }
 
     fn as_slice(&self) -> &'a [u8] {
-        unsafe { ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * 32) }
+        unsafe {
+            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size())
+        }
     }
 
     fn count(&self) -> u32 {
@@ -229,7 +289,9 @@ impl<'a> SegmentField<'a> for &'a [Hash] {
 }
 
 impl<'a> SegmentField<'a> for &'a str {
-    const ITEM_SIZE: usize = 1;
+    fn item_size() -> usize {
+        1
+    }
 
     fn from_slice(slice: &'a [u8]) -> Self {
         unsafe { ::std::str::from_utf8_unchecked(slice) }
@@ -254,6 +316,24 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 }
 
+// impl<'a, T> SegmentField<'a> for &'a [T] where T: Field<'a> {
+//     fn item_size() -> usize {
+//         T::field_size()
+//     }
+
+//     fn from_slice(slice: &'a [u8]) -> Self {
+//         unsafe { ::std::slice::from_raw_parts(slice.as_ptr() as *const T, slice.len() / Self::item_size()) }
+//     }
+
+//     fn as_slice(&self) -> &'a [u8] {
+//         unsafe { ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size()) }
+//     }
+
+//     fn count(&self) -> u32 {
+//         self.len() as u32
+//     }
+// }
+
 #[test]
 fn test_unicode_string() {
     let mut buf = vec![0; 8];
@@ -262,7 +342,7 @@ fn test_unicode_string() {
     <&str as Field>::check(&buf, 0, 8).unwrap();
 
     let buf2 = buf.clone();
-    <&str as Field>::check(&buf2, 0, 8).unwrap();    
+    <&str as Field>::check(&buf2, 0, 8).unwrap();
     let s2: &str = Field::read(&buf2, 0, 8);
     assert_eq!(s2, s);
 }
