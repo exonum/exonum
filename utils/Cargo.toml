@@ -11,4 +11,6 @@ time = "0.1"
 hex = "0.2"
 serde = "0.8"
 serde_macros = "0.8.9"
+rustless = "0.9"
+valico = "1.0"
 toml = {version="0.2", default-features=false, features=["serde"]}

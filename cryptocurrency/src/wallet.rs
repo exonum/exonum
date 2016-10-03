@@ -23,7 +23,11 @@ pub struct Wallet {
 }
 
 impl Wallet {
-    pub fn new<S: AsRef<str>>(public_key: &PublicKey, name: S, amount: i64, history_hash: &Hash) -> Wallet {
+    pub fn new<S: AsRef<str>>(public_key: &PublicKey,
+                              name: S,
+                              amount: i64,
+                              history_hash: &Hash)
+                              -> Wallet {
         let mut wallet = Wallet { raw: vec![0; WALLET_SIZE] };
 
         Field::write(&public_key, &mut wallet.raw, 0, 32);

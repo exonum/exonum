@@ -9,6 +9,8 @@ extern crate serde;
 extern crate toml;
 extern crate exonum;
 extern crate hex;
+extern crate rustless;
+extern crate valico;
 
 pub mod config;
 pub mod config_file;

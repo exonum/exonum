@@ -166,7 +166,6 @@ impl<F> CurrencyView<F>
         MerklePatriciaTable::new(MapTable::new(vec![21], &self))
     }
 
-    // TODO move to api
     pub fn wallet(&self, pub_key: &PublicKey) -> Result<Option<(WalletId, Wallet)>, Error> {
         if let Some(id) = self.wallet_ids().get(pub_key)? {
             let wallet_pair = self.wallets().get(id)?.map(|wallet| (id, wallet));
@@ -239,7 +238,7 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                 if let Some((id, mut wallet)) = view.wallet(msg.wallet())? {
                     let history = view.wallet_history(id);
                     history.append(tx_hash)?;
-                    
+
                     let new_amount = wallet.balance() + msg.amount();
                     wallet.set_balance(new_amount);
                     wallet.set_history_hash(&history.root_hash()?);
@@ -252,9 +251,12 @@ impl<D> Blockchain for CurrencyBlockchain<D>
                 }
 
                 let id = view.wallets().len()?;
-                view.wallet_history(id).append(tx_hash)?;                
+                view.wallet_history(id).append(tx_hash)?;
 
-                let wallet = Wallet::new(msg.pub_key(), msg.name(), 0, &view.wallet_history(id).root_hash()?);
+                let wallet = Wallet::new(msg.pub_key(),
+                                         msg.name(),
+                                         0,
+                                         &view.wallet_history(id).root_hash()?);
                 view.wallets().append(wallet)?;
                 view.wallet_ids().put(msg.pub_key(), id)?;
             }

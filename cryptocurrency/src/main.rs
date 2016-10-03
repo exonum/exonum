@@ -37,18 +37,17 @@ use rand::{Rng, thread_rng};
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
-use exonum::blockchain::{Blockchain};
-use exonum::crypto::{Hash, gen_keypair, PublicKey, SecretKey};
+use exonum::crypto::{gen_keypair, PublicKey, SecretKey};
 use exonum::messages::Message;
 
 use utils::config_file::ConfigFile;
 use utils::config::NodeConfig;
 use utils::HexValue;
-use utils::blockchain_explorer::BlockchainExplorer;
+use utils::blockchain_explorer;
 
-use cryptocurrency::{CurrencyBlockchain, CurrencyTx, CurrencyView, TxIssue, TxTransfer,
+use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer,
                      TxCreateWallet};
-use cryptocurrency::api::CryptocurrencyApi;
+use cryptocurrency::api::CurrencyApi;
 
 pub type CurrencyTxSender<B> = TxSender<B, NodeChannel<B>>;
 
@@ -76,10 +75,8 @@ fn load_keypair_from_cookies(storage: &CookieJar) -> StorageResult<(PublicKey, S
     let p = storage.permanent();
     let e = p.encrypted();
 
-    let public_key =
-        PublicKey::from_slice(load_hex_value_from_cookie(&e, "public_key")?.as_ref());
-    let secret_key =
-        SecretKey::from_slice(load_hex_value_from_cookie(&e, "secret_key")?.as_ref());
+    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&e, "public_key")?.as_ref());
+    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&e, "secret_key")?.as_ref());
 
     let public_key = public_key.ok_or(StorageError::new("Unable to read public key"))?;
     let secret_key = secret_key.ok_or(StorageError::new("Unable to read secret key"))?;
@@ -87,69 +84,7 @@ fn load_keypair_from_cookies(storage: &CookieJar) -> StorageResult<(PublicKey, S
 }
 
 fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: CurrencyBlockchain<D>) {
-    api.namespace("blockchain", move |api| {
-        api.get("block", |endpoint| {
-            let b1 = b1.clone();
-
-            endpoint.summary("Returns blockchain info array");
-            endpoint.params(|params| {
-                params.opt_typed("from", json_dsl::u64());
-                params.opt_typed("to", json_dsl::u64())
-            });
-
-            endpoint.handle(move |client, params| {
-                let view: CurrencyView<D::Fork> = b1.clone().view();
-                let from = params.find("from").map(|x| x.as_u64().unwrap()).unwrap_or(0);
-                let to = params.find("to").map(|x| x.as_u64().unwrap());
-
-                match BlockchainExplorer::<D>::blocks_range(&view, from, to) {
-                    Ok(blocks) => client.json(&blocks.to_json()),
-                    Err(e) => client.error(e),
-                }
-            })
-        });
-        api.get("block/:height", |endpoint| {
-            let b1 = b1.clone();
-
-            endpoint.summary("Returns block with given height");
-            endpoint.params(|params| {
-                params.req_typed("height", json_dsl::u64());
-            });
-
-            endpoint.handle(move |client, params| {
-                let view = b1.clone().view();
-                let height = params.find("height").unwrap().as_u64().unwrap();
-
-                match BlockchainExplorer::<D>::get_block_info(&view, height) {
-                    Ok(Some(block)) => client.json(&block.to_json()),
-                    Ok(None) => Ok(client),
-                    Err(e) => client.error(e),
-                }
-            })
-        });
-        api.get("transaction/:hash", |endpoint| {
-            let b1 = b1.clone();
-
-            endpoint.summary("Returns transaction info with given hash");
-            endpoint.params(|params| {
-                params.req_typed("hash", json_dsl::string());
-            });
-
-            endpoint.handle(move |client, params| {
-                let view = b1.clone().view();
-                let hash = params.find("hash").unwrap().as_str().unwrap();
-                match Hash::from_hex(hash) {
-                    Ok(hash) => {
-                        match BlockchainExplorer::<D>::get_tx_info(&view, &hash) {
-                            Ok(tx_info) => client.json(&tx_info.to_json()),
-                            Err(e) => client.error(e),
-                        }
-                    }
-                    Err(_) => client.error(StorageError::new("Unable to decode transaction hash")),
-                }
-            })
-        });
-    })
+    blockchain_explorer::make_api::<CurrencyBlockchain<D>, CurrencyTx>(api, b1);
 }
 
 fn cryptocurrency_api<D: Database>(api: &mut Api,
@@ -258,9 +193,8 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         Err(e) => return client.error(e),
                     }
                 };
-                let view = b.view();
-                let r = CryptocurrencyApi::<D>::wallet_info(&view, &public_key);
-                match r {
+                let currency_api = CurrencyApi::<D>::new(b.clone());
+                match currency_api.wallet_info(&public_key) {
                     Ok(Some(info)) => client.json(&info.to_json()),
                     _ => client.error(StorageError::new("Unable to get wallet info")),
                 }
@@ -304,28 +238,28 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 
             let mut app = Application::new(api);
 
-            swagger::enable(&mut app, swagger::Spec {
-                info: swagger::Info {
-                    title: "Cryptocurrency API".to_string(),
-                    description: Some("Simple API to demonstration".to_string()),
-                    contact: Some(swagger::Contact {
-                        name: "Aleksey Sidorov".to_string(),
-                        url: Some("aleksei.sidorov@xdev.re".to_string()),
-                        ..Default::default()
-                    }),
-                    license: Some(swagger::License {
-                        name: "Demo".to_string(),
-                        url: "http://exonum.com".to_string()
-                    }),
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
+            swagger::enable(&mut app,
+                            swagger::Spec {
+                                info: swagger::Info {
+                                    title: "Cryptocurrency API".to_string(),
+                                    description: Some("Simple API to demonstration".to_string()),
+                                    contact: Some(swagger::Contact {
+                                        name: "Aleksey Sidorov".to_string(),
+                                        url: Some("aleksei.sidorov@xdev.re".to_string()),
+                                        ..Default::default()
+                                    }),
+                                    license: Some(swagger::License {
+                                        name: "Demo".to_string(),
+                                        url: "http://exonum.com".to_string(),
+                                    }),
+                                    ..Default::default()
+                                },
+                                ..Default::default()
+                            });
 
             let mut chain = iron::Chain::new(app);
             let api_key = b"abacabasecretcoinblabla23nx8Hasojd8";
-            let cookie =
-                ::rustless::batteries::cookie::new(api_key);
+            let cookie = ::rustless::batteries::cookie::new(api_key);
             chain.link(cookie);
             iron::Iron::new(chain).http(listen_address).unwrap();
         });
