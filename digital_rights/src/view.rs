@@ -37,23 +37,29 @@ storage_value! {
         price_per_listen:       u32             [08 => 12]
         min_plays:              u32             [12 => 16]
         additional_conditions:  &str            [16 => 24]
-        //owners:                 &[u32]          [24 => 32]
+        owners:                 &[u32]          [24 => 32]
     }
 }
 
 storage_value! {
     Ownership {
-        const SIZE = 32;
+        const SIZE = 80;
 
-        fingerprint:            &Hash           [0 => 32]
+        fingerprint:            &Hash           [00 => 32]
+        plays:                  u64             [32 => 40]
+        amount:                 u64             [40 => 48]
+        reports_hash:           &Hash           [48 => 80]
     }
 }
 
 storage_value! {
     Contract {
-        const SIZE = 32;
+        const SIZE = 80;
 
-        fingerprint:            &Hash           [0 => 32]
+        fingerprint:            &Hash           [00 => 32]
+        plays:                  u64             [32 => 40]
+        amount:                 u64             [40 => 48]
+        reports_hash:           &Hash           [48 => 80]
     }
 }
 
@@ -114,4 +120,79 @@ impl<F> DigitalRightsView<F>
     }
 }
 
-// TODO test dto macro!
+
+#[cfg(test)]
+mod tests {
+    use exonum::crypto::{gen_keypair, hash};
+    use super::{Owner, Distributor, Content, Contract, Ownership};
+    use super::super::txs::ContentShare;
+
+    #[test]
+    fn test_owner() {
+        let p = gen_keypair().0;
+        let s = "One";
+        let h = hash(&[]);
+        let owner = Owner::new(&p, s, &h);
+
+        assert_eq!(owner.pub_key(), &p);
+        assert_eq!(owner.name(), s);
+        assert_eq!(owner.ownership_hash(), &h);
+    }
+
+    #[test]
+    fn test_distributor() {
+        let p = gen_keypair().0;
+        let s = "Dist";
+        let h = hash(&[]);
+        let owner = Distributor::new(&p, s, &h);
+
+        assert_eq!(owner.pub_key(), &p);
+        assert_eq!(owner.name(), s);
+        assert_eq!(owner.contracts_hash(), &h);
+    }
+
+    #[test]
+    fn test_content() {
+        let title = "Iron Maiden - Brave New World";
+        let price_per_listen = 1;
+        let min_plays = 100;
+        let additional_conditions = "";
+        let owners = [ContentShare::new(0, 15).into(), ContentShare::new(1, 85).into()];
+
+        let content = Content::new(title, price_per_listen, min_plays, additional_conditions, owners.as_ref());
+
+        assert_eq!(content.title(), title);
+        assert_eq!(content.price_per_listen(), price_per_listen);
+        assert_eq!(content.min_plays(), min_plays);
+        assert_eq!(content.additional_conditions(), additional_conditions);
+        assert_eq!(content.owners(), owners.as_ref());
+    }
+
+    #[test]
+    fn test_ownership() {
+        let f = hash(&[]);
+        let p = 10;
+        let a = 1000;
+        let r = hash(&[]);
+        let ownership = Ownership::new(&f, p, a, &r);
+
+        assert_eq!(ownership.fingerprint(), &f);
+        assert_eq!(ownership.plays(), p);
+        assert_eq!(ownership.amount(), a);
+        assert_eq!(ownership.reports_hash(), &r);
+    }
+
+    #[test]
+    fn test_contract() {
+        let f = hash(&[]);
+        let p = 10;
+        let a = 1000;
+        let r = hash(&[]);
+        let contract = Contract::new(&f, p, a, &r);
+
+        assert_eq!(contract.fingerprint(), &f);
+        assert_eq!(contract.plays(), p);
+        assert_eq!(contract.amount(), a);
+        assert_eq!(contract.reports_hash(), &r);
+    }
+}

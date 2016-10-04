@@ -79,3 +79,17 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use byteorder::{ByteOrder, LittleEndian};
+
+    use exonum::crypto::gen_keypair;
+    use exonum::storage::MemoryDB;
+    use exonum::blockchain::Blockchain;
+    use exonum::messages::Message;
+
+    use super::{DigitalRightsTx, DigitalRightsBlockchain, TxCreateOwner, TxCreateDistributor};
+
+}

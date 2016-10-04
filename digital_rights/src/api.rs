@@ -61,28 +61,6 @@ pub struct DistributorInfo {
     contracts: HexField<Hash>,
 }
 
-// pub struct WalletInfo {
-//     inner: Wallet,
-//     id: WalletId,
-//     history: Vec<CurrencyTx>,
-// }
-
-// impl Serialize for WalletInfo {
-//     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-//         where S: Serializer
-//     {
-//         let mut state = ser.serialize_struct("wallet", 7)?;
-//         ser.serialize_struct_elt(&mut state, "id", self.id)?;
-//         ser.serialize_struct_elt(&mut state, "balance", self.inner.balance())?;
-//         ser.serialize_struct_elt(&mut state, "name", self.inner.name())?;
-//         ser.serialize_struct_elt(&mut state, "history", &self.history)?;
-//         ser.serialize_struct_elt(&mut state,
-//                                   "history_hash",
-//                                   self.inner.history_hash().to_hex())?;
-//         ser.serialize_struct_end(state)
-//     }
-// }
-
 pub struct DigitalRightsApi<D: Database> {
     blockchain: DigitalRightsBlockchain<D>,
 }
@@ -120,40 +98,3 @@ impl<D: Database> DigitalRightsApi<D> {
         }
     }
 }
-
-// pub struct CurrencyApi<D: Database> {
-//     blockchain: CurrencyBlockchain<D>,
-// }
-
-// impl<D: Database> CurrencyApi<D> {
-//     pub fn new(b: CurrencyBlockchain<D>) -> CurrencyApi<D> {
-//         CurrencyApi { blockchain: b }
-//     }
-
-//     pub fn wallet_info(&self, pub_key: &PublicKey) -> StorageResult<Option<WalletInfo>> {
-//         let view = self.blockchain.view();
-//         if let Some((id, wallet)) = view.wallet(pub_key)? {
-//             let history = view.wallet_history(id).values()?;
-//             let txs = {
-//                 let mut v = Vec::new();
-
-//                 let explorer = BlockchainExplorer::<CurrencyBlockchain<D>>::from_view(view);
-//                 for hash in history {
-//                     if let Some(tx_info) = explorer.tx_info::<CurrencyTx>(&hash)? {
-//                         v.push(tx_info)
-//                     }
-//                 }
-//                 v
-//             };
-
-//             let info = WalletInfo {
-//                 id: id,
-//                 inner: wallet,
-//                 history: txs,
-//             };
-//             Ok(Some(info))
-//         } else {
-//             Ok(None)
-//         }
-//     }
-// }

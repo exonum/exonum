@@ -6,9 +6,8 @@ use std::convert::Into;
 use time::Timespec;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
-use exonum::messages::{Field, SegmentField};
 use exonum::messages::{RawMessage, Message, Error as MessageError};
-use exonum::crypto::{PublicKey, Hash, hash};
+use exonum::crypto::{PublicKey, Hash};
 
 pub const TX_CREATE_OWNER_ID: u16 = 128;
 pub const TX_CREATE_DITRIBUTOR_ID: u16 = 129;
@@ -39,15 +38,15 @@ message! {
 message! {
     TxAddContent {
         const ID = TX_ADD_CONTENT;
-        const SIZE = 92;
+        const SIZE = 96;
 
         pub_key:                &PublicKey      [00 => 32]
         fingerprint:            &Hash           [32 => 64]
         title:                  &str            [64 => 72]
         price_per_listen:       u32             [72 => 76]
         min_plays:              u32             [76 => 80]
-        additional_conditions:  &str            [80 => 88]
-        //distribution:           &[u32]          [88 => 92]
+        distribution:           &[u32]          [80 => 88]
+        additional_conditions:  &str            [88 => 96]
     }
 }
 
@@ -156,7 +155,6 @@ impl ContentShare {
     }
 }
 
-// TODO use TryInto
 impl Into<u32> for ContentShare {
     fn into(self) -> u32 {
         let mut v = vec![0; 4];
@@ -221,22 +219,24 @@ mod tests {
         let price_per_listen = 1;
         let min_plays = 100;
         let additional_conditions = "Give me your money";
-        let distribution = [100500];
+        let distribution = [ContentShare::new(0, 15).into(), ContentShare::new(1, 85).into()];
 
         let tx = TxAddContent::new(&p,
                                    &fingerprint,
                                    title,
                                    price_per_listen,
                                    min_plays,
+                                   &distribution,
                                    additional_conditions,
-                                   // &distribution,
                                    &s);
+
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.fingerprint(), &fingerprint);
         assert_eq!(tx.title(), title);
         assert_eq!(tx.price_per_listen(), price_per_listen);
         assert_eq!(tx.min_plays(), min_plays);
         assert_eq!(tx.additional_conditions(), additional_conditions);
+        assert_eq!(tx.distribution(), &distribution);
     }
 
     #[test]

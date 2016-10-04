@@ -135,7 +135,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
         });
 
         let b = blockchain.clone();
-        api.get("distributors", move |endpoint| {
+        api.get("distributors/:id", move |endpoint| {
             endpoint.params(|params| {
                 params.req_typed("id", json_dsl::u64());
             });
@@ -152,7 +152,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
         });
 
         let b = blockchain.clone();
-        api.get("owners", move |endpoint| {
+        api.get("owners/:id", move |endpoint| {
             endpoint.params(|params| {
                 params.req_typed("id", json_dsl::u64());
             });

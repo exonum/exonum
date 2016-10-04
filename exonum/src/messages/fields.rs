@@ -318,7 +318,7 @@ impl<'a> SegmentField<'a> for &'a str {
 
 impl<'a> SegmentField<'a> for &'a [u32] {
     fn item_size() -> usize {
-        4
+        32
     }
 
     fn from_slice(slice: &'a [u8]) -> Self {
@@ -358,7 +358,7 @@ impl<'a> SegmentField<'a> for &'a [u32] {
 // }
 
 #[test]
-fn test_unicode_string() {
+fn test_str_segment() {
     let mut buf = vec![0; 8];
     let s = "test юникодной строчки efw_adqq ss/adfq";
     Field::write(&s, &mut buf, 0, 8);
@@ -368,4 +368,17 @@ fn test_unicode_string() {
     <&str as Field>::check(&buf2, 0, 8).unwrap();
     let s2: &str = Field::read(&buf2, 0, 8);
     assert_eq!(s2, s);
+}
+
+#[test]
+fn test_u32_segment() {
+    let mut buf = vec![0; 8];
+    let s = [1u32, 3, 10, 15, 23, 4, 45];
+    Field::write(&s.as_ref(), &mut buf, 0, 8);
+    <&[u32] as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <&[u32] as Field>::check(&buf2, 0, 8).unwrap();
+    let s2: &[u32] = Field::read(&buf2, 0, 8);
+    assert_eq!(s2, s.as_ref());
 }
