@@ -9,19 +9,19 @@ storage_value! {
         const SIZE = 80;
 
         pub_key:            &PublicKey  [00 => 32]
-        name:               &str        [72 => 80]
-        balance:            i64         [32 => 40]
-        history_hash:       &Hash       [40 => 72]
+        name:               &str        [32 => 40]
+        balance:            i64         [40 => 48]
+        history_hash:       &Hash       [48 => 80]
     }
 }
 
 impl Wallet {
     pub fn set_balance(&mut self, balance: i64) {
-        Field::write(&balance, &mut self.raw, 32, 40);
+        Field::write(&balance, &mut self.raw, 40, 48);
     }
 
     pub fn set_history_hash(&mut self, hash: &Hash) {
-        Field::write(&hash, &mut self.raw, 40, 72);
+        Field::write(&hash, &mut self.raw, 48, 80);
     }
 
     pub fn transfer_to(&mut self, other: &mut Wallet, amount: i64) {
