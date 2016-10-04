@@ -316,6 +316,29 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 }
 
+impl<'a> SegmentField<'a> for &'a [u32] {
+    fn item_size() -> usize {
+        4
+    }
+
+    fn from_slice(slice: &'a [u8]) -> Self {
+        unsafe {
+            ::std::slice::from_raw_parts(slice.as_ptr() as *const u32,
+                                         slice.len() / Self::item_size())
+        }
+    }
+
+    fn as_slice(&self) -> &'a [u8] {
+        unsafe {
+            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size())
+        }
+    }
+
+    fn count(&self) -> u32 {
+        self.len() as u32
+    }
+}
+
 // impl<'a, T> SegmentField<'a> for &'a [T] where T: Field<'a> {
 //     fn item_size() -> usize {
 //         T::field_size()

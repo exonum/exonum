@@ -1,6 +1,10 @@
 #![feature(question_mark)]
 
+use std::io::Cursor;
+use std::convert::Into;
+
 use time::Timespec;
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use exonum::messages::{Field, SegmentField};
 use exonum::messages::{RawMessage, Message, Error as MessageError};
@@ -35,15 +39,15 @@ message! {
 message! {
     TxAddContent {
         const ID = TX_ADD_CONTENT;
-        const SIZE = 96;
+        const SIZE = 92;
 
         pub_key:                &PublicKey      [00 => 32]
         fingerprint:            &Hash           [32 => 64]
         title:                  &str            [64 => 72]
         price_per_listen:       u32             [72 => 76]
         min_plays:              u32             [76 => 80]
-        additional_conditions:  u64             [80 => 88]
-        //distribution:         [ContentShare]  [88 => 96]
+        additional_conditions:  &str            [80 => 88]
+        //distribution:           &[u32]          [88 => 92]
     }
 }
 
@@ -137,51 +141,42 @@ impl DigitalRightsTx {
     }
 }
 
-// #[derive(Clone, Debug)]
-// pub struct ContentShare {
-//     raw: Vec<u8>
-// }
+pub struct ContentShare {
+    pub owner_id: u16,
+    pub share: u16
+}
 
-// impl ContentShare {
-//     pub fn new(owner_id: u32, share: u32) -> ContentShare {
-//         debug_assert!(share <= 100);
+impl ContentShare {
+    pub fn new(owner_id: u16, share: u16) -> ContentShare {
+        debug_assert!(share <= 100);
+        ContentShare {
+            owner_id: owner_id,
+            share: share
+        }
+    }
+}
 
-//         let mut buf = vec![0; 8];
-//         Field::write(&owner_id, &mut buf, 0, 4);
-//         Field::write(&share, &mut buf, 4, 8);
+//TODO use TryInto
+impl Into<u32> for ContentShare {
+    fn into(self) -> u32 {
+        let mut v = vec![0; 4];
+        v.write_u16::<LittleEndian>(self.owner_id).unwrap();
+        v.write_u16::<LittleEndian>(self.share).unwrap();
+        Cursor::new(v).read_u32::<LittleEndian>().unwrap()
+    }
+}
 
-//         ContentShare {
-//             raw: buf
-//         }
-//     }
-
-//     pub fn from_raw(raw: Vec<u8>) -> ContentShare {
-//         debug_assert!(raw.len() == 8);
-//         ContentShare {
-//             raw: raw
-//         }
-//     }
-
-//     pub fn owner_id(&self) -> u32 {
-//         Field::read(&self.raw, 0, 4)
-//     }
-
-//     pub fn share(&self) -> u32 {
-//         Field::read(&self.raw, 4, 8)
-//     }
-// }
-
-// impl<'a> Field<'a> for &'a ContentShare {
-//     const FIELD_SIZE: usize = 8;
-
-//     fn read(buffer: &'a [u8], from: usize, to: usize) -> &'a ContentShare {
-//         ContentShare::from_raw(buffer[from..to].to_vec())
-//     }
-
-//     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-//         buffer[from..to].copy_from_slice(self.raw.as_ref());
-//     }
-// }
+impl Into<ContentShare> for u32 {
+    fn into(self) -> ContentShare {
+        let mut v = vec![0; 4];
+        v.write_u32::<LittleEndian>(self).unwrap();
+        let mut c = Cursor::new(v);
+        ContentShare {
+            owner_id: c.read_u16::<LittleEndian>().unwrap(),
+            share: c.read_u16::<LittleEndian>().unwrap()
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -189,7 +184,17 @@ mod tests {
 
     use exonum::crypto::{gen_keypair, hash};
 
-    use super::{TxCreateOwner, TxCreateDistributor, TxAddContent, TxAddContract, TxReport};
+    use super::{TxCreateOwner, TxCreateDistributor, TxAddContent, TxAddContract, TxReport, ContentShare};
+
+    #[test]
+    fn test_content_share() {
+        let c1 = ContentShare::new(1, 50);
+        let u = c1.into();
+        let c2 = ContentShare::from(u);
+
+        assert_eq!(c2.owner_id, 1);
+        assert_eq!(c2.share, 50);
+    }
 
     #[test]
     fn test_tx_create_owner() {
@@ -202,7 +207,7 @@ mod tests {
     #[test]
     fn test_tx_create_distributor() {
         let (p, s) = gen_keypair();
-        let tx = TxCreateOwner::new(&p, "Vasya", &s);
+        let tx = TxCreateDistributor::new(&p, "Vasya", &s);
         assert_eq!(tx.name(), "Vasya");
         assert_eq!(tx.pub_key(), &p);
     }
@@ -214,7 +219,10 @@ mod tests {
         let title = "Unknown artist - track 1";
         let price_per_listen = 1;
         let min_plays = 100;
-        let additional_conditions = 0;
+        let additional_conditions = "Give me your money";
+        let distribution = [
+            100500
+        ];
 
         let tx = TxAddContent::new(&p,
                                    &fingerprint,
@@ -222,6 +230,7 @@ mod tests {
                                    price_per_listen,
                                    min_plays,
                                    additional_conditions,
+                                   //&distribution,
                                    &s);
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.fingerprint(), &fingerprint);
@@ -258,12 +267,4 @@ mod tests {
         assert_eq!(tx.distributor_id(), distributor);
         assert_eq!(tx.time(), ts);
     }
-
-    // #[test]
-    // fn test_content_share() {
-    //     let content = ContentShare::new(1, 10);
-
-    //     assert_eq!(content.owner_id(), 1);
-    //     assert_eq!(content.share(), 10);
-    // }
 }

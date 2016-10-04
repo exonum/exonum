@@ -1,11 +1,13 @@
 #![feature(question_mark)]
 #![feature(associated_consts)]
 
-#[macro_use(message)]
+#[macro_use(message, storage_value)]
 extern crate exonum;
 extern crate time;
+extern crate byteorder;
 
 mod txs;
+mod view;
 
 use std::ops::Deref;
 
@@ -15,6 +17,16 @@ use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable}
 use exonum::blockchain::{Blockchain, View};
 
 use txs::DigitalRightsTx;
+
+storage_value! {
+    Owner {
+        const SIZE = 80;
+
+        pub_key:            &PublicKey  [00 => 32]
+        name:               &str        [32 => 40]
+        ownership_hash:     &Hash       [40 => 72]
+    }
+}
 
 #[derive(Clone)]
 pub struct DigitalRightsBlockchain<D: Database> {
