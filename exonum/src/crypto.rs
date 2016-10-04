@@ -9,7 +9,8 @@ pub use sodiumoxide::crypto::sign::ed25519::{PublicKey, SecretKey, Seed, Signatu
 
 pub use sodiumoxide::crypto::hash::sha256::{hash, Digest as Hash, DIGESTBYTES as HASH_SIZE};
 
-use hex::{ToHex, FromHex, FromHexError};
+use hex::{FromHex, FromHexError};
+pub use hex::ToHex;
 
 pub trait HexValue: Sized {
     fn to_hex(&self) -> String;

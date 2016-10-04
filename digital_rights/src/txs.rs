@@ -143,7 +143,7 @@ impl DigitalRightsTx {
 
 pub struct ContentShare {
     pub owner_id: u16,
-    pub share: u16
+    pub share: u16,
 }
 
 impl ContentShare {
@@ -151,12 +151,12 @@ impl ContentShare {
         debug_assert!(share <= 100);
         ContentShare {
             owner_id: owner_id,
-            share: share
+            share: share,
         }
     }
 }
 
-//TODO use TryInto
+// TODO use TryInto
 impl Into<u32> for ContentShare {
     fn into(self) -> u32 {
         let mut v = vec![0; 4];
@@ -173,7 +173,7 @@ impl Into<ContentShare> for u32 {
         let mut c = Cursor::new(v);
         ContentShare {
             owner_id: c.read_u16::<LittleEndian>().unwrap(),
-            share: c.read_u16::<LittleEndian>().unwrap()
+            share: c.read_u16::<LittleEndian>().unwrap(),
         }
     }
 }
@@ -184,7 +184,8 @@ mod tests {
 
     use exonum::crypto::{gen_keypair, hash};
 
-    use super::{TxCreateOwner, TxCreateDistributor, TxAddContent, TxAddContract, TxReport, ContentShare};
+    use super::{TxCreateOwner, TxCreateDistributor, TxAddContent, TxAddContract, TxReport,
+                ContentShare};
 
     #[test]
     fn test_content_share() {
@@ -220,9 +221,7 @@ mod tests {
         let price_per_listen = 1;
         let min_plays = 100;
         let additional_conditions = "Give me your money";
-        let distribution = [
-            100500
-        ];
+        let distribution = [100500];
 
         let tx = TxAddContent::new(&p,
                                    &fingerprint,
@@ -230,7 +229,7 @@ mod tests {
                                    price_per_listen,
                                    min_plays,
                                    additional_conditions,
-                                   //&distribution,
+                                   // &distribution,
                                    &s);
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.fingerprint(), &fingerprint);

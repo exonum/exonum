@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::Field;
@@ -5,7 +7,7 @@ use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable, MerkleTable};
 use exonum::blockchain::{Blockchain, View};
 
-use super::DigitalRightsView;
+use super::DigitalRightsTx;
 
 storage_value! {
     Owner {
@@ -67,7 +69,33 @@ impl Distributor {
     }
 }
 
-impl<F> DigitalRightsView<F> where F: Fork {
+pub struct DigitalRightsView<F: Fork> {
+    pub fork: F,
+}
+
+impl<F> View<F> for DigitalRightsView<F>
+    where F: Fork
+{
+    type Transaction = DigitalRightsTx;
+
+    fn from_fork(fork: F) -> Self {
+        DigitalRightsView { fork: fork }
+    }
+}
+
+impl<F> Deref for DigitalRightsView<F>
+    where F: Fork
+{
+    type Target = F;
+
+    fn deref(&self) -> &Self::Target {
+        &self.fork
+    }
+}
+
+impl<F> DigitalRightsView<F>
+    where F: Fork
+{
     pub fn owners(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Owner> {
         MerkleTable::new(MapTable::new(vec![30], &self))
     }
@@ -77,11 +105,13 @@ impl<F> DigitalRightsView<F> where F: Fork {
     pub fn contents(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, Content> {
         MerklePatriciaTable::new(MapTable::new(vec![32], &self))
     }
-    pub fn owner_contents(&self, owner_id: u16) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Ownership> {
+    pub fn owner_contents(&self,
+                          owner_id: u16)
+                          -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Ownership> {
         let mut prefix = vec![33; 3];
         LittleEndian::write_u16(&mut prefix[1..], owner_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
 }
 
-//TODO test dto macro!
+// TODO test dto macro!
