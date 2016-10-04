@@ -1,3 +1,5 @@
+#[macro_use]
+mod spec;
 mod block;
 mod view;
 

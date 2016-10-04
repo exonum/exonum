@@ -11,7 +11,7 @@ extern crate byteorder;
 #[macro_use]
 extern crate log;
 
-#[macro_use(message)]
+#[macro_use(message, storage_value)]
 extern crate exonum;
 extern crate blockchain_explorer;
 
