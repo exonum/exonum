@@ -12,6 +12,7 @@ extern crate valico;
 extern crate env_logger;
 extern crate clap;
 extern crate serde;
+extern crate serde_json;
 extern crate time;
 extern crate rand;
 
@@ -31,7 +32,7 @@ use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
 use rustless::batteries::swagger;
 use valico::json_dsl;
 use hyper::status::StatusCode;
-use rand::{Rng, thread_rng};
+use serde_json::value::from_value;
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
@@ -41,8 +42,9 @@ use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 
-use digital_rights::{DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor};
-use digital_rights::api::DigitalRightsApi;
+use digital_rights::{DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor,
+                     TxAddContent};
+use digital_rights::api::{DigitalRightsApi, ContentInfo};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
@@ -58,6 +60,7 @@ fn save_user(storage: &mut CookieJar, role: &str, public_key: &PublicKey, secret
 
 fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar, key: &str) -> StorageResult<Vec<u8>> {
     if let Some(cookie) = storage.find(key) {
+        println!("{}", cookie);
         if let Ok(value) = HexValue::from_hex(cookie.value) {
             return Ok(value);
         }
@@ -167,6 +170,56 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                 }
             })
         });
+
+        let ch = channel.clone();
+        api.put("contents", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("title", json_dsl::string());
+                params.req_typed("fingerprint", json_dsl::string());
+                params.req_typed("additional_conditions", json_dsl::string());
+                params.req_typed("price_per_listen", json_dsl::u64());
+                params.req_typed("min_plays", json_dsl::u64());
+                params.req_nested("owners", json_dsl::array(), |params| {
+                    params.req_typed("owner_id", json_dsl::u64());
+                    params.req_typed("share", json_dsl::u64());
+                });
+            });
+
+            endpoint.handle(move |client, params| {
+                let content_info = from_value::<ContentInfo>(params.clone()).unwrap();
+                let (role, pub_key, sec_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((r, p, s)) => (r, p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+                match role.as_ref() {
+                    "owner" => {
+                        let owners = content_info.owners
+                            .iter()
+                            .cloned()
+                            .map(|info| info.into())
+                            .collect::<Vec<u32>>();
+
+                        let tx = TxAddContent::new(&pub_key,
+                                                   &content_info.fingerprint.0,
+                                                   &content_info.title,
+                                                   content_info.price_per_listen as u32,
+                                                   content_info.min_plays as u32,
+                                                   &owners,
+                                                   &content_info.additional_conditions,
+                                                   &sec_key);
+                        send_tx(DigitalRightsTx::AddContent(tx), client, ch.clone())
+                    }
+                    _ => client.error(StorageError::new("Unknown role")),
+                }
+            })
+        });
+
     });
 }
 

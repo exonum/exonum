@@ -19,5 +19,6 @@ log = "0.3"
 byteorder = "0.5"
 
 serde = "0.8"
-serde_macros = "0.8.9"
+serde_macros = "0.8"
+serde_json = "0.8"
 jsonway = "1.0"

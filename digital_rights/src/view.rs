@@ -4,8 +4,8 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::Field;
 use exonum::crypto::{PublicKey, Hash, hash};
-use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable, MerkleTable};
-use exonum::blockchain::{Blockchain, View};
+use exonum::storage::{Fork, MerklePatriciaTable, MapTable, MerkleTable};
+use exonum::blockchain::View;
 
 use super::DigitalRightsTx;
 

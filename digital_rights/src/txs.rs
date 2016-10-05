@@ -137,7 +137,7 @@ impl DigitalRightsTx {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct ContentShare {
     pub owner_id: u16,
     pub share: u16,

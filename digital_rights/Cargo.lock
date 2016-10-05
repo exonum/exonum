@@ -14,6 +14,7 @@ dependencies = [
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustless 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.10 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_macros 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.35 (registry+https://github.com/rust-lang/crates.io-index)",
  "valico 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -18,11 +18,12 @@ pub mod api;
 use std::ops::Deref;
 
 use exonum::messages::Message;
-use exonum::crypto::{PublicKey, Hash, hash};
-use exonum::storage::{Map, Database, Fork, Error, MerklePatriciaTable, MapTable, List};
-use exonum::blockchain::{Blockchain};
+use exonum::crypto::{Hash, hash};
+use exonum::storage::{Map, Database, Error, List};
+use exonum::blockchain::Blockchain;
 
-pub use txs::{DigitalRightsTx, TxCreateOwner, TxCreateDistributor, TxAddContent, ContentShare, TxAddContract};
+pub use txs::{DigitalRightsTx, TxCreateOwner, TxCreateDistributor, TxAddContent, ContentShare,
+              TxAddContract};
 pub use view::{DigitalRightsView, Owner, Distributor, Content, Ownership, Contract};
 
 const OWNERS_MAX_COUNT: u64 = 5000;
@@ -198,9 +199,9 @@ mod tests {
             let o1 = v.owners().get(0).unwrap().unwrap();
             let o2 = v.owners().get(1).unwrap().unwrap();
             assert_eq!(o1.ownership_hash(),
-                    &v.owner_contents(0).root_hash().unwrap());
+                       &v.owner_contents(0).root_hash().unwrap());
             assert_eq!(o2.ownership_hash(),
-                    &v.owner_contents(1).root_hash().unwrap());
+                       &v.owner_contents(1).root_hash().unwrap());
         }
 
         {
@@ -246,7 +247,7 @@ mod tests {
         assert_eq!(d2.pub_key(), cd2.pub_key());
         assert_eq!(d2.name(), cd2.name());
 
-        let f1 = &hash(&[1, 2, 3, 4]);                    
+        let f1 = &hash(&[1, 2, 3, 4]);
         {
             let co1 = TxCreateOwner::new(&p1, "o1", &s1);
             let co2 = TxCreateOwner::new(&p2, "o2", &s2);
@@ -288,7 +289,7 @@ mod tests {
         }
 
         {
-            let f2 = &hash(&[3, 2, 3, 4]);  
+            let f2 = &hash(&[3, 2, 3, 4]);
             let ac = TxAddContract::new(&p2, 1, f2, &s2);
             execute_tx::<MemoryDB>(&v, DigitalRightsTx::AddContract(ac.clone())).unwrap();
             let contracts = v.distributor_contracts(1);
