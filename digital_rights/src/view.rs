@@ -159,7 +159,11 @@ mod tests {
         let additional_conditions = "";
         let owners = [ContentShare::new(0, 15).into(), ContentShare::new(1, 85).into()];
 
-        let content = Content::new(title, price_per_listen, min_plays, additional_conditions, owners.as_ref());
+        let content = Content::new(title,
+                                   price_per_listen,
+                                   min_plays,
+                                   additional_conditions,
+                                   owners.as_ref());
 
         assert_eq!(content.title(), title);
         assert_eq!(content.price_per_listen(), price_per_listen);

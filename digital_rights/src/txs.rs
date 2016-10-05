@@ -1,10 +1,7 @@
-#![feature(question_mark)]
-
-use std::io::Cursor;
 use std::convert::Into;
 
 use time::Timespec;
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::{RawMessage, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash};
@@ -45,7 +42,7 @@ message! {
         title:                  &str            [64 => 72]
         price_per_listen:       u32             [72 => 76]
         min_plays:              u32             [76 => 80]
-        distribution:           &[u32]          [80 => 88]
+        owners:                 &[u32]          [80 => 88]
         additional_conditions:  &str            [88 => 96]
     }
 }
@@ -140,6 +137,7 @@ impl DigitalRightsTx {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub struct ContentShare {
     pub owner_id: u16,
     pub share: u16,
@@ -158,20 +156,20 @@ impl ContentShare {
 impl Into<u32> for ContentShare {
     fn into(self) -> u32 {
         let mut v = vec![0; 4];
-        v.write_u16::<LittleEndian>(self.owner_id).unwrap();
-        v.write_u16::<LittleEndian>(self.share).unwrap();
-        Cursor::new(v).read_u32::<LittleEndian>().unwrap()
+        LittleEndian::write_u16(&mut v[0..2], self.owner_id);
+        LittleEndian::write_u16(&mut v[2..4], self.share);
+        let u = LittleEndian::read_u32(&v[0..4]);
+        u
     }
 }
 
 impl Into<ContentShare> for u32 {
     fn into(self) -> ContentShare {
         let mut v = vec![0; 4];
-        v.write_u32::<LittleEndian>(self).unwrap();
-        let mut c = Cursor::new(v);
+        LittleEndian::write_u32(&mut v[0..4], self);
         ContentShare {
-            owner_id: c.read_u16::<LittleEndian>().unwrap(),
-            share: c.read_u16::<LittleEndian>().unwrap(),
+            owner_id: LittleEndian::read_u16(&v[0..2]),
+            share: LittleEndian::read_u16(&v[2..4]),
         }
     }
 }
@@ -186,10 +184,10 @@ mod tests {
                 ContentShare};
 
     #[test]
-    fn test_content_share() {
+    fn test_content_share() { 
         let c1 = ContentShare::new(1, 50);
-        let u = c1.into();
-        let c2 = ContentShare::from(u);
+        let u: u32 = c1.into();
+        let c2: ContentShare = u.into();
 
         assert_eq!(c2.owner_id, 1);
         assert_eq!(c2.share, 50);
@@ -219,14 +217,14 @@ mod tests {
         let price_per_listen = 1;
         let min_plays = 100;
         let additional_conditions = "Give me your money";
-        let distribution = [ContentShare::new(0, 15).into(), ContentShare::new(1, 85).into()];
+        let owners = [ContentShare::new(0, 15).into(), ContentShare::new(1, 85).into()];
 
         let tx = TxAddContent::new(&p,
                                    &fingerprint,
                                    title,
                                    price_per_listen,
                                    min_plays,
-                                   &distribution,
+                                   &owners,
                                    additional_conditions,
                                    &s);
 
@@ -236,7 +234,7 @@ mod tests {
         assert_eq!(tx.price_per_listen(), price_per_listen);
         assert_eq!(tx.min_plays(), min_plays);
         assert_eq!(tx.additional_conditions(), additional_conditions);
-        assert_eq!(tx.distribution(), &distribution);
+        assert_eq!(tx.owners(), &owners);
     }
 
     #[test]
