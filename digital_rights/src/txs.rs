@@ -47,6 +47,16 @@ message! {
     }
 }
 
+impl TxAddContent {
+    pub fn owner_shares(&self) -> Vec<ContentShare> {
+        self.owners()
+            .iter()
+            .cloned()
+            .map(|x| -> ContentShare { x.into() })
+            .collect()
+    }
+}
+
 message! {
     TxAddContract {
         const ID = TX_ADD_CONTRACT;

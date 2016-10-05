@@ -44,7 +44,7 @@ use exonum::node::config::GenesisConfig;
 
 use digital_rights::{DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor,
                      TxAddContent};
-use digital_rights::api::{DigitalRightsApi, ContentInfo};
+use digital_rights::api::{DigitalRightsApi, NewContent};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
@@ -186,7 +186,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
             });
 
             endpoint.handle(move |client, params| {
-                let content_info = from_value::<ContentInfo>(params.clone()).unwrap();
+                let content_info = from_value::<NewContent>(params.clone()).unwrap();
                 let (role, pub_key, sec_key) = {
                     let r = {
                         let cookies = client.request.cookies();

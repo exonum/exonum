@@ -1,13 +1,9 @@
-use std::marker::PhantomData;
-
 use serde::{Serialize, Serializer};
-use serde::de;
-use serde::de::{Visitor, Deserialize, Deserializer};
 
-use exonum::crypto::{HexValue, PublicKey, Hash, ToHex};
+use exonum::crypto::{PublicKey, Hash, HexValue};
 use exonum::storage::{List, Database, Result as StorageResult};
 use exonum::blockchain::Blockchain;
-use blockchain_explorer::TransactionInfo;
+use blockchain_explorer::{TransactionInfo, HexField};
 
 use super::{DigitalRightsTx, DigitalRightsBlockchain, ContentShare};
 
@@ -21,12 +17,24 @@ impl Serialize for DigitalRightsTx {
                 state = ser.serialize_struct("transaction", 3)?;
                 ser.serialize_struct_elt(&mut state, "type", "create_owner")?;
                 ser.serialize_struct_elt(&mut state, "name", tx.name())?;
-                ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key())?;
+                ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key().to_hex())?;
             }
             DigitalRightsTx::CreateDistributor(ref tx) => {
                 state = ser.serialize_struct("transaction", 3)?;
+                ser.serialize_struct_elt(&mut state, "type", "create_distributor")?;
                 ser.serialize_struct_elt(&mut state, "name", tx.name())?;
-                ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key())?;
+                ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key().to_hex())?;
+            }
+            DigitalRightsTx::AddContent(ref tx) => {
+                state = ser.serialize_struct("transaction", 3)?;
+                ser.serialize_struct_elt(&mut state, "type", "create_distributor")?;
+                ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "fingerprint", tx.fingerprint().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "title", tx.title())?;                
+                ser.serialize_struct_elt(&mut state, "price_per_listen", tx.price_per_listen())?;                
+                ser.serialize_struct_elt(&mut state, "min_plays", tx.min_plays())?;  
+                ser.serialize_struct_elt(&mut state, "additional_conditions", tx.title())?; 
+                ser.serialize_struct_elt(&mut state, "owners", tx.owner_shares())?;                
             }
             _ => {
                 unimplemented!();
@@ -38,56 +46,14 @@ impl Serialize for DigitalRightsTx {
 
 impl TransactionInfo for DigitalRightsTx {}
 
-#[derive(Debug)]
-pub struct HexField<T: AsRef<[u8]>>(pub T);
-
-impl<T> Serialize for HexField<T>
-    where T: AsRef<[u8]>
-{
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        ser.serialize_str(&self.0.as_ref().to_hex())
-    }
-}
-
-struct HexVisitor<T>
-    where T: AsRef<[u8]> + HexValue
-{
-    _p: PhantomData<T>,
-}
-
-impl<T> Visitor for HexVisitor<T>
-    where T: AsRef<[u8]> + HexValue
-{
-    type Value = HexField<T>;
-
-    fn visit_str<E>(&mut self, s: &str) -> Result<HexField<T>, E>
-        where E: de::Error
-    {
-        let v = T::from_hex(s).map_err(|_| de::Error::custom("Invalid hex"))?;
-        Ok(HexField(v))
-    }
-}
-
-impl<T> Deserialize for HexField<T>
-    where T: AsRef<[u8]> + HexValue
-{
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        deserializer.deserialize_str(HexVisitor { _p: PhantomData })
-    }
-}
-
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OwnerInfo {
     name: String,
     pub_key: HexField<PublicKey>,
     ownership: HexField<Hash>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DistributorInfo {
     name: String,
     pub_key: HexField<PublicKey>,
@@ -95,7 +61,7 @@ pub struct DistributorInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ContentInfo {
+pub struct NewContent {
     pub title: String,
     pub fingerprint: HexField<Hash>,
     pub additional_conditions: String,

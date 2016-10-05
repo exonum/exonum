@@ -4,150 +4,79 @@
 #![plugin(serde_macros)]
 #![feature(question_mark)]
 
+mod explorer;
+
 extern crate time;
 extern crate serde;
 extern crate exonum;
 extern crate rustless;
 extern crate valico;
 
-use std::cmp;
+use std::ops::Deref;
+use std::marker::PhantomData;
 
 use serde::{Serialize, Serializer};
+use serde::de;
+use serde::de::{Visitor, Deserialize, Deserializer};
 use rustless::json::ToJson;
 use rustless::{Api, Nesting};
 use valico::json_dsl;
 
-use exonum::crypto::{Hash, HexValue};
-use exonum::storage::{Map, List};
-use exonum::storage::{Error as StorageError, Result as StorageResult};
-use exonum::blockchain::{Blockchain, View};
+use exonum::crypto::{Hash, HexValue, ToHex};
+use exonum::storage::{Error as StorageError};
+use exonum::blockchain::{Blockchain};
 
-pub struct BlockchainExplorer<B: Blockchain> {
-    view: B::View,
-}
-
-pub trait TransactionInfo: Serialize {}
+pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
 
 #[derive(Debug)]
-pub struct BlockInfo<T>
-    where T: TransactionInfo
-{
-    height: u64,
-    // proposer: PublicKey, // TODO add to block dto
-    propose_time: i64,
+pub struct HexField<T: AsRef<[u8]>>(pub T);
 
-    prev_hash: Hash,
-    hash: Hash,
-    state_hash: Hash,
-    tx_hash: Hash,
-    txs: Vec<T>,
+impl<T> Deref for HexField<T> 
+    where T: AsRef<[u8]>
+{
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
 }
 
-impl<T> Serialize for BlockInfo<T>
-    where T: TransactionInfo
+impl<T> Serialize for HexField<T>
+    where T: AsRef<[u8]>
 {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let mut state = ser.serialize_struct("block_info", 8)?;
-        ser.serialize_struct_elt(&mut state, "height", self.height)?;
-        //ser.serialize_struct_elt(&mut state, "propose_time", self.proposer.to_hex())?;
-        ser.serialize_struct_elt(&mut state, "propose_time", self.propose_time)?;
-
-        ser.serialize_struct_elt(&mut state, "prev_hash", self.prev_hash.to_hex())?;
-        ser.serialize_struct_elt(&mut state, "hash", self.hash.to_hex())?;
-        ser.serialize_struct_elt(&mut state, "state_hash", self.state_hash.to_hex())?;
-        ser.serialize_struct_elt(&mut state, "tx_hash", self.tx_hash.to_hex())?;
-        ser.serialize_struct_elt(&mut state, "txs", &self.txs)?;
-        ser.serialize_struct_end(state)
+        ser.serialize_str(&self.0.as_ref().to_hex())
     }
 }
 
+struct HexVisitor<T>
+    where T: AsRef<[u8]> + HexValue
+{
+    _p: PhantomData<T>,
+}
 
-impl<B: Blockchain> BlockchainExplorer<B> {
-    pub fn new(b: B) -> BlockchainExplorer<B> {
-        BlockchainExplorer { view: b.view() }
-    }
+impl<T> Visitor for HexVisitor<T>
+    where T: AsRef<[u8]> + HexValue
+{
+    type Value = HexField<T>;
 
-    pub fn from_view(view: B::View) -> BlockchainExplorer<B> {
-        BlockchainExplorer { view: view }
-    }
-
-    pub fn tx_info<T>(&self, tx_hash: &Hash) -> StorageResult<Option<T>>
-        where T: TransactionInfo + From<B::Transaction>
+    fn visit_str<E>(&mut self, s: &str) -> Result<HexField<T>, E>
+        where E: de::Error
     {
-        let tx = self.view.transactions().get(tx_hash)?;
-        Ok(tx.map(|tx| T::from(tx)))
+        let v = T::from_hex(s).map_err(|_| de::Error::custom("Invalid hex"))?;
+        Ok(HexField(v))
     }
+}
 
-    pub fn block_info<T>(&self, block_hash: &Hash) -> StorageResult<Option<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
+impl<T> Deserialize for HexField<T>
+    where T: AsRef<[u8]> + HexValue
+{
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
     {
-        let block = self.view.blocks().get(block_hash)?;
-        if let Some(block) = block {
-            let block_txs = self.block_txs(block.height())?;
-            let info = BlockInfo {
-                height: block.height(),
-                // proposer: block.proposer(),
-                propose_time: block.time().sec,
-
-                prev_hash: *block.prev_hash(),
-                hash: *block_hash,
-                state_hash: *block.state_hash(),
-                tx_hash: *block.tx_hash(),
-                txs: block_txs,
-            };
-            Ok(Some(info))
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn block_info_with_height<T>(&self, height: u64) -> StorageResult<Option<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
-    {
-        if let Some(block_hash) = self.view.heights().get(height)? {
-            // TODO avoid double unwrap
-            self.block_info(&block_hash)
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn blocks_range<T>(&self, from: u64, to: Option<u64>) -> StorageResult<Vec<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
-    {
-        let heights = self.view.heights();
-
-        let max_len = heights.len()?;
-        let len = cmp::min(max_len, to.unwrap_or(max_len));
-
-        let mut v = Vec::new();
-        for height in from..len {
-            if let Some(ref h) = heights.get(height)? {
-                if let Some(block_info) = self.block_info(h)? {
-                    v.push(block_info);
-                }
-            }
-        }
-        Ok(v)
-    }
-
-    fn block_txs<T>(&self, height: u64) -> StorageResult<Vec<T>>
-        where T: TransactionInfo + From<B::Transaction>
-    {
-        let txs = self.view.block_txs(height);
-        let tx_count = txs.len()?;
-
-        let mut v = Vec::new();
-        for i in 0..tx_count {
-            if let Some(tx_hash) = txs.get(i)? {
-                if let Some(tx_info) = self.tx_info(&tx_hash)? {
-                    v.push(tx_info);
-                }
-            }
-        }
-        Ok(v)
+        deserializer.deserialize_str(HexVisitor { _p: PhantomData })
     }
 }
 
