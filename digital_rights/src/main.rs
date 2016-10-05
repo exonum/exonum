@@ -37,13 +37,14 @@ use serde_json::value::from_value;
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
-use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue};
+use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash};
 use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
+use blockchain_explorer::HexField;
 
 use digital_rights::{DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor,
-                     TxAddContent};
+                     TxAddContent, TxAddContract};
 use digital_rights::api::{DigitalRightsApi, NewContent};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
@@ -220,6 +221,40 @@ fn digital_rights_api<D: Database>(api: &mut Api,
             })
         });
 
+        let ch = channel.clone();
+        api.put("contracts/:fingerprint", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("fingerprint", json_dsl::string());
+            });
+
+            endpoint.handle(move |client, params| {
+                let fingerprint = {
+                    let r = Hash::from_hex(params.find("fingerprint").unwrap().as_str().unwrap());
+                    match r {
+                        Ok(f) => f,
+                        Err(e) => return client.error(e)
+                    }
+                };
+                let (role, pub_key, sec_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((r, p, s)) => (r, p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+                match role.as_ref() {
+                    "distributor" => {
+                        let id = 0; //TODO add table
+                        let tx = TxAddContract::new(&pub_key, id, &fingerprint, &sec_key);
+                        send_tx(DigitalRightsTx::AddContract(tx), client, ch.clone())
+                    }
+                    _ => client.error(StorageError::new("Unknown role")),
+                }
+            })
+        });
     });
 }
 
