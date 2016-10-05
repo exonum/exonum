@@ -118,6 +118,13 @@ impl<F> DigitalRightsView<F>
         LittleEndian::write_u16(&mut prefix[1..], owner_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
+    pub fn distributor_contracts(&self,
+                                 distributor_id: u16)
+                                 -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Contract> {
+        let mut prefix = vec![34; 3];
+        LittleEndian::write_u16(&mut prefix[1..], distributor_id);
+        MerkleTable::new(MapTable::new(prefix, &self))
+    }
 }
 
 

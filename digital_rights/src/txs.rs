@@ -184,7 +184,7 @@ mod tests {
                 ContentShare};
 
     #[test]
-    fn test_content_share() { 
+    fn test_content_share() {
         let c1 = ContentShare::new(1, 50);
         let u: u32 = c1.into();
         let c2: ContentShare = u.into();
