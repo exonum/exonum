@@ -91,15 +91,15 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
             endpoint.summary("Returns blockchain info array");
             endpoint.params(|params| {
                 params.opt_typed("from", json_dsl::u64());
-                params.opt_typed("to", json_dsl::u64())
+                params.opt_typed("count", json_dsl::u64())
             });
 
             endpoint.handle(move |client, params| {
-                let from = params.find("from").map(|x| x.as_u64().unwrap()).unwrap_or(0);
-                let to = params.find("to").map(|x| x.as_u64().unwrap());
+                let from = params.find("from").map(|x| x.as_u64().unwrap());
+                let count = params.find("count").map(|x| x.as_u64().unwrap()).unwrap_or(100);
 
                 let explorer = BlockchainExplorer::new(b1.clone());
-                match explorer.blocks_range::<T>(from, to) {
+                match explorer.blocks_range::<T>(count, from) {
                     Ok(blocks) => client.json(&blocks.to_json()),
                     Err(e) => client.error(e),
                 }
