@@ -37,15 +37,15 @@ message! {
 message! {
     TxAddContent {
         const ID = TX_ADD_CONTENT;
-        const SIZE = 96;
+        const SIZE = 104;
 
         pub_key:                &PublicKey      [00 => 32]
         fingerprint:            &Fingerprint    [32 => 64]
         title:                  &str            [64 => 72]
-        price_per_listen:       u32             [72 => 76]
-        min_plays:              u32             [76 => 80]
-        owners:                 &[u32]          [80 => 88]
-        additional_conditions:  &str            [88 => 96]
+        price_per_listen:       u64             [72 => 80]
+        min_plays:              u64             [80 => 88]
+        owners:                 &[u32]          [88 => 96]
+        additional_conditions:  &str            [96 => 104]
     }
 }
 
@@ -63,13 +63,15 @@ message! {
 message! {
     TxReport {
         const ID = TX_REPORT;
-        const SIZE = 106;
+        const SIZE = 122;
 
         pub_key:                &PublicKey      [00 => 32]
         uuid:                   &Uuid           [32 => 64]
         distributor_id:         u16             [64 => 66]
         fingerprint:            &Hash           [66 => 98]
         time:                   Timespec        [98 => 106]
+        plays:                  u64             [106 => 114]
+        comment:                &str            [114 => 122]    
     }
 }
 
@@ -268,8 +270,10 @@ mod tests {
         let distributor = 1000;
         let uuid = hash(&[]);
         let ts = time::get_time();
+        let plays = 100;
+        let comment = "My Comment";
 
-        let tx = TxReport::new(&p, &uuid, distributor, &fingerprint, ts, &s);
+        let tx = TxReport::new(&p, &uuid, distributor, &fingerprint, ts, plays, comment, &s);
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.uuid(), &uuid);
         assert_eq!(tx.fingerprint(), &fingerprint);

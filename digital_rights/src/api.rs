@@ -50,6 +50,8 @@ impl Serialize for DigitalRightsTx {
                 ser.serialize_struct_elt(&mut state, "distributor_id", tx.distributor_id())?;
                 ser.serialize_struct_elt(&mut state, "fingerprint", tx.fingerprint())?;
                 ser.serialize_struct_elt(&mut state, "time", tx.time().sec)?;
+                ser.serialize_struct_elt(&mut state, "plays", tx.plays())?;
+                ser.serialize_struct_elt(&mut state, "comment", tx.comment())?;
             }
         }
         ser.serialize_struct_end(state)
@@ -86,8 +88,8 @@ pub struct ContentInfo {
     pub title: String,
     pub fingerprint: HexField<Fingerprint>,
     pub additional_conditions: String,
-    pub price_per_listen: u32,
-    pub min_plays: u32,
+    pub price_per_listen: u64,
+    pub min_plays: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -124,9 +126,9 @@ impl<D: Database> DigitalRightsApi<D> {
         Ok(r)
     }
 
-    pub fn owner_info(&self, owner_id: u64) -> StorageResult<Option<OwnerInfo>> {
+    pub fn owner_info(&self, id: u16) -> StorageResult<Option<OwnerInfo>> {
         let view = self.blockchain.view();
-        if let Some(owner) = view.owners().get(owner_id)? {
+        if let Some(owner) = view.owners().get(id as u64)? {
             let info = OwnerInfo {
                 name: owner.name().to_string(),
                 pub_key: HexField(*owner.pub_key()),
@@ -138,9 +140,9 @@ impl<D: Database> DigitalRightsApi<D> {
         }
     }
 
-    pub fn distributor_info(&self, owner_id: u64) -> StorageResult<Option<DistributorInfo>> {
+    pub fn distributor_info(&self, id: u16) -> StorageResult<Option<DistributorInfo>> {
         let view = self.blockchain.view();
-        if let Some(distributor) = view.distributors().get(owner_id)? {
+        if let Some(distributor) = view.distributors().get(id as u64)? {
             let info = DistributorInfo {
                 name: distributor.name().to_string(),
                 pub_key: HexField(*distributor.pub_key()),

@@ -148,7 +148,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                 let id = params.find("id").unwrap().as_u64().unwrap();
 
                 let drm = DigitalRightsApi::new(b.clone());
-                match drm.distributor_info(id) {
+                match drm.distributor_info(id as u16) {
                     Ok(Some(info)) => client.json(&info.to_json()),
                     _ => client.error(StorageError::new("Unable to get distributor")),
                 }
@@ -162,7 +162,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
             });
 
             endpoint.handle(move |client, params| {
-                let id = params.find("id").unwrap().as_u64().unwrap();
+                let id = params.find("id").unwrap().as_u64().unwrap() as u16;
 
                 let drm = DigitalRightsApi::new(b.clone());
                 match drm.owner_info(id) {
@@ -209,8 +209,8 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                         let tx = TxAddContent::new(&pub_key,
                                                    &content_info.fingerprint.0,
                                                    &content_info.title,
-                                                   content_info.price_per_listen as u32,
-                                                   content_info.min_plays as u32,
+                                                   content_info.price_per_listen,
+                                                   content_info.min_plays,
                                                    &owners,
                                                    &content_info.additional_conditions,
                                                    &sec_key);

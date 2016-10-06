@@ -23,10 +23,10 @@ use exonum::storage::{Map, Database, Error, List};
 use exonum::blockchain::Blockchain;
 
 pub use txs::{DigitalRightsTx, TxCreateOwner, TxCreateDistributor, TxAddContent, ContentShare,
-              TxAddContract};
+              TxAddContract, TxReport};
 pub use view::{DigitalRightsView, Owner, Distributor, Content, Ownership, Contract, Report};
 
-const OWNERS_MAX_COUNT: u64 = 5000;
+pub const OWNERS_MAX_COUNT: u16 = 5000;
 
 pub type Uuid = Hash;
 pub type Fingerprint = Hash;
@@ -79,11 +79,11 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                 }
 
                 let owners = view.owners();
-                let onwer_id = owners.len()?;
+                let onwer_id = owners.len()? as u16;
                 if onwer_id < OWNERS_MAX_COUNT {
                     let owner = Owner::new(tx.pub_key(), tx.name(), &hash(&[]));
                     owners.append(owner)?;
-                    view.participants().put(tx.pub_key(), onwer_id as u16)?;
+                    view.participants().put(tx.pub_key(), onwer_id)?;
                 }
             }
             DigitalRightsTx::CreateDistributor(ref tx) => {
@@ -193,7 +193,7 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                 let id = tx.distributor_id();
                 let fingerprint = tx.fingerprint();
 
-                //preconditions
+                // preconditions
                 if view.reports().get(tx.uuid())?.is_some() {
                     return Ok(());
                 }
@@ -207,22 +207,77 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                         return Ok(());
                     }
                 };
-                // let mut contract = {
-                //     if let Some(contract) = view.distributor_contracts().get(id)? {
-                //         contract
-                //     } else {
-                //         return Ok(());
-                //     }
-                // };
-                // let mut content = {
-                //     if let Some(content) = view.contents().get(fingerprint)? {
-                //         content
-                //     } else {
-                //         return Ok(());
-                //     }
-                // };
+                let content = {
+                    if let Some(content) = view.contents().get(fingerprint)? {
+                        content
+                    } else {
+                        return Ok(());
+                    }
+                };
+                for share in content.shares() {
+                    if view.owners().get(share.owner_id as u64)?.is_none() {
+                        return Ok(());
+                    }
+                }
 
-                //let report = Report::new(id, &fingerprint, tx., p, a, c);
+                let (contract_id, mut contract) = {
+                    let r = view.find_contract(id, &fingerprint)?;
+                    if let Some((contract_id, contract)) = r {
+                        (contract_id as u64, contract)
+                    } else {
+                        return Ok(());
+                    }
+                };
+
+                let amount = content.price_per_listen() * tx.plays();
+                let report = Report::new(id,
+                                         &fingerprint,
+                                         tx.time(),
+                                         tx.plays(),
+                                         amount,
+                                         tx.comment());
+                view.reports().put(tx.uuid(), report)?;
+
+                // update hashes and other fields
+                let distrubutor_reports = view.distributor_reports(id, fingerprint);
+                distrubutor_reports.append(*tx.uuid())?;
+
+                // update contract
+                contract.add_amount(amount);
+                contract.add_plays(tx.plays());
+                contract.set_reports_hash(&distrubutor_reports.root_hash()?);
+                view.distributor_contracts(id).set(contract_id, contract)?;
+
+                // update distributor
+                distrubutor.set_contracts_hash(&view.distributor_contracts(id).root_hash()?);
+                view.distributors().set(id as u64, distrubutor)?;
+
+                // update owners
+                for share in content.shares() {
+                    let id = share.owner_id;
+                    let mut owner = view.owners().get(id as u64)?.unwrap();
+                    let (ownership_id, mut ownership) = {
+                        let r = view.find_ownership(id, &fingerprint)?;
+                        if let Some((ownership_id, ownership)) = r {
+                            (ownership_id as u64, ownership)
+                        } else {
+                            return Ok(());
+                        }
+                    };
+
+                    // Update reports hash
+                    let owner_reports = view.owner_reports(id, fingerprint);
+                    owner_reports.append(*tx.uuid())?;
+
+                    // Update ownership
+                    ownership.add_amount(amount * 100 / share.share as u64);
+                    ownership.add_plays(tx.plays());
+                    ownership.set_reports_hash(&owner_reports.root_hash()?);
+                    view.owner_contents(id).set(ownership_id, ownership)?;
+
+                    owner.set_ownership_hash(&view.owner_contents(id).root_hash()?);
+                    view.owners().set(id as u64, owner)?;
+                }
             }
         }
         Ok(())
@@ -232,12 +287,14 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
 
 #[cfg(test)]
 mod tests {
+    use time;
+
     use exonum::crypto::{gen_keypair, hash};
     use exonum::storage::{Map, List, Database, MemoryDB, Result as StorageResult};
     use exonum::blockchain::Blockchain;
 
     use super::{DigitalRightsView, DigitalRightsTx, DigitalRightsBlockchain, TxCreateOwner,
-                TxCreateDistributor, TxAddContent, ContentShare, TxAddContract};
+                TxCreateDistributor, TxAddContent, ContentShare, TxAddContract, TxReport};
 
     fn execute_tx<D: Database>(v: &DigitalRightsView<D::Fork>,
                                tx: DigitalRightsTx)
@@ -378,6 +435,72 @@ mod tests {
             execute_tx::<MemoryDB>(&v, DigitalRightsTx::AddContract(ac.clone())).unwrap();
             let contracts = v.distributor_contracts(1);
             assert_eq!(contracts.get(1).unwrap(), None);
+        }
+    }
+
+    #[test]
+    fn test_report() {
+        let b = DigitalRightsBlockchain { db: MemoryDB::new() };
+        let v = b.view();
+
+        let (p1, s1) = gen_keypair();
+        let (p2, s2) = gen_keypair();
+        let (p3, s3) = gen_keypair();
+        let (p4, s4) = gen_keypair();
+        let price = 10;
+
+        let cd1 = TxCreateDistributor::new(&p1, "d1", &s1);
+        let cd2 = TxCreateDistributor::new(&p2, "d2", &s2);
+        execute_tx::<MemoryDB>(&v, DigitalRightsTx::CreateDistributor(cd1.clone())).unwrap();
+        execute_tx::<MemoryDB>(&v, DigitalRightsTx::CreateDistributor(cd2.clone())).unwrap();
+
+        let f1 = &hash(&[1, 2, 3, 4]);
+        {
+            let co1 = TxCreateOwner::new(&p3, "o1", &s3);
+            let co2 = TxCreateOwner::new(&p4, "o2", &s4);
+            execute_tx::<MemoryDB>(&v, DigitalRightsTx::CreateOwner(co1.clone())).unwrap();
+            execute_tx::<MemoryDB>(&v, DigitalRightsTx::CreateOwner(co2.clone())).unwrap();
+
+            let d1 = [ContentShare::new(0, 30).into(), ContentShare::new(1, 70).into()];
+            let ac1 = TxAddContent::new(&p1, f1, "Manowar", price, 10, d1.as_ref(), "None", &s1);
+            execute_tx::<MemoryDB>(&v, DigitalRightsTx::AddContent(ac1.clone())).unwrap();
+        }
+
+        {
+            let tx1 = DigitalRightsTx::AddContract(TxAddContract::new(&p1, 0, f1, &s1));
+            let tx2 = DigitalRightsTx::AddContract(TxAddContract::new(&p2, 1, f1, &s2));
+            execute_tx::<MemoryDB>(&v, tx1).unwrap();
+            execute_tx::<MemoryDB>(&v, tx2).unwrap();
+        }
+
+        {
+            let uuid = hash(&[90]);
+            let did = 0;
+            let time = time::get_time();
+            let plays = 10000;
+            let comment = "My First report";
+            let report_tx = TxReport::new(&p1, &uuid, did, &f1, time, plays, comment, &s1);
+            execute_tx::<MemoryDB>(&v, DigitalRightsTx::Report(report_tx.clone())).unwrap();
+            let report = v.reports().get(&uuid).unwrap().unwrap();
+            let total_amount = plays * price;
+            assert_eq!(report.amount(), total_amount);
+
+            let oc1 = v.owner_contents(0).get(0).unwrap().unwrap();
+            let oc2 = v.owner_contents(1).get(0).unwrap().unwrap();
+
+            assert_eq!(oc1.amount(), total_amount * 100 / 30);
+            assert_eq!(oc2.amount(), total_amount * 100 / 70);
+            assert_eq!(oc1.reports_hash(),
+                       &v.owner_reports(0, f1).root_hash().unwrap());
+            assert_eq!(oc2.reports_hash(),
+                       &v.owner_reports(1, f1).root_hash().unwrap());
+
+            let dc1 = v.distributor_contracts(0).get(0).unwrap().unwrap();
+            assert_eq!(dc1.amount(), total_amount);
+
+            assert_eq!(v.owner_reports(0, f1).get(0).unwrap().unwrap(), uuid);
+            assert_eq!(v.owner_reports(1, f1).get(0).unwrap().unwrap(), uuid);
+            assert_eq!(v.distributor_reports(0, f1).get(0).unwrap().unwrap(), uuid);
         }
     }
 }

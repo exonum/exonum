@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use time::{Timespec};
+use time::Timespec;
 use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::Field;
@@ -9,7 +9,7 @@ use exonum::storage::{Map, Fork, MerklePatriciaTable, MapTable, MerkleTable, Lis
                       Result as StorageResult};
 use exonum::blockchain::View;
 
-use super::{DigitalRightsTx, Uuid, Fingerprint};
+use super::{DigitalRightsTx, Uuid, Fingerprint, ContentShare};
 
 storage_value! {
     Owner {
@@ -33,14 +33,14 @@ storage_value! {
 
 storage_value! {
     Content {
-        const SIZE = 40;
+        const SIZE = 48;
 
         title:                  &str            [00 => 08]
-        price_per_listen:       u32             [08 => 12]
-        min_plays:              u32             [12 => 16]
-        additional_conditions:  &str            [16 => 24]
-        owners:                 &[u32]          [24 => 32]
-        distributors:           &[u16]          [32 => 40]
+        price_per_listen:       u64             [08 => 16]
+        min_plays:              u64             [16 => 24]
+        additional_conditions:  &str            [24 => 32]
+        owners:                 &[u32]          [32 => 40]
+        distributors:           &[u16]          [40 => 48]
     }
 }
 
@@ -72,7 +72,7 @@ storage_value! {
 
         distributor_id:         u16             [00 => 02]
         fingerprint:            &Fingerprint    [02 => 34]
-        date:                   Timespec        [34 => 42]
+        time:                   Timespec        [34 => 42]
         plays:                  u64             [42 => 50]
         amount:                 u64             [50 => 58]
         comment:                &str            [58 => 66]
@@ -93,7 +93,45 @@ impl Distributor {
 
 impl Content {
     pub fn set_distributors(&mut self, distributors: &[u16]) {
-        Field::write(&distributors, &mut self.raw, 32, 40);
+        Field::write(&distributors, &mut self.raw, 40, 48);
+    }
+
+    pub fn shares(&self) -> Vec<ContentShare> {
+        self.owners()
+            .iter()
+            .cloned()
+            .map(|x| -> ContentShare { x.into() })
+            .collect()
+    }
+}
+
+impl Ownership {
+    pub fn add_plays(&mut self, plays: u64) {
+        let new_plays = self.plays() + plays;
+        Field::write(&new_plays, &mut self.raw, 32, 40);
+    }
+    pub fn add_amount(&mut self, amount: u64) {
+        let new_amount = self.amount() + amount;
+        Field::write(&new_amount, &mut self.raw, 40, 48);
+    }
+
+    pub fn set_reports_hash(&mut self, hash: &Hash) {
+        hash.write(&mut self.raw, 48, 80)
+    }
+}
+
+impl Contract {
+    pub fn add_plays(&mut self, plays: u64) {
+        let new_plays = self.plays() + plays;
+        Field::write(&new_plays, &mut self.raw, 32, 40);
+    }
+    pub fn add_amount(&mut self, amount: u64) {
+        let new_amount = self.amount() + amount;
+        Field::write(&new_amount, &mut self.raw, 40, 48);
+    }
+
+    pub fn set_reports_hash(&mut self, hash: &Hash) {
+        hash.write(&mut self.raw, 48, 80)
     }
 }
 
@@ -153,9 +191,9 @@ impl<F> DigitalRightsView<F>
         MerkleTable::new(MapTable::new(prefix, &self))
     }
     pub fn owner_reports(&self,
-                          id: u16,
-                          fingerprint: &Fingerprint)
-                          -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Uuid> {
+                         id: u16,
+                         fingerprint: &Fingerprint)
+                         -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Uuid> {
         let mut prefix = vec![36; 35];
         LittleEndian::write_u16(&mut prefix[1..], id);
         prefix[3..].copy_from_slice(fingerprint.as_ref());
@@ -163,9 +201,9 @@ impl<F> DigitalRightsView<F>
         MerkleTable::new(MapTable::new(prefix, &self))
     }
     pub fn distributor_reports(&self,
-                          id: u16,
-                          fingerprint: &Fingerprint)
-                          -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Uuid> {
+                               id: u16,
+                               fingerprint: &Fingerprint)
+                               -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Uuid> {
         let mut prefix = vec![37; 35];
         LittleEndian::write_u16(&mut prefix[1..], id);
         prefix[3..].copy_from_slice(fingerprint.as_ref());
@@ -188,6 +226,31 @@ impl<F> DigitalRightsView<F>
             }
         }
         Ok(v)
+    }
+    // TODO видимо нужны еще техниеческие таблицы, чтобы не было O(n)
+    pub fn find_contract(&self,
+                         id: u16,
+                         fingerprint: &Fingerprint)
+                         -> StorageResult<Option<(u16, Contract)>> {
+        let contracts = self.distributor_contracts(id);
+        let values = contracts.values()?;
+        let r = values.into_iter()
+            .enumerate()
+            .find(|&(_, ref c)| c.fingerprint() == fingerprint)
+            .map(|(x, y)| (x as u16, y));
+        Ok(r)
+    }
+    pub fn find_ownership(&self,
+                          id: u16,
+                          fingerprint: &Fingerprint)
+                          -> StorageResult<Option<(u16, Ownership)>> {
+        let contents = self.owner_contents(id);
+        let values = contents.values()?;
+        let r = values.into_iter()
+            .enumerate()
+            .find(|&(_, ref c)| c.fingerprint() == fingerprint)
+            .map(|(x, y)| (x as u16, y));
+        Ok(r)
     }
 }
 
@@ -262,11 +325,20 @@ mod tests {
         let p = 10;
         let a = 1000;
         let r = hash(&[]);
-        let ownership = Ownership::new(&f, p, a, &r);
+        let mut ownership = Ownership::new(&f, p, a, &r);
 
         assert_eq!(ownership.fingerprint(), &f);
         assert_eq!(ownership.plays(), p);
         assert_eq!(ownership.amount(), a);
+        assert_eq!(ownership.reports_hash(), &r);
+
+        let r = hash(&[12, 213, 3]);
+        ownership.add_amount(a);
+        ownership.add_plays(p);
+        ownership.set_reports_hash(&r);
+
+        assert_eq!(ownership.amount(), a * 2);
+        assert_eq!(ownership.plays(), p * 2);
         assert_eq!(ownership.reports_hash(), &r);
     }
 
@@ -276,11 +348,20 @@ mod tests {
         let p = 10;
         let a = 1000;
         let r = hash(&[]);
-        let contract = Contract::new(&f, p, a, &r);
+        let mut contract = Contract::new(&f, p, a, &r);
 
         assert_eq!(contract.fingerprint(), &f);
         assert_eq!(contract.plays(), p);
         assert_eq!(contract.amount(), a);
+        assert_eq!(contract.reports_hash(), &r);
+
+        let r = hash(&[12, 213, 3]);
+        contract.add_amount(a);
+        contract.add_plays(p);
+        contract.set_reports_hash(&r);
+
+        assert_eq!(contract.amount(), a * 2);
+        assert_eq!(contract.plays(), p * 2);
         assert_eq!(contract.reports_hash(), &r);
     }
 
@@ -296,7 +377,7 @@ mod tests {
 
         assert_eq!(report.distributor_id(), i);
         assert_eq!(report.fingerprint(), &f);
-        assert_eq!(report.date(), d);
+        assert_eq!(report.time(), d);
         assert_eq!(report.plays(), p);
         assert_eq!(report.amount(), a);
         assert_eq!(report.comment(), c);
