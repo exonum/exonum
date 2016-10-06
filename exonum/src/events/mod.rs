@@ -373,14 +373,15 @@ mod tests {
 
     impl TestEvents {
         pub fn with_addr(addr: SocketAddr) -> TestEvents {
-            let network = Network::with_config(addr, NetworkConfiguration {
-                max_incoming_connections: 128,
-                max_outgoing_connections: 128,
-                tcp_nodelay: true,
-                tcp_keep_alive: Some(1),
-                tcp_reconnect_timeout: 1000,
-                tcp_reconnect_timeout_max: 600000,
-            });
+            let network = Network::with_config(addr,
+                                               NetworkConfiguration {
+                                                   max_incoming_connections: 128,
+                                                   max_outgoing_connections: 128,
+                                                   tcp_nodelay: true,
+                                                   tcp_keep_alive: Some(1),
+                                                   tcp_reconnect_timeout: 1000,
+                                                   tcp_reconnect_timeout_max: 600000,
+                                               });
             let handler = TestHandler::new();
 
             TestEvents(Events::new(network, handler).unwrap())

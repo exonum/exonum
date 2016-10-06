@@ -67,9 +67,7 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
 
 impl Error {
     pub fn new<T: Into<String>>(message: T) -> Error {
-        Error {
-            message: message.into()
-        }
+        Error { message: message.into() }
     }
 }
 

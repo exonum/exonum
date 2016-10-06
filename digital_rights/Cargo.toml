@@ -1,0 +1,24 @@
+[package]
+name = "digital_rights"
+version = "0.1.0"
+authors = ["Aleksey Sidorov <aleksei.sidorov@xdev.re", "Ivan Ivashchenko <ivan.ivashchenko@xdev.re"]
+
+[dependencies]
+exonum = {version="0.1", path="../exonum"}
+blockchain_explorer = {version="0.1", path="../blockchain_explorer"}
+env_logger = "0.3"
+clap = {version="2.13", features=["unstable"]}
+
+rustless = "0.9"
+iron = "0.4"
+hyper = "0.9"
+valico = "1.0"
+time = "0.1"
+rand = "0.3"
+log = "0.3"
+byteorder = "0.5"
+
+serde = "0.8"
+serde_macros = "0.8"
+serde_json = "0.8"
+jsonway = "1.0"
