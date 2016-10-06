@@ -28,6 +28,9 @@ pub use view::{DigitalRightsView, Owner, Distributor, Content, Ownership, Contra
 
 const OWNERS_MAX_COUNT: u64 = 5000;
 
+pub type Uuid = Hash;
+pub type Fingerprint = Hash;
+
 #[derive(Clone)]
 pub struct DigitalRightsBlockchain<D: Database> {
     pub db: D,
@@ -186,8 +189,40 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                 distrubutor.set_contracts_hash(hash);
                 view.distributors().set(id as u64, distrubutor)?;
             }
-            _ => {
-                unimplemented!();
+            DigitalRightsTx::Report(ref tx) => {
+                let id = tx.distributor_id();
+                let fingerprint = tx.fingerprint();
+
+                //preconditions
+                if view.reports().get(tx.uuid())?.is_some() {
+                    return Ok(());
+                }
+                let mut distrubutor = {
+                    if let Some(d) = view.distributors().get(id as u64)? {
+                        if d.pub_key() != tx.pub_key() {
+                            return Ok(());
+                        }
+                        d
+                    } else {
+                        return Ok(());
+                    }
+                };
+                // let mut contract = {
+                //     if let Some(contract) = view.distributor_contracts().get(id)? {
+                //         contract
+                //     } else {
+                //         return Ok(());
+                //     }
+                // };
+                // let mut content = {
+                //     if let Some(content) = view.contents().get(fingerprint)? {
+                //         content
+                //     } else {
+                //         return Ok(());
+                //     }
+                // };
+
+                //let report = Report::new(id, &fingerprint, tx., p, a, c);
             }
         }
         Ok(())

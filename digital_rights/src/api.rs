@@ -5,7 +5,7 @@ use exonum::storage::{Map, List, Database, Result as StorageResult};
 use exonum::blockchain::Blockchain;
 use blockchain_explorer::{TransactionInfo, HexField};
 
-use super::{DigitalRightsTx, DigitalRightsBlockchain, ContentShare};
+use super::{DigitalRightsTx, DigitalRightsBlockchain, ContentShare, Uuid, Fingerprint};
 
 impl Serialize for DigitalRightsTx {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
@@ -26,7 +26,7 @@ impl Serialize for DigitalRightsTx {
                 ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key().to_hex())?;
             }
             DigitalRightsTx::AddContent(ref tx) => {
-                state = ser.serialize_struct("transaction", 3)?;
+                state = ser.serialize_struct("transaction", 8)?;
                 ser.serialize_struct_elt(&mut state, "type", "create_distributor")?;
                 ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key().to_hex())?;
                 ser.serialize_struct_elt(&mut state, "fingerprint", tx.fingerprint().to_hex())?;
@@ -36,8 +36,20 @@ impl Serialize for DigitalRightsTx {
                 ser.serialize_struct_elt(&mut state, "additional_conditions", tx.title())?;
                 ser.serialize_struct_elt(&mut state, "owners", tx.owner_shares())?;
             }
-            _ => {
-                unimplemented!();
+            DigitalRightsTx::AddContract(ref tx) => {
+                state = ser.serialize_struct("transaction", 3)?;
+                ser.serialize_struct_elt(&mut state, "type", "add_contract")?;
+                ser.serialize_struct_elt(&mut state, "distributor_id", tx.distributor_id())?;
+                ser.serialize_struct_elt(&mut state, "fingerprint", tx.fingerprint().to_hex())?;
+            }
+            DigitalRightsTx::Report(ref tx) => {
+                state = ser.serialize_struct("transaction", 8)?;
+                ser.serialize_struct_elt(&mut state, "type", "report")?;
+                ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "uuid", tx.uuid().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "distributor_id", tx.distributor_id())?;
+                ser.serialize_struct_elt(&mut state, "fingerprint", tx.fingerprint())?;
+                ser.serialize_struct_elt(&mut state, "time", tx.time().sec)?;
             }
         }
         ser.serialize_struct_end(state)
@@ -72,16 +84,24 @@ pub struct DistributorInfo {
 #[derive(Debug, Serialize)]
 pub struct ContentInfo {
     pub title: String,
-    pub fingerprint: HexField<Hash>,
+    pub fingerprint: HexField<Fingerprint>,
     pub additional_conditions: String,
     pub price_per_listen: u32,
     pub min_plays: u32,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ContractInfo {
+    pub fingerprint: HexField<Fingerprint>,
+    pub plays: u64,
+    pub amount: u64,
+    pub reports: HexField<Hash>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NewContent {
     pub title: String,
-    pub fingerprint: HexField<Hash>,
+    pub fingerprint: HexField<Fingerprint>,
     pub additional_conditions: String,
     pub price_per_listen: u64,
     pub min_plays: u64,
@@ -132,11 +152,10 @@ impl<D: Database> DigitalRightsApi<D> {
         }
     }
 
-    pub fn available_contents(&self, distributor_id: u64) -> StorageResult<Vec<ContentInfo>> {
-        let view = self.blockchain.view();
-        let distributor_id = distributor_id as u16;
-
-        let v = view.list_content()?
+    pub fn available_contents(&self, distributor_id: u16) -> StorageResult<Vec<ContentInfo>> {
+        let v = self.blockchain
+            .view()
+            .list_content()?
             .into_iter()
             .filter(|&(_, ref content)| !content.distributors().contains(&distributor_id))
             .map(|(fingerprint, content)| {

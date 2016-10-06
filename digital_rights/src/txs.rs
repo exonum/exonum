@@ -6,6 +6,8 @@ use byteorder::{ByteOrder, LittleEndian};
 use exonum::messages::{RawMessage, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash};
 
+use super::{Fingerprint, Uuid};
+
 pub const TX_CREATE_OWNER_ID: u16 = 128;
 pub const TX_CREATE_DITRIBUTOR_ID: u16 = 129;
 pub const TX_ADD_CONTENT: u16 = 130;
@@ -38,22 +40,12 @@ message! {
         const SIZE = 96;
 
         pub_key:                &PublicKey      [00 => 32]
-        fingerprint:            &Hash           [32 => 64]
+        fingerprint:            &Fingerprint    [32 => 64]
         title:                  &str            [64 => 72]
         price_per_listen:       u32             [72 => 76]
         min_plays:              u32             [76 => 80]
         owners:                 &[u32]          [80 => 88]
         additional_conditions:  &str            [88 => 96]
-    }
-}
-
-impl TxAddContent {
-    pub fn owner_shares(&self) -> Vec<ContentShare> {
-        self.owners()
-            .iter()
-            .cloned()
-            .map(|x| -> ContentShare { x.into() })
-            .collect()
     }
 }
 
@@ -64,7 +56,7 @@ message! {
 
         pub_key:                &PublicKey      [00 => 32]
         distributor_id:         u16             [32 => 34]
-        fingerprint:            &Hash           [34 => 66]
+        fingerprint:            &Fingerprint    [34 => 66]
     }
 }
 
@@ -74,10 +66,20 @@ message! {
         const SIZE = 106;
 
         pub_key:                &PublicKey      [00 => 32]
-        uuid:                   &Hash           [32 => 64]
+        uuid:                   &Uuid           [32 => 64]
         distributor_id:         u16             [64 => 66]
         fingerprint:            &Hash           [66 => 98]
         time:                   Timespec        [98 => 106]
+    }
+}
+
+impl TxAddContent {
+    pub fn owner_shares(&self) -> Vec<ContentShare> {
+        self.owners()
+            .iter()
+            .cloned()
+            .map(|x| -> ContentShare { x.into() })
+            .collect()
     }
 }
 

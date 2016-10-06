@@ -1,5 +1,6 @@
 use std::ops::Deref;
 
+use time::{Timespec};
 use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::Field;
@@ -8,7 +9,7 @@ use exonum::storage::{Map, Fork, MerklePatriciaTable, MapTable, MerkleTable, Lis
                       Result as StorageResult};
 use exonum::blockchain::View;
 
-use super::DigitalRightsTx;
+use super::{DigitalRightsTx, Uuid, Fingerprint};
 
 storage_value! {
     Owner {
@@ -47,7 +48,7 @@ storage_value! {
     Ownership {
         const SIZE = 80;
 
-        fingerprint:            &Hash           [00 => 32]
+        fingerprint:            &Fingerprint    [00 => 32]
         plays:                  u64             [32 => 40]
         amount:                 u64             [40 => 48]
         reports_hash:           &Hash           [48 => 80]
@@ -58,7 +59,7 @@ storage_value! {
     Contract {
         const SIZE = 80;
 
-        fingerprint:            &Hash           [00 => 32]
+        fingerprint:            &Fingerprint    [00 => 32]
         plays:                  u64             [32 => 40]
         amount:                 u64             [40 => 48]
         reports_hash:           &Hash           [48 => 80]
@@ -70,8 +71,8 @@ storage_value! {
         const SIZE = 66;
 
         distributor_id:         u16             [00 => 02]
-        fingerprint:            &Hash           [02 => 34]
-        date:                   u64             [34 => 42]
+        fingerprint:            &Fingerprint    [02 => 34]
+        date:                   Timespec        [34 => 42]
         plays:                  u64             [42 => 50]
         amount:                 u64             [50 => 58]
         comment:                &str            [58 => 66]
@@ -129,32 +130,57 @@ impl<F> DigitalRightsView<F>
     pub fn distributors(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Distributor> {
         MerkleTable::new(MapTable::new(vec![31], &self))
     }
-    pub fn contents(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, Content> {
+    pub fn contents(&self)
+                    -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Fingerprint, Content> {
         MerklePatriciaTable::new(MapTable::new(vec![32], &self))
     }
+    pub fn reports(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Uuid, Report> {
+        MerklePatriciaTable::new(MapTable::new(vec![33], &self))
+    }
+
     pub fn owner_contents(&self,
                           owner_id: u16)
                           -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Ownership> {
-        let mut prefix = vec![33; 3];
+        let mut prefix = vec![34; 3];
         LittleEndian::write_u16(&mut prefix[1..], owner_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
     pub fn distributor_contracts(&self,
                                  distributor_id: u16)
                                  -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Contract> {
-        let mut prefix = vec![34; 3];
+        let mut prefix = vec![35; 3];
         LittleEndian::write_u16(&mut prefix[1..], distributor_id);
+        MerkleTable::new(MapTable::new(prefix, &self))
+    }
+    pub fn owner_reports(&self,
+                          id: u16,
+                          fingerprint: &Fingerprint)
+                          -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Uuid> {
+        let mut prefix = vec![36; 35];
+        LittleEndian::write_u16(&mut prefix[1..], id);
+        prefix[3..].copy_from_slice(fingerprint.as_ref());
+
+        MerkleTable::new(MapTable::new(prefix, &self))
+    }
+    pub fn distributor_reports(&self,
+                          id: u16,
+                          fingerprint: &Fingerprint)
+                          -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Uuid> {
+        let mut prefix = vec![37; 35];
+        LittleEndian::write_u16(&mut prefix[1..], id);
+        prefix[3..].copy_from_slice(fingerprint.as_ref());
+
         MerkleTable::new(MapTable::new(prefix, &self))
     }
 
     pub fn participants(&self) -> MapTable<F, PublicKey, u16> {
         MapTable::new(vec![40], &self)
     }
-    pub fn fingerprints(&self) -> ListTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
+    pub fn fingerprints(&self) -> ListTable<MapTable<F, [u8], Vec<u8>>, u64, Fingerprint> {
         ListTable::new(MapTable::new(vec![41], &self))
     }
 
-    pub fn list_content(&self) -> StorageResult<Vec<(Hash, Content)>> {
+    pub fn list_content(&self) -> StorageResult<Vec<(Fingerprint, Content)>> {
         let mut v = Vec::new();
         for fingerprint in self.fingerprints().values()? {
             if let Some(content) = self.contents().get(&fingerprint)? {
@@ -168,6 +194,8 @@ impl<F> DigitalRightsView<F>
 
 #[cfg(test)]
 mod tests {
+    use time::get_time;
+
     use exonum::crypto::{gen_keypair, hash};
     use super::{Owner, Distributor, Content, Contract, Ownership, Report};
     use super::super::txs::ContentShare;
@@ -260,7 +288,7 @@ mod tests {
     fn test_report() {
         let i = 0;
         let f = hash(&[]);
-        let d = 102452;
+        let d = get_time();
         let p = 1000;
         let a = 10000;
         let c = "Comment";
