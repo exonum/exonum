@@ -222,6 +222,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
         });
 
         let ch = channel.clone();
+        let b = blockchain.clone();
         api.put("contracts/:fingerprint", move |endpoint| {
             endpoint.params(|params| {
                 params.req_typed("fingerprint", json_dsl::string());
@@ -232,7 +233,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     let r = Hash::from_hex(params.find("fingerprint").unwrap().as_str().unwrap());
                     match r {
                         Ok(f) => f,
-                        Err(e) => return client.error(e)
+                        Err(e) => return client.error(e),
                     }
                 };
                 let (role, pub_key, sec_key) = {
@@ -247,9 +248,15 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                 };
                 match role.as_ref() {
                     "distributor" => {
-                        let id = 0; //TODO add table
-                        let tx = TxAddContract::new(&pub_key, id, &fingerprint, &sec_key);
-                        send_tx(DigitalRightsTx::AddContract(tx), client, ch.clone())
+                        let drm = DigitalRightsApi::new(b.clone());
+                        match drm.participant_id(&pub_key) {
+                            Ok(Some(id)) => {
+                                let tx = TxAddContract::new(&pub_key, id, &fingerprint, &sec_key);
+                                send_tx(DigitalRightsTx::AddContract(tx), client, ch.clone())
+                            }
+                            _ => client.error(StorageError::new("Unknown pub_key")),
+                        }
+
                     }
                     _ => client.error(StorageError::new("Unknown role")),
                 }

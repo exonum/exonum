@@ -4,7 +4,8 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::Field;
 use exonum::crypto::{PublicKey, Hash, hash};
-use exonum::storage::{Fork, MerklePatriciaTable, MapTable, MerkleTable};
+use exonum::storage::{Map, Fork, MerklePatriciaTable, MapTable, MerkleTable, ListTable,
+                      Result as StorageResult};
 use exonum::blockchain::View;
 
 use super::DigitalRightsTx;
@@ -61,6 +62,19 @@ storage_value! {
         plays:                  u64             [32 => 40]
         amount:                 u64             [40 => 48]
         reports_hash:           &Hash           [48 => 80]
+    }
+}
+
+storage_value! {
+    Report {
+        const SIZE = 66;
+
+        distributor_id:         u16             [00 => 02]
+        fingerprint:            &Hash           [02 => 34]
+        date:                   u64             [34 => 42]
+        plays:                  u64             [42 => 50]
+        amount:                 u64             [50 => 58]
+        comment:                &str            [58 => 66]
     }
 }
 
@@ -132,13 +146,30 @@ impl<F> DigitalRightsView<F>
         LittleEndian::write_u16(&mut prefix[1..], distributor_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
+
+    pub fn participants(&self) -> MapTable<F, PublicKey, u16> {
+        MapTable::new(vec![40], &self)
+    }
+    pub fn fingerprints(&self) -> ListTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
+        ListTable::new(MapTable::new(vec![41], &self))
+    }
+
+    pub fn list_content(&self) -> StorageResult<Vec<(Hash, Content)>> {
+        let mut v = Vec::new();
+        for fingerprint in self.fingerprints().values()? {
+            if let Some(content) = self.contents().get(&fingerprint)? {
+                v.push((fingerprint, content));
+            }
+        }
+        Ok(v)
+    }
 }
 
 
 #[cfg(test)]
 mod tests {
     use exonum::crypto::{gen_keypair, hash};
-    use super::{Owner, Distributor, Content, Contract, Ownership};
+    use super::{Owner, Distributor, Content, Contract, Ownership, Report};
     use super::super::txs::ContentShare;
 
     #[test]
@@ -175,11 +206,11 @@ mod tests {
         let distributors = [0, 1, 2, 3, 4, 5];
 
         let mut content = Content::new(title,
-                                   price_per_listen,
-                                   min_plays,
-                                   additional_conditions,
-                                   owners.as_ref(),
-                                   distributors.as_ref());
+                                       price_per_listen,
+                                       min_plays,
+                                       additional_conditions,
+                                       owners.as_ref(),
+                                       distributors.as_ref());
 
         assert_eq!(content.title(), title);
         assert_eq!(content.price_per_listen(), price_per_listen);
@@ -223,5 +254,23 @@ mod tests {
         assert_eq!(contract.plays(), p);
         assert_eq!(contract.amount(), a);
         assert_eq!(contract.reports_hash(), &r);
+    }
+
+    #[test]
+    fn test_report() {
+        let i = 0;
+        let f = hash(&[]);
+        let d = 102452;
+        let p = 1000;
+        let a = 10000;
+        let c = "Comment";
+        let report = Report::new(i, &f, d, p, a, c);
+
+        assert_eq!(report.distributor_id(), i);
+        assert_eq!(report.fingerprint(), &f);
+        assert_eq!(report.date(), d);
+        assert_eq!(report.plays(), p);
+        assert_eq!(report.amount(), a);
+        assert_eq!(report.comment(), c);
     }
 }

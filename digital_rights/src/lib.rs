@@ -24,7 +24,7 @@ use exonum::blockchain::Blockchain;
 
 pub use txs::{DigitalRightsTx, TxCreateOwner, TxCreateDistributor, TxAddContent, ContentShare,
               TxAddContract};
-pub use view::{DigitalRightsView, Owner, Distributor, Content, Ownership, Contract};
+pub use view::{DigitalRightsView, Owner, Distributor, Content, Ownership, Contract, Report};
 
 const OWNERS_MAX_COUNT: u64 = 5000;
 
@@ -56,6 +56,14 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
         let mut b = Vec::new();
         b.extend_from_slice(view.distributors().root_hash()?.as_ref());
         b.extend_from_slice(view.owners().root_hash()?.as_ref());
+        b.extend_from_slice(view.contents().root_hash()?.as_ref());
+
+        for id in 0..view.distributors().len()? as u16 {
+            b.extend_from_slice(view.distributor_contracts(id).root_hash()?.as_ref())
+        }
+        for id in 0..view.owners().len()? as u16 {
+            b.extend_from_slice(view.owner_contents(id).root_hash()?.as_ref())
+        }
 
         Ok(hash(b.as_ref()))
     }
@@ -63,15 +71,29 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
     fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
         match *tx {
             DigitalRightsTx::CreateOwner(ref tx) => {
+                if view.participants().get(tx.pub_key())?.is_some() {
+                    return Ok(());
+                }
+
                 let owners = view.owners();
-                if owners.len()? < OWNERS_MAX_COUNT {
+                let onwer_id = owners.len()?;
+                if onwer_id < OWNERS_MAX_COUNT {
                     let owner = Owner::new(tx.pub_key(), tx.name(), &hash(&[]));
                     owners.append(owner)?;
+                    view.participants().put(tx.pub_key(), onwer_id as u16)?;
                 }
             }
             DigitalRightsTx::CreateDistributor(ref tx) => {
+                if view.participants().get(tx.pub_key())?.is_some() {
+                    return Ok(());
+                }
+
+                let distributors = view.distributors();
+                let distributor_id = distributors.len()?;
+
                 let distributor = Distributor::new(tx.pub_key(), tx.name(), &hash(&[]));
-                view.distributors().append(distributor)?;
+                distributors.append(distributor)?;
+                view.participants().put(tx.pub_key(), distributor_id as u16)?;
             }
             DigitalRightsTx::AddContent(ref tx) => {
                 // preconditions
@@ -106,6 +128,7 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                                            tx.owners(),
                                            &[]);
                 view.contents().put(tx.fingerprint(), content)?;
+                view.fingerprints().append(*tx.fingerprint())?;
 
                 for content_share in &shares {
                     let ownership = Ownership::new(tx.fingerprint(), 0, 0, &hash(&[]));
@@ -219,6 +242,7 @@ mod tests {
                        &v.owner_contents(0).root_hash().unwrap());
             assert_eq!(o2.ownership_hash(),
                        &v.owner_contents(1).root_hash().unwrap());
+            assert!(v.fingerprints().values().unwrap().contains(f1));
         }
 
         {
@@ -252,6 +276,8 @@ mod tests {
 
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
+        let (p3, s3) = gen_keypair();
+        let (p4, s4) = gen_keypair();
 
         let cd1 = TxCreateDistributor::new(&p1, "d1", &s1);
         let cd2 = TxCreateDistributor::new(&p2, "d2", &s2);
@@ -266,8 +292,8 @@ mod tests {
 
         let f1 = &hash(&[1, 2, 3, 4]);
         {
-            let co1 = TxCreateOwner::new(&p1, "o1", &s1);
-            let co2 = TxCreateOwner::new(&p2, "o2", &s2);
+            let co1 = TxCreateOwner::new(&p3, "o1", &s3);
+            let co2 = TxCreateOwner::new(&p4, "o2", &s4);
             execute_tx::<MemoryDB>(&v, DigitalRightsTx::CreateOwner(co1.clone())).unwrap();
             execute_tx::<MemoryDB>(&v, DigitalRightsTx::CreateOwner(co2.clone())).unwrap();
 

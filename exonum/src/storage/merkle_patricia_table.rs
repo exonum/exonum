@@ -622,8 +622,8 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
-        let key = BitSlice::from_bytes(key.as_ref()).to_db_key();
-        let v = self.map.get(key.as_ref())?;
+        let db_key = BitSlice::from_bytes(key.as_ref()).to_db_key();
+        let v = self.map.get(db_key.as_ref())?;
         Ok(v.map(StorageValue::deserialize))
     }
 
@@ -636,8 +636,16 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
         self.remove(BitSlice::from_bytes(key.as_ref()))
     }
 
-    fn find_key(&self, _: &K) -> Result<Option<Vec<u8>>, Error> {
-        unimplemented!();
+    fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>, Error> {
+        let key = key.as_ref();
+        debug_assert!(key.len() <= KEY_SIZE);
+
+        let mut db_key = vec![0; DB_KEY_SIZE];
+        db_key[0] = LEAF_KEY_PREFIX;
+        db_key[1..key.len() + 1].copy_from_slice(key);
+
+        let r = self.map.find_key(db_key.as_slice())?;
+        Ok(r.map(|v| v[1..v.len() - 1].to_vec()))
     }
 }
 
@@ -972,6 +980,10 @@ mod tests {
         assert_eq!(table1.get(&vec![254; 32]).unwrap(), Some(vec![2]));
         assert_eq!(table2.get(&vec![255; 32]).unwrap(), Some(vec![1]));
         assert_eq!(table2.get(&vec![254; 32]).unwrap(), Some(vec![2]));
+
+        //assert_eq!(table1.find_key(&vec![]).unwrap(), Some(vec![254; 32])); //FIXME
+        assert_eq!(table1.find_key(&vec![254; 32]).unwrap(), Some(vec![254; 32]));
+        assert_eq!(table1.find_key(&vec![255; 32]).unwrap(), Some(vec![255; 32]));
 
         assert!(table1.root_hash().unwrap() != hash(&[]));
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
