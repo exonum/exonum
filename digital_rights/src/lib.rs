@@ -103,7 +103,8 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                                            tx.price_per_listen(),
                                            tx.min_plays(),
                                            tx.additional_conditions(),
-                                           tx.owners());
+                                           tx.owners(),
+                                           &[]);
                 view.contents().put(tx.fingerprint(), content)?;
 
                 for content_share in &shares {
@@ -120,7 +121,10 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                 }
             }
             DigitalRightsTx::AddContract(ref tx) => {
-                let r = view.distributors().get(tx.distributor_id() as u64)?;
+                let id = tx.distributor_id();
+                let fingerprint = tx.fingerprint();
+
+                let r = view.distributors().get(id as u64)?;
                 let mut distrubutor = {
                     if let Some(d) = r {
                         if d.pub_key() != tx.pub_key() {
@@ -132,19 +136,32 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                     }
                 };
 
-                if view.contents().get(tx.fingerprint())?.is_none() {
+                let mut content = {
+                    if let Some(content) = view.contents().get(fingerprint)? {
+                        content
+                    } else {
+                        return Ok(());
+                    }
+                };
+
+                // Проверка, нет ли у нас контракта на этот контент
+                // TODO сделать, чтобы реализация работала не за O(n)
+                if content.distributors().contains(&id) {
                     return Ok(());
                 }
 
-                // TODO проверка, что мы не регистрировали такой же контракт
+                let mut distrubutors = content.distributors().to_vec();
+                distrubutors.push(id);
+                content.set_distributors(distrubutors.as_ref());
+                view.contents().put(fingerprint, content)?;
 
-                let contract = Contract::new(tx.fingerprint(), 0, 0, &hash(&[]));
-                let contracts = view.distributor_contracts(tx.distributor_id());
+                let contract = Contract::new(fingerprint, 0, 0, &hash(&[]));
+                let contracts = view.distributor_contracts(id);
                 contracts.append(contract)?;
 
                 let hash = &contracts.root_hash()?;
                 distrubutor.set_contracts_hash(hash);
-                view.distributors().set(tx.distributor_id() as u64, distrubutor)?;
+                view.distributors().set(id as u64, distrubutor)?;
             }
             _ => {
                 unimplemented!();
@@ -268,6 +285,9 @@ mod tests {
 
             let d1 = v.distributors().get(0).unwrap().unwrap();
             assert_eq!(d1.contracts_hash(), &contracts.root_hash().unwrap());
+
+            let content = v.contents().get(f1).unwrap().unwrap();
+            assert_eq!(content.distributors(), &[0]);
         }
 
         {
@@ -279,6 +299,9 @@ mod tests {
 
             let d1 = v.distributors().get(0).unwrap().unwrap();
             assert_eq!(d1.contracts_hash(), &contracts.root_hash().unwrap());
+
+            let content = v.contents().get(f1).unwrap().unwrap();
+            assert_eq!(content.distributors(), &[0, 1]);
         }
 
         {

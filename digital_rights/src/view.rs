@@ -31,13 +31,14 @@ storage_value! {
 
 storage_value! {
     Content {
-        const SIZE = 32;
+        const SIZE = 40;
 
         title:                  &str            [00 => 08]
         price_per_listen:       u32             [08 => 12]
         min_plays:              u32             [12 => 16]
         additional_conditions:  &str            [16 => 24]
         owners:                 &[u32]          [24 => 32]
+        distributors:           &[u16]          [32 => 40]
     }
 }
 
@@ -72,6 +73,12 @@ impl Owner {
 impl Distributor {
     pub fn set_contracts_hash(&mut self, hash: &Hash) {
         hash.write(&mut self.raw, 40, 72)
+    }
+}
+
+impl Content {
+    pub fn set_distributors(&mut self, distributors: &[u16]) {
+        Field::write(&distributors, &mut self.raw, 32, 40);
     }
 }
 
@@ -165,18 +172,29 @@ mod tests {
         let min_plays = 100;
         let additional_conditions = "";
         let owners = [ContentShare::new(0, 15).into(), ContentShare::new(1, 85).into()];
+        let distributors = [0, 1, 2, 3, 4, 5];
 
-        let content = Content::new(title,
+        let mut content = Content::new(title,
                                    price_per_listen,
                                    min_plays,
                                    additional_conditions,
-                                   owners.as_ref());
+                                   owners.as_ref(),
+                                   distributors.as_ref());
 
         assert_eq!(content.title(), title);
         assert_eq!(content.price_per_listen(), price_per_listen);
         assert_eq!(content.min_plays(), min_plays);
         assert_eq!(content.additional_conditions(), additional_conditions);
         assert_eq!(content.owners(), owners.as_ref());
+        assert_eq!(content.distributors(), distributors.as_ref());
+
+        let distributors = [4, 3, 2];
+        content.set_distributors(distributors.as_ref());
+        assert_eq!(content.distributors(), distributors.as_ref());
+
+        let distributors = [18, 19, 20, 1, 2, 4, 5, 6, 3, 4, 5, 6];
+        content.set_distributors(distributors.as_ref());
+        assert_eq!(content.distributors(), distributors.as_ref());
     }
 
     #[test]

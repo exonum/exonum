@@ -265,6 +265,52 @@ impl<'a> SegmentField<'a> for &'a [u8] {
     }
 }
 
+impl<'a> SegmentField<'a> for &'a [u16] {
+    fn item_size() -> usize {
+        mem::size_of::<u16>()
+    }
+
+    fn from_slice(slice: &'a [u8]) -> Self {
+        unsafe {
+            ::std::slice::from_raw_parts(slice.as_ptr() as *const u16,
+                                         slice.len() / Self::item_size())
+        }
+    }
+
+    fn as_slice(&self) -> &'a [u8] {
+        unsafe {
+            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size())
+        }
+    }
+
+    fn count(&self) -> u32 {
+        self.len() as u32
+    }
+}
+
+impl<'a> SegmentField<'a> for &'a [u32] {
+    fn item_size() -> usize {
+        mem::size_of::<u32>()
+    }
+
+    fn from_slice(slice: &'a [u8]) -> Self {
+        unsafe {
+            ::std::slice::from_raw_parts(slice.as_ptr() as *const u32,
+                                         slice.len() / Self::item_size())
+        }
+    }
+
+    fn as_slice(&self) -> &'a [u8] {
+        unsafe {
+            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size())
+        }
+    }
+
+    fn count(&self) -> u32 {
+        self.len() as u32
+    }
+}
+
 impl<'a> SegmentField<'a> for &'a [Hash] {
     fn item_size() -> usize {
         32
@@ -316,29 +362,6 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 }
 
-impl<'a> SegmentField<'a> for &'a [u32] {
-    fn item_size() -> usize {
-        32
-    }
-
-    fn from_slice(slice: &'a [u8]) -> Self {
-        unsafe {
-            ::std::slice::from_raw_parts(slice.as_ptr() as *const u32,
-                                         slice.len() / Self::item_size())
-        }
-    }
-
-    fn as_slice(&self) -> &'a [u8] {
-        unsafe {
-            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size())
-        }
-    }
-
-    fn count(&self) -> u32 {
-        self.len() as u32
-    }
-}
-
 // impl<'a, T> SegmentField<'a> for &'a [T] where T: Field<'a> {
 //     fn item_size() -> usize {
 //         T::field_size()
@@ -369,6 +392,20 @@ fn test_str_segment() {
     let s2: &str = Field::read(&buf2, 0, 8);
     assert_eq!(s2, s);
 }
+
+#[test]
+fn test_u16_segment() {
+    let mut buf = vec![0; 8];
+    let s = [1u16, 3, 10, 15, 23, 4, 45];
+    Field::write(&s.as_ref(), &mut buf, 0, 8);
+    <&[u16] as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <&[u16] as Field>::check(&buf2, 0, 8).unwrap();
+    let s2: &[u16] = Field::read(&buf2, 0, 8);
+    assert_eq!(s2, s.as_ref());
+}
+
 
 #[test]
 fn test_u32_segment() {
