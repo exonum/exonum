@@ -20,6 +20,7 @@ extern crate exonum;
 extern crate blockchain_explorer;
 extern crate digital_rights;
 
+use std::error::Error;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
@@ -30,6 +31,7 @@ use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning, Response, Client, ErrorResponse};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
 use rustless::batteries::swagger;
+use rustless::errors;
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use serde_json::value::from_value;
@@ -282,14 +284,20 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                 api.prefix("api");
 
                 api.error_formatter(|err, _media| {
+                    println!("{}", err.description());                    
+
                     let body;
                     let code;
+
                     if let Some(e) = err.downcast::<StorageError>() {
                         code = StatusCode::InternalServerError;
                         body = format!("An error in backend occured: {}", e);
+                    } else if let Some(e) = err.downcast::<errors::NotMatch>() {
+                        code = StatusCode::NotFound;
+                        body = e.description().to_string();
                     } else {
                         code = StatusCode::NotImplemented;
-                        body = format!("Unsecified error");
+                        body = format!("Unspecified error: {}", err);
                     }
 
                     let json = &jsonway::object(|json| json.set("message", body)).unwrap();
