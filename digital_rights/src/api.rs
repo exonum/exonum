@@ -5,7 +5,7 @@ use exonum::storage::{Map, List, Database, Result as StorageResult};
 use exonum::blockchain::Blockchain;
 use blockchain_explorer::{TransactionInfo, HexField};
 
-use super::{DigitalRightsTx, DigitalRightsBlockchain, ContentShare, Uuid, Fingerprint};
+use super::{DigitalRightsTx, DigitalRightsBlockchain, ContentShare, Uuid, Fingerprint, Content, Contract};
 
 impl Serialize for DigitalRightsTx {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
@@ -80,7 +80,9 @@ pub struct OwnerInfo {
 pub struct DistributorInfo {
     pub name: String,
     pub pub_key: HexField<PublicKey>,
-    pub contracts: HexField<Hash>,
+    pub available_content: Vec<ContentInfo>,
+    pub contracts: Vec<ContractInfo>,
+    pub contracts_hash: HexField<Hash>,
 }
 
 #[derive(Debug, Serialize)]
@@ -90,6 +92,7 @@ pub struct ContentInfo {
     pub additional_conditions: String,
     pub price_per_listen: u64,
     pub min_plays: u64,
+    pub distributors: Vec<u16>,
 }
 
 #[derive(Debug, Serialize)]
@@ -97,7 +100,7 @@ pub struct ContractInfo {
     pub fingerprint: HexField<Fingerprint>,
     pub plays: u64,
     pub amount: u64,
-    pub reports: HexField<Hash>,
+    pub reports_hash: HexField<Hash>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -117,6 +120,30 @@ pub struct NewReport {
     pub time: u64,
     pub plays: u64,
     pub comment: String,
+}
+
+impl ContractInfo {
+    pub fn new(contract: Contract) -> ContractInfo {
+        ContractInfo {
+            fingerprint: HexField(*contract.fingerprint()),
+            plays: contract.plays(),
+            amount: contract.amount(),
+            reports_hash: HexField(*contract.reports_hash())
+        }
+    }
+}
+
+impl ContentInfo {
+    pub fn new(fingerprint: Fingerprint, content: Content) -> ContentInfo {
+        ContentInfo {
+            title: content.title().to_string(),
+            fingerprint: HexField(fingerprint),
+            additional_conditions: content.additional_conditions().to_string(),
+            price_per_listen: content.price_per_listen(),
+            min_plays: content.min_plays(),
+            distributors: content.distributors().into()
+        }
+    }
 }
 
 pub struct DigitalRightsApi<D: Database> {
@@ -152,10 +179,18 @@ impl<D: Database> DigitalRightsApi<D> {
     pub fn distributor_info(&self, id: u16) -> StorageResult<Option<DistributorInfo>> {
         let view = self.blockchain.view();
         if let Some(distributor) = view.distributors().get(id as u64)? {
+            let available_content = self.available_contents(id)?;
+            let mut contracts = Vec::new();            
+            for contract in view.distributor_contracts(id).values()? {
+                contracts.push(ContractInfo::new(contract));
+            }
+
             let info = DistributorInfo {
                 name: distributor.name().to_string(),
                 pub_key: HexField(*distributor.pub_key()),
-                contracts: HexField(*distributor.contracts_hash()),
+                contracts_hash: HexField(*distributor.contracts_hash()),
+                available_content: available_content,
+                contracts: contracts,
             };
             Ok(Some(info))
         } else {
@@ -169,15 +204,7 @@ impl<D: Database> DigitalRightsApi<D> {
             .list_content()?
             .into_iter()
             .filter(|&(_, ref content)| !content.distributors().contains(&distributor_id))
-            .map(|(fingerprint, content)| {
-                ContentInfo {
-                    title: content.title().to_string(),
-                    fingerprint: HexField(fingerprint),
-                    additional_conditions: content.additional_conditions().to_string(),
-                    price_per_listen: content.price_per_listen(),
-                    min_plays: content.min_plays(),
-                }
-            })
+            .map(|(fingerprint, content)| ContentInfo::new(fingerprint, content))
             .collect();
         Ok(v)
     }
