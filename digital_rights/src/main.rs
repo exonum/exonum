@@ -46,8 +46,8 @@ use exonum::node::config::GenesisConfig;
 use blockchain_explorer::HexField;
 
 use digital_rights::{DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor,
-                     TxAddContent, TxAddContract};
-use digital_rights::api::{DigitalRightsApi, NewContent};
+                     TxAddContent, TxAddContract, TxReport};
+use digital_rights::api::{DigitalRightsApi, NewContent, NewReport};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
@@ -63,7 +63,6 @@ fn save_user(storage: &mut CookieJar, role: &str, public_key: &PublicKey, secret
 
 fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar, key: &str) -> StorageResult<Vec<u8>> {
     if let Some(cookie) = storage.find(key) {
-        println!("{}", cookie);
         if let Ok(value) = HexValue::from_hex(cookie.value) {
             return Ok(value);
         }
@@ -189,7 +188,8 @@ fn digital_rights_api<D: Database>(api: &mut Api,
             });
 
             endpoint.handle(move |client, params| {
-                let content_info = from_value::<NewContent>(params.clone()).unwrap();
+                // TODO remove unwrap
+                let new_content = from_value::<NewContent>(params.clone()).unwrap();
                 let (role, pub_key, sec_key) = {
                     let r = {
                         let cookies = client.request.cookies();
@@ -202,19 +202,19 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                 };
                 match role.as_ref() {
                     "owner" => {
-                        let owners = content_info.owners
+                        let owners = new_content.owners
                             .iter()
                             .cloned()
                             .map(|info| info.into())
                             .collect::<Vec<u32>>();
 
                         let tx = TxAddContent::new(&pub_key,
-                                                   &content_info.fingerprint.0,
-                                                   &content_info.title,
-                                                   content_info.price_per_listen,
-                                                   content_info.min_plays,
+                                                   &new_content.fingerprint.0,
+                                                   &new_content.title,
+                                                   new_content.price_per_listen,
+                                                   new_content.min_plays,
                                                    &owners,
-                                                   &content_info.additional_conditions,
+                                                   &new_content.additional_conditions,
                                                    &sec_key);
                         send_tx(DigitalRightsTx::AddContent(tx), client, ch.clone())
                     }
@@ -264,6 +264,61 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                 }
             })
         });
+
+        let ch = channel.clone();
+        let b = blockchain.clone();
+        api.put("report", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("uuid", json_dsl::string());
+                params.req_typed("fingerprint", json_dsl::string());
+                params.req_typed("time", json_dsl::u64());
+                params.req_typed("plays", json_dsl::string());
+                params.req_typed("comment", json_dsl::string());
+            });
+
+            endpoint.handle(move |client, params| {
+                let new_report = from_value::<NewReport>(params.clone()).unwrap();
+
+                let (role, pub_key, sec_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((r, p, s)) => (r, p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+                match role.as_ref() {
+                    "distributor" => {
+                        let drm = DigitalRightsApi::new(b.clone());
+                        match drm.participant_id(&pub_key) {
+                            Ok(Some(id)) => {
+                                let nsec = new_report.time;
+                                // TODO переделать нормально, например, взяв крейт chrono
+                                let ts = time::Timespec {
+                                    sec: (nsec / 1_000_000_000) as i64,
+                                    nsec: (nsec % 1_000_000_000) as i32,
+                                };
+
+                                let tx = TxReport::new(&pub_key,
+                                                       &new_report.uuid.0,
+                                                       id,
+                                                       &new_report.fingerprint.0,
+                                                       ts,
+                                                       new_report.plays,
+                                                       &new_report.comment,
+                                                       &sec_key);
+                                send_tx(DigitalRightsTx::Report(tx), client, ch.clone())
+                            }
+                            _ => client.error(StorageError::new("Unknown pub_key")),
+                        }
+
+                    }
+                    _ => client.error(StorageError::new("Unknown role")),
+                }
+            })
+        });
     });
 }
 
@@ -284,11 +339,8 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                 api.prefix("api");
 
                 api.error_formatter(|err, _media| {
-                    println!("{}", err.description());                    
-
                     let body;
                     let code;
-
                     if let Some(e) = err.downcast::<StorageError>() {
                         code = StatusCode::InternalServerError;
                         body = format!("An error in backend occured: {}", e);
@@ -297,7 +349,7 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                         body = e.description().to_string();
                     } else {
                         code = StatusCode::NotImplemented;
-                        body = format!("Unspecified error: {}", err);
+                        body = format!("Unspecified error: {:?}", err);
                     }
 
                     let json = &jsonway::object(|json| json.set("message", body)).unwrap();

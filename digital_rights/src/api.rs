@@ -110,6 +110,15 @@ pub struct NewContent {
     pub owners: Vec<ContentShare>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewReport {
+    pub uuid: HexField<Uuid>,
+    pub fingerprint: HexField<Fingerprint>,
+    pub time: u64,
+    pub plays: u64,
+    pub comment: String,
+}
+
 pub struct DigitalRightsApi<D: Database> {
     blockchain: DigitalRightsBlockchain<D>,
 }
