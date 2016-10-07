@@ -81,7 +81,7 @@ pub struct DistributorInfo {
     pub contracts_hash: HexField<Hash>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ContentInfo {
     pub title: String,
     pub fingerprint: HexField<Fingerprint>,
@@ -117,6 +117,18 @@ pub struct ReportInfo {
     pub plays: u64,
     pub amount: u64,
     pub comment: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DistributorContentInfo {
+    pub content: ContentInfo,
+    pub contract: Option<ContractInfo>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct OwnerContentInfo {
+    pub content: ContentInfo,
+    pub reports: Vec<ReportInfo>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -259,6 +271,35 @@ impl<D: Database> DigitalRightsApi<D> {
         } else {
             Ok(None)
         }
+    }
+    
+    pub fn distributor_content_info(&self, id: u16, fingerprint: &Fingerprint) -> StorageResult<Option<DistributorContentInfo>> {
+        let v = self.blockchain.view();
+        if let Some(content) = v.contents().get(fingerprint)? {
+            let content = ContentInfo::new(fingerprint.clone(), content);
+            let contract = v.find_contract(id, fingerprint)?;
+            let reports = self.find_reports(Role::Distributor(id), fingerprint)?;
+            let info = DistributorContentInfo {
+                contract: contract.map(|c| ContractInfo::new(c.1, content.clone(), reports)),
+                content: content
+            };
+            return Ok(Some(info));
+        }
+        Ok(None)
+    }
+
+    pub fn owner_content_info(&self, id: u16, fingerprint: &Fingerprint) -> StorageResult<Option<OwnerContentInfo>> {
+        let v = self.blockchain.view();
+        if let Some(content) = v.contents().get(fingerprint)? {
+            let content = ContentInfo::new(fingerprint.clone(), content);
+            let reports = self.find_reports(Role::Owner(id), fingerprint)?;
+            let info = OwnerContentInfo {
+                content: content,
+                reports: reports,
+            };
+            return Ok(Some(info));
+        }
+        Ok(None)
     }
 
     pub fn available_contents(&self, distributor_id: u16) -> StorageResult<Vec<ContentInfo>> {

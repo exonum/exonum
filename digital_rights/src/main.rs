@@ -45,7 +45,7 @@ use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 use blockchain_explorer::HexField;
 
-use digital_rights::{DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor,
+use digital_rights::{Fingerprint, DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor,
                      TxAddContent, TxAddContract, TxReport, Role};
 use digital_rights::api::{DigitalRightsApi, NewContent, NewReport};
 
@@ -350,6 +350,51 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                         }
                     }
                     _ => client.error(StorageError::new("Wrong pub_key"))
+                }
+            })
+        });
+
+        let b = blockchain.clone();
+        api.get("contents/:fingerprint", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("fingerprint", json_dsl::string());
+            });
+
+            endpoint.handle(move |client, params| {
+                let fingerprint = {
+                    let r = Fingerprint::from_hex(params.find("fingerprint").unwrap().as_str().unwrap());
+                    match r {
+                        Ok(f) => f,
+                        Err(e) => return client.error(e),
+                    }
+                };
+
+                let (_, pub_key, _) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((r, p, s)) => (r, p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+
+                let drm = DigitalRightsApi::new(b.clone());
+                match drm.participant_id(&pub_key) {
+                    Ok(Some(Role::Distributor(id))) => {
+                        match drm.distributor_content_info(id, &fingerprint) {
+                            Ok(Some(info)) => client.json(&info.to_json()),
+                            _ => client.error(StorageError::new("Unable to find content"))
+                        }
+                    }
+                    Ok(Some(Role::Owner(id))) => {
+                        match drm.owner_content_info(id, &fingerprint) {
+                            Ok(Some(info)) => client.json(&info.to_json()),
+                            _ => client.error(StorageError::new("Unable to find content"))     
+                        }
+                    }
+                    _ => client.error(StorageError::new("Unknown role"))
                 }
             })
         });

@@ -28,11 +28,11 @@ use exonum::blockchain::{Blockchain};
 
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
 
-#[derive(Debug)]
-pub struct HexField<T: AsRef<[u8]>>(pub T);
+#[derive(Clone, Debug)]
+pub struct HexField<T: AsRef<[u8]> + Clone>(pub T);
 
 impl<T> Deref for HexField<T> 
-    where T: AsRef<[u8]>
+    where T: AsRef<[u8]> + Clone
 {
     type Target = T;
 
@@ -42,7 +42,7 @@ impl<T> Deref for HexField<T>
 }
 
 impl<T> Serialize for HexField<T>
-    where T: AsRef<[u8]>
+    where T: AsRef<[u8]> + Clone
 {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
@@ -58,7 +58,7 @@ struct HexVisitor<T>
 }
 
 impl<T> Visitor for HexVisitor<T>
-    where T: AsRef<[u8]> + HexValue
+    where T: AsRef<[u8]> + HexValue + Clone
 {
     type Value = HexField<T>;
 
@@ -71,7 +71,7 @@ impl<T> Visitor for HexVisitor<T>
 }
 
 impl<T> Deserialize for HexField<T>
-    where T: AsRef<[u8]> + HexValue
+    where T: AsRef<[u8]> + HexValue + Clone
 {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
