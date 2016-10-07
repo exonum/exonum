@@ -93,23 +93,20 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     pub fn blocks_range<T>(&self, count: u64, from: Option<u64>) -> StorageResult<Vec<BlockInfo<T>>>
         where T: TransactionInfo + From<B::Transaction>
     {
-        println!("from: {:?} c: {}", from, count);
         let heights = self.view.heights();
 
         let max_len = heights.len()?;
-        let from = from.unwrap_or(max_len.checked_sub(count).unwrap_or(0));
-        let to = cmp::min(max_len, from + count);
+        let to = from.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
+        let from = to.checked_sub(count).unwrap_or(0);
 
-        println!("from: {}, to: {}", from, to);
         let mut v = Vec::new();
-        for height in from..to {
+        for height in (from..to).rev() {
             if let Some(ref h) = heights.get(height)? {
                 if let Some(block_info) = self.block_info(h, false)? {
                     v.push(block_info);
                 }
             }
         }
-        v.reverse(); // TODO rewrite in for
         Ok(v)
     }
 

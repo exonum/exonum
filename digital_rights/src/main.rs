@@ -282,12 +282,18 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                 api.prefix("api");
 
                 api.error_formatter(|err, _media| {
+                    let body;
+                    let code;
                     if let Some(e) = err.downcast::<StorageError>() {
-                        let body = format!("An internal error occured: {}", e);
-                        Some(Response::from(StatusCode::InternalServerError, Box::new(body)))
+                        code = StatusCode::InternalServerError;
+                        body = format!("An error in backend occured: {}", e);
                     } else {
-                        None
+                        code = StatusCode::NotImplemented;
+                        body = format!("Unsecified error");
                     }
+
+                    let json = &jsonway::object(|json| json.set("message", body)).unwrap();
+                    Some(Response::from_json(code, &json))
                 });
 
                 blockchain_explorer_api(api, blockchain.clone());

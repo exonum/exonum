@@ -119,7 +119,7 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
                 let explorer = BlockchainExplorer::new(b1.clone());
                 match explorer.block_info_with_height::<T>(height) {
                     Ok(Some(block)) => client.json(&block.to_json()),
-                    Ok(None) => Ok(client),
+                    Ok(None) => client.error(StorageError::new("Unable to find block with given height")),
                     Err(e) => client.error(e),
                 }
             })
