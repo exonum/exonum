@@ -46,7 +46,7 @@ use exonum::node::config::GenesisConfig;
 use blockchain_explorer::HexField;
 
 use digital_rights::{DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor,
-                     TxAddContent, TxAddContract, TxReport};
+                     TxAddContent, TxAddContract, TxReport, Role};
 use digital_rights::api::{DigitalRightsApi, NewContent, NewReport};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
@@ -139,40 +139,6 @@ fn digital_rights_api<D: Database>(api: &mut Api,
             })
         });
 
-        let b = blockchain.clone();
-        api.get("distributors/:id", move |endpoint| {
-            endpoint.params(|params| {
-                params.req_typed("id", json_dsl::u64());
-            });
-
-            endpoint.handle(move |client, params| {
-                let id = params.find("id").unwrap().as_u64().unwrap();
-
-                let drm = DigitalRightsApi::new(b.clone());
-                match drm.distributor_info(id as u16) {
-                    Ok(Some(info)) => client.json(&info.to_json()),
-                    _ => client.error(StorageError::new("Unable to get distributor")),
-                }
-            })
-        });
-
-        let b = blockchain.clone();
-        api.get("owners/:id", move |endpoint| {
-            endpoint.params(|params| {
-                params.req_typed("id", json_dsl::u64());
-            });
-
-            endpoint.handle(move |client, params| {
-                let id = params.find("id").unwrap().as_u64().unwrap() as u16;
-
-                let drm = DigitalRightsApi::new(b.clone());
-                match drm.owner_info(id) {
-                    Ok(Some(info)) => client.json(&info.to_json()),
-                    _ => client.error(StorageError::new("Unable to get owner")),
-                }
-            })
-        });
-
         let ch = channel.clone();
         api.put("contents", move |endpoint| {
             endpoint.params(|params| {
@@ -252,11 +218,11 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     "distributor" => {
                         let drm = DigitalRightsApi::new(b.clone());
                         match drm.participant_id(&pub_key) {
-                            Ok(Some(id)) => {
+                            Ok(Some(Role::Distributor(id))) => {
                                 let tx = TxAddContract::new(&pub_key, id, &fingerprint, &sec_key);
                                 send_tx(DigitalRightsTx::AddContract(tx), client, ch.clone())
                             }
-                            _ => client.error(StorageError::new("Unknown pub_key")),
+                            _ => client.error(StorageError::new("Unknown pub_key or wrong user role")),
                         }
 
                     }
@@ -293,7 +259,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     "distributor" => {
                         let drm = DigitalRightsApi::new(b.clone());
                         match drm.participant_id(&pub_key) {
-                            Ok(Some(id)) => {
+                            Ok(Some(Role::Distributor(id))) => {
                                 let nsec = new_report.time;
                                 // TODO переделать нормально, например, взяв крейт chrono
                                 let ts = time::Timespec {
@@ -316,6 +282,74 @@ fn digital_rights_api<D: Database>(api: &mut Api,
 
                     }
                     _ => client.error(StorageError::new("Unknown role")),
+                }
+            })
+        });
+
+        let b = blockchain.clone();
+        api.get("distributors/:id", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("id", json_dsl::u64());
+            });
+
+            endpoint.handle(move |client, params| {
+                let id = params.find("id").unwrap().as_u64().unwrap();
+
+                let drm = DigitalRightsApi::new(b.clone());
+                match drm.distributor_info(id as u16) {
+                    Ok(Some(info)) => client.json(&info.to_json()),
+                    _ => client.error(StorageError::new("Unable to get distributor")),
+                }
+            })
+        });
+
+        let b = blockchain.clone();
+        api.get("owners/:id", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("id", json_dsl::u64());
+            });
+
+            endpoint.handle(move |client, params| {
+                let id = params.find("id").unwrap().as_u64().unwrap() as u16;
+
+                let drm = DigitalRightsApi::new(b.clone());
+                match drm.owner_info(id) {
+                    Ok(Some(info)) => client.json(&info.to_json()),
+                    _ => client.error(StorageError::new("Unable to get owner")),
+                }
+            })
+        });
+
+        let b = blockchain.clone();
+        api.get("find_user/:pub_key", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("pub_key", json_dsl::string());
+            });
+
+            endpoint.handle(move |client, params| {
+                let pub_key = {
+                    let r = PublicKey::from_hex(params.find("pub_key").unwrap().as_str().unwrap());
+                    match r {
+                        Ok(f) => f,
+                        Err(e) => return client.error(e),
+                    }
+                };
+
+                let drm = DigitalRightsApi::new(b.clone());
+                match drm.participant_id(&pub_key) {
+                    Ok(Some(Role::Owner(id))) => {
+                        match drm.owner_info(id) {
+                            Ok(Some(info)) => client.json(&info.to_json()),
+                            _ => client.error(StorageError::new("Unable to get owner")),
+                        }
+                    }
+                    Ok(Some(Role::Distributor(id))) => {
+                        match drm.distributor_info(id) {
+                            Ok(Some(info)) => client.json(&info.to_json()),
+                            _ => client.error(StorageError::new("Unable to get owner")),
+                        }
+                    }
+                    _ => client.error(StorageError::new("Wrong pub_key"))
                 }
             })
         });

@@ -44,6 +44,20 @@ impl<D: Database> Deref for DigitalRightsBlockchain<D> {
     }
 }
 
+pub enum Role {
+    Distributor(u16),
+    Owner(u16)
+}
+
+impl Role {
+    pub fn id(&self) -> u16 {
+        match *self {
+            Role::Distributor(id) => id,
+            Role::Owner(id) => id
+        }
+    }
+}
+
 impl<D> Blockchain for DigitalRightsBlockchain<D>
     where D: Database
 {
@@ -74,20 +88,20 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
     fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
         match *tx {
             DigitalRightsTx::CreateOwner(ref tx) => {
-                if view.participants().get(tx.pub_key())?.is_some() {
+                if view.find_participant(tx.pub_key())?.is_some() {
                     return Ok(());
                 }
 
                 let owners = view.owners();
-                let onwer_id = owners.len()? as u16;
-                if onwer_id < OWNERS_MAX_COUNT {
+                let owner_id = owners.len()? as u16;
+                if owner_id < OWNERS_MAX_COUNT {
                     let owner = Owner::new(tx.pub_key(), tx.name(), &hash(&[]));
                     owners.append(owner)?;
-                    view.participants().put(tx.pub_key(), onwer_id)?;
+                    view.add_participant(tx.pub_key(), Role::Owner(owner_id))?;
                 }
             }
             DigitalRightsTx::CreateDistributor(ref tx) => {
-                if view.participants().get(tx.pub_key())?.is_some() {
+                if view.find_participant(tx.pub_key())?.is_some() {
                     return Ok(());
                 }
 
@@ -96,7 +110,7 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
 
                 let distributor = Distributor::new(tx.pub_key(), tx.name(), &hash(&[]));
                 distributors.append(distributor)?;
-                view.participants().put(tx.pub_key(), distributor_id as u16)?;
+                view.add_participant(tx.pub_key(), Role::Distributor(distributor_id as u16))?
             }
             DigitalRightsTx::AddContent(ref tx) => {
                 // preconditions

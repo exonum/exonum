@@ -5,7 +5,7 @@ use exonum::storage::{Map, List, Database, Result as StorageResult};
 use exonum::blockchain::Blockchain;
 use blockchain_explorer::{TransactionInfo, HexField};
 
-use super::{DigitalRightsTx, DigitalRightsBlockchain, ContentShare, Uuid, Fingerprint, Content, Contract};
+use super::{Role,DigitalRightsTx, DigitalRightsBlockchain, ContentShare, Uuid, Fingerprint, Content, Contract};
 
 impl Serialize for DigitalRightsTx {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
@@ -60,17 +60,10 @@ impl Serialize for DigitalRightsTx {
 
 impl TransactionInfo for DigitalRightsTx {}
 
-#[derive(Serialize)]
-pub enum UserRole<O, D>
-    where D: Serialize,
-          O: Serialize
-{
-    Distributor(D),
-    Owner(O),
-}
-
 #[derive(Debug, Serialize)]
 pub struct OwnerInfo {
+    pub id: u16,
+    pub role: &'static str,
     pub name: String,
     pub pub_key: HexField<PublicKey>,
     pub ownership: HexField<Hash>,
@@ -78,6 +71,8 @@ pub struct OwnerInfo {
 
 #[derive(Debug, Serialize)]
 pub struct DistributorInfo {
+    pub id: u16,
+    pub role: &'static str,
     pub name: String,
     pub pub_key: HexField<PublicKey>,
     pub available_content: Vec<ContentInfo>,
@@ -155,17 +150,17 @@ impl<D: Database> DigitalRightsApi<D> {
         DigitalRightsApi { blockchain: b }
     }
 
-    pub fn participant_id(&self, pub_key: &PublicKey) -> StorageResult<Option<u16>> {
+    pub fn participant_id(&self, pub_key: &PublicKey) -> StorageResult<Option<Role>> {
         let view = self.blockchain.view();
-        let r = view.participants().get(pub_key)?;
-        r.map(|i| i as u16);
-        Ok(r)
+        view.find_participant(pub_key)
     }
 
     pub fn owner_info(&self, id: u16) -> StorageResult<Option<OwnerInfo>> {
         let view = self.blockchain.view();
         if let Some(owner) = view.owners().get(id as u64)? {
             let info = OwnerInfo {
+                id: id,
+                role: "owner",
                 name: owner.name().to_string(),
                 pub_key: HexField(*owner.pub_key()),
                 ownership: HexField(*owner.ownership_hash()),
@@ -186,6 +181,8 @@ impl<D: Database> DigitalRightsApi<D> {
             }
 
             let info = DistributorInfo {
+                id: id,
+                role: "distributor",
                 name: distributor.name().to_string(),
                 pub_key: HexField(*distributor.pub_key()),
                 contracts_hash: HexField(*distributor.contracts_hash()),
