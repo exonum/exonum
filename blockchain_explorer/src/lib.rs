@@ -85,7 +85,7 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
           T: TransactionInfo + From<B::Transaction>
 {
     api.namespace("blockchain", move |api| {
-        api.get("block", |endpoint| {
+        api.get("blocks", |endpoint| {
             let b1 = b1.clone();
 
             endpoint.summary("Returns blockchain info array");
@@ -105,7 +105,7 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
                 }
             })
         });
-        api.get("block/:height", |endpoint| {
+        api.get("blocks/:height", |endpoint| {
             let b1 = b1.clone();
 
             endpoint.summary("Returns block with given height");
@@ -124,7 +124,7 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
                 }
             })
         });
-        api.get("transaction/:hash", |endpoint| {
+        api.get("transactions/:hash", |endpoint| {
             let b1 = b1.clone();
 
             endpoint.summary("Returns transaction info with given hash");

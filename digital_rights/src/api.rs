@@ -89,6 +89,7 @@ pub struct ContentInfo {
     pub price_per_listen: u64,
     pub min_plays: u64,
     pub distributors: Vec<u16>,
+    pub owners: Vec<ContentShare>,
 }
 
 #[derive(Debug, Serialize)]
@@ -120,14 +121,24 @@ pub struct ReportInfo {
 }
 
 #[derive(Debug, Serialize)]
+pub struct DistributorContractInfo {
+    pub plays: u64,
+    pub amount: u64,
+    pub reports_hash: HexField<Hash>,
+    pub reports: Vec<ReportInfo>
+}
+
+#[derive(Debug, Serialize)]
 pub struct DistributorContentInfo {
     pub content: ContentInfo,
-    pub contract: Option<ContractInfo>,
+    pub contract: Option<DistributorContractInfo>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct OwnerContentInfo {
     pub content: ContentInfo,
+    pub plays: u64,
+    pub amount: u64,
     pub reports: Vec<ReportInfo>
 }
 
@@ -157,7 +168,7 @@ impl ContractInfo {
             plays: contract.plays(),
             amount: contract.amount(),
             reports_hash: HexField(*contract.reports_hash()),
-            reports: reports
+            reports: reports,
         }
     }
 }
@@ -183,7 +194,8 @@ impl ContentInfo {
             additional_conditions: content.additional_conditions().to_string(),
             price_per_listen: content.price_per_listen(),
             min_plays: content.min_plays(),
-            distributors: content.distributors().into()
+            distributors: content.distributors().into(),
+            owners: content.shares(),
         }
     }
 }
@@ -202,6 +214,18 @@ impl ReportInfo {
         }
     }
 }
+
+impl DistributorContractInfo {
+    pub fn new(contract: Contract, reports: Vec<ReportInfo>) -> DistributorContractInfo {
+        DistributorContractInfo {
+            plays: contract.plays(),
+            amount: contract.amount(),
+            reports_hash: HexField(*contract.reports_hash()),
+            reports: reports
+        }
+    }
+}
+
 
 pub struct DigitalRightsApi<D: Database> {
     blockchain: DigitalRightsBlockchain<D>,
@@ -280,7 +304,7 @@ impl<D: Database> DigitalRightsApi<D> {
             let contract = v.find_contract(id, fingerprint)?;
             let reports = self.find_reports(Role::Distributor(id), fingerprint)?;
             let info = DistributorContentInfo {
-                contract: contract.map(|c| ContractInfo::new(c.1, content.clone(), reports)),
+                contract: contract.map(|contract| DistributorContractInfo::new(contract.1, reports)),
                 content: content
             };
             return Ok(Some(info));
@@ -292,10 +316,13 @@ impl<D: Database> DigitalRightsApi<D> {
         let v = self.blockchain.view();
         if let Some(content) = v.contents().get(fingerprint)? {
             let content = ContentInfo::new(fingerprint.clone(), content);
+            let ownership = v.find_ownership(id, fingerprint)?.unwrap().1;
             let reports = self.find_reports(Role::Owner(id), fingerprint)?;
             let info = OwnerContentInfo {
                 content: content,
                 reports: reports,
+                plays: ownership.plays(),
+                amount: ownership.amount()
             };
             return Ok(Some(info));
         }

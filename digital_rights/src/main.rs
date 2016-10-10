@@ -233,7 +233,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
 
         let ch = channel.clone();
         let b = blockchain.clone();
-        api.put("report", move |endpoint| {
+        api.put("reports", move |endpoint| {
             endpoint.params(|params| {
                 params.req_typed("uuid", json_dsl::string());
                 params.req_typed("fingerprint", json_dsl::string());
@@ -425,7 +425,10 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                         body = format!("An error in backend occured: {}", e);
                     } else if let Some(e) = err.downcast::<errors::NotMatch>() {
                         code = StatusCode::NotFound;
-                        body = e.description().to_string();
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<errors::Validation>() {
+                        code = StatusCode::BadRequest;
+                        body = e.to_string();
                     } else {
                         code = StatusCode::NotImplemented;
                         body = format!("Unspecified error: {:?}", err);
