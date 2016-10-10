@@ -95,7 +95,7 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
             });
 
             endpoint.handle(move |client, params| {
-                let from = params.find("from").map(|x| x.as_u64().unwrap());
+                let from = params.find("from").map(|x| x.as_u64().unwrap()).map(|x| x + 1);
                 let count = params.find("count").map(|x| x.as_u64().unwrap()).unwrap_or(100);
 
                 let explorer = BlockchainExplorer::new(b1.clone());

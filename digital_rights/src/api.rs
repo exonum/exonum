@@ -1,3 +1,4 @@
+use std::marker::PhantomData;
 use serde::{Serialize, Serializer};
 
 use exonum::crypto::{PublicKey, Hash, HexValue};
@@ -303,16 +304,17 @@ impl OwnerContentInfo {
 }
 
 pub struct DigitalRightsApi<D: Database> {
-    blockchain: DigitalRightsBlockchain<D>,
+    view: DigitalRightsView<D::Fork>,
+    _b: PhantomData<DigitalRightsBlockchain<D>>,
 }
 
 impl<D: Database> DigitalRightsApi<D> {
     pub fn new(b: DigitalRightsBlockchain<D>) -> DigitalRightsApi<D> {
-        DigitalRightsApi { blockchain: b }
+        DigitalRightsApi { view: b.view(), _b: PhantomData }
     }
 
-    pub fn view(&self) -> DigitalRightsView<D::Fork> {
-        self.blockchain.view()
+    pub fn view(&self) -> &DigitalRightsView<D::Fork> {
+        &self.view
     }
 
     pub fn participant_id(&self, pub_key: &PublicKey) -> StorageResult<Option<Role>> {
@@ -349,7 +351,7 @@ impl<D: Database> DigitalRightsApi<D> {
     }
 
     pub fn distributor_info(&self, id: u16) -> StorageResult<Option<DistributorInfo>> {
-        let view = self.blockchain.view();
+        let view = self.view();
         if let Some(distributor) = view.distributors().get(id as u64)? {
             let available_content = self.available_contents(id)?;
             let mut contracts = Vec::new();
@@ -382,7 +384,7 @@ impl<D: Database> DigitalRightsApi<D> {
                                     id: u16,
                                     fingerprint: &Fingerprint)
                                     -> StorageResult<Option<DistributorContentInfo>> {
-        let v = self.blockchain.view();
+        let v = self.view();
         if let Some(content) = v.contents().get(fingerprint)? {
             let owners = self.shares_info(&content.shares())?;
             let content = ContentInfo::new(fingerprint.clone(), content, owners);
@@ -401,7 +403,7 @@ impl<D: Database> DigitalRightsApi<D> {
                               id: u16,
                               fingerprint: &Fingerprint)
                               -> StorageResult<Option<OwnerContentInfo>> {
-        let v = self.blockchain.view();
+        let v = self.view();
         if let Some(content) = v.contents().get(fingerprint)? {
             let owners = self.shares_info(&content.shares())?;
             let content = ContentInfo::new(fingerprint.clone(), content, owners);

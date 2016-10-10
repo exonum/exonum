@@ -35,9 +35,8 @@ macro_rules! storage_value {
             }
 
             pub fn from_raw(raw: Vec<u8>) -> $name {
-                // TODO: error instead of panic?
-                assert_eq!(raw.len(), $body);
-                Block { raw: raw }
+                debug_assert_eq!(raw.len(), $body);
+                $ name { raw: raw }
             }
 
             $(pub fn $field_name(&self) -> $field_type {
