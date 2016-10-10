@@ -8,6 +8,8 @@ use blockchain_explorer::{TransactionInfo, HexField};
 use super::{Role, DigitalRightsTx, DigitalRightsBlockchain, DigitalRightsView, ContentShare, Uuid,
             Fingerprint, Content, Contract, Report, Ownership};
 
+//TODO придумать удобные макросы, чтобы не создавать по 100500 структур с похожими полями
+
 impl Serialize for DigitalRightsTx {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
@@ -68,6 +70,12 @@ pub struct ContentShareInfo {
     pub name: String,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct DistributorShortInfo {
+    pub id: u16,
+    pub name: String
+}
+
 #[derive(Debug, Serialize)]
 pub struct OwnerInfo {
     pub id: u16,
@@ -120,7 +128,7 @@ pub struct OwnershipInfo {
 
 #[derive(Debug, Serialize)]
 pub struct ReportInfo {
-    pub distributor_id: u16,
+    pub distributor: DistributorShortInfo,
     pub fingerprint: HexField<Fingerprint>,
     pub time: u64,
     pub plays: u64,
@@ -143,7 +151,7 @@ pub struct DistributorContentInfo {
     pub additional_conditions: String,
     pub price_per_listen: u64,
     pub min_plays: u64,
-    pub distributors: Vec<u16>,
+    pub distributors: Vec<DistributorShortInfo>,
     pub owners: Vec<ContentShareInfo>,
 
     pub contract: Option<DistributorContractInfo>,
@@ -156,7 +164,7 @@ pub struct OwnerContentInfo {
     pub additional_conditions: String,
     pub price_per_listen: u64,
     pub min_plays: u64,
-    pub distributors: Vec<u16>,
+    pub distributors: Vec<DistributorShortInfo>,
     pub owners: Vec<ContentShareInfo>,
 
     pub plays: u64,
@@ -228,11 +236,11 @@ impl ContentInfo {
 }
 
 impl ReportInfo {
-    pub fn new(report: Report) -> ReportInfo {
+    pub fn new(report: Report, distributor: DistributorShortInfo) -> ReportInfo {
         let time = report.time();
         let nsec = (time.sec as u64) * 1_000_000_000 + time.nsec as u64;
         ReportInfo {
-            distributor_id: report.distributor_id(),
+            distributor: distributor,
             fingerprint: HexField(*report.fingerprint()),
             time: nsec,
             plays: report.plays(),
@@ -255,7 +263,8 @@ impl DistributorContractInfo {
 
 impl DistributorContentInfo {
     pub fn new(content: ContentInfo,
-               contract: Option<DistributorContractInfo>)
+               contract: Option<DistributorContractInfo>,
+               distributors: Vec<DistributorShortInfo>)
                -> DistributorContentInfo {
         DistributorContentInfo {
             title: content.title,
@@ -263,7 +272,7 @@ impl DistributorContentInfo {
             additional_conditions: content.additional_conditions,
             price_per_listen: content.price_per_listen,
             min_plays: content.min_plays,
-            distributors: content.distributors,
+            distributors: distributors,
             owners: content.owners,
 
             contract: contract,
@@ -274,7 +283,8 @@ impl DistributorContentInfo {
 impl OwnerContentInfo {
     pub fn new(content: ContentInfo,
                ownership: Ownership,
-               reports: Vec<ReportInfo>)
+               reports: Vec<ReportInfo>,
+               distributors: Vec<DistributorShortInfo>)
                -> OwnerContentInfo {
         OwnerContentInfo {
             title: content.title,
@@ -282,7 +292,7 @@ impl OwnerContentInfo {
             additional_conditions: content.additional_conditions,
             price_per_listen: content.price_per_listen,
             min_plays: content.min_plays,
-            distributors: content.distributors,
+            distributors: distributors,
             owners: content.owners,
 
             reports: reports,
@@ -379,8 +389,9 @@ impl<D: Database> DigitalRightsApi<D> {
             let reports = self.find_reports(Role::Distributor(id), fingerprint)?;
             let contract = v.find_contract(id, fingerprint)?
                 .map(|contract| DistributorContractInfo::new(contract.1, reports));
+            let distributors = self.distributor_names(&content.distributors)?;
 
-            let info = DistributorContentInfo::new(content, contract);
+            let info = DistributorContentInfo::new(content, contract, distributors);
             return Ok(Some(info));
         }
         Ok(None)
@@ -396,8 +407,9 @@ impl<D: Database> DigitalRightsApi<D> {
             let content = ContentInfo::new(fingerprint.clone(), content, owners);
             let reports = self.find_reports(Role::Owner(id), fingerprint)?;
             let ownership = v.find_ownership(id, fingerprint)?.unwrap().1;
+            let distributors = self.distributor_names(&content.distributors)?;
 
-            let info = OwnerContentInfo::new(content, ownership, reports);
+            let info = OwnerContentInfo::new(content, ownership, reports, distributors);
             return Ok(Some(info));
         }
         Ok(None)
@@ -418,7 +430,7 @@ impl<D: Database> DigitalRightsApi<D> {
                         id: Role,
                         fingerprint: &Fingerprint)
                         -> StorageResult<Vec<ReportInfo>> {
-        let view = self.blockchain.view();
+        let view = self.view();
         let uuids = match id {
             Role::Owner(id) => {
                 view.owner_reports(id, fingerprint)
@@ -433,7 +445,13 @@ impl<D: Database> DigitalRightsApi<D> {
         let mut v = Vec::new();
         for uuid in uuids {
             let report = view.reports().get(&uuid)?.unwrap();
-            v.push(ReportInfo::new(report));
+            let id = report.distributor_id();
+            let distributor = view.distributors().get(id as u64)?.unwrap();
+            let info = DistributorShortInfo {
+                id: id,
+                name: distributor.name().into()
+            };
+            v.push(ReportInfo::new(report, info));
         }
         Ok(v)
     }
@@ -441,7 +459,7 @@ impl<D: Database> DigitalRightsApi<D> {
     pub fn shares_info(&self,
                        content_shares: &Vec<ContentShare>)
                        -> StorageResult<Vec<ContentShareInfo>> {
-        let view = self.blockchain.view();
+        let view = self.view();
 
         let mut r = Vec::new();
         for share in content_shares {
@@ -453,5 +471,19 @@ impl<D: Database> DigitalRightsApi<D> {
             })
         }
         Ok(r)
+    }
+
+    pub fn distributor_names(&self, ids: &Vec<u16>) -> StorageResult<Vec<DistributorShortInfo>> {
+        let view = self.view();
+
+        let mut out = Vec::new();
+        for id in ids {
+            let distributor = view.distributors().get(*id as u64)?.unwrap();
+            out.push(DistributorShortInfo {
+                id: *id,
+                name: distributor.name().into()
+            });
+        }
+        Ok(out)
     }
 }
