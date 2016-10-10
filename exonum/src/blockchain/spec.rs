@@ -34,6 +34,12 @@ macro_rules! storage_value {
                 $name { raw: buf }
             }
 
+            pub fn from_raw(raw: Vec<u8>) -> $name {
+                // TODO: error instead of panic?
+                assert_eq!(raw.len(), $body);
+                Block { raw: raw }
+            }
+
             $(pub fn $field_name(&self) -> $field_type {
                 use $crate::messages::Field;
                 Field::read(&self.raw, $from, $to)
