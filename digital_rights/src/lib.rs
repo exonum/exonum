@@ -46,14 +46,14 @@ impl<D: Database> Deref for DigitalRightsBlockchain<D> {
 
 pub enum Role {
     Distributor(u16),
-    Owner(u16)
+    Owner(u16),
 }
 
 impl Role {
     pub fn id(&self) -> u16 {
         match *self {
             Role::Distributor(id) => id,
-            Role::Owner(id) => id
+            Role::Owner(id) => id,
         }
     }
 }

@@ -230,7 +230,7 @@ impl<F> DigitalRightsView<F>
     pub fn add_participant(&self, pub_key: &PublicKey, role: Role) -> StorageResult<()> {
         let db_id = match role {
             Role::Distributor(id) => id + OWNERS_MAX_COUNT,
-            Role::Owner(id) => id
+            Role::Owner(id) => id,
         };
         self.participants().put(pub_key, db_id)
     }

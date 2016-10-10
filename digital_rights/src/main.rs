@@ -45,8 +45,8 @@ use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 use blockchain_explorer::HexField;
 
-use digital_rights::{Fingerprint, DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner, TxCreateDistributor,
-                     TxAddContent, TxAddContract, TxReport, Role};
+use digital_rights::{Fingerprint, DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner,
+                     TxCreateDistributor, TxAddContent, TxAddContract, TxReport, Role};
 use digital_rights::api::{DigitalRightsApi, NewContent, NewReport};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;

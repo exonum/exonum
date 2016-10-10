@@ -5,7 +5,8 @@ use exonum::storage::{Map, List, Database, Result as StorageResult};
 use exonum::blockchain::Blockchain;
 use blockchain_explorer::{TransactionInfo, HexField};
 
-use super::{Role,DigitalRightsTx, DigitalRightsBlockchain, ContentShare, Uuid, Fingerprint, Content, Contract, Report, Ownership};
+use super::{Role, DigitalRightsTx, DigitalRightsBlockchain, DigitalRightsView, ContentShare, Uuid,
+            Fingerprint, Content, Contract, Report, Ownership};
 
 impl Serialize for DigitalRightsTx {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
@@ -60,6 +61,13 @@ impl Serialize for DigitalRightsTx {
 
 impl TransactionInfo for DigitalRightsTx {}
 
+#[derive(Debug, Serialize, Clone)]
+pub struct ContentShareInfo {
+    pub id: u16,
+    pub share: u16,
+    pub name: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct OwnerInfo {
     pub id: u16,
@@ -89,7 +97,7 @@ pub struct ContentInfo {
     pub price_per_listen: u64,
     pub min_plays: u64,
     pub distributors: Vec<u16>,
-    pub owners: Vec<ContentShare>,
+    pub owners: Vec<ContentShareInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -98,7 +106,7 @@ pub struct ContractInfo {
     pub plays: u64,
     pub amount: u64,
     pub reports_hash: HexField<Hash>,
-    pub reports: Vec<ReportInfo>
+    pub reports: Vec<ReportInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -107,7 +115,7 @@ pub struct OwnershipInfo {
     pub plays: u64,
     pub amount: u64,
     pub reports_hash: HexField<Hash>,
-    pub reports: Vec<ReportInfo>
+    pub reports: Vec<ReportInfo>,
 }
 
 #[derive(Debug, Serialize)]
@@ -125,21 +133,35 @@ pub struct DistributorContractInfo {
     pub plays: u64,
     pub amount: u64,
     pub reports_hash: HexField<Hash>,
-    pub reports: Vec<ReportInfo>
+    pub reports: Vec<ReportInfo>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct DistributorContentInfo {
-    pub content: ContentInfo,
+    pub title: String,
+    pub fingerprint: HexField<Fingerprint>,
+    pub additional_conditions: String,
+    pub price_per_listen: u64,
+    pub min_plays: u64,
+    pub distributors: Vec<u16>,
+    pub owners: Vec<ContentShareInfo>,
+
     pub contract: Option<DistributorContractInfo>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct OwnerContentInfo {
-    pub content: ContentInfo,
+    pub title: String,
+    pub fingerprint: HexField<Fingerprint>,
+    pub additional_conditions: String,
+    pub price_per_listen: u64,
+    pub min_plays: u64,
+    pub distributors: Vec<u16>,
+    pub owners: Vec<ContentShareInfo>,
+
     pub plays: u64,
     pub amount: u64,
-    pub reports: Vec<ReportInfo>
+    pub reports: Vec<ReportInfo>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -174,20 +196,25 @@ impl ContractInfo {
 }
 
 impl OwnershipInfo {
-    pub fn new(ownership: Ownership, content: ContentInfo, reports: Vec<ReportInfo>) -> OwnershipInfo {
+    pub fn new(ownership: Ownership,
+               content: ContentInfo,
+               reports: Vec<ReportInfo>)
+               -> OwnershipInfo {
         OwnershipInfo {
             content: content,
             plays: ownership.plays(),
             amount: ownership.amount(),
             reports_hash: HexField(*ownership.reports_hash()),
-            reports: reports
+            reports: reports,
         }
     }
 }
 
-
 impl ContentInfo {
-    pub fn new(fingerprint: Fingerprint, content: Content) -> ContentInfo {
+    pub fn new(fingerprint: Fingerprint,
+               content: Content,
+               owners: Vec<ContentShareInfo>)
+               -> ContentInfo {
         ContentInfo {
             title: content.title().to_string(),
             fingerprint: HexField(fingerprint),
@@ -195,7 +222,7 @@ impl ContentInfo {
             price_per_listen: content.price_per_listen(),
             min_plays: content.min_plays(),
             distributors: content.distributors().into(),
-            owners: content.shares(),
+            owners: owners,
         }
     }
 }
@@ -221,11 +248,49 @@ impl DistributorContractInfo {
             plays: contract.plays(),
             amount: contract.amount(),
             reports_hash: HexField(*contract.reports_hash()),
-            reports: reports
+            reports: reports,
         }
     }
 }
 
+impl DistributorContentInfo {
+    pub fn new(content: ContentInfo,
+               contract: Option<DistributorContractInfo>)
+               -> DistributorContentInfo {
+        DistributorContentInfo {
+            title: content.title,
+            fingerprint: content.fingerprint,
+            additional_conditions: content.additional_conditions,
+            price_per_listen: content.price_per_listen,
+            min_plays: content.min_plays,
+            distributors: content.distributors,
+            owners: content.owners,
+
+            contract: contract,
+        }
+    }
+}
+
+impl OwnerContentInfo {
+    pub fn new(content: ContentInfo,
+               ownership: Ownership,
+               reports: Vec<ReportInfo>)
+               -> OwnerContentInfo {
+        OwnerContentInfo {
+            title: content.title,
+            fingerprint: content.fingerprint,
+            additional_conditions: content.additional_conditions,
+            price_per_listen: content.price_per_listen,
+            min_plays: content.min_plays,
+            distributors: content.distributors,
+            owners: content.owners,
+
+            reports: reports,
+            plays: ownership.plays(),
+            amount: ownership.amount(),
+        }
+    }
+}
 
 pub struct DigitalRightsApi<D: Database> {
     blockchain: DigitalRightsBlockchain<D>,
@@ -236,19 +301,24 @@ impl<D: Database> DigitalRightsApi<D> {
         DigitalRightsApi { blockchain: b }
     }
 
+    pub fn view(&self) -> DigitalRightsView<D::Fork> {
+        self.blockchain.view()
+    }
+
     pub fn participant_id(&self, pub_key: &PublicKey) -> StorageResult<Option<Role>> {
-        let view = self.blockchain.view();
+        let view = self.view();
         view.find_participant(pub_key)
     }
 
     pub fn owner_info(&self, id: u16) -> StorageResult<Option<OwnerInfo>> {
-        let view = self.blockchain.view();
+        let view = self.view();
         if let Some(owner) = view.owners().get(id as u64)? {
             let mut ownership = Vec::new();
             for owner_content in view.owner_contents(id).values()? {
                 let fingerprint = owner_content.fingerprint().clone();
                 let r = view.contents().get(&fingerprint)?.unwrap();
-                let content = ContentInfo::new(fingerprint, r);
+                let owners = self.shares_info(&r.shares())?;
+                let content = ContentInfo::new(fingerprint, r, owners);
                 let reports = self.find_reports(Role::Owner(id), &fingerprint)?;
 
                 ownership.push(OwnershipInfo::new(owner_content, content, reports));
@@ -260,7 +330,7 @@ impl<D: Database> DigitalRightsApi<D> {
                 name: owner.name().to_string(),
                 pub_key: HexField(*owner.pub_key()),
                 ownership_hash: HexField(*owner.ownership_hash()),
-                ownership: ownership
+                ownership: ownership,
             };
             Ok(Some(info))
         } else {
@@ -272,11 +342,12 @@ impl<D: Database> DigitalRightsApi<D> {
         let view = self.blockchain.view();
         if let Some(distributor) = view.distributors().get(id as u64)? {
             let available_content = self.available_contents(id)?;
-            let mut contracts = Vec::new();            
+            let mut contracts = Vec::new();
             for contract in view.distributor_contracts(id).values()? {
                 let fingerprint = contract.fingerprint().clone();
                 let r = view.contents().get(&fingerprint)?.unwrap();
-                let content = ContentInfo::new(fingerprint, r);
+                let owners = self.shares_info(&r.shares())?;
+                let content = ContentInfo::new(fingerprint, r, owners);
                 let reports = self.find_reports(Role::Distributor(id), &fingerprint)?;
 
                 contracts.push(ContractInfo::new(contract, content, reports));
@@ -296,61 +367,65 @@ impl<D: Database> DigitalRightsApi<D> {
             Ok(None)
         }
     }
-    
-    pub fn distributor_content_info(&self, id: u16, fingerprint: &Fingerprint) -> StorageResult<Option<DistributorContentInfo>> {
+
+    pub fn distributor_content_info(&self,
+                                    id: u16,
+                                    fingerprint: &Fingerprint)
+                                    -> StorageResult<Option<DistributorContentInfo>> {
         let v = self.blockchain.view();
         if let Some(content) = v.contents().get(fingerprint)? {
-            let content = ContentInfo::new(fingerprint.clone(), content);
-            let contract = v.find_contract(id, fingerprint)?;
+            let owners = self.shares_info(&content.shares())?;
+            let content = ContentInfo::new(fingerprint.clone(), content, owners);
             let reports = self.find_reports(Role::Distributor(id), fingerprint)?;
-            let info = DistributorContentInfo {
-                contract: contract.map(|contract| DistributorContractInfo::new(contract.1, reports)),
-                content: content
-            };
+            let contract = v.find_contract(id, fingerprint)?
+                .map(|contract| DistributorContractInfo::new(contract.1, reports));
+
+            let info = DistributorContentInfo::new(content, contract);
             return Ok(Some(info));
         }
         Ok(None)
     }
 
-    pub fn owner_content_info(&self, id: u16, fingerprint: &Fingerprint) -> StorageResult<Option<OwnerContentInfo>> {
+    pub fn owner_content_info(&self,
+                              id: u16,
+                              fingerprint: &Fingerprint)
+                              -> StorageResult<Option<OwnerContentInfo>> {
         let v = self.blockchain.view();
         if let Some(content) = v.contents().get(fingerprint)? {
-            let content = ContentInfo::new(fingerprint.clone(), content);
-            let ownership = v.find_ownership(id, fingerprint)?.unwrap().1;
+            let owners = self.shares_info(&content.shares())?;
+            let content = ContentInfo::new(fingerprint.clone(), content, owners);
             let reports = self.find_reports(Role::Owner(id), fingerprint)?;
-            let info = OwnerContentInfo {
-                content: content,
-                reports: reports,
-                plays: ownership.plays(),
-                amount: ownership.amount()
-            };
+            let ownership = v.find_ownership(id, fingerprint)?.unwrap().1;
+
+            let info = OwnerContentInfo::new(content, ownership, reports);
             return Ok(Some(info));
         }
         Ok(None)
     }
 
     pub fn available_contents(&self, distributor_id: u16) -> StorageResult<Vec<ContentInfo>> {
-        let v = self.blockchain
-            .view()
-            .list_content()?
-            .into_iter()
-            .filter(|&(_, ref content)| !content.distributors().contains(&distributor_id))
-            .map(|(fingerprint, content)| ContentInfo::new(fingerprint, content))
-            .collect();
+        let mut v = Vec::new();
+        for (fingerprint, content) in self.view().list_content()? {
+            if !content.distributors().contains(&distributor_id) {
+                let owners = self.shares_info(&content.shares())?;
+                v.push(ContentInfo::new(fingerprint, content, owners));
+            }
+        }
         Ok(v)
     }
 
-    pub fn find_reports(&self, id: Role, fingerprint: &Fingerprint) -> StorageResult<Vec<ReportInfo>> {
+    pub fn find_reports(&self,
+                        id: Role,
+                        fingerprint: &Fingerprint)
+                        -> StorageResult<Vec<ReportInfo>> {
         let view = self.blockchain.view();
         let uuids = match id {
             Role::Owner(id) => {
-                view
-                    .owner_reports(id, fingerprint)
+                view.owner_reports(id, fingerprint)
                     .values()?
             }
             Role::Distributor(id) => {
-                view
-                    .distributor_reports(id, fingerprint)
+                view.distributor_reports(id, fingerprint)
                     .values()?
             }
         };
@@ -361,5 +436,22 @@ impl<D: Database> DigitalRightsApi<D> {
             v.push(ReportInfo::new(report));
         }
         Ok(v)
+    }
+
+    pub fn shares_info(&self,
+                       content_shares: &Vec<ContentShare>)
+                       -> StorageResult<Vec<ContentShareInfo>> {
+        let view = self.blockchain.view();
+
+        let mut r = Vec::new();
+        for share in content_shares {
+            let owner = view.owners().get(share.owner_id as u64)?.unwrap();
+            r.push(ContentShareInfo {
+                id: share.owner_id,
+                share: share.share,
+                name: owner.name().into(),
+            })
+        }
+        Ok(r)
     }
 }
