@@ -22,7 +22,7 @@ macro_rules! storage_value {
             }
 
             fn hash(&self) -> Hash {
-                hash(self.raw.as_ref())
+                $name::hash(self)
             }
         }
 
@@ -37,6 +37,10 @@ macro_rules! storage_value {
             pub fn from_raw(raw: Vec<u8>) -> $name {
                 debug_assert_eq!(raw.len(), $body);
                 $ name { raw: raw }
+            }
+
+            pub fn hash(&self) -> Hash {
+                hash(self.raw.as_ref())
             }
 
             $(pub fn $field_name(&self) -> $field_type {
