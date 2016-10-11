@@ -284,7 +284,7 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                     owner_reports.append(*tx.uuid())?;
 
                     // Update ownership
-                    ownership.add_amount(amount * 100 / share.share as u64);
+                    ownership.add_amount(amount * share.share as u64 / 100);
                     ownership.add_plays(tx.plays());
                     ownership.set_reports_hash(&owner_reports.root_hash()?);
                     view.owner_contents(id).set(ownership_id, ownership)?;
@@ -502,8 +502,8 @@ mod tests {
             let oc1 = v.owner_contents(0).get(0).unwrap().unwrap();
             let oc2 = v.owner_contents(1).get(0).unwrap().unwrap();
 
-            assert_eq!(oc1.amount(), total_amount * 100 / 30);
-            assert_eq!(oc2.amount(), total_amount * 100 / 70);
+            assert_eq!(oc1.amount(), total_amount * 30 / 100);
+            assert_eq!(oc2.amount(), total_amount * 70 / 100);
             assert_eq!(oc1.reports_hash(),
                        &v.owner_reports(0, f1).root_hash().unwrap());
             assert_eq!(oc2.reports_hash(),
