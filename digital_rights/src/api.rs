@@ -9,7 +9,7 @@ use blockchain_explorer::{TransactionInfo, HexField};
 use super::{Role, DigitalRightsTx, DigitalRightsBlockchain, DigitalRightsView, ContentShare, Uuid,
             Fingerprint, Content, Contract, Report, Ownership};
 
-//TODO придумать удобные макросы, чтобы не создавать по 100500 структур с похожими полями
+// TODO придумать удобные макросы, чтобы не создавать по 100500 структур с похожими полями
 
 impl Serialize for DigitalRightsTx {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
@@ -74,7 +74,7 @@ pub struct ContentShareInfo {
 #[derive(Debug, Serialize, Clone)]
 pub struct DistributorShortInfo {
     pub id: u16,
-    pub name: String
+    pub name: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -310,7 +310,10 @@ pub struct DigitalRightsApi<D: Database> {
 
 impl<D: Database> DigitalRightsApi<D> {
     pub fn new(b: DigitalRightsBlockchain<D>) -> DigitalRightsApi<D> {
-        DigitalRightsApi { view: b.view(), _b: PhantomData }
+        DigitalRightsApi {
+            view: b.view(),
+            _b: PhantomData,
+        }
     }
 
     pub fn view(&self) -> &DigitalRightsView<D::Fork> {
@@ -451,7 +454,7 @@ impl<D: Database> DigitalRightsApi<D> {
             let distributor = view.distributors().get(id as u64)?.unwrap();
             let info = DistributorShortInfo {
                 id: id,
-                name: distributor.name().into()
+                name: distributor.name().into(),
             };
             v.push(ReportInfo::new(report, info));
         }
@@ -483,7 +486,7 @@ impl<D: Database> DigitalRightsApi<D> {
             let distributor = view.distributors().get(*id as u64)?.unwrap();
             out.push(DistributorShortInfo {
                 id: *id,
-                name: distributor.name().into()
+                name: distributor.name().into(),
             });
         }
         Ok(out)

@@ -76,10 +76,22 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
         b.extend_from_slice(view.contents().root_hash()?.as_ref());
 
         for id in 0..view.distributors().len()? as u16 {
-            b.extend_from_slice(view.distributor_contracts(id).root_hash()?.as_ref())
+            let contracts = view.distributor_contracts(id);
+            b.extend_from_slice(contracts.root_hash()?.as_ref());
+            for contract in contracts.values()? {
+                let reports = view.distributor_reports(id, contract.fingerprint());
+                let hash = reports.root_hash()?;
+                b.extend_from_slice(hash.as_ref());
+            }
         }
         for id in 0..view.owners().len()? as u16 {
-            b.extend_from_slice(view.owner_contents(id).root_hash()?.as_ref())
+            let ownerships = view.owner_contents(id);
+            b.extend_from_slice(ownerships.root_hash()?.as_ref());
+            for ownership in ownerships.values()? {
+                let reports = view.owner_reports(id, ownership.fingerprint());
+                let hash = reports.root_hash()?;
+                b.extend_from_slice(hash.as_ref());
+            }
         }
 
         Ok(hash(b.as_ref()))
