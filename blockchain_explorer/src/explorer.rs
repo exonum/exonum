@@ -20,13 +20,14 @@ pub struct BlockInfo<T>
     where T: TransactionInfo
 {
     height: u64,
-    // proposer: PublicKey, // TODO add to block dto
+    proposer: u32,
     propose_time: i64,
 
     hash: HexField<Hash>,
     state_hash: HexField<Hash>,
     tx_hash: HexField<Hash>,
     tx_count: u64,
+    precommits_count: u64,
     txs: Option<Vec<T>>,
 }
 
@@ -52,25 +53,27 @@ impl<B: Blockchain> BlockchainExplorer<B> {
         let block = self.view.blocks().get(block_hash)?;
         if let Some(block) = block {
             let height = block.height();
-            let (txs, count) = {
+            let (txs, txs_count) = {
                 if full_info {
                     let txs = self.block_txs(block.height())?;
-                    let count = txs.len() as u64;
-                    (Some(txs), count)
+                    let txs_count = txs.len() as u64;
+                    (Some(txs), txs_count)
                 } else {
                     (None, self.view.block_txs(height).len()? as u64)
                 }
             };
 
+            let precommits_count = self.view.precommits(block_hash).len()? as u64;
             let info = BlockInfo {
                 height: height,
-                // proposer: block.proposer(),
+                proposer: block.proposer(),
                 propose_time: block.time().sec,
 
                 hash: HexField(*block_hash),
                 state_hash: HexField(*block.state_hash()),
                 tx_hash: HexField(*block.tx_hash()),
-                tx_count: count,
+                tx_count: txs_count,
+                precommits_count: precommits_count,
                 txs: txs,
             };
             Ok(Some(info))
