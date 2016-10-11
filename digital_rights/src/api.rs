@@ -72,7 +72,7 @@ pub struct ContentShareInfo {
 }
 
 #[derive(Debug, Serialize, Clone)]
-pub struct DistributorShortInfo {
+pub struct ParticipantInfo {
     pub id: u16,
     pub name: String,
 }
@@ -129,7 +129,7 @@ pub struct OwnershipInfo {
 
 #[derive(Debug, Serialize)]
 pub struct ReportInfo {
-    pub distributor: DistributorShortInfo,
+    pub distributor: ParticipantInfo,
     pub fingerprint: HexField<Fingerprint>,
     pub time: u64,
     pub plays: u64,
@@ -152,7 +152,7 @@ pub struct DistributorContentInfo {
     pub additional_conditions: String,
     pub price_per_listen: u64,
     pub min_plays: u64,
-    pub distributors: Vec<DistributorShortInfo>,
+    pub distributors: Vec<ParticipantInfo>,
     pub owners: Vec<ContentShareInfo>,
 
     pub contract: Option<DistributorContractInfo>,
@@ -165,7 +165,7 @@ pub struct OwnerContentInfo {
     pub additional_conditions: String,
     pub price_per_listen: u64,
     pub min_plays: u64,
-    pub distributors: Vec<DistributorShortInfo>,
+    pub distributors: Vec<ParticipantInfo>,
     pub owners: Vec<ContentShareInfo>,
 
     pub plays: u64,
@@ -237,7 +237,7 @@ impl ContentInfo {
 }
 
 impl ReportInfo {
-    pub fn new(report: Report, distributor: DistributorShortInfo) -> ReportInfo {
+    pub fn new(report: Report, distributor: ParticipantInfo) -> ReportInfo {
         let time = report.time();
         let nsec = (time.sec as u64) * 1_000_000_000 + time.nsec as u64;
         ReportInfo {
@@ -265,7 +265,7 @@ impl DistributorContractInfo {
 impl DistributorContentInfo {
     pub fn new(content: ContentInfo,
                contract: Option<DistributorContractInfo>,
-               distributors: Vec<DistributorShortInfo>)
+               distributors: Vec<ParticipantInfo>)
                -> DistributorContentInfo {
         DistributorContentInfo {
             title: content.title,
@@ -285,7 +285,7 @@ impl OwnerContentInfo {
     pub fn new(content: ContentInfo,
                ownership: Ownership,
                reports: Vec<ReportInfo>,
-               distributors: Vec<DistributorShortInfo>)
+               distributors: Vec<ParticipantInfo>)
                -> OwnerContentInfo {
         OwnerContentInfo {
             title: content.title,
@@ -452,7 +452,7 @@ impl<D: Database> DigitalRightsApi<D> {
             let report = view.reports().get(&uuid)?.unwrap();
             let id = report.distributor_id();
             let distributor = view.distributors().get(id as u64)?.unwrap();
-            let info = DistributorShortInfo {
+            let info = ParticipantInfo {
                 id: id,
                 name: distributor.name().into(),
             };
@@ -478,17 +478,109 @@ impl<D: Database> DigitalRightsApi<D> {
         Ok(r)
     }
 
-    pub fn distributor_names(&self, ids: &Vec<u16>) -> StorageResult<Vec<DistributorShortInfo>> {
+    pub fn distributor_names(&self, ids: &Vec<u16>) -> StorageResult<Vec<ParticipantInfo>> {
         let view = self.view();
 
         let mut out = Vec::new();
         for id in ids {
             let distributor = view.distributors().get(*id as u64)?.unwrap();
-            out.push(DistributorShortInfo {
+            out.push(ParticipantInfo {
                 id: *id,
                 name: distributor.name().into(),
             });
         }
         Ok(out)
+    }
+}
+
+impl<D: Database> DigitalRightsApi<D> {
+    pub fn flow(&self) -> StorageResult<impl Serialize> {
+        #[derive(Debug, Serialize)]
+        struct ShortContentInfo {
+            fingerprint: HexField<Fingerprint>,
+            title: String,
+        }
+
+        #[derive(Debug, Serialize)]
+        struct ShortContractInfo {
+            id: u16,
+            fingerprint: HexField<Fingerprint>,
+            amount: u64,
+            plays: u64
+        }
+
+        #[derive(Debug, Serialize)]
+        struct FlowInfo {
+            contents: Vec<ShortContentInfo>,
+            owners: Vec<ParticipantInfo>,
+            distributors: Vec<ParticipantInfo>,
+            ownerships: Vec<ShortContractInfo>,
+            contracts: Vec<ShortContractInfo>
+        }
+
+        let view = self.view();
+
+        let contents = view.list_content()?
+            .into_iter()
+            .map(|(f, c)| {
+                ShortContentInfo {
+                    fingerprint: HexField(f),
+                    title: c.title().into(),
+                }
+            })
+            .collect();
+        let owners = view.owners()
+            .values()?
+            .into_iter()
+            .enumerate()
+            .map(|(id, owner)| {
+                ParticipantInfo {
+                    id: id as u16,
+                    name: owner.name().into(),
+                }
+            })
+            .collect::<Vec<_>>();
+        let distributors = view.distributors()
+            .values()?
+            .into_iter()
+            .enumerate()
+            .map(|(id, owner)| {
+                ParticipantInfo {
+                    id: id as u16,
+                    name: owner.name().into(),
+                }
+            })
+            .collect();
+        let mut ownerships = Vec::new();
+        for id in 0..owners.len() as u16 {
+            for ownership in view.owner_contents(id).values()? {
+                ownerships.push(ShortContractInfo {
+                    id: id,
+                    fingerprint: HexField(*ownership.fingerprint()),
+                    plays: ownership.plays(),
+                    amount: ownership.amount()
+                });
+            }
+        }
+        let mut contracts = Vec::new();
+        for id in 0..owners.len() as u16 {
+            for contract in view.distributor_contracts(id).values()? {
+                contracts.push(ShortContractInfo {
+                    id: id,
+                    fingerprint: HexField(*contract.fingerprint()),
+                    plays: contract.plays(),
+                    amount: contract.amount()
+                });
+            }
+        }
+
+        let info = FlowInfo {
+            contents: contents,
+            owners: owners,
+            distributors: distributors,
+            ownerships: ownerships,
+            contracts: contracts
+        };
+        Ok(info)
     }
 }

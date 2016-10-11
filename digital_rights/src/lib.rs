@@ -3,6 +3,7 @@
 #![feature(plugin)]
 #![plugin(serde_macros)]
 #![feature(question_mark)]
+#![feature(conservative_impl_trait)]
 
 #[macro_use(message, storage_value)]
 extern crate exonum;

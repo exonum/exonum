@@ -398,6 +398,17 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                 }
             })
         });
+
+        let b = blockchain.clone();
+        api.get("flow", move |endpoint| {
+            endpoint.handle(move |client, _params| {
+                let drm = DigitalRightsApi::new(b.clone());
+                match drm.flow() {
+                    Ok(info) => client.json(&info.to_json()),
+                    Err(e) => client.error(e)
+                }
+            })
+        });
     });
 }
 
