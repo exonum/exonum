@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use time::Timespec;
 use super::super::crypto::{Hash, PublicKey};
+use super::MessageBuffer;
 
 pub const CONNECT_MESSAGE_ID: u16 = 0;
 pub const STATUS_MESSAGE_ID: u16 = 1;
@@ -8,13 +9,14 @@ pub const STATUS_MESSAGE_ID: u16 = 1;
 pub const PROPOSE_MESSAGE_ID: u16 = 2;
 pub const PREVOTE_MESSAGE_ID: u16 = 3;
 pub const PRECOMMIT_MESSAGE_ID: u16 = 4;
+pub const BLOCK_MESSAGE_ID: u16 = 5;
 
-pub const REQUEST_PROPOSE_MESSAGE_ID: u16 = 5;
-pub const REQUEST_TRANSACTIONS_MESSAGE_ID: u16 = 6;
-pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 7;
-pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 8;
-pub const REQUEST_COMMIT_MESSAGE_ID: u16 = 9;
-pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
+pub const REQUEST_PROPOSE_MESSAGE_ID: u16 = 6;
+pub const REQUEST_TRANSACTIONS_MESSAGE_ID: u16 = 7;
+pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
+pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
+pub const REQUEST_COMMIT_MESSAGE_ID: u16 = 10;
+pub const REQUEST_PEERS_MESSAGE_ID: u16 = 11;
 
 message! {
     Connect {
@@ -78,6 +80,15 @@ message! {
     }
 }
 
+// message! {
+//     Block {
+//         const ID = BLOCK_MESSAGE_ID;
+//         const SIZE = 16;
+
+//         precommits:     Vec<&[u8]>        [00 => 08]
+//         transactions:   Vec<&[u8]>        [08 => 16] 
+//     }
+// }
 
 message! {
     RequestPropose {
@@ -157,49 +168,3 @@ message! {
         time:           Timespec    [64 => 72]
     }
 }
-
-// message! {
-//     TxIssue//{
-//         const ID = 11;
-//         const SIZE = 56;
-
-//         seed:           u64         [00 => 08]
-//         asset:          &PublicKey  [08 => 40]
-//         name:           &str        [40 => 48]
-//         amount:         u64         [48 => 56]
-//     }
-// }
-
-// message! {
-//     TxTransfer//{
-//         const ID = 12;
-//         const SIZE = 80;
-
-//         seed:           u64         [00 => 08]
-//         from:           &PublicKey  [08 => 40]
-//         to:             &PublicKey  [40 => 72]
-//         amount:         u64         [72 => 80]
-//     }
-// }
-
-// message! {
-//     TxVoteValidator//{
-//         const ID = 13;
-//         const SIZE = 48;
-
-//         seed:           u64         [00 => 08]
-//         pub_key:        &PublicKey  [08 => 40]
-//         power:          u64         [40 => 48]
-//     }
-// }
-
-// message! {
-//     TxVoteConfig//{
-//         const ID = 14;
-//         const SIZE = 24;
-
-//         seed:           u64         [00 => 08]
-//         key:            &[u8]       [08 => 16]
-//         value:          &[u8]       [16 => 24]
-//     }
-// }
