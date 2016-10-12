@@ -6,7 +6,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::{Hash, PublicKey};
 
-use super::Error;
+use super::{Error, Message};
 
 pub trait Field<'a> {
     // TODO: use Read and Cursor
@@ -247,6 +247,101 @@ impl<'a, T> Field<'a> for T
     }
 }
 
+impl<'a> Field<'a> for Vec<&'a [u8]> {
+    fn field_size() -> usize {
+        1
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<&'a [u8]> {
+        unsafe {
+            debug_assert_eq!(to - from, 8);
+            let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
+            let count = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
+            println!("Array: pos: {}, count: {}, buffer_len: {}", pos, count, buffer.len());
+
+            let segments = &buffer[pos..pos + count * 8];
+            
+            let mut vec = Vec::new();
+            for i in 0..count {
+                let from = i * 8;
+                let pos = LittleEndian::read_u32(&segments[from..from + 4]);
+                let count = LittleEndian::read_u32(&segments[from + 4..from + 8]);
+                println!("segment: pos: {}, count: {}", pos, count);
+
+                let ptr = buffer.as_ptr().offset(pos as isize);
+                let len = count as usize;
+                let slice_ptr = ::std::slice::from_raw_parts(ptr as *const u8, len);
+                vec.push(slice_ptr);
+            }
+            vec
+        }
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        debug_assert_eq!(to - from, 8);
+
+        let pos = buffer.len();
+        LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
+        LittleEndian::write_u32(&mut buffer[from + 4..to], self.len() as u32);
+
+        buffer.resize(pos + self.len() * 8 + 8, 0);
+        println!("pos: {}, to: {}, from: {}, len: {}", pos, to, from, buffer.len());
+        //debug_assert_eq!(pos + (to - from), buffer.len());
+        // Write segment positions
+        println!("Write: resize buf to {}", buffer.len());
+        let mut from = pos;
+        let mut pos = buffer.len();
+        for segment in self.iter() {
+            let len = segment.len();
+            LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
+            LittleEndian::write_u32(&mut buffer[from + 4..from + 8], len as u32);
+            println!("Write segment ptr: from:{}, len: {}, total_len: {}", from, len, pos);
+            from += 8;
+            pos += len;
+        }
+        // Write segment bodies
+        for segment in self.iter() {
+            buffer.extend_from_slice(segment);
+            println!("Write: resize buf to {}", buffer.len());            
+        }
+    }
+
+    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
+        // let pos = LittleEndian::read_u32(&buffer[from..from + 4]);
+        // let count = LittleEndian::read_u32(&buffer[from + 4..to]);
+
+        // if count == 0 {
+        //     return Ok(());
+        // }
+
+        // let start = pos as usize;
+
+        // if start < from + 8 {
+        //     return Err(Error::IncorrectSegmentRefference {
+        //         position: from as u32,
+        //         value: pos,
+        //     });
+        // }
+
+        // let end = start + Self::item_size() * (count as usize);
+
+        // if end > buffer.len() {
+        //     return Err(Error::IncorrectSegmentSize {
+        //         position: (from + 4) as u32,
+        //         value: count,
+        //     });
+        // }
+
+        // unsafe {
+        //     let ptr = buffer.as_ptr().offset(pos as isize);
+        //     let len = (count as usize) * Self::item_size();
+        //     Self::check_data(::std::slice::from_raw_parts(ptr as *const u8, len),
+        //                      from as u32)
+        // }
+        Ok(())
+    }   
+}
+
 impl<'a> SegmentField<'a> for &'a [u8] {
     fn item_size() -> usize {
         1
@@ -406,7 +501,6 @@ fn test_u16_segment() {
     assert_eq!(s2, s.as_ref());
 }
 
-
 #[test]
 fn test_u32_segment() {
     let mut buf = vec![0; 8];
@@ -418,4 +512,21 @@ fn test_u32_segment() {
     <&[u32] as Field>::check(&buf2, 0, 8).unwrap();
     let s2: &[u32] = Field::read(&buf2, 0, 8);
     assert_eq!(s2, s.as_ref());
+}
+
+#[test]
+fn test_segments_of_segments() {
+    let mut buf = vec![0; 8];
+    let v1 = [1u8, 2, 3];
+    let v2 = [1u8, 3];
+    let v3 = [2u8, 5, 2, 3, 56, 3];
+
+    let dat = vec![v1.as_ref(), v2.as_ref(), v3.as_ref()];
+    Field::write(&dat, &mut buf, 0, 8);
+    <Vec<&[u8]> as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <Vec<&[u8]> as Field>::check(&buf2, 0, 8).unwrap();
+    let dat2: Vec<&[u8]> = Field::read(&buf2, 0, 8);
+    assert_eq!(dat2, dat);
 }
