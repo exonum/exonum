@@ -9,7 +9,7 @@ use exonum::storage::{Map, Fork, MerklePatriciaTable, MapTable, MerkleTable, Lis
                       Result as StorageResult};
 use exonum::blockchain::View;
 
-use super::{DigitalRightsTx, Uuid, Fingerprint, ContentShare};
+use super::{OWNERS_MAX_COUNT, DigitalRightsTx, Uuid, Fingerprint, ContentShare, Role};
 
 storage_value! {
     Owner {
@@ -227,6 +227,26 @@ impl<F> DigitalRightsView<F>
         }
         Ok(v)
     }
+    pub fn add_participant(&self, pub_key: &PublicKey, role: Role) -> StorageResult<()> {
+        let db_id = match role {
+            Role::Distributor(id) => id + OWNERS_MAX_COUNT,
+            Role::Owner(id) => id,
+        };
+        self.participants().put(pub_key, db_id)
+    }
+    pub fn find_participant(&self, pub_key: &PublicKey) -> StorageResult<Option<Role>> {
+        let r = self.participants()
+            .get(pub_key)?
+            .map(|db_id| {
+                if db_id < OWNERS_MAX_COUNT {
+                    Role::Owner(db_id)
+                } else {
+                    Role::Distributor(db_id - OWNERS_MAX_COUNT)
+                }
+            });
+        Ok(r)
+    }
+
     // TODO видимо нужны еще техниеческие таблицы, чтобы не было O(n)
     pub fn find_contract(&self,
                          id: u16,

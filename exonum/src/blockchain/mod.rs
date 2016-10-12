@@ -65,7 +65,8 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                                propose.time(),
                                &last_hash,
                                &tx_hash,
-                               &state_hash);
+                               &state_hash,
+                               propose.validator());
         // Eval block hash
         let block_hash = block.hash();
         // Update height

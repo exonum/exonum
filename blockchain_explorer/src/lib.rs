@@ -28,11 +28,11 @@ use exonum::blockchain::{Blockchain};
 
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
 
-#[derive(Debug)]
-pub struct HexField<T: AsRef<[u8]>>(pub T);
+#[derive(Clone, Debug)]
+pub struct HexField<T: AsRef<[u8]> + Clone>(pub T);
 
 impl<T> Deref for HexField<T> 
-    where T: AsRef<[u8]>
+    where T: AsRef<[u8]> + Clone
 {
     type Target = T;
 
@@ -42,7 +42,7 @@ impl<T> Deref for HexField<T>
 }
 
 impl<T> Serialize for HexField<T>
-    where T: AsRef<[u8]>
+    where T: AsRef<[u8]> + Clone
 {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
@@ -58,7 +58,7 @@ struct HexVisitor<T>
 }
 
 impl<T> Visitor for HexVisitor<T>
-    where T: AsRef<[u8]> + HexValue
+    where T: AsRef<[u8]> + HexValue + Clone
 {
     type Value = HexField<T>;
 
@@ -71,7 +71,7 @@ impl<T> Visitor for HexVisitor<T>
 }
 
 impl<T> Deserialize for HexField<T>
-    where T: AsRef<[u8]> + HexValue
+    where T: AsRef<[u8]> + HexValue + Clone
 {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
@@ -85,27 +85,27 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
           T: TransactionInfo + From<B::Transaction>
 {
     api.namespace("blockchain", move |api| {
-        api.get("block", |endpoint| {
+        api.get("blocks", |endpoint| {
             let b1 = b1.clone();
 
             endpoint.summary("Returns blockchain info array");
             endpoint.params(|params| {
                 params.opt_typed("from", json_dsl::u64());
-                params.opt_typed("to", json_dsl::u64())
+                params.opt_typed("count", json_dsl::u64())
             });
 
             endpoint.handle(move |client, params| {
-                let from = params.find("from").map(|x| x.as_u64().unwrap()).unwrap_or(0);
-                let to = params.find("to").map(|x| x.as_u64().unwrap());
+                let from = params.find("from").map(|x| x.as_u64().unwrap()).map(|x| x + 1);
+                let count = params.find("count").map(|x| x.as_u64().unwrap()).unwrap_or(100);
 
                 let explorer = BlockchainExplorer::new(b1.clone());
-                match explorer.blocks_range::<T>(from, to) {
+                match explorer.blocks_range::<T>(count, from) {
                     Ok(blocks) => client.json(&blocks.to_json()),
                     Err(e) => client.error(e),
                 }
             })
         });
-        api.get("block/:height", |endpoint| {
+        api.get("blocks/:height", |endpoint| {
             let b1 = b1.clone();
 
             endpoint.summary("Returns block with given height");
@@ -119,12 +119,12 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
                 let explorer = BlockchainExplorer::new(b1.clone());
                 match explorer.block_info_with_height::<T>(height) {
                     Ok(Some(block)) => client.json(&block.to_json()),
-                    Ok(None) => Ok(client),
+                    Ok(None) => client.error(StorageError::new("Unable to find block with given height")),
                     Err(e) => client.error(e),
                 }
             })
         });
-        api.get("transaction/:hash", |endpoint| {
+        api.get("transactions/:hash", |endpoint| {
             let b1 = b1.clone();
 
             endpoint.summary("Returns transaction info with given hash");

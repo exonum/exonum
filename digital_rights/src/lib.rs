@@ -3,6 +3,7 @@
 #![feature(plugin)]
 #![plugin(serde_macros)]
 #![feature(question_mark)]
+#![feature(conservative_impl_trait)]
 
 #[macro_use(message, storage_value)]
 extern crate exonum;
@@ -44,6 +45,20 @@ impl<D: Database> Deref for DigitalRightsBlockchain<D> {
     }
 }
 
+pub enum Role {
+    Distributor(u16),
+    Owner(u16),
+}
+
+impl Role {
+    pub fn id(&self) -> u16 {
+        match *self {
+            Role::Distributor(id) => id,
+            Role::Owner(id) => id,
+        }
+    }
+}
+
 impl<D> Blockchain for DigitalRightsBlockchain<D>
     where D: Database
 {
@@ -62,10 +77,22 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
         b.extend_from_slice(view.contents().root_hash()?.as_ref());
 
         for id in 0..view.distributors().len()? as u16 {
-            b.extend_from_slice(view.distributor_contracts(id).root_hash()?.as_ref())
+            let contracts = view.distributor_contracts(id);
+            b.extend_from_slice(contracts.root_hash()?.as_ref());
+            for contract in contracts.values()? {
+                let reports = view.distributor_reports(id, contract.fingerprint());
+                let hash = reports.root_hash()?;
+                b.extend_from_slice(hash.as_ref());
+            }
         }
         for id in 0..view.owners().len()? as u16 {
-            b.extend_from_slice(view.owner_contents(id).root_hash()?.as_ref())
+            let ownerships = view.owner_contents(id);
+            b.extend_from_slice(ownerships.root_hash()?.as_ref());
+            for ownership in ownerships.values()? {
+                let reports = view.owner_reports(id, ownership.fingerprint());
+                let hash = reports.root_hash()?;
+                b.extend_from_slice(hash.as_ref());
+            }
         }
 
         Ok(hash(b.as_ref()))
@@ -74,20 +101,20 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
     fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
         match *tx {
             DigitalRightsTx::CreateOwner(ref tx) => {
-                if view.participants().get(tx.pub_key())?.is_some() {
+                if view.find_participant(tx.pub_key())?.is_some() {
                     return Ok(());
                 }
 
                 let owners = view.owners();
-                let onwer_id = owners.len()? as u16;
-                if onwer_id < OWNERS_MAX_COUNT {
+                let owner_id = owners.len()? as u16;
+                if owner_id < OWNERS_MAX_COUNT {
                     let owner = Owner::new(tx.pub_key(), tx.name(), &hash(&[]));
                     owners.append(owner)?;
-                    view.participants().put(tx.pub_key(), onwer_id)?;
+                    view.add_participant(tx.pub_key(), Role::Owner(owner_id))?;
                 }
             }
             DigitalRightsTx::CreateDistributor(ref tx) => {
-                if view.participants().get(tx.pub_key())?.is_some() {
+                if view.find_participant(tx.pub_key())?.is_some() {
                     return Ok(());
                 }
 
@@ -96,7 +123,7 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
 
                 let distributor = Distributor::new(tx.pub_key(), tx.name(), &hash(&[]));
                 distributors.append(distributor)?;
-                view.participants().put(tx.pub_key(), distributor_id as u16)?;
+                view.add_participant(tx.pub_key(), Role::Distributor(distributor_id as u16))?
             }
             DigitalRightsTx::AddContent(ref tx) => {
                 // preconditions
@@ -270,7 +297,7 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
                     owner_reports.append(*tx.uuid())?;
 
                     // Update ownership
-                    ownership.add_amount(amount * 100 / share.share as u64);
+                    ownership.add_amount(amount * share.share as u64 / 100);
                     ownership.add_plays(tx.plays());
                     ownership.set_reports_hash(&owner_reports.root_hash()?);
                     view.owner_contents(id).set(ownership_id, ownership)?;
@@ -488,8 +515,8 @@ mod tests {
             let oc1 = v.owner_contents(0).get(0).unwrap().unwrap();
             let oc2 = v.owner_contents(1).get(0).unwrap().unwrap();
 
-            assert_eq!(oc1.amount(), total_amount * 100 / 30);
-            assert_eq!(oc2.amount(), total_amount * 100 / 70);
+            assert_eq!(oc1.amount(), total_amount * 30 / 100);
+            assert_eq!(oc2.amount(), total_amount * 70 / 100);
             assert_eq!(oc1.reports_hash(),
                        &v.owner_reports(0, f1).root_hash().unwrap());
             assert_eq!(oc2.reports_hash(),

@@ -22,16 +22,26 @@ macro_rules! storage_value {
             }
 
             fn hash(&self) -> Hash {
-                hash(self.raw.as_ref())
+                $name::hash(self)
             }
         }
 
+        // TODO extract some fields like hash and from_raw into trait
         impl $name {
             pub fn new($($field_name: $field_type,)*) -> $name {
                 use $crate::messages::{Field};
                 let mut buf = vec![0; $body];
                 $($field_name.write(&mut buf, $from, $to);)*
                 $name { raw: buf }
+            }
+
+            pub fn from_raw(raw: Vec<u8>) -> $name {
+                debug_assert_eq!(raw.len(), $body);
+                $ name { raw: raw }
+            }
+
+            pub fn hash(&self) -> Hash {
+                hash(self.raw.as_ref())
             }
 
             $(pub fn $field_name(&self) -> $field_type {

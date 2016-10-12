@@ -68,7 +68,7 @@ fn test_get_lock_and_send_precommit() {
                                &[],
                                sandbox.s(1));
 
-    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
+    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]), 1);
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
@@ -92,7 +92,7 @@ fn test_commit() {
                                &[],
                                sandbox.s(1));
 
-    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
+    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]), 1);
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));

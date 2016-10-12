@@ -20,14 +20,15 @@ pub struct BlockInfo<T>
     where T: TransactionInfo
 {
     height: u64,
-    // proposer: PublicKey, // TODO add to block dto
+    proposer: u32,
     propose_time: i64,
 
-    prev_hash: HexField<Hash>,
     hash: HexField<Hash>,
     state_hash: HexField<Hash>,
     tx_hash: HexField<Hash>,
-    txs: Vec<T>,
+    tx_count: u64,
+    precommits_count: u64,
+    txs: Option<Vec<T>>,
 }
 
 impl<B: Blockchain> BlockchainExplorer<B> {
@@ -46,22 +47,34 @@ impl<B: Blockchain> BlockchainExplorer<B> {
         Ok(tx.map(|tx| T::from(tx)))
     }
 
-    pub fn block_info<T>(&self, block_hash: &Hash) -> StorageResult<Option<BlockInfo<T>>>
+    pub fn block_info<T>(&self, block_hash: &Hash, full_info: bool) -> StorageResult<Option<BlockInfo<T>>>
         where T: TransactionInfo + From<B::Transaction>
     {
         let block = self.view.blocks().get(block_hash)?;
         if let Some(block) = block {
-            let block_txs = self.block_txs(block.height())?;
+            let height = block.height();
+            let (txs, txs_count) = {
+                if full_info {
+                    let txs = self.block_txs(block.height())?;
+                    let txs_count = txs.len() as u64;
+                    (Some(txs), txs_count)
+                } else {
+                    (None, self.view.block_txs(height).len()? as u64)
+                }
+            };
+
+            let precommits_count = self.view.precommits(block_hash).len()? as u64;
             let info = BlockInfo {
-                height: block.height(),
-                // proposer: block.proposer(),
+                height: height,
+                proposer: block.proposer(),
                 propose_time: block.time().sec,
 
-                prev_hash: HexField(*block.prev_hash()),
                 hash: HexField(*block_hash),
                 state_hash: HexField(*block.state_hash()),
                 tx_hash: HexField(*block.tx_hash()),
-                txs: block_txs,
+                tx_count: txs_count,
+                precommits_count: precommits_count,
+                txs: txs,
             };
             Ok(Some(info))
         } else {
@@ -74,24 +87,25 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     {
         if let Some(block_hash) = self.view.heights().get(height)? {
             // TODO avoid double unwrap
-            self.block_info(&block_hash)
+            self.block_info(&block_hash, true)
         } else {
             Ok(None)
         }
     }
 
-    pub fn blocks_range<T>(&self, from: u64, to: Option<u64>) -> StorageResult<Vec<BlockInfo<T>>>
+    pub fn blocks_range<T>(&self, count: u64, from: Option<u64>) -> StorageResult<Vec<BlockInfo<T>>>
         where T: TransactionInfo + From<B::Transaction>
     {
         let heights = self.view.heights();
 
         let max_len = heights.len()?;
-        let len = cmp::min(max_len, to.unwrap_or(max_len));
+        let to = from.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
+        let from = to.checked_sub(count).unwrap_or(0);
 
         let mut v = Vec::new();
-        for height in from..len {
+        for height in (from..to).rev() {
             if let Some(ref h) = heights.get(height)? {
-                if let Some(block_info) = self.block_info(h)? {
+                if let Some(block_info) = self.block_info(h, false)? {
                     v.push(block_info);
                 }
             }
