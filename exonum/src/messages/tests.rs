@@ -277,12 +277,14 @@ fn test_block() {
 #[test]
 fn test_request_block() {
     let (public_key, secret_key) = gen_keypair();
+    let time = time::get_time();
 
     // write
-    let request = RequestBlock::new(&public_key, &public_key, 1, &secret_key);
+    let request = RequestBlock::new(&public_key, &public_key, time, 1, &secret_key);
     // read
     assert_eq!(request.from(), &public_key);
     assert_eq!(request.height(), 1);
     assert_eq!(request.to(), &public_key);
+    assert_eq!(request.time(), time);
     assert!(request.verify(&public_key));
 }

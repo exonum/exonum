@@ -175,10 +175,11 @@ message! {
 message! {
     RequestBlock {
         const ID = REQUEST_BLOCK_MESSAGE_ID;
-        const SIZE = 72;
+        const SIZE = 80;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
-        height:         u64         [64 => 72]
+        time:           Timespec    [64 => 72]
+        height:         u64         [72 => 80]
     }
 }

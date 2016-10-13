@@ -1,5 +1,5 @@
 use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
-                             RequestPrevotes, RequestPrecommits, RequestCommit};
+                             RequestPrevotes, RequestPrecommits, RequestCommit, RequestBlock, Block};
 use super::super::blockchain::{Blockchain, View};
 use super::super::storage::{Map, List};
 use super::super::events::Channel;
@@ -43,6 +43,7 @@ impl<B, S> NodeHandler<B, S>
             RequestMessage::Precommits(msg) => self.handle_request_precommits(msg),
             RequestMessage::Commit(msg) => self.handle_request_commit(msg),
             RequestMessage::Peers(msg) => self.handle_request_peers(msg),
+            RequestMessage::Block(msg) => self.handle_request_block(msg),
         }
     }
 
@@ -150,5 +151,33 @@ impl<B, S> NodeHandler<B, S>
         for precommit in precommits {
             self.send_to_peer(*msg.from(), &precommit);
         }
+    }
+
+    pub fn handle_request_block(&mut self, msg: RequestBlock) {
+        if msg.height() >= self.state.height() {
+            return;
+        }
+
+        let view = self.blockchain.view();
+        let height = msg.height();
+        let block_hash = view.heights().get(height).unwrap().unwrap();    
+
+        let block = view.blocks().get(&block_hash).unwrap().unwrap();
+        let precommits = view.precommits(&block_hash)
+            .values()
+            .unwrap()
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let transactions = view.block_txs(height)
+            .values()
+            .unwrap()
+            .iter()
+            .map(|tx_hash| view.transactions().get(tx_hash).unwrap().unwrap())
+            .map(|p| p.raw().clone())
+            .collect::<Vec<_>>();
+
+        let block_msg = Block::new(block, precommits, transactions, &self.secret_key);
+        self.send_to_peer(*msg.from(), block_msg.raw());
     }
 }
