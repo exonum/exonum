@@ -260,19 +260,12 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
 
         let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
         let count = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
-        let segments = &buffer[pos..pos + count * 8];
 
         let mut vec = Vec::new();
         for i in 0..count {
-            let from = i * 8;
-            let pos = LittleEndian::read_u32(&segments[from..from + 4]);
-            let count = LittleEndian::read_u32(&segments[from + 4..from + 8]);
-            unsafe {
-                let ptr = buffer.as_ptr().offset(pos as isize);
-                let len = count as usize;
-                let slice = ::std::slice::from_raw_parts(ptr as *const u8, len);
-                vec.push(slice);
-            }
+            let from = pos + i * 8;
+            let slice = <&[u8] as Field>::read(&buffer, from, from + 8);
+            vec.push(slice);
         }
         vec
     }
