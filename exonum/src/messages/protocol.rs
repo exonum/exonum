@@ -86,7 +86,7 @@ message! {
 //         const SIZE = 16;
 
 //         precommits:     Vec<&[u8]>        [00 => 08]
-//         transactions:   Vec<&[u8]>        [08 => 16] 
+//         transactions:   Vec<&[u8]>        [08 => 16]
 //     }
 // }
 
