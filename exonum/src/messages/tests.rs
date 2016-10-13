@@ -2,7 +2,8 @@ use std::net::SocketAddr;
 
 use super::super::crypto::{hash, gen_keypair};
 
-use super::{Field, RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, Block};
+use super::{Field, RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, Block,
+            RequestBlock};
 
 #[test]
 fn test_str_segment() {
@@ -245,4 +246,17 @@ fn test_block() {
     let block = Block::new(precommits.clone(), transactions.clone(), &secret_key);
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
+}
+
+#[test]
+fn test_request_block() {
+    let (public_key, secret_key) = gen_keypair();
+
+    // write
+    let request = RequestBlock::new(&public_key, &public_key, 1, &secret_key);
+    // read
+    assert_eq!(request.from(), &public_key);
+    assert_eq!(request.height(), 1);
+    assert_eq!(request.to(), &public_key);
+    assert!(request.verify(&public_key));
 }

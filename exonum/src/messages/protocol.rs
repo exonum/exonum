@@ -17,6 +17,7 @@ pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
 pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_COMMIT_MESSAGE_ID: u16 = 10;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 11;
+pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 12;
 
 message! {
     Connect {
@@ -166,5 +167,16 @@ message! {
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
         time:           Timespec    [64 => 72]
+    }
+}
+
+message! {
+    RequestBlock {
+        const ID = REQUEST_BLOCK_MESSAGE_ID;
+        const SIZE = 72;
+
+        from:           &PublicKey  [00 => 32]
+        to:             &PublicKey  [32 => 64]
+        height:         u64         [64 => 72]
     }
 }
