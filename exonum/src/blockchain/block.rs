@@ -10,7 +10,7 @@ storage_value!(
 
         height:                 u64         [00 => 08]
         time:                   Timespec    [08 => 16]
-        prev_hash:              &Hash       [16 => 48]   
+        prev_hash:              &Hash       [16 => 48]
         tx_hash:                &Hash       [48 => 80]
         state_hash:             &Hash       [80 => 112]
         proposer:               u32         [112 => 116]

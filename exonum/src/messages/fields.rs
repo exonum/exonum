@@ -247,34 +247,34 @@ impl<'a, T> Field<'a> for T
     }
 }
 
+// TODO как-то это все обобщить, чтобы не было магических констант
+// и можно было хранить что-то серъезнее &[u8]
+// во вторых нужно как-то избавиться от лишних выделений памяти
 impl<'a> Field<'a> for Vec<&'a [u8]> {
     fn field_size() -> usize {
         1
     }
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<&'a [u8]> {
-        unsafe {
-            debug_assert_eq!(to - from, 8);
-            let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
-            let count = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
-            println!("Array: pos: {}, count: {}, buffer_len: {}", pos, count, buffer.len());
+        debug_assert_eq!(to - from, 8);
 
-            let segments = &buffer[pos..pos + count * 8];
-            
-            let mut vec = Vec::new();
-            for i in 0..count {
-                let from = i * 8;
-                let pos = LittleEndian::read_u32(&segments[from..from + 4]);
-                let count = LittleEndian::read_u32(&segments[from + 4..from + 8]);
-                println!("segment: pos: {}, count: {}", pos, count);
+        let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
+        let count = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
+        let segments = &buffer[pos..pos + count * 8];
 
+        let mut vec = Vec::new();
+        for i in 0..count {
+            let from = i * 8;
+            let pos = LittleEndian::read_u32(&segments[from..from + 4]);
+            let count = LittleEndian::read_u32(&segments[from + 4..from + 8]);
+            unsafe {
                 let ptr = buffer.as_ptr().offset(pos as isize);
                 let len = count as usize;
-                let slice_ptr = ::std::slice::from_raw_parts(ptr as *const u8, len);
-                vec.push(slice_ptr);
+                let slice = ::std::slice::from_raw_parts(ptr as *const u8, len);
+                vec.push(slice);
             }
-            vec
         }
+        vec
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
@@ -283,63 +283,56 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
         let pos = buffer.len();
         LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
         LittleEndian::write_u32(&mut buffer[from + 4..to], self.len() as u32);
-
         buffer.resize(pos + self.len() * 8 + 8, 0);
-        println!("pos: {}, to: {}, from: {}, len: {}", pos, to, from, buffer.len());
-        //debug_assert_eq!(pos + (to - from), buffer.len());
-        // Write segment positions
-        println!("Write: resize buf to {}", buffer.len());
+
+        // Write segment headers
         let mut from = pos;
         let mut pos = buffer.len();
         for segment in self.iter() {
             let len = segment.len();
             LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
             LittleEndian::write_u32(&mut buffer[from + 4..from + 8], len as u32);
-            println!("Write segment ptr: from:{}, len: {}, total_len: {}", from, len, pos);
+
             from += 8;
             pos += len;
         }
+
         // Write segment bodies
         for segment in self.iter() {
             buffer.extend_from_slice(segment);
-            println!("Write: resize buf to {}", buffer.len());            
         }
     }
 
+    // TODO Тут вызов функции по сути рекурсивный, нужно написать некий хэлпер для check
     fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
-        // let pos = LittleEndian::read_u32(&buffer[from..from + 4]);
-        // let count = LittleEndian::read_u32(&buffer[from + 4..to]);
+        let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
+        let len = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
 
-        // if count == 0 {
-        //     return Ok(());
-        // }
+        if len == 0 {
+            return Ok(());
+        }
 
-        // let start = pos as usize;
+        if pos < from + 8 {
+            return Err(Error::IncorrectSegmentRefference {
+                position: from as u32,
+                value: pos as u32,
+            });
+        }
 
-        // if start < from + 8 {
-        //     return Err(Error::IncorrectSegmentRefference {
-        //         position: from as u32,
-        //         value: pos,
-        //     });
-        // }
+        let end = pos + 8 * len;
+        if end > buffer.len() {
+            return Err(Error::IncorrectSegmentSize {
+                position: (from + 4) as u32,
+                value: len as u32,
+            });
+        }
 
-        // let end = start + Self::item_size() * (count as usize);
-
-        // if end > buffer.len() {
-        //     return Err(Error::IncorrectSegmentSize {
-        //         position: (from + 4) as u32,
-        //         value: count,
-        //     });
-        // }
-
-        // unsafe {
-        //     let ptr = buffer.as_ptr().offset(pos as isize);
-        //     let len = (count as usize) * Self::item_size();
-        //     Self::check_data(::std::slice::from_raw_parts(ptr as *const u8, len),
-        //                      from as u32)
-        // }
+        for i in 0..len {
+            let from = i * 8;
+            <&[u8] as Field>::check(&buffer, from, from + 8)?;
+        }
         Ok(())
-    }   
+    }
 }
 
 impl<'a> SegmentField<'a> for &'a [u8] {

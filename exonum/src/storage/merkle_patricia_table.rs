@@ -981,9 +981,11 @@ mod tests {
         assert_eq!(table2.get(&vec![255; 32]).unwrap(), Some(vec![1]));
         assert_eq!(table2.get(&vec![254; 32]).unwrap(), Some(vec![2]));
 
-        //assert_eq!(table1.find_key(&vec![]).unwrap(), Some(vec![254; 32])); //FIXME
-        assert_eq!(table1.find_key(&vec![254; 32]).unwrap(), Some(vec![254; 32]));
-        assert_eq!(table1.find_key(&vec![255; 32]).unwrap(), Some(vec![255; 32]));
+        // assert_eq!(table1.find_key(&vec![]).unwrap(), Some(vec![254; 32])); //FIXME
+        assert_eq!(table1.find_key(&vec![254; 32]).unwrap(),
+                   Some(vec![254; 32]));
+        assert_eq!(table1.find_key(&vec![255; 32]).unwrap(),
+                   Some(vec![255; 32]));
 
         assert!(table1.root_hash().unwrap() != hash(&[]));
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
