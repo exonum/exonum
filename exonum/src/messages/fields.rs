@@ -7,7 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::{Hash, PublicKey};
 
-use super::{Error, RawMessage, MessageBuffer};
+use super::{Error, RawMessage, MessageBuffer, Message};
 
 pub trait Field<'a> {
     // TODO: use Read and Cursor
@@ -444,8 +444,6 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
     }
 }
 
-// TODO Обобщить это все как следует, лучше всего, чтобы работало как для RawMessage, 
-// так и для типажа Message
 impl<'a> Field<'a> for Vec<RawMessage> {
     fn field_size() -> usize {
         1
@@ -472,6 +470,35 @@ impl<'a> Field<'a> for Vec<RawMessage> {
     }
 }
 
+impl<'a, T> Field<'a> for Vec<T> 
+    where T: Message
+{
+    fn field_size() -> usize {
+        1
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<T> {
+        let raw: Vec<RawMessage> = Field::read(buffer, from, to);
+        let out = raw.into_iter()
+            .map(|x| T::from_raw(x).unwrap()) //FIXME remove unwrap
+            .collect();
+        out
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        let raw = self.into_iter()
+            .map(|x| x.raw().as_ref().as_ref())
+            .collect::<Vec<&[u8]>>();
+        Field::write(&raw, buffer, from, to);
+    }
+
+    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
+        //TODO check messages as messages
+        <Vec<RawMessage> as Field>::check(&buffer, from, to)
+    }
+}
+
+
 // impl<'a, T> SegmentField<'a> for &'a [T] where T: Field<'a> {
 //     fn item_size() -> usize {
 //         T::field_size()
@@ -492,15 +519,8 @@ impl<'a> Field<'a> for Vec<RawMessage> {
 
 #[cfg(test)]
 mod tests {
-    use std::mem;
-    use std::sync::Arc;
-    use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
-
-    use time::Timespec;
-    use byteorder::{ByteOrder, LittleEndian};
-
-    use ::crypto::{Hash, PublicKey, gen_keypair, hash};
-    use ::messages::{Field, SegmentField, Error, RawMessage, MessageBuffer, Message, Status};
+    use ::crypto::{gen_keypair, hash};
+    use ::messages::{Field, RawMessage, Message, Status};
 
     #[test]
     fn test_str_segment() {
@@ -574,6 +594,25 @@ mod tests {
         let buf2 = buf.clone();
         <Vec<RawMessage> as Field>::check(&buf2, 0, 8).unwrap();
         let dat2: Vec<RawMessage> = Field::read(&buf2, 0, 8);
+        assert_eq!(dat2, dat);
+    }
+
+    #[test]
+    fn test_segments_of_status_messages() {
+        let (_, sec_key) = gen_keypair();
+
+        let mut buf = vec![0; 8];
+        let m1 = Status::new(1, 2, &hash(&[]), &sec_key);
+        let m2 = Status::new(2, 4, &hash(&[1]), &sec_key);
+        let m3 = Status::new(6, 5, &hash(&[3]), &sec_key);
+
+        let dat = vec![m1, m2, m3];
+        Field::write(&dat, &mut buf, 0, 8);
+        <Vec<Status> as Field>::check(&buf, 0, 8).unwrap();
+
+        let buf2 = buf.clone();
+        <Vec<Status> as Field>::check(&buf2, 0, 8).unwrap();
+        let dat2: Vec<Status> = Field::read(&buf2, 0, 8);
         assert_eq!(dat2, dat);
     }
 }
