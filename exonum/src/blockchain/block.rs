@@ -1,6 +1,8 @@
 use time::Timespec;
 
 use super::super::crypto::{Hash, hash};
+use super::super::messages::Field;
+use super::super::storage::StorageValue;
 
 pub const BLOCK_SIZE: usize = 116;
 
@@ -18,6 +20,23 @@ storage_value!(
 );
 
 // TODO: add network_id, propose_round, block version?
+
+// TODO add generic implementation for whole storage values
+impl<'a> Field<'a> for Block
+{
+    fn field_size() -> usize {
+        8
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Block {
+        let data = <&[u8] as Field>::read(&buffer, from, to);
+        Block::deserialize(data.to_vec())
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        <&[u8] as Field>::write(&self.clone().serialize().as_slice(), buffer, from, to);
+    }
+}
 
 
 #[test]

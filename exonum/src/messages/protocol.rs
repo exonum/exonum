@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use time::Timespec;
 use super::super::crypto::{Hash, PublicKey};
 use super::RawMessage;
+use super::super::blockchain;
 
 pub const CONNECT_MESSAGE_ID: u16 = 0;
 pub const STATUS_MESSAGE_ID: u16 = 1;
@@ -84,10 +85,11 @@ message! {
 message! {
     Block {
         const ID = BLOCK_MESSAGE_ID;
-        const SIZE = 16;
+        const SIZE = 24;
 
-        precommits:     Vec<Precommit>    [00 => 08]
-        transactions:   Vec<RawMessage>   [08 => 16]
+        block:          blockchain::Block [00 => 08]
+        precommits:     Vec<Precommit>    [08 => 16]
+        transactions:   Vec<RawMessage>   [16 => 24]
     }
 }
 
