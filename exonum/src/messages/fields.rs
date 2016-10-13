@@ -1,4 +1,5 @@
 use std::mem;
+use std::sync::Arc;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 
 use time::Timespec;
@@ -6,7 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::{Hash, PublicKey};
 
-use super::{Error, Message};
+use super::{Error, RawMessage, MessageBuffer};
 
 pub trait Field<'a> {
     // TODO: use Read and Cursor
@@ -247,87 +248,6 @@ impl<'a, T> Field<'a> for T
     }
 }
 
-// TODO как-то это все обобщить, чтобы не было магических констант
-// и можно было хранить что-то серъезнее &[u8]
-// во вторых нужно как-то избавиться от лишних выделений памяти
-impl<'a> Field<'a> for Vec<&'a [u8]> {
-    fn field_size() -> usize {
-        1
-    }
-
-    fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<&'a [u8]> {
-        debug_assert_eq!(to - from, 8);
-
-        let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
-        let count = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
-
-        let mut vec = Vec::new();
-        for i in 0..count {
-            let from = pos + i * 8;
-            let slice = <&[u8] as Field>::read(&buffer, from, from + 8);
-            vec.push(slice);
-        }
-        vec
-    }
-
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-        debug_assert_eq!(to - from, 8);
-
-        let pos = buffer.len();
-        LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
-        LittleEndian::write_u32(&mut buffer[from + 4..to], self.len() as u32);
-        buffer.resize(pos + self.len() * 8 + 8, 0);
-
-        // Write segment headers
-        let mut from = pos;
-        let mut pos = buffer.len();
-        for segment in self.iter() {
-            let len = segment.len();
-            LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
-            LittleEndian::write_u32(&mut buffer[from + 4..from + 8], len as u32);
-
-            from += 8;
-            pos += len;
-        }
-
-        // Write segment bodies
-        for segment in self.iter() {
-            buffer.extend_from_slice(segment);
-        }
-    }
-
-    // TODO Тут вызов функции по сути рекурсивный, нужно написать некий хэлпер для check
-    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
-        let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
-        let len = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
-
-        if len == 0 {
-            return Ok(());
-        }
-
-        if pos < from + 8 {
-            return Err(Error::IncorrectSegmentRefference {
-                position: from as u32,
-                value: pos as u32,
-            });
-        }
-
-        let end = pos + 8 * len;
-        if end > buffer.len() {
-            return Err(Error::IncorrectSegmentSize {
-                position: (from + 4) as u32,
-                value: len as u32,
-            });
-        }
-
-        for i in 0..len {
-            let from = i * 8;
-            <&[u8] as Field>::check(&buffer, from, from + 8)?;
-        }
-        Ok(())
-    }
-}
-
 impl<'a> SegmentField<'a> for &'a [u8] {
     fn item_size() -> usize {
         1
@@ -443,6 +363,115 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 }
 
+// TODO как-то это все обобщить, чтобы не было магических констант
+// и можно было хранить что-то серъезнее &[u8]
+// во вторых нужно как-то избавиться от лишних выделений памяти
+impl<'a> Field<'a> for Vec<&'a [u8]> {
+    fn field_size() -> usize {
+        1
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<&'a [u8]> {
+        debug_assert_eq!(to - from, 8);
+
+        let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
+        let count = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
+
+        let mut vec = Vec::new();
+        for i in 0..count {
+            let from = pos + i * 8;
+            let slice = <&[u8] as Field>::read(&buffer, from, from + 8);
+            vec.push(slice);
+        }
+        vec
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        debug_assert_eq!(to - from, 8);
+
+        let pos = buffer.len();
+        LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
+        LittleEndian::write_u32(&mut buffer[from + 4..to], self.len() as u32);
+        buffer.resize(pos + self.len() * 8 + 8, 0);
+
+        // Write segment headers
+        let mut from = pos;
+        let mut pos = buffer.len();
+        for segment in self.iter() {
+            let len = segment.count();
+            LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
+            LittleEndian::write_u32(&mut buffer[from + 4..from + 8], len);
+
+            from += 8;
+            pos += len as usize;
+        }
+
+        // Write segment bodies
+        for segment in self.iter() {
+            buffer.extend_from_slice(segment.as_slice());
+        }
+    }
+
+    // TODO Тут вызов функции по сути рекурсивный, нужно написать некий хэлпер для check
+    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
+        let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
+        let len = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
+
+        if len == 0 {
+            return Ok(());
+        }
+
+        if pos < from + 8 {
+            return Err(Error::IncorrectSegmentRefference {
+                position: from as u32,
+                value: pos as u32,
+            });
+        }
+
+        let end = pos + 8 * len;
+        if end > buffer.len() {
+            return Err(Error::IncorrectSegmentSize {
+                position: (from + 4) as u32,
+                value: len as u32,
+            });
+        }
+
+        for i in 0..len {
+            let from = i * 8;
+            <&[u8] as Field>::check(&buffer, from, from + 8)?;
+        }
+        Ok(())
+    }
+}
+
+// TODO Обобщить это все как следует, лучше всего, чтобы работало как для RawMessage, 
+// так и для типажа Message
+impl<'a> Field<'a> for Vec<RawMessage> {
+    fn field_size() -> usize {
+        1
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<RawMessage> {
+        let raw: Vec<&[u8]> = Field::read(buffer, from, to);
+        let out = raw.into_iter()
+            .map(|x| Arc::new(MessageBuffer::from_vec(x.to_vec())))
+            .collect();
+        out
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        let raw = self.into_iter()
+            .map(|x| x.as_ref().as_ref())
+            .collect::<Vec<&[u8]>>();
+        Field::write(&raw, buffer, from, to);
+    }
+
+    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
+        //TODO check messages as messages
+        <Vec<&[u8]> as Field>::check(&buffer, from, to)
+    }
+}
+
 // impl<'a, T> SegmentField<'a> for &'a [T] where T: Field<'a> {
 //     fn item_size() -> usize {
 //         T::field_size()
@@ -461,58 +490,91 @@ impl<'a> SegmentField<'a> for &'a str {
 //     }
 // }
 
-#[test]
-fn test_str_segment() {
-    let mut buf = vec![0; 8];
-    let s = "test юникодной строчки efw_adqq ss/adfq";
-    Field::write(&s, &mut buf, 0, 8);
-    <&str as Field>::check(&buf, 0, 8).unwrap();
+#[cfg(test)]
+mod tests {
+    use std::mem;
+    use std::sync::Arc;
+    use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 
-    let buf2 = buf.clone();
-    <&str as Field>::check(&buf2, 0, 8).unwrap();
-    let s2: &str = Field::read(&buf2, 0, 8);
-    assert_eq!(s2, s);
+    use time::Timespec;
+    use byteorder::{ByteOrder, LittleEndian};
+
+    use ::crypto::{Hash, PublicKey, gen_keypair, hash};
+    use ::messages::{Field, SegmentField, Error, RawMessage, MessageBuffer, Message, Status};
+
+    #[test]
+    fn test_str_segment() {
+        let mut buf = vec![0; 8];
+        let s = "test юникодной строчки efw_adqq ss/adfq";
+        Field::write(&s, &mut buf, 0, 8);
+        <&str as Field>::check(&buf, 0, 8).unwrap();
+
+        let buf2 = buf.clone();
+        <&str as Field>::check(&buf2, 0, 8).unwrap();
+        let s2: &str = Field::read(&buf2, 0, 8);
+        assert_eq!(s2, s);
+    }
+
+    #[test]
+    fn test_u16_segment() {
+        let mut buf = vec![0; 8];
+        let s = [1u16, 3, 10, 15, 23, 4, 45];
+        Field::write(&s.as_ref(), &mut buf, 0, 8);
+        <&[u16] as Field>::check(&buf, 0, 8).unwrap();
+
+        let buf2 = buf.clone();
+        <&[u16] as Field>::check(&buf2, 0, 8).unwrap();
+        let s2: &[u16] = Field::read(&buf2, 0, 8);
+        assert_eq!(s2, s.as_ref());
+    }
+
+    #[test]
+    fn test_u32_segment() {
+        let mut buf = vec![0; 8];
+        let s = [1u32, 3, 10, 15, 23, 4, 45];
+        Field::write(&s.as_ref(), &mut buf, 0, 8);
+        <&[u32] as Field>::check(&buf, 0, 8).unwrap();
+
+        let buf2 = buf.clone();
+        <&[u32] as Field>::check(&buf2, 0, 8).unwrap();
+        let s2: &[u32] = Field::read(&buf2, 0, 8);
+        assert_eq!(s2, s.as_ref());
+    }
+
+    #[test]
+    fn test_segments_of_segments() {
+        let mut buf = vec![0; 8];
+        let v1 = [1u8, 2, 3];
+        let v2 = [1u8, 3];
+        let v3 = [2u8, 5, 2, 3, 56, 3];
+
+        let dat = vec![v1.as_ref(), v2.as_ref(), v3.as_ref()];
+        Field::write(&dat, &mut buf, 0, 8);
+        <Vec<&[u8]> as Field>::check(&buf, 0, 8).unwrap();
+
+        let buf2 = buf.clone();
+        <Vec<&[u8]> as Field>::check(&buf2, 0, 8).unwrap();
+        let dat2: Vec<&[u8]> = Field::read(&buf2, 0, 8);
+        assert_eq!(dat2, dat);
+    }
+
+    #[test]
+    fn test_segments_of_raw_messages() {
+        let (_, sec_key) = gen_keypair();
+
+        let mut buf = vec![0; 8];
+        let m1 = Status::new(1, 2, &hash(&[]), &sec_key);
+        let m2 = Status::new(2, 4, &hash(&[1]), &sec_key);
+        let m3 = Status::new(6, 5, &hash(&[3]), &sec_key);
+
+        let dat = vec![m1.raw().clone(), m2.raw().clone(), m3.raw().clone()];
+        Field::write(&dat, &mut buf, 0, 8);
+        <Vec<RawMessage> as Field>::check(&buf, 0, 8).unwrap();
+
+        let buf2 = buf.clone();
+        <Vec<RawMessage> as Field>::check(&buf2, 0, 8).unwrap();
+        let dat2: Vec<RawMessage> = Field::read(&buf2, 0, 8);
+        assert_eq!(dat2, dat);
+    }
 }
 
-#[test]
-fn test_u16_segment() {
-    let mut buf = vec![0; 8];
-    let s = [1u16, 3, 10, 15, 23, 4, 45];
-    Field::write(&s.as_ref(), &mut buf, 0, 8);
-    <&[u16] as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <&[u16] as Field>::check(&buf2, 0, 8).unwrap();
-    let s2: &[u16] = Field::read(&buf2, 0, 8);
-    assert_eq!(s2, s.as_ref());
-}
-
-#[test]
-fn test_u32_segment() {
-    let mut buf = vec![0; 8];
-    let s = [1u32, 3, 10, 15, 23, 4, 45];
-    Field::write(&s.as_ref(), &mut buf, 0, 8);
-    <&[u32] as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <&[u32] as Field>::check(&buf2, 0, 8).unwrap();
-    let s2: &[u32] = Field::read(&buf2, 0, 8);
-    assert_eq!(s2, s.as_ref());
-}
-
-#[test]
-fn test_segments_of_segments() {
-    let mut buf = vec![0; 8];
-    let v1 = [1u8, 2, 3];
-    let v2 = [1u8, 3];
-    let v3 = [2u8, 5, 2, 3, 56, 3];
-
-    let dat = vec![v1.as_ref(), v2.as_ref(), v3.as_ref()];
-    Field::write(&dat, &mut buf, 0, 8);
-    <Vec<&[u8]> as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <Vec<&[u8]> as Field>::check(&buf2, 0, 8).unwrap();
-    let dat2: Vec<&[u8]> = Field::read(&buf2, 0, 8);
-    assert_eq!(dat2, dat);
-}
