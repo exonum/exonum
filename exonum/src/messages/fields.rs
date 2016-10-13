@@ -498,6 +498,20 @@ impl<'a, T> Field<'a> for Vec<T>
     }
 }
 
+impl<'a> Field<'a> for Vec<u8> {
+    fn field_size() -> usize {
+        8
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<u8> {
+        let data = <&[u8] as Field>::read(&buffer, from, to);
+        data.to_vec()
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        <&[u8] as Field>::write(&self.as_slice(), buffer, from, to);
+    }
+}
 
 // impl<'a, T> SegmentField<'a> for &'a [T] where T: Field<'a> {
 //     fn item_size() -> usize {

@@ -1,9 +1,12 @@
 use std::net::SocketAddr;
 
-use super::super::crypto::{hash, gen_keypair};
+use time;
 
+use super::super::crypto::{hash, gen_keypair};
+use super::super::blockchain;
 use super::{Field, RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, Block,
             RequestBlock};
+
 
 #[test]
 fn test_str_segment() {
@@ -16,6 +19,19 @@ fn test_str_segment() {
     <&str as Field>::check(&buf2, 0, 8).unwrap();
     let s2: &str = Field::read(&buf2, 0, 8);
     assert_eq!(s2, s);
+}
+
+#[test]
+fn test_vec_segment() {
+    let mut buf = vec![0; 8];
+    let v = vec![1, 2, 3, 5, 10];
+    Field::write(&v, &mut buf, 0, 8);
+    <Vec<u8> as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <Vec<u8> as Field>::check(&buf2, 0, 8).unwrap();
+    let v2: Vec<u8> = Field::read(&buf2, 0, 8);
+    assert_eq!(v2, v);
 }
 
 #[test]
@@ -217,6 +233,15 @@ fn test_status() {
 fn test_block() {
     let (_, secret_key) = gen_keypair();
 
+    let content = blockchain::Block::new(
+        500,
+        time::get_time(),
+        &hash(&[1]),
+        &hash(&[2]),
+        &hash(&[3]),
+        0,
+    );
+
     let precommits = vec![
         Precommit::new(123,
                         15,
@@ -243,7 +268,8 @@ fn test_block() {
         Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone(),
     ];
 
-    let block = Block::new(precommits.clone(), transactions.clone(), &secret_key);
+    let block = Block::new(content.clone(), precommits.clone(), transactions.clone(), &secret_key);
+    assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
 }
