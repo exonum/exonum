@@ -233,42 +233,41 @@ fn test_status() {
 fn test_block() {
     let (_, secret_key) = gen_keypair();
 
-    let content = blockchain::Block::new(
-        500,
-        time::get_time(),
-        &hash(&[1]),
-        &hash(&[2]),
-        &hash(&[3]),
-        0,
-    );
+    let content = blockchain::Block::new(500,
+                                         time::get_time(),
+                                         &hash(&[1]),
+                                         &hash(&[2]),
+                                         &hash(&[3]),
+                                         0);
 
-    let precommits = vec![
-        Precommit::new(123,
-                        15,
-                        25,
-                        &hash(&[1, 2, 3]),
-                        &hash(&[3, 2, 1]),
-                        &secret_key),
-        Precommit::new(13,
-                        25,
-                        35,
-                        &hash(&[4, 2, 3]),
-                        &hash(&[3, 3, 1]),
-                        &secret_key),
-        Precommit::new(323,
-                        15,
-                        25,
-                        &hash(&[1, 1, 3]),
-                        &hash(&[5, 2, 1]),
-                        &secret_key)
-    ];
+    let precommits = vec![Precommit::new(123,
+                                         15,
+                                         25,
+                                         &hash(&[1, 2, 3]),
+                                         &hash(&[3, 2, 1]),
+                                         &secret_key),
+                          Precommit::new(13,
+                                         25,
+                                         35,
+                                         &hash(&[4, 2, 3]),
+                                         &hash(&[3, 3, 1]),
+                                         &secret_key),
+                          Precommit::new(323,
+                                         15,
+                                         25,
+                                         &hash(&[1, 1, 3]),
+                                         &hash(&[5, 2, 1]),
+                                         &secret_key)];
     let transactions = vec![
         Status::new(1, 2, &hash(&[]), &secret_key).raw().clone(),
         Status::new(2, 4, &hash(&[2]), &secret_key).raw().clone(),
         Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone(),
     ];
 
-    let block = Block::new(content.clone(), precommits.clone(), transactions.clone(), &secret_key);
+    let block = Block::new(content.clone(),
+                           precommits.clone(),
+                           transactions.clone(),
+                           &secret_key);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);

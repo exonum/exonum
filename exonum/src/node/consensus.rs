@@ -6,7 +6,7 @@ use super::super::crypto::{Hash, PublicKey};
 use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
-                             RequestPrecommits, RequestCommit};
+                             RequestPrecommits, RequestCommit, RequestBlock, Block};
 use super::super::storage::Map;
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
@@ -101,6 +101,10 @@ impl<B, S> NodeHandler<B, S>
         } else {
             self.has_full_propose(hash, msg.round());
         }
+    }
+
+    pub fn handle_block(&mut self, msg: Block) {
+        debug!("Handle block {:?}", msg);
     }
 
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
@@ -456,6 +460,15 @@ impl<B, S> NodeHandler<B, S>
                                        self.channel.get_time(),
                                        self.state.height(),
                                        &self.secret_key)
+                        .raw()
+                        .clone()
+                }
+                RequestData::Block(height) => {
+                    RequestBlock::new(&self.public_key,
+                                      &peer,
+                                      self.channel.get_time(),
+                                      height,
+                                      &self.secret_key)
                         .raw()
                         .clone()
                 }
