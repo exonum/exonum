@@ -1,5 +1,6 @@
 use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
-                             RequestPrevotes, RequestPrecommits, RequestCommit, RequestBlock, Block};
+                             RequestPrevotes, RequestPrecommits, RequestCommit, RequestBlock,
+                             Block};
 use super::super::blockchain::{Blockchain, View};
 use super::super::storage::{Map, List};
 use super::super::events::Channel;
@@ -160,7 +161,7 @@ impl<B, S> NodeHandler<B, S>
 
         let view = self.blockchain.view();
         let height = msg.height();
-        let block_hash = view.heights().get(height).unwrap().unwrap();    
+        let block_hash = view.heights().get(height).unwrap().unwrap();
 
         let block = view.blocks().get(&block_hash).unwrap().unwrap();
         let precommits = view.precommits(&block_hash)

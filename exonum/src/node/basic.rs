@@ -28,6 +28,7 @@ impl<B, S> NodeHandler<B, S>
             Any::Transaction(message) => self.handle_tx(message),
             Any::Consensus(message) => self.handle_consensus(message),
             Any::Request(message) => self.handle_request(message),
+            Any::Block(message) => self.handle_block(message),
         }
     }
 

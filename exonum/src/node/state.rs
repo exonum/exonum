@@ -15,6 +15,7 @@ const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
 const REQUEST_PREVOTES_WAIT: u64 = 100;
 const REQUEST_PRECOMMITS_WAIT: u64 = 100;
 const REQUEST_COMMIT_WAIT: u64 = 100;
+const REQUEST_BLOCK_WAIT: u64 = 100;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -69,6 +70,7 @@ pub enum RequestData {
     Prevotes(Round, Hash),
     Precommits(Round, Hash, Hash),
     Commit, // TODO: add height?
+    Block(u64),
 }
 
 // Состояние запроса
@@ -101,6 +103,7 @@ impl RequestData {
             RequestData::Prevotes(..) => REQUEST_PREVOTES_WAIT,
             RequestData::Precommits(..) => REQUEST_PRECOMMITS_WAIT,
             RequestData::Commit => REQUEST_COMMIT_WAIT,
+            RequestData::Block(..) => REQUEST_BLOCK_WAIT,
         };
         Duration::milliseconds(ms as i64)
     }

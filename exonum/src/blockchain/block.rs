@@ -22,8 +22,7 @@ storage_value!(
 // TODO: add network_id, propose_round, block version?
 
 // TODO add generic implementation for whole storage values
-impl<'a> Field<'a> for Block
-{
+impl<'a> Field<'a> for Block {
     fn field_size() -> usize {
         8
     }

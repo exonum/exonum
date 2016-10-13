@@ -26,6 +26,7 @@ pub use self::protocol::*;
 pub enum Any<Tx: Message> {
     Connect(Connect),
     Status(Status),
+    Block(Block),
     Consensus(ConsensusMessage),
     Request(RequestMessage),
     Transaction(Tx),
@@ -46,7 +47,7 @@ pub enum RequestMessage {
     Precommits(RequestPrecommits),
     Commit(RequestCommit),
     Peers(RequestPeers),
-    Block(RequestBlock)
+    Block(RequestBlock),
 }
 
 // #[derive(Clone, PartialEq)]
@@ -278,6 +279,7 @@ impl<Tx: Message> fmt::Debug for Any<Tx> {
             Any::Consensus(ref msg) => write!(fmt, "{:?}", msg),
             Any::Request(ref msg) => write!(fmt, "{:?}", msg),
             Any::Transaction(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Block(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }
