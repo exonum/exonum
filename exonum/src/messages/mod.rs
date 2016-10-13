@@ -46,6 +46,7 @@ pub enum RequestMessage {
     Precommits(RequestPrecommits),
     Commit(RequestCommit),
     Peers(RequestPeers),
+    Block(RequestBlock)
 }
 
 // #[derive(Clone, PartialEq)]
@@ -110,6 +111,7 @@ impl RequestMessage {
             RequestMessage::Precommits(ref msg) => msg.from(),
             RequestMessage::Commit(ref msg) => msg.from(),
             RequestMessage::Peers(ref msg) => msg.from(),
+            RequestMessage::Block(ref msg) => msg.from(),
         }
     }
 
@@ -121,6 +123,7 @@ impl RequestMessage {
             RequestMessage::Precommits(ref msg) => msg.to(),
             RequestMessage::Commit(ref msg) => msg.to(),
             RequestMessage::Peers(ref msg) => msg.to(),
+            RequestMessage::Block(ref msg) => msg.to(),
         }
     }
 
@@ -132,6 +135,7 @@ impl RequestMessage {
             RequestMessage::Precommits(ref msg) => msg.time(),
             RequestMessage::Commit(ref msg) => msg.time(),
             RequestMessage::Peers(ref msg) => msg.time(),
+            RequestMessage::Block(ref msg) => msg.time(),
         }
     }
 
@@ -143,6 +147,7 @@ impl RequestMessage {
             RequestMessage::Precommits(ref msg) => msg.verify(public_key),
             RequestMessage::Commit(ref msg) => msg.verify(public_key),
             RequestMessage::Peers(ref msg) => msg.verify(public_key),
+            RequestMessage::Block(ref msg) => msg.verify(public_key),
         }
     }
 
@@ -154,6 +159,7 @@ impl RequestMessage {
             RequestMessage::Precommits(ref msg) => msg.raw(),
             RequestMessage::Commit(ref msg) => msg.raw(),
             RequestMessage::Peers(ref msg) => msg.raw(),
+            RequestMessage::Block(ref msg) => msg.raw(),
         }
     }
 }
@@ -167,6 +173,7 @@ impl fmt::Debug for RequestMessage {
             RequestMessage::Precommits(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Commit(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Peers(ref msg) => write!(fmt, "{:?}", msg),
+            RequestMessage::Block(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }
