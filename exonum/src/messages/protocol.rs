@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use time::Timespec;
 use super::super::crypto::{Hash, PublicKey};
-use super::MessageBuffer;
+use super::RawMessage;
 
 pub const CONNECT_MESSAGE_ID: u16 = 0;
 pub const STATUS_MESSAGE_ID: u16 = 1;
@@ -80,15 +80,15 @@ message! {
     }
 }
 
-// message! {
-//     Block {
-//         const ID = BLOCK_MESSAGE_ID;
-//         const SIZE = 16;
+message! {
+    Block {
+        const ID = BLOCK_MESSAGE_ID;
+        const SIZE = 16;
 
-//         precommits:     Vec<&[u8]>        [00 => 08]
-//         transactions:   Vec<&[u8]>        [08 => 16]
-//     }
-// }
+        precommits:     Vec<Precommit>    [00 => 08]
+        transactions:   Vec<RawMessage>   [08 => 16]
+    }
+}
 
 message! {
     RequestPropose {

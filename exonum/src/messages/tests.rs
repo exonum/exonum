@@ -2,7 +2,101 @@ use std::net::SocketAddr;
 
 use super::super::crypto::{hash, gen_keypair};
 
-use super::{Message, Connect, Propose, Prevote, Precommit, Status};
+use super::{Field, RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, Block};
+
+#[test]
+fn test_str_segment() {
+    let mut buf = vec![0; 8];
+    let s = "test юникодной строчки efw_adqq ss/adfq";
+    Field::write(&s, &mut buf, 0, 8);
+    <&str as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <&str as Field>::check(&buf2, 0, 8).unwrap();
+    let s2: &str = Field::read(&buf2, 0, 8);
+    assert_eq!(s2, s);
+}
+
+#[test]
+fn test_u16_segment() {
+    let mut buf = vec![0; 8];
+    let s = [1u16, 3, 10, 15, 23, 4, 45];
+    Field::write(&s.as_ref(), &mut buf, 0, 8);
+    <&[u16] as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <&[u16] as Field>::check(&buf2, 0, 8).unwrap();
+    let s2: &[u16] = Field::read(&buf2, 0, 8);
+    assert_eq!(s2, s.as_ref());
+}
+
+#[test]
+fn test_u32_segment() {
+    let mut buf = vec![0; 8];
+    let s = [1u32, 3, 10, 15, 23, 4, 45];
+    Field::write(&s.as_ref(), &mut buf, 0, 8);
+    <&[u32] as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <&[u32] as Field>::check(&buf2, 0, 8).unwrap();
+    let s2: &[u32] = Field::read(&buf2, 0, 8);
+    assert_eq!(s2, s.as_ref());
+}
+
+#[test]
+fn test_segments_of_segments() {
+    let mut buf = vec![0; 8];
+    let v1 = [1u8, 2, 3];
+    let v2 = [1u8, 3];
+    let v3 = [2u8, 5, 2, 3, 56, 3];
+
+    let dat = vec![v1.as_ref(), v2.as_ref(), v3.as_ref()];
+    Field::write(&dat, &mut buf, 0, 8);
+    <Vec<&[u8]> as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <Vec<&[u8]> as Field>::check(&buf2, 0, 8).unwrap();
+    let dat2: Vec<&[u8]> = Field::read(&buf2, 0, 8);
+    assert_eq!(dat2, dat);
+}
+
+#[test]
+fn test_segments_of_raw_messages() {
+    let (_, sec_key) = gen_keypair();
+
+    let mut buf = vec![0; 8];
+    let m1 = Status::new(1, 2, &hash(&[]), &sec_key);
+    let m2 = Status::new(2, 4, &hash(&[1]), &sec_key);
+    let m3 = Status::new(6, 5, &hash(&[3]), &sec_key);
+
+    let dat = vec![m1.raw().clone(), m2.raw().clone(), m3.raw().clone()];
+    Field::write(&dat, &mut buf, 0, 8);
+    <Vec<RawMessage> as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <Vec<RawMessage> as Field>::check(&buf2, 0, 8).unwrap();
+    let dat2: Vec<RawMessage> = Field::read(&buf2, 0, 8);
+    assert_eq!(dat2, dat);
+}
+
+#[test]
+fn test_segments_of_status_messages() {
+    let (_, sec_key) = gen_keypair();
+
+    let mut buf = vec![0; 8];
+    let m1 = Status::new(1, 2, &hash(&[]), &sec_key);
+    let m2 = Status::new(2, 4, &hash(&[1]), &sec_key);
+    let m3 = Status::new(6, 5, &hash(&[3]), &sec_key);
+
+    let dat = vec![m1, m2, m3];
+    Field::write(&dat, &mut buf, 0, 8);
+    <Vec<Status> as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <Vec<Status> as Field>::check(&buf2, 0, 8).unwrap();
+    let dat2: Vec<Status> = Field::read(&buf2, 0, 8);
+    assert_eq!(dat2, dat);
+}
 
 #[test]
 fn test_connect() {
@@ -116,4 +210,39 @@ fn test_status() {
     assert_eq!(commit.height(), height);
     assert_eq!(commit.last_hash(), &last_hash);
     assert!(commit.verify(&public_key));
+}
+
+#[test]
+fn test_block() {
+    let (_, secret_key) = gen_keypair();
+
+    let precommits = vec![
+        Precommit::new(123,
+                        15,
+                        25,
+                        &hash(&[1, 2, 3]),
+                        &hash(&[3, 2, 1]),
+                        &secret_key),
+        Precommit::new(13,
+                        25,
+                        35,
+                        &hash(&[4, 2, 3]),
+                        &hash(&[3, 3, 1]),
+                        &secret_key),
+        Precommit::new(323,
+                        15,
+                        25,
+                        &hash(&[1, 1, 3]),
+                        &hash(&[5, 2, 1]),
+                        &secret_key)
+    ];
+    let transactions = vec![
+        Status::new(1, 2, &hash(&[]), &secret_key).raw().clone(),
+        Status::new(2, 4, &hash(&[2]), &secret_key).raw().clone(),
+        Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone(),
+    ];
+
+    let block = Block::new(precommits.clone(), transactions.clone(), &secret_key);
+    assert_eq!(block.precommits(), precommits);
+    assert_eq!(block.transactions(), transactions);
 }
