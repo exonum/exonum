@@ -42,7 +42,7 @@ use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash};
 use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
-use blockchain_explorer::{ValueNotFound};
+use blockchain_explorer::ValueNotFound;
 
 use digital_rights::{Fingerprint, DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner,
                      TxCreateDistributor, TxAddContent, TxAddContract, TxReport, Role};
@@ -96,6 +96,23 @@ fn send_tx<'a, D: Database>(tx: DigitalRightsTx,
     client.json(json)
 }
 
+fn add_participant<'a, D: Database>(tx: DigitalRightsTx,
+                                    client: Client<'a>,
+                                    ch: Channel<DigitalRightsBlockchain<D>>,
+                                    pub_key: &PublicKey,
+                                    sec_key: &SecretKey)
+                                    -> Result<Client<'a>, ErrorResponse> {
+    let tx_hash = tx.hash().to_hex();
+    ch.send(tx);
+    let json = &jsonway::object(|json| {
+            json.set("tx_hash", tx_hash);
+            json.set("pub_key", pub_key);
+            json.set("sec_key", sec_key);
+        })
+        .unwrap();
+    client.json(json)
+}
+
 fn digital_rights_api<D: Database>(api: &mut Api,
                                    blockchain: DigitalRightsBlockchain<D>,
                                    channel: Channel<DigitalRightsBlockchain<D>>) {
@@ -115,7 +132,11 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     save_user(&mut cookies, "owner", &public_key, &secret_key);
                 }
                 let tx = TxCreateOwner::new(&public_key, &name, &secret_key);
-                send_tx(DigitalRightsTx::CreateOwner(tx), client, ch.clone())
+                add_participant(DigitalRightsTx::CreateOwner(tx), 
+                                client, 
+                                ch.clone(), 
+                                &public_key, 
+                                &secret_key)
             })
         });
 
@@ -134,7 +155,51 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     save_user(&mut cookies, "distributor", &public_key, &secret_key);
                 }
                 let tx = TxCreateDistributor::new(&public_key, &name, &secret_key);
-                send_tx(DigitalRightsTx::CreateDistributor(tx), client, ch.clone())
+                add_participant(DigitalRightsTx::CreateDistributor(tx), 
+                                client, 
+                                ch.clone(), 
+                                &public_key, 
+                                &secret_key)
+            })
+        });
+
+        let b = blockchain.clone();
+        api.post("auth", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("pub_key", json_dsl::string());
+                params.req_typed("sec_key", json_dsl::string());
+            });
+
+            endpoint.handle(move |client, params| {
+                let pub_key = {
+                    let r = PublicKey::from_hex(params.find("pub_key").unwrap().as_str().unwrap());
+                    match r {
+                        Ok(r) => r,
+                        Err(e) => return client.error(e),
+                    }
+                };
+                let sec_key = {
+                    let r = SecretKey::from_hex(params.find("sec_key").unwrap().as_str().unwrap());
+                    match r {
+                        Ok(r) => r,
+                        Err(e) => return client.error(e),
+                    }
+                };
+                // TODO add keys verification
+
+                let drm = DigitalRightsApi::new(b.clone());
+                let role = match drm.participant_id(&pub_key) {
+                    Ok(Some(Role::Distributor(_))) => "distributor",
+                    Ok(Some(Role::Owner(_))) => "owner",
+                    Ok(None) => return client.error(ValueNotFound::new("Unable to auth with given key")),
+                    Err(e) => return client.error(e)
+                };
+
+                {
+                    let mut cookies = client.request.cookies();
+                    save_user(&mut cookies, role, &pub_key, &sec_key);
+                }
+                client.empty()
             })
         });
 

@@ -466,7 +466,7 @@ impl<D: Database> DigitalRightsApi<D> {
             let distributor = self.distributor_info(report.distributor_id())?.unwrap();
             let info = ParticipantInfo {
                 id: distributor.id,
-                name: distributor.name
+                name: distributor.name,
             };
             Some(ReportInfo::new(report, info))
         } else {
@@ -520,7 +520,7 @@ impl<D: Database> DigitalRightsApi<D> {
             id: u16,
             fingerprint: HexField<Fingerprint>,
             amount: u64,
-            plays: u64
+            plays: u64,
         }
 
         #[derive(Debug, Serialize)]
@@ -529,7 +529,7 @@ impl<D: Database> DigitalRightsApi<D> {
             owners: Vec<ParticipantInfo>,
             distributors: Vec<ParticipantInfo>,
             ownerships: Vec<ShortContractInfo>,
-            contracts: Vec<ShortContractInfo>
+            contracts: Vec<ShortContractInfo>,
         }
 
         let view = self.view();
@@ -572,7 +572,7 @@ impl<D: Database> DigitalRightsApi<D> {
                     id: id,
                     fingerprint: HexField(*ownership.fingerprint()),
                     plays: ownership.plays(),
-                    amount: ownership.amount()
+                    amount: ownership.amount(),
                 });
             }
         }
@@ -583,7 +583,7 @@ impl<D: Database> DigitalRightsApi<D> {
                     id: id,
                     fingerprint: HexField(*contract.fingerprint()),
                     plays: contract.plays(),
-                    amount: contract.amount()
+                    amount: contract.amount(),
                 });
             }
         }
@@ -593,7 +593,7 @@ impl<D: Database> DigitalRightsApi<D> {
             owners: owners,
             distributors: distributors,
             ownerships: ownerships,
-            contracts: contracts
+            contracts: contracts,
         };
         Ok(info)
     }
