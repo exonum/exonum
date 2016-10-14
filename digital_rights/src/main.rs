@@ -20,7 +20,6 @@ extern crate exonum;
 extern crate blockchain_explorer;
 extern crate digital_rights;
 
-use std::error::Error;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
@@ -43,7 +42,7 @@ use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash};
 use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
-use blockchain_explorer::HexField;
+use blockchain_explorer::{ValueNotFound};
 
 use digital_rights::{Fingerprint, DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner,
                      TxCreateDistributor, TxAddContent, TxAddContract, TxReport, Role};
@@ -385,16 +384,42 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     Ok(Some(Role::Distributor(id))) => {
                         match drm.distributor_content_info(id, &fingerprint) {
                             Ok(Some(info)) => client.json(&info.to_json()),
-                            _ => client.error(StorageError::new("Unable to find content"))
+                            Err(e) => client.error(e),
+                            _ => client.error(ValueNotFound::new("Unable to find content"))
                         }
                     }
                     Ok(Some(Role::Owner(id))) => {
                         match drm.owner_content_info(id, &fingerprint) {
                             Ok(Some(info)) => client.json(&info.to_json()),
-                            _ => client.error(StorageError::new("Unable to find content"))     
+                            Err(e) => client.error(e),
+                            _ => client.error(ValueNotFound::new("Unable to find content"))     
                         }
                     }
                     _ => client.error(StorageError::new("Unknown role"))
+                }
+            })
+        });
+
+        let b = blockchain.clone();
+        api.get("reports/:uuid", move |endpoint| {
+            endpoint.params(|params| {
+                params.req_typed("uuid", json_dsl::string());
+            });
+
+            endpoint.handle(move |client, params| {
+                let uuid = {
+                    let r = Fingerprint::from_hex(params.find("uuid").unwrap().as_str().unwrap());
+                    match r {
+                        Ok(f) => f,
+                        Err(e) => return client.error(e),
+                    }
+                };
+
+                let drm = DigitalRightsApi::new(b.clone());
+                match drm.find_report(&uuid) {
+                    Ok(Some(info)) => client.json(&info.to_json()),
+                    Ok(None) => client.error(ValueNotFound::new("Unable to find report with given uuid")),
+                    Err(e) => client.error(e),
                 }
             })
         });
@@ -409,7 +434,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                 }
             })
         });
-    });
+    }); // namespace drm
 }
 
 fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
@@ -439,6 +464,9 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                         body = e.to_string();
                     } else if let Some(e) = err.downcast::<errors::Validation>() {
                         code = StatusCode::BadRequest;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<ValueNotFound>() {
+                        code = StatusCode::NotFound;
                         body = e.to_string();
                     } else {
                         code = StatusCode::NotImplemented;

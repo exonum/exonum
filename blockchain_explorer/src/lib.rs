@@ -14,6 +14,8 @@ extern crate valico;
 
 use std::ops::Deref;
 use std::marker::PhantomData;
+use std::error;
+use std::fmt;
 
 use serde::{Serialize, Serializer};
 use serde::de;
@@ -23,15 +25,36 @@ use rustless::{Api, Nesting};
 use valico::json_dsl;
 
 use exonum::crypto::{Hash, HexValue, ToHex};
-use exonum::storage::{Error as StorageError};
-use exonum::blockchain::{Blockchain};
+use exonum::storage::Error as StorageError;
+use exonum::blockchain::Blockchain;
 
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
+
+#[derive(Debug)]
+pub struct ValueNotFound(String);
+
+impl fmt::Display for ValueNotFound {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ValueNotFound: {}", self.0)
+    }
+}
+
+impl error::Error for ValueNotFound {
+    fn description(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
+impl ValueNotFound {
+    pub fn new<T: Into<String>>(s: T) -> ValueNotFound {
+        ValueNotFound(s.into())
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct HexField<T: AsRef<[u8]> + Clone>(pub T);
 
-impl<T> Deref for HexField<T> 
+impl<T> Deref for HexField<T>
     where T: AsRef<[u8]> + Clone
 {
     type Target = T;
@@ -119,7 +142,9 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
                 let explorer = BlockchainExplorer::new(b1.clone());
                 match explorer.block_info_with_height::<T>(height) {
                     Ok(Some(block)) => client.json(&block.to_json()),
-                    Ok(None) => client.error(StorageError::new("Unable to find block with given height")),
+                    Ok(None) => {
+                        client.error(ValueNotFound::new("Unable to find block with given height"))
+                    }
                     Err(e) => client.error(e),
                 }
             })
@@ -138,7 +163,11 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
                 match Hash::from_hex(hash) {
                     Ok(hash) => {
                         match explorer.tx_info::<T>(&hash) {
-                            Ok(tx_info) => client.json(&tx_info.to_json()),
+                            Ok(Some(tx_info)) => client.json(&tx_info.to_json()),
+                            Ok(None) => {
+                                client.error(ValueNotFound::new("Unable to found transaction \
+                                                                 with given hash"))
+                            }
                             Err(e) => client.error(e),
                         }
                     }

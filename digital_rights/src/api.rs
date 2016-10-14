@@ -461,6 +461,20 @@ impl<D: Database> DigitalRightsApi<D> {
         Ok(v)
     }
 
+    pub fn find_report(&self, uuid: &Uuid) -> StorageResult<Option<ReportInfo>> {
+        let r = if let Some(report) = self.view().reports().get(&uuid)? {
+            let distributor = self.distributor_info(report.distributor_id())?.unwrap();
+            let info = ParticipantInfo {
+                id: distributor.id,
+                name: distributor.name
+            };
+            Some(ReportInfo::new(report, info))
+        } else {
+            None
+        };
+        Ok(r)
+    }
+
     pub fn shares_info(&self,
                        content_shares: &Vec<ContentShare>)
                        -> StorageResult<Vec<ContentShareInfo>> {
