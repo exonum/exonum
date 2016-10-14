@@ -20,11 +20,6 @@ pub trait View<F: Fork>: Deref<Target = F> {
         MapTable::new(vec![01], self)
     }
 
-    // FIXME: remove this!
-    fn proposes(&self) -> MapTable<F, Hash, Propose> {
-        MapTable::new(vec![10], self)
-    }
-
     fn heights(&self) -> ListTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
         ListTable::new(MapTable::new(vec![02], self))
     }

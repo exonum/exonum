@@ -1,5 +1,5 @@
 use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
-                             RequestPrevotes, RequestPrecommits, RequestCommit, RequestBlock,
+                             RequestPrevotes, RequestPrecommits, RequestBlock,
                              Block};
 use super::super::blockchain::{Blockchain, View};
 use super::super::storage::{Map, List};
@@ -42,7 +42,6 @@ impl<B, S> NodeHandler<B, S>
             RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
             RequestMessage::Prevotes(msg) => self.handle_request_prevotes(msg),
             RequestMessage::Precommits(msg) => self.handle_request_precommits(msg),
-            RequestMessage::Commit(msg) => self.handle_request_commit(msg),
             RequestMessage::Peers(msg) => self.handle_request_peers(msg),
             RequestMessage::Block(msg) => self.handle_request_block(msg),
         }
@@ -56,15 +55,8 @@ impl<B, S> NodeHandler<B, S>
         let propose = if msg.height() == self.state.height() {
             self.state.propose(msg.propose_hash()).map(|p| p.message().raw().clone())
         } else {
-            // msg.height < state.height
-            self.blockchain
-                .view()
-                .proposes()
-                .get(msg.propose_hash())
-                .unwrap()
-                .map(|p| p.raw().clone())
+            return;
         };
-
 
         if let Some(propose) = propose {
             self.send_to_peer(*msg.from(), &propose);
@@ -133,28 +125,8 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn handle_request_commit(&mut self, msg: RequestCommit) {
-        if msg.height() >= self.state.height() {
-            return;
-        }
-
-        let view = self.blockchain.view();
-
-        let block_hash = view.heights().get(msg.height()).unwrap().unwrap();
-
-        let precommits = view.precommits(&block_hash)
-            .values()
-            .unwrap()
-            .iter()
-            .map(|p| p.raw().clone())
-            .collect::<Vec<_>>();
-
-        for precommit in precommits {
-            self.send_to_peer(*msg.from(), &precommit);
-        }
-    }
-
     pub fn handle_request_block(&mut self, msg: RequestBlock) {
+        info!("Handle block request with h {}, max_h: {}", msg.height(), self.state.height());
         if msg.height() >= self.state.height() {
             return;
         }
@@ -178,7 +150,10 @@ impl<B, S> NodeHandler<B, S>
             .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 
-        let block_msg = Block::new(block, precommits, transactions, &self.secret_key);
+        let block_msg = Block::new(&self.public_key, block, precommits, transactions, &self.secret_key);
         self.send_to_peer(*msg.from(), block_msg.raw());
+
+        let addr = self.state.peers().get(msg.from());
+        info!("Send block {:#?} to {:?}", block_msg.raw().len(), addr);
     }
 }

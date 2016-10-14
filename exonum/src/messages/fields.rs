@@ -392,18 +392,18 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
         let pos = buffer.len();
         LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
         LittleEndian::write_u32(&mut buffer[from + 4..to], self.len() as u32);
-        buffer.resize(pos + self.len() * 8 + 8, 0);
+        buffer.resize(pos + self.len() * 8, 0);
 
         // Write segment headers
         let mut from = pos;
         let mut pos = buffer.len();
         for segment in self.iter() {
-            let len = segment.count();
+            let count = segment.count();
             LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
-            LittleEndian::write_u32(&mut buffer[from + 4..from + 8], len);
+            LittleEndian::write_u32(&mut buffer[from + 4..from + 8], count);
 
             from += 8;
-            pos += len as usize;
+            pos += count as usize;
         }
 
         // Write segment bodies
@@ -415,9 +415,9 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
     // TODO Тут вызов функции по сути рекурсивный, нужно написать некий хэлпер для check
     fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
         let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
-        let len = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
+        let count = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
 
-        if len == 0 {
+        if count == 0 {
             return Ok(());
         }
 
@@ -428,16 +428,16 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
             });
         }
 
-        let end = pos + 8 * len;
+        let end = pos + 8 * count;
         if end > buffer.len() {
             return Err(Error::IncorrectSegmentSize {
                 position: (from + 4) as u32,
-                value: len as u32,
+                value: count as u32,
             });
         }
 
-        for i in 0..len {
-            let from = i * 8;
+        for i in 0..count {
+            let from = pos + i * 8;
             <&[u8] as Field>::check(&buffer, from, from + 8)?;
         }
         Ok(())

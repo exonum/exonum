@@ -21,7 +21,7 @@ pub type RawMessage = sync::Arc<MessageBuffer>;
 
 #[derive(Debug, PartialEq)]
 pub struct MessageBuffer {
-    raw: Vec<u8>,
+    pub raw: Vec<u8>,
 }
 
 impl MessageBuffer {
