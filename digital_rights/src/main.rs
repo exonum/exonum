@@ -106,8 +106,8 @@ fn add_participant<'a, D: Database>(tx: DigitalRightsTx,
     ch.send(tx);
     let json = &jsonway::object(|json| {
             json.set("tx_hash", tx_hash);
-            json.set("pub_key", pub_key);
-            json.set("sec_key", sec_key);
+            json.set("pub_key", pub_key.to_hex());
+            json.set("sec_key", sec_key.to_hex());
         })
         .unwrap();
     client.json(json)
@@ -189,7 +189,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
 
                 let drm = DigitalRightsApi::new(b.clone());
                 let role = match drm.participant_id(&pub_key) {
-                    Ok(Some(Role::Distributor(_))) => "distributor",
+                    Ok(Some(Role::Distributor(_p))) => "distributor",
                     Ok(Some(Role::Owner(_))) => "owner",
                     Ok(None) => return client.error(ValueNotFound::new("Unable to auth with given key")),
                     Err(e) => return client.error(e)
