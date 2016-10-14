@@ -62,26 +62,27 @@ fn test_u32_segment() {
 
 #[test]
 fn test_segments_of_segments() {
-    let mut buf = vec![0; 8];
+    let mut buf = vec![255; 64];
     let v1 = [1u8, 2, 3];
     let v2 = [1u8, 3];
     let v3 = [2u8, 5, 2, 3, 56, 3];
 
     let dat = vec![v1.as_ref(), v2.as_ref(), v3.as_ref()];
-    Field::write(&dat, &mut buf, 0, 8);
-    <Vec<&[u8]> as Field>::check(&buf, 0, 8).unwrap();
+    Field::write(&dat, &mut buf, 48, 56);
+    <Vec<&[u8]> as Field>::check(&buf, 48, 56).unwrap();
 
     let buf2 = buf.clone();
-    <Vec<&[u8]> as Field>::check(&buf2, 0, 8).unwrap();
-    let dat2: Vec<&[u8]> = Field::read(&buf2, 0, 8);
+    <Vec<&[u8]> as Field>::check(&buf2, 48, 56).unwrap();
+    let dat2: Vec<&[u8]> = Field::read(&buf2, 48, 56);
     assert_eq!(dat2, dat);
+    assert_eq!(buf.len(), 64 + v1.len() + v2.len() + v3.len() + 24);
 }
 
 #[test]
 fn test_segments_of_raw_messages() {
     let (_, sec_key) = gen_keypair();
 
-    let mut buf = vec![0; 8];
+    let mut buf = vec![255; 8];
     let m1 = Status::new(1, 2, &hash(&[]), &sec_key);
     let m2 = Status::new(2, 4, &hash(&[1]), &sec_key);
     let m3 = Status::new(6, 5, &hash(&[3]), &sec_key);
@@ -97,10 +98,23 @@ fn test_segments_of_raw_messages() {
 }
 
 #[test]
+fn test_empty_segments() {
+    let mut buf = vec![255; 8];
+    let dat: Vec<RawMessage> = vec![];
+    Field::write(&dat, &mut buf, 0, 8);
+    <Vec<RawMessage> as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <Vec<RawMessage> as Field>::check(&buf2, 0, 8).unwrap();
+    let dat2: Vec<RawMessage> = Field::read(&buf2, 0, 8);
+    assert_eq!(dat2, dat);
+}
+
+#[test]
 fn test_segments_of_status_messages() {
     let (_, sec_key) = gen_keypair();
 
-    let mut buf = vec![0; 8];
+    let mut buf = vec![255; 8];
     let m1 = Status::new(1, 2, &hash(&[]), &sec_key);
     let m2 = Status::new(2, 4, &hash(&[1]), &sec_key);
     let m3 = Status::new(6, 5, &hash(&[3]), &sec_key);
@@ -231,7 +245,7 @@ fn test_status() {
 
 #[test]
 fn test_block() {
-    let (_, secret_key) = gen_keypair();
+    let (pub_key, secret_key) = gen_keypair();
 
     let content = blockchain::Block::new(500,
                                          time::get_time(),
@@ -263,14 +277,53 @@ fn test_block() {
         Status::new(2, 4, &hash(&[2]), &secret_key).raw().clone(),
         Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone(),
     ];
-
-    let block = Block::new(content.clone(),
+    let block = Block::new(&pub_key,
+                           content.clone(),
                            precommits.clone(),
                            transactions.clone(),
                            &secret_key);
+
+    assert_eq!(block.from(), &pub_key);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
+
+    let block2 = Block::from_raw(block.raw().clone()).unwrap();
+    assert_eq!(block2.from(), &pub_key);
+    assert_eq!(block2.block(), content);
+    assert_eq!(block2.precommits(), precommits);
+    assert_eq!(block2.transactions(), transactions);
+}
+
+#[test]
+fn test_empty_block() {
+    // let (pub_key, secret_key) = gen_keypair();
+
+    // let content = blockchain::Block::new(200,
+    //                                      time::get_time(),
+    //                                      &hash(&[1]),
+    //                                      &hash(&[2]),
+    //                                      &hash(&[3]),
+    //                                      0);
+
+    // let precommits = Vec::new();
+    // let transactions = Vec::new();
+    // let block = Block::new(&pub_key,
+    //                        content.clone(),
+    //                        precommits.clone(),
+    //                        transactions.clone(),
+    //                        &secret_key);
+
+    // assert_eq!(block.from(), &pub_key);
+    // assert_eq!(block.block(), content);
+    // assert_eq!(block.precommits(), precommits);
+    // assert_eq!(block.transactions(), transactions);
+
+    // let block2 = Block::from_raw(block.raw().clone()).unwrap();
+    // assert_eq!(block2.from(), &pub_key);
+    // assert_eq!(block2.block(), content);
+    // assert_eq!(block2.precommits(), precommits);
+    // assert_eq!(block2.transactions(), transactions);
 }
 
 #[test]

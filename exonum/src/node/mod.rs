@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use time::{Duration, Timespec};
 
-use super::crypto::{PublicKey, SecretKey};
+use super::crypto::{PublicKey, SecretKey, Hash, hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
                     EventsConfiguration, Channel, EventHandler};
 use super::blockchain::Blockchain;
@@ -218,6 +218,13 @@ impl<B, S> NodeHandler<B, S>
             .last_block()
             .unwrap()
             .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time())
+    }
+
+    pub fn last_block_hash(&self) -> Hash {
+        self.blockchain
+            .last_block()
+            .unwrap()
+            .map_or_else(|| hash(&[]), |p| p.hash())
     }
 }
 

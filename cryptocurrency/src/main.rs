@@ -42,8 +42,7 @@ use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 
-use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer,
-                     TxCreateWallet};
+use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer, TxCreateWallet};
 use cryptocurrency::api::CurrencyApi;
 
 pub type CurrencyTxSender<B> = TxSender<B, NodeChannel<B>>;

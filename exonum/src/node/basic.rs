@@ -75,8 +75,9 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_status(&mut self, msg: Status) {
-        // Handle message from future height
-        if msg.height() > self.state.height() {
+        let height = self.state.height();
+            // Handle message from future height
+            if msg.height() > height {
             // Check validator height info
             // FIXME: make sure that validator id < validator count
             if self.state.validator_height(msg.validator()) >= msg.height() {
@@ -96,26 +97,11 @@ impl<B, S> NodeHandler<B, S>
             };
             // Update validator height
             self.state.set_validator_height(msg.validator(), msg.height());
-            // Request commit
-            self.request(RequestData::Commit, peer);
+            // Request block
+            self.request(RequestData::Block(height), peer);
+
+            info!("Request block from {:?} with height: {}", peer, height);
         }
-
-        // TODO: remove this?
-        // // Handle message from current height
-        // if msg.height() == self.state.height() {
-        //     // Request propose or txs
-        //     self.request_propose_or_txs(ctx, msg.propose_hash(), msg.validator());
-
-        //     // Request precommits
-        //     if !self.state.has_majority_precommits(msg.round(),
-        //                                           *msg.propose_hash(),
-        //                                           *msg.block_hash()) {
-        //         let data = RequestData::Precommits(msg.round(),
-        //                                           *msg.propose_hash(),
-        //                                           *msg.block_hash());
-        //         self.request(ctx, data, msg.validator());
-        //     }
-        // }
     }
 
     pub fn handle_request_peers(&mut self, msg: RequestPeers) {

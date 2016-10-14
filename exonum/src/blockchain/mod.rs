@@ -7,9 +7,12 @@ use std::collections::HashMap;
 use std::borrow::Borrow;
 use std::ops::Deref;
 
+use time::Timespec;
+
 use ::crypto::{Hash, hash};
 use ::messages::{Propose, Precommit, Message};
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
+use ::node::{ValidatorId};
 
 pub use self::block::Block;
 pub use self::view::View;
@@ -37,36 +40,38 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
     fn execute(fork: &Self::View, tx: &Self::Transaction) -> Result<(), Error>;
 
+    //TODO use Iterator to avoid memory allocations?
     fn create_patch(&self,
-                    propose: &Propose,
-                    txs: &HashMap<Hash, Self::Transaction>)
+                    height: u64,
+                    time: Timespec,
+                    validator: ValidatorId,
+                    txs: &[(Hash, Self::Transaction)])
                     -> Result<(Hash, Patch), Error> {
         // Get last hash
         let last_hash = self.last_hash()?.unwrap_or(hash(&[]));
         // Create fork
         let mut fork = self.view();
         // Save & execute transactions
-        for hash in propose.transactions() {
-            let tx = txs.get(hash).unwrap().clone();
+        for &(hash, ref tx) in txs.into_iter() {
             Self::execute(&mut fork, &tx)?;
             fork.transactions()
-                .put(hash, tx)
+                .put(&hash, tx.clone())
                 .unwrap();
-            fork.block_txs(propose.height())
-                .append(*hash)
+            fork.block_txs(height)
+                .append(hash)
                 .unwrap();
         }
         // Get tx hash
-        let tx_hash = fork.block_txs(propose.height()).root_hash()?;
+        let tx_hash = fork.block_txs(height).root_hash()?;
         // Get state hash
         let state_hash = Self::state_hash(&mut fork)?;
         // Create block
-        let block = Block::new(propose.height(),
-                               propose.time(),
+        let block = Block::new(height,
+                               time,
                                &last_hash,
                                &tx_hash,
                                &state_hash,
-                               propose.validator());
+                               validator);
         // Eval block hash
         let block_hash = block.hash();
         // Update height
@@ -74,9 +79,6 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         fork.heights().append(block_hash).is_ok();
         // Save block
         fork.blocks().put(&block_hash, block).is_ok();
-        // Save propose (FIXME: remove)
-        fork.proposes().put(&Message::hash(propose), propose.clone()).is_ok();
-
         Ok((block_hash, fork.changes()))
     }
 

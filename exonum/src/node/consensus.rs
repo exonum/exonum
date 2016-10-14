@@ -6,7 +6,7 @@ use super::super::crypto::{Hash, PublicKey};
 use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
-                             RequestPrecommits, RequestCommit, RequestBlock, Block};
+                             RequestPrecommits, RequestBlock, Block};
 use super::super::storage::Map;
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
@@ -103,8 +103,82 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
+    // TODO write helper function which returns Result
     pub fn handle_block(&mut self, msg: Block) {
+        info!("{:?}", msg);
+        // TODO
+        // Добавить pub_key получателя и время отправления, чтобы защититься от ддоса
+
+        if !msg.verify(msg.from()) {
+            return;
+        }
         debug!("Handle block {:?}", msg);
+
+        let block = msg.block();
+        let block_hash = block.hash();
+        // TODO add block with greater height to queue
+        if self.state.height() != block.height() {
+            return;
+        }
+
+        if block.prev_hash() != &self.last_block_hash() {
+            return;
+        }
+
+        // Verify transactions
+        let mut txs = Vec::new();
+        for raw in msg.transactions() {
+            match B::Transaction::from_raw(raw) {
+                Ok(tx) => {
+                    if !B::verify_tx(&tx) {
+                        return;
+                    }
+                    txs.push((tx.hash(), tx));
+                }
+                Err(_) => return,
+            }
+        }
+        // Verify precommits and adds them to state
+        let precommits = msg.precommits();
+        let mut has_consensus = false;
+        for precommit in &precommits {
+            if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
+                if !precommit.verify(pub_key) || precommit.block_hash() != &block_hash {
+                    warn!("Block with incorrect precommit received from {:?}", msg.from());
+                    return;
+                }
+            } else {
+                return;
+            }
+            has_consensus = self.state.add_precommit(&precommit);
+        }
+        // Ensure that we have consensus for this block
+        if !has_consensus {
+            return;
+        }
+
+        let (block_hash, patch) =
+            self.blockchain
+                .create_patch(block.height(),
+                              block.time(),
+                              block.proposer(),
+                              txs.as_slice())
+                .unwrap();
+
+        // Verify block_hash
+        if block_hash != block.hash() {
+            warn!("Block with incorrect hash received from {:?}", msg.from());
+            return;
+        }
+        // Commit block
+        // TODO использовать общий с self.commit код
+        self.blockchain.commit(block_hash, patch, precommits.iter()).unwrap();
+        // Update state to new height
+        self.state.new_height(&block_hash);
+
+        info!("{:?} ========== added (height: {})",
+              self.channel.get_time(),
+              self.state.height());
     }
 
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
@@ -282,10 +356,10 @@ impl<B, S> NodeHandler<B, S>
         self.add_round_timeout();
 
         // Request commits
-        for validator in self.state.validator_heights() {
-            let peer = self.public_key_of(validator);
-            self.request(RequestData::Commit, peer)
-        }
+        // for validator in self.state.validator_heights() {
+        //     let peer = self.public_key_of(validator);
+        //     self.request(RequestData::Commit, peer)
+        // }
     }
 
     pub fn handle_tx(&mut self, msg: B::Transaction) {
@@ -454,15 +528,6 @@ impl<B, S> NodeHandler<B, S>
                         .raw()
                         .clone()
                 }
-                RequestData::Commit => {
-                    RequestCommit::new(&self.public_key,
-                                       &peer,
-                                       self.channel.get_time(),
-                                       self.state.height(),
-                                       &self.secret_key)
-                        .raw()
-                        .clone()
-                }
                 RequestData::Block(height) => {
                     RequestBlock::new(&self.public_key,
                                       &peer,
@@ -487,13 +552,24 @@ impl<B, S> NodeHandler<B, S>
 
     // FIXME: remove this bull shit
     pub fn execute(&mut self, hash: &Hash) -> Hash {
-        let msg = self.state.propose(hash).unwrap().message().clone();
-        let (block_hash, patch) =
-            self.blockchain.create_patch(&msg, self.state.transactions()).unwrap();
-
+        let propose = self.state.propose(hash).unwrap().message().clone();
+        let (block_hash, patch) = {
+            let txs = propose.transactions()
+                .iter()
+                .map(|hash| {
+                    let tx = self.state.transactions().get(hash).unwrap();
+                    (*hash, tx.clone())
+                })
+                .collect::<Vec<_>>();
+            self.blockchain
+                .create_patch(propose.height(),
+                              propose.time(),
+                              propose.validator(),
+                              txs.as_slice())
+                .unwrap()
+        };
         // Save patch
         self.state.propose(hash).unwrap().set_patch(block_hash, patch);
-
         block_hash
     }
 

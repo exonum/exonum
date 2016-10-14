@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use time::Duration;
 
-use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
+use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, Block};
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
 
@@ -14,7 +14,6 @@ const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
 const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
 const REQUEST_PREVOTES_WAIT: u64 = 100;
 const REQUEST_PRECOMMITS_WAIT: u64 = 100;
-const REQUEST_COMMIT_WAIT: u64 = 100;
 const REQUEST_BLOCK_WAIT: u64 = 100;
 
 pub type Round = u32;
@@ -69,7 +68,6 @@ pub enum RequestData {
     Transactions(Hash),
     Prevotes(Round, Hash),
     Precommits(Round, Hash, Hash),
-    Commit, // TODO: add height?
     Block(u64),
 }
 
@@ -95,6 +93,13 @@ pub struct ProposeState {
     unknown_txs: BTreeSet<Hash>,
 }
 
+pub struct BlockState {
+    /// Блок
+    block: Block,
+    // Набор изменений, которые нужно внести в состояние для применения блока
+    patch: Option<Patch>
+}
+
 impl RequestData {
     pub fn timeout(&self) -> Duration {
         let ms = match *self {
@@ -102,7 +107,6 @@ impl RequestData {
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
             RequestData::Prevotes(..) => REQUEST_PREVOTES_WAIT,
             RequestData::Precommits(..) => REQUEST_PRECOMMITS_WAIT,
-            RequestData::Commit => REQUEST_COMMIT_WAIT,
             RequestData::Block(..) => REQUEST_BLOCK_WAIT,
         };
         Duration::milliseconds(ms as i64)
@@ -304,6 +308,7 @@ impl<Tx> State<Tx> {
         self.round += 1;
     }
 
+    //FIXME use block_hash
     pub fn new_height(&mut self, propose_hash: &Hash) {
         self.height += 1;
         self.round = 1;
@@ -313,12 +318,15 @@ impl<Tx> State<Tx> {
         self.last_hash = *propose_hash;
 
         {
-            let state = self.proposes
-                .get(propose_hash)
-                .expect("Trying to commit unknown propose");
-            self.commited_txs += state.propose.transactions().len() as u64;
-            for tx in state.propose.transactions() {
-                self.transactions.remove(tx);
+            // let state = self.proposes
+            //     .get(propose_hash)
+            //     .expect("Trying to commit unknown propose");
+
+            if let Some(state) = self.proposes.get(propose_hash) {
+                self.commited_txs += state.propose.transactions().len() as u64;
+                for tx in state.propose.transactions() {
+                    self.transactions.remove(tx);
+                }
             }
         }
         // TODO: destruct/construct structure HeightState instead of call clear
@@ -418,7 +426,7 @@ impl<Tx> State<Tx> {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
             if let Some(_) = self.our_prevotes.insert(msg.round(), msg.clone()) {
-                panic!("Trying to send different prevotes for same round");
+                //panic!("Trying to send different prevotes for same round");
             }
         }
 
@@ -440,7 +448,7 @@ impl<Tx> State<Tx> {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
             if let Some(_) = self.our_precommits.insert(msg.round(), msg.clone()) {
-                panic!("Trying to send different precommits for same round");
+                //panic!("Trying to send different precommits for same round");
             }
         }
 
