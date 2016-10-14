@@ -188,9 +188,9 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                 // TODO add keys verification
 
                 let drm = DigitalRightsApi::new(b.clone());
-                let role = match drm.participant_id(&pub_key) {
-                    Ok(Some(Role::Distributor(_p))) => "distributor",
-                    Ok(Some(Role::Owner(_))) => "owner",
+                let (role, id) = match drm.participant_id(&pub_key) {
+                    Ok(Some(id @ Role::Distributor(_))) => ("distributor", id),
+                    Ok(Some(id @ Role::Owner(_))) => ("owner", id),
                     Ok(None) => return client.error(ValueNotFound::new("Unable to auth with given key")),
                     Err(e) => return client.error(e)
                 };
@@ -199,7 +199,20 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     let mut cookies = client.request.cookies();
                     save_user(&mut cookies, role, &pub_key, &sec_key);
                 }
-                client.empty()
+                match id {
+                    Role::Distributor(id) => {
+                        match drm.distributor_info(id as u16) {
+                            Ok(Some(info)) => client.json(&info.to_json()),
+                            _ => client.error(StorageError::new("Unable to get distributor")),
+                        }
+                    }
+                    Role::Owner(id) => {
+                        match drm.owner_info(id as u16) {
+                            Ok(Some(info)) => client.json(&info.to_json()),
+                            _ => client.error(StorageError::new("Unable to get distributor")),
+                        }
+                    }
+                }
             })
         });
 
