@@ -1,0 +1,21 @@
+[package]
+name = "land_title"
+version = "0.1.0"
+authors = ["Alex S. Marinenko <alex.marinenko@xdev.re>"]
+
+[dependencies]
+exonum = {version="0.1", path="../exonum"}
+blockchain_explorer = {version="0.1", path="../blockchain_explorer"}
+clap = {version="2.13", features=["unstable"]}
+env_logger = "0.3"
+byteorder = "0.5"
+serde = "0.8"
+valico = "1.0"
+serde_macros = "0.8"
+serde_json = "0.8"
+jsonway = "1.0"
+rustless = "0.9"
+hyper = "0.9"
+iron = "0.4"
+time = "0.1"
+rand = "0.3"
