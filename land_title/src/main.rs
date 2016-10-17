@@ -45,7 +45,11 @@ use blockchain_explorer::HexField;
 
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
                      TxModifyObject, TxTransferObject, TxRemoveObject};
+<<<<<<< 65b155a36d19ce9b95143ccc6fef712ba3d2099d
 use land_title::api::{ObjectsApi, ObjectInfo};
+=======
+use land_title::api::ObjectsApi;
+>>>>>>> Initial implementation
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
@@ -121,7 +125,6 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
 
             let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
             println!("LandTitles node server started on {}", listen_address);
-
             let mut app = Application::new(api);
 
             swagger::enable(&mut app,
@@ -166,7 +169,9 @@ fn land_titles_api<D: Database>(api: &mut Api,
                                    blockchain: ObjectsBlockchain<D>,
                                    channel: Channel<ObjectsBlockchain<D>>) {
 
+
     api.namespace("obm", move |api| {
+
 
          let ch = channel.clone();
          api.post("owners", move |endpoint| {
@@ -218,6 +223,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
                             .collect::<Vec<u64>>();
                 let tx = TxCreateObject::new(&public_key, &object_info.title, &points, &object_info.owner_pub_key, &secret_key);
                 send_tx(ObjectTx::CreateObject(tx), client, ch.clone())
+
              })
          });
 
