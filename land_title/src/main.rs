@@ -45,7 +45,7 @@ use blockchain_explorer::HexField;
 
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
                      TxModifyObject, TxTransferObject, TxRemoveObject};
-use land_title::api::ObjectsApi;
+use land_title::api::{ObjectsApi, ObjectInfo};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
@@ -120,18 +120,18 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
             });
 
             let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
-            println!("DigitalRights node server started on {}", listen_address);
+            println!("LandTitles node server started on {}", listen_address);
 
             let mut app = Application::new(api);
 
             swagger::enable(&mut app,
                             swagger::Spec {
                                 info: swagger::Info {
-                                    title: "DigitalRights API".to_string(),
+                                    title: "LandTitles API".to_string(),
                                     description: Some("Simple API to demonstration".to_string()),
                                     contact: Some(swagger::Contact {
-                                        name: "Aleksey Sidorov".to_string(),
-                                        url: Some("aleksei.sidorov@xdev.re".to_string()),
+                                        name: "Aleksandr Marinenko".to_string(),
+                                        url: Some("aleksandr.marinenko@xdev.re".to_string()),
                                         ..Default::default()
                                     }),
                                     license: Some(swagger::License {
@@ -166,7 +166,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
                                    blockchain: ObjectsBlockchain<D>,
                                    channel: Channel<ObjectsBlockchain<D>>) {
 
-    api.namespace("drm", move |api| {
+    api.namespace("obm", move |api| {
 
          let ch = channel.clone();
          api.post("owners", move |endpoint| {
@@ -191,18 +191,33 @@ fn land_titles_api<D: Database>(api: &mut Api,
          api.post("objects", move |endpoint| {
              endpoint.params(|params| {
                  params.req_typed("title", json_dsl::string());
+                 params.req_nested("points", json_dsl::array(), |params| {
+                     params.req_typed("x", json_dsl::u64());
+                     params.req_typed("y", json_dsl::u64());
+                 });
+                 params.req_typed("owner_pub_key", json_dsl::string());
+                 params.req_typed("deleted", json_dsl::boolean());
              });
 
              endpoint.handle(move |client, params| {
-                 let name = params.find("title").unwrap().as_str().unwrap();
-
-                 let (public_key, secret_key) = gen_keypair();
-                 {
-                     let mut cookies = client.request.cookies();
-                     save_user(&mut cookies, "distributor", &public_key, &secret_key);
-                 }
-                 let tx = TxCreateDistributor::new(&public_key, &name, &secret_key);
-                 send_tx(DigitalRightsTx::CreateDistributor(tx), client, ch.clone())
+                let object_info = from_value::<ObjectInfo>(params.clone()).unwrap();
+                let (role, public_key, secret_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((r, p, s)) => (r, p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+                let points = object_info.points
+                            .iter()
+                            .cloned()
+                            .map(|info| info.into())
+                            .collect::<Vec<u64>>();
+                let tx = TxCreateObject::new(&public_key, &object_info.title, &points, &object_info.owner_pub_key, &secret_key);
+                send_tx(ObjectTx::CreateObject(tx), client, ch.clone())
              })
          });
 

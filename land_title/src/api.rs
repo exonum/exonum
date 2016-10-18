@@ -56,14 +56,14 @@ impl Serialize for ObjectTx {
 
 impl TransactionInfo for ObjectTx {}
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OwnerInfo {
     pub pub_key: HexField<PublicKey>,
     pub name: String,
     pub ownership_hash: HexField<Hash>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ObjectInfo {
     pub pub_key: HexField<PublicKey>,
     pub title: String,
