@@ -164,26 +164,17 @@ impl<B, S> NodeHandler<B, S>
                               block.proposer(),
                               txs.as_slice())
                 .unwrap();
-
         // Verify block_hash
         if block_hash != block.hash() {
             warn!("Block with incorrect hash received from {:?}", msg.from());
             return;
         }
         // Commit block
-        // TODO использовать общий с self.commit код
-        self.blockchain.commit(block_hash, patch, precommits.iter()).unwrap();
-        // Update state to new height
-        let round = self.actual_round();
-        self.state.new_height(&block_hash, round);
-
-        info!("{:?} ========== height = {}",
-              self.channel.get_time(),
-              self.state.height());
-
+        self.state.add_block(block_hash, patch);
+        self.commit(block_hash, precommits.iter());
+        // Request next block if needed
         let heights = self.state.validator_heights();
         if !heights.is_empty() {
-            // Request next block if needed
             for id in heights {
                 let peer = self.state.public_key_of(id).unwrap().clone();
                 if self.state.peers().contains_key(&peer) {
@@ -193,11 +184,7 @@ impl<B, S> NodeHandler<B, S>
                     break;
                 }
             }
-        } else {
-            // We reached actual height
-            // Add timeout for actual round
-            self.add_round_timeout();
-        }
+        } 
     }
 
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
@@ -227,7 +214,11 @@ impl<B, S> NodeHandler<B, S>
                 panic!("We are fucked up...");
             }
 
-            self.commit(round, &hash);
+            let precommits = self.state.precommits(round, our_block_hash).unwrap()
+                .iter()
+                .map(|(_, x)| x.clone())
+                .collect::<Vec<_>>();
+            self.commit(our_block_hash, precommits.iter());
         }
     }
 
@@ -281,7 +272,11 @@ impl<B, S> NodeHandler<B, S>
                 panic!("We are fucked up...");
             }
 
-            self.commit(round, propose_hash);
+            let precommits = self.state.precommits(round, our_block_hash).unwrap()
+                .iter()
+                .map(|(_, x)| x.clone())
+                .collect::<Vec<_>>();
+            self.commit(our_block_hash, precommits.iter());
         } else {
             self.state.add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
         }
@@ -298,7 +293,7 @@ impl<B, S> NodeHandler<B, S>
             let block_hash = self.execute(&propose_hash);
             self.send_precommit(round, &propose_hash, &block_hash);
             // Commit if has consensus
-            if self.state.has_majority_precommits(round, propose_hash, block_hash) {
+            if self.state.has_majority_precommits(round, block_hash) {
                 self.has_majority_precommits(round, &propose_hash, &block_hash);
                 return;
             }
@@ -342,20 +337,20 @@ impl<B, S> NodeHandler<B, S>
     }
 
     // FIXME: push precommits into storage
-    pub fn commit(&mut self, round: Round, hash: &Hash) {
-        debug!("COMMIT {:?} {:?}", round, hash);
+    pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self, block_hash: Hash, precommits: I) {
+        debug!("COMMIT {:?}", block_hash);
         // Merge changes into storage
         {
             // FIXME: remove unwrap here
-            let block_hash = self.state.propose(hash).unwrap().block_hash().unwrap();
-            let patch = self.state.propose(hash).unwrap().patch().unwrap();
-            let precommits = self.state.precommits(round, *hash, block_hash).unwrap().values();
+            let patch = self.state.block(&block_hash).unwrap().patch();
             self.blockchain.commit(block_hash, patch, precommits).unwrap();
         }
 
         // Update state to new height
         let round = self.actual_round();
-        self.state.new_height(hash, round);
+        // FIXME rewrite me!
+        let txs = self.blockchain.view().block_txs(self.state.height()).values().unwrap();
+        self.state.new_height(&block_hash, round, &txs);
 
         info!("{:?} ========== height = {}, commited = {}, pool = {}",
               self.channel.get_time(),
@@ -565,14 +560,14 @@ impl<B, S> NodeHandler<B, S>
     }
 
     // FIXME: remove this bull shit
-    pub fn execute(&mut self, hash: &Hash) -> Hash {
-        let propose = self.state.propose(hash).unwrap().message().clone();
+    pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
+        let propose = self.state.propose(propose_hash).unwrap().message().clone();
         let (block_hash, patch) = {
             let txs = propose.transactions()
                 .iter()
-                .map(|hash| {
-                    let tx = self.state.transactions().get(hash).unwrap();
-                    (*hash, tx.clone())
+                .map(|propose_hash| {
+                    let tx = self.state.transactions().get(propose_hash).unwrap();
+                    (*propose_hash, tx.clone())
                 })
                 .collect::<Vec<_>>();
             self.blockchain
@@ -583,7 +578,7 @@ impl<B, S> NodeHandler<B, S>
                 .unwrap()
         };
         // Save patch
-        self.state.propose(hash).unwrap().set_patch(block_hash, patch);
+        self.state.add_block(block_hash, patch);
         block_hash
     }
 

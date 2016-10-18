@@ -37,7 +37,7 @@ pub struct State<Tx> {
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), HashMap<ValidatorId, Prevote>>,
-    precommits: HashMap<(Round, Hash, Hash), HashMap<ValidatorId, Precommit>>,
+    precommits: HashMap<(Round, Hash), HashMap<ValidatorId, Precommit>>,
 
     transactions: HashMap<Hash, Tx>,
     queued: Vec<ConsensusMessage>,
@@ -85,15 +85,12 @@ pub struct ProposeState {
     hash: Hash,
     // Тело предложения
     propose: Propose,
-    // Вычисленный хеш блока (из предложения)
-    block_hash: Option<Hash>,
-    // Набор изменений, которые нужно внести в состояние для применения блока
-    patch: Option<Patch>,
     // Множество неизвестных транзакций из этого предложения
     // FIXME: use HashSet here
     unknown_txs: BTreeSet<Hash>,
 }
 
+#[derive(Clone)]
 pub struct BlockState {
     // Набор изменений, которые нужно внести в состояние для применения блока
     hash: Hash,
@@ -155,19 +152,6 @@ impl ProposeState {
     pub fn has_unknown_txs(&self) -> bool {
         !self.unknown_txs.is_empty()
     }
-
-    pub fn block_hash(&self) -> Option<Hash> {
-        self.block_hash
-    }
-
-    pub fn set_patch(&mut self, block_hash: Hash, patch: Patch) {
-        self.block_hash = Some(block_hash);
-        self.patch = Some(patch);
-    }
-
-    pub fn patch(&mut self) -> Option<Patch> {
-        self.patch.take()
-    }
 }
 
 impl BlockState {
@@ -183,7 +167,7 @@ impl BlockState {
     }
 
     pub fn patch(self) -> Patch {
-        self.patch
+        self.patch.clone()
     }
 }
 
@@ -319,6 +303,10 @@ impl<Tx> State<Tx> {
         self.proposes.get_mut(hash)
     }
 
+    pub fn block(&self, hash: &Hash) -> Option<BlockState> {
+        self.blocks.get(hash).cloned()
+    }
+
     pub fn jump_round(&mut self, round: Round) {
         self.round = round;
     }
@@ -328,27 +316,22 @@ impl<Tx> State<Tx> {
     }
 
     //FIXME use block_hash
-    pub fn new_height(&mut self, propose_hash: &Hash, round: Round) {
+    pub fn new_height(&mut self, block_hash: &Hash, round: Round, txs: &Vec<Hash>) {
         self.height += 1;
         self.round = round;
         self.locked_round = 0;
         self.locked_propose = None;
         // TODO: use block hash instead
-        self.last_hash = *propose_hash;
+        self.last_hash = *block_hash;
 
         {
-            // let state = self.proposes
-            //     .get(propose_hash)
-            //     .expect("Trying to commit unknown propose");
-
-            if let Some(state) = self.proposes.get(propose_hash) {
-                self.commited_txs += state.propose.transactions().len() as u64;
-                for tx in state.propose.transactions() {
-                    self.transactions.remove(tx);
-                }
+            self.commited_txs += txs.len() as u64;
+            for tx in txs {
+                self.transactions.remove(tx);
             }
         }
         // TODO: destruct/construct structure HeightState instead of call clear
+        self.blocks.clear();
         self.proposes.clear();
         self.prevotes.clear();
         self.precommits.clear();
@@ -392,10 +375,9 @@ impl<Tx> State<Tx> {
 
     pub fn precommits(&self,
                       round: Round,
-                      propose_hash: Hash,
                       block_hash: Hash)
                       -> Option<&HashMap<ValidatorId, Precommit>> {
-        self.precommits.get(&(round, propose_hash, block_hash))
+        self.precommits.get(&(round, block_hash))
     }
 
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
@@ -405,8 +387,6 @@ impl<Tx> State<Tx> {
                              ProposeState {
                                  hash: propose_hash,
                                  propose: msg,
-                                 block_hash: None,
-                                 patch: None,
                                  unknown_txs: BTreeSet::new(),
                              });
 
@@ -433,9 +413,19 @@ impl<Tx> State<Tx> {
                 Some(e.insert(ProposeState {
                     hash: propose_hash,
                     propose: msg.clone(),
-                    block_hash: None,
-                    patch: None,
                     unknown_txs: unknown_txs,
+                }))
+            }
+        }
+    }
+
+    pub fn add_block(&mut self, block_hash: Hash, patch: Patch) -> Option<&BlockState> {
+        match self.blocks.entry(block_hash) {
+            Entry::Occupied(..) => None,
+            Entry::Vacant(e) => {
+                Some(e.insert(BlockState {
+                    hash: block_hash,
+                    patch: patch
                 }))
             }
         }
@@ -471,7 +461,7 @@ impl<Tx> State<Tx> {
             }
         }
 
-        let key = (msg.round(), *msg.propose_hash(), *msg.block_hash());
+        let key = (msg.round(), *msg.block_hash());
         let map = self.precommits.entry(key).or_insert_with(HashMap::new);
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
@@ -494,10 +484,9 @@ impl<Tx> State<Tx> {
 
     pub fn has_majority_precommits(&self,
                                    round: Round,
-                                   propose_hash: Hash,
                                    block_hash: Hash)
                                    -> bool {
-        match self.precommits.get(&(round, propose_hash, block_hash)) {
+        match self.precommits.get(&(round, block_hash)) {
             Some(map) => map.len() >= self.majority_count(),
             None => false,
         }
