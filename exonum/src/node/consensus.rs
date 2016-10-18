@@ -179,6 +179,13 @@ impl<B, S> NodeHandler<B, S>
         info!("{:?} ========== added (height: {})",
               self.channel.get_time(),
               self.state.height());
+
+        // Request next block if needed
+        if let Some(id) = self.state.validator_heights().first() {
+            let height = self.state.height();
+            let peer = self.state.public_key_of(*id).unwrap().clone();
+            self.request(RequestData::Block(height), peer);
+        }
     }
 
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
