@@ -85,9 +85,14 @@ impl<B, S> NodeHandler<B, S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        let last_hash = blockchain.last_hash().unwrap().unwrap_or_else(|| super::crypto::hash(&[]));
-
-        let state = State::new(id as u32, config.validators, connect, last_hash);
+        let r = blockchain.last_block().unwrap();
+        // TODO нужно создать api и для того, чтобы здесь подключался genesis блок
+        let (last_hash, last_height) = if let Some(last_block) = r {
+            (last_block.hash(), last_block.height() + 1)
+        } else {
+            (super::crypto::hash(&[]), 0)
+        };
+        let state = State::new(id as u32, config.validators, connect, last_hash, last_height);
         NodeHandler {
             public_key: config.listener.public_key,
             secret_key: config.listener.secret_key,
