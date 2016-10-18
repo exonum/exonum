@@ -211,13 +211,15 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     Role::Distributor(id) => {
                         match drm.distributor_info(id as u16) {
                             Ok(Some(info)) => client.json(&info.to_json()),
-                            _ => client.error(ValueNotFound::new("Unable to get distributor")),
+                            Ok(None) => client.error(ValueNotFound::new("Unable to get distributor")),
+                            Err(e) => client.error(e),
                         }
                     }
                     Role::Owner(id) => {
                         match drm.owner_info(id as u16) {
                             Ok(Some(info)) => client.json(&info.to_json()),
-                            _ => client.error(ValueNotFound::new("Unable to get distributor")),
+                            Ok(None) => client.error(ValueNotFound::new("Unable to get distributor")),
+                            Err(e) => client.error(e),
                         }
                     }
                 }
