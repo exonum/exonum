@@ -353,6 +353,15 @@ impl<D: Database> DigitalRightsApi<D> {
         }
     }
 
+    pub fn is_content_owner(&self, id: u16, fingerprint: &Fingerprint) -> StorageResult<bool> {
+        let r = if let Some(content) = self.view().contents().get(fingerprint)? {
+            content.shares().iter().find(|x| x.owner_id == id).is_some()
+        } else {
+            false
+        };
+        Ok(r)
+    }
+
     pub fn distributor_info(&self, id: u16) -> StorageResult<Option<DistributorInfo>> {
         let view = self.view();
         if let Some(distributor) = view.distributors().get(id as u64)? {
@@ -407,19 +416,13 @@ impl<D: Database> DigitalRightsApi<D> {
                               id: u16,
                               fingerprint: &Fingerprint)
                               -> StorageResult<Option<OwnerContentInfo>> {
-        println!("id: {}, f: {:?}", id, fingerprint);
         let v = self.view();
         if let Some(content) = v.contents().get(fingerprint)? {
-            println!("content {:?}", content);
             let owners = self.shares_info(&content.shares())?;
-            println!("shares {:?}", owners);
             let distributors = self.distributor_names(&content.distributors())?;
-            println!("distributors {:?}", distributors);
             let content = ContentInfo::new(fingerprint.clone(), content, owners, distributors);
             let reports = self.find_reports(Role::Owner(id), fingerprint)?;
-            println!("reports {:?}", reports);
             let ownership = v.find_ownership(id, fingerprint)?;
-            println!("ownership {:?}", ownership);
             let ownership = ownership.unwrap().1;
 
             let info = OwnerContentInfo::new(content, ownership, reports);

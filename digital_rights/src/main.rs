@@ -478,10 +478,22 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                                 }
                             }
                             Ok(Some(Role::Owner(id))) => {
-                                match drm.owner_content_info(id, &fingerprint) {
-                                    Ok(Some(info)) => client.json(&info.to_json()),
-                                    Ok(None) => client.error(ValueNotFound::new("Unable to find content")),   
-                                    Err(e) => client.error(e),
+                                match drm.is_content_owner(id, &fingerprint) {
+                                    Ok(true) => {
+                                        match drm.owner_content_info(id, &fingerprint) {
+                                            Ok(Some(info)) => client.json(&info.to_json()),
+                                            Ok(None) => client.error(ValueNotFound::new("Unable to find content")),   
+                                            Err(e) => client.error(e),
+                                        }
+                                    }
+                                    Ok(false) => {
+                                        match drm.content_info(&fingerprint) {
+                                            Ok(Some(info)) => client.json(&info.to_json()),
+                                            Ok(None) => client.error(ValueNotFound::new("Unable to find content")),
+                                            Err(e) => client.error(e),
+                                        }
+                                    }
+                                    Err(e) => client.error(e)
                                 }
                             }
                             Ok(None) => client.error(ValueNotFound::new("Unknown role")),
