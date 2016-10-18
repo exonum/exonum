@@ -167,7 +167,8 @@ impl<Tx> State<Tx> {
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
                connect: Connect,
-               last_hash: Hash)
+               last_hash: Hash,
+               last_height: u64)
                -> State<Tx> {
         let validators_len = validators.len();
 
@@ -177,7 +178,7 @@ impl<Tx> State<Tx> {
             peers: HashMap::new(),
             connections: HashMap::new(),
             validators: validators,
-            height: 0,
+            height: last_height,
             round: 1,
             locked_round: 0,
             locked_propose: None,
