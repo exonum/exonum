@@ -399,7 +399,7 @@ mod tests {
             let owner = v.owners().get(id as u64).unwrap().unwrap();
             assert_eq!(owner.pub_key(), &p1);
 
-            let ownership = v.owner_contents(id).get(1).unwrap().unwrap();
+            let (_, ownership) = v.find_ownership(id, f5).unwrap().unwrap();
             assert_eq!(ownership.fingerprint(), f5);
             assert_eq!(ownership.plays(), 0);
             assert_eq!(ownership.amount(), 0);

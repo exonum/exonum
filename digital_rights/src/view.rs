@@ -266,6 +266,7 @@ impl<F> DigitalRightsView<F>
                           -> StorageResult<Option<(u16, Ownership)>> {
         let contents = self.owner_contents(id);
         let values = contents.values()?;
+        println!("id: {:?}, f: {:?}, ownerships: {:?}", id, fingerprint, values);
         let r = values.into_iter()
             .enumerate()
             .find(|&(_, ref c)| c.fingerprint() == fingerprint)
