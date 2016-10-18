@@ -407,13 +407,20 @@ impl<D: Database> DigitalRightsApi<D> {
                               id: u16,
                               fingerprint: &Fingerprint)
                               -> StorageResult<Option<OwnerContentInfo>> {
+        println!("id: {}, f: {:?}", id, fingerprint);
         let v = self.view();
         if let Some(content) = v.contents().get(fingerprint)? {
+            println!("content {:?}", content);
             let owners = self.shares_info(&content.shares())?;
+            println!("shares {:?}", owners);
             let distributors = self.distributor_names(&content.distributors())?;
+            println!("distributors {:?}", distributors);
             let content = ContentInfo::new(fingerprint.clone(), content, owners, distributors);
             let reports = self.find_reports(Role::Owner(id), fingerprint)?;
-            let ownership = v.find_ownership(id, fingerprint)?.unwrap().1;
+            println!("reports {:?}", reports);
+            let ownership = v.find_ownership(id, fingerprint)?;
+            println!("ownership {:?}", ownership);
+            let ownership = ownership.unwrap().1;
 
             let info = OwnerContentInfo::new(content, ownership, reports);
             return Ok(Some(info));

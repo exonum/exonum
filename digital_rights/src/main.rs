@@ -266,7 +266,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                                                    &sec_key);
                         send_tx(DigitalRightsTx::AddContent(tx), client, ch.clone())
                     }
-                    _ => client.error(StorageError::new("Unknown role")),
+                    role => client.error(ValueNotFound::new(format!("Wrong role {}", role))),
                 }
             })
         });

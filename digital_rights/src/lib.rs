@@ -386,6 +386,21 @@ mod tests {
             execute_tx::<MemoryDB>(&v, DigitalRightsTx::AddContent(ac4.clone())).unwrap();
             assert_eq!(v.contents().get(&f4).unwrap(), None);
         }
+
+        {
+            let f5 = &hash(&[4]);
+            let d5 = [ContentShare::new(0, 100).into()];
+            let ac5 = TxAddContent::new(&p1, f5, "Epica", 1, 10, d5.as_ref(), "Some", &s1);
+            execute_tx::<MemoryDB>(&v, DigitalRightsTx::AddContent(ac5.clone())).unwrap();
+
+            let c = v.contents().get(&f5).unwrap().unwrap();
+            let shares = c.shares();
+            let id = shares[0].owner_id;
+            let owner = v.owners().get(id as u64).unwrap().unwrap();
+            let ownership = v.owner_contents(id).get(0).unwrap().unwrap();
+            println!("{:?}", owner);
+            println!("{:?}", ownership);
+        }
     }
 
     #[test]
