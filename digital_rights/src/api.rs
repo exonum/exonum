@@ -420,6 +420,16 @@ impl<D: Database> DigitalRightsApi<D> {
         Ok(None)
     }
 
+    pub fn content_info(&self, fingerprint: &Fingerprint) -> StorageResult<Option<ContentInfo>> {
+        let v = self.view();
+        if let Some(content) = v.contents().get(fingerprint)? {
+            let owners = self.shares_info(&content.shares())?;
+            let info = ContentInfo::new(*fingerprint, content, owners);
+            return Ok(Some(info));
+        }
+        Ok(None)
+    }
+
     pub fn available_contents(&self, distributor_id: u16) -> StorageResult<Vec<ContentInfo>> {
         let mut v = Vec::new();
         for (fingerprint, content) in self.view().list_content()? {
