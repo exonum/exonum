@@ -76,8 +76,8 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
-            // Handle message from future height
-            if msg.height() > height {
+        // Handle message from future height
+        if msg.height() > height {
             // Check validator height info
             // FIXME: make sure that validator id < validator count
             if self.state.validator_height(msg.validator()) >= msg.height() {
@@ -99,7 +99,6 @@ impl<B, S> NodeHandler<B, S>
             self.state.set_validator_height(msg.validator(), msg.height());
             // Request block
             self.request(RequestData::Block(height), peer);
-
             info!("Request block from {:?} with height: {}", peer, height);
         }
     }

@@ -3,14 +3,13 @@ mod spec;
 mod block;
 mod view;
 
-use std::collections::HashMap;
 use std::borrow::Borrow;
 use std::ops::Deref;
 
 use time::Timespec;
 
 use ::crypto::{Hash, hash};
-use ::messages::{Propose, Precommit, Message};
+use ::messages::{Precommit, Message};
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 use ::node::{ValidatorId};
 
