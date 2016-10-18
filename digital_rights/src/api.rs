@@ -105,7 +105,7 @@ pub struct ContentInfo {
     pub additional_conditions: String,
     pub price_per_listen: u64,
     pub min_plays: u64,
-    pub distributors: Vec<u16>,
+    pub distributors: Vec<ParticipantInfo>,
     pub owners: Vec<ContentShareInfo>,
 }
 
@@ -222,7 +222,8 @@ impl OwnershipInfo {
 impl ContentInfo {
     pub fn new(fingerprint: Fingerprint,
                content: Content,
-               owners: Vec<ContentShareInfo>)
+               owners: Vec<ContentShareInfo>,
+               distributors: Vec<ParticipantInfo>)
                -> ContentInfo {
         ContentInfo {
             title: content.title().to_string(),
@@ -230,7 +231,7 @@ impl ContentInfo {
             additional_conditions: content.additional_conditions().to_string(),
             price_per_listen: content.price_per_listen(),
             min_plays: content.min_plays(),
-            distributors: content.distributors().into(),
+            distributors: distributors,
             owners: owners,
         }
     }
@@ -264,8 +265,7 @@ impl DistributorContractInfo {
 
 impl DistributorContentInfo {
     pub fn new(content: ContentInfo,
-               contract: Option<DistributorContractInfo>,
-               distributors: Vec<ParticipantInfo>)
+               contract: Option<DistributorContractInfo>)
                -> DistributorContentInfo {
         DistributorContentInfo {
             title: content.title,
@@ -273,7 +273,7 @@ impl DistributorContentInfo {
             additional_conditions: content.additional_conditions,
             price_per_listen: content.price_per_listen,
             min_plays: content.min_plays,
-            distributors: distributors,
+            distributors: content.distributors,
             owners: content.owners,
 
             contract: contract,
@@ -284,8 +284,7 @@ impl DistributorContentInfo {
 impl OwnerContentInfo {
     pub fn new(content: ContentInfo,
                ownership: Ownership,
-               reports: Vec<ReportInfo>,
-               distributors: Vec<ParticipantInfo>)
+               reports: Vec<ReportInfo>)
                -> OwnerContentInfo {
         OwnerContentInfo {
             title: content.title,
@@ -293,7 +292,7 @@ impl OwnerContentInfo {
             additional_conditions: content.additional_conditions,
             price_per_listen: content.price_per_listen,
             min_plays: content.min_plays,
-            distributors: distributors,
+            distributors: content.distributors,
             owners: content.owners,
 
             reports: reports,
@@ -333,7 +332,8 @@ impl<D: Database> DigitalRightsApi<D> {
                 let fingerprint = owner_content.fingerprint().clone();
                 let r = view.contents().get(&fingerprint)?.unwrap();
                 let owners = self.shares_info(&r.shares())?;
-                let content = ContentInfo::new(fingerprint, r, owners);
+                let distributors = self.distributor_names(r.distributors())?;
+                let content = ContentInfo::new(fingerprint, r, owners, distributors);
                 let reports = self.find_reports(Role::Owner(id), &fingerprint)?;
 
                 ownership.push(OwnershipInfo::new(owner_content, content, reports));
@@ -362,7 +362,8 @@ impl<D: Database> DigitalRightsApi<D> {
                 let fingerprint = contract.fingerprint().clone();
                 let r = view.contents().get(&fingerprint)?.unwrap();
                 let owners = self.shares_info(&r.shares())?;
-                let content = ContentInfo::new(fingerprint, r, owners);
+                let distributors = self.distributor_names(&r.distributors())?;
+                let content = ContentInfo::new(fingerprint, r, owners, distributors);
                 let reports = self.find_reports(Role::Distributor(id), &fingerprint)?;
 
                 contracts.push(ContractInfo::new(contract, content, reports));
@@ -390,13 +391,13 @@ impl<D: Database> DigitalRightsApi<D> {
         let v = self.view();
         if let Some(content) = v.contents().get(fingerprint)? {
             let owners = self.shares_info(&content.shares())?;
-            let content = ContentInfo::new(fingerprint.clone(), content, owners);
+            let distributors = self.distributor_names(&content.distributors())?;
+            let content = ContentInfo::new(fingerprint.clone(), content, owners, distributors);
             let reports = self.find_reports(Role::Distributor(id), fingerprint)?;
             let contract = v.find_contract(id, fingerprint)?
                 .map(|contract| DistributorContractInfo::new(contract.1, reports));
-            let distributors = self.distributor_names(&content.distributors)?;
 
-            let info = DistributorContentInfo::new(content, contract, distributors);
+            let info = DistributorContentInfo::new(content, contract);
             return Ok(Some(info));
         }
         Ok(None)
@@ -409,12 +410,12 @@ impl<D: Database> DigitalRightsApi<D> {
         let v = self.view();
         if let Some(content) = v.contents().get(fingerprint)? {
             let owners = self.shares_info(&content.shares())?;
-            let content = ContentInfo::new(fingerprint.clone(), content, owners);
+            let distributors = self.distributor_names(&content.distributors())?;
+            let content = ContentInfo::new(fingerprint.clone(), content, owners, distributors);
             let reports = self.find_reports(Role::Owner(id), fingerprint)?;
             let ownership = v.find_ownership(id, fingerprint)?.unwrap().1;
-            let distributors = self.distributor_names(&content.distributors)?;
 
-            let info = OwnerContentInfo::new(content, ownership, reports, distributors);
+            let info = OwnerContentInfo::new(content, ownership, reports);
             return Ok(Some(info));
         }
         Ok(None)
@@ -424,7 +425,8 @@ impl<D: Database> DigitalRightsApi<D> {
         let v = self.view();
         if let Some(content) = v.contents().get(fingerprint)? {
             let owners = self.shares_info(&content.shares())?;
-            let info = ContentInfo::new(*fingerprint, content, owners);
+            let distributors = self.distributor_names(content.distributors())?;
+            let info = ContentInfo::new(*fingerprint, content, owners, distributors);
             return Ok(Some(info));
         }
         Ok(None)
@@ -435,7 +437,8 @@ impl<D: Database> DigitalRightsApi<D> {
         for (fingerprint, content) in self.view().list_content()? {
             if !content.distributors().contains(&distributor_id) {
                 let owners = self.shares_info(&content.shares())?;
-                v.push(ContentInfo::new(fingerprint, content, owners));
+                let distributors = self.distributor_names(content.distributors())?;
+                v.push(ContentInfo::new(fingerprint, content, owners, distributors));
             }
         }
         Ok(v)
@@ -502,11 +505,13 @@ impl<D: Database> DigitalRightsApi<D> {
         Ok(r)
     }
 
-    pub fn distributor_names(&self, ids: &Vec<u16>) -> StorageResult<Vec<ParticipantInfo>> {
+    pub fn distributor_names<T: AsRef<[u16]>>(&self,
+                                              ids: T)
+                                              -> StorageResult<Vec<ParticipantInfo>> {
         let view = self.view();
 
         let mut out = Vec::new();
-        for id in ids {
+        for id in ids.as_ref().iter() {
             let distributor = view.distributors().get(*id as u64)?.unwrap();
             out.push(ParticipantInfo {
                 id: *id,
