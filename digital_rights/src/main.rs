@@ -53,11 +53,10 @@ pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
 fn save_user(storage: &mut CookieJar, role: &str, public_key: &PublicKey, secret_key: &SecretKey) {
     let p = storage.permanent();
-    let e = p.encrypted();
 
-    e.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
-    e.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
-    e.add(Cookie::new("role".to_string(), role.to_string()));
+    p.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
+    p.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
+    p.add(Cookie::new("role".to_string(), role.to_string()));
 }
 
 fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar,
@@ -73,14 +72,13 @@ fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar,
 
 fn load_user(storage: &CookieJar) -> Result<(String, PublicKey, SecretKey), ValueNotFound> {
     let p = storage.permanent();
-    let e = p.encrypted();
 
-    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&e, "public_key")?.as_ref());
-    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&e, "secret_key")?.as_ref());
+    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&p, "public_key")?.as_ref());
+    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&p, "secret_key")?.as_ref());
 
     let public_key = public_key.ok_or(ValueNotFound::new("Unable to read public key"))?;
     let secret_key = secret_key.ok_or(ValueNotFound::new("Unable to read secret key"))?;
-    let role = e.find("role").ok_or(ValueNotFound::new("Unable to read role"))?.value;
+    let role = p.find("role").ok_or(ValueNotFound::new("Unable to read role"))?.value;
     Ok((role, public_key, secret_key))
 }
 
