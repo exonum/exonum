@@ -126,7 +126,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_request_block(&mut self, msg: RequestBlock) {
-        info!("Handle block request with h {}, max_h: {}", msg.height(), self.state.height());
+        debug!("Handle block request with height:{}, our height: {}", msg.height(), self.state.height());
         if msg.height() >= self.state.height() {
             return;
         }
@@ -152,8 +152,5 @@ impl<B, S> NodeHandler<B, S>
 
         let block_msg = Block::new(&self.public_key, block, precommits, transactions, &self.secret_key);
         self.send_to_peer(*msg.from(), block_msg.raw());
-
-        let addr = self.state.peers().get(msg.from());
-        info!("Send block {:#?} to {:?}", block_msg.raw().len(), addr);
     }
 }

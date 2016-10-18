@@ -80,8 +80,9 @@ impl<B, S> NodeHandler<B, S>
         if msg.height() > height {
             // Check validator height info
             // FIXME: make sure that validator id < validator count
-            if self.state.validator_height(msg.validator()) >= msg.height() {
-                return;
+            if msg.height() > self.state.validator_height(msg.validator()) {
+                // Update validator height
+                self.state.set_validator_height(msg.validator(), msg.height());
             }
             // Verify validator if and signature
             let peer = match self.state.public_key_of(msg.validator()) {
@@ -95,11 +96,8 @@ impl<B, S> NodeHandler<B, S>
                 // Incorrect validator id
                 None => return,
             };
-            // Update validator height
-            self.state.set_validator_height(msg.validator(), msg.height());
             // Request block
             self.request(RequestData::Block(height), peer);
-            info!("Request block from {:?} with height: {}", peer, height);
         }
     }
 
