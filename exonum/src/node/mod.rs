@@ -19,6 +19,8 @@ pub mod config;
 pub use self::config::{ListenerConfig, ConsensusConfig};
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 
+const GENESIS_TIME: Timespec = Timespec { sec: 0, nsec: 0 };
+
 #[derive(Clone, Debug)]
 pub enum ExternalMessage<B: Blockchain> {
     Transaction(B::Transaction),
@@ -70,6 +72,12 @@ pub struct Configuration {
     pub validators: Vec<PublicKey>,
 }
 
+fn actual_round(now: Timespec, propose: Timespec, round_timeout: u32, propose_timeout: u32) -> Round {
+    let duration = now - propose - Duration::milliseconds(propose_timeout as i64);
+    let round = (duration.num_milliseconds() / round_timeout as i64) as Round + 1;
+    ::std::cmp::min(1, round)
+}
+
 impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
@@ -87,12 +95,23 @@ impl<B, S> NodeHandler<B, S>
 
         let r = blockchain.last_block().unwrap();
         // TODO нужно создать api и для того, чтобы здесь подключался genesis блок
-        let (last_hash, last_height) = if let Some(last_block) = r {
-            (last_block.hash(), last_block.height() + 1)
+        let (last_hash, last_height, last_time) = if let Some(last_block) = r {
+            (last_block.hash(), last_block.height() + 1, last_block.time())
         } else {
-            (super::crypto::hash(&[]), 0)
+            (super::crypto::hash(&[]), 0, GENESIS_TIME)
         };
-        let state = State::new(id as u32, config.validators, connect, last_hash, last_height);
+        let round = actual_round(sender.get_time(), 
+            last_time, 
+            config.consensus.round_timeout, 
+            config.consensus.propose_timeout);
+
+        let state = State::new(id as u32, 
+            config.validators, 
+            connect, 
+            last_hash, 
+            last_height,
+            round,
+            );
         NodeHandler {
             public_key: config.listener.public_key,
             secret_key: config.listener.secret_key,
@@ -217,7 +236,7 @@ impl<B, S> NodeHandler<B, S>
         self.blockchain
             .last_block()
             .unwrap()
-            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time())
+            .map_or_else(|| GENESIS_TIME, |p| p.time())
     }
 
     pub fn last_block_hash(&self) -> Hash {
@@ -225,6 +244,10 @@ impl<B, S> NodeHandler<B, S>
             .last_block()
             .unwrap()
             .map_or_else(|| hash(&[]), |p| p.hash())
+    }
+
+    pub fn actual_round(&self) -> Round {
+        actual_round(self.channel.get_time(), self.last_block_time(), self.round_timeout, self.propose_timeout)
     }
 }
 

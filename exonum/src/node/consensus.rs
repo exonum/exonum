@@ -19,6 +19,7 @@ impl<B, S> NodeHandler<B, S>
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+        trace!("Consenus message with height {}, our height: {}", msg.height(), self.state.height());
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
             return;
@@ -105,7 +106,6 @@ impl<B, S> NodeHandler<B, S>
 
     // TODO write helper function which returns Result
     pub fn handle_block(&mut self, msg: Block) {
-        info!("{:?}", msg);
         // TODO
         // Добавить pub_key получателя и время отправления, чтобы защититься от ддоса
 
@@ -174,17 +174,29 @@ impl<B, S> NodeHandler<B, S>
         // TODO использовать общий с self.commit код
         self.blockchain.commit(block_hash, patch, precommits.iter()).unwrap();
         // Update state to new height
-        self.state.new_height(&block_hash);
+        let round = self.actual_round();
+        self.state.new_height(&block_hash, round);
 
-        info!("{:?} ========== added (height: {})",
+        info!("{:?} ========== height = {}",
               self.channel.get_time(),
               self.state.height());
 
-        // Request next block if needed
-        if let Some(id) = self.state.validator_heights().first() {
-            let height = self.state.height();
-            let peer = self.state.public_key_of(*id).unwrap().clone();
-            self.request(RequestData::Block(height), peer);
+        let heights = self.state.validator_heights();
+        if !heights.is_empty() {
+            // Request next block if needed
+            for id in heights {
+                let peer = self.state.public_key_of(id).unwrap().clone();
+                if self.state.peers().contains_key(&peer) {
+                    let height = self.state.height();
+                    self.request(RequestData::Block(height), peer);
+                    info!("Send block request to peer: {} height: {}", id, height);
+                    break;
+                }
+            }
+        } else {
+            // We reached actual height
+            // Add timeout for actual round
+            self.add_round_timeout();
         }
     }
 
@@ -342,10 +354,12 @@ impl<B, S> NodeHandler<B, S>
         }
 
         // Update state to new height
-        self.state.new_height(hash);
+        let round = self.actual_round();
+        self.state.new_height(hash, round);
 
-        info!("{:?} ========== commited = {}, pool = {}",
+        info!("{:?} ========== height = {}, commited = {}, pool = {}",
               self.channel.get_time(),
+              self.state.height(),
               self.state.commited_txs,
               self.state.transactions().len());
 
@@ -361,12 +375,6 @@ impl<B, S> NodeHandler<B, S>
 
         // Add timeout for first round
         self.add_round_timeout();
-
-        // Request commits
-        // for validator in self.state.validator_heights() {
-        //     let peer = self.public_key_of(validator);
-        //     self.request(RequestData::Commit, peer)
-        // }
     }
 
     pub fn handle_tx(&mut self, msg: B::Transaction) {
@@ -425,14 +433,13 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
-        debug!("ROUND TIMEOUT height={}, round={}", height, round);
         if height != self.state.height() {
             return;
         }
-
         if round != self.state.round() {
             return;
         }
+        debug!("ROUND TIMEOUT height={}, round={}", height, round);
 
         // Update state to new round
         self.state.new_round();

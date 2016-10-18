@@ -35,6 +35,7 @@ pub struct State<Tx> {
 
     // messages
     proposes: HashMap<Hash, ProposeState>,
+    blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), HashMap<ValidatorId, Prevote>>,
     precommits: HashMap<(Round, Hash, Hash), HashMap<ValidatorId, Precommit>>,
 
@@ -94,10 +95,9 @@ pub struct ProposeState {
 }
 
 pub struct BlockState {
-    /// Блок
-    block: Block,
     // Набор изменений, которые нужно внести в состояние для применения блока
-    patch: Option<Patch>
+    hash: Hash,
+    patch: Patch,
 }
 
 impl RequestData {
@@ -170,12 +170,30 @@ impl ProposeState {
     }
 }
 
+impl BlockState {
+    pub fn new(hash: Hash, patch: Patch) -> BlockState {
+        BlockState {
+            hash: hash,
+            patch: patch
+        }
+    }
+
+    pub fn hash(&self) -> Hash {
+        self.hash
+    }
+
+    pub fn patch(self) -> Patch {
+        self.patch
+    }
+}
+
 impl<Tx> State<Tx> {
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
                connect: Connect,
                last_hash: Hash,
-               last_height: u64)
+               last_height: u64,
+               actual_round: Round)
                -> State<Tx> {
         let validators_len = validators.len();
 
@@ -186,12 +204,13 @@ impl<Tx> State<Tx> {
             connections: HashMap::new(),
             validators: validators,
             height: last_height,
-            round: 1,
+            round: actual_round,
             locked_round: 0,
             locked_propose: None,
             last_hash: last_hash,
 
             proposes: HashMap::new(),
+            blocks: HashMap::new(),
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
@@ -309,9 +328,9 @@ impl<Tx> State<Tx> {
     }
 
     //FIXME use block_hash
-    pub fn new_height(&mut self, propose_hash: &Hash) {
+    pub fn new_height(&mut self, propose_hash: &Hash, round: Round) {
         self.height += 1;
-        self.round = 1;
+        self.round = round;
         self.locked_round = 0;
         self.locked_propose = None;
         // TODO: use block hash instead

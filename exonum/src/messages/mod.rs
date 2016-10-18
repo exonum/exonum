@@ -230,10 +230,7 @@ impl<Tx: Message> Any<Tx> {
         Ok(match raw.message_type() {
             CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
             STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
-            BLOCK_MESSAGE_ID => {
-                info!("Block len {}", raw.len());
-                Any::Block(Block::from_raw(raw)?)
-            }
+            BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
 
             PROPOSE_MESSAGE_ID => {
                 Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
