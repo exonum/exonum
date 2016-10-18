@@ -53,10 +53,15 @@ pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
 fn save_user(storage: &mut CookieJar, role: &str, public_key: &PublicKey, secret_key: &SecretKey) {
     let p = storage.permanent();
+    let add_cookie = |name: &str, value| {
+        let mut cookie = Cookie::new(name.to_string(), value);
+        cookie.path = Some("/".to_string());
+        p.add(cookie)
+    };
 
-    p.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
-    p.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
-    p.add(Cookie::new("role".to_string(), role.to_string()));
+    add_cookie("public_key", public_key.to_hex());
+    add_cookie("secret_key", secret_key.to_hex());
+    add_cookie("role", role.to_string());
 }
 
 fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar,

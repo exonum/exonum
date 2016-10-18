@@ -397,9 +397,14 @@ mod tests {
             let shares = c.shares();
             let id = shares[0].owner_id;
             let owner = v.owners().get(id as u64).unwrap().unwrap();
-            let ownership = v.owner_contents(id).get(0).unwrap().unwrap();
-            println!("{:?}", owner);
-            println!("{:?}", ownership);
+            assert_eq!(owner.pub_key(), &p1);
+
+            let ownership = v.owner_contents(id).get(1).unwrap().unwrap();
+            assert_eq!(ownership.fingerprint(), f5);
+            assert_eq!(ownership.plays(), 0);
+            assert_eq!(ownership.amount(), 0);
+
+            assert_eq!(v.owner_reports(id, f5).len().unwrap(), 0);
         }
     }
 
