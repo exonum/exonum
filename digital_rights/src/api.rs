@@ -289,7 +289,7 @@ impl OwnerContentInfo {
                -> OwnerContentInfo {
         let share = content.owners.iter().find(|x| x.id == owner_id).unwrap().share as u64;
         for mut report in &mut reports {
-            report.amount *= share / 100;
+            report.amount = (report.amount * share) / 100;
         }
 
         OwnerContentInfo {
