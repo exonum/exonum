@@ -170,7 +170,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
         // Commit block
-        self.state.add_block(block_hash, patch);
+        self.state.add_block(block_hash, patch, None);
         self.commit(block_hash, precommits.iter());
         // Request next block if needed
         let heights = self.state.validator_heights();
@@ -339,18 +339,17 @@ impl<B, S> NodeHandler<B, S>
     // FIXME: push precommits into storage
     pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self, block_hash: Hash, precommits: I) {
         debug!("COMMIT {:?}", block_hash);
+        
+        let block_state = self.state.block(&block_hash).unwrap();
+        let propose_hash = block_state.propose_hash();
         // Merge changes into storage
         {
-            // FIXME: remove unwrap here
-            let patch = self.state.block(&block_hash).unwrap().patch();
+            let patch = block_state.patch();
             self.blockchain.commit(block_hash, patch, precommits).unwrap();
         }
-
         // Update state to new height
         let round = self.actual_round();
-        // FIXME rewrite me!
-        let txs = self.blockchain.view().block_txs(self.state.height()).values().unwrap();
-        self.state.new_height(&block_hash, round, &txs);
+        self.state.new_height(&block_hash, round, propose_hash.as_ref());
 
         info!("{:?} ========== height = {}, commited = {}, pool = {}",
               self.channel.get_time(),
@@ -363,13 +362,15 @@ impl<B, S> NodeHandler<B, S>
             self.handle_consensus(msg);
         }
 
-        // Send propose
-        if self.is_leader() {
-            self.add_propose_timeout();
-        }
+        if self.state.validator_heights().is_empty() {
+            // Send propose
+            if self.is_leader() {
+                self.add_propose_timeout();
+            }
 
-        // Add timeout for first round
-        self.add_round_timeout();
+            // Add timeout for first round
+            self.add_round_timeout();
+        }
     }
 
     pub fn handle_tx(&mut self, msg: B::Transaction) {
@@ -578,7 +579,7 @@ impl<B, S> NodeHandler<B, S>
                 .unwrap()
         };
         // Save patch
-        self.state.add_block(block_hash, patch);
+        self.state.add_block(block_hash, patch, Some(*propose_hash));
         block_hash
     }
 

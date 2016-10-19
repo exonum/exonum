@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use time::Duration;
 
-use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, Block};
+use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
 
@@ -92,9 +92,12 @@ pub struct ProposeState {
 
 #[derive(Clone)]
 pub struct BlockState {
-    // Набор изменений, которые нужно внести в состояние для применения блока
+    // Хэш блока
     hash: Hash,
+    // Набор изменений, которые нужно внести в состояние для применения блока
     patch: Patch,
+    // Хэш предложения из которого блок получен (если имеется)
+    propose_hash: Option<Hash>
 }
 
 impl RequestData {
@@ -155,10 +158,11 @@ impl ProposeState {
 }
 
 impl BlockState {
-    pub fn new(hash: Hash, patch: Patch) -> BlockState {
+    pub fn new(hash: Hash, patch: Patch, propose_hash: Option<Hash>) -> BlockState {
         BlockState {
             hash: hash,
-            patch: patch
+            patch: patch,
+            propose_hash: propose_hash,
         }
     }
 
@@ -168,6 +172,10 @@ impl BlockState {
 
     pub fn patch(self) -> Patch {
         self.patch.clone()
+    }
+
+    pub fn propose_hash(&self) -> Option<Hash> {
+        self.propose_hash
     }
 }
 
@@ -285,7 +293,7 @@ impl<Tx> State<Tx> {
 
     pub fn lock(&mut self, round: Round, hash: Hash) {
         if self.locked_round >= round {
-            panic!("Incorrect lock")
+            //panic!("Incorrect lock")
         }
         self.locked_round = round;
         self.locked_propose = Some(hash);
@@ -316,20 +324,23 @@ impl<Tx> State<Tx> {
     }
 
     //FIXME use block_hash
-    pub fn new_height(&mut self, block_hash: &Hash, round: Round, txs: &Vec<Hash>) {
+    pub fn new_height(&mut self, block_hash: &Hash, round: Round, propose_hash: Option<&Hash>) {
         self.height += 1;
         self.round = round;
         self.locked_round = 0;
         self.locked_propose = None;
-        // TODO: use block hash instead
         self.last_hash = *block_hash;
 
-        {
-            self.commited_txs += txs.len() as u64;
-            for tx in txs {
+        if let Some(propose_hash) = propose_hash {
+            let state = self.proposes
+                .get(propose_hash)
+                .expect("Trying to commit unknown propose");
+            self.commited_txs += state.propose.transactions().len() as u64;
+            for tx in state.propose.transactions() {
                 self.transactions.remove(tx);
             }
         }
+
         // TODO: destruct/construct structure HeightState instead of call clear
         self.blocks.clear();
         self.proposes.clear();
@@ -419,13 +430,14 @@ impl<Tx> State<Tx> {
         }
     }
 
-    pub fn add_block(&mut self, block_hash: Hash, patch: Patch) -> Option<&BlockState> {
+    pub fn add_block(&mut self, block_hash: Hash, patch: Patch, propose_hash: Option<Hash>) -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => {
                 Some(e.insert(BlockState {
                     hash: block_hash,
-                    patch: patch
+                    patch: patch,
+                    propose_hash: propose_hash,
                 }))
             }
         }

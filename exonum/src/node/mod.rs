@@ -203,7 +203,7 @@ impl<B, S> NodeHandler<B, S>
         let current_time = self.channel.get_time();
         let time = ::std::cmp::max(current_time, self.last_block_time() + duration);
 
-        debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
+        debug!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}",
                time,
                self.state.height(),
                self.state.round());
