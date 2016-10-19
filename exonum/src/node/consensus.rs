@@ -13,6 +13,8 @@ use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 use super::super::events::Channel;
 use super::{ExternalMessage, NodeTimeout};
 
+const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
+
 // TODO reduce view invokations
 impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
@@ -70,6 +72,7 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn handle_propose(&mut self, msg: Propose) {
         debug!("Handle propose {:?}", msg);
+
         // TODO: check time
         // TODO: check that transactions are not commited yet
         if self.state.propose(&msg.hash()).is_some() {
@@ -106,12 +109,26 @@ impl<B, S> NodeHandler<B, S>
 
     // TODO write helper function which returns Result
     pub fn handle_block(&mut self, msg: Block) {
-        // TODO
-        // Добавить pub_key получателя и время отправления, чтобы защититься от ддоса
-
+        // Request are sended to us
+        if msg.to() != &self.public_key {
+            return;
+        }
+        // FIXME: we should use some epsilon for checking lifetime < 0
+        let lifetime = match (self.channel.get_time() - msg.time()).num_nanoseconds() {
+            Some(nanos) => nanos,
+            None => {
+                // Incorrect time into message
+                return;
+            }
+        };
+        // Incorrect time of the bock
+        if lifetime < 0 || lifetime > BLOCK_ALIVE {
+            return;
+        }
         if !msg.verify(msg.from()) {
             return;
         }
+        
         debug!("Handle block {:?}", msg);
 
         let block = msg.block();
@@ -120,8 +137,8 @@ impl<B, S> NodeHandler<B, S>
         if self.state.height() != block.height() {
             return;
         }
-
         if block.prev_hash() != &self.last_block_hash() {
+            warn!("Weird block received from {:?}", msg.from());
             return;
         }
 
@@ -180,7 +197,6 @@ impl<B, S> NodeHandler<B, S>
                 if self.state.peers().contains_key(&peer) {
                     let height = self.state.height();
                     self.request(RequestData::Block(height), peer);
-                    info!("Send block request to peer: {} height: {}", id, height);
                     break;
                 }
             }

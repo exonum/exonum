@@ -84,12 +84,14 @@ message! {
 message! {
     Block {
         const ID = BLOCK_MESSAGE_ID;
-        const SIZE = 64;
+        const SIZE = 96;
 
-        from:           &PublicKey        [00 => 32]
-        block:          blockchain::Block [32 => 40]
-        precommits:     Vec<Precommit>    [48 => 56]
-        transactions:   Vec<RawMessage>   [56 => 64]
+        from:           &PublicKey          [00 => 32]
+        to:             &PublicKey          [32 => 64]
+        time:           Timespec            [64 => 72]
+        block:          blockchain::Block   [72 => 80]
+        precommits:     Vec<Precommit>      [80 => 88]
+        transactions:   Vec<RawMessage>     [88 => 96]
     }
 }
 

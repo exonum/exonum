@@ -246,6 +246,7 @@ fn test_status() {
 #[test]
 fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
+    let ts = time::get_time();
 
     let content = blockchain::Block::new(500,
                                          time::get_time(),
@@ -278,18 +279,24 @@ fn test_block() {
         Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone(),
     ];
     let block = Block::new(&pub_key,
+                           &pub_key,
+                           ts,
                            content.clone(),
                            precommits.clone(),
                            transactions.clone(),
                            &secret_key);
 
     assert_eq!(block.from(), &pub_key);
+    assert_eq!(block.to(), &pub_key);
+    assert_eq!(block.time(), ts);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
 
     let block2 = Block::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
+    assert_eq!(block2.to(), &pub_key);
+    assert_eq!(block2.time(), ts);
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits);
     assert_eq!(block2.transactions(), transactions);
@@ -297,33 +304,35 @@ fn test_block() {
 
 #[test]
 fn test_empty_block() {
-    // let (pub_key, secret_key) = gen_keypair();
+    let (pub_key, secret_key) = gen_keypair();
+    let ts = time::get_time();
 
-    // let content = blockchain::Block::new(200,
-    //                                      time::get_time(),
-    //                                      &hash(&[1]),
-    //                                      &hash(&[2]),
-    //                                      &hash(&[3]),
-    //                                      0);
+    let content = blockchain::Block::new(200, ts, &hash(&[1]), &hash(&[2]), &hash(&[3]), 0);
 
-    // let precommits = Vec::new();
-    // let transactions = Vec::new();
-    // let block = Block::new(&pub_key,
-    //                        content.clone(),
-    //                        precommits.clone(),
-    //                        transactions.clone(),
-    //                        &secret_key);
+    let precommits = Vec::new();
+    let transactions = Vec::new();
+    let block = Block::new(&pub_key,
+                           &pub_key,
+                           ts,
+                           content.clone(),
+                           precommits.clone(),
+                           transactions.clone(),
+                           &secret_key);
 
-    // assert_eq!(block.from(), &pub_key);
-    // assert_eq!(block.block(), content);
-    // assert_eq!(block.precommits(), precommits);
-    // assert_eq!(block.transactions(), transactions);
+    assert_eq!(block.from(), &pub_key);
+    assert_eq!(block.to(), &pub_key);
+    assert_eq!(block.time(), ts);
+    assert_eq!(block.block(), content);
+    assert_eq!(block.precommits(), precommits);
+    assert_eq!(block.transactions(), transactions);
 
-    // let block2 = Block::from_raw(block.raw().clone()).unwrap();
-    // assert_eq!(block2.from(), &pub_key);
-    // assert_eq!(block2.block(), content);
-    // assert_eq!(block2.precommits(), precommits);
-    // assert_eq!(block2.transactions(), transactions);
+    let block2 = Block::from_raw(block.raw().clone()).unwrap();
+    assert_eq!(block2.from(), &pub_key);
+    assert_eq!(block2.to(), &pub_key);
+    assert_eq!(block2.time(), ts);
+    assert_eq!(block2.block(), content);
+    assert_eq!(block2.precommits(), precommits);
+    assert_eq!(block2.transactions(), transactions);
 }
 
 #[test]
