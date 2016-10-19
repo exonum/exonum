@@ -1,0 +1,24 @@
+{% if (user.get("ownership").length > 0) { %}
+  <div class="app-list-headers clearfix">
+    <div class="pull-left">List of content that you own</div>
+  </div>
+  <table class="table table-hover table-condensed distributed owned">
+    <thead>
+      <tr><th>Title</th><th>Plays</th><th>Revenue</th><tr>
+    </thead>
+    <tbody>
+      {% _.each(user.get("ownership"), function(ownership) { %}
+        <tr data-fingerprint="{{ ownership.content.fingerprint }}">
+          <td>{{ ownership.content.title }}</td>
+          <td class="text-right">{{ ownership.plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+          <td>{{ ownership.content.price_per_listen }}¢</td>
+        </tr>
+      {% }) %}
+    </tbody>
+  </table>
+{% } else { %}
+  <h6 class="text-center text-muted">You have not registered any content yet.</h6>
+{% } %}
+<div class="buttons-wrapper">
+  <a class="button button-red" id="owner-dashboard-add-content">Add new content</a>
+</div>

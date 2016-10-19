@@ -1,0 +1,41 @@
+{% if (user.get("contracts").length > 0) { %}
+  <div class="app-list-headers clearfix">
+    <div class="pull-left">List of content that you are distribute</div>
+  </div>
+  <table class="table table-hover table-condensed distributed">
+  <thead>
+    <tr><th>Title</th><th>Plays</th><tr>
+  </thead>
+  <tbody>
+    {% _.each(user.get("contracts"), function(contract) { %}
+      <tr data-fingerprint="{{ contract.content.fingerprint }}">
+        <td>{{ contract.content.title }}</td>
+        <td class="text-right text-{{ contract.plays >= contract.min_plays ? "success" : "warning" }}">
+          {{ contract.plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
+          /
+          {{ contract.content.min_plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
+        </td>
+      </tr>
+    {% }) %}
+  </tbody>
+  </table>
+{% } %}
+{% if (user.get("available_content").length > 0) { %}
+<div class="app-list-headers clearfix">
+  <div class="pull-left">List of content that is available for distribution</div>
+</div>
+<table class="table table-hover table-condensed available">
+<thead>
+  <tr><th>Title</th><th>Min. Plays</th><th>Price</th><tr>
+</thead>
+<tbody>
+  {% _.each(_.chain(user.get("available_content")).reverse().value(), function(content) { %}
+    <tr data-fingerprint="{{ content.fingerprint }}">
+      <td>{{ content.title }}</td>
+      <td class="text-right">{{ content.min_plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+      <td class="text-right">{{ content.price_per_listen }}¢</td>
+    </tr>
+  {% }) %}
+</tbody>
+</table>
+{% } %}

@@ -1,0 +1,46 @@
+<div class="app-list-headers clearfix">
+    {% if (block.get('height') < last_height) { %}
+      <div class="pull-left"><a id="block-prev">← {{ block.get('height') + 1 }}</a></div>
+    {% } %}
+    {% if (block.get('height') > 1) { %}
+      <div class="pull-right"><a id="block-next">{{ block.get('height') - 1 }} →</a></div>
+    {% } %}
+</div>
+
+<dl>
+  <dt>Hash</dt>
+  <dd><samp>{{ block.get('hash') }}</samp></dd>
+  <dt>Propose time</dt>
+  <dd>{{ moment.unix(block.get('propose_time')).format() }}</dd>
+  <dt>Proposer</dt>
+  <dd>Validator #{{ block.get('proposer') + 1 }}</dd>
+  <dt>Tx hash</dt>
+  <dd><samp>{{ block.get('tx_hash') }}</samp></dd>
+  <dt>State hash</dt>
+  <dd><samp>{{ block.get('state_hash') }}</samp></dd>
+</dl>
+
+<div class="col-xs-offset-2" style="margin-bottom: 23px;">
+    <div><div class="checker active"></div> <span>Approved by 7 validators</span></div>
+    <div><div class="checker active"></div> <span><a href="#">Anchored to Bitcoin blockchain</a></span></div>
+</div>
+
+{% if (block.get('tx_count') != 0) { %}
+  <dl>
+    <dt>Transactions ({{ block.get('tx_count') }})</dt>
+    <dd>
+      <table class="table table-hover table-condensed">
+        <thead>
+            <tr><th>Type</th><th>Desctition</th><th>Amount</th><tr>
+        </thead>
+        <tbody>
+            <tr><td>Register</td><td>Adele (#7439) added Hello</td><td>–</td></tr>
+            <tr><td>Buy</td><td>Sony (#1989) bought rights (Ed&nbsp;Sheeran&nbsp;#6783)</td><td>–</td></tr>
+            <tr><td>Report</td><td>Sony (#1989) reported (M.&nbsp;Jakson&nbsp;#0841)</td><td>100&nbsp;000</td></tr>
+        </tbody>
+      </table>
+    </dd>
+  </dl>
+{% } else { %}
+  <h5 class="text-center text-muted">There aren't transactions in this block.</h5>
+{% } %}

@@ -1,0 +1,12 @@
+{
+  "name": "drm-frontend",
+  "private": true,
+  "dependencies": {
+    "jquery": "~2.1.1",
+    "moment": "~2.15.1",
+    "backbone": "~1.3.3",
+    "backbone-forms": "~0.14.1",
+    "bootswatch-dist": "paper",
+    "cookie": "~1.2.1"
+  }
+}

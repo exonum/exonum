@@ -1,0 +1,86 @@
+<div class="app-list-headers clearfix">
+  <div class="text-center">
+    {{ content.get('fingerprint').substr(0, 8) }}-{{ content.get('fingerprint').substr(8, 4) }}-{{ content.get('fingerprint').substr(12, 4) }}-{{ content.get('fingerprint').substr(16, 4) }}-{{ content.get('fingerprint').substr(20, 12) }}
+  </div>
+</div>
+<dl class="dl-horizontal">
+  <dt>Title</dt>
+  <dd>{{ content.get('title') }}</dd>
+  <dt>Price per listen</dt>
+  <dd>{{ content.get('price_per_listen') }}¢</dd>
+  <dt>Min. Plays</dt>
+  <dd>{{ content.get('min_plays').toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</dd>
+  {% if (content.get('additional_conditions')) { %}
+    <dt>Aditional conditions</dt>
+    <dd>{{ content.get('additional_conditions') }} </dd>
+  {% } %}
+</dl>
+
+{% if (user.get("role") == "distributor") { %}
+  {% if (content.get("contract")) { %}
+    <!-- Distributed content -->
+    <div class="app-list-headers clearfix">
+      <div class="text-center">Current streaming status</div>
+    </div>
+    <h4 class="text-center text-{{ content.get("contract").plays >= content.get("min_plays") ? "success" : "warning" }}">
+      {{ content.get("contract").plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
+      /
+      {{ content.get("min_plays").toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
+    </h4>
+    <div class="buttons-wrapper">
+      <a class="button" id="content-update-status">Update distribution status</a>
+    </div>
+  {% } else { %}
+  <!-- Available content -->
+  <div class="buttons-wrapper">
+      <a class="button button-red" id="content-buy-inside">Buy inside the platform</a>
+      <a class="button" id="content-buy-outside">Buy outside the platform</a>
+  </div>
+  {% } %}
+{% } %}
+
+<div class="app-list-headers clearfix">
+  <div class="text-center">Owner information</div>
+</div>
+<div class="col-sm-offset-1 col-sm-10">
+  <table class="table">
+    {% _.each(content.get("owners"), function(owner) { %}
+      <tr>
+        <td>#{{ owner.id }}</td>
+        <td class="text-right">{{ owner.name }}</td>
+        <td class="text-right">{{ owner.share }}%</td>
+      </tr>
+    {% }) %}
+  </table>
+</div>
+
+{% if (user.get("role") == "owner") { %}
+  <!-- Owned content -->
+  <div class="app-list-headers clearfix">
+    <div class="text-center">Current status</div>
+  </div>
+  {% if (content.get("distributors").length > 0 ) { %}
+    <h5 class="text-center text-success">
+      Distribution rights’ve bought by<br>
+      {% _.each(content.get("distributors"), function(distributor) { %}
+        {{ distributor.name }} #{{ distributor.id }}
+      {% }) %}
+    </h5>
+    {% if (content.get("reports").length > 0) { %}
+    <div class="app-list-headers clearfix">
+      <div class="text-center">Revenue</div>
+    </div>
+    <table class="table">
+      {% _.each(content.get("reports"), function(report) { %}
+      <tr>
+        <td>{{ report.comment }}</td>
+        <td class="text-right">{{ moment.unix(report.time / 1000).format('YYYY-MM-DD') }}</td>
+        <td class="text-right">£{{ Math.round(report.amount / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+      </tr>
+      {% }) %}
+    </table>
+    {% } %}
+  {% } else { %}
+    <h5 class="text-center text-muted">No one distributes this content.</h5>
+  {% } %}
+{% } %}

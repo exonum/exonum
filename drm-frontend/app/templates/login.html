@@ -1,0 +1,31 @@
+{% if (users.length > 0) { %}
+<div class="app-list-headers clearfix">
+  <div class="pull-left">You can log in using existing accounts</div>
+</div>
+<div class="buttons-wrapper" id="registered-accounts">
+  {% _.each(users, function(user, i) { %}
+    <a class="button login" data-index="{{ i }}">
+      <b>{{ user.name }}</b> (#{{ user.id }})
+    </a>
+  {% }) %}
+</div>
+<div class="app-list-headers clearfix">
+  <div class="pull-left">Or you can create a new account</div>
+</div>
+{% } else { %}
+<div class="app-list-headers clearfix">
+  <div class="pull-left">You have not registered any accounts yet</div>
+</div>
+{% } %}
+<div class="buttons-wrapper">
+  <a class="button" id="login-registration">Create new account</a>
+</div>
+<div class="app-list-headers clearfix">
+  <div class="pull-left">Or just explore blockchain</div>
+</div>
+<div class="buttons-wrapper">
+  <a class="button" id="login-blockchain">Blockchain explorer</a>
+</div>
+<span class="list-option-link">
+  Find out more on <a target="_blank" href="http://exonum.com/">exonum.com</a>
+</span>
