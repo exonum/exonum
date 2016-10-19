@@ -2,7 +2,7 @@ use std::slice::SliceConcatExt;
 use std::ops::Deref;
 
 use ::crypto::Hash;
-use ::messages::{Precommit, Propose, Message};
+use ::messages::{Precommit, Message};
 use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable};
 
 use super::Block;

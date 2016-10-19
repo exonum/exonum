@@ -59,10 +59,10 @@ impl GenesisConfig {
         GenesisConfig {
             validators: pairs,
             consensus: ConsensusConfig {
-                round_timeout: 3000,
-                status_timeout: 5000,
+                round_timeout: 1000,
+                status_timeout: 3000,
                 peers_timeout: 10000,
-                propose_timeout: 3000,
+                propose_timeout: 500,
             },
             network: NetworkConfiguration {
                 max_incoming_connections: 128,
