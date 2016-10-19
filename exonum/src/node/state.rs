@@ -184,8 +184,7 @@ impl<Tx> State<Tx> {
                validators: Vec<PublicKey>,
                connect: Connect,
                last_hash: Hash,
-               last_height: u64,
-               actual_round: Round)
+               last_height: u64)
                -> State<Tx> {
         let validators_len = validators.len();
 
@@ -196,7 +195,7 @@ impl<Tx> State<Tx> {
             connections: HashMap::new(),
             validators: validators,
             height: last_height,
-            round: actual_round,
+            round: 0,
             locked_round: 0,
             locked_propose: None,
             last_hash: last_hash,
@@ -293,7 +292,7 @@ impl<Tx> State<Tx> {
 
     pub fn lock(&mut self, round: Round, hash: Hash) {
         if self.locked_round >= round {
-            //panic!("Incorrect lock")
+            panic!("Incorrect lock")
         }
         self.locked_round = round;
         self.locked_propose = Some(hash);

@@ -339,7 +339,7 @@ impl<B, S> NodeHandler<B, S>
     // FIXME: push precommits into storage
     pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self, block_hash: Hash, precommits: I) {
         debug!("COMMIT {:?}", block_hash);
-        
+
         let block_state = self.state.block(&block_hash).unwrap();
         let propose_hash = block_state.propose_hash();
         // Merge changes into storage
@@ -363,11 +363,6 @@ impl<B, S> NodeHandler<B, S>
         }
 
         if self.state.validator_heights().is_empty() {
-            // Send propose
-            if self.is_leader() {
-                self.add_propose_timeout();
-            }
-
             // Add timeout for first round
             self.add_round_timeout();
         }
@@ -457,8 +452,15 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn handle_propose_timeout(&mut self) {
+    pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
+        if height != self.state.height() {
+            return;
+        }
+        if round != self.state.round() {
+            return;
+        }
         debug!("I AM LEADER!!! pool = {}", self.state.transactions().len());
+
         let round = self.state.round();
         let txs: Vec<Hash> = self.state
             .transactions()
