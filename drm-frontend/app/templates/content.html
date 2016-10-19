@@ -6,7 +6,7 @@
 <dl class="dl-horizontal">
   <dt>Title</dt>
   <dd>{{ content.get('title') }}</dd>
-  <dt>Price per listen</dt>
+  <dt>Price per play</dt>
   <dd>{{ content.get('price_per_listen') }}¢</dd>
   <dt>Min. Plays</dt>
   <dd>{{ content.get('min_plays').toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</dd>
@@ -20,7 +20,7 @@
   {% if (content.get("contract")) { %}
     <!-- Distributed content -->
     <div class="app-list-headers clearfix">
-      <div class="text-center">Current streaming status</div>
+      <div class="text-center">Current distribution status</div>
     </div>
     <h4 class="text-center text-{{ content.get("contract").plays >= content.get("min_plays") ? "success" : "warning" }}">
       {{ content.get("contract").plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
@@ -61,12 +61,12 @@
   </div>
   {% if (content.get("distributors").length > 0 ) { %}
     <h5 class="text-center text-success">
-      Distribution rights’ve bought by<br>
+      Distribution rights have been bought by
       {% _.each(content.get("distributors"), function(distributor) { %}
-        {{ distributor.name }} #{{ distributor.id }}
+        <br>{{ distributor.name }} #{{ distributor.id }}
       {% }) %}
     </h5>
-    {% if (content.get("reports").length > 0) { %}
+    {% if (content.get("reports")) { %}
     <div class="app-list-headers clearfix">
       <div class="text-center">Revenue</div>
     </div>

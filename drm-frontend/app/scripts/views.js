@@ -30,7 +30,7 @@ var LoginPage = Backbone.View.extend({
   },
 
   login: function(e) {
-    var index = $(e.target).data("index");
+    var index = $(e.currentTarget).data("index");
     app.login(app.users[index]);
   },
 
@@ -242,6 +242,8 @@ var AddContentPage = Backbone.View.extend({
     "focus #add-content-title": "onFocus",
     "focus #add-content-min-plays": "onFocus",
     "focus #add-content-price-per-listen": "onFocus",
+    "click #add-content-add-coowner": "addCoowner",
+    "click .add-content-remove-coowner": "removeCoowner",
   },
 
   onFocus: function(e) {
@@ -262,6 +264,39 @@ var AddContentPage = Backbone.View.extend({
     this.$el.find("#add-content-fingerprint-group").removeClass("has-error");
   },
 
+  getOwners: function() {
+    var owners = [];
+    this.$el.find("#owners tbody tr").each(function(i, el) {
+      owners.push({
+        owner_id: $(el).data("id"),
+        share: Math.round($(el).find('input').val().replace(/[^0-9]/g, ''))
+      });
+    });
+    console.log(owners);
+    return owners;
+  },
+
+  addCoowner: function() {
+    var that = this;
+    var id = this.$el.find('#add-content-user-id').val();
+    app.views.container.loadingStart();
+    new Owner({id: id}).fetch({
+      success: function(model) {
+        app.views.container.loadingFinish();
+        var name = model.get('name');
+        that.$el.find("#owners tbody").append('<tr data-id="' + id + '"><td class="title col-sm-7">' + name + ' #' + id + '</td><td class="col-sm-3"><input type="input" class="form-control" value="0"></td><td class="col-sm-2"><a class="label label-danger add-content-remove-coowner">–</a></td></tr>');
+      },
+      error: function() {
+        app.views.container.loadingFinish();
+        that.$el.find('#add-content-user-id').val('');
+      }
+    });
+  },
+
+  removeCoowner: function(e) {
+    $(e.target).parents('tr').remove();
+  },
+
   addContent: function() {
     console.log("!! Add content");
     var hasError = false;
@@ -272,9 +307,7 @@ var AddContentPage = Backbone.View.extend({
       price_per_listen: this.$el.find("#add-content-price-per-listen").val(),
       min_plays: this.$el.find("#add-content-min-plays").val(),
       additional_conditions: this.$el.find("#add-content-additional-conditions").val(),
-      owners: [
-        { owner_id: app.user.get("id"), "share": 100 }
-      ]
+      owners: this.getOwners()
     };
 
     console.log(content);
@@ -409,12 +442,12 @@ var ContainerView = Backbone.View.extend({
 
   changePage: function(page) {
     console.log("change page", page);
+    var title = $.isFunction(app.views[page].title) ?
+                app.views[page].title() :
+                app.views[page].title;
     if (app.views[page].showToolbar) {
       this.$el.find('.app-content').show();
       this.$el.find('.toolbar').show();
-      var title = $.isFunction(app.views[page].title) ?
-                  app.views[page].title() :
-                  app.views[page].title;
       this.$el.find('.toolbar-title').text(title);
       if (app.views[page].backPage === undefined) {
         this.$el.find('.toolbar-return-button').hide();
@@ -429,7 +462,7 @@ var ContainerView = Backbone.View.extend({
     };
     $(".page[data-page!='" + page + "']").hide();
     $(".page[data-page='" + page + "']").show();
-    $("title").text(app.views[page].title + " – Exonum");
+    $("title").text(title + " – Exonum");
     this.loadingFinish();
   },
 

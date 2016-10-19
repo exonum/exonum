@@ -8,7 +8,7 @@
     </div>
   </div>
   <div class="form-group" id="add-content-fingerprint-group">
-    <label for="add-content-fingerprint" class="col-sm-3 control-label">Fingerprint</label>
+    <label for="add-content-fingerprint" class="col-sm-3 control-label">Audio fingerprint</label>
     <div class="col-sm-9">
       <input type="input" class="form-control" id="add-content-fingerprint" disabled>
        <span class="help-block">Please upload file to calculate fingerprint.</span>
@@ -23,16 +23,29 @@
   </div>
 </div>
 <div>
-<!--   <div class="form-group">
+  <div class="form-group">
     <label class="control-label"><strong>Enter information about owners:</strong></label>
-    <table class="table owners">
-      <tr>
-        <td class="title col-sm-7">{{ user.get('name') }} #{{ user.get('id') }}</td>
-        <td class="col-sm-3"><input type="input" class="form-control" value="100%"></td>
-        <td class="col-sm-2"><a class="label label-danger">–</a></td>
-      </tr>
+    <table class="table owners" id="owners">
+      <tbody>
+        <tr data-id="{{ user.get('id') }}">
+          <td class="title col-sm-7">{{ user.get('name') }} #{{ user.get('id') }}</td>
+          <td class="col-sm-3"><input type="input" class="form-control" value="100%"></td>
+          <td class="col-sm-2"><a class="label label-danger add-content-remove-coowner">–</a></td>
+        </tr>
+      </tbody>
     </table>
-  </div> -->
+  </div>
+  <div class="form-group">
+    <table class="table owners">
+      <tbody>
+        <tr>
+          <td class="title col-sm-7">Enter User ID to add another co-owner:</td>
+          <td class="col-sm-3"><input type="input" class="form-control" id="add-content-user-id"></td>
+          <td class="col-sm-2"><a class="label label-success" id="add-content-add-coowner">+</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
   <div class="form-group">
     <label class="control-label"><strong>Enter information about distribution:</strong></label>
   </div>
@@ -42,14 +55,14 @@
     <label for="add-content-price-per-listen" class="col-sm-3 control-label">Price, £</label>
     <div class="col-sm-9">
       <input type="number" step="0.01" min="0" class="form-control" id="add-content-price-per-listen" >
-      <span class="help-block">Price for each listening.</span>
+      <span class="help-block">Price for each play.</span>
     </div>
   </div>
   <div class="form-group" id="add-content-min-plays-group">
     <label for="add-content-min-plays" class="col-sm-3 control-label">Min.&nbsp;Plays</label>
     <div class="col-sm-9">
       <input type="number" step="1" min="0" class="form-control" id="add-content-min-plays" placeholder="100000">
-      <span class="help-block">The minimum number of plays per month to be paid.</span>
+      <span class="help-block">The minimum number of plays to be paid.</span>
     </div>
   </div>
   <div class="form-group">

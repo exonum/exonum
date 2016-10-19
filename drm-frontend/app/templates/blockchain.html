@@ -1,6 +1,12 @@
 <table class="table table-hover table-condensed blockchain">
   <thead>
-    <tr><td>Height</td><td>Time</td><td>Hash</td><td>Txs</td><td>Anchoring</td><tr>
+    <tr>
+      <td>Height</td>
+      <td>Time</td>
+      <td>Hash</td>
+      <td>Txs</td>
+      <!-- <td>Anchoring</td> -->
+    </tr>
   </thead>
   <tbody>
     {% blocks.each(function(block) { %}
@@ -9,14 +15,15 @@
         <td title="{{ moment.unix(block.get('propose_time')).format() }}">{{ moment.unix(block.get('propose_time')).fromNow() }}</td>
         <td><samp>{{ block.get('hash').substr(0, 8) }}</samp></td>
         <td>{{ block.get('tx_count') }}</td>
-        <td class="text-right">
+<!--         <td class="text-right">
           <div class="checker"></div>
-        </td>
+        </td> -->
       </tr>
     {% }) %}
   </tbody>
 </table>
-<div class="app-list-headers clearfix">
+<!-- <div class="app-list-headers clearfix">
   <div class="pull-left"><a href="#">← Newer</a></div>
   <div class="pull-right"><a href="#">Older →</a></div>
 </div>
+ -->
