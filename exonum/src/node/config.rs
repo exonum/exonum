@@ -47,10 +47,11 @@ impl ListenerConfig {
 }
 
 impl GenesisConfig {
-    pub fn gen(validators_count: u8) -> GenesisConfig {
+    pub fn gen(validators_count: u8, port: Option<u16>) -> GenesisConfig {
         let mut pairs = Vec::new();
+        let port = port.unwrap_or(7000);
         for i in 0..validators_count {
-            let addr = format!("127.0.0.1:{}", 7000 + i as u32).parse().unwrap();
+            let addr = format!("127.0.0.1:{}", port + i as u16).parse().unwrap();
             let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap(),
                                                      addr);
             pairs.push(pair);
@@ -59,9 +60,9 @@ impl GenesisConfig {
         GenesisConfig {
             validators: pairs,
             consensus: ConsensusConfig {
-                round_timeout: 1000,
-                status_timeout: 3000,
-                peers_timeout: 10000,
+                round_timeout: 3000,
+                status_timeout: 2000,
+                peers_timeout: 30000,
                 propose_timeout: 500,
             },
             network: NetworkConfiguration {
