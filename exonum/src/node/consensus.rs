@@ -46,25 +46,7 @@ impl<B, S> NodeHandler<B, S>
         }
 
         match msg {
-            ConsensusMessage::Propose(msg) => {
-                // Check prev_hash
-                if msg.prev_hash() != self.state.last_hash() {
-                    return;
-                }
-
-                // Check leader
-                if msg.validator() != self.state.leader(msg.round()) {
-                    return;
-                }
-
-                // Check timeout
-                if msg.time() - self.last_block_time() <
-                   Duration::milliseconds(self.propose_timeout as i64) {
-                    return;
-                }
-
-                self.handle_propose(msg)
-            }
+            ConsensusMessage::Propose(msg) => self.handle_propose(msg),
             ConsensusMessage::Prevote(msg) => self.handle_prevote(msg),
             ConsensusMessage::Precommit(msg) => self.handle_precommit(msg),
         }
@@ -72,6 +54,22 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn handle_propose(&mut self, msg: Propose) {
         debug!("Handle propose {:?}", msg);
+
+        // Check prev_hash
+        if msg.prev_hash() != self.state.last_hash() {
+            return;
+        }
+
+        // Check leader
+        if msg.validator() != self.state.leader(msg.round()) {
+            return;
+        }
+
+        // Check timeout
+        if msg.time() - self.last_block_time() <
+            Duration::milliseconds(self.propose_timeout as i64) {
+            return;
+        }
 
         // TODO: check time
         // TODO: check that transactions are not commited yet

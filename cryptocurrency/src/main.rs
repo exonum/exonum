@@ -285,6 +285,12 @@ fn main() {
             .about("Generates default configuration file")
             .version(env!("CARGO_PKG_VERSION"))
             .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+            .arg(Arg::with_name("START_PORT")
+                .short("p")
+                .long("port")
+                .value_name("START_PORT")
+                .help("Port for first validator")
+                .takes_value(true))
             .arg(Arg::with_name("COUNT")
                 .help("Validators count")
                 .required(true)
@@ -320,7 +326,8 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = GenesisConfig::gen(count);
+            let port: Option<u16> = matches.value_of("START_PORT").map(|x| x.parse().unwrap());
+            let cfg = GenesisConfig::gen(count, port);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
