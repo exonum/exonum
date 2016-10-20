@@ -377,11 +377,8 @@ impl<B, S> NodeHandler<B, S>
         for msg in self.state.queued() {
             self.handle_consensus(msg);
         }
-
-        if self.state.validator_heights().is_empty() {
-            // Add timeout for first round
-            self.add_round_timeout();
-        }
+        // Add timeout for first round
+        self.add_round_timeout();
     }
 
     pub fn handle_tx(&mut self, msg: B::Transaction) {
