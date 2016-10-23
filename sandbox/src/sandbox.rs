@@ -8,7 +8,7 @@ use std::ops::Drop;
 use time::Timespec;
 
 use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout,
-                   ListenerConfig, ConsensusConfig};
+                   ListenerConfig, ConsensusConfig, GENESIS_TIME};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
@@ -291,9 +291,10 @@ impl<B, G> Sandbox<B, G>
     pub fn set_time(&self, sec: i64, nsec: i32) {
         self.check_unexpected_message();
         // set time
+        // FIXME temporary hack, remove this bullshit, use methods like add_time
         let now = Timespec {
-            sec: sec,
-            nsec: nsec,
+            sec: GENESIS_TIME.sec + sec,
+            nsec: GENESIS_TIME.nsec + nsec,
         };
         self.inner.lock().unwrap().time = now;
         // handle timeouts if occurs
@@ -410,7 +411,7 @@ pub fn timestamping_sandbox
 
     let inner = Arc::new(Mutex::new(SandboxInner {
         address: addresses[0].clone(),
-        time: Timespec { sec: 0, nsec: 0 },
+        time: GENESIS_TIME,
         sended: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),

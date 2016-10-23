@@ -19,7 +19,7 @@ pub mod config;
 pub use self::config::{ListenerConfig, ConsensusConfig};
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 
-const GENESIS_TIME: Timespec = Timespec {
+pub const GENESIS_TIME: Timespec = Timespec {
     sec: 1451649600,
     nsec: 0,
 };
