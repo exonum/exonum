@@ -22,7 +22,7 @@ fn test_send_propose_and_prevote() {
     // round happens
     sandbox.set_time(1, 0);
     sandbox.set_time(2, 0);
-    sandbox.set_time(3, 0);
+    sandbox.set_time(3, 999_999_999);
 
     sandbox.assert_state(0, 4);
 
