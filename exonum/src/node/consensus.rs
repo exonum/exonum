@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
-use time::Duration;
+use time::{Duration, Timespec};
 
 use super::super::crypto::{Hash, PublicKey};
 use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
                              RequestPrecommits, RequestBlock, Block};
-use super::super::storage::Map;
+use super::super::storage::{Map, Patch};
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
 use super::super::events::Channel;
@@ -21,7 +21,9 @@ impl<B, S> NodeHandler<B, S>
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
-        trace!("Consenus message with height {}, our height: {}", msg.height(), self.state.height());
+        trace!("Consenus message with height {}, our height: {}",
+               msg.height(),
+               self.state.height());
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
             return;
@@ -62,12 +64,15 @@ impl<B, S> NodeHandler<B, S>
 
         // Check leader
         if msg.validator() != self.state.leader(msg.round()) {
+            warn!("Wrong propose leader detected: actual={}, expected={}",
+                  msg.validator(),
+                  self.state.leader(msg.round()));
             return;
         }
 
         // Check timeout
         if msg.time() - self.last_block_time() <
-            Duration::milliseconds(self.propose_timeout as i64) {
+           Duration::milliseconds(self.propose_timeout as i64) {
             return;
         }
 
@@ -126,7 +131,7 @@ impl<B, S> NodeHandler<B, S>
         if !msg.verify(msg.from()) {
             return;
         }
-        
+
         debug!("Handle block {:?}", msg);
 
         let block = msg.block();
@@ -159,7 +164,8 @@ impl<B, S> NodeHandler<B, S>
         for precommit in &precommits {
             if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
                 if !precommit.verify(pub_key) || precommit.block_hash() != &block_hash {
-                    warn!("Block with incorrect precommit received from {:?}", msg.from());
+                    warn!("Block with incorrect precommit received from {:?}",
+                          msg.from());
                     return;
                 }
             } else {
@@ -172,20 +178,17 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-        let (block_hash, patch) =
-            self.blockchain
-                .create_patch(block.height(),
-                              block.time(),
-                              block.proposer(),
-                              txs.as_slice())
-                .unwrap();
+        let (block_hash, txs, patch) = self.create_block(block.height(),
+                                                         block.time(),
+                                                         block.proposer(),
+                                                         txs.as_slice());
         // Verify block_hash
         if block_hash != block.hash() {
             warn!("Block with incorrect hash received from {:?}", msg.from());
             return;
         }
         // Commit block
-        self.state.add_block(block_hash, patch, None);
+        self.state.add_block(block_hash, patch, txs);
         self.commit(block_hash, precommits.iter());
         // Request next block if needed
         let heights = self.state.validator_heights();
@@ -198,7 +201,7 @@ impl<B, S> NodeHandler<B, S>
                     break;
                 }
             }
-        } 
+        }
     }
 
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
@@ -228,7 +231,9 @@ impl<B, S> NodeHandler<B, S>
                 panic!("We are fucked up...");
             }
 
-            let precommits = self.state.precommits(round, our_block_hash).unwrap()
+            let precommits = self.state
+                .precommits(round, our_block_hash)
+                .unwrap()
                 .iter()
                 .map(|(_, x)| x.clone())
                 .collect::<Vec<_>>();
@@ -286,7 +291,9 @@ impl<B, S> NodeHandler<B, S>
                 panic!("We are fucked up...");
             }
 
-            let precommits = self.state.precommits(round, our_block_hash).unwrap()
+            let precommits = self.state
+                .precommits(round, our_block_hash)
+                .unwrap()
                 .iter()
                 .map(|(_, x)| x.clone())
                 .collect::<Vec<_>>();
@@ -351,19 +358,20 @@ impl<B, S> NodeHandler<B, S>
     }
 
     // FIXME: push precommits into storage
-    pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self, block_hash: Hash, precommits: I) {
+    pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
+                                                         block_hash: Hash,
+                                                         precommits: I) {
         debug!("COMMIT {:?}", block_hash);
 
-        let block_state = self.state.block(&block_hash).unwrap();
-        let propose_hash = block_state.propose_hash();
         // Merge changes into storage
         {
-            let patch = block_state.patch();
+            let block_state = self.state.block(&block_hash).unwrap();
+            let patch = block_state.patch().clone();
             self.blockchain.commit(block_hash, patch, precommits).unwrap();
         }
         // Update state to new height
         let round = self.actual_round();
-        self.state.new_height(&block_hash, round, propose_hash.as_ref());
+        self.state.new_height(&block_hash, round);
 
         info!("{:?} ========== height = {}, commited = {}, pool = {}",
               self.channel.get_time(),
@@ -377,6 +385,10 @@ impl<B, S> NodeHandler<B, S>
         }
         // Add timeout for first round
         self.add_round_timeout();
+        // Send propose we is leader
+        if self.is_leader() {
+            self.add_propose_timeout();
+        }
     }
 
     pub fn handle_tx(&mut self, msg: B::Transaction) {
@@ -398,9 +410,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-
         let full_proposes = self.state.add_transaction(hash, msg);
-
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));
@@ -465,11 +475,13 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
         if height != self.state.height() {
+            // It is too late 
             return;
         }
         if round != self.state.round() {
             return;
         }
+        
         debug!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
         let round = self.state.round();
@@ -563,7 +575,7 @@ impl<B, S> NodeHandler<B, S>
             };
             self.send_to_peer(peer, &message);
             debug!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}",
-                   message,
+                   data,
                    peer);
         }
     }
@@ -573,26 +585,33 @@ impl<B, S> NodeHandler<B, S>
         self.state.leader(self.state.round()) == self.state.id()
     }
 
+    pub fn create_block(&mut self,
+                        height: Height,
+                        time: Timespec,
+                        proposer: ValidatorId,
+                        txs: &[(Hash, B::Transaction)])
+                        -> (Hash, Vec<Hash>, Patch) {
+        self.blockchain
+            .create_patch(height, time, proposer, txs)
+            .unwrap()
+    }
+
     // FIXME: remove this bull shit
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         let propose = self.state.propose(propose_hash).unwrap().message().clone();
-        let (block_hash, patch) = {
-            let txs = propose.transactions()
-                .iter()
-                .map(|propose_hash| {
-                    let tx = self.state.transactions().get(propose_hash).unwrap();
-                    (*propose_hash, tx.clone())
-                })
-                .collect::<Vec<_>>();
-            self.blockchain
-                .create_patch(propose.height(),
-                              propose.time(),
-                              propose.validator(),
-                              txs.as_slice())
-                .unwrap()
-        };
+        let txs = propose.transactions()
+            .iter()
+            .map(|tx_hash| {
+                let tx = self.state.transactions().get(tx_hash).unwrap();
+                (*tx_hash, tx.clone())
+            })
+            .collect::<Vec<_>>();
+        let (block_hash, txs, patch) = self.create_block(propose.height(),
+                                                         propose.time(),
+                                                         propose.validator(),
+                                                         txs.as_slice());
         // Save patch
-        self.state.add_block(block_hash, patch, Some(*propose_hash));
+        self.state.add_block(block_hash, patch, txs);
         block_hash
     }
 

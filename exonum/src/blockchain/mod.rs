@@ -45,12 +45,13 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                     time: Timespec,
                     validator: ValidatorId,
                     txs: &[(Hash, Self::Transaction)])
-                    -> Result<(Hash, Patch), Error> {
+                    -> Result<(Hash, Vec<Hash>, Patch), Error> {
         // Get last hash
         let last_hash = self.last_hash()?.unwrap_or(hash(&[]));
         // Create fork
         let mut fork = self.view();
         // Save & execute transactions
+        let mut tx_hashes = Vec::new();
         for &(hash, ref tx) in txs.into_iter() {
             Self::execute(&mut fork, &tx)?;
             fork.transactions()
@@ -59,6 +60,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             fork.block_txs(height)
                 .append(hash)
                 .unwrap();
+            tx_hashes.push(hash);
         }
         // Get tx hash
         let tx_hash = fork.block_txs(height).root_hash()?;
@@ -78,7 +80,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         fork.heights().append(block_hash).is_ok();
         // Save block
         fork.blocks().put(&block_hash, block).is_ok();
-        Ok((block_hash, fork.changes()))
+        Ok((block_hash, tx_hashes, fork.changes()))
     }
 
     fn commit<'a, I: Iterator<Item = &'a Precommit>>(&self,
