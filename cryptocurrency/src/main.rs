@@ -16,6 +16,7 @@ extern crate serde;
 extern crate time;
 extern crate rand;
 extern crate log;
+extern crate colored;
 
 extern crate exonum;
 extern crate blockchain_explorer;
@@ -35,8 +36,9 @@ use rustless::batteries::swagger;
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use rand::{Rng, thread_rng};
-use log::{LogRecord, LogLevelFilter};
+use log::{LogRecord, LogLevel};
 use env_logger::LogBuilder;
+use colored::*;
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
@@ -274,11 +276,18 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 fn main() {
     let format = |record: &LogRecord| {
         let now = time::now_utc();
-        format!("{}  [{}]  {}", now.asctime(), record.level(), record.args())
+        let level = match record.level() {
+            LogLevel::Error => "ERROR".red(),
+            LogLevel::Warn  => "WARN".yellow(),
+            LogLevel::Info  => "INFO".green(),
+            LogLevel::Debug => "DEBUG".cyan(),
+            LogLevel::Trace => "TRACE".white(),
+        };
+        format!("{} - [ {} ] - {}", now.asctime().to_string().bold(), level, record.args())
     };
 
     let mut builder = LogBuilder::new();
-    builder.format(format).filter(None, LogLevelFilter::Info);
+    builder.format(format);
 
     if env::var("RUST_LOG").is_ok() {
        builder.parse(&env::var("RUST_LOG").unwrap());

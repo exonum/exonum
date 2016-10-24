@@ -149,6 +149,7 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
+            trace!("Send to addr: {}", conn.addr());
             self.channel.send_to(&conn.addr(), message.clone());
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
@@ -156,7 +157,16 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
+        trace!("Send to addr: {}", address);
         self.channel.send_to(address, message.clone());
+    }
+
+    // TODO: use Into<RawMessage>
+    pub fn broadcast(&mut self, message: &RawMessage) {
+        for conn in self.state.peers().values() {
+            trace!("Send to addr: {}", conn.addr());
+            self.channel.send_to(&conn.addr(), message.clone());
+        }
     }
 
     pub fn connect(&mut self, address: &SocketAddr) {
@@ -165,9 +175,7 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn request(&mut self, data: RequestData, peer: PublicKey) {
         let is_new = self.state.request(data.clone(), peer);
-
         if is_new {
-            debug!("ADD REQUEST TIMEOUT");
             self.add_request_timeout(data, None);
         }
     }
@@ -202,6 +210,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
+        debug!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
         self.channel.add_timeout(NodeTimeout::Request(data, peer), time);
     }
@@ -209,13 +218,6 @@ impl<B, S> NodeHandler<B, S>
     pub fn add_peer_exchange_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout as i64);
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
-    }
-
-    // TODO: use Into<RawMessage>
-    pub fn broadcast(&mut self, message: &RawMessage) {
-        for conn in self.state.peers().values() {
-            self.channel.send_to(&conn.addr(), message.clone());
-        }
     }
 
     pub fn last_block_time(&self) -> Timespec {

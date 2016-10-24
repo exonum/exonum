@@ -52,21 +52,23 @@ impl<B, S> NodeHandler<B, S>
         if address == self.state.our_connect_message().addr() {
             return;
         }
-        info!("Received connect message from {}", address);
-
         // Check if we have another connect message from peer with the given public_key
         let public_key = *message.pub_key();
-        let mut need_connect = true;
+        let mut need_connect = false;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
-                warn!("Received weird connection message from {}", address);
+                error!("Received outdated Connect message from {}", address);
                 return;
+            } else if saved_message.time() < message.time() {
+                need_connect = saved_message.addr() != message.addr();
+            } else {
+                if saved_message.addr() != message.addr() {
+                    error!("Received weird Connect message from {}", address);
+                }
             }
-            need_connect = !(saved_message.addr() == message.addr() &&
-                             saved_message.time() == message.time());
         }
+        info!("Received Connect message from {}", address);
         self.state.add_peer(public_key, message);
-
         if need_connect {
             // TODO: reduce double sending of connect message
             info!("Establish connection with {}", address);
@@ -115,8 +117,8 @@ impl<B, S> NodeHandler<B, S>
                                      self.state.height(),
                                      &hash,
                                      &self.secret_key);
+            debug!("Broadcast status: {:?}", status);
             self.broadcast(status.raw());
-            debug!("Send status: {:?}", status);
         }
         self.add_status_timeout();
     }
@@ -141,9 +143,8 @@ impl<B, S> NodeHandler<B, S>
                                         peer.pub_key(),
                                         self.channel.get_time(),
                                         &self.secret_key);
+            debug!("Request peers from peer with addr {:?}", peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
-
-            debug!("request peers from peer with addr {:?}", peer.addr());
         }
         self.add_peer_exchange_timeout();
     }
