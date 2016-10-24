@@ -21,17 +21,20 @@ impl<B, S> NodeHandler<B, S>
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
-        trace!("Consenus message with height {}, our height: {}",
-               msg.height(),
-               self.state.height());
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
+            debug!("Received consensus message from other height: msg.height={}, self.height={}",
+                   msg.height(),
+                   self.state.height());
             return;
         }
 
         // Queued messages from next height or round
         // TODO: shoud we ignore messages from far rounds?
         if msg.height() == self.state.height() + 1 || msg.round() > self.state.round() {
+            debug!("Received consensus message from future round: msg.round={}, self.round={}",
+                   msg.round(),
+                   self.state.round());
             self.state.add_queued(msg);
             return;
         }
@@ -40,11 +43,17 @@ impl<B, S> NodeHandler<B, S>
             // Incorrect signature of message
             Some(public_key) => {
                 if !msg.verify(public_key) {
+                    error!("Received message with incorrect signature validator={}",
+                           msg.validator());
                     return;
                 }
             }
             // Incorrect validator id
-            None => return,
+            None => {
+                error!("Received message from incorrect validator={}",
+                       msg.validator());
+                return;
+            }
         }
 
         match msg {
@@ -55,24 +64,24 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_propose(&mut self, msg: Propose) {
-        debug!("Handle propose {:?}", msg);
-
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
+            error!("Received propose with wrong last_block_hash msg={:?}", msg);
             return;
         }
 
         // Check leader
         if msg.validator() != self.state.leader(msg.round()) {
-            warn!("Wrong propose leader detected: actual={}, expected={}",
-                  msg.validator(),
-                  self.state.leader(msg.round()));
+            error!("Wrong propose leader detected: actual={}, expected={}",
+                   msg.validator(),
+                   self.state.leader(msg.round()));
             return;
         }
 
         // Check timeout
         if msg.time() - self.last_block_time() <
            Duration::milliseconds(self.propose_timeout as i64) {
+               error!("Received propose with wrong time msg={:?}", msg);
             return;
         }
 
@@ -82,6 +91,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
+        debug!("Handle propose {:?}", msg);
         let view = self.blockchain.view();
         for hash in msg.transactions() {
             if view.transactions().get(hash).unwrap().is_some() {
@@ -114,6 +124,7 @@ impl<B, S> NodeHandler<B, S>
     pub fn handle_block(&mut self, msg: Block) {
         // Request are sended to us
         if msg.to() != &self.public_key {
+            //TODO error!
             return;
         }
         // FIXME: we should use some epsilon for checking lifetime < 0
@@ -121,14 +132,17 @@ impl<B, S> NodeHandler<B, S>
             Some(nanos) => nanos,
             None => {
                 // Incorrect time into message
+            //TODO error!
                 return;
             }
         };
         // Incorrect time of the bock
         if lifetime < 0 || lifetime > BLOCK_ALIVE {
+            //TODO error!            
             return;
         }
         if !msg.verify(msg.from()) {
+            //TODO error!            
             return;
         }
 
@@ -445,6 +459,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
+        //TODO debug asserts?
         if height != self.state.height() {
             return;
         }
@@ -474,14 +489,15 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
+        // TODO debug asserts?
         if height != self.state.height() {
-            // It is too late 
+            // It is too late
             return;
         }
         if round != self.state.round() {
             return;
         }
-        
+
         debug!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
         let round = self.state.round();
