@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use time::{Duration, Timespec};
 
-use super::super::crypto::{Hash, PublicKey};
+use super::super::crypto::{Hash, PublicKey, HexValue};
 use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
@@ -81,7 +81,7 @@ impl<B, S> NodeHandler<B, S>
         // Check timeout
         if msg.time() - self.last_block_time() <
            Duration::milliseconds(self.propose_timeout as i64) {
-               error!("Received propose with wrong time msg={:?}", msg);
+            error!("Received propose with wrong time msg={:?}", msg);
             return;
         }
 
@@ -124,7 +124,9 @@ impl<B, S> NodeHandler<B, S>
     pub fn handle_block(&mut self, msg: Block) {
         // Request are sended to us
         if msg.to() != &self.public_key {
-            //TODO error!
+            error!("Received block that intended for another peer, to={}, from={}",
+                   msg.to().to_hex(),
+                   msg.from().to_hex());
             return;
         }
         // FIXME: we should use some epsilon for checking lifetime < 0
@@ -132,17 +134,21 @@ impl<B, S> NodeHandler<B, S>
             Some(nanos) => nanos,
             None => {
                 // Incorrect time into message
-            //TODO error!
+                error!("Received block with incorrect time={}",
+                       msg.from().to_hex());
                 return;
             }
         };
         // Incorrect time of the bock
         if lifetime < 0 || lifetime > BLOCK_ALIVE {
-            //TODO error!            
+            error!("Received block with incorrect lifetime={}, from={}",
+                   lifetime,
+                   msg.from().to_hex());
             return;
         }
         if !msg.verify(msg.from()) {
-            //TODO error!            
+            error!("Received block with wrong signature, from={}",
+                   msg.from().to_hex());
             return;
         }
 
@@ -410,7 +416,6 @@ impl<B, S> NodeHandler<B, S>
         let hash = Message::hash(&msg);
 
         // Make sure that it is new transaction
-        // TODO: use contains instead of get?
         if self.state.transactions().contains_key(&hash) {
             return;
         }
@@ -437,7 +442,6 @@ impl<B, S> NodeHandler<B, S>
         let hash = Message::hash(&msg);
 
         // Make sure that it is new transaction
-        // TODO: use contains instead of get?
         if self.state.transactions().contains_key(&hash) {
             return;
         }
@@ -454,12 +458,13 @@ impl<B, S> NodeHandler<B, S>
             self.has_full_propose(hash, round);
         }
 
-        // broadcast transaction to validators
+        // Broadcast transaction to validators
+        debug!("Broadcast transactions: {:?}", msg);
         self.broadcast(msg.raw());
     }
 
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
-        //TODO debug asserts?
+        // TODO debug asserts?
         if height != self.state.height() {
             return;
         }
@@ -498,7 +503,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-        debug!("I AM LEADER!!! pool = {}", self.state.transactions().len());
+        info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
         let round = self.state.round();
         let txs: Vec<Hash> = self.state
@@ -513,8 +518,8 @@ impl<B, S> NodeHandler<B, S>
                                    self.state.last_hash(),
                                    &txs,
                                    &self.secret_key);
+        debug!("Broadcast propose: {:?}", propose);
         self.broadcast(propose.raw());
-        debug!("Send propose: {:?}", propose);
 
         // Save our propose into state
         let hash = self.state.add_self_propose(propose);
@@ -589,10 +594,10 @@ impl<B, S> NodeHandler<B, S>
                         .clone()
                 }
             };
-            self.send_to_peer(peer, &message);
             debug!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}",
                    data,
                    peer);
+            self.send_to_peer(peer, &message);
         }
     }
 
@@ -667,8 +672,8 @@ impl<B, S> NodeHandler<B, S>
                                    locked_round,
                                    &self.secret_key);
         let has_majority_prevotes = self.state.add_prevote(&prevote);
+        debug!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
-        debug!("Send prevote: {:?}", prevote);
         if has_majority_prevotes {
             self.lock(round, *propose_hash);
         }
@@ -682,8 +687,8 @@ impl<B, S> NodeHandler<B, S>
                                        block_hash,
                                        &self.secret_key);
         self.state.add_precommit(&precommit);
+        debug!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
-        debug!("Send precommit: {:?}", precommit);
     }
 
     fn public_key_of(&self, id: ValidatorId) -> PublicKey {
