@@ -15,6 +15,7 @@ extern crate clap;
 extern crate serde;
 extern crate time;
 extern crate rand;
+extern crate log;
 
 extern crate exonum;
 extern crate blockchain_explorer;
@@ -24,6 +25,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
 use std::default::Default;
+use std::env;
 
 use clap::{Arg, App, SubCommand};
 use rustless::json::ToJson;
@@ -33,6 +35,8 @@ use rustless::batteries::swagger;
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use rand::{Rng, thread_rng};
+use log::{LogRecord, LogLevelFilter};
+use env_logger::LogBuilder;
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
@@ -268,7 +272,19 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    let format = |record: &LogRecord| {
+        let now = time::now_utc();
+        format!("{}  [{}]  {}", now.asctime(), record.level(), record.args())
+    };
+
+    let mut builder = LogBuilder::new();
+    builder.format(format).filter(None, LogLevelFilter::Info);
+
+    if env::var("RUST_LOG").is_ok() {
+       builder.parse(&env::var("RUST_LOG").unwrap());
+    }
+
+    builder.init().unwrap();
 
     let app = App::new("Simple cryptocurrency demo program")
         .version(env!("CARGO_PKG_VERSION"))
