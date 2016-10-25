@@ -97,7 +97,9 @@ pub struct BlockState {
     // Набор изменений, которые нужно внести в состояние для применения блока
     patch: Patch,
     // Хэши транзакций, закомиченных в этот блок
-    txs: Vec<Hash>
+    txs: Vec<Hash>,
+    // Proposer id
+    proposer: ValidatorId,
 }
 
 impl RequestData {
@@ -158,11 +160,12 @@ impl ProposeState {
 }
 
 impl BlockState {
-    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>) -> BlockState {
+    pub fn new(proposer: ValidatorId, hash: Hash, patch: Patch, txs: Vec<Hash>) -> BlockState {
         BlockState {
             hash: hash,
             patch: patch,
             txs: txs,
+            proposer: proposer,
         }
     }
 
@@ -176,6 +179,10 @@ impl BlockState {
 
     pub fn txs(&self) -> &Vec<Hash> {
         &self.txs
+    }
+
+    pub fn proposer(&self) -> ValidatorId {
+        self.proposer
     }
 }
 
@@ -322,7 +329,7 @@ impl<Tx> State<Tx> {
         self.round += 1;
     }
 
-    //FIXME use block_hash
+    // FIXME use block_hash
     pub fn new_height(&mut self, block_hash: &Hash, round: Round) {
         self.height += 1;
         self.round = round;
@@ -427,11 +434,17 @@ impl<Tx> State<Tx> {
         }
     }
 
-    pub fn add_block(&mut self, block_hash: Hash, patch: Patch, txs: Vec<Hash>) -> Option<&BlockState> {
+    pub fn add_block(&mut self,
+                     proposer: ValidatorId,
+                     block_hash: Hash,
+                     patch: Patch,
+                     txs: Vec<Hash>)
+                     -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => {
                 Some(e.insert(BlockState {
+                    proposer: proposer,
                     hash: block_hash,
                     patch: patch,
                     txs: txs,
@@ -444,7 +457,7 @@ impl<Tx> State<Tx> {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
             if let Some(_) = self.our_prevotes.insert(msg.round(), msg.clone()) {
-                //panic!("Trying to send different prevotes for same round");
+                // panic!("Trying to send different prevotes for same round");
             }
         }
 
@@ -466,7 +479,7 @@ impl<Tx> State<Tx> {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
             if let Some(_) = self.our_precommits.insert(msg.round(), msg.clone()) {
-                //panic!("Trying to send different precommits for same round");
+                // panic!("Trying to send different precommits for same round");
             }
         }
 
@@ -491,10 +504,7 @@ impl<Tx> State<Tx> {
         self.unknown_proposes_with_precommits.remove(propose_hash).unwrap_or_default()
     }
 
-    pub fn has_majority_precommits(&self,
-                                   round: Round,
-                                   block_hash: Hash)
-                                   -> bool {
+    pub fn has_majority_precommits(&self, round: Round, block_hash: Hash) -> bool {
         match self.precommits.get(&(round, block_hash)) {
             Some(map) => map.len() >= self.majority_count(),
             None => false,

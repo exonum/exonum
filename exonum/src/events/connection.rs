@@ -104,7 +104,6 @@ impl MessageWriter {
                 }
             }
         }
-
         Ok(())
     }
 

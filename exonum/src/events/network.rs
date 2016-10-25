@@ -137,18 +137,19 @@ impl Network {
                            address,
                            id.0);
 
-                    return match self.incoming[id].try_read() {
-                        Ok(Some(buf)) => {
-                            let msg = RawMessage::new(buf);
-                            handler.handle_event(Event::Incoming(msg));
-                            Ok(())
-                        }
-                        Ok(None) => Ok(()),
-                        Err(e) => {
-                            self.remove_incoming_connection(event_loop, id);
-                            Err(e)
-                        }
-                    };
+                    loop {
+                        match self.incoming[id].try_read() {
+                            Ok(Some(buf)) => {
+                                let msg = RawMessage::new(buf);
+                                handler.handle_event(Event::Incoming(msg));
+                            }
+                            Ok(None) => return Ok(()),
+                            Err(e) => {
+                                self.remove_incoming_connection(event_loop, id);
+                                return Err(e);
+                            }
+                        };
+                    }
                 }
             }
             PeerKind::Outgoing => {
@@ -205,7 +206,8 @@ impl Network {
         Ok(())
     }
 
-    pub fn tick<H: EventHandler>(&mut self, _: &mut EventLoop<H>) {}
+    pub fn tick<H: EventHandler>(&mut self, _: &mut EventLoop<H>) {
+    }
 
     pub fn send_to<H: EventHandler>(&mut self,
                                     event_loop: &mut EventLoop<H>,
