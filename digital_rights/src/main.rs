@@ -53,11 +53,15 @@ pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
 fn save_user(storage: &mut CookieJar, role: &str, public_key: &PublicKey, secret_key: &SecretKey) {
     let p = storage.permanent();
-    let e = p.encrypted();
+    let add_cookie = |name: &str, value| {
+        let mut cookie = Cookie::new(name.to_string(), value);
+        cookie.path = Some("/".to_string());
+        p.add(cookie)
+    };
 
-    e.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
-    e.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
-    e.add(Cookie::new("role".to_string(), role.to_string()));
+    add_cookie("public_key", public_key.to_hex());
+    add_cookie("secret_key", secret_key.to_hex());
+    add_cookie("role", role.to_string());
 }
 
 fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar,
@@ -73,14 +77,13 @@ fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar,
 
 fn load_user(storage: &CookieJar) -> Result<(String, PublicKey, SecretKey), ValueNotFound> {
     let p = storage.permanent();
-    let e = p.encrypted();
 
-    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&e, "public_key")?.as_ref());
-    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&e, "secret_key")?.as_ref());
+    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&p, "public_key")?.as_ref());
+    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&p, "secret_key")?.as_ref());
 
     let public_key = public_key.ok_or(ValueNotFound::new("Unable to read public key"))?;
     let secret_key = secret_key.ok_or(ValueNotFound::new("Unable to read secret key"))?;
-    let role = e.find("role").ok_or(ValueNotFound::new("Unable to read role"))?.value;
+    let role = p.find("role").ok_or(ValueNotFound::new("Unable to read role"))?.value;
     Ok((role, public_key, secret_key))
 }
 
@@ -208,13 +211,15 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                     Role::Distributor(id) => {
                         match drm.distributor_info(id as u16) {
                             Ok(Some(info)) => client.json(&info.to_json()),
-                            _ => client.error(ValueNotFound::new("Unable to get distributor")),
+                            Ok(None) => client.error(ValueNotFound::new("Unable to get distributor")),
+                            Err(e) => client.error(e),
                         }
                     }
                     Role::Owner(id) => {
                         match drm.owner_info(id as u16) {
                             Ok(Some(info)) => client.json(&info.to_json()),
-                            _ => client.error(ValueNotFound::new("Unable to get distributor")),
+                            Ok(None) => client.error(ValueNotFound::new("Unable to get distributor")),
+                            Err(e) => client.error(e),
                         }
                     }
                 }
@@ -266,7 +271,7 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                                                    &sec_key);
                         send_tx(DigitalRightsTx::AddContent(tx), client, ch.clone())
                     }
-                    _ => client.error(StorageError::new("Unknown role")),
+                    role => client.error(ValueNotFound::new(format!("Wrong role {}", role))),
                 }
             })
         });
@@ -473,10 +478,22 @@ fn digital_rights_api<D: Database>(api: &mut Api,
                                 }
                             }
                             Ok(Some(Role::Owner(id))) => {
-                                match drm.owner_content_info(id, &fingerprint) {
-                                    Ok(Some(info)) => client.json(&info.to_json()),
-                                    Ok(None) => client.error(ValueNotFound::new("Unable to find content")),   
-                                    Err(e) => client.error(e),
+                                match drm.is_content_owner(id, &fingerprint) {
+                                    Ok(true) => {
+                                        match drm.owner_content_info(id, &fingerprint) {
+                                            Ok(Some(info)) => client.json(&info.to_json()),
+                                            Ok(None) => client.error(ValueNotFound::new("Unable to find content")),   
+                                            Err(e) => client.error(e),
+                                        }
+                                    }
+                                    Ok(false) => {
+                                        match drm.content_info(&fingerprint) {
+                                            Ok(Some(info)) => client.json(&info.to_json()),
+                                            Ok(None) => client.error(ValueNotFound::new("Unable to find content")),
+                                            Err(e) => client.error(e),
+                                        }
+                                    }
+                                    Err(e) => client.error(e)
                                 }
                             }
                             Ok(None) => client.error(ValueNotFound::new("Unknown role")),

@@ -282,10 +282,16 @@ impl DistributorContentInfo {
 }
 
 impl OwnerContentInfo {
-    pub fn new(content: ContentInfo,
+    pub fn new(owner_id: u16,
+               content: ContentInfo,
                ownership: Ownership,
-               reports: Vec<ReportInfo>)
+               mut reports: Vec<ReportInfo>)
                -> OwnerContentInfo {
+        let share = content.owners.iter().find(|x| x.id == owner_id).unwrap().share as u64;
+        for mut report in &mut reports {
+            report.amount = (report.amount * share) / 100;
+        }
+
         OwnerContentInfo {
             title: content.title,
             fingerprint: content.fingerprint,
@@ -353,6 +359,15 @@ impl<D: Database> DigitalRightsApi<D> {
         }
     }
 
+    pub fn is_content_owner(&self, id: u16, fingerprint: &Fingerprint) -> StorageResult<bool> {
+        let r = if let Some(content) = self.view().contents().get(fingerprint)? {
+            content.shares().iter().find(|x| x.owner_id == id).is_some()
+        } else {
+            false
+        };
+        Ok(r)
+    }
+
     pub fn distributor_info(&self, id: u16) -> StorageResult<Option<DistributorInfo>> {
         let view = self.view();
         if let Some(distributor) = view.distributors().get(id as u64)? {
@@ -415,7 +430,7 @@ impl<D: Database> DigitalRightsApi<D> {
             let reports = self.find_reports(Role::Owner(id), fingerprint)?;
             let ownership = v.find_ownership(id, fingerprint)?.unwrap().1;
 
-            let info = OwnerContentInfo::new(content, ownership, reports);
+            let info = OwnerContentInfo::new(id, content, ownership, reports);
             return Ok(Some(info));
         }
         Ok(None)
