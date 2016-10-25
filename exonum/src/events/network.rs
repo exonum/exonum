@@ -174,14 +174,17 @@ impl Network {
                 if set.is_writable() {
                     let address = *self.outgoing[id].address();
 
-                    trace!("{}: Socket is writable {} id: {}",
+                    trace!("{}: Socket is writable addr={}",
                            self.address(),
-                           address,
-                           id.0);
+                           address);
 
                     let r = {
                         // Write data into socket
-                        trace!("{}: Try write to: {}", self.address(), address);
+                        let (len, bytes) = self.outgoing[id].writer_state();
+                        trace!("{}: position={}, queue={}", 
+                            self.address(), 
+                            bytes,
+                            len);
 
                         self.outgoing[id].try_write()?;
                         event_loop.reregister(self.outgoing[id].socket(),
