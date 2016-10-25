@@ -33,13 +33,13 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
-        debug!("Connected to: {}", addr);
+        info!("Connected to: {}", addr);
         let message = self.state.our_connect_message().clone();
         self.send_to_addr(addr, message.raw());
     }
 
     pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
-        debug!("Disconnected from: {}", addr);
+        info!("Disconnected from: {}", addr);
         let need_reconnect = self.state.remove_peer_with_addr(addr);
         if need_reconnect {
             self.connect(addr);
@@ -71,7 +71,7 @@ impl<B, S> NodeHandler<B, S>
         self.state.add_peer(public_key, message);
         if need_connect {
             // TODO: reduce double sending of connect message
-            info!("Establish connection with {}", address);
+            info!("Send Connect message to {}", address);
             self.connect(&address);
         }
     }

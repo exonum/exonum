@@ -134,8 +134,7 @@ impl<B, S> NodeHandler<B, S>
             Some(nanos) => nanos,
             None => {
                 // Incorrect time into message
-                error!("Received block with incorrect time={}",
-                       msg.from().to_hex());
+                error!("Received block with incorrect time={}", msg.from().to_hex());
                 return;
             }
         };
@@ -208,7 +207,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
         // Commit block
-        self.state.add_block(block_hash, patch, txs);
+        self.state.add_block(block.proposer(), block_hash, patch, txs);
         self.commit(block_hash, precommits.iter());
         // Request next block if needed
         let heights = self.state.validator_heights();
@@ -384,18 +383,20 @@ impl<B, S> NodeHandler<B, S>
         debug!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        {
+        let proposer = {
             let block_state = self.state.block(&block_hash).unwrap();
             let patch = block_state.patch().clone();
             self.blockchain.commit(block_hash, patch, precommits).unwrap();
-        }
+            block_state.proposer()
+        };
         // Update state to new height
         let round = self.actual_round();
         self.state.new_height(&block_hash, round);
 
-        info!("{:?} ========== height = {}, commited = {}, pool = {}",
+        info!("{:?} ========== height={}, proposer={}, commited={}, pool={}",
               self.channel.get_time(),
               self.state.height(),
+              proposer,
               self.state.commited_txs,
               self.state.transactions().len());
 
@@ -632,7 +633,7 @@ impl<B, S> NodeHandler<B, S>
                                                          propose.validator(),
                                                          txs.as_slice());
         // Save patch
-        self.state.add_block(block_hash, patch, txs);
+        self.state.add_block(propose.validator(), block_hash, patch, txs);
         block_hash
     }
 
