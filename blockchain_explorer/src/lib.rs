@@ -1,6 +1,5 @@
 #![feature(type_ascription)]
-#![feature(question_mark)]
-#![feature(rustc_macro)]
+#![feature(proc_macro)]
 
 mod explorer;
 
