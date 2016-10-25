@@ -1,13 +1,13 @@
 #![feature(type_ascription)]
-#![feature(custom_derive)]
-#![feature(plugin)]
-#![plugin(serde_macros)]
 #![feature(question_mark)]
+#![feature(rustc_macro)]
 
 mod explorer;
 
 extern crate time;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate exonum;
 extern crate rustless;
 extern crate valico;
