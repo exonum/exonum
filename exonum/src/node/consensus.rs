@@ -11,7 +11,7 @@ use super::super::storage::{Map, Patch};
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
 use super::super::events::Channel;
-use super::{ExternalMessage, NodeTimeout};
+use super::{ExternalMessage, NodeTimeout, State};
 
 const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
@@ -40,18 +40,16 @@ impl<B, S> NodeHandler<B, S>
         }
 
         match self.state.public_key_of(msg.validator()) {
-            // Incorrect signature of message
+            // incorrect signature of message
             Some(public_key) => {
                 if !msg.verify(public_key) {
-                    error!("Received message with incorrect signature validator={}",
-                           msg.validator());
+                    error!("Received message with incorrect signature msg={:?}", msg);
                     return;
                 }
             }
-            // Incorrect validator id
+            // incorrect validator id
             None => {
-                error!("Received message from incorrect validator={}",
-                       msg.validator());
+                error!("Received message from incorrect msg={:?}", msg);
                 return;
             }
         }
@@ -78,21 +76,32 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
+        // check time of the propose
+        let round = msg.round();
+        let start_time = self.round_start_time(round) +
+                         Duration::milliseconds(self.propose_timeout);
+        let end_time = start_time + Duration::milliseconds(self.round_timeout);
         // Check timeout
-        if msg.time() - self.last_block_time() <
-           Duration::milliseconds(self.propose_timeout as i64) {
-            error!("Received propose with wrong time msg={:?}", msg);
+        if msg.time() < start_time || msg.time() > end_time {
+            error!("Received propose with wrong time, msg={:?}", msg);
             return;
         }
 
-        // TODO: check time
-        // TODO: check that transactions are not commited yet
+        let view = self.blockchain.view();
+        // Check that transactions are not commited yet
+        for hash in msg.transactions() {
+            if view.transactions().get(hash).unwrap().is_some() {
+                error!("Received propose with already commited transaction, msg={:?}",
+                       msg);
+                return;
+            }
+        }
+
         if self.state.propose(&msg.hash()).is_some() {
             return;
         }
 
         debug!("Handle propose {:?}", msg);
-        let view = self.blockchain.view();
         for hash in msg.transactions() {
             if view.transactions().get(hash).unwrap().is_some() {
                 return;
@@ -133,21 +142,21 @@ impl<B, S> NodeHandler<B, S>
         let lifetime = match (self.channel.get_time() - msg.time()).num_nanoseconds() {
             Some(nanos) => nanos,
             None => {
-                // Incorrect time into message
-                error!("Received block with incorrect time={}", msg.from().to_hex());
+                // incorrect time into message
+                error!("Received block with incorrect time msg={:?}", msg);
                 return;
             }
         };
-        // Incorrect time of the bock
+        // check time of the bock
         if lifetime < 0 || lifetime > BLOCK_ALIVE {
-            error!("Received block with incorrect lifetime={}, from={}",
+            error!("Received block with incorrect lifetime={}, msg={:?}",
                    lifetime,
-                   msg.from().to_hex());
+                   msg);
             return;
         }
+        // Check signature
         if !msg.verify(msg.from()) {
-            error!("Received block with wrong signature, from={}",
-                   msg.from().to_hex());
+            error!("Received block with wrong signature, msg={:?}", msg);
             return;
         }
 
@@ -160,19 +169,29 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
         if block.prev_hash() != &self.last_block_hash() {
-            warn!("Weird block received from {:?}", msg.from());
+            error!("Weird block received from {:?}", msg.from());
             return;
         }
 
+        // if block.proposer() != State::<B::Transaction>::leader_for_height(block.)
+
         // Verify transactions
+        let view = self.blockchain.view();
         let mut txs = Vec::new();
         for raw in msg.transactions() {
             match B::Transaction::from_raw(raw) {
                 Ok(tx) => {
-                    if !B::verify_tx(&tx) {
+                    let hash = tx.hash();
+                    if view.transactions().get(&hash).unwrap().is_some() {
+                        error!("Received block with already commited transaction, msg={:?}",
+                               msg);
                         return;
                     }
-                    txs.push((tx.hash(), tx));
+                    if !B::verify_tx(&tx) {
+                        error!("Incorrect transaction in block detected, msg={:?}", msg);
+                        return;
+                    }
+                    txs.push((hash, tx));
                 }
                 Err(_) => return,
             }
@@ -182,9 +201,21 @@ impl<B, S> NodeHandler<B, S>
         let mut has_consensus = false;
         for precommit in &precommits {
             if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
-                if !precommit.verify(pub_key) || precommit.block_hash() != &block_hash {
-                    warn!("Block with incorrect precommit received from {:?}",
-                          msg.from());
+                let is_correct = if !precommit.verify(pub_key) {
+                    false
+                } else if precommit.block_hash() != &block_hash {
+                    false
+                } else {
+                    let leader = State::<B::Transaction>::leader_for_height(precommit.height(),
+                                                                            precommit.round(),
+                                                                            self.state
+                                                                                .validators());
+                    leader == precommit.validator()
+                };
+
+                if !is_correct {
+                    error!("Block with incorrect precommit received from {:?}",
+                           msg.from());
                     return;
                 }
             } else {
@@ -203,8 +234,7 @@ impl<B, S> NodeHandler<B, S>
                                                          txs.as_slice());
         // Verify block_hash
         if block_hash != block.hash() {
-            warn!("Block with incorrect hash received from {:?}", msg.from());
-            return;
+            panic!("Block with incorrect hash received from {:?}", msg.from());
         }
         // Commit block
         self.state.add_block(block.proposer(), block_hash, patch, txs);

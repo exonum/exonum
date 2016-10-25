@@ -56,10 +56,10 @@ pub struct NodeHandler<B, S>
     pub state: State<B::Transaction>,
     pub channel: S,
     pub blockchain: B,
-    pub round_timeout: u32,
-    pub propose_timeout: u32,
-    pub status_timeout: u32,
-    pub peers_timeout: u32,
+    pub round_timeout: i64,
+    pub propose_timeout: i64,
+    pub status_timeout: i64,
+    pub peers_timeout: i64,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
 }
@@ -109,10 +109,10 @@ impl<B, S> NodeHandler<B, S>
             state: state,
             channel: sender,
             blockchain: blockchain,
-            round_timeout: config.consensus.round_timeout,
-            propose_timeout: config.consensus.propose_timeout,
-            status_timeout: config.consensus.status_timeout,
-            peers_timeout: config.consensus.peers_timeout,
+            round_timeout: config.consensus.round_timeout as i64,
+            propose_timeout: config.consensus.propose_timeout as i64,
+            status_timeout: config.consensus.status_timeout as i64,
+            peers_timeout: config.consensus.peers_timeout as i64,
             peer_discovery: config.peer_discovery,
         }
     }
@@ -130,7 +130,7 @@ impl<B, S> NodeHandler<B, S>
             self.connect(address);
             info!("Try to connect with peer {}", address);
         }
-        
+
         let round = self.actual_round();
         self.state.jump_round(round);
 
@@ -181,8 +181,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_round_timeout(&mut self) {
-        let ms = self.state.round() as i64 * self.round_timeout as i64;
-        let time = self.last_block_time() + Duration::milliseconds(ms);
+        let time = self.round_start_time(self.state.round() + 1);
         debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
                self.state.height(),
@@ -193,8 +192,8 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_propose_timeout(&mut self) {
-        let ms = (self.state.round() as i64 - 1) * self.round_timeout as i64 + self.propose_timeout as i64;
-        let time = self.last_block_time() + Duration::milliseconds(ms);
+        let time = self.round_start_time(self.state.round()) +
+                   Duration::milliseconds(self.propose_timeout);
         debug!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
                self.state.height(),
@@ -205,7 +204,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_status_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout as i64);
+        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout);
         self.channel.add_timeout(NodeTimeout::Status, time);
     }
 
@@ -216,7 +215,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout as i64);
+        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout);
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
@@ -239,14 +238,19 @@ impl<B, S> NodeHandler<B, S>
         let propose = self.last_block_time();
         debug_assert!(now >= propose);
 
-        let duration = (now - propose - Duration::milliseconds(self.propose_timeout as i64))
+        let duration = (now - propose - Duration::milliseconds(self.propose_timeout))
             .num_milliseconds();
         if duration > 0 {
-            let round = (duration / self.round_timeout as i64) as Round + 1;
+            let round = (duration / self.round_timeout) as Round + 1;
             ::std::cmp::max(1, round)
         } else {
             1
         }
+    }
+
+    pub fn round_start_time(&self, round: Round) -> Timespec {
+        let ms = (round - 1) as i64 * self.round_timeout;
+        self.last_block_time() + Duration::milliseconds(ms)
     }
 }
 

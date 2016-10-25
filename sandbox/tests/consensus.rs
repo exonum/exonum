@@ -17,15 +17,17 @@ fn test_queue_message_from_future_round() {
     let propose = Propose::new(2,
                                0,
                                2,
-                               sandbox.time() + Duration::milliseconds(sandbox.propose_timeout()),
+                               sandbox.time() +
+                               Duration::milliseconds(sandbox.round_timeout() +
+                                                      sandbox.propose_timeout()),
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(2));
 
     sandbox.recv(propose.clone());
-    sandbox.set_time(0, 999_999_999);
+    sandbox.add_time(Duration::milliseconds(sandbox.round_timeout() - 1));
     sandbox.assert_state(0, 1);
-    sandbox.set_time(1, 0);
+    sandbox.add_time(Duration::milliseconds(1));
     sandbox.assert_state(0, 2);
     sandbox.broadcast(Prevote::new(0, 0, 2, &propose.hash(), 0, sandbox.s(0)));
 }
@@ -82,7 +84,7 @@ fn ignore_propose_with_commited_transaction() {
 //     - not only leader, also prevotes
 //     - not only leader, alto precommiters
 // - request tx from propose with unkwnown tx
-// - ignore propose that sends before than timeout exceeded 
+// - ignore propose that sends before than timeout exceeded
 
 // HAS FULL PROPOSE
 
