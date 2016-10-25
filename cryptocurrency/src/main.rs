@@ -1,8 +1,5 @@
 #![feature(type_ascription)]
 #![feature(question_mark)]
-#![feature(custom_derive)]
-#![feature(plugin)]
-#![plugin(serde_macros)]
 
 #[macro_use]
 extern crate rustless;
