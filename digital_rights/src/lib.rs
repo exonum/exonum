@@ -1,7 +1,6 @@
 #![feature(type_ascription)]
-#![feature(question_mark)]
 #![feature(conservative_impl_trait)]
-#![feature(rustc_macro)]
+#![feature(proc_macro)]
 
 #[macro_use(message, storage_value)]
 extern crate exonum;
