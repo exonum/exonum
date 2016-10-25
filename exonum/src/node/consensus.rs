@@ -205,17 +205,22 @@ impl<B, S> NodeHandler<B, S>
                     false
                 } else if precommit.block_hash() != &block_hash {
                     false
+                } else if precommit.height() != block.height() {
+                    false
                 } else {
-                    let leader = State::<B::Transaction>::leader_for_height(precommit.height(),
-                                                                            precommit.round(),
-                                                                            self.state
-                                                                                .validators());
-                    leader == precommit.validator()
+                    true
                 };
+                // TODO add round to block and proposer to precommit
+                // } else {
+                //     let leader = State::<B::Transaction>::leader_for_height(precommit.height(),
+                //                                                             precommit.round(),
+                //                                                             self.state
+                //                                                                 .validators());
+                //     leader == precommit.validator()
+                // };
 
                 if !is_correct {
-                    error!("Block with incorrect precommit received from {:?}",
-                           msg.from());
+                    error!("Block with incorrect precommit received, msg={:?}", msg);
                     return;
                 }
             } else {
