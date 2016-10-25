@@ -20,9 +20,9 @@ fn test_send_propose_and_prevote() {
     sandbox.recv(tx.clone());
 
     // round happens
-    sandbox.set_time(1, 0);
-    sandbox.set_time(2, 0);
-    sandbox.set_time(3, 999_999_999);
+    sandbox.add_time(Duration::milliseconds(1000));
+    sandbox.add_time(Duration::milliseconds(1000));
+    sandbox.add_time(Duration::milliseconds(1999));
 
     sandbox.assert_state(0, 4);
 

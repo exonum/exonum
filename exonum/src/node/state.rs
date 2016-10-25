@@ -69,7 +69,7 @@ pub enum RequestData {
     Transactions(Hash),
     Prevotes(Round, Hash),
     Precommits(Round, Hash, Hash),
-    Block(u64),
+    Block(Height),
 }
 
 // Состояние запроса
@@ -260,7 +260,11 @@ impl<Tx> State<Tx> {
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {
-        ((self.height() + round as u64) % (self.validators.len() as u64)) as ValidatorId
+        Self::leader_for_height(self.height(), round, self.validators.as_slice())
+    }
+    // TODO move to proper place (maybe Blockchain?)
+    pub fn leader_for_height(height: Height, round: Round, validators: &[PublicKey]) -> ValidatorId {
+        ((height + round as u64) % (validators.len() as u64)) as ValidatorId
     }
 
     pub fn validator_height(&self, id: ValidatorId) -> Height {
