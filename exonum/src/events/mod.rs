@@ -436,10 +436,10 @@ mod tests {
             }
         }
 
-        fn wait_for_messages(&mut self,
-                             mut count: usize,
-                             duration: Duration)
-                             -> Result<Vec<RawMessage>, String> {
+        pub fn wait_for_messages(&mut self,
+                                 mut count: usize,
+                                 duration: Duration)
+                                 -> Result<Vec<RawMessage>, String> {
             let mut v = Vec::new();
             let start = get_time();
             loop {
@@ -516,7 +516,7 @@ mod tests {
                 e.send_to(&addrs[1], m1.clone());
                 e.send_to(&addrs[1], m2.clone());
                 e.send_to(&addrs[1], m1.clone());
-                
+
                 let msgs = e.wait_for_messages(3, Duration::milliseconds(10000)).unwrap();
                 assert_eq!(msgs[0], m2);
                 assert_eq!(msgs[1], m1);
@@ -642,10 +642,10 @@ mod benches {
     use std::thread;
     use std::net::SocketAddr;
 
-    use time::{get_time, Duration};
+    use time::Duration;
 
     use super::{Network, NetworkConfiguration, Events, Reactor};
-    use super::tests::{gen_message, TestEvents, TestPoller, TestHandler};
+    use super::tests::{gen_message, TestEvents, TestHandler};
 
     use test::Bencher;
 
@@ -657,15 +657,15 @@ mod benches {
 
     impl TestEvents {
         fn with_cfg(cfg: &BenchConfig, addr: SocketAddr) -> TestEvents {
-            let network = Network::with_config(NetworkConfiguration {
-                listen_address: addr,
-                max_incoming_connections: 128,
-                max_outgoing_connections: 128,
-                tcp_nodelay: cfg.tcp_nodelay,
-                tcp_keep_alive: None,
-                tcp_reconnect_timeout: 1000,
-                tcp_reconnect_timeout_max: 600000,
-            });
+            let network = Network::with_config(addr,
+                                               NetworkConfiguration {
+                                                   max_incoming_connections: 128,
+                                                   max_outgoing_connections: 128,
+                                                   tcp_nodelay: cfg.tcp_nodelay,
+                                                   tcp_keep_alive: None,
+                                                   tcp_reconnect_timeout: 1000,
+                                                   tcp_reconnect_timeout_max: 600000,
+                                               });
             let handler = TestHandler::new();
 
             TestEvents(Events::new(network, handler).unwrap())
@@ -689,7 +689,7 @@ mod benches {
                     e1.send_to(&addrs[1], msg);
                     e1.wait_for_messages(1, timeout).unwrap();
                 }
-                e1.wait_for_disconnect().unwrap();
+                e1.wait_for_disconnect(Duration::milliseconds(1000)).unwrap();
             });
             let t2 = thread::spawn(move || {
                 e2.wait_for_connect(&addrs[0]).unwrap();

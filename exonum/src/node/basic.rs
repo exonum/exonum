@@ -54,7 +54,7 @@ impl<B, S> NodeHandler<B, S>
         }
         // Check if we have another connect message from peer with the given public_key
         let public_key = *message.pub_key();
-        let mut need_connect = false;
+        let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
                 error!("Received outdated Connect message from {}", address);
@@ -64,10 +64,11 @@ impl<B, S> NodeHandler<B, S>
             } else {
                 if saved_message.addr() != message.addr() {
                     error!("Received weird Connect message from {}", address);
+                    return;
                 }
             }
         }
-        info!("Received Connect message from {}", address);
+        info!("Received Connect message from {}, {}", address, need_connect);
         self.state.add_peer(public_key, message);
         if need_connect {
             // TODO: reduce double sending of connect message
