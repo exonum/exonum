@@ -248,6 +248,7 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
+    // FIXME find more flexible solution
     pub fn round_start_time(&self, round: Round) -> Timespec {
         let ms = (round - 1) as i64 * self.round_timeout;
         self.last_block_time() + Duration::milliseconds(ms)

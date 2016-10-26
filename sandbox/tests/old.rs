@@ -68,14 +68,14 @@ fn test_get_lock_and_send_precommit() {
                                &[],
                                sandbox.s(1));
 
-    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]), 1);
+    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]), 1, 1);
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
     sandbox.recv(Prevote::new(1, 0, 1, &propose.hash(), 0, sandbox.s(1)));
     sandbox.assert_lock(0, None);
     sandbox.recv(Prevote::new(2, 0, 1, &propose.hash(), 0, sandbox.s(2)));
-    sandbox.broadcast(Precommit::new(0, 0, 1, &propose.hash(), &block.hash(), sandbox.s(0)));
+    sandbox.broadcast(Precommit::new(0, 1, 0, 1, &propose.hash(), &block.hash(), sandbox.s(0)));
     sandbox.assert_lock(1, Some(propose.hash()));
 }
 
@@ -92,15 +92,15 @@ fn test_commit() {
                                &[],
                                sandbox.s(1));
 
-    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]), 1);
+    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]), 1, 1);
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
     sandbox.recv(Prevote::new(1, 0, 1, &propose.hash(), 0, sandbox.s(1)));
     sandbox.recv(Prevote::new(2, 0, 1, &propose.hash(), 0, sandbox.s(2)));
-    sandbox.broadcast(Precommit::new(0, 0, 1, &propose.hash(), &block.hash(), sandbox.s(0)));
-    sandbox.recv(Precommit::new(2, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(2)));
-    sandbox.recv(Precommit::new(3, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(3)));
+    sandbox.broadcast(Precommit::new(0, 1, 0, 1, &propose.hash(), &block.hash(), sandbox.s(0)));
+    sandbox.recv(Precommit::new(2, 1, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(2)));
+    sandbox.recv(Precommit::new(3, 1, 0, 1, &propose.hash(), &propose.hash(), sandbox.s(3)));
     sandbox.assert_state(0, 1);
 }
 
