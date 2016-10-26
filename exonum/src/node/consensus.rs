@@ -11,7 +11,7 @@ use super::super::storage::{Map, Patch};
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
 use super::super::events::Channel;
-use super::{ExternalMessage, NodeTimeout, State};
+use super::{ExternalMessage, NodeTimeout};
 
 const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
@@ -165,6 +165,7 @@ impl<B, S> NodeHandler<B, S>
 
         let block = msg.block();
         let block_hash = block.hash();
+
         // TODO add block with greater height to queue
         if self.state.height() != block.height() {
             return;
@@ -175,46 +176,25 @@ impl<B, S> NodeHandler<B, S>
             error!("Weird block received, block={:?}", msg);
             return;
         }
-        if block.proposer() !=
-           State::<B::Transaction>::leader_for_height(block.height(),
-                                                      block.propose_round(),
-                                                      self.state.validators()) {
-            error!("Block with wrong proposer received, block={:?}", msg);
-            return;
-        }
+
         // Verify propose time
-        let round = block.propose_round();
-        let start_time = self.round_start_time(round) +
+        let propose_round = block.propose_round();
+        let start_time = self.round_start_time(propose_round) +
                          Duration::milliseconds(self.propose_timeout);
         let end_time = start_time + Duration::milliseconds(self.round_timeout);
         if msg.time() < start_time || block.time() > end_time {
             error!("Received block with wrong propose time, block={:?}", msg);
             return;
         }
-        // Verify transactions
-        let view = self.blockchain.view();
-        let mut txs = Vec::new();
-        for raw in msg.transactions() {
-            match B::Transaction::from_raw(raw) {
-                Ok(tx) => {
-                    let hash = tx.hash();
-                    if view.transactions().get(&hash).unwrap().is_some() {
-                        error!("Received block with already commited transaction, block={:?}",
-                               msg);
-                        return;
-                    }
-                    if !B::verify_tx(&tx) {
-                        error!("Incorrect transaction in block detected, block={:?}", msg);
-                        return;
-                    }
-                    txs.push((hash, tx));
-                }
-                Err(_) => return,
-            }
-        }
-        // Verify precommits and adds them to state
+
+        // Verify precommits
         let precommits = msg.precommits();
-        let mut has_consensus = false;
+        if precommits.len() < self.state.majority_count() ||
+           precommits.len() > self.state.validators().len() {
+            error!("Received block without consensus, block={:?}", msg);
+            return;
+        }
+        let precommit_round = precommits[0].round();
         for precommit in &precommits {
             if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
                 if !precommit.verify(pub_key) {
@@ -235,43 +215,60 @@ impl<B, S> NodeHandler<B, S>
                            precommit);
                     return;
                 }
-                let leader = State::<B::Transaction>::leader_for_height(precommit.height(),
-                                                                        precommit.round(),
-                                                                        self.state
-                                                                            .validators());
-                if leader != precommit.proposer() {
-                    error!("Received precommit with wrong leader, block={:?}, precommit={:?}",
+                if precommit.round() != precommit_round {
+                    error!("Received precommits with the different rounds, block={:?}, \
+                            precommit={:?}",
                            msg,
                            precommit);
                     return;
                 }
             } else {
+                error!("Received precommit with wrong validator, block={:?}, precommit={:?}",
+                       msg,
+                       precommit);
                 return;
             }
-            has_consensus = self.state.add_precommit(&precommit);
         }
 
-        // Ensure that we have consensus for this block
-        if !has_consensus {
-            error!("Received block without consensus, block={:?}", msg);
-            return;
-        }
+        if self.state.block(&block_hash).is_none() {
+            // Verify transactions
+            let view = self.blockchain.view();
+            let mut txs = Vec::new();
+            for raw in msg.transactions() {
+                match B::Transaction::from_raw(raw) {
+                    Ok(tx) => {
+                        let hash = tx.hash();
+                        if view.transactions().get(&hash).unwrap().is_some() {
+                            error!("Received block with already commited transaction, block={:?}",
+                                   msg);
+                            return;
+                        }
+                        if !B::verify_tx(&tx) {
+                            error!("Incorrect transaction in block detected, block={:?}", msg);
+                            return;
+                        }
+                        txs.push((hash, tx));
+                    }
+                    Err(_) => return,
+                }
+            }
 
-        let (block_hash, txs, patch) = self.create_block(block.height(),
-                                                         block.propose_round(),
-                                                         block.time(),
-                                                         block.proposer(),
-                                                         txs.as_slice());
-        // Verify block_hash
-        if block_hash != block.hash() {
-            panic!("Block with incorrect hash received from {:?}", msg.from());
-        }
+            let (block_hash, txs, patch) = self.create_block(block.height(),
+                                                             block.propose_round(),
+                                                             block.time(),
+                                                             txs.as_slice());
+            // Verify block_hash
+            if block_hash != block.hash() {
+                panic!("Block with incorrect hash received from {:?}", msg.from());
+            }
 
-        // Commit block
-        self.state.add_block(block.proposer(), block_hash, patch, txs);
+            // Commit block
+            self.state.add_block(block_hash, patch, txs, propose_round);
+        }
         self.commit(block_hash, precommits.iter());
 
         // Request next block if needed
+        // TODO randomize next peer
         let heights = self.state.validator_heights();
         if !heights.is_empty() {
             for id in heights {
@@ -306,7 +303,7 @@ impl<B, S> NodeHandler<B, S>
         // Commit propose
         for (round, block_hash) in self.state.unknown_propose_with_precommits(&hash) {
             // Execute block and get state hash
-            let (our_block_hash, _) = self.execute(&hash);
+            let our_block_hash = self.execute(&hash);
 
             if our_block_hash != block_hash {
                 panic!("We are fucked up...");
@@ -366,7 +363,7 @@ impl<B, S> NodeHandler<B, S>
             // FIXME: проверка что у нас есть все транзакции
 
             // Execute block and get state hash
-            let (our_block_hash, _) = self.execute(propose_hash);
+            let our_block_hash = self.execute(propose_hash);
 
             if &our_block_hash != block_hash {
                 panic!("We are fucked up...");
@@ -392,8 +389,8 @@ impl<B, S> NodeHandler<B, S>
         // Send precommit
         if !self.state.have_incompatible_prevotes() {
             // Execute block and get state hash
-            let (block_hash, proposer) = self.execute(&propose_hash);
-            self.send_precommit(proposer, round, &propose_hash, &block_hash);
+            let block_hash = self.execute(&propose_hash);
+            self.send_precommit(round, &propose_hash, &block_hash);
             // Commit if has consensus
             if self.state.has_majority_precommits(round, block_hash) {
                 self.has_majority_precommits(round, &propose_hash, &block_hash);
@@ -445,19 +442,24 @@ impl<B, S> NodeHandler<B, S>
         debug!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let proposer = {
+        let propose_round = {
             let block_state = self.state.block(&block_hash).unwrap();
             let patch = block_state.patch().clone();
             self.blockchain.commit(block_hash, patch, precommits).unwrap();
-            block_state.proposer()
+            block_state.propose_round()
         };
+
+        let height = self.state.height();
+        let proposer = self.state.leader(propose_round);
+
         // Update state to new height
         let round = self.actual_round();
         self.state.new_height(&block_hash, round);
 
-        info!("{:?} ========== height={}, proposer={}, commited={}, pool={}",
+        info!("{:?} ====== height={}, round={}, proposer={}, commited={}, pool={}",
               self.channel.get_time(),
-              self.state.height(),
+              height,
+              propose_round,
               proposer,
               self.state.commited_txs,
               self.state.transactions().len());
@@ -673,16 +675,15 @@ impl<B, S> NodeHandler<B, S>
                         height: Height,
                         round: Round,
                         time: Timespec,
-                        proposer: ValidatorId,
                         txs: &[(Hash, B::Transaction)])
                         -> (Hash, Vec<Hash>, Patch) {
         self.blockchain
-            .create_patch(height, round, time, proposer, txs)
+            .create_patch(height, round, time, txs)
             .unwrap()
     }
 
     // FIXME: remove this bull shit
-    pub fn execute(&mut self, propose_hash: &Hash) -> (Hash, ValidatorId) {
+    pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         let propose = self.state.propose(propose_hash).unwrap().message().clone();
         let txs = propose.transactions()
             .iter()
@@ -694,11 +695,10 @@ impl<B, S> NodeHandler<B, S>
         let (block_hash, txs, patch) = self.create_block(propose.height(),
                                                          propose.round(),
                                                          propose.time(),
-                                                         propose.validator(),
                                                          txs.as_slice());
         // Save patch
-        self.state.add_block(propose.validator(), block_hash, patch, txs);
-        (block_hash, propose.validator())
+        self.state.add_block(block_hash, patch, txs, propose.round());
+        block_hash
     }
 
     pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) {
@@ -744,13 +744,8 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn send_precommit(&mut self,
-                          proposer: ValidatorId,
-                          round: Round,
-                          propose_hash: &Hash,
-                          block_hash: &Hash) {
+    pub fn send_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
         let precommit = Precommit::new(self.state.id(),
-                                       proposer,
                                        self.state.height(),
                                        round,
                                        propose_hash,

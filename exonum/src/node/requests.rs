@@ -5,6 +5,8 @@ use super::super::storage::{Map, List};
 use super::super::events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
+// TODO validate_heights нужно обновлять по любым сообщениям, а не только по status (если они корректно подписаны)
+// TODO propose имеет смысл запрашивать только тогда, когда мы знаем, что узел находится на нашей высоте
 
 const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 

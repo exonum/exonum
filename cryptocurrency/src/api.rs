@@ -66,11 +66,15 @@ impl Serialize for WalletInfo {
 
 pub struct CurrencyApi<D: Database> {
     blockchain: CurrencyBlockchain<D>,
+    validators: Vec<PublicKey>,
 }
 
 impl<D: Database> CurrencyApi<D> {
-    pub fn new(b: CurrencyBlockchain<D>) -> CurrencyApi<D> {
-        CurrencyApi { blockchain: b }
+    pub fn new(b: CurrencyBlockchain<D>, v: Vec<PublicKey>) -> CurrencyApi<D> {
+        CurrencyApi {
+            blockchain: b,
+            validators: v,
+        }
     }
 
     pub fn wallet_info(&self, pub_key: &PublicKey) -> StorageResult<Option<WalletInfo>> {
@@ -80,7 +84,9 @@ impl<D: Database> CurrencyApi<D> {
             let txs = {
                 let mut v = Vec::new();
 
-                let explorer = BlockchainExplorer::<CurrencyBlockchain<D>>::from_view(view);
+                let explorer =
+                    BlockchainExplorer::<CurrencyBlockchain<D>>::from_view(view,
+                                                                           self.validators.clone());
                 for hash in history {
                     if let Some(tx_info) = explorer.tx_info::<CurrencyTx>(&hash)? {
                         v.push(tx_info)

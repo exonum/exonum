@@ -208,13 +208,11 @@ fn test_precommit() {
     let height = 123_123_123;
     let round = 321_321_312;
     let propose_hash = hash(&[1, 2, 3]);
-    let proposer = 12;
     let block_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
 
     // write
     let precommit = Precommit::new(validator,
-                                   proposer,
                                    height,
                                    round,
                                    &propose_hash,
@@ -222,7 +220,6 @@ fn test_precommit() {
                                    &secret_key);
     // read
     assert_eq!(precommit.validator(), validator);
-    assert_eq!(precommit.proposer(), proposer);
     assert_eq!(precommit.height(), height);
     assert_eq!(precommit.round(), round);
     assert_eq!(precommit.propose_hash(), &propose_hash);
@@ -252,29 +249,25 @@ fn test_block() {
     let ts = time::get_time();
 
     let content = blockchain::Block::new(500,
+                                         1,
                                          time::get_time(),
                                          &hash(&[1]),
                                          &hash(&[2]),
-                                         &hash(&[3]),
-                                         0,
-                                         1);
+                                         &hash(&[3]));
 
     let precommits = vec![Precommit::new(123,
-                                         12,
                                          15,
                                          25,
                                          &hash(&[1, 2, 3]),
                                          &hash(&[3, 2, 1]),
                                          &secret_key),
                           Precommit::new(13,
-                                         12,
                                          25,
                                          35,
                                          &hash(&[4, 2, 3]),
                                          &hash(&[3, 3, 1]),
                                          &secret_key),
                           Precommit::new(323,
-                                         12,
                                          15,
                                          25,
                                          &hash(&[1, 1, 3]),
@@ -314,7 +307,7 @@ fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
     let ts = time::get_time();
 
-    let content = blockchain::Block::new(200, ts, &hash(&[1]), &hash(&[2]), &hash(&[3]), 0, 1);
+    let content = blockchain::Block::new(200, 1, ts, &hash(&[1]), &hash(&[2]), &hash(&[3]));
 
     let precommits = Vec::new();
     let transactions = Vec::new();

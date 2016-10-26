@@ -11,7 +11,6 @@ use time::Timespec;
 use ::crypto::{Hash, hash};
 use ::messages::{Precommit, Message};
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
-use ::node::ValidatorId;
 
 pub use self::block::Block;
 pub use self::view::View;
@@ -44,7 +43,6 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                     height: u64,
                     round: u32,
                     time: Timespec,
-                    validator: ValidatorId,
                     txs: &[(Hash, Self::Transaction)])
                     -> Result<(Hash, Vec<Hash>, Patch), Error> {
         // Get last hash
@@ -68,13 +66,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Get state hash
         let state_hash = Self::state_hash(&mut fork)?;
         // Create block
-        let block = Block::new(height,
-                               time,
-                               &last_hash,
-                               &tx_hash,
-                               &state_hash,
-                               validator,
-                               round);
+        let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
         // Eval block hash
         let block_hash = block.hash();
         // Update height
