@@ -63,7 +63,6 @@ message! {
         const SIZE = 84;
 
         validator:      u32         [00 => 04]
-        proposer:       u32         [04 => 08]
         height:         u64         [08 => 16]
         round:          u32         [16 => 20]
         propose_hash:   &Hash       [20 => 52]

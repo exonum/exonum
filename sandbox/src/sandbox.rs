@@ -7,8 +7,8 @@ use std::ops::Drop;
 
 use time::{Timespec, Duration};
 
-use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout,
-                   ListenerConfig, ConsensusConfig, GENESIS_TIME};
+use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig,
+                   ConsensusConfig, GENESIS_TIME};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
@@ -385,7 +385,7 @@ pub fn timestamping_sandbox
 
     let config = Configuration {
         listener: ListenerConfig {
-            address: addresses[0].clone(),            
+            address: addresses[0].clone(),
             public_key: validators[0].0.clone(),
             secret_key: validators[0].1.clone(),
         },

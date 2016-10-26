@@ -98,8 +98,8 @@ pub struct BlockState {
     patch: Patch,
     // Хэши транзакций, закомиченных в этот блок
     txs: Vec<Hash>,
-    // Proposer id
-    proposer: ValidatorId,
+    // Раунд на котором был создан Propose
+    propose_round: Round,
 }
 
 impl RequestData {
@@ -160,12 +160,12 @@ impl ProposeState {
 }
 
 impl BlockState {
-    pub fn new(proposer: ValidatorId, hash: Hash, patch: Patch, txs: Vec<Hash>) -> BlockState {
+    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, propose_round: Round) -> BlockState {
         BlockState {
             hash: hash,
             patch: patch,
             txs: txs,
-            proposer: proposer,
+            propose_round: propose_round,
         }
     }
 
@@ -181,8 +181,8 @@ impl BlockState {
         &self.txs
     }
 
-    pub fn proposer(&self) -> ValidatorId {
-        self.proposer
+    pub fn propose_round(&self) -> Round {
+        self.propose_round
     }
 }
 
@@ -261,14 +261,7 @@ impl<Tx> State<Tx> {
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {
-        Self::leader_for_height(self.height(), round, self.validators.as_slice())
-    }
-    // TODO move to proper place (maybe Blockchain?)
-    pub fn leader_for_height(height: Height,
-                             round: Round,
-                             validators: &[PublicKey])
-                             -> ValidatorId {
-        ((height + round as u64) % (validators.len() as u64)) as ValidatorId
+        ((self.height() + round as u64) % (self.validators.len() as u64)) as ValidatorId
     }
 
     pub fn validator_height(&self, id: ValidatorId) -> Height {
@@ -443,19 +436,19 @@ impl<Tx> State<Tx> {
     }
 
     pub fn add_block(&mut self,
-                     proposer: ValidatorId,
                      block_hash: Hash,
                      patch: Patch,
-                     txs: Vec<Hash>)
+                     txs: Vec<Hash>,
+                     propose_round: Round)
                      -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => {
                 Some(e.insert(BlockState {
-                    proposer: proposer,
                     hash: block_hash,
                     patch: patch,
                     txs: txs,
+                    propose_round: propose_round,
                 }))
             }
         }
@@ -487,7 +480,7 @@ impl<Tx> State<Tx> {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
             if let Some(_) = self.our_precommits.insert(msg.round(), msg.clone()) {
-                // panic!("Trying to send different precommits for same round");
+                panic!("Trying to send different precommits for same round");
             }
         }
 

@@ -81,13 +81,16 @@ fn load_keypair_from_cookies(storage: &CookieJar) -> StorageResult<(PublicKey, S
     Ok((public_key, secret_key))
 }
 
-fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: CurrencyBlockchain<D>) {
-    blockchain_explorer::make_api::<CurrencyBlockchain<D>, CurrencyTx>(api, b1);
+fn blockchain_explorer_api<D: Database>(api: &mut Api,
+                                        b1: CurrencyBlockchain<D>,
+                                        validators: Vec<PublicKey>) {
+    blockchain_explorer::make_api::<CurrencyBlockchain<D>, CurrencyTx>(api, b1, validators);
 }
 
 fn cryptocurrency_api<D: Database>(api: &mut Api,
                                    blockchain: CurrencyBlockchain<D>,
-                                   channel: CurrencyTxSender<CurrencyBlockchain<D>>) {
+                                   channel: CurrencyTxSender<CurrencyBlockchain<D>>,
+                                   validators: Vec<PublicKey>) {
     api.namespace("wallets", move |api| {
         let ch = channel.clone();
         api.post("create", move |endpoint| {
@@ -179,6 +182,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
         });
 
         let b = blockchain.clone();
+        let v = validators.clone();
         api.get("info", move |endpoint| {
             endpoint.handle(move |client, _| {
                 let (public_key, _) = {
@@ -191,7 +195,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         Err(e) => return client.error(e),
                     }
                 };
-                let currency_api = CurrencyApi::<D>::new(b.clone());
+                let currency_api = CurrencyApi::<D>::new(b.clone(), v.clone());
                 match currency_api.wallet_info(&public_key) {
                     Ok(Some(info)) => client.json(&info.to_json()),
                     _ => client.error(StorageError::new("Unable to get wallet info")),
@@ -205,6 +209,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                          node_cfg: Configuration,
                          port: Option<u16>) {
     if let Some(port) = port {
+        let validators = node_cfg.validators.clone();
         let mut node = Node::new(blockchain.clone(), node_cfg);
         let channel = node.channel();
 
@@ -226,8 +231,8 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                     }
                 });
 
-                blockchain_explorer_api(api, blockchain.clone());
-                cryptocurrency_api(api, blockchain.clone(), channel.clone());
+                blockchain_explorer_api(api, blockchain.clone(), validators.clone());
+                cryptocurrency_api(api, blockchain.clone(), channel.clone(), validators.clone());
                 api.mount(swagger::create_api("docs"));
             });
 

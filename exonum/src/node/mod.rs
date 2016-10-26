@@ -64,7 +64,6 @@ pub struct NodeHandler<B, S>
     pub peer_discovery: Vec<SocketAddr>,
 }
 
-// TODO extract node handler configuration
 #[derive(Debug, Clone)]
 pub struct Configuration {
     pub listener: ListenerConfig,
