@@ -234,6 +234,7 @@ impl<Tx> State<Tx> {
         self.id
     }
 
+    // TODO Move to blockchain (and store therein)
     pub fn validators(&self) -> &[PublicKey] {
         &self.validators
     }
@@ -263,7 +264,10 @@ impl<Tx> State<Tx> {
         Self::leader_for_height(self.height(), round, self.validators.as_slice())
     }
     // TODO move to proper place (maybe Blockchain?)
-    pub fn leader_for_height(height: Height, round: Round, validators: &[PublicKey]) -> ValidatorId {
+    pub fn leader_for_height(height: Height,
+                             round: Round,
+                             validators: &[PublicKey])
+                             -> ValidatorId {
         ((height + round as u64) % (validators.len() as u64)) as ValidatorId
     }
 

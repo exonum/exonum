@@ -68,7 +68,9 @@ impl<B, S> NodeHandler<B, S>
                 }
             }
         }
-        info!("Received Connect message from {}, {}", address, need_connect);
+        info!("Received Connect message from {}, {}",
+              address,
+              need_connect);
         self.state.add_peer(public_key, message);
         if need_connect {
             // TODO: reduce double sending of connect message

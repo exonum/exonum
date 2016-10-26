@@ -60,13 +60,14 @@ message! {
 message! {
     Precommit {
         const ID = PRECOMMIT_MESSAGE_ID;
-        const SIZE = 80;
+        const SIZE = 84;
 
         validator:      u32         [00 => 04]
-        height:         u64         [04 => 12]
-        round:          u32         [12 => 16]
-        propose_hash:   &Hash       [16 => 48]
-        block_hash:     &Hash       [48 => 80]
+        proposer:       u32         [04 => 08]
+        height:         u64         [08 => 16]
+        round:          u32         [16 => 20]
+        propose_hash:   &Hash       [20 => 52]
+        block_hash:     &Hash       [52 => 84]
     }
 }
 
