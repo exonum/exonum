@@ -32,7 +32,9 @@ impl<B, S> NodeHandler<B, S>
         // Queued messages from next height or round
         // TODO: shoud we ignore messages from far rounds?
         if msg.height() == self.state.height() + 1 || msg.round() > self.state.round() {
-            debug!("Received consensus message from future round: msg.round={}, self.round={}",
+            debug!("Received consensus message from future round: msg.height={}, msg.round={}, \
+                    self.round={}",
+                   msg.height(),
                    msg.round(),
                    self.state.round());
             self.state.add_queued(msg);
