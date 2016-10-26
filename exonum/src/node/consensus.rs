@@ -169,11 +169,17 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
         if block.prev_hash() != &self.last_block_hash() {
-            error!("Weird block received from {:?}", msg.from());
+            error!("Weird block received, msg={:?}", msg);
             return;
         }
 
-        // if block.proposer() != State::<B::Transaction>::leader_for_height(block.)
+        if block.proposer() !=
+           State::<B::Transaction>::leader_for_height(block.height(),
+                                                      block.propose_round(),
+                                                      self.state.validators()) {
+            error!("Block with wrong proposer received, msg={:?}", msg);
+            return;
+        }
 
         // Verify transactions
         let view = self.blockchain.view();
@@ -234,6 +240,7 @@ impl<B, S> NodeHandler<B, S>
         }
 
         let (block_hash, txs, patch) = self.create_block(block.height(),
+                                                         block.propose_round(),
                                                          block.time(),
                                                          block.proposer(),
                                                          txs.as_slice());
@@ -279,7 +286,7 @@ impl<B, S> NodeHandler<B, S>
         // Commit propose
         for (round, block_hash) in self.state.unknown_propose_with_precommits(&hash) {
             // Execute block and get state hash
-            let our_block_hash = self.execute(&hash);
+            let (our_block_hash, _) = self.execute(&hash);
 
             if our_block_hash != block_hash {
                 panic!("We are fucked up...");
@@ -339,7 +346,7 @@ impl<B, S> NodeHandler<B, S>
             // FIXME: проверка что у нас есть все транзакции
 
             // Execute block and get state hash
-            let our_block_hash = self.execute(propose_hash);
+            let (our_block_hash, _) = self.execute(propose_hash);
 
             if &our_block_hash != block_hash {
                 panic!("We are fucked up...");
@@ -365,8 +372,8 @@ impl<B, S> NodeHandler<B, S>
         // Send precommit
         if !self.state.have_incompatible_prevotes() {
             // Execute block and get state hash
-            let block_hash = self.execute(&propose_hash);
-            self.send_precommit(round, &propose_hash, &block_hash);
+            let (block_hash, proposer) = self.execute(&propose_hash);
+            self.send_precommit(proposer, round, &propose_hash, &block_hash);
             // Commit if has consensus
             if self.state.has_majority_precommits(round, block_hash) {
                 self.has_majority_precommits(round, &propose_hash, &block_hash);
@@ -644,17 +651,18 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn create_block(&mut self,
                         height: Height,
+                        round: Round,
                         time: Timespec,
                         proposer: ValidatorId,
                         txs: &[(Hash, B::Transaction)])
                         -> (Hash, Vec<Hash>, Patch) {
         self.blockchain
-            .create_patch(height, time, proposer, txs)
+            .create_patch(height, round, time, proposer, txs)
             .unwrap()
     }
 
     // FIXME: remove this bull shit
-    pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
+    pub fn execute(&mut self, propose_hash: &Hash) -> (Hash, ValidatorId) {
         let propose = self.state.propose(propose_hash).unwrap().message().clone();
         let txs = propose.transactions()
             .iter()
@@ -664,12 +672,13 @@ impl<B, S> NodeHandler<B, S>
             })
             .collect::<Vec<_>>();
         let (block_hash, txs, patch) = self.create_block(propose.height(),
+                                                         propose.round(),
                                                          propose.time(),
                                                          propose.validator(),
                                                          txs.as_slice());
         // Save patch
         self.state.add_block(propose.validator(), block_hash, patch, txs);
-        block_hash
+        (block_hash, propose.validator())
     }
 
     pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) {
@@ -715,8 +724,13 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn send_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
+    pub fn send_precommit(&mut self,
+                          proposer: ValidatorId,
+                          round: Round,
+                          propose_hash: &Hash,
+                          block_hash: &Hash) {
         let precommit = Precommit::new(self.state.id(),
+                                       proposer,
                                        self.state.height(),
                                        round,
                                        propose_hash,

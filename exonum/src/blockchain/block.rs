@@ -4,7 +4,7 @@ use super::super::crypto::{Hash, hash};
 use super::super::messages::Field;
 use super::super::storage::StorageValue;
 
-pub const BLOCK_SIZE: usize = 116;
+pub const BLOCK_SIZE: usize = 120;
 
 storage_value!(
     Block {
@@ -16,10 +16,11 @@ storage_value!(
         tx_hash:                &Hash       [48 => 80]
         state_hash:             &Hash       [80 => 112]
         proposer:               u32         [112 => 116]
+        propose_round:          u32         [116 => 120]
     }
 );
 
-// TODO: add network_id, propose_round, block version?
+// TODO: add network_id, block version?
 
 // TODO add generic implementation for whole storage values
 impl<'a> Field<'a> for Block {
@@ -46,7 +47,14 @@ fn test_block() {
     let tx_hash = hash(&[4, 5, 6]);
     let state_hash = hash(&[7, 8, 9]);
     let proposer = 10;
-    let block = Block::new(height, time, &prev_hash, &tx_hash, &state_hash, proposer);
+    let round = 2;
+    let block = Block::new(height,
+                           time,
+                           &prev_hash,
+                           &tx_hash,
+                           &state_hash,
+                           proposer,
+                           round);
 
     assert_eq!(block.height(), height);
     assert_eq!(block.time(), time);
@@ -54,4 +62,5 @@ fn test_block() {
     assert_eq!(block.tx_hash(), &tx_hash);
     assert_eq!(block.state_hash(), &state_hash);
     assert_eq!(block.proposer(), proposer);
+    assert_eq!(block.propose_round(), round);
 }

@@ -181,8 +181,8 @@ impl Network {
                     let r = {
                         // Write data into socket
                         let (len, bytes) = self.outgoing[id].writer_state();
-                        trace!("{}: position={}, queue={}", 
-                            self.address(), 
+                        trace!("{}: position={}, queue={}",
+                            self.address(),
                             bytes,
                             len);
 
@@ -209,8 +209,7 @@ impl Network {
         Ok(())
     }
 
-    pub fn tick<H: EventHandler>(&mut self, _: &mut EventLoop<H>) {
-    }
+    pub fn tick<H: EventHandler>(&mut self, _: &mut EventLoop<H>) {}
 
     pub fn send_to<H: EventHandler>(&mut self,
                                     event_loop: &mut EventLoop<H>,

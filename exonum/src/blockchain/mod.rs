@@ -11,7 +11,7 @@ use time::Timespec;
 use ::crypto::{Hash, hash};
 use ::messages::{Precommit, Message};
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
-use ::node::{ValidatorId};
+use ::node::ValidatorId;
 
 pub use self::block::Block;
 pub use self::view::View;
@@ -39,9 +39,10 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
     fn execute(fork: &Self::View, tx: &Self::Transaction) -> Result<(), Error>;
 
-    //TODO use Iterator to avoid memory allocations?
+    // TODO use Iterator to avoid memory allocations?
     fn create_patch(&self,
                     height: u64,
+                    round: u32,
                     time: Timespec,
                     validator: ValidatorId,
                     txs: &[(Hash, Self::Transaction)])
@@ -72,7 +73,8 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                                &last_hash,
                                &tx_hash,
                                &state_hash,
-                               validator);
+                               validator,
+                               round);
         // Eval block hash
         let block_hash = block.hash();
         // Update height
