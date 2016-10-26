@@ -28,11 +28,11 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     }
 
     fn last_block(&self) -> Result<Option<Block>, Error> {
-        Ok(match self.last_hash()? {
-            Some(hash) => Some(self.view().blocks().get(&hash)?.unwrap()),
+        let view = self.view();
+        Ok(match view.heights().last()? {
+            Some(hash) => Some(view.blocks().get(&hash)?.unwrap()),
             None => None,
         })
-
     }
 
     fn verify_tx(tx: &Self::Transaction) -> bool;

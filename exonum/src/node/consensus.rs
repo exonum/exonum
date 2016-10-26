@@ -81,7 +81,6 @@ impl<B, S> NodeHandler<B, S>
         let start_time = self.round_start_time(round) +
                          Duration::milliseconds(self.propose_timeout);
         let end_time = start_time + Duration::milliseconds(self.round_timeout);
-        // Check timeout
         if msg.time() < start_time || msg.time() > end_time {
             error!("Received propose with wrong time, msg={:?}", msg);
             return;
@@ -168,19 +167,28 @@ impl<B, S> NodeHandler<B, S>
         if self.state.height() != block.height() {
             return;
         }
+
+        // Check block content
         if block.prev_hash() != &self.last_block_hash() {
-            error!("Weird block received, msg={:?}", msg);
+            error!("Weird block received, block={:?}", msg);
             return;
         }
-
         if block.proposer() !=
            State::<B::Transaction>::leader_for_height(block.height(),
                                                       block.propose_round(),
                                                       self.state.validators()) {
-            error!("Block with wrong proposer received, msg={:?}", msg);
+            error!("Block with wrong proposer received, block={:?}", msg);
             return;
         }
-
+        // Verify propose time
+        let round = block.propose_round();
+        let start_time = self.round_start_time(round) +
+                         Duration::milliseconds(self.propose_timeout);
+        let end_time = start_time + Duration::milliseconds(self.round_timeout);
+        if msg.time() < start_time || block.time() > end_time {
+            error!("Received block with wrong propose time, block={:?}", msg);
+            return;
+        }
         // Verify transactions
         let view = self.blockchain.view();
         let mut txs = Vec::new();
@@ -189,12 +197,12 @@ impl<B, S> NodeHandler<B, S>
                 Ok(tx) => {
                     let hash = tx.hash();
                     if view.transactions().get(&hash).unwrap().is_some() {
-                        error!("Received block with already commited transaction, msg={:?}",
+                        error!("Received block with already commited transaction, block={:?}",
                                msg);
                         return;
                     }
                     if !B::verify_tx(&tx) {
-                        error!("Incorrect transaction in block detected, msg={:?}", msg);
+                        error!("Incorrect transaction in block detected, block={:?}", msg);
                         return;
                     }
                     txs.push((hash, tx));
@@ -207,26 +215,32 @@ impl<B, S> NodeHandler<B, S>
         let mut has_consensus = false;
         for precommit in &precommits {
             if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
-                let is_correct = if !precommit.verify(pub_key) {
-                    false
-                } else if precommit.block_hash() != &block_hash {
-                    false
-                } else if precommit.height() != block.height() {
-                    false
-                } else {
-                    true
-                };
-                // TODO add round to block and proposer to precommit
-                // } else {
-                //     let leader = State::<B::Transaction>::leader_for_height(precommit.height(),
-                //                                                             precommit.round(),
-                //                                                             self.state
-                //                                                                 .validators());
-                //     leader == precommit.validator()
-                // };
-
-                if !is_correct {
-                    error!("Block with incorrect precommit received, msg={:?}", msg);
+                if !precommit.verify(pub_key) {
+                    error!("Received wrong signed precommit, block={:?}, precommit={:?}",
+                           msg,
+                           precommit);
+                    return;
+                }
+                if precommit.block_hash() != &block_hash {
+                    error!("Received precommit with wrong block_hash, block={:?}, precommit={:?}",
+                           msg,
+                           precommit);
+                    return;
+                }
+                if precommit.height() != block.height() {
+                    error!("Received precommit with wrong height, block={:?}, precommit={:?}",
+                           msg,
+                           precommit);
+                    return;
+                }
+                let leader = State::<B::Transaction>::leader_for_height(precommit.height(),
+                                                                        precommit.round(),
+                                                                        self.state
+                                                                            .validators());
+                if leader != precommit.proposer() {
+                    error!("Received precommit with wrong leader, block={:?}, precommit={:?}",
+                           msg,
+                           precommit);
                     return;
                 }
             } else {
@@ -234,8 +248,10 @@ impl<B, S> NodeHandler<B, S>
             }
             has_consensus = self.state.add_precommit(&precommit);
         }
+
         // Ensure that we have consensus for this block
         if !has_consensus {
+            error!("Received block without consensus, block={:?}", msg);
             return;
         }
 
@@ -248,9 +264,11 @@ impl<B, S> NodeHandler<B, S>
         if block_hash != block.hash() {
             panic!("Block with incorrect hash received from {:?}", msg.from());
         }
+
         // Commit block
         self.state.add_block(block.proposer(), block_hash, patch, txs);
         self.commit(block_hash, precommits.iter());
+
         // Request next block if needed
         let heights = self.state.validator_heights();
         if !heights.is_empty() {

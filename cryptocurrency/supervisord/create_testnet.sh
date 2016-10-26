@@ -9,7 +9,7 @@ mkdir -p ${destdir}/log/supervisor
 mkdir ${destdir}/run
 mkdir ${destdir}/db
 cp -R ${scriptdir}/etc ${destdir}
-$node_executable -c ${destdir}/testnet.conf generate 4 -p 9000
+$node_executable -c ${destdir}/testnet.conf generate 9 -p 9000
 
 echo "--> To start testnet:"
 echo "cd ${destdir}"

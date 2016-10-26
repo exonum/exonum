@@ -174,17 +174,12 @@ impl Network {
                 if set.is_writable() {
                     let address = *self.outgoing[id].address();
 
-                    trace!("{}: Socket is writable addr={}",
-                           self.address(),
-                           address);
+                    trace!("{}: Socket is writable addr={}", self.address(), address);
 
                     let r = {
                         // Write data into socket
                         let (len, bytes) = self.outgoing[id].writer_state();
-                        trace!("{}: position={}, queue={}",
-                            self.address(),
-                            bytes,
-                            len);
+                        trace!("{}: position={}, queue={}", self.address(), bytes, len);
 
                         self.outgoing[id].try_write()?;
                         event_loop.reregister(self.outgoing[id].socket(),
@@ -401,7 +396,10 @@ impl Network {
                                               address: SocketAddr,
                                               delay: u64)
                                               -> io::Result<()> {
-        debug!("{}: Add reconnect timeout to={}, delay={}", self.address(), address, delay);
+        debug!("{}: Add reconnect timeout to={}, delay={}",
+               self.address(),
+               address,
+               delay);
         let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
         let timeout = event_loop.timeout_ms(reconnect, delay)
             .map_err(|e| make_io_error(format!("A mio error occured {:?}", e)))?;

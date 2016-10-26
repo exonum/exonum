@@ -274,19 +274,22 @@ fn main() {
         let now = time::now_utc();
         let level = match record.level() {
             LogLevel::Error => "ERROR".red(),
-            LogLevel::Warn  => "WARN".yellow(),
-            LogLevel::Info  => "INFO".green(),
+            LogLevel::Warn => "WARN".yellow(),
+            LogLevel::Info => "INFO".green(),
             LogLevel::Debug => "DEBUG".cyan(),
             LogLevel::Trace => "TRACE".white(),
         };
-        format!("{} - [ {} ] - {}", now.asctime().to_string().bold(), level, record.args())
+        format!("{} - [ {} ] - {}",
+                now.asctime().to_string().bold(),
+                level,
+                record.args())
     };
 
     let mut builder = LogBuilder::new();
     builder.format(format);
 
     if env::var("RUST_LOG").is_ok() {
-       builder.parse(&env::var("RUST_LOG").unwrap());
+        builder.parse(&env::var("RUST_LOG").unwrap());
     }
 
     builder.init().unwrap();
