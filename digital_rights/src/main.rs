@@ -81,8 +81,12 @@ fn load_user(storage: &CookieJar) -> Result<(String, PublicKey, SecretKey), Valu
     Ok((role, public_key, secret_key))
 }
 
-fn blockchain_explorer_api<D: Database>(api: &mut Api, blockchain: DigitalRightsBlockchain<D>, validators: Vec<PublicKey>) {
-    blockchain_explorer::make_api::<DigitalRightsBlockchain<D>, DigitalRightsTx>(api, blockchain, validators.clone());
+fn blockchain_explorer_api<D: Database>(api: &mut Api,
+                                        blockchain: DigitalRightsBlockchain<D>,
+                                        cfg: Configuration) {
+    blockchain_explorer::make_api::<DigitalRightsBlockchain<D>, DigitalRightsTx>(api,
+                                                                                 blockchain,
+                                                                                 cfg);
 }
 
 fn send_tx<'a, D: Database>(tx: DigitalRightsTx,
@@ -532,8 +536,7 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                          node_cfg: Configuration,
                          port: Option<u16>) {
     if let Some(port) = port {
-        let validators = node_cfg.validators.clone();
-        let mut node = Node::new(blockchain.clone(), node_cfg);
+        let mut node = Node::new(blockchain.clone(), node_cfg.clone());
         let channel = node.channel();
 
         let api_thread = thread::spawn(move || {
@@ -572,7 +575,7 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                     Some(Response::from_json(code, &json))
                 });
 
-                blockchain_explorer_api(api, blockchain.clone(), validators);
+                blockchain_explorer_api(api, blockchain.clone(), node_cfg);
                 digital_rights_api(api, blockchain.clone(), channel.clone());
                 api.mount(swagger::create_api("docs"));
             });

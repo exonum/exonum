@@ -6,6 +6,7 @@ use exonum::storage::{Map, List};
 use exonum::storage::Result as StorageResult;
 use exonum::crypto::{Hash, PublicKey};
 use exonum::blockchain::{Blockchain, View};
+use exonum::node::Configuration;
 
 use super::HexField;
 
@@ -33,17 +34,17 @@ pub struct BlockInfo<T>
 }
 
 impl<B: Blockchain> BlockchainExplorer<B> {
-    pub fn new(b: B, validators: Vec<PublicKey>) -> BlockchainExplorer<B> {
+    pub fn new(b: B, cfg: Configuration) -> BlockchainExplorer<B> {
         BlockchainExplorer {
             view: b.view(),
-            validators: validators,
+            validators: cfg.validators,
         }
     }
 
-    pub fn from_view(view: B::View, validators: Vec<PublicKey>) -> BlockchainExplorer<B> {
+    pub fn from_view(view: B::View, cfg: Configuration) -> BlockchainExplorer<B> {
         BlockchainExplorer {
             view: view,
-            validators: validators,
+            validators: cfg.validators,
         }
     }
 
