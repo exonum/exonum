@@ -523,7 +523,7 @@ impl<D: Database> DigitalRightsApi<D> {
 }
 
 impl<D: Database> DigitalRightsApi<D> {
-    pub fn flow(&self) -> StorageResult<impl TODO> {
+    pub fn flow(&self) -> StorageResult<impl Serialize> {
         #[derive(Debug, Serialize)]
         struct ShortContentInfo {
             fingerprint: HexField<Fingerprint>,

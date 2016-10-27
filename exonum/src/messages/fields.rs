@@ -224,7 +224,7 @@ impl<'a, T> Field<'a> for T
         let start = pos as usize;
 
         if start < from + 8 {
-            return Err(Error::IncorrectSegmentRefference {
+            return Err(Error::IncorrectSegmentReference {
                 position: from as u32,
                 value: pos,
             });
@@ -422,7 +422,7 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
         }
 
         if pos < from + 8 {
-            return Err(Error::IncorrectSegmentRefference {
+            return Err(Error::IncorrectSegmentReference {
                 position: from as u32,
                 value: pos as u32,
             });
