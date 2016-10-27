@@ -28,7 +28,7 @@ impl<'a> Field<'a> for Block {
     }
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Block {
-        let data = <&[u8] as Field>::read(&buffer, from, to);
+        let data = <&[u8] as Field>::read(buffer, from, to);
         Block::deserialize(data.to_vec())
     }
 

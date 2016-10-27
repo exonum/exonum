@@ -30,8 +30,8 @@ impl ListenerConfig {
     pub fn gen_from_seed(seed: &Seed, addr: SocketAddr) -> ListenerConfig {
         let keys = gen_keypair_from_seed(seed);
         ListenerConfig {
-            public_key: keys.0.clone(),
-            secret_key: keys.1.clone(),
+            public_key: keys.0,
+            secret_key: keys.1,
             address: addr,
         }
     }
@@ -39,8 +39,8 @@ impl ListenerConfig {
     pub fn gen(addr: SocketAddr) -> ListenerConfig {
         let keys = gen_keypair();
         ListenerConfig {
-            public_key: keys.0.clone(),
-            secret_key: keys.1.clone(),
+            public_key: keys.0,
+            secret_key: keys.1,
             address: addr,
         }
     }

@@ -320,7 +320,7 @@ impl<B> Node<B>
     where B: Blockchain
 {
     pub fn new(blockchain: B, config: Configuration) -> Node<B> {
-        let network = Network::with_config(config.listener.address, config.network.clone());
+        let network = Network::with_config(config.listener.address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = MioChannel::new(config.listener.address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);

@@ -148,8 +148,9 @@ impl Fork for LevelDBView {
     fn changes(&self) -> Patch {
         self.changes.borrow().clone()
     }
-    fn merge(&self, patch: Patch) {
-        self.changes.borrow_mut().extend(patch);
+    fn merge(&self, patch: &Patch) {
+        let iter = patch.into_iter().map(|(k, v)| (k.clone(), v.clone()));
+        self.changes.borrow_mut().extend(iter);
     }
 }
 
@@ -160,10 +161,10 @@ impl Database for LevelDB {
         LevelDBView::new(self)
     }
 
-    fn merge(&self, patch: Patch) -> Result<(), Error> {
+    fn merge(&self, patch: &Patch) -> Result<(), Error> {
         let mut batch = Writebatch::new();
-        for (key, change) in patch.into_iter() {
-            match change {
+        for (key, change) in patch {
+            match *change {
                 Change::Put(ref v) => {
                     batch.put(key, v);
                 }
