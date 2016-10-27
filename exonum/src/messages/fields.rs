@@ -380,7 +380,7 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
         let mut vec = Vec::new();
         for i in 0..count {
             let from = pos + i * 8;
-            let slice = <&[u8] as Field>::read(&buffer, from, from + 8);
+            let slice = <&[u8] as Field>::read(buffer, from, from + 8);
             vec.push(slice);
         }
         vec
@@ -438,7 +438,7 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
 
         for i in 0..count {
             let from = pos + i * 8;
-            <&[u8] as Field>::check(&buffer, from, from + 8)?;
+            <&[u8] as Field>::check(buffer, from, from + 8)?;
         }
         Ok(())
     }
@@ -451,10 +451,9 @@ impl<'a> Field<'a> for Vec<RawMessage> {
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<RawMessage> {
         let raw: Vec<&[u8]> = Field::read(buffer, from, to);
-        let out = raw.into_iter()
+        raw.into_iter()
             .map(|x| Arc::new(MessageBuffer::from_vec(x.to_vec())))
-            .collect();
-        out
+            .collect()
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
@@ -466,7 +465,7 @@ impl<'a> Field<'a> for Vec<RawMessage> {
 
     fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
         // TODO check messages as messages
-        <Vec<&[u8]> as Field>::check(&buffer, from, to)
+        <Vec<&[u8]> as Field>::check(buffer, from, to)
     }
 }
 
@@ -479,10 +478,9 @@ impl<'a, T> Field<'a> for Vec<T>
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<T> {
         let raw: Vec<RawMessage> = Field::read(buffer, from, to);
-        let out = raw.into_iter()
+        raw.into_iter()
             .map(|x| T::from_raw(x).unwrap()) //FIXME remove unwrap
-            .collect();
-        out
+            .collect()
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
@@ -494,7 +492,7 @@ impl<'a, T> Field<'a> for Vec<T>
 
     fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
         // TODO check messages as messages
-        <Vec<RawMessage> as Field>::check(&buffer, from, to)
+        <Vec<RawMessage> as Field>::check(buffer, from, to)
     }
 }
 
@@ -504,7 +502,7 @@ impl<'a> Field<'a> for Vec<u8> {
     }
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Vec<u8> {
-        let data = <&[u8] as Field>::read(&buffer, from, to);
+        let data = <&[u8] as Field>::read(buffer, from, to);
         data.to_vec()
     }
 

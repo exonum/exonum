@@ -272,7 +272,7 @@ impl<B, S> NodeHandler<B, S>
         let heights = self.state.validator_heights();
         if !heights.is_empty() {
             for id in heights {
-                let peer = self.state.public_key_of(id).unwrap().clone();
+                let peer = *self.state.public_key_of(id).unwrap();
                 if self.state.peers().contains_key(&peer) {
                     let height = self.state.height();
                     self.request(RequestData::Block(height), peer);
@@ -444,7 +444,7 @@ impl<B, S> NodeHandler<B, S>
         // Merge changes into storage
         let propose_round = {
             let block_state = self.state.block(&block_hash).unwrap();
-            let patch = block_state.patch().clone();
+            let patch = block_state.patch();
             self.blockchain.commit(block_hash, patch, precommits).unwrap();
             block_state.propose_round()
         };

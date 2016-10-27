@@ -55,7 +55,7 @@ fn test_database_merge<T: Database>(db: T) -> Result<(), Error> {
     assert_eq!(db.get(b"caba")?, Some(vec![34, 2, 3]));
     assert_eq!(db.get(b"abacaba")?, Some(vec![1, 65]));
 
-    db.merge(patch)?;
+    db.merge(&patch)?;
     assert_eq!(db.get(b"ab")?, None);
     assert_eq!(db.get(b"caba")?, Some(vec![10]));
     assert_eq!(db.get(b"abac")?, Some(vec![14, 12]));

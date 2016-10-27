@@ -48,11 +48,11 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Get last hash
         let last_hash = self.last_hash()?.unwrap_or(hash(&[]));
         // Create fork
-        let mut fork = self.view();
+        let fork = self.view();
         // Save & execute transactions
         let mut tx_hashes = Vec::new();
-        for &(hash, ref tx) in txs.into_iter() {
-            Self::execute(&mut fork, &tx)?;
+        for &(hash, ref tx) in txs {
+            Self::execute(&fork, tx)?;
             fork.transactions()
                 .put(&hash, tx.clone())
                 .unwrap();
@@ -64,7 +64,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Get tx hash
         let tx_hash = fork.block_txs(height).root_hash()?;
         // Get state hash
-        let state_hash = Self::state_hash(&mut fork)?;
+        let state_hash = Self::state_hash(&fork)?;
         // Create block
         let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
         // Eval block hash
@@ -79,7 +79,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
     fn commit<'a, I: Iterator<Item = &'a Precommit>>(&self,
                                                      block_hash: Hash,
-                                                     patch: Patch,
+                                                     patch: &Patch,
                                                      precommits: I)
                                                      -> Result<(), Error> {
         let patch = {
@@ -93,14 +93,14 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             view.changes()
         };
 
-        self.merge(patch)
+        self.merge(&patch)
     }
 
     fn view(&self) -> Self::View {
         Self::View::from_fork(self.borrow().fork())
     }
 
-    fn merge(&self, patch: Patch) -> Result<(), Error> {
+    fn merge(&self, patch: &Patch) -> Result<(), Error> {
         self.deref().merge(patch)
     }
 }
