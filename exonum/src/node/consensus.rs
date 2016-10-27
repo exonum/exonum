@@ -155,11 +155,6 @@ impl<B, S> NodeHandler<B, S>
                    msg);
             return;
         }
-        // Check signature
-        if !msg.verify(msg.from()) {
-            error!("Received block with wrong signature, msg={:?}", msg);
-            return;
-        }
 
         debug!("Handle block {:?}", msg);
 
@@ -196,36 +191,9 @@ impl<B, S> NodeHandler<B, S>
         }
         let precommit_round = precommits[0].round();
         for precommit in &precommits {
-            if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
-                if !precommit.verify(pub_key) {
-                    error!("Received wrong signed precommit, block={:?}, precommit={:?}",
-                           msg,
-                           precommit);
-                    return;
-                }
-                if precommit.block_hash() != &block_hash {
-                    error!("Received precommit with wrong block_hash, block={:?}, precommit={:?}",
-                           msg,
-                           precommit);
-                    return;
-                }
-                if precommit.height() != block.height() {
-                    error!("Received precommit with wrong height, block={:?}, precommit={:?}",
-                           msg,
-                           precommit);
-                    return;
-                }
-                if precommit.round() != precommit_round {
-                    error!("Received precommits with the different rounds, block={:?}, \
-                            precommit={:?}",
-                           msg,
-                           precommit);
-                    return;
-                }
-            } else {
-                error!("Received precommit with wrong validator, block={:?}, precommit={:?}",
-                       msg,
-                       precommit);
+            let r = self.verify_precommit(&block_hash, block.height(), precommit_round, precommit);
+            if let Err(e) = r {
+                error!("{}, block={:?}", e, msg);
                 return;
             }
         }
@@ -249,7 +217,12 @@ impl<B, S> NodeHandler<B, S>
                         }
                         txs.push((hash, tx));
                     }
-                    Err(_) => return,
+                    Err(e) => {
+                        error!("Unknown transaction in block detected, error={:?}, block={:?}",
+                               e,
+                               msg);
+                        return;
+                    }
                 }
             }
 
@@ -259,35 +232,23 @@ impl<B, S> NodeHandler<B, S>
                                                              txs.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
-                panic!("Block with incorrect hash received from {:?}", msg.from());
+                panic!("Block_hash incorrect in received block={:?}", msg);
             }
 
             // Commit block
             self.state.add_block(block_hash, patch, txs, propose_round);
         }
         self.commit(block_hash, precommits.iter());
-
-        // Request next block if needed
-        // TODO randomize next peer
-        let heights = self.state.validator_heights();
-        if !heights.is_empty() {
-            for id in heights {
-                let peer = *self.state.public_key_of(id).unwrap();
-                if self.state.peers().contains_key(&peer) {
-                    let height = self.state.height();
-                    self.request(RequestData::Block(height), peer);
-                    break;
-                }
-            }
-        }
+        self.request_next_block();
     }
 
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
         if self.state.locked_round() == 0 {
-            // TODO: what if we HAVE prevote for the propose round?
             if !self.state.have_prevote(propose_round) {
-                self.send_prevote(propose_round, &hash);
+                self.broadcast_prevote(propose_round, &hash);
+            } else {
+                // TODO: what if we HAVE prevote for the propose round?
             }
         }
 
@@ -344,11 +305,8 @@ impl<B, S> NodeHandler<B, S>
         // Remove request info
         self.remove_request(RequestData::Prevotes(round, *propose_hash));
         // Lock to propose
-        if self.state.locked_round() < round {
-            // FIXME: проверка что у нас есть все транзакции
-            if self.state.propose(propose_hash).is_some() {
-                self.lock(round, *propose_hash);
-            }
+        if self.state.locked_round() < round && self.state.propose(propose_hash).is_some() {
+            self.lock(round, *propose_hash);
         }
     }
 
@@ -390,7 +348,7 @@ impl<B, S> NodeHandler<B, S>
         if !self.state.have_incompatible_prevotes() {
             // Execute block and get state hash
             let block_hash = self.execute(&propose_hash);
-            self.send_precommit(round, &propose_hash, &block_hash);
+            self.broadcast_precommit(round, &propose_hash, &block_hash);
             // Commit if has consensus
             if self.state.has_majority_precommits(round, block_hash) {
                 self.has_majority_precommits(round, &propose_hash, &block_hash);
@@ -401,9 +359,10 @@ impl<B, S> NodeHandler<B, S>
         // Send prevotes
         for round in self.state.locked_round() + 1...self.state.round() {
             if !self.state.have_prevote(round) {
-                self.send_prevote(round, &propose_hash);
+                self.broadcast_prevote(round, &propose_hash);
                 if self.state.has_majority_prevotes(round, propose_hash) {
-                    self.has_majority_prevotes(round, &propose_hash);
+                    // FIXME remove recursive lock call
+                    self.lock(round, propose_hash);
                 }
             }
         }
@@ -547,7 +506,7 @@ impl<B, S> NodeHandler<B, S>
         // Send prevote if we are locked or propose if we are leader
         if let Some(hash) = self.state.locked_propose() {
             let round = self.state.round();
-            self.send_prevote(round, &hash);
+            self.broadcast_prevote(round, &hash);
         } else if self.is_leader() {
             self.add_propose_timeout();
         }
@@ -590,7 +549,7 @@ impl<B, S> NodeHandler<B, S>
         let hash = self.state.add_self_propose(propose);
 
         // Send prevote
-        self.send_prevote(round, &hash);
+        self.broadcast_prevote(round, &hash);
     }
 
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
@@ -723,12 +682,27 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
+    pub fn request_next_block(&mut self) {
+        // TODO randomize next peer
+        let heights = self.state.validator_heights();
+        if !heights.is_empty() {
+            for id in heights {
+                let peer = *self.state.public_key_of(id).unwrap();
+                if self.state.peers().contains_key(&peer) {
+                    let height = self.state.height();
+                    self.request(RequestData::Block(height), peer);
+                    break;
+                }
+            }
+        }
+    }
+
     pub fn remove_request(&mut self, data: RequestData) -> HashSet<PublicKey> {
         // TODO: clear timeout
         self.state.remove_request(&data)
     }
 
-    pub fn send_prevote(&mut self, round: Round, propose_hash: &Hash) {
+    pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) {
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(self.state.id(),
                                    self.state.height(),
@@ -744,7 +718,7 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn send_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
+    pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
         let precommit = Precommit::new(self.state.id(),
                                        self.state.height(),
                                        round,
@@ -754,6 +728,41 @@ impl<B, S> NodeHandler<B, S>
         self.state.add_precommit(&precommit);
         debug!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
+    }
+
+    // TODO reuse where is possible
+    pub fn verify_precommit(&self,
+                            block_hash: &Hash,
+                            block_height: Height,
+                            precommit_round: Round,
+                            precommit: &Precommit)
+                            -> Result<(), String> {
+        if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
+            if !precommit.verify(pub_key) {
+                let e = format!("Received wrong signed precommit, precommit={:?}", precommit);
+                return Err(e);
+            }
+            if precommit.block_hash() != block_hash {
+                let e = format!("Received precommit with wrong block_hash, precommit={:?}",
+                                precommit);
+                return Err(e);
+            }
+            if precommit.height() != block_height {
+                let e = format!("Received precommit with wrong height, precommit={:?}",
+                                precommit);
+                return Err(e);
+            }
+            if precommit.round() != precommit_round {
+                let e = format!("Received precommits with the different rounds, precommit={:?}",
+                                precommit);
+                return Err(e);
+            }
+        } else {
+            let e = format!("Received precommit with wrong validator, precommit={:?}",
+                            precommit);
+            return Err(e);
+        }
+        Ok(())
     }
 
     fn public_key_of(&self, id: ValidatorId) -> PublicKey {

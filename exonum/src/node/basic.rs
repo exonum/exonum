@@ -61,11 +61,9 @@ impl<B, S> NodeHandler<B, S>
                 return;
             } else if saved_message.time() < message.time() {
                 need_connect = saved_message.addr() != message.addr();
-            } else {
-                if saved_message.addr() != message.addr() {
-                    error!("Received weird Connect message from {}", address);
-                    return;
-                }
+            } else if saved_message.addr() != message.addr() {
+                error!("Received weird Connect message from {}", address);
+                return;
             }
         }
         info!("Received Connect message from {}, {}",
@@ -138,8 +136,7 @@ impl<B, S> NodeHandler<B, S>
                 .peers()
                 .iter()
                 .map(|x| x.1.clone())
-                .skip(gen_peer_id())
-                .next()
+                .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
             let msg = RequestPeers::new(&self.public_key,

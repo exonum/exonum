@@ -98,7 +98,7 @@ fn main() {
                 }
             };
             println!("Known peers is {:#?}", peers);
-            let node_cfg = cfg.to_node_configuration(idx, peers);
+            let node_cfg = cfg.gen_node_configuration(idx, peers);
             match matches.value_of("LEVELDB_PATH") {
                 Some(ref db_path) => {
                     println!("Using levedb storage with path: {}", db_path);

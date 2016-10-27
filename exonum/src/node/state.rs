@@ -104,6 +104,7 @@ pub struct BlockState {
 
 impl RequestData {
     pub fn timeout(&self) -> Duration {
+        #![cfg_attr(feature="clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => REQUEST_PROPOSE_WAIT,
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
