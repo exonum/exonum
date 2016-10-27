@@ -35,6 +35,10 @@ impl MessageBuffer {
         self.raw.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.raw.is_empty()
+    }
+
     pub fn network_id(&self) -> u8 {
         self.raw[0]
     }

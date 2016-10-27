@@ -389,8 +389,7 @@ mod tests {
 
         pub fn wait_for_bind(&mut self, addr: &SocketAddr) -> Option<()> {
             self.0.bind().unwrap();
-            let r = self.wait_for_connect(addr);
-            r
+            self.wait_for_connect(addr)
         }
 
         pub fn wait_for_connect(&mut self, addr: &SocketAddr) -> Option<()> {
@@ -451,7 +450,7 @@ mod tests {
 
                 if let Some(msg) = self.0.inner.handler.message() {
                     v.push(msg);
-                    count = count - 1;
+                    count -= 1;
                     if count == 0 {
                         return Ok(v);
                     }
@@ -500,8 +499,8 @@ mod tests {
         let m1 = gen_message(15, 100000);
         let m2 = gen_message(16, 400);
 
-        let mut e1 = TestEvents::with_addr(addrs[0].clone());
-        let mut e2 = TestEvents::with_addr(addrs[1].clone());
+        let mut e1 = TestEvents::with_addr(addrs[0]);
+        let mut e2 = TestEvents::with_addr(addrs[1]);
         e1.0.bind().unwrap();
         e2.0.bind().unwrap();
 
@@ -557,8 +556,8 @@ mod tests {
         let m2 = gen_message(16, 400);
         let m3 = gen_message(17, 600);
 
-        let mut e1 = TestEvents::with_addr(addrs[0].clone());
-        let mut e2 = TestEvents::with_addr(addrs[1].clone());
+        let mut e1 = TestEvents::with_addr(addrs[0]);
+        let mut e2 = TestEvents::with_addr(addrs[1]);
         e1.0.bind().unwrap();
         e2.0.bind().unwrap();
 
@@ -581,7 +580,7 @@ mod tests {
                 }
                 debug!("t1: connection closed");
                 {
-                    let mut e = TestEvents::with_addr(addrs[0].clone());
+                    let mut e = TestEvents::with_addr(addrs[0]);
                     e.wait_for_bind(&addrs[1]).unwrap();
 
                     debug!("t1: connection reopened");
@@ -620,7 +619,7 @@ mod tests {
                 debug!("t2: connection closed");
                 {
                     debug!("t2: connection reopened");
-                    let mut e = TestEvents::with_addr(addrs[1].clone());
+                    let mut e = TestEvents::with_addr(addrs[1]);
                     e.wait_for_bind(&addrs[0]).unwrap();
 
                     debug!("t2: send m3 to t1");

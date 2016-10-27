@@ -64,7 +64,7 @@ fn main() {
             }
             patch = fork.changes();
         }
-        db.merge(patch).unwrap();
+        db.merge(&patch).unwrap();
     } else {
         let map = MerklePatriciaTable::new(MapTable::new(prefix, &mut db));
         for item in (0..count).map(kv_generator) {

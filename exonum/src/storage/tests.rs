@@ -64,7 +64,7 @@ fn test_database_merge<T: Database>(db: T) -> Result<(), Error> {
     Ok(())
 }
 
-fn test_table_list<T: Database>(prefix: Vec<u8>, db: &mut T) -> Result<(), Error> {
+fn test_table_list<T: Database>(prefix: Vec<u8>, db: &T) -> Result<(), Error> {
     let list = MerkleTable::new(MapTable::new(prefix, db));
     assert_eq!(list.len()?, 0 as u64);
     list.append(vec![10])?;
@@ -83,12 +83,12 @@ fn test_table_list<T: Database>(prefix: Vec<u8>, db: &mut T) -> Result<(), Error
     Ok(())
 }
 
-fn test_table_map<T: Database>(prefix: Vec<u8>, db: &mut T) -> Result<(), Error> {
+fn test_table_map<T: Database>(prefix: Vec<u8>, db: &T) -> Result<(), Error> {
     let map = MapTable::new(prefix, db);
     test_map_simple(map)
 }
 
-fn test_map_find_keys<T: Map<[u8], Vec<u8>>>(db: &mut T) {
+fn test_map_find_keys<T: Map<[u8], Vec<u8>>>(db: &T) {
     db.put(b"a", b"12345".to_vec()).unwrap();
     db.put(b"ab", b"123456".to_vec()).unwrap();
     db.put(b"ac", b"123457".to_vec()).unwrap();
@@ -102,7 +102,7 @@ fn test_map_find_keys<T: Map<[u8], Vec<u8>>>(db: &mut T) {
     assert_eq!(db.find_key(b"c").unwrap(), None);
 }
 
-fn test_map_table_different_prefixes<T: Database>(db: &mut T) {
+fn test_map_table_different_prefixes<T: Database>(db: &T) {
     {
         let map2 = MapTable::new(b"abc".to_vec(), db);
         map2.put(&b"abac".to_vec(), b"12345".to_vec()).unwrap();
@@ -154,68 +154,68 @@ fn leveldb_database_merge() {
 
 #[test]
 fn memorydb_table_list() {
-    let mut db = MemoryDB::new();
-    test_table_list(vec![01], &mut db).unwrap();
-    test_table_list(vec![02], &mut db).unwrap();
+    let db = MemoryDB::new();
+    test_table_list(vec![01], &db).unwrap();
+    test_table_list(vec![02], &db).unwrap();
 }
 
 #[test]
 fn leveldb_table_list() {
-    let mut db = leveldb_database();
-    test_table_list(vec![01], &mut db).unwrap();
-    test_table_list(vec![02], &mut db).unwrap();
+    let db = leveldb_database();
+    test_table_list(vec![01], &db).unwrap();
+    test_table_list(vec![02], &db).unwrap();
 }
 
 #[test]
 fn memorydb_table_map() {
-    let mut db = MemoryDB::new();
-    test_table_map(vec![01], &mut db).unwrap();
-    test_table_map(vec![02], &mut db).unwrap();
+    let db = MemoryDB::new();
+    test_table_map(vec![01], &db).unwrap();
+    test_table_map(vec![02], &db).unwrap();
 }
 
 #[test]
 fn leveldb_table_map() {
-    let mut db = leveldb_database();
-    test_table_map(vec![01], &mut db).unwrap();
-    test_table_map(vec![02], &mut db).unwrap();
+    let db = leveldb_database();
+    test_table_map(vec![01], &db).unwrap();
+    test_table_map(vec![02], &db).unwrap();
 }
 
 #[test]
 fn leveldb_find_key() {
-    let mut db = leveldb_database();
-    test_map_find_keys(&mut db);
+    let db = leveldb_database();
+    test_map_find_keys(&db);
 }
 
 #[test]
 fn memorydb_find_key() {
-    let mut db = MemoryDB::new();
-    test_map_find_keys(&mut db);
+    let db = MemoryDB::new();
+    test_map_find_keys(&db);
 }
 
 #[test]
 fn leveldb_map_find_key() {
-    let mut db = leveldb_database();
-    let mut map = MapTable::new(vec![02], &mut db);
-    test_map_find_keys(&mut map);
+    let db = leveldb_database();
+    let map = MapTable::new(vec![02], &db);
+    test_map_find_keys(&map);
 }
 
 #[test]
 fn memorydb_map_find_key() {
-    let mut db = MemoryDB::new();
-    let mut map = MapTable::new(vec![02], &mut db);
-    test_map_find_keys(&mut map);
+    let db = MemoryDB::new();
+    let map = MapTable::new(vec![02], &db);
+    test_map_find_keys(&map);
 }
 
 #[test]
 fn leveldb_map_table_different_prefixes() {
-    let mut db = leveldb_database();
-    test_map_table_different_prefixes(&mut db);
+    let db = leveldb_database();
+    test_map_table_different_prefixes(&db);
 }
 
 #[test]
 fn memorydb_map_table_different_prefixes() {
-    let mut db = MemoryDB::new();
-    test_map_table_different_prefixes(&mut db);
+    let db = MemoryDB::new();
+    test_map_table_different_prefixes(&db);
 }
 
 // #[test]

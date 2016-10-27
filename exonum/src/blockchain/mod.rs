@@ -46,7 +46,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                     txs: &[(Hash, Self::Transaction)])
                     -> Result<(Hash, Vec<Hash>, Patch), Error> {
         // Get last hash
-        let last_hash = self.last_hash()?.unwrap_or(hash(&[]));
+        let last_hash = self.last_hash()?.unwrap_or_else(|| hash(&[]));
         // Create fork
         let fork = self.view();
         // Save & execute transactions

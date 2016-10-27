@@ -2,6 +2,8 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(test, feature(test))]
 
+#![cfg_attr(feature="clippy", allow(zero_prefixed_literal))]
+
 #![feature(inclusive_range_syntax)]
 #![feature(type_ascription)]
 #![feature(slice_concat_ext)]

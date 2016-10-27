@@ -52,7 +52,7 @@ impl GenesisConfig {
         let port = port.unwrap_or(7000);
         for i in 0..validators_count {
             let addr = format!("127.0.0.1:{}", port + i as u16).parse().unwrap();
-            let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap(),
+            let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&[i; 32]).unwrap(),
                                                      addr);
             pairs.push(pair);
         }
@@ -76,7 +76,7 @@ impl GenesisConfig {
         }
     }
 
-    pub fn to_node_configuration(self,
+    pub fn gen_node_configuration(self,
                                  idx: usize,
                                  known_peers: Vec<::std::net::SocketAddr>)
                                  -> Configuration {
