@@ -458,8 +458,12 @@ impl<Tx> State<Tx> {
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
-            if let Some(_) = self.our_prevotes.insert(msg.round(), msg.clone()) {
-                // panic!("Trying to send different prevotes for same round");
+            if let Some(other) = self.our_prevotes.insert(msg.round(), msg.clone()) {
+                if &other != msg {
+                    panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
+                           other,
+                           msg);
+                }
             }
         }
 
@@ -480,8 +484,13 @@ impl<Tx> State<Tx> {
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
-            if let Some(_) = self.our_precommits.insert(msg.round(), msg.clone()) {
-                panic!("Trying to send different precommits for same round");
+            if let Some(other) = self.our_precommits.insert(msg.round(), msg.clone()) {
+                if other.propose_hash() != msg.propose_hash() {
+                    panic!("Trying to send different precommits for same round, old={:?}, \
+                            new={:?}",
+                           other,
+                           msg);
+                }
             }
         }
 
