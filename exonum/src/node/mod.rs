@@ -181,7 +181,7 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round() + 1);
-        debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
+        trace!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
                self.state.height(),
                self.state.round(),
@@ -193,7 +193,7 @@ impl<B, S> NodeHandler<B, S>
     pub fn add_propose_timeout(&mut self) {
         let time = self.round_start_time(self.state.round()) +
                    Duration::milliseconds(self.propose_timeout);
-        debug!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
+        trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
                self.state.height(),
                self.state.round(),
@@ -208,7 +208,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
-        debug!("ADD REQUEST TIMEOUT");
+        trace!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
         self.channel.add_timeout(NodeTimeout::Request(data, peer), time);
     }

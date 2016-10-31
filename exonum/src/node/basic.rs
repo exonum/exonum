@@ -118,7 +118,7 @@ impl<B, S> NodeHandler<B, S>
                                      self.state.height(),
                                      &hash,
                                      &self.secret_key);
-            debug!("Broadcast status: {:?}", status);
+            trace!("Broadcast status: {:?}", status);
             self.broadcast(status.raw());
         }
         self.add_status_timeout();
@@ -143,7 +143,7 @@ impl<B, S> NodeHandler<B, S>
                                         peer.pub_key(),
                                         self.channel.get_time(),
                                         &self.secret_key);
-            debug!("Request peers from peer with addr {:?}", peer.addr());
+            trace!("Request peers from peer with addr {:?}", peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
         self.add_peer_exchange_timeout();

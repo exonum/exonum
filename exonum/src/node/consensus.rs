@@ -23,7 +23,7 @@ impl<B, S> NodeHandler<B, S>
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
-            debug!("Received consensus message from other height: msg.height={}, self.height={}",
+            warn!("Received consensus message from other height: msg.height={}, self.height={}",
                    msg.height(),
                    self.state.height());
             return;
@@ -32,10 +32,11 @@ impl<B, S> NodeHandler<B, S>
         // Queued messages from next height or round
         // TODO: shoud we ignore messages from far rounds?
         if msg.height() == self.state.height() + 1 || msg.round() > self.state.round() {
-            debug!("Received consensus message from future round: msg.height={}, msg.round={}, \
-                    self.round={}",
+            trace!("Received consensus message from future round: msg.height={}, msg.round={}, \
+                    self.height={}, self.round={}",
                    msg.height(),
                    msg.round(),
+                   self.state.height(),
                    self.state.round());
             self.state.add_queued(msg);
             return;
@@ -56,6 +57,7 @@ impl<B, S> NodeHandler<B, S>
             }
         }
 
+        trace!("Handle message={:?}", msg);
         match msg {
             ConsensusMessage::Propose(msg) => self.handle_propose(msg),
             ConsensusMessage::Prevote(msg) => self.handle_prevote(msg),
@@ -102,7 +104,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-        debug!("Handle propose {:?}", msg);
+        trace!("Handle propose");
         for hash in msg.transactions() {
             if view.transactions().get(hash).unwrap().is_some() {
                 return;
@@ -119,7 +121,7 @@ impl<B, S> NodeHandler<B, S>
         let known_nodes = self.remove_request(RequestData::Propose(hash));
 
         if has_unknown_txs {
-            debug!("REQUEST TRANSACTIONS!!!");
+            trace!("REQUEST TRANSACTIONS!!!");
             let key = self.public_key_of(msg.validator());
             self.request(RequestData::Transactions(hash), key);
             for node in known_nodes {
@@ -156,7 +158,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-        debug!("Handle block {:?}", msg);
+        trace!("Handle block");
 
         let block = msg.block();
         let block_hash = block.hash();
@@ -281,7 +283,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_prevote(&mut self, prevote: Prevote) {
-        debug!("Handle prevote {:?}", prevote);
+        trace!("Handle prevote");
         // Add prevote
         let has_consensus = self.state.add_prevote(&prevote);
 
@@ -340,7 +342,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn lock(&mut self, round: Round, propose_hash: Hash) {
-        debug!("MAKE LOCK {:?} {:?}", round, propose_hash);
+        trace!("MAKE LOCK {:?} {:?}", round, propose_hash);
         // Change lock
         self.state.lock(round, propose_hash);
 
@@ -369,7 +371,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_precommit(&mut self, msg: Precommit) {
-        debug!("Handle precommit {:?}", msg);
+        trace!("Handle precommit");
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
 
@@ -398,7 +400,7 @@ impl<B, S> NodeHandler<B, S>
     pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
                                                          block_hash: Hash,
                                                          precommits: I) {
-        debug!("COMMIT {:?}", block_hash);
+        trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
         let propose_round = {
@@ -436,7 +438,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_tx(&mut self, msg: B::Transaction) {
-        debug!("Handle tx {:?}", msg);
+        trace!("Handle transaction");
         let hash = Message::hash(&msg);
 
         // Make sure that it is new transaction
@@ -462,7 +464,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_incoming_tx(&mut self, msg: B::Transaction) {
-        debug!("Handle incoming tx {:?}", msg);
+        trace!("Handle incoming transaction");
         let hash = Message::hash(&msg);
 
         // Make sure that it is new transaction
@@ -483,7 +485,7 @@ impl<B, S> NodeHandler<B, S>
         }
 
         // Broadcast transaction to validators
-        debug!("Broadcast transactions: {:?}", msg);
+        trace!("Broadcast transactions: {:?}", msg);
         self.broadcast(msg.raw());
     }
 
@@ -495,7 +497,7 @@ impl<B, S> NodeHandler<B, S>
         if round != self.state.round() {
             return;
         }
-        debug!("ROUND TIMEOUT height={}, round={}", height, round);
+        warn!("ROUND TIMEOUT height={}, round={}", height, round);
 
         // Update state to new round
         self.state.new_round();
@@ -545,7 +547,7 @@ impl<B, S> NodeHandler<B, S>
                                    self.state.last_hash(),
                                    &txs,
                                    &self.secret_key);
-        debug!("Broadcast propose: {:?}", propose);
+        trace!("Broadcast propose: {:?}", propose);
         self.broadcast(propose.raw());
 
         // Save our propose into state
@@ -556,7 +558,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
-        debug!("!!!!!!!!!!!!!!!!!!! HANDLE REQUEST TIMEOUT");
+        trace!("!!!!!!!!!!!!!!!!!!! HANDLE REQUEST TIMEOUT");
         // FIXME: check height?
         if let Some(peer) = self.state.retry(&data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
@@ -621,7 +623,7 @@ impl<B, S> NodeHandler<B, S>
                         .clone()
                 }
             };
-            debug!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}",
+            trace!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}",
                    data,
                    peer);
             self.send_to_peer(peer, &message);
@@ -714,7 +716,7 @@ impl<B, S> NodeHandler<B, S>
                                    locked_round,
                                    &self.secret_key);
         let has_majority_prevotes = self.state.add_prevote(&prevote);
-        debug!("Broadcast prevote: {:?}", prevote);
+        trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
         if has_majority_prevotes {
             self.lock(round, *propose_hash);
@@ -729,7 +731,7 @@ impl<B, S> NodeHandler<B, S>
                                        block_hash,
                                        &self.secret_key);
         self.state.add_precommit(&precommit);
-        debug!("Broadcast precommit: {:?}", precommit);
+        trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
     }
 
