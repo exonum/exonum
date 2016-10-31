@@ -526,6 +526,9 @@ impl<B, S> NodeHandler<B, S>
         if round != self.state.round() {
             return;
         }
+        if self.state.locked_propose().is_some() {
+            return;
+        }
 
         info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
