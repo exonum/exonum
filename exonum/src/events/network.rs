@@ -137,18 +137,19 @@ impl Network {
                            address,
                            id.0);
 
-                    return match self.incoming[id].try_read() {
-                        Ok(Some(buf)) => {
-                            let msg = RawMessage::new(buf);
-                            handler.handle_event(Event::Incoming(msg));
-                            Ok(())
-                        }
-                        Ok(None) => Ok(()),
-                        Err(e) => {
-                            self.remove_incoming_connection(event_loop, id);
-                            Err(e)
-                        }
-                    };
+                    loop {
+                        match self.incoming[id].try_read() {
+                            Ok(Some(buf)) => {
+                                let msg = RawMessage::new(buf);
+                                handler.handle_event(Event::Incoming(msg));
+                            }
+                            Ok(None) => return Ok(()),
+                            Err(e) => {
+                                self.remove_incoming_connection(event_loop, id);
+                                return Err(e);
+                            }
+                        };
+                    }
                 }
             }
             PeerKind::Outgoing => {
@@ -173,12 +174,13 @@ impl Network {
                 if set.is_writable() {
                     let address = *self.outgoing[id].address();
 
-                    trace!("{}: Socket is writable {} id: {}",
-                           self.address(),
-                           address,
-                           id.0);
+                    trace!("{}: Socket is writable addr={}", self.address(), address);
 
                     let r = {
+                        // Write data into socket
+                        let (len, bytes) = self.outgoing[id].writer_state();
+                        trace!("{}: position={}, queue={}", self.address(), bytes, len);
+
                         self.outgoing[id].try_write()?;
                         event_loop.reregister(self.outgoing[id].socket(),
                                         id,
@@ -186,14 +188,14 @@ impl Network {
                                         PollOpt::edge())?;
                         Ok(())
                     };
-
-                    // Write data into socket
                     if let Err(e) = r {
                         self.remove_outgoing_connection(event_loop, id);
                         handler.handle_event(Event::Disconnected(address));
                         return Err(e);
                     }
+
                     if self.mark_connected(event_loop, id) {
+                        trace!("{}: Handle connected with={}", self.address(), address);
                         handler.handle_event(Event::Connected(address));
                     }
                 }
@@ -374,7 +376,8 @@ impl Network {
     fn configure_stream(&self, stream: &mut TcpStream) -> io::Result<()> {
         stream.take_socket_error()?;
         stream.set_keepalive(self.config.tcp_keep_alive)?;
-        stream.set_nodelay(self.config.tcp_nodelay)
+        stream.set_nodelay(self.config.tcp_nodelay)?;
+        stream.take_socket_error()
     }
 
     fn add_reconnect_request<H: EventHandler>(&mut self,
@@ -393,6 +396,10 @@ impl Network {
                                               address: SocketAddr,
                                               delay: u64)
                                               -> io::Result<()> {
+        debug!("{}: Add reconnect timeout to={}, delay={}",
+               self.address(),
+               address,
+               delay);
         let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
         let timeout = event_loop.timeout_ms(reconnect, delay)
             .map_err(|e| make_io_error(format!("A mio error occured {:?}", e)))?;
@@ -413,6 +420,7 @@ impl Network {
                                                 addr: &SocketAddr)
                                                 -> bool {
         if let Some(timeout) = self.reconnects.remove(addr) {
+            debug!("{}: Clear reconnect timeout to={}", self.address(), addr);
             event_loop.clear_timeout(timeout);
             return true;
         }

@@ -1,5 +1,4 @@
 #![feature(type_ascription)]
-#![feature(question_mark)]
 
 extern crate rand;
 extern crate time;

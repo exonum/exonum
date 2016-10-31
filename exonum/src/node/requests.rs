@@ -1,10 +1,12 @@
 use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
-                             RequestPrevotes, RequestPrecommits, RequestCommit};
+                             RequestPrevotes, RequestPrecommits, RequestBlock, Block};
 use super::super::blockchain::{Blockchain, View};
 use super::super::storage::{Map, List};
 use super::super::events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
+// TODO validate_heights нужно обновлять по любым сообщениям, а не только по status (если они корректно подписаны)
+// TODO propose имеет смысл запрашивать только тогда, когда мы знаем, что узел находится на нашей высоте
 
 const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
@@ -41,8 +43,8 @@ impl<B, S> NodeHandler<B, S>
             RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
             RequestMessage::Prevotes(msg) => self.handle_request_prevotes(msg),
             RequestMessage::Precommits(msg) => self.handle_request_precommits(msg),
-            RequestMessage::Commit(msg) => self.handle_request_commit(msg),
             RequestMessage::Peers(msg) => self.handle_request_peers(msg),
+            RequestMessage::Block(msg) => self.handle_request_block(msg),
         }
     }
 
@@ -54,15 +56,8 @@ impl<B, S> NodeHandler<B, S>
         let propose = if msg.height() == self.state.height() {
             self.state.propose(msg.propose_hash()).map(|p| p.message().raw().clone())
         } else {
-            // msg.height < state.height
-            self.blockchain
-                .view()
-                .proposes()
-                .get(msg.propose_hash())
-                .unwrap()
-                .map(|p| p.raw().clone())
+            return;
         };
-
 
         if let Some(propose) = propose {
             self.send_to_peer(*msg.from(), &propose);
@@ -109,7 +104,7 @@ impl<B, S> NodeHandler<B, S>
 
         let precommits = if msg.height() == self.state.height() {
             if let Some(precommits) = self.state
-                .precommits(msg.round(), *msg.propose_hash(), *msg.block_hash()) {
+                .precommits(msg.round(), *msg.block_hash()) {
                 precommits.values().map(|p| p.raw().clone()).collect()
             } else {
                 Vec::new()
@@ -131,24 +126,40 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn handle_request_commit(&mut self, msg: RequestCommit) {
+    pub fn handle_request_block(&mut self, msg: RequestBlock) {
+        debug!("Handle block request with height:{}, our height: {}",
+               msg.height(),
+               self.state.height());
         if msg.height() >= self.state.height() {
             return;
         }
 
         let view = self.blockchain.view();
+        let height = msg.height();
+        let block_hash = view.heights().get(height).unwrap().unwrap();
 
-        let block_hash = view.heights().get(msg.height()).unwrap().unwrap();
-
+        let block = view.blocks().get(&block_hash).unwrap().unwrap();
         let precommits = view.precommits(&block_hash)
             .values()
             .unwrap()
             .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let transactions = view.block_txs(height)
+            .values()
+            .unwrap()
+            .iter()
+            .map(|tx_hash| view.transactions().get(tx_hash).unwrap().unwrap())
             .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 
-        for precommit in precommits {
-            self.send_to_peer(*msg.from(), &precommit);
-        }
+        let block_msg = Block::new(&self.public_key,
+                                   msg.from(),
+                                   self.channel.get_time(),
+                                   block,
+                                   precommits,
+                                   transactions,
+                                   &self.secret_key);
+        self.send_to_peer(*msg.from(), block_msg.raw());
     }
 }

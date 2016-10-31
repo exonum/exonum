@@ -26,6 +26,7 @@ pub use self::protocol::*;
 pub enum Any<Tx: Message> {
     Connect(Connect),
     Status(Status),
+    Block(Block),
     Consensus(ConsensusMessage),
     Request(RequestMessage),
     Transaction(Tx),
@@ -44,8 +45,8 @@ pub enum RequestMessage {
     Transactions(RequestTransactions),
     Prevotes(RequestPrevotes),
     Precommits(RequestPrecommits),
-    Commit(RequestCommit),
     Peers(RequestPeers),
+    Block(RequestBlock),
 }
 
 // #[derive(Clone, PartialEq)]
@@ -108,8 +109,8 @@ impl RequestMessage {
             RequestMessage::Transactions(ref msg) => msg.from(),
             RequestMessage::Prevotes(ref msg) => msg.from(),
             RequestMessage::Precommits(ref msg) => msg.from(),
-            RequestMessage::Commit(ref msg) => msg.from(),
             RequestMessage::Peers(ref msg) => msg.from(),
+            RequestMessage::Block(ref msg) => msg.from(),
         }
     }
 
@@ -119,8 +120,8 @@ impl RequestMessage {
             RequestMessage::Transactions(ref msg) => msg.to(),
             RequestMessage::Prevotes(ref msg) => msg.to(),
             RequestMessage::Precommits(ref msg) => msg.to(),
-            RequestMessage::Commit(ref msg) => msg.to(),
             RequestMessage::Peers(ref msg) => msg.to(),
+            RequestMessage::Block(ref msg) => msg.to(),
         }
     }
 
@@ -130,8 +131,8 @@ impl RequestMessage {
             RequestMessage::Transactions(ref msg) => msg.time(),
             RequestMessage::Prevotes(ref msg) => msg.time(),
             RequestMessage::Precommits(ref msg) => msg.time(),
-            RequestMessage::Commit(ref msg) => msg.time(),
             RequestMessage::Peers(ref msg) => msg.time(),
+            RequestMessage::Block(ref msg) => msg.time(),
         }
     }
 
@@ -141,8 +142,8 @@ impl RequestMessage {
             RequestMessage::Transactions(ref msg) => msg.verify(public_key),
             RequestMessage::Prevotes(ref msg) => msg.verify(public_key),
             RequestMessage::Precommits(ref msg) => msg.verify(public_key),
-            RequestMessage::Commit(ref msg) => msg.verify(public_key),
             RequestMessage::Peers(ref msg) => msg.verify(public_key),
+            RequestMessage::Block(ref msg) => msg.verify(public_key),
         }
     }
 
@@ -152,8 +153,8 @@ impl RequestMessage {
             RequestMessage::Transactions(ref msg) => msg.raw(),
             RequestMessage::Prevotes(ref msg) => msg.raw(),
             RequestMessage::Precommits(ref msg) => msg.raw(),
-            RequestMessage::Commit(ref msg) => msg.raw(),
             RequestMessage::Peers(ref msg) => msg.raw(),
+            RequestMessage::Block(ref msg) => msg.raw(),
         }
     }
 }
@@ -165,8 +166,8 @@ impl fmt::Debug for RequestMessage {
             RequestMessage::Transactions(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Prevotes(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Precommits(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Commit(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Peers(ref msg) => write!(fmt, "{:?}", msg),
+            RequestMessage::Block(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }
@@ -229,6 +230,7 @@ impl<Tx: Message> Any<Tx> {
         Ok(match raw.message_type() {
             CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
             STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
+            BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
 
             PROPOSE_MESSAGE_ID => {
                 Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
@@ -252,11 +254,11 @@ impl<Tx: Message> Any<Tx> {
             REQUEST_PRECOMMITS_MESSAGE_ID => {
                 Any::Request(RequestMessage::Precommits(RequestPrecommits::from_raw(raw)?))
             }
-            REQUEST_COMMIT_MESSAGE_ID => {
-                Any::Request(RequestMessage::Commit(RequestCommit::from_raw(raw)?))
-            }
             REQUEST_PEERS_MESSAGE_ID => {
                 Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))
+            }
+            REQUEST_BLOCK_MESSAGE_ID => {
+                Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
             }
             _ => Any::Transaction(Tx::from_raw(raw)?),
         })
@@ -271,6 +273,7 @@ impl<Tx: Message> fmt::Debug for Any<Tx> {
             Any::Consensus(ref msg) => write!(fmt, "{:?}", msg),
             Any::Request(ref msg) => write!(fmt, "{:?}", msg),
             Any::Transaction(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Block(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }

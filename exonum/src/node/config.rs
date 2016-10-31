@@ -30,8 +30,8 @@ impl ListenerConfig {
     pub fn gen_from_seed(seed: &Seed, addr: SocketAddr) -> ListenerConfig {
         let keys = gen_keypair_from_seed(seed);
         ListenerConfig {
-            public_key: keys.0.clone(),
-            secret_key: keys.1.clone(),
+            public_key: keys.0,
+            secret_key: keys.1,
             address: addr,
         }
     }
@@ -39,19 +39,20 @@ impl ListenerConfig {
     pub fn gen(addr: SocketAddr) -> ListenerConfig {
         let keys = gen_keypair();
         ListenerConfig {
-            public_key: keys.0.clone(),
-            secret_key: keys.1.clone(),
+            public_key: keys.0,
+            secret_key: keys.1,
             address: addr,
         }
     }
 }
 
 impl GenesisConfig {
-    pub fn gen(validators_count: u8) -> GenesisConfig {
+    pub fn gen(validators_count: u8, port: Option<u16>) -> GenesisConfig {
         let mut pairs = Vec::new();
+        let port = port.unwrap_or(7000);
         for i in 0..validators_count {
-            let addr = format!("127.0.0.1:{}", 7000 + i as u32).parse().unwrap();
-            let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&vec![i; 32]).unwrap(),
+            let addr = format!("127.0.0.1:{}", port + i as u16).parse().unwrap();
+            let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&[i; 32]).unwrap(),
                                                      addr);
             pairs.push(pair);
         }
@@ -62,7 +63,7 @@ impl GenesisConfig {
                 round_timeout: 3000,
                 status_timeout: 5000,
                 peers_timeout: 10000,
-                propose_timeout: 3000,
+                propose_timeout: 1000,
             },
             network: NetworkConfiguration {
                 max_incoming_connections: 128,
@@ -75,7 +76,7 @@ impl GenesisConfig {
         }
     }
 
-    pub fn to_node_configuration(self,
+    pub fn gen_node_configuration(self,
                                  idx: usize,
                                  known_peers: Vec<::std::net::SocketAddr>)
                                  -> Configuration {

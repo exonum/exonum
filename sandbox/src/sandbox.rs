@@ -5,10 +5,10 @@ use std::sync::{Arc, Mutex};
 use std::net::SocketAddr;
 use std::ops::Drop;
 
-use time::Timespec;
+use time::{Timespec, Duration};
 
-use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout,
-                   ListenerConfig, ConsensusConfig};
+use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig,
+                   ConsensusConfig, GENESIS_TIME};
 use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
@@ -228,6 +228,9 @@ impl<B, G> Sandbox<B, G>
     pub fn propose_timeout(&self) -> i64 {
         self.cfg.consensus.propose_timeout as i64
     }
+    pub fn round_timeout(&self) -> i64 {
+        self.cfg.consensus.round_timeout as i64
+    }
 
     pub fn recv<T: Message>(&self, msg: T) {
         self.check_unexpected_message();
@@ -288,14 +291,13 @@ impl<B, G> Sandbox<B, G>
         }
     }
 
-    pub fn set_time(&self, sec: i64, nsec: i32) {
+    pub fn add_time(&self, duration: Duration) {
         self.check_unexpected_message();
-        // set time
-        let now = Timespec {
-            sec: sec,
-            nsec: nsec,
+        let now = {
+            let mut inner = self.inner.lock().unwrap();
+            inner.time = inner.time + duration;
+            inner.time
         };
-        self.inner.lock().unwrap().time = now;
         // handle timeouts if occurs
         loop {
             let timeout = {
@@ -383,7 +385,7 @@ pub fn timestamping_sandbox
 
     let config = Configuration {
         listener: ListenerConfig {
-            address: addresses[0].clone(),            
+            address: addresses[0].clone(),
             public_key: validators[0].0.clone(),
             secret_key: validators[0].1.clone(),
         },
@@ -410,7 +412,7 @@ pub fn timestamping_sandbox
 
     let inner = Arc::new(Mutex::new(SandboxInner {
         address: addresses[0].clone(),
-        time: Timespec { sec: 0, nsec: 0 },
+        time: GENESIS_TIME,
         sended: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
@@ -457,9 +459,9 @@ fn test_sandbox_assert_status() {
     // TODO: remove this?
     let s = timestamping_sandbox();
     s.assert_state(0, 1);
-    s.set_time(0, 999_999_999);
+    s.add_time(Duration::milliseconds(999));
     s.assert_state(0, 1);
-    s.set_time(1, 0);
+    s.add_time(Duration::milliseconds(1));
     s.assert_state(0, 2);
 }
 
@@ -503,6 +505,6 @@ fn test_sandbox_unexpected_message_when_time_changed() {
     let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.set_time(1, 0);
+    s.add_time(Duration::milliseconds(1000));
     panic!("Oops! We don't catch unexpected message");
 }

@@ -3,6 +3,7 @@ use serde::{Serialize, Serializer};
 use exonum::crypto::{HexValue, PublicKey};
 use exonum::storage::{Database, Result as StorageResult};
 use exonum::blockchain::Blockchain;
+use exonum::node::Configuration;
 use blockchain_explorer::{BlockchainExplorer, TransactionInfo};
 
 use super::{CurrencyTx, CurrencyBlockchain};
@@ -66,11 +67,15 @@ impl Serialize for WalletInfo {
 
 pub struct CurrencyApi<D: Database> {
     blockchain: CurrencyBlockchain<D>,
+    cfg: Configuration,
 }
 
 impl<D: Database> CurrencyApi<D> {
-    pub fn new(b: CurrencyBlockchain<D>) -> CurrencyApi<D> {
-        CurrencyApi { blockchain: b }
+    pub fn new(b: CurrencyBlockchain<D>, cfg: Configuration) -> CurrencyApi<D> {
+        CurrencyApi {
+            blockchain: b,
+            cfg: cfg,
+        }
     }
 
     pub fn wallet_info(&self, pub_key: &PublicKey) -> StorageResult<Option<WalletInfo>> {
@@ -80,7 +85,8 @@ impl<D: Database> CurrencyApi<D> {
             let txs = {
                 let mut v = Vec::new();
 
-                let explorer = BlockchainExplorer::<CurrencyBlockchain<D>>::from_view(view);
+                let explorer =
+                    BlockchainExplorer::<CurrencyBlockchain<D>>::from_view(view, self.cfg.clone());
                 for hash in history {
                     if let Some(tx_info) = explorer.tx_info::<CurrencyTx>(&hash)? {
                         v.push(tx_info)

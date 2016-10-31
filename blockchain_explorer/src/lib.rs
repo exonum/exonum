@@ -1,13 +1,12 @@
 #![feature(type_ascription)]
-#![feature(custom_derive)]
-#![feature(plugin)]
-#![plugin(serde_macros)]
-#![feature(question_mark)]
+#![feature(proc_macro)]
 
 mod explorer;
 
 extern crate time;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate exonum;
 extern crate rustless;
 extern crate valico;
@@ -27,6 +26,7 @@ use valico::json_dsl;
 use exonum::crypto::{Hash, HexValue, ToHex};
 use exonum::storage::Error as StorageError;
 use exonum::blockchain::Blockchain;
+use exonum::node::Configuration;
 
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
 
@@ -103,13 +103,14 @@ impl<T> Deserialize for HexField<T>
     }
 }
 
-pub fn make_api<B, T>(api: &mut Api, b1: B)
+pub fn make_api<B, T>(api: &mut Api, b: B, cfg: Configuration)
     where B: Blockchain,
           T: TransactionInfo + From<B::Transaction>
 {
     api.namespace("blockchain", move |api| {
         api.get("blocks", |endpoint| {
-            let b1 = b1.clone();
+            let b = b.clone();
+            let c = cfg.clone();
 
             endpoint.summary("Returns blockchain info array");
             endpoint.params(|params| {
@@ -121,7 +122,7 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
                 let from = params.find("from").map(|x| x.as_u64().unwrap()).map(|x| x + 1);
                 let count = params.find("count").map(|x| x.as_u64().unwrap()).unwrap_or(100);
 
-                let explorer = BlockchainExplorer::new(b1.clone());
+                let explorer = BlockchainExplorer::new(b.clone(), c.clone());
                 match explorer.blocks_range::<T>(count, from) {
                     Ok(blocks) => client.json(&blocks.to_json()),
                     Err(e) => client.error(e),
@@ -129,7 +130,8 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
             })
         });
         api.get("blocks/:height", |endpoint| {
-            let b1 = b1.clone();
+            let b = b.clone();
+            let c = cfg.clone();
 
             endpoint.summary("Returns block with given height");
             endpoint.params(|params| {
@@ -139,7 +141,7 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
             endpoint.handle(move |client, params| {
                 let height = params.find("height").unwrap().as_u64().unwrap();
 
-                let explorer = BlockchainExplorer::new(b1.clone());
+                let explorer = BlockchainExplorer::new(b.clone(), c.clone());
                 match explorer.block_info_with_height::<T>(height) {
                     Ok(Some(block)) => client.json(&block.to_json()),
                     Ok(None) => {
@@ -150,7 +152,8 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
             })
         });
         api.get("transactions/:hash", |endpoint| {
-            let b1 = b1.clone();
+            let b = b.clone();
+            let c = cfg.clone();
 
             endpoint.summary("Returns transaction info with given hash");
             endpoint.params(|params| {
@@ -159,7 +162,7 @@ pub fn make_api<B, T>(api: &mut Api, b1: B)
 
             endpoint.handle(move |client, params| {
                 let hash = params.find("hash").unwrap().as_str().unwrap();
-                let explorer = BlockchainExplorer::new(b1.clone());
+                let explorer = BlockchainExplorer::new(b.clone(), c.clone());
                 match Hash::from_hex(hash) {
                     Ok(hash) => {
                         match explorer.tx_info::<T>(&hash) {

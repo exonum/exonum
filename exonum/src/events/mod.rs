@@ -389,8 +389,7 @@ mod tests {
 
         pub fn wait_for_bind(&mut self, addr: &SocketAddr) -> Option<()> {
             self.0.bind().unwrap();
-            let r = self.wait_for_connect(addr);
-            r
+            self.wait_for_connect(addr)
         }
 
         pub fn wait_for_connect(&mut self, addr: &SocketAddr) -> Option<()> {
@@ -412,7 +411,7 @@ mod tests {
             }
         }
 
-        pub fn wait_for_msg(&mut self, duration: Duration) -> Option<RawMessage> {
+        pub fn wait_for_message(&mut self, duration: Duration) -> Option<RawMessage> {
             let start = get_time();
             loop {
                 self.process_events().unwrap();
@@ -436,12 +435,35 @@ mod tests {
             }
         }
 
-        pub fn wait_for_disconnect(&mut self) -> Option<()> {
+        pub fn wait_for_messages(&mut self,
+                                 mut count: usize,
+                                 duration: Duration)
+                                 -> Result<Vec<RawMessage>, String> {
+            let mut v = Vec::new();
             let start = get_time();
             loop {
                 self.process_events().unwrap();
 
-                if start + Duration::milliseconds(1000) < get_time() {
+                if start + duration < get_time() {
+                    return Err(format!("Timeout exceeded, {} messages is not received", count));
+                }
+
+                if let Some(msg) = self.0.inner.handler.message() {
+                    v.push(msg);
+                    count -= 1;
+                    if count == 0 {
+                        return Ok(v);
+                    }
+                }
+            }
+        }
+
+        pub fn wait_for_disconnect(&mut self, max_duration: Duration) -> Option<()> {
+            let start = get_time();
+            loop {
+                self.process_events().unwrap();
+
+                if start + max_duration < get_time() {
                     return None;
                 }
                 while let Some(e) = self.0.inner.handler.event() {
@@ -474,11 +496,11 @@ mod tests {
         let addrs: [SocketAddr; 2] = ["127.0.0.1:7200".parse().unwrap(),
                                       "127.0.0.1:7201".parse().unwrap()];
 
-        let m1 = gen_message(15, 1000000);
+        let m1 = gen_message(15, 100000);
         let m2 = gen_message(16, 400);
 
-        let mut e1 = TestEvents::with_addr(addrs[0].clone());
-        let mut e2 = TestEvents::with_addr(addrs[1].clone());
+        let mut e1 = TestEvents::with_addr(addrs[0]);
+        let mut e2 = TestEvents::with_addr(addrs[1]);
         e1.0.bind().unwrap();
         e2.0.bind().unwrap();
 
@@ -490,9 +512,14 @@ mod tests {
                 let mut e = e1;
                 e.wait_for_connect(&addrs[1]);
 
-                e.send_to(&addrs[1], m1);
-                assert_eq!(e.wait_for_msg(Duration::milliseconds(10000)), Some(m2));
-                e.wait_for_disconnect().unwrap();
+                e.send_to(&addrs[1], m1.clone());
+                e.send_to(&addrs[1], m2.clone());
+                e.send_to(&addrs[1], m1.clone());
+
+                let msgs = e.wait_for_messages(3, Duration::milliseconds(10000)).unwrap();
+                assert_eq!(msgs[0], m2);
+                assert_eq!(msgs[1], m1);
+                assert_eq!(msgs[2], m2);
             });
         }
 
@@ -504,8 +531,14 @@ mod tests {
                 let mut e = e2;
                 e.wait_for_connect(&addrs[0]);
 
-                e.send_to(&addrs[0], m2);
-                assert_eq!(e.wait_for_msg(Duration::milliseconds(10000)), Some(m1));
+                e.send_to(&addrs[0], m2.clone());
+                e.send_to(&addrs[0], m1.clone());
+                e.send_to(&addrs[0], m2.clone());
+                let msgs = e.wait_for_messages(3, Duration::milliseconds(10000)).unwrap();
+                assert_eq!(msgs[0], m1);
+                assert_eq!(msgs[1], m2);
+                assert_eq!(msgs[2], m1);
+                e.wait_for_disconnect(Duration::milliseconds(10000)).unwrap();
             });
         }
 
@@ -523,8 +556,8 @@ mod tests {
         let m2 = gen_message(16, 400);
         let m3 = gen_message(17, 600);
 
-        let mut e1 = TestEvents::with_addr(addrs[0].clone());
-        let mut e2 = TestEvents::with_addr(addrs[1].clone());
+        let mut e1 = TestEvents::with_addr(addrs[0]);
+        let mut e2 = TestEvents::with_addr(addrs[1]);
         e1.0.bind().unwrap();
         e2.0.bind().unwrap();
 
@@ -542,19 +575,19 @@ mod tests {
                     debug!("t1: send m1 to t2");
                     e.send_to(&addrs[1], m1);
                     debug!("t1: wait for m2");
-                    assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m2));
+                    assert_eq!(e.wait_for_message(Duration::milliseconds(5000)), Some(m2));
                     debug!("t1: received m2 from t2");
                 }
                 debug!("t1: connection closed");
                 {
-                    let mut e = TestEvents::with_addr(addrs[0].clone());
+                    let mut e = TestEvents::with_addr(addrs[0]);
                     e.wait_for_bind(&addrs[1]).unwrap();
 
                     debug!("t1: connection reopened");
                     debug!("t1: send m3 to t2");
                     e.send_to(&addrs[1], m3.clone());
                     debug!("t1: wait for m3");
-                    assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m3));
+                    assert_eq!(e.wait_for_message(Duration::milliseconds(5000)), Some(m3));
                     debug!("t1: received m3 from t2");
                     e.process_events().unwrap();
                 }
@@ -576,22 +609,22 @@ mod tests {
                     debug!("t2: send m2 to t1");
                     e.send_to(&addrs[0], m2);
                     debug!("t2: wait for m1");
-                    assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)), Some(m1));
+                    assert_eq!(e.wait_for_message(Duration::milliseconds(5000)), Some(m1));
                     debug!("t2: received m1 from t1");
                     debug!("t2: wait for m3");
-                    assert_eq!(e.wait_for_msg(Duration::milliseconds(5000)),
+                    assert_eq!(e.wait_for_message(Duration::milliseconds(5000)),
                                Some(m3.clone()));
                     debug!("t2: received m3 from t1");
                 }
                 debug!("t2: connection closed");
                 {
                     debug!("t2: connection reopened");
-                    let mut e = TestEvents::with_addr(addrs[1].clone());
+                    let mut e = TestEvents::with_addr(addrs[1]);
                     e.wait_for_bind(&addrs[0]).unwrap();
 
                     debug!("t2: send m3 to t1");
                     e.send_to(&addrs[0], m3.clone());
-                    e.wait_for_disconnect().unwrap();
+                    e.wait_for_disconnect(Duration::milliseconds(5000)).unwrap();
                 }
                 debug!("t2: finished");
             });
@@ -608,10 +641,10 @@ mod benches {
     use std::thread;
     use std::net::SocketAddr;
 
-    use time::{get_time, Duration};
+    use time::Duration;
 
     use super::{Network, NetworkConfiguration, Events, Reactor};
-    use super::tests::{gen_message, TestEvents, TestPoller, TestHandler};
+    use super::tests::{gen_message, TestEvents, TestHandler};
 
     use test::Bencher;
 
@@ -623,39 +656,18 @@ mod benches {
 
     impl TestEvents {
         fn with_cfg(cfg: &BenchConfig, addr: SocketAddr) -> TestEvents {
-            let network = Network::with_config(NetworkConfiguration {
-                listen_address: addr,
-                max_incoming_connections: 128,
-                max_outgoing_connections: 128,
-                tcp_nodelay: cfg.tcp_nodelay,
-                tcp_keep_alive: None,
-                tcp_reconnect_timeout: 1000,
-                tcp_reconnect_timeout_max: 600000,
-            });
+            let network = Network::with_config(addr,
+                                               NetworkConfiguration {
+                                                   max_incoming_connections: 128,
+                                                   max_outgoing_connections: 128,
+                                                   tcp_nodelay: cfg.tcp_nodelay,
+                                                   tcp_keep_alive: None,
+                                                   tcp_reconnect_timeout: 1000,
+                                                   tcp_reconnect_timeout_max: 600000,
+                                               });
             let handler = TestHandler::new();
 
             TestEvents(Events::new(network, handler).unwrap())
-        }
-
-        fn wait_for_messages(&mut self,
-                             mut count: usize,
-                             duration: Duration)
-                             -> Result<(), String> {
-            let start = get_time();
-            loop {
-                self.0.run_once(Some(100)).unwrap();
-
-                if start + duration < get_time() {
-                    return Err(format!("Timeout exceeded, {} messages is not received", count));
-                }
-
-                if let Some(_) = self.0.inner.handler.message() {
-                    count = count - 1;
-                    if count == 0 {
-                        return Ok(());
-                    }
-                }
-            }
         }
     }
 
@@ -676,7 +688,7 @@ mod benches {
                     e1.send_to(&addrs[1], msg);
                     e1.wait_for_messages(1, timeout).unwrap();
                 }
-                e1.wait_for_disconnect().unwrap();
+                e1.wait_for_disconnect(Duration::milliseconds(1000)).unwrap();
             });
             let t2 = thread::spawn(move || {
                 e2.wait_for_connect(&addrs[0]).unwrap();

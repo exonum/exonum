@@ -2,7 +2,7 @@ use std::slice::SliceConcatExt;
 use std::ops::Deref;
 
 use ::crypto::Hash;
-use ::messages::{Precommit, Propose, Message};
+use ::messages::{Precommit, Message};
 use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable};
 
 use super::Block;
@@ -18,11 +18,6 @@ pub trait View<F: Fork>: Deref<Target = F> {
 
     fn blocks(&self) -> MapTable<F, Hash, Block> {
         MapTable::new(vec![01], self)
-    }
-
-    // FIXME: remove this!
-    fn proposes(&self) -> MapTable<F, Hash, Propose> {
-        MapTable::new(vec![10], self)
     }
 
     fn heights(&self) -> ListTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {

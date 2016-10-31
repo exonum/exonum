@@ -1,16 +1,18 @@
 use std::cmp;
 
-use serde::{Serialize};
+use serde::Serialize;
 
 use exonum::storage::{Map, List};
-use exonum::storage::{Result as StorageResult};
-use exonum::crypto::{Hash};
+use exonum::storage::Result as StorageResult;
+use exonum::crypto::{Hash, PublicKey};
 use exonum::blockchain::{Blockchain, View};
+use exonum::node::Configuration;
 
 use super::HexField;
 
 pub struct BlockchainExplorer<B: Blockchain> {
     view: B::View,
+    validators: Vec<PublicKey>,
 }
 
 pub trait TransactionInfo: Serialize {}
@@ -32,12 +34,18 @@ pub struct BlockInfo<T>
 }
 
 impl<B: Blockchain> BlockchainExplorer<B> {
-    pub fn new(b: B) -> BlockchainExplorer<B> {
-        BlockchainExplorer { view: b.view() }
+    pub fn new(b: B, cfg: Configuration) -> BlockchainExplorer<B> {
+        BlockchainExplorer {
+            view: b.view(),
+            validators: cfg.validators,
+        }
     }
 
-    pub fn from_view(view: B::View) -> BlockchainExplorer<B> {
-        BlockchainExplorer { view: view }
+    pub fn from_view(view: B::View, cfg: Configuration) -> BlockchainExplorer<B> {
+        BlockchainExplorer {
+            view: view,
+            validators: cfg.validators,
+        }
     }
 
     pub fn tx_info<T>(&self, tx_hash: &Hash) -> StorageResult<Option<T>>
@@ -47,7 +55,10 @@ impl<B: Blockchain> BlockchainExplorer<B> {
         Ok(tx.map(|tx| T::from(tx)))
     }
 
-    pub fn block_info<T>(&self, block_hash: &Hash, full_info: bool) -> StorageResult<Option<BlockInfo<T>>>
+    pub fn block_info<T>(&self,
+                         block_hash: &Hash,
+                         full_info: bool)
+                         -> StorageResult<Option<BlockInfo<T>>>
         where T: TransactionInfo + From<B::Transaction>
     {
         let block = self.view.blocks().get(block_hash)?;
@@ -63,10 +74,15 @@ impl<B: Blockchain> BlockchainExplorer<B> {
                 }
             };
 
+            // TODO Find more common solution
+            // FIXME this code was copied from state.rs
+            let proposer = ((height + block.propose_round() as u64) %
+                            (self.validators.len() as u64)) as u32;
+
             let precommits_count = self.view.precommits(block_hash).len()? as u64;
             let info = BlockInfo {
                 height: height,
-                proposer: block.proposer(),
+                proposer: proposer,
                 propose_time: block.time().sec,
 
                 hash: HexField(*block_hash),
