@@ -65,7 +65,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
-        debug!("HANDLE TRANSACTIONS REQUEST!!!");
+        trace!("HANDLE TRANSACTIONS REQUEST!!!");
         let view = self.blockchain.view();
         for hash in msg.txs() {
             let tx = self.state
@@ -127,7 +127,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_request_block(&mut self, msg: RequestBlock) {
-        debug!("Handle block request with height:{}, our height: {}",
+        trace!("Handle block request with height:{}, our height: {}",
                msg.height(),
                self.state.height());
         if msg.height() >= self.state.height() {
