@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use time::{Duration, Timespec};
 
-use super::crypto::{PublicKey, SecretKey};
+use super::crypto::{PublicKey, SecretKey, Hash, hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
                     EventsConfiguration, Channel, EventHandler};
 use super::blockchain::Blockchain;
@@ -19,6 +19,11 @@ pub mod config;
 pub use self::config::{ListenerConfig, ConsensusConfig};
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 
+pub const GENESIS_TIME: Timespec = Timespec {
+    sec: 1451649600,
+    nsec: 0,
+};
+
 #[derive(Clone, Debug)]
 pub enum ExternalMessage<B: Blockchain> {
     Transaction(B::Transaction),
@@ -29,7 +34,7 @@ pub enum NodeTimeout {
     Status,
     Round(u64, u32),
     Request(RequestData, Option<PublicKey>),
-    Propose,
+    Propose(u64, u32),
     PeerExchange,
 }
 
@@ -51,15 +56,14 @@ pub struct NodeHandler<B, S>
     pub state: State<B::Transaction>,
     pub channel: S,
     pub blockchain: B,
-    pub round_timeout: u32,
-    pub propose_timeout: u32,
-    pub status_timeout: u32,
-    pub peers_timeout: u32,
+    pub round_timeout: i64,
+    pub propose_timeout: i64,
+    pub status_timeout: i64,
+    pub peers_timeout: i64,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
 }
 
-// TODO extract node handler configuration
 #[derive(Debug, Clone)]
 pub struct Configuration {
     pub listener: ListenerConfig,
@@ -92,17 +96,22 @@ impl<B, S> NodeHandler<B, S>
         } else {
             (super::crypto::hash(&[]), 0)
         };
-        let state = State::new(id as u32, config.validators, connect, last_hash, last_height);
+
+        let state = State::new(id as u32,
+                               config.validators,
+                               connect,
+                               last_hash,
+                               last_height);
         NodeHandler {
             public_key: config.listener.public_key,
             secret_key: config.listener.secret_key,
             state: state,
             channel: sender,
             blockchain: blockchain,
-            round_timeout: config.consensus.round_timeout,
-            propose_timeout: config.consensus.propose_timeout,
-            status_timeout: config.consensus.status_timeout,
-            peers_timeout: config.consensus.peers_timeout,
+            round_timeout: config.consensus.round_timeout as i64,
+            propose_timeout: config.consensus.propose_timeout as i64,
+            status_timeout: config.consensus.status_timeout as i64,
+            peers_timeout: config.consensus.peers_timeout as i64,
             peer_discovery: config.peer_discovery,
         }
     }
@@ -121,14 +130,8 @@ impl<B, S> NodeHandler<B, S>
             info!("Try to connect with peer {}", address);
         }
 
-        // TODO: rewrite this bullshit
-        let time = self.blockchain
-            .last_block()
-            .unwrap()
-            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time());
-        let round = 1 +
-                    (self.channel.get_time() - time).num_milliseconds() / self.round_timeout as i64;
-        self.state.jump_round(round as u32);
+        let round = self.actual_round();
+        self.state.jump_round(round);
 
         info!("Jump to round {}", round);
 
@@ -145,6 +148,7 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
+            trace!("Send to addr: {}", conn.addr());
             self.channel.send_to(&conn.addr(), message.clone());
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
@@ -152,7 +156,16 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
+        trace!("Send to addr: {}", address);
         self.channel.send_to(address, message.clone());
+    }
+
+    // TODO: use Into<RawMessage>
+    pub fn broadcast(&mut self, message: &RawMessage) {
+        for conn in self.state.peers().values() {
+            trace!("Send to addr: {}", conn.addr());
+            self.channel.send_to(&conn.addr(), message.clone());
+        }
     }
 
     pub fn connect(&mut self, address: &SocketAddr) {
@@ -161,63 +174,83 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn request(&mut self, data: RequestData, peer: PublicKey) {
         let is_new = self.state.request(data.clone(), peer);
-
         if is_new {
-            debug!("ADD REQUEST TIMEOUT");
             self.add_request_timeout(data, None);
         }
     }
 
     pub fn add_round_timeout(&mut self) {
-        let ms = self.state.round() as i64 * self.round_timeout as i64;
-        let time = self.last_block_time() + Duration::milliseconds(ms);
-        debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
+        let time = self.round_start_time(self.state.round() + 1);
+        debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
                self.state.height(),
-               self.state.round());
+               self.state.round(),
+               (time - self.channel.get_time()).num_milliseconds());
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
 
     pub fn add_propose_timeout(&mut self) {
-        let duration = Duration::milliseconds(self.propose_timeout as i64);
-        let current_time = self.channel.get_time();
-        let time = ::std::cmp::max(current_time, self.last_block_time() + duration);
-
-        debug!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
+        let time = self.round_start_time(self.state.round()) +
+                   Duration::milliseconds(self.propose_timeout);
+        debug!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
                self.state.height(),
-               self.state.round());
-        self.channel.add_timeout(NodeTimeout::Propose, time);
+               self.state.round(),
+               (time - self.channel.get_time()).num_milliseconds());
+        let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
+        self.channel.add_timeout(timeout, time);
     }
 
     pub fn add_status_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout as i64);
+        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout);
         self.channel.add_timeout(NodeTimeout::Status, time);
     }
 
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
+        debug!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
         self.channel.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout as i64);
+        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout);
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
-    }
-
-    // TODO: use Into<RawMessage>
-    pub fn broadcast(&mut self, message: &RawMessage) {
-        for conn in self.state.peers().values() {
-            self.channel.send_to(&conn.addr(), message.clone());
-        }
     }
 
     pub fn last_block_time(&self) -> Timespec {
         self.blockchain
             .last_block()
             .unwrap()
-            .map_or_else(|| Timespec { sec: 0, nsec: 0 }, |p| p.time())
+            .map_or_else(|| GENESIS_TIME, |p| p.time())
+    }
+
+    pub fn last_block_hash(&self) -> Hash {
+        self.blockchain
+            .last_block()
+            .unwrap()
+            .map_or_else(|| hash(&[]), |p| p.hash())
+    }
+
+    pub fn actual_round(&self) -> Round {
+        let now = self.channel.get_time();
+        let propose = self.last_block_time();
+        debug_assert!(now >= propose);
+
+        let duration = (now - propose - Duration::milliseconds(self.propose_timeout))
+            .num_milliseconds();
+        if duration > 0 {
+            let round = (duration / self.round_timeout) as Round + 1;
+            ::std::cmp::max(1, round)
+        } else {
+            1
+        }
+    }
+
+    // FIXME find more flexible solution
+    pub fn round_start_time(&self, round: Round) -> Timespec {
+        let ms = (round - 1) as i64 * self.round_timeout;
+        self.last_block_time() + Duration::milliseconds(ms)
     }
 }
 
@@ -251,7 +284,7 @@ impl<B, S> EventHandler for NodeHandler<B, S>
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
             NodeTimeout::Status => self.handle_status_timeout(),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
-            NodeTimeout::Propose => self.handle_propose_timeout(),
+            NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
         }
     }
 }
@@ -287,7 +320,7 @@ impl<B> Node<B>
     where B: Blockchain
 {
     pub fn new(blockchain: B, config: Configuration) -> Node<B> {
-        let network = Network::with_config(config.listener.address, config.network.clone());
+        let network = Network::with_config(config.listener.address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = MioChannel::new(config.listener.address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);

@@ -28,17 +28,18 @@ impl<B, S> NodeHandler<B, S>
             Any::Transaction(message) => self.handle_tx(message),
             Any::Consensus(message) => self.handle_consensus(message),
             Any::Request(message) => self.handle_request(message),
+            Any::Block(message) => self.handle_block(message),
         }
     }
 
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
-        debug!("Connected to: {}", addr);
+        info!("Connected to: {}", addr);
         let message = self.state.our_connect_message().clone();
         self.send_to_addr(addr, message.raw());
     }
 
     pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
-        debug!("Disconnected from: {}", addr);
+        info!("Disconnected from: {}", addr);
         let need_reconnect = self.state.remove_peer_with_addr(addr);
         if need_reconnect {
             self.connect(addr);
@@ -51,35 +52,40 @@ impl<B, S> NodeHandler<B, S>
         if address == self.state.our_connect_message().addr() {
             return;
         }
-        info!("Received connect message from {}", address);
-
         // Check if we have another connect message from peer with the given public_key
         let public_key = *message.pub_key();
         let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
-                warn!("Received weird connection message from {}", address);
+                error!("Received outdated Connect message from {}", address);
+                return;
+            } else if saved_message.time() < message.time() {
+                need_connect = saved_message.addr() != message.addr();
+            } else if saved_message.addr() != message.addr() {
+                error!("Received weird Connect message from {}", address);
                 return;
             }
-            need_connect = !(saved_message.addr() == message.addr() &&
-                             saved_message.time() == message.time());
         }
+        info!("Received Connect message from {}, {}",
+              address,
+              need_connect);
         self.state.add_peer(public_key, message);
-
         if need_connect {
             // TODO: reduce double sending of connect message
-            info!("Establish connection with {}", address);
+            info!("Send Connect message to {}", address);
             self.connect(&address);
         }
     }
 
     pub fn handle_status(&mut self, msg: Status) {
+        let height = self.state.height();
         // Handle message from future height
-        if msg.height() > self.state.height() {
+        if msg.height() > height {
             // Check validator height info
             // FIXME: make sure that validator id < validator count
-            if self.state.validator_height(msg.validator()) >= msg.height() {
-                return;
+            if msg.height() > self.state.validator_height(msg.validator()) {
+                // Update validator height
+                self.state.set_validator_height(msg.validator(), msg.height());
             }
             // Verify validator if and signature
             let peer = match self.state.public_key_of(msg.validator()) {
@@ -93,28 +99,9 @@ impl<B, S> NodeHandler<B, S>
                 // Incorrect validator id
                 None => return,
             };
-            // Update validator height
-            self.state.set_validator_height(msg.validator(), msg.height());
-            // Request commit
-            self.request(RequestData::Commit, peer);
+            // Request block
+            self.request(RequestData::Block(height), peer);
         }
-
-        // TODO: remove this?
-        // // Handle message from current height
-        // if msg.height() == self.state.height() {
-        //     // Request propose or txs
-        //     self.request_propose_or_txs(ctx, msg.propose_hash(), msg.validator());
-
-        //     // Request precommits
-        //     if !self.state.has_majority_precommits(msg.round(),
-        //                                           *msg.propose_hash(),
-        //                                           *msg.block_hash()) {
-        //         let data = RequestData::Precommits(msg.round(),
-        //                                           *msg.propose_hash(),
-        //                                           *msg.block_hash());
-        //         self.request(ctx, data, msg.validator());
-        //     }
-        // }
     }
 
     pub fn handle_request_peers(&mut self, msg: RequestPeers) {
@@ -131,8 +118,8 @@ impl<B, S> NodeHandler<B, S>
                                      self.state.height(),
                                      &hash,
                                      &self.secret_key);
+            debug!("Broadcast status: {:?}", status);
             self.broadcast(status.raw());
-            debug!("Send status: {:?}", status);
         }
         self.add_status_timeout();
     }
@@ -149,17 +136,15 @@ impl<B, S> NodeHandler<B, S>
                 .peers()
                 .iter()
                 .map(|x| x.1.clone())
-                .skip(gen_peer_id())
-                .next()
+                .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
             let msg = RequestPeers::new(&self.public_key,
                                         peer.pub_key(),
                                         self.channel.get_time(),
                                         &self.secret_key);
+            debug!("Request peers from peer with addr {:?}", peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
-
-            debug!("request peers from peer with addr {:?}", peer.addr());
         }
         self.add_peer_exchange_timeout();
     }

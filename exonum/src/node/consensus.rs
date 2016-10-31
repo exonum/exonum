@@ -1,17 +1,19 @@
 use std::collections::HashSet;
 
-use time::Duration;
+use time::{Duration, Timespec};
 
-use super::super::crypto::{Hash, PublicKey};
+use super::super::crypto::{Hash, PublicKey, HexValue};
 use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
-                             RequestPrecommits, RequestCommit};
-use super::super::storage::Map;
+                             RequestPrecommits, RequestBlock, Block};
+use super::super::storage::{Map, Patch};
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
 use super::super::events::Channel;
 use super::{ExternalMessage, NodeTimeout};
+
+const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 // TODO reduce view invokations
 impl<B, S> NodeHandler<B, S>
@@ -21,61 +23,86 @@ impl<B, S> NodeHandler<B, S>
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
+            debug!("Received consensus message from other height: msg.height={}, self.height={}",
+                   msg.height(),
+                   self.state.height());
             return;
         }
 
         // Queued messages from next height or round
         // TODO: shoud we ignore messages from far rounds?
         if msg.height() == self.state.height() + 1 || msg.round() > self.state.round() {
+            debug!("Received consensus message from future round: msg.height={}, msg.round={}, \
+                    self.round={}",
+                   msg.height(),
+                   msg.round(),
+                   self.state.round());
             self.state.add_queued(msg);
             return;
         }
 
         match self.state.public_key_of(msg.validator()) {
-            // Incorrect signature of message
+            // incorrect signature of message
             Some(public_key) => {
                 if !msg.verify(public_key) {
+                    error!("Received message with incorrect signature msg={:?}", msg);
                     return;
                 }
             }
-            // Incorrect validator id
-            None => return,
+            // incorrect validator id
+            None => {
+                error!("Received message from incorrect msg={:?}", msg);
+                return;
+            }
         }
 
         match msg {
-            ConsensusMessage::Propose(msg) => {
-                // Check prev_hash
-                if msg.prev_hash() != self.state.last_hash() {
-                    return;
-                }
-
-                // Check leader
-                if msg.validator() != self.state.leader(msg.round()) {
-                    return;
-                }
-
-                // Check timeout
-                if msg.time() - self.last_block_time() <
-                   Duration::milliseconds(self.propose_timeout as i64) {
-                    return;
-                }
-
-                self.handle_propose(msg)
-            }
+            ConsensusMessage::Propose(msg) => self.handle_propose(msg),
             ConsensusMessage::Prevote(msg) => self.handle_prevote(msg),
             ConsensusMessage::Precommit(msg) => self.handle_precommit(msg),
         }
     }
 
     pub fn handle_propose(&mut self, msg: Propose) {
-        debug!("Handle propose {:?}", msg);
-        // TODO: check time
-        // TODO: check that transactions are not commited yet
-        if self.state.propose(&msg.hash()).is_some() {
+        // Check prev_hash
+        if msg.prev_hash() != self.state.last_hash() {
+            error!("Received propose with wrong last_block_hash msg={:?}", msg);
+            return;
+        }
+
+        // Check leader
+        if msg.validator() != self.state.leader(msg.round()) {
+            error!("Wrong propose leader detected: actual={}, expected={}",
+                   msg.validator(),
+                   self.state.leader(msg.round()));
+            return;
+        }
+
+        // check time of the propose
+        let round = msg.round();
+        let start_time = self.round_start_time(round) +
+                         Duration::milliseconds(self.propose_timeout);
+        let end_time = start_time + Duration::milliseconds(self.round_timeout);
+        if msg.time() < start_time || msg.time() > end_time {
+            error!("Received propose with wrong time, msg={:?}", msg);
             return;
         }
 
         let view = self.blockchain.view();
+        // Check that transactions are not commited yet
+        for hash in msg.transactions() {
+            if view.transactions().get(hash).unwrap().is_some() {
+                error!("Received propose with already commited transaction, msg={:?}",
+                       msg);
+                return;
+            }
+        }
+
+        if self.state.propose(&msg.hash()).is_some() {
+            return;
+        }
+
+        debug!("Handle propose {:?}", msg);
         for hash in msg.transactions() {
             if view.transactions().get(hash).unwrap().is_some() {
                 return;
@@ -103,12 +130,125 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
+    // TODO write helper function which returns Result
+    pub fn handle_block(&mut self, msg: Block) {
+        // Request are sended to us
+        if msg.to() != &self.public_key {
+            error!("Received block that intended for another peer, to={}, from={}",
+                   msg.to().to_hex(),
+                   msg.from().to_hex());
+            return;
+        }
+        // FIXME: we should use some epsilon for checking lifetime < 0
+        let lifetime = match (self.channel.get_time() - msg.time()).num_nanoseconds() {
+            Some(nanos) => nanos,
+            None => {
+                // incorrect time into message
+                error!("Received block with incorrect time msg={:?}", msg);
+                return;
+            }
+        };
+        // check time of the bock
+        if lifetime < 0 || lifetime > BLOCK_ALIVE {
+            error!("Received block with incorrect lifetime={}, msg={:?}",
+                   lifetime,
+                   msg);
+            return;
+        }
+
+        debug!("Handle block {:?}", msg);
+
+        let block = msg.block();
+        let block_hash = block.hash();
+
+        // TODO add block with greater height to queue
+        if self.state.height() != block.height() {
+            return;
+        }
+
+        // Check block content
+        if block.prev_hash() != &self.last_block_hash() {
+            error!("Weird block received, block={:?}", msg);
+            return;
+        }
+
+        // Verify propose time
+        let propose_round = block.propose_round();
+        let start_time = self.round_start_time(propose_round) +
+                         Duration::milliseconds(self.propose_timeout);
+        let end_time = start_time + Duration::milliseconds(self.round_timeout);
+        if msg.time() < start_time || block.time() > end_time {
+            error!("Received block with wrong propose time, block={:?}", msg);
+            return;
+        }
+
+        // Verify precommits
+        let precommits = msg.precommits();
+        if precommits.len() < self.state.majority_count() ||
+           precommits.len() > self.state.validators().len() {
+            error!("Received block without consensus, block={:?}", msg);
+            return;
+        }
+        let precommit_round = precommits[0].round();
+        for precommit in &precommits {
+            let r = self.verify_precommit(&block_hash, block.height(), precommit_round, precommit);
+            if let Err(e) = r {
+                error!("{}, block={:?}", e, msg);
+                return;
+            }
+        }
+
+        if self.state.block(&block_hash).is_none() {
+            // Verify transactions
+            let view = self.blockchain.view();
+            let mut txs = Vec::new();
+            for raw in msg.transactions() {
+                match B::Transaction::from_raw(raw) {
+                    Ok(tx) => {
+                        let hash = tx.hash();
+                        if view.transactions().get(&hash).unwrap().is_some() {
+                            error!("Received block with already commited transaction, block={:?}",
+                                   msg);
+                            return;
+                        }
+                        if !B::verify_tx(&tx) {
+                            error!("Incorrect transaction in block detected, block={:?}", msg);
+                            return;
+                        }
+                        txs.push((hash, tx));
+                    }
+                    Err(e) => {
+                        error!("Unknown transaction in block detected, error={:?}, block={:?}",
+                               e,
+                               msg);
+                        return;
+                    }
+                }
+            }
+
+            let (block_hash, txs, patch) = self.create_block(block.height(),
+                                                             block.propose_round(),
+                                                             block.time(),
+                                                             txs.as_slice());
+            // Verify block_hash
+            if block_hash != block.hash() {
+                panic!("Block_hash incorrect in received block={:?}", msg);
+            }
+
+            // Commit block
+            self.state.add_block(block_hash, patch, txs, propose_round);
+        }
+        self.commit(block_hash, precommits.iter());
+        self.request_next_block();
+    }
+
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
         if self.state.locked_round() == 0 {
-            // TODO: what if we HAVE prevote for the propose round?
             if !self.state.have_prevote(propose_round) {
-                self.send_prevote(propose_round, &hash);
+                self.broadcast_prevote(propose_round, &hash);
+            } else {
+                // TODO: what if we HAVE prevote for the propose round?
             }
         }
 
@@ -130,7 +270,13 @@ impl<B, S> NodeHandler<B, S>
                 panic!("We are fucked up...");
             }
 
-            self.commit(round, &hash);
+            let precommits = self.state
+                .precommits(round, our_block_hash)
+                .unwrap()
+                .iter()
+                .map(|(_, x)| x.clone())
+                .collect::<Vec<_>>();
+            self.commit(our_block_hash, precommits.iter());
         }
     }
 
@@ -159,11 +305,8 @@ impl<B, S> NodeHandler<B, S>
         // Remove request info
         self.remove_request(RequestData::Prevotes(round, *propose_hash));
         // Lock to propose
-        if self.state.locked_round() < round {
-            // FIXME: проверка что у нас есть все транзакции
-            if self.state.propose(propose_hash).is_some() {
-                self.lock(round, *propose_hash);
-            }
+        if self.state.locked_round() < round && self.state.propose(propose_hash).is_some() {
+            self.lock(round, *propose_hash);
         }
     }
 
@@ -184,7 +327,13 @@ impl<B, S> NodeHandler<B, S>
                 panic!("We are fucked up...");
             }
 
-            self.commit(round, propose_hash);
+            let precommits = self.state
+                .precommits(round, our_block_hash)
+                .unwrap()
+                .iter()
+                .map(|(_, x)| x.clone())
+                .collect::<Vec<_>>();
+            self.commit(our_block_hash, precommits.iter());
         } else {
             self.state.add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
         }
@@ -199,9 +348,9 @@ impl<B, S> NodeHandler<B, S>
         if !self.state.have_incompatible_prevotes() {
             // Execute block and get state hash
             let block_hash = self.execute(&propose_hash);
-            self.send_precommit(round, &propose_hash, &block_hash);
+            self.broadcast_precommit(round, &propose_hash, &block_hash);
             // Commit if has consensus
-            if self.state.has_majority_precommits(round, propose_hash, block_hash) {
+            if self.state.has_majority_precommits(round, block_hash) {
                 self.has_majority_precommits(round, &propose_hash, &block_hash);
                 return;
             }
@@ -210,9 +359,10 @@ impl<B, S> NodeHandler<B, S>
         // Send prevotes
         for round in self.state.locked_round() + 1...self.state.round() {
             if !self.state.have_prevote(round) {
-                self.send_prevote(round, &propose_hash);
+                self.broadcast_prevote(round, &propose_hash);
                 if self.state.has_majority_prevotes(round, propose_hash) {
-                    self.has_majority_prevotes(round, &propose_hash);
+                    // FIXME remove recursive lock call
+                    self.lock(round, propose_hash);
                 }
             }
         }
@@ -245,22 +395,31 @@ impl<B, S> NodeHandler<B, S>
     }
 
     // FIXME: push precommits into storage
-    pub fn commit(&mut self, round: Round, hash: &Hash) {
-        debug!("COMMIT {:?} {:?}", round, hash);
+    pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
+                                                         block_hash: Hash,
+                                                         precommits: I) {
+        debug!("COMMIT {:?}", block_hash);
+
         // Merge changes into storage
-        {
-            // FIXME: remove unwrap here
-            let block_hash = self.state.propose(hash).unwrap().block_hash().unwrap();
-            let patch = self.state.propose(hash).unwrap().patch().unwrap();
-            let precommits = self.state.precommits(round, *hash, block_hash).unwrap().values();
+        let propose_round = {
+            let block_state = self.state.block(&block_hash).unwrap();
+            let patch = block_state.patch();
             self.blockchain.commit(block_hash, patch, precommits).unwrap();
-        }
+            block_state.propose_round()
+        };
+
+        let height = self.state.height();
+        let proposer = self.state.leader(propose_round);
 
         // Update state to new height
-        self.state.new_height(hash);
+        let round = self.actual_round();
+        self.state.new_height(&block_hash, round);
 
-        info!("{:?} ========== commited = {}, pool = {}",
+        info!("{:?} ====== height={}, round={}, proposer={}, commited={}, pool={}",
               self.channel.get_time(),
+              height,
+              propose_round,
+              proposer,
               self.state.commited_txs,
               self.state.transactions().len());
 
@@ -268,19 +427,11 @@ impl<B, S> NodeHandler<B, S>
         for msg in self.state.queued() {
             self.handle_consensus(msg);
         }
-
-        // Send propose
-        if self.is_leader() {
-            self.add_propose_timeout();
-        }
-
         // Add timeout for first round
         self.add_round_timeout();
-
-        // Request commits
-        for validator in self.state.validator_heights() {
-            let peer = self.public_key_of(validator);
-            self.request(RequestData::Commit, peer)
+        // Send propose we is leader
+        if self.is_leader() {
+            self.add_propose_timeout();
         }
     }
 
@@ -289,7 +440,6 @@ impl<B, S> NodeHandler<B, S>
         let hash = Message::hash(&msg);
 
         // Make sure that it is new transaction
-        // TODO: use contains instead of get?
         if self.state.transactions().contains_key(&hash) {
             return;
         }
@@ -303,9 +453,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-
         let full_proposes = self.state.add_transaction(hash, msg);
-
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));
@@ -318,7 +466,6 @@ impl<B, S> NodeHandler<B, S>
         let hash = Message::hash(&msg);
 
         // Make sure that it is new transaction
-        // TODO: use contains instead of get?
         if self.state.transactions().contains_key(&hash) {
             return;
         }
@@ -335,19 +482,20 @@ impl<B, S> NodeHandler<B, S>
             self.has_full_propose(hash, round);
         }
 
-        // broadcast transaction to validators
+        // Broadcast transaction to validators
+        debug!("Broadcast transactions: {:?}", msg);
         self.broadcast(msg.raw());
     }
 
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
-        debug!("ROUND TIMEOUT height={}, round={}", height, round);
+        // TODO debug asserts?
         if height != self.state.height() {
             return;
         }
-
         if round != self.state.round() {
             return;
         }
+        debug!("ROUND TIMEOUT height={}, round={}", height, round);
 
         // Update state to new round
         self.state.new_round();
@@ -358,7 +506,7 @@ impl<B, S> NodeHandler<B, S>
         // Send prevote if we are locked or propose if we are leader
         if let Some(hash) = self.state.locked_propose() {
             let round = self.state.round();
-            self.send_prevote(round, &hash);
+            self.broadcast_prevote(round, &hash);
         } else if self.is_leader() {
             self.add_propose_timeout();
         }
@@ -369,8 +517,18 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn handle_propose_timeout(&mut self) {
-        debug!("I AM LEADER!!! pool = {}", self.state.transactions().len());
+    pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
+        // TODO debug asserts?
+        if height != self.state.height() {
+            // It is too late
+            return;
+        }
+        if round != self.state.round() {
+            return;
+        }
+
+        info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
+
         let round = self.state.round();
         let txs: Vec<Hash> = self.state
             .transactions()
@@ -384,14 +542,14 @@ impl<B, S> NodeHandler<B, S>
                                    self.state.last_hash(),
                                    &txs,
                                    &self.secret_key);
+        debug!("Broadcast propose: {:?}", propose);
         self.broadcast(propose.raw());
-        debug!("Send propose: {:?}", propose);
 
         // Save our propose into state
         let hash = self.state.add_self_propose(propose);
 
         // Send prevote
-        self.send_prevote(round, &hash);
+        self.broadcast_prevote(round, &hash);
     }
 
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
@@ -450,20 +608,20 @@ impl<B, S> NodeHandler<B, S>
                         .raw()
                         .clone()
                 }
-                RequestData::Commit => {
-                    RequestCommit::new(&self.public_key,
-                                       &peer,
-                                       self.channel.get_time(),
-                                       self.state.height(),
-                                       &self.secret_key)
+                RequestData::Block(height) => {
+                    RequestBlock::new(&self.public_key,
+                                      &peer,
+                                      self.channel.get_time(),
+                                      height,
+                                      &self.secret_key)
                         .raw()
                         .clone()
                 }
             };
-            self.send_to_peer(peer, &message);
             debug!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}",
-                   message,
+                   data,
                    peer);
+            self.send_to_peer(peer, &message);
         }
     }
 
@@ -472,15 +630,33 @@ impl<B, S> NodeHandler<B, S>
         self.state.leader(self.state.round()) == self.state.id()
     }
 
+    pub fn create_block(&mut self,
+                        height: Height,
+                        round: Round,
+                        time: Timespec,
+                        txs: &[(Hash, B::Transaction)])
+                        -> (Hash, Vec<Hash>, Patch) {
+        self.blockchain
+            .create_patch(height, round, time, txs)
+            .unwrap()
+    }
+
     // FIXME: remove this bull shit
-    pub fn execute(&mut self, hash: &Hash) -> Hash {
-        let msg = self.state.propose(hash).unwrap().message().clone();
-        let (block_hash, patch) =
-            self.blockchain.create_patch(&msg, self.state.transactions()).unwrap();
-
+    pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
+        let propose = self.state.propose(propose_hash).unwrap().message().clone();
+        let txs = propose.transactions()
+            .iter()
+            .map(|tx_hash| {
+                let tx = self.state.transactions().get(tx_hash).unwrap();
+                (*tx_hash, tx.clone())
+            })
+            .collect::<Vec<_>>();
+        let (block_hash, txs, patch) = self.create_block(propose.height(),
+                                                         propose.round(),
+                                                         propose.time(),
+                                                         txs.as_slice());
         // Save patch
-        self.state.propose(hash).unwrap().set_patch(block_hash, patch);
-
+        self.state.add_block(block_hash, patch, txs, propose.round());
         block_hash
     }
 
@@ -506,12 +682,27 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
+    pub fn request_next_block(&mut self) {
+        // TODO randomize next peer
+        let heights = self.state.validator_heights();
+        if !heights.is_empty() {
+            for id in heights {
+                let peer = *self.state.public_key_of(id).unwrap();
+                if self.state.peers().contains_key(&peer) {
+                    let height = self.state.height();
+                    self.request(RequestData::Block(height), peer);
+                    break;
+                }
+            }
+        }
+    }
+
     pub fn remove_request(&mut self, data: RequestData) -> HashSet<PublicKey> {
         // TODO: clear timeout
         self.state.remove_request(&data)
     }
 
-    pub fn send_prevote(&mut self, round: Round, propose_hash: &Hash) {
+    pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) {
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(self.state.id(),
                                    self.state.height(),
@@ -520,14 +711,14 @@ impl<B, S> NodeHandler<B, S>
                                    locked_round,
                                    &self.secret_key);
         let has_majority_prevotes = self.state.add_prevote(&prevote);
+        debug!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
-        debug!("Send prevote: {:?}", prevote);
         if has_majority_prevotes {
             self.lock(round, *propose_hash);
         }
     }
 
-    pub fn send_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
+    pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
         let precommit = Precommit::new(self.state.id(),
                                        self.state.height(),
                                        round,
@@ -535,8 +726,43 @@ impl<B, S> NodeHandler<B, S>
                                        block_hash,
                                        &self.secret_key);
         self.state.add_precommit(&precommit);
+        debug!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
-        debug!("Send precommit: {:?}", precommit);
+    }
+
+    // TODO reuse where is possible
+    pub fn verify_precommit(&self,
+                            block_hash: &Hash,
+                            block_height: Height,
+                            precommit_round: Round,
+                            precommit: &Precommit)
+                            -> Result<(), String> {
+        if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
+            if !precommit.verify(pub_key) {
+                let e = format!("Received wrong signed precommit, precommit={:?}", precommit);
+                return Err(e);
+            }
+            if precommit.block_hash() != block_hash {
+                let e = format!("Received precommit with wrong block_hash, precommit={:?}",
+                                precommit);
+                return Err(e);
+            }
+            if precommit.height() != block_height {
+                let e = format!("Received precommit with wrong height, precommit={:?}",
+                                precommit);
+                return Err(e);
+            }
+            if precommit.round() != precommit_round {
+                let e = format!("Received precommits with the different rounds, precommit={:?}",
+                                precommit);
+                return Err(e);
+            }
+        } else {
+            let e = format!("Received precommit with wrong validator, precommit={:?}",
+                            precommit);
+            return Err(e);
+        }
+        Ok(())
     }
 
     fn public_key_of(&self, id: ValidatorId) -> PublicKey {

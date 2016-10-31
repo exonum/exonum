@@ -38,6 +38,12 @@ fn main() {
             .about("Generates default configuration file")
             .version("0.1")
             .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+            .arg(Arg::with_name("START_PORT")
+                .short("p")
+                .long("port")
+                .value_name("START_PORT")
+                .help("Port for first validator")
+                .takes_value(true))
             .arg(Arg::with_name("COUNT")
                 .help("Validators count")
                 .required(true)
@@ -68,7 +74,8 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = GenesisConfig::gen(count);
+            let port: Option<u16> = matches.value_of("START_PORT").map(|x| x.parse().unwrap());
+            let cfg = GenesisConfig::gen(count, port);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
@@ -91,7 +98,7 @@ fn main() {
                 }
             };
             println!("Known peers is {:#?}", peers);
-            let node_cfg = cfg.to_node_configuration(idx, peers);
+            let node_cfg = cfg.gen_node_configuration(idx, peers);
             match matches.value_of("LEVELDB_PATH") {
                 Some(ref db_path) => {
                     println!("Using levedb storage with path: {}", db_path);

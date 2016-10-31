@@ -14,7 +14,7 @@ const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
 const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
 const REQUEST_PREVOTES_WAIT: u64 = 100;
 const REQUEST_PRECOMMITS_WAIT: u64 = 100;
-const REQUEST_COMMIT_WAIT: u64 = 100;
+const REQUEST_BLOCK_WAIT: u64 = 100;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -35,8 +35,9 @@ pub struct State<Tx> {
 
     // messages
     proposes: HashMap<Hash, ProposeState>,
+    blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), HashMap<ValidatorId, Prevote>>,
-    precommits: HashMap<(Round, Hash, Hash), HashMap<ValidatorId, Precommit>>,
+    precommits: HashMap<(Round, Hash), HashMap<ValidatorId, Precommit>>,
 
     transactions: HashMap<Hash, Tx>,
     queued: Vec<ConsensusMessage>,
@@ -68,7 +69,7 @@ pub enum RequestData {
     Transactions(Hash),
     Prevotes(Round, Hash),
     Precommits(Round, Hash, Hash),
-    Commit, // TODO: add height?
+    Block(Height),
 }
 
 // Состояние запроса
@@ -84,23 +85,32 @@ pub struct ProposeState {
     hash: Hash,
     // Тело предложения
     propose: Propose,
-    // Вычисленный хеш блока (из предложения)
-    block_hash: Option<Hash>,
-    // Набор изменений, которые нужно внести в состояние для применения блока
-    patch: Option<Patch>,
     // Множество неизвестных транзакций из этого предложения
     // FIXME: use HashSet here
     unknown_txs: BTreeSet<Hash>,
 }
 
+#[derive(Clone)]
+pub struct BlockState {
+    // Хэш блока
+    hash: Hash,
+    // Набор изменений, которые нужно внести в состояние для применения блока
+    patch: Patch,
+    // Хэши транзакций, закомиченных в этот блок
+    txs: Vec<Hash>,
+    // Раунд на котором был создан Propose
+    propose_round: Round,
+}
+
 impl RequestData {
     pub fn timeout(&self) -> Duration {
+        #![cfg_attr(feature="clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => REQUEST_PROPOSE_WAIT,
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
             RequestData::Prevotes(..) => REQUEST_PREVOTES_WAIT,
             RequestData::Precommits(..) => REQUEST_PRECOMMITS_WAIT,
-            RequestData::Commit => REQUEST_COMMIT_WAIT,
+            RequestData::Block(..) => REQUEST_BLOCK_WAIT,
         };
         Duration::milliseconds(ms as i64)
     }
@@ -148,18 +158,32 @@ impl ProposeState {
     pub fn has_unknown_txs(&self) -> bool {
         !self.unknown_txs.is_empty()
     }
+}
 
-    pub fn block_hash(&self) -> Option<Hash> {
-        self.block_hash
+impl BlockState {
+    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, propose_round: Round) -> BlockState {
+        BlockState {
+            hash: hash,
+            patch: patch,
+            txs: txs,
+            propose_round: propose_round,
+        }
     }
 
-    pub fn set_patch(&mut self, block_hash: Hash, patch: Patch) {
-        self.block_hash = Some(block_hash);
-        self.patch = Some(patch);
+    pub fn hash(&self) -> Hash {
+        self.hash
     }
 
-    pub fn patch(&mut self) -> Option<Patch> {
-        self.patch.take()
+    pub fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    pub fn txs(&self) -> &Vec<Hash> {
+        &self.txs
+    }
+
+    pub fn propose_round(&self) -> Round {
+        self.propose_round
     }
 }
 
@@ -179,12 +203,13 @@ impl<Tx> State<Tx> {
             connections: HashMap::new(),
             validators: validators,
             height: last_height,
-            round: 1,
+            round: 0,
             locked_round: 0,
             locked_propose: None,
             last_hash: last_hash,
 
             proposes: HashMap::new(),
+            blocks: HashMap::new(),
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
@@ -210,6 +235,7 @@ impl<Tx> State<Tx> {
         self.id
     }
 
+    // TODO Move to blockchain (and store therein)
     pub fn validators(&self) -> &[PublicKey] {
         &self.validators
     }
@@ -293,6 +319,10 @@ impl<Tx> State<Tx> {
         self.proposes.get_mut(hash)
     }
 
+    pub fn block(&self, hash: &Hash) -> Option<&BlockState> {
+        self.blocks.get(hash)
+    }
+
     pub fn jump_round(&mut self, round: Round) {
         self.round = round;
     }
@@ -301,24 +331,24 @@ impl<Tx> State<Tx> {
         self.round += 1;
     }
 
-    pub fn new_height(&mut self, propose_hash: &Hash) {
+    // FIXME use block_hash
+    pub fn new_height(&mut self, block_hash: &Hash, round: Round) {
         self.height += 1;
-        self.round = 1;
+        self.round = round;
         self.locked_round = 0;
         self.locked_propose = None;
-        // TODO: use block hash instead
-        self.last_hash = *propose_hash;
-
+        self.last_hash = *block_hash;
         {
-            let state = self.proposes
-                .get(propose_hash)
-                .expect("Trying to commit unknown propose");
-            self.commited_txs += state.propose.transactions().len() as u64;
-            for tx in state.propose.transactions() {
-                self.transactions.remove(tx);
+            // Commit transactions if needed
+            let txs = self.block(block_hash).unwrap().txs.clone();
+            for hash in txs {
+                if self.transactions.remove(&hash).is_some() {
+                    self.commited_txs += 1;
+                }
             }
         }
         // TODO: destruct/construct structure HeightState instead of call clear
+        self.blocks.clear();
         self.proposes.clear();
         self.prevotes.clear();
         self.precommits.clear();
@@ -362,10 +392,9 @@ impl<Tx> State<Tx> {
 
     pub fn precommits(&self,
                       round: Round,
-                      propose_hash: Hash,
                       block_hash: Hash)
                       -> Option<&HashMap<ValidatorId, Precommit>> {
-        self.precommits.get(&(round, propose_hash, block_hash))
+        self.precommits.get(&(round, block_hash))
     }
 
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
@@ -375,8 +404,6 @@ impl<Tx> State<Tx> {
                              ProposeState {
                                  hash: propose_hash,
                                  propose: msg,
-                                 block_hash: None,
-                                 patch: None,
                                  unknown_txs: BTreeSet::new(),
                              });
 
@@ -403,9 +430,26 @@ impl<Tx> State<Tx> {
                 Some(e.insert(ProposeState {
                     hash: propose_hash,
                     propose: msg.clone(),
-                    block_hash: None,
-                    patch: None,
                     unknown_txs: unknown_txs,
+                }))
+            }
+        }
+    }
+
+    pub fn add_block(&mut self,
+                     block_hash: Hash,
+                     patch: Patch,
+                     txs: Vec<Hash>,
+                     propose_round: Round)
+                     -> Option<&BlockState> {
+        match self.blocks.entry(block_hash) {
+            Entry::Occupied(..) => None,
+            Entry::Vacant(e) => {
+                Some(e.insert(BlockState {
+                    hash: block_hash,
+                    patch: patch,
+                    txs: txs,
+                    propose_round: propose_round,
                 }))
             }
         }
@@ -414,8 +458,12 @@ impl<Tx> State<Tx> {
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
-            if let Some(_) = self.our_prevotes.insert(msg.round(), msg.clone()) {
-                panic!("Trying to send different prevotes for same round");
+            if let Some(other) = self.our_prevotes.insert(msg.round(), msg.clone()) {
+                if &other != msg {
+                    panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
+                           other,
+                           msg);
+                }
             }
         }
 
@@ -436,12 +484,17 @@ impl<Tx> State<Tx> {
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
         let majority_count = self.majority_count();
         if msg.validator() == self.id() {
-            if let Some(_) = self.our_precommits.insert(msg.round(), msg.clone()) {
-                panic!("Trying to send different precommits for same round");
+            if let Some(other) = self.our_precommits.insert(msg.round(), msg.clone()) {
+                if other.propose_hash() != msg.propose_hash() {
+                    panic!("Trying to send different precommits for same round, old={:?}, \
+                            new={:?}",
+                           other,
+                           msg);
+                }
             }
         }
 
-        let key = (msg.round(), *msg.propose_hash(), *msg.block_hash());
+        let key = (msg.round(), *msg.block_hash());
         let map = self.precommits.entry(key).or_insert_with(HashMap::new);
         map.entry(msg.validator()).or_insert_with(|| msg.clone());
 
@@ -462,12 +515,8 @@ impl<Tx> State<Tx> {
         self.unknown_proposes_with_precommits.remove(propose_hash).unwrap_or_default()
     }
 
-    pub fn has_majority_precommits(&self,
-                                   round: Round,
-                                   propose_hash: Hash,
-                                   block_hash: Hash)
-                                   -> bool {
-        match self.precommits.get(&(round, propose_hash, block_hash)) {
+    pub fn has_majority_precommits(&self, round: Round, block_hash: Hash) -> bool {
+        match self.precommits.get(&(round, block_hash)) {
             Some(map) => map.len() >= self.majority_count(),
             None => false,
         }

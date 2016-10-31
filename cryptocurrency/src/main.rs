@@ -1,8 +1,4 @@
 #![feature(type_ascription)]
-#![feature(question_mark)]
-#![feature(custom_derive)]
-#![feature(plugin)]
-#![plugin(serde_macros)]
 
 #[macro_use]
 extern crate rustless;
@@ -15,6 +11,8 @@ extern crate clap;
 extern crate serde;
 extern crate time;
 extern crate rand;
+extern crate log;
+extern crate colored;
 
 extern crate exonum;
 extern crate blockchain_explorer;
@@ -24,6 +22,7 @@ use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
 use std::default::Default;
+use std::env;
 
 use clap::{Arg, App, SubCommand};
 use rustless::json::ToJson;
@@ -33,6 +32,9 @@ use rustless::batteries::swagger;
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use rand::{Rng, thread_rng};
+use log::{LogRecord, LogLevel};
+use env_logger::LogBuilder;
+use colored::*;
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
@@ -42,8 +44,7 @@ use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 
-use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer,
-                     TxCreateWallet};
+use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer, TxCreateWallet};
 use cryptocurrency::api::CurrencyApi;
 
 pub type CurrencyTxSender<B> = TxSender<B, NodeChannel<B>>;
@@ -80,13 +81,16 @@ fn load_keypair_from_cookies(storage: &CookieJar) -> StorageResult<(PublicKey, S
     Ok((public_key, secret_key))
 }
 
-fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: CurrencyBlockchain<D>) {
-    blockchain_explorer::make_api::<CurrencyBlockchain<D>, CurrencyTx>(api, b1);
+fn blockchain_explorer_api<D: Database>(api: &mut Api,
+                                        b: CurrencyBlockchain<D>,
+                                        cfg: Configuration) {
+    blockchain_explorer::make_api::<CurrencyBlockchain<D>, CurrencyTx>(api, b, cfg);
 }
 
 fn cryptocurrency_api<D: Database>(api: &mut Api,
                                    blockchain: CurrencyBlockchain<D>,
-                                   channel: CurrencyTxSender<CurrencyBlockchain<D>>) {
+                                   channel: CurrencyTxSender<CurrencyBlockchain<D>>,
+                                   cfg: Configuration) {
     api.namespace("wallets", move |api| {
         let ch = channel.clone();
         api.post("create", move |endpoint| {
@@ -178,6 +182,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
         });
 
         let b = blockchain.clone();
+        let c = cfg.clone();
         api.get("info", move |endpoint| {
             endpoint.handle(move |client, _| {
                 let (public_key, _) = {
@@ -190,7 +195,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         Err(e) => return client.error(e),
                     }
                 };
-                let currency_api = CurrencyApi::<D>::new(b.clone());
+                let currency_api = CurrencyApi::<D>::new(b.clone(), c.clone());
                 match currency_api.wallet_info(&public_key) {
                     Ok(Some(info)) => client.json(&info.to_json()),
                     _ => client.error(StorageError::new("Unable to get wallet info")),
@@ -204,7 +209,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                          node_cfg: Configuration,
                          port: Option<u16>) {
     if let Some(port) = port {
-        let mut node = Node::new(blockchain.clone(), node_cfg);
+        let mut node = Node::new(blockchain.clone(), node_cfg.clone());
         let channel = node.channel();
 
         let api_thread = thread::spawn(move || {
@@ -225,8 +230,8 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                     }
                 });
 
-                blockchain_explorer_api(api, blockchain.clone());
-                cryptocurrency_api(api, blockchain.clone(), channel.clone());
+                blockchain_explorer_api(api, blockchain.clone(), node_cfg.clone());
+                cryptocurrency_api(api, blockchain.clone(), channel.clone(), node_cfg);
                 api.mount(swagger::create_api("docs"));
             });
 
@@ -269,7 +274,29 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    let format = |record: &LogRecord| {
+        let now = time::now_utc();
+        let level = match record.level() {
+            LogLevel::Error => "ERROR".red(),
+            LogLevel::Warn => "WARN".yellow(),
+            LogLevel::Info => "INFO".green(),
+            LogLevel::Debug => "DEBUG".cyan(),
+            LogLevel::Trace => "TRACE".white(),
+        };
+        format!("{} - [ {} ] - {}",
+                now.asctime().to_string().bold(),
+                level,
+                record.args())
+    };
+
+    let mut builder = LogBuilder::new();
+    builder.format(format);
+
+    if env::var("RUST_LOG").is_ok() {
+        builder.parse(&env::var("RUST_LOG").unwrap());
+    }
+
+    builder.init().unwrap();
 
     let app = App::new("Simple cryptocurrency demo program")
         .version(env!("CARGO_PKG_VERSION"))
@@ -286,6 +313,12 @@ fn main() {
             .about("Generates default configuration file")
             .version(env!("CARGO_PKG_VERSION"))
             .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+            .arg(Arg::with_name("START_PORT")
+                .short("p")
+                .long("port")
+                .value_name("START_PORT")
+                .help("Port for first validator")
+                .takes_value(true))
             .arg(Arg::with_name("COUNT")
                 .help("Validators count")
                 .required(true)
@@ -321,7 +354,8 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = GenesisConfig::gen(count);
+            let port: Option<u16> = matches.value_of("START_PORT").map(|x| x.parse().unwrap());
+            let cfg = GenesisConfig::gen(count, port);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
@@ -344,7 +378,7 @@ fn main() {
                         .collect()
                 }
             };
-            let node_cfg = cfg.to_node_configuration(idx, peers);
+            let node_cfg = cfg.gen_node_configuration(idx, peers);
             match matches.value_of("LEVELDB_PATH") {
                 Some(ref db_path) => {
                     println!("Using levedb storage with path: {}", db_path);

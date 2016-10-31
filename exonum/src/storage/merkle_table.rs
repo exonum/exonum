@@ -44,7 +44,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
         self.get_hash(self.height()?, K::zero())
-            .map(|h| h.unwrap_or(hash(&[])))
+            .map(|h| h.unwrap_or_else(|| hash(&[])))
     }
 
     fn height(&self) -> Result<K, Error> {
@@ -216,8 +216,8 @@ mod tests {
 
     #[test]
     fn test_list_methods() {
-        let mut storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
+        let storage = MemoryDB::new();
+        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
 
         assert!(table.is_empty().unwrap());
         assert_eq!(table.len().unwrap(), 0);
@@ -238,8 +238,8 @@ mod tests {
 
     #[test]
     fn test_height() {
-        let mut storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
+        let storage = MemoryDB::new();
+        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
 
         table.append(vec![1]).unwrap();
         assert_eq!(table.height().unwrap(), 1);
@@ -265,18 +265,18 @@ mod tests {
 
     #[test]
     fn test_hashes() {
-        let mut storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
+        let storage = MemoryDB::new();
+        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
-        let h1 = hash(&vec![1]);
-        let h2 = hash(&vec![2]);
-        let h3 = hash(&vec![3]);
-        let h4 = hash(&vec![4]);
-        let h5 = hash(&vec![5]);
-        let h6 = hash(&vec![6]);
-        let h7 = hash(&vec![7]);
-        let h8 = hash(&vec![8]);
+        let h1 = hash(&[1]);
+        let h2 = hash(&[2]);
+        let h3 = hash(&[3]);
+        let h4 = hash(&[4]);
+        let h5 = hash(&[5]);
+        let h6 = hash(&[6]);
+        let h7 = hash(&[7]);
+        let h8 = hash(&[8]);
         let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
         let h123 = hash(&[h12.as_ref(), h3.as_ref()].concat());
         let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
@@ -319,8 +319,8 @@ mod tests {
 
     #[test]
     fn test_hash_in_values() {
-        let mut storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &mut storage));
+        let storage = MemoryDB::new();
+        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
 
         let h = hash(&[1, 2, 3, 4]);
         table.append(h).unwrap();
@@ -329,11 +329,11 @@ mod tests {
 
     #[test]
     fn test_hash_set_value_simple() {
-        let h1 = hash(&vec![1]);
-        let h2 = hash(&vec![2]);
+        let h1 = hash(&[1]);
+        let h2 = hash(&[2]);
 
-        let mut s = MemoryDB::new();
-        let t = MerkleTable::new(MapTable::new(vec![255], &mut s));
+        let s = MemoryDB::new();
+        let t = MerkleTable::new(MapTable::new(vec![255], &s));
         assert_eq!(t.get(0u32).unwrap(), None);
         t.append(vec![1]).unwrap();
         assert_eq!(t.root_hash().unwrap(), h1);
@@ -344,8 +344,8 @@ mod tests {
 
     #[test]
     fn test_hash_set_value() {
-        let mut s1 = MemoryDB::new();
-        let t1 = MerkleTable::new(MapTable::new(vec![255], &mut s1));
+        let s1 = MemoryDB::new();
+        let t1 = MerkleTable::new(MapTable::new(vec![255], &s1));
         assert_eq!(t1.get(0u32).unwrap(), None);
         t1.append(vec![1]).unwrap();
         t1.append(vec![2]).unwrap();
@@ -357,8 +357,8 @@ mod tests {
         t1.set(2, vec![5]).unwrap();
         t1.set(3, vec![1]).unwrap();
 
-        let mut s2 = MemoryDB::new();
-        let t2 = MerkleTable::new(MapTable::new(vec![255], &mut s2));
+        let s2 = MemoryDB::new();
+        let t2 = MerkleTable::new(MapTable::new(vec![255], &s2));
         assert_eq!(t2.get(0u32).unwrap(), None);
         t2.append(vec![4]).unwrap();
         t2.append(vec![7]).unwrap();

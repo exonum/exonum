@@ -104,7 +104,6 @@ impl MessageWriter {
                 }
             }
         }
-
         Ok(())
     }
 
@@ -193,6 +192,16 @@ impl OutgoingConnection {
 
     pub fn is_idle(&self) -> bool {
         self.writer.is_idle()
+    }
+
+    pub fn writer_state(&self) -> (usize, usize) {
+        let len = self.writer.queue.len();
+        let bytes = if len > 0 {
+            self.writer.queue[0].len() - self.writer.position
+        } else {
+            0
+        };
+        (len, bytes)
     }
 }
 

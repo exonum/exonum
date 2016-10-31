@@ -1,6 +1,8 @@
 use time::Timespec;
 
 use super::super::crypto::{Hash, hash};
+use super::super::messages::Field;
+use super::super::storage::StorageValue;
 
 pub const BLOCK_SIZE: usize = 116;
 
@@ -9,15 +11,31 @@ storage_value!(
         const SIZE = BLOCK_SIZE;
 
         height:                 u64         [00 => 08]
-        time:                   Timespec    [08 => 16]
-        prev_hash:              &Hash       [16 => 48]   
-        tx_hash:                &Hash       [48 => 80]
-        state_hash:             &Hash       [80 => 112]
-        proposer:               u32         [112 => 116]
+        propose_round:          u32         [08 => 12]
+        time:                   Timespec    [12 => 20]
+        prev_hash:              &Hash       [20 => 52]
+        tx_hash:                &Hash       [52 => 84]
+        state_hash:             &Hash       [84 => 116]
     }
 );
 
-// TODO: add network_id, propose_round, block version?
+// TODO: add network_id, block version?
+
+// TODO add generic implementation for whole storage values
+impl<'a> Field<'a> for Block {
+    fn field_size() -> usize {
+        8
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> Block {
+        let data = <&[u8] as Field>::read(buffer, from, to);
+        Block::deserialize(data.to_vec())
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        <&[u8] as Field>::write(&self.clone().serialize().as_slice(), buffer, from, to);
+    }
+}
 
 
 #[test]
@@ -27,13 +45,13 @@ fn test_block() {
     let prev_hash = hash(&[1, 2, 3]);
     let tx_hash = hash(&[4, 5, 6]);
     let state_hash = hash(&[7, 8, 9]);
-    let proposer = 10;
-    let block = Block::new(height, time, &prev_hash, &tx_hash, &state_hash, proposer);
+    let round = 2;
+    let block = Block::new(height, round, time, &prev_hash, &tx_hash, &state_hash);
 
     assert_eq!(block.height(), height);
     assert_eq!(block.time(), time);
     assert_eq!(block.prev_hash(), &prev_hash);
     assert_eq!(block.tx_hash(), &tx_hash);
     assert_eq!(block.state_hash(), &state_hash);
-    assert_eq!(block.proposer(), proposer);
+    assert_eq!(block.propose_round(), round);
 }

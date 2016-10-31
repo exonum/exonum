@@ -20,9 +20,9 @@ fn test_send_propose_and_prevote() {
     sandbox.recv(tx.clone());
 
     // round happens
-    sandbox.set_time(1, 0);
-    sandbox.set_time(2, 0);
-    sandbox.set_time(3, 0);
+    sandbox.add_time(Duration::milliseconds(1000));
+    sandbox.add_time(Duration::milliseconds(1000));
+    sandbox.add_time(Duration::milliseconds(1999));
 
     sandbox.assert_state(0, 4);
 
@@ -68,7 +68,7 @@ fn test_get_lock_and_send_precommit() {
                                &[],
                                sandbox.s(1));
 
-    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]), 1);
+    let block = Block::new(0, 1, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
@@ -92,7 +92,7 @@ fn test_commit() {
                                &[],
                                sandbox.s(1));
 
-    let block = Block::new(0, propose_time, &hash(&[]), &hash(&[]), &hash(&[]), 1);
+    let block = Block::new(0, 1, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));

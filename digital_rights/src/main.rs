@@ -1,7 +1,4 @@
 #![feature(type_ascription)]
-#![feature(question_mark)]
-#![feature(custom_derive)]
-#![feature(plugin)]
 
 #[macro_use]
 extern crate rustless;
@@ -87,8 +84,12 @@ fn load_user(storage: &CookieJar) -> Result<(String, PublicKey, SecretKey), Valu
     Ok((role, public_key, secret_key))
 }
 
-fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: DigitalRightsBlockchain<D>) {
-    blockchain_explorer::make_api::<DigitalRightsBlockchain<D>, DigitalRightsTx>(api, b1);
+fn blockchain_explorer_api<D: Database>(api: &mut Api,
+                                        blockchain: DigitalRightsBlockchain<D>,
+                                        cfg: Configuration) {
+    blockchain_explorer::make_api::<DigitalRightsBlockchain<D>, DigitalRightsTx>(api,
+                                                                                 blockchain,
+                                                                                 cfg);
 }
 
 fn send_tx<'a, D: Database>(tx: DigitalRightsTx,
@@ -552,7 +553,7 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                          node_cfg: Configuration,
                          port: Option<u16>) {
     if let Some(port) = port {
-        let mut node = Node::new(blockchain.clone(), node_cfg);
+        let mut node = Node::new(blockchain.clone(), node_cfg.clone());
         let channel = node.channel();
 
         let api_thread = thread::spawn(move || {
@@ -591,7 +592,7 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                     Some(Response::from_json(code, &json))
                 });
 
-                blockchain_explorer_api(api, blockchain.clone());
+                blockchain_explorer_api(api, blockchain.clone(), node_cfg);
                 digital_rights_api(api, blockchain.clone(), channel.clone());
                 api.mount(swagger::create_api("docs"));
             });
@@ -652,6 +653,12 @@ fn main() {
             .about("Generates default configuration file")
             .version(env!("CARGO_PKG_VERSION"))
             .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+            .arg(Arg::with_name("START_PORT")
+                .short("p")
+                .long("port")
+                .value_name("START_PORT")
+                .help("Port for first validator")
+                .takes_value(true))
             .arg(Arg::with_name("COUNT")
                 .help("Validators count")
                 .required(true)
@@ -687,7 +694,8 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = GenesisConfig::gen(count);
+            let port: Option<u16> = matches.value_of("START_PORT").map(|x| x.parse().unwrap());
+            let cfg = GenesisConfig::gen(count, port);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}",
                      path);
@@ -710,7 +718,7 @@ fn main() {
                         .collect()
                 }
             };
-            let node_cfg = cfg.to_node_configuration(idx, peers);
+            let node_cfg = cfg.gen_node_configuration(idx, peers);
             match matches.value_of("LEVELDB_PATH") {
                 Some(ref db_path) => {
                     println!("Using levedb storage with path: {}", db_path);

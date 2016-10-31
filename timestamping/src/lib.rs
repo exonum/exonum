@@ -1,5 +1,3 @@
-#![feature(question_mark)]
-
 #[macro_use(message)]
 extern crate exonum;
 

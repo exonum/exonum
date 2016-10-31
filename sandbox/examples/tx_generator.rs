@@ -91,7 +91,7 @@ fn main() {
                 }
             };
 
-            let node_cfg = cfg.to_node_configuration(idx, peers);
+            let node_cfg = cfg.gen_node_configuration(idx, peers);
 
             let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
             let mut node = Node::new(blockchain.clone(), node_cfg);
