@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
 import unittest
+
 import requests
+from requests.packages.urllib3.util.retry import Retry
+from requests.adapters import HTTPAdapter
+
 import json
 import time
 import base64
@@ -18,23 +22,32 @@ class ExonumApi(unittest.TestCase):
     def setUp(self):
         self.times = 100
         self.timeout = 1
+        # Configure http session
+        self.session = requests.Session()
+        retries = Retry(total=20,
+                backoff_factor=1,
+                status_forcelist=[ 500, 502, 503, 504 ])
+        self.session.mount('http://', HTTPAdapter(max_retries=retries))
+
+    def tearDown(self):
+        self.session.close()
     
     def url(self, endpoint):
         return self.host + "/" + endpoint
 
     def put(self, endpoint, payload, cookies=None): 
         url = self.url(endpoint)    
-        r = requests.put(url, json=payload, cookies=cookies)
+        r = self.session.put(url, json=payload, cookies=cookies)
         return r
 
     def post(self, endpoint, payload, cookies=None): 
         url = self.url(endpoint)
-        r = requests.post(url, json=payload, cookies=cookies)
+        r = self.session.post(url, json=payload, cookies=cookies)
         return r
 
     def get(self, endpoint, cookies=None): 
         url = self.url(endpoint)
-        r = requests.get(url, cookies=cookies)
+        r = self.session.get(url, cookies=cookies)
         return r
 
     def find_transaction(self, hash): 
