@@ -7,7 +7,11 @@ supervisor_conf=${destdir}/etc/supervisord.conf
 sock_file=/tmp/
 
 start() {
-    ${scriptdir}/create_testnet.sh ${destdir} > /dev/null 2>&1
+    mkdir -p ${destdir}/log/supervisor
+    mkdir ${destdir}/run
+    mkdir ${destdir}/db
+    cp -R ${scriptdir}/etc ${destdir}
+    $node_executable -c ${destdir}/testnet.conf generate 9 -p 9000
     cd $destdir
     supervisord
     supervisorctl start leveldb:*
@@ -15,9 +19,8 @@ start() {
 
 stop() {
     cd ${destdir}
-    if [ -e /tmp/supervisor_cryptocurrency.sock ]
+    if [ -e /tmp/supervisor_tst_cryptocurrency.sock ]
     then
-        supervisorctl stop all
         supervisorctl shutdown
     fi 
     rm -rf "./db"
