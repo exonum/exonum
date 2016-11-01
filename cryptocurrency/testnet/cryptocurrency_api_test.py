@@ -24,10 +24,10 @@ class CryptocurrencyApi(ExonumApi):
     
 
 
-class DigitalRightsApiTest(CryptocurrencyApi):
+class CryptocurrencyApiTest(CryptocurrencyApi):
     def setUp(self):
         super().setUp()
-        self.host = "http://127.0.0.1:8200/api/v1"
+        self.host = "http://127.0.0.1:8500/api/v1"
         self.times = 50
 
     def create_many_users(self, txs):
