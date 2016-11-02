@@ -37,8 +37,8 @@ pub struct State<Tx> {
     // messages
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
-    prevotes: HashMap<(Round, Hash), HashMap<ValidatorId, Prevote>>,
-    precommits: HashMap<(Round, Hash), HashMap<ValidatorId, Precommit>>,
+    prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
+    precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
     transactions: HashMap<Hash, Tx>,
     queued: Vec<ConsensusMessage>,
@@ -101,6 +101,61 @@ pub struct BlockState {
     txs: Vec<Hash>,
     // Раунд на котором был создан Propose
     propose_round: Round,
+}
+
+pub trait VoteMessage: Message {
+    fn validator(&self) -> ValidatorId;
+}
+
+impl VoteMessage for Precommit {
+    fn validator(&self) -> ValidatorId {
+        self.validator()
+    }
+}
+
+impl VoteMessage for Prevote {
+    fn validator(&self) -> ValidatorId {
+        self.validator()
+    }
+}
+
+pub struct Votes<T: VoteMessage> {
+    messages: Vec<T>,
+    validators: BitVec,
+    count: usize,
+}
+
+impl<T> Votes<T>
+    where T: VoteMessage
+{
+    pub fn new(validators_len: usize) -> Votes<T> {
+        Votes {
+            messages: Vec::new(),
+            validators: BitVec::from_elem(validators_len, false),
+            count: 0,
+        }
+    }
+
+    pub fn insert(&mut self, message: &T) {
+        let voter = message.validator() as usize;
+        if !self.validators[voter] {
+            self.count += 1;
+            self.validators.set(voter, true);
+            self.messages.push(message.clone());
+        }
+    }
+
+    pub fn validators(&self) -> &BitVec {
+        &self.validators
+    }
+
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    pub fn messages(&self) -> &Vec<T> {
+        &self.messages
+    }
 }
 
 impl RequestData {
@@ -384,18 +439,18 @@ impl<Tx> State<Tx> {
         full_proposes
     }
 
-    pub fn prevotes(&self,
-                    round: Round,
-                    propose_hash: Hash)
-                    -> Option<&HashMap<ValidatorId, Prevote>> {
-        self.prevotes.get(&(round, propose_hash))
+    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Prevote] {
+        self.prevotes
+            .get(&(round, propose_hash))
+            .map(|votes| votes.messages().as_slice())
+            .unwrap_or_else(|| &[])
     }
 
-    pub fn precommits(&self,
-                      round: Round,
-                      block_hash: Hash)
-                      -> Option<&HashMap<ValidatorId, Precommit>> {
-        self.precommits.get(&(round, block_hash))
+    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Precommit] {
+        self.precommits
+            .get(&(round, propose_hash))
+            .map(|votes| votes.messages().as_slice())
+            .unwrap_or_else(|| &[])
     }
 
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
@@ -469,38 +524,33 @@ impl<Tx> State<Tx> {
         }
 
         let key = (msg.round(), *msg.propose_hash());
-        let map = self.prevotes.entry(key).or_insert_with(HashMap::new);
-        map.entry(msg.validator()).or_insert_with(|| msg.clone());
-
-        map.len() >= majority_count
+        let validators_len = self.validators.len();
+        let mut votes = self.prevotes.entry(key).or_insert_with(|| Votes::new(validators_len));
+        votes.insert(msg);
+        votes.count() >= majority_count
     }
 
     pub fn has_majority_prevotes(&self, round: Round, propose_hash: Hash) -> bool {
         match self.prevotes.get(&(round, propose_hash)) {
-            Some(map) => map.len() >= self.majority_count(),
+            Some(votes) => votes.count() >= self.majority_count(),
             None => false,
         }
     }
 
-    // TODO implement and use Votes data structure
     pub fn has_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        let mut vec = BitVec::from_elem(self.validators.len(), false);
-        if let Some(map) = self.prevotes.get(&(round, *propose_hash)) {
-            for prevote in map.values() {
-                vec.set(prevote.validator() as usize, true);
-            }
+        if let Some(votes) = self.prevotes.get(&(round, *propose_hash)) {
+            votes.validators().clone()
+        } else {
+            BitVec::from_elem(self.validators.len(), false)
         }
-        vec
     }
 
     pub fn has_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        let mut vec = BitVec::from_elem(self.validators.len(), false);
-        if let Some(map) = self.precommits.get(&(round, *propose_hash)) {
-            for precommit in map.values() {
-                vec.set(precommit.validator() as usize, true);
-            }
+        if let Some(votes) = self.precommits.get(&(round, *propose_hash)) {
+            votes.validators().clone()
+        } else {
+            BitVec::from_elem(self.validators.len(), false)
         }
-        vec
     }
 
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
@@ -517,10 +567,10 @@ impl<Tx> State<Tx> {
         }
 
         let key = (msg.round(), *msg.block_hash());
-        let map = self.precommits.entry(key).or_insert_with(HashMap::new);
-        map.entry(msg.validator()).or_insert_with(|| msg.clone());
-
-        map.len() >= majority_count
+        let validators_len = self.validators.len();
+        let votes = self.precommits.entry(key).or_insert_with(|| Votes::new(validators_len));
+        votes.insert(msg);
+        votes.count() >= majority_count
     }
 
     pub fn add_unknown_propose_with_precommits(&mut self,
@@ -539,7 +589,7 @@ impl<Tx> State<Tx> {
 
     pub fn has_majority_precommits(&self, round: Round, block_hash: Hash) -> bool {
         match self.precommits.get(&(round, block_hash)) {
-            Some(map) => map.len() >= self.majority_count(),
+            Some(votes) => votes.count() >= self.majority_count(),
             None => false,
         }
     }

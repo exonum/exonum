@@ -86,18 +86,15 @@ impl<B, S> NodeHandler<B, S>
         }
 
         let has_prevotes = msg.validators();
-        let prevotes = if let Some(prevotes) = self.state
-            .prevotes(msg.round(), *msg.propose_hash()) {
-            prevotes.values()
-                .filter(|p| !has_prevotes[p.validator() as usize])
-                .map(|p| p.raw().clone())
-                .collect()
-        } else {
-            Vec::new()
-        };
+        let prevotes = self.state
+            .prevotes(msg.round(), *msg.propose_hash())
+            .iter()
+            .filter(|p| !has_prevotes[p.validator() as usize])
+            .map(|p| p.raw().clone())
+            .collect::<Vec<_>>();
 
-        for prevote in prevotes {
-            self.send_to_peer(*msg.from(), &prevote);
+        for prevote in &prevotes {
+            self.send_to_peer(*msg.from(), prevote);
         }
     }
 
@@ -107,27 +104,22 @@ impl<B, S> NodeHandler<B, S>
         }
 
         let has_precommits = msg.validators();
-        let precommits = if msg.height() == self.state.height() {
-            if let Some(precommits) = self.state
-                .precommits(msg.round(), *msg.block_hash()) {
-                precommits.values()
-                    .filter(|p| !has_precommits[p.validator() as usize])
-                    .map(|p| p.raw().clone())
-                    .collect()
-            } else {
-                Vec::new()
-            }
-        } else {
-            // msg.height < state.height
-            self.blockchain
-                .view()
-                .precommits(msg.block_hash())
-                .values()
-                .unwrap()
-                .iter()
-                .map(|p| p.raw().clone())
-                .collect()
-        };
+        let precommits = self.state
+            .precommits(msg.round(), *msg.propose_hash())
+            .iter()
+            .filter(|p| !has_precommits[p.validator() as usize])
+            .map(|p| p.raw().clone())
+            .collect::<Vec<_>>();
+
+        // FIXME what about msg.height < state.height ? 
+        // self.blockchain
+        //     .view()
+        //     .precommits(msg.block_hash())
+        //     .values()
+        //     .unwrap()
+        //     .iter()
+        //     .map(|p| p.raw().clone())
+        //     .collect()
 
         for precommit in precommits {
             self.send_to_peer(*msg.from(), &precommit);
