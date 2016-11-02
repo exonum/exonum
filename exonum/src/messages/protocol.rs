@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 use time::Timespec;
 use super::super::crypto::{Hash, PublicKey};
-use super::RawMessage;
+use super::{RawMessage, BitVec};
 use super::super::blockchain;
 
 pub const CONNECT_MESSAGE_ID: u16 = 0;
@@ -123,7 +123,7 @@ message! {
 message! {
     RequestPrevotes {
         const ID = REQUEST_PREVOTES_MESSAGE_ID;
-        const SIZE = 116;
+        const SIZE = 124;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
@@ -131,14 +131,14 @@ message! {
         height:         u64         [72 => 80]
         round:          u32         [80 => 84]
         propose_hash:   &Hash       [84 => 116]
-        // validators:     &Bitset     [60 => 68]
+        validators:     BitVec      [116 => 124]
     }
 }
 
 message! {
     RequestPrecommits {
         const ID = REQUEST_PRECOMMITS_MESSAGE_ID;
-        const SIZE = 148;
+        const SIZE = 156;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
@@ -147,7 +147,7 @@ message! {
         round:          u32         [80 => 84]
         propose_hash:   &Hash       [84 => 116]
         block_hash:     &Hash       [116 => 148]
-        // validators:     &Bitset     [60 => 68]
+        validators:     BitVec      [148 => 156]
     }
 }
 

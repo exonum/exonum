@@ -85,9 +85,13 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
+        let has_prevotes = msg.validators();
         let prevotes = if let Some(prevotes) = self.state
             .prevotes(msg.round(), *msg.propose_hash()) {
-            prevotes.values().map(|p| p.raw().clone()).collect()
+            prevotes.values()
+                .filter(|p| !has_prevotes[p.validator() as usize])
+                .map(|p| p.raw().clone())
+                .collect()
         } else {
             Vec::new()
         };
@@ -102,10 +106,14 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
+        let has_precommits = msg.validators();
         let precommits = if msg.height() == self.state.height() {
             if let Some(precommits) = self.state
                 .precommits(msg.round(), *msg.block_hash()) {
-                precommits.values().map(|p| p.raw().clone()).collect()
+                precommits.values()
+                    .filter(|p| !has_precommits[p.validator() as usize])
+                    .map(|p| p.raw().clone())
+                    .collect()
             } else {
                 Vec::new()
             }
