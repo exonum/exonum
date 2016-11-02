@@ -170,3 +170,11 @@ $ tx_generator -c /tmp/exonum/testnet.conf run 1 -p "0" -t 100 -d 256 -x 10 1000
 ## Оценка производительности сети
 
 TODO
+
+# Разворачивание фронтенда DRM
+1. установить node.js http://nodejs.org/ (если Windows, то добавить её в PATH)
+2. установить gulp, bower и yeoman `npm install -g gulp-cli bower yo`
+3. перейти в папку `drm-frontend`
+4. запустить команду `npm install`
+5. запустить команду `bower install`
+6. запустить `gulp serve` (может потребоваться запуск через `sudo`)
