@@ -4,7 +4,8 @@ use std::net::SocketAddr;
 
 use time::Duration;
 
-use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
+use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
+                             BitVec};
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
 
@@ -479,6 +480,27 @@ impl<Tx> State<Tx> {
             Some(map) => map.len() >= self.majority_count(),
             None => false,
         }
+    }
+
+    // TODO implement and use Votes data structure
+    pub fn has_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
+        let mut vec = BitVec::from_elem(self.validators.len(), false);
+        if let Some(map) = self.prevotes.get(&(round, *propose_hash)) {
+            for prevote in map.values() {
+                vec.set(prevote.validator() as usize, true);
+            }
+        }
+        vec
+    }
+
+    pub fn has_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
+        let mut vec = BitVec::from_elem(self.validators.len(), false);
+        if let Some(map) = self.precommits.get(&(round, *propose_hash)) {
+            for precommit in map.values() {
+                vec.set(precommit.validator() as usize, true);
+            }
+        }
+        vec
     }
 
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
