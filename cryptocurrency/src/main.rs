@@ -54,10 +54,9 @@ fn save_keypair_in_cookies(storage: &mut CookieJar,
                            public_key: &PublicKey,
                            secret_key: &SecretKey) {
     let p = storage.permanent();
-    let e = p.encrypted();
 
-    e.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
-    e.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
+    p.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
+    p.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
 }
 
 fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar, key: &str) -> StorageResult<Vec<u8>> {
@@ -71,10 +70,9 @@ fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar, key: &str) -> StorageR
 
 fn load_keypair_from_cookies(storage: &CookieJar) -> StorageResult<(PublicKey, SecretKey)> {
     let p = storage.permanent();
-    let e = p.encrypted();
 
-    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&e, "public_key")?.as_ref());
-    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&e, "secret_key")?.as_ref());
+    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&p, "public_key")?.as_ref());
+    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&p, "secret_key")?.as_ref());
 
     let public_key = public_key.ok_or(StorageError::new("Unable to read public key"))?;
     let secret_key = secret_key.ok_or(StorageError::new("Unable to read secret key"))?;
