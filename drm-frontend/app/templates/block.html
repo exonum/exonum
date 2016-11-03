@@ -1,9 +1,9 @@
 <div class="app-list-headers clearfix">
     {% if (block.get('height') < last_height) { %}
-      <div class="pull-left"><a id="block-prev">← {{ block.get('height') + 1 }}</a></div>
+      <div class="pull-left"><a id="block-prev" role="button">← {{ block.get('height') + 1 }}</a></div>
     {% } %}
     {% if (block.get('height') > 1) { %}
-      <div class="pull-right"><a id="block-next">{{ block.get('height') - 1 }} →</a></div>
+      <div class="pull-right"><a id="block-next" role="button">{{ block.get('height') - 1 }} →</a></div>
     {% } %}
 </div>
 

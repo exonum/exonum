@@ -14,13 +14,17 @@ html {
     height: 100%;
     display: table;
     margin: auto;
+    width: 100%;
 }
-
 a {
     color: #266be9;
     /*text-decoration: underline;*/
 }
 
+.page {
+    margin: 0 auto;
+    max-width: 640px;
+}
 .app-wrapper {
     margin: 0 auto;
     width: 375px;
@@ -29,7 +33,6 @@ a {
     background: #eceef2;
     position: relative;
 }
-
 .welcome-wrapper {
     width: 100%;
     min-height: 100%;
@@ -39,7 +42,6 @@ a {
     color: #fff;
     overflow: hidden;
 }
-
 .welcome-intro {
     padding-top: 60px;
     padding-bottom: 60px;
@@ -57,22 +59,26 @@ a {
     letter-spacing: 5px;
 }
 .app-subheader {
-    text-align: left;
+    text-align: center;
     font-size: 14px;
     padding: 20px;
-    letter-spacing: 1.2x;
+    letter-spacing: 1.2px;
+    margin: 0 auto;
+    max-width: 480px;
 }
 
+
+/*
+    Buttons
+*/
 .buttons-wrapper {
     width: 280px;
     margin: 0 auto;
 }
-
 .buttons-wrapper .button {
     margin-top: 13px;
     margin-bottom: 20px;
 }
-
 .button {
     text-align: center;
     display: block;
@@ -130,7 +136,23 @@ a.button:focus, a.button:active, a.button:hover {
     color: #006699;
 }
 .button.button-link:focus, .button.button-link:active { color: #142f5e; background: transparent; }
+.button-group {
+    display: table;
+    width: 100%;
+    margin-bottom: 20px;
+}
+.button-group .button {
+    display: table-cell;
+    width: 33%;
+    border-radius: 0;
+}
+.button-group .button:first-child { border-radius: 21px 0 0 21px; }
+.button-group .button:last-child { border-radius: 0 21px 21px 0; }
 
+
+/*
+    Toolbar
+*/
 .toolbar {
     background: #0e1f3e;
     color: #fff;
@@ -154,8 +176,11 @@ a.button:focus, a.button:active, a.button:hover {
     width: 80px;
     height: 60px;
     text-align: center;
+    text-overflow: ellipsis;
     cursor: pointer;
     font-size: 10px;
+    overflow: hidden;
+    white-space: nowrap;
 }
 .toolbar-title {
     margin: 0 60px;
@@ -167,6 +192,10 @@ a.button:focus, a.button:active, a.button:hover {
     line-height: 22px;
 }
 
+
+/*
+    Bottom menu
+*/
 .bottom-menu {
     background: #fff;
     color: #233a59;
@@ -200,13 +229,16 @@ a.button:focus, a.button:active, a.button:hover {
     max-height: 22px;
 }
 
+
+/*
+    Content
+*/
 .app-content {
     position: relative;
     width: 100%;
     overflow: auto;
     padding: 75px 20px;
 }
-
 .app-content ol {
     font-size: 12px;
     margin-bottom: 20px;
@@ -218,14 +250,12 @@ a.button:focus, a.button:active, a.button:hover {
     word-break: break-all;
     color: #333;
 }
-
 .app-list-headers {
     text-transform: uppercase;
     font-size: 11px;
     color: #7c8ba1;
     margin-bottom: 8px;
 }
-
 .app-list {
     background: #fff;
     width: 100%;
@@ -245,6 +275,7 @@ a.button:focus, a.button:active, a.button:hover {
 .app-list td:last-child {
     text-align: right;
 }
+
 .cell-light { color: #abb5c4; }
 .cell-small { font-size: 12px; }
 .cell-smaller { font-size: 11px; }
@@ -252,6 +283,15 @@ a.button:focus, a.button:active, a.button:hover {
 .cell-action-type { text-transform: uppercase; color: #647082; font-size: 13px; }
 .cell-action-type:focus, .cell-action-type:active { color: #6566ff; }
 .cell-link { font-size: 12px; }
+
+.list-option-description { margin-bottom: 25px; }
+.list-option-ends { margin-bottom: 25px; font-size: 16px; text-align: center; }
+.list-option-link { margin-bottom: 25px; text-align: center; display: block; }
+
+
+/*
+    Checker
+*/
 .checker {
     display: inline-block;
     width: 21px;
@@ -268,10 +308,10 @@ a.button:focus, a.button:active, a.button:hover {
     background: #00d66a url(../images/icon_check.svg) center center no-repeat;
 }
 
-.list-option-description { margin-bottom: 25px; }
-.list-option-ends { margin-bottom: 25px; font-size: 16px; text-align: center; }
-.list-option-link { margin-bottom: 25px; text-align: center; display: block; }
 
+/*
+    Modal
+*/
 .modal-content {
     background-color: rgba(255, 255, 255, 0.97);
     border: none;
@@ -349,6 +389,10 @@ a.button:focus, a.button:active, a.button:hover {
     border: solid 2px #dfe2e6;
 }
 
+
+/*
+    Content header
+*/
 .app-content-header {
     margin: -15px -20px 10px -20px;
     padding: 0px 20px;
@@ -364,7 +408,6 @@ a.button:focus, a.button:active, a.button:hover {
     line-height: 20px;
     display: inline-block;
 }
-
 .inner-header {
     text-align: center;
     text-transform: uppercase;
@@ -372,7 +415,14 @@ a.button:focus, a.button:active, a.button:hover {
     color: #7c8ba1;
     margin-bottom: 8px;
 }
-
+.app-content p {
+    font-size: 12px;
+    margin-bottom: 20px;
+}
+.app-content p.blacked {
+    font-size: 14px;
+    color: #333333;
+}
 .code-box {
     border: solid 1px #647082;
     background: #fff;
@@ -385,30 +435,6 @@ a.button:focus, a.button:active, a.button:hover {
     font-family: Courier, monospace;
 }
 .code-box.code-box-bigger { font-size: 14px; }
-
-
-.app-content p {
-    font-size: 12px;
-    margin-bottom: 20px;
-}
-.app-content p.blacked {
-    font-size: 14px;
-    color: #333333;
-}
-
-.button-group {
-    display: table;
-    width: 100%;
-    margin-bottom: 20px;
-}
-.button-group .button {
-    display: table-cell;
-    width: 33%;
-    border-radius: 0;
-}
-.button-group .button:first-child { border-radius: 21px 0 0 21px; }
-.button-group .button:last-child { border-radius: 0 21px 21px 0; }
-
 .decrypt-desc {
     text-align: center;
     max-width: 230px;
@@ -416,7 +442,6 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .decrypt-desc p { font-size: 14px; }
 .modal-decrypt-dark .decrypt-desc p { color: #a6a6a6; }
-
 .keyboard-inputs {
     height: 13px;
     line-height: 13px;
@@ -457,7 +482,6 @@ a.button:focus, a.button:active, a.button:hover {
 .keyboard-button-letters {
     font-size: 9px;
 }
-
 .input-wrapper {
     color: #000;
     background: #fff;
@@ -484,14 +508,12 @@ a.button:focus, a.button:active, a.button:hover {
     /*font-family: "Myriad Pro", Myriad, "Liberation Sans", "Nimbus Sans L", "Helvetica Neue", Helvetica, Arial, sans-serif;*/
     font-family: 'Open Sans', sans-serif;
 }
-
 .app-content-divider {
     margin: 0 -20px;
     height: 1px;
     background: #d8dde4;
     margin-bottom: 10px;
 }
-
 .grats {
     text-align: center;
     font-size: 18px;
@@ -505,7 +527,6 @@ a.button:focus, a.button:active, a.button:hover {
     font-size: 14px;
     margin-bottom: 15px;
 }
-
 .right-arrow {
     display: inline-block;
     vertical-align: middle;
@@ -513,23 +534,19 @@ a.button:focus, a.button:active, a.button:hover {
     height: 20px;
     background: url(../images/right_arrow.svg) center center no-repeat;
 }
-
 .blockchain > tbody > tr > td,
 .owned > tbody > tr > td,
 .distributed > tbody > tr > td,
 .available > tbody > tr > td {
   cursor: pointer;
 }
-
 .owners > tbody > tr > td {
     vertical-align: middle;
     border-top: none;
 }
-
 .owners .title, .plays {
     text-align: right;
 }
-
 @media (min-width: 768px) {
     .dl-horizontal dt {
         width: 100px;
@@ -545,17 +562,21 @@ a.button:focus, a.button:active, a.button:hover {
   display: none;
 }
 
+
+/*
+    Page loader
+*/
 .loading {
-  position: absolute;
-  top: 0px;
-  left: 0px;
-  background-color: rgba(255, 255, 255, 0.7);
-  width: 100%;
-  height: 100%;
-  z-index: 1020;
-  -webkit-user-select: none;
-  text-align: center;
-  padding-right: 25px;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    background-color: rgba(255, 255, 255, 0.7);
+    width: 100%;
+    height: 100%;
+    z-index: 1020;
+    -webkit-user-select: none;
+    text-align: center;
+    padding-right: 25px;
 }
 
 .spinner {
@@ -565,10 +586,6 @@ a.button:focus, a.button:active, a.button:hover {
   color: #000;
   -webkit-animation: spin 2s infinite linear;
           animation: spin 2s infinite linear;
-}
-
-#block-prev, #block-next {
-  cursor: pointer;
 }
 
 @-webkit-keyframes spin {
