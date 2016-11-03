@@ -538,19 +538,17 @@ impl<Tx> State<Tx> {
     }
 
     pub fn has_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        if let Some(votes) = self.prevotes.get(&(round, *propose_hash)) {
-            votes.validators().clone()
-        } else {
-            BitVec::from_elem(self.validators.len(), false)
-        }
+        let len = self.validators.len();
+        self.prevotes.get(&(round, *propose_hash))
+            .map(|x| x.validators().clone())
+            .unwrap_or_else(|| BitVec::from_elem(len, false))
     }
 
     pub fn has_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        if let Some(votes) = self.precommits.get(&(round, *propose_hash)) {
-            votes.validators().clone()
-        } else {
-            BitVec::from_elem(self.validators.len(), false)
-        }
+        let len = self.validators.len();
+        self.precommits.get(&(round, *propose_hash))
+            .map(|x| x.validators().clone())        
+            .unwrap_or_else(|| BitVec::from_elem(len, false))
     }
 
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
