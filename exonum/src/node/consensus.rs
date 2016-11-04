@@ -595,7 +595,7 @@ impl<B, S> NodeHandler<B, S>
                                          self.state.height(),
                                          round,
                                          propose_hash,
-                                         self.state.has_prevotes(round, propose_hash),
+                                         self.state.known_prevotes(round, propose_hash),
                                          &self.secret_key)
                         .raw()
                         .clone()
@@ -608,7 +608,7 @@ impl<B, S> NodeHandler<B, S>
                                            round,
                                            propose_hash,
                                            block_hash,
-                                           self.state.has_precommits(round, propose_hash),
+                                           self.state.known_precommits(round, propose_hash),
                                            &self.secret_key)
                         .raw()
                         .clone()
