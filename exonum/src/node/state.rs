@@ -537,14 +537,14 @@ impl<Tx> State<Tx> {
         }
     }
 
-    pub fn has_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
+    pub fn known_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
         let len = self.validators.len();
         self.prevotes.get(&(round, *propose_hash))
             .map(|x| x.validators().clone())
             .unwrap_or_else(|| BitVec::from_elem(len, false))
     }
 
-    pub fn has_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
+    pub fn known_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
         let len = self.validators.len();
         self.precommits.get(&(round, *propose_hash))
             .map(|x| x.validators().clone())        
