@@ -1,3 +1,4 @@
+#![feature(custom_attribute)]
 #![feature(type_ascription)]
 #![feature(question_mark)]
 #![feature(custom_derive)]
@@ -92,7 +93,7 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                          node_cfg: Configuration,
                          port: Option<u16>) {
     if let Some(port) = port {
-        let mut node = Node::new(blockchain.clone(), node_cfg);
+        let mut node = Node::new(blockchain.clone(), node_cfg.clone());
         let channel = node.channel();
 
         let api_thread = thread::spawn(move || {
@@ -113,7 +114,7 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                     }
                 });
 
-                blockchain_explorer_api(api, blockchain.clone());
+                blockchain_explorer_api(api, blockchain.clone(), node_cfg);
                 land_titles_api(api, blockchain.clone(), channel.clone());
                 api.mount(swagger::create_api("docs"));
             });
@@ -156,8 +157,8 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
     }
 }
 
-fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: ObjectsBlockchain<D>) {
-    blockchain_explorer::make_api::<ObjectsBlockchain<D>, ObjectTx>(api, b1);
+fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: ObjectsBlockchain<D>, cfg: Configuration) {
+    blockchain_explorer::make_api::<ObjectsBlockchain<D>, ObjectTx>(api, b1, cfg);
 }
 
 
@@ -280,7 +281,8 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => {
             let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let cfg = GenesisConfig::gen(count);
+            let port: Option<u16> = matches.value_of("START_PORT").map(|x| x.parse().unwrap());
+            let cfg = GenesisConfig::gen(count, port);
             ConfigFile::save(&cfg, &path).unwrap();
             println!("The configuration was successfully written to file {:?}", path);
         }
@@ -302,7 +304,7 @@ fn main() {
                         .collect()
                 }
             };
-            let node_cfg = cfg.to_node_configuration(idx, peers);
+            let node_cfg = cfg.gen_node_configuration(idx, peers);
             match matches.value_of("LEVELDB_PATH") {
                 Some(ref db_path) => {
                     println!("Using levedb storage with path: {}", db_path);

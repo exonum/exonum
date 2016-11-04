@@ -1,3 +1,4 @@
+#![feature(custom_attribute)]
 #![feature(type_ascription)]
 #![feature(custom_derive)]
 #![feature(plugin)]
