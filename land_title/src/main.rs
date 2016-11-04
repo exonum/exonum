@@ -49,14 +49,13 @@ use land_title::api::{ObjectsApi, ObjectInfo};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
-fn save_user(storage: &mut CookieJar, role: &str, public_key: &PublicKey, secret_key: &SecretKey) {
-    let p = storage.permanent();
-    let e = p.encrypted();
-
-    e.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
-    e.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
-    e.add(Cookie::new("role".to_string(), role.to_string()));
-}
+// fn save_user(storage: &mut CookieJar, public_key: &PublicKey, secret_key: &SecretKey) {
+//     let p = storage.permanent();
+//     let e = p.encrypted();
+//     e.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
+//     e.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
+//     println!("cookies set");
+// }
 
 fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar, key: &str) -> StorageResult<Vec<u8>> {
     if let Some(cookie) = storage.find(key) {
@@ -170,20 +169,23 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
          let ch = channel.clone();
          api.post("owners", move |endpoint| {
+
              endpoint.params(|params| {
-                 params.req_typed("name", json_dsl::string());
+                 params.req_typed("firstname", json_dsl::string());
+                 params.req_typed("lastname", json_dsl::string());
              });
 
              endpoint.handle(move |client, params| {
-                 let name = params.find("name").unwrap().as_str().unwrap();
+
+                 let firstname = params.find("firstname").unwrap().as_str().unwrap();
+                 let lastname = params.find("lastname").unwrap().as_str().unwrap();
 
                  let (public_key, secret_key) = gen_keypair();
-                 {
-                     let mut cookies = client.request.cookies();
-                     save_user(&mut cookies, "owner", &public_key, &secret_key);
-                 }
-                 let tx = TxCreateOwner::new(&public_key, &name, &secret_key);
+
+                 let tx = TxCreateOwner::new(&public_key, &firstname, &lastname, &secret_key);
+
                  send_tx(ObjectTx::CreateOwner(tx), client, ch.clone())
+
              })
          });
 
@@ -215,136 +217,12 @@ fn land_titles_api<D: Database>(api: &mut Api,
                             .iter()
                             .cloned()
                             .map(|info| info.into())
-                            .collect::<Vec<u64>>();
-                let tx = TxCreateObject::new(&public_key, &object_info.title, &points, &object_info.owner_pub_key, &secret_key);
+                            .collect::<Vec<f64>>();
+                let tx = TxCreateObject::new(&public_key, &object_info.title, &points, object_info.owner_id, &secret_key);
                 send_tx(ObjectTx::CreateObject(tx), client, ch.clone())
              })
          });
 
-    //     let b = blockchain.clone();
-    //     api.get("distributors/:id", move |endpoint| {
-    //         endpoint.params(|params| {
-    //             params.req_typed("id", json_dsl::u64());
-    //         });
-
-    //         endpoint.handle(move |client, params| {
-    //             let id = params.find("id").unwrap().as_u64().unwrap();
-
-    //             let drm = DigitalRightsApi::new(b.clone());
-    //             match drm.distributor_info(id as u16) {
-    //                 Ok(Some(info)) => client.json(&info.to_json()),
-    //                 _ => client.error(StorageError::new("Unable to get distributor")),
-    //             }
-    //         })
-    //     });
-
-    //     let b = blockchain.clone();
-    //     api.get("owners/:id", move |endpoint| {
-    //         endpoint.params(|params| {
-    //             params.req_typed("id", json_dsl::u64());
-    //         });
-
-    //         endpoint.handle(move |client, params| {
-    //             let id = params.find("id").unwrap().as_u64().unwrap() as u16;
-
-    //             let drm = DigitalRightsApi::new(b.clone());
-    //             match drm.owner_info(id) {
-    //                 Ok(Some(info)) => client.json(&info.to_json()),
-    //                 _ => client.error(StorageError::new("Unable to get owner")),
-    //             }
-    //         })
-    //     });
-
-    //     let ch = channel.clone();
-    //     api.put("contents", move |endpoint| {
-    //         endpoint.params(|params| {
-    //             params.req_typed("title", json_dsl::string());
-    //             params.req_typed("fingerprint", json_dsl::string());
-    //             params.req_typed("additional_conditions", json_dsl::string());
-    //             params.req_typed("price_per_listen", json_dsl::u64());
-    //             params.req_typed("min_plays", json_dsl::u64());
-    //             params.req_nested("owners", json_dsl::array(), |params| {
-    //                 params.req_typed("owner_id", json_dsl::u64());
-    //                 params.req_typed("share", json_dsl::u64());
-    //             });
-    //         });
-
-    //         endpoint.handle(move |client, params| {
-    //             let content_info = from_value::<NewContent>(params.clone()).unwrap();
-    //             let (role, pub_key, sec_key) = {
-    //                 let r = {
-    //                     let cookies = client.request.cookies();
-    //                     load_user(&cookies)
-    //                 };
-    //                 match r {
-    //                     Ok((r, p, s)) => (r, p, s),
-    //                     Err(e) => return client.error(e),
-    //                 }
-    //             };
-    //             match role.as_ref() {
-    //                 "owner" => {
-    //                     let owners = content_info.owners
-    //                         .iter()
-    //                         .cloned()
-    //                         .map(|info| info.into())
-    //                         .collect::<Vec<u32>>();
-
-    //                     let tx = TxAddContent::new(&pub_key,
-    //                                                &content_info.fingerprint.0,
-    //                                                &content_info.title,
-    //                                                content_info.price_per_listen,
-    //                                                content_info.min_plays,
-    //                                                &owners,
-    //                                                &content_info.additional_conditions,
-    //                                                &sec_key);
-    //                     send_tx(DigitalRightsTx::AddContent(tx), client, ch.clone())
-    //                 }
-    //                 _ => client.error(StorageError::new("Unknown role")),
-    //             }
-    //         })
-    //     });
-
-    //     let ch = channel.clone();
-    //     let b = blockchain.clone();
-    //     api.put("contracts/:fingerprint", move |endpoint| {
-    //         endpoint.params(|params| {
-    //             params.req_typed("fingerprint", json_dsl::string());
-    //         });
-
-    //         endpoint.handle(move |client, params| {
-    //             let fingerprint = {
-    //                 let r = Hash::from_hex(params.find("fingerprint").unwrap().as_str().unwrap());
-    //                 match r {
-    //                     Ok(f) => f,
-    //                     Err(e) => return client.error(e),
-    //                 }
-    //             };
-    //             let (role, pub_key, sec_key) = {
-    //                 let r = {
-    //                     let cookies = client.request.cookies();
-    //                     load_user(&cookies)
-    //                 };
-    //                 match r {
-    //                     Ok((r, p, s)) => (r, p, s),
-    //                     Err(e) => return client.error(e),
-    //                 }
-    //             };
-    //             match role.as_ref() {
-    //                 "distributor" => {
-    //                     let drm = DigitalRightsApi::new(b.clone());
-    //                     match drm.participant_id(&pub_key) {
-    //                         Ok(Some(id)) => {
-    //                             let tx = TxAddContract::new(&pub_key, id, &fingerprint, &sec_key);
-    //                             send_tx(DigitalRightsTx::AddContract(tx), client, ch.clone())
-    //                         }
-    //                         _ => client.error(StorageError::new("Unknown pub_key")),
-    //                     }
-
-    //                 }
-    //                 _ => client.error(StorageError::new("Unknown role")),
-    //             }
-    //         })
-    //     });
     });
 }
 
