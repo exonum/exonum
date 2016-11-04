@@ -17,6 +17,8 @@ pub struct ConsensusConfig {
     pub propose_timeout: u32,
     pub status_timeout: u32,
     pub peers_timeout: u32,
+    pub txs_block_limit : u32,
+    pub txs_pool_limit: u32
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -64,6 +66,8 @@ impl GenesisConfig {
                 status_timeout: 5000,
                 peers_timeout: 10000,
                 propose_timeout: 500,
+                txs_block_limit: 500,
+                txs_pool_limit: 5000,
             },
             network: NetworkConfiguration {
                 max_incoming_connections: 128,

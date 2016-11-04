@@ -1,12 +1,15 @@
 use std::io;
 use std::net::SocketAddr;
 use std::marker::PhantomData;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey, Hash, hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
-                    EventsConfiguration, Channel, EventHandler};
+                    EventsConfiguration, Channel, EventHandler, Result as EventsResult,
+                    Error as EventsError};
 use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
 
@@ -44,6 +47,7 @@ pub struct TxSender<B, S>
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
 {
     inner: S,
+    tx_pool_handle: Arc<AtomicBool>,
     _b: PhantomData<B>,
 }
 
@@ -60,6 +64,7 @@ pub struct NodeHandler<B, S>
     pub propose_timeout: i64,
     pub status_timeout: i64,
     pub peers_timeout: i64,
+    pub txs_block_limit: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
 }
@@ -101,7 +106,8 @@ impl<B, S> NodeHandler<B, S>
                                config.validators,
                                connect,
                                last_hash,
-                               last_height);
+                               last_height,
+                               config.consensus.txs_pool_limit as usize);
         NodeHandler {
             public_key: config.listener.public_key,
             secret_key: config.listener.secret_key,
@@ -113,6 +119,7 @@ impl<B, S> NodeHandler<B, S>
             status_timeout: config.consensus.status_timeout as i64,
             peers_timeout: config.consensus.peers_timeout as i64,
             peer_discovery: config.peer_discovery,
+            txs_block_limit: config.consensus.txs_block_limit,
         }
     }
 
@@ -293,17 +300,25 @@ impl<B, S> TxSender<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
 {
-    pub fn new(inner: S) -> TxSender<B, S> {
+    pub fn new(inner: S, handle: Arc<AtomicBool>) -> TxSender<B, S> {
         TxSender {
             inner: inner,
+            tx_pool_handle: handle,
             _b: PhantomData,
         }
     }
 
-    pub fn send(&self, tx: B::Transaction) {
+    pub fn send(&self, tx: B::Transaction) -> EventsResult<()> {
+        if !self.tx_pool_handle.load(Ordering::SeqCst) {
+            return Err(EventsError::new("Transations pool is full"));
+        }
+
         if B::verify_tx(&tx) {
             let msg = ExternalMessage::Transaction(tx);
-            self.inner.post_event(msg);
+            self.inner.post_event(msg)?;
+            Ok(())
+        } else {
+            Err(EventsError::new("Unable to verify transacion"))
         }
     }
 }
@@ -338,6 +353,7 @@ impl<B> Node<B>
     }
 
     pub fn channel(&self) -> TxSender<B, NodeChannel<B>> {
-        TxSender::new(self.reactor.handler().channel.clone())
+        let handler = self.reactor.handler();
+        TxSender::new(handler.channel.clone(), handler.state.tx_pool_handle())
     }
 }

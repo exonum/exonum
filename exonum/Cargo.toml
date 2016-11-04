@@ -24,5 +24,4 @@ env_logger = "0.3"
 
 [features]
 default = []
-
 long_benchmarks = []
