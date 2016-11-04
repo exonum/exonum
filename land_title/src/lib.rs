@@ -1,4 +1,7 @@
+<<<<<<< HEAD
 #![feature(custom_attribute)]
+=======
+>>>>>>> 4ca31566de98a459b782951513aac49129df5ff3
 #![feature(type_ascription)]
 #![feature(custom_derive)]
 #![feature(plugin)]

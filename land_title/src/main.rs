@@ -93,7 +93,9 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                          node_cfg: Configuration,
                          port: Option<u16>) {
     if let Some(port) = port {
+
         let mut node = Node::new(blockchain.clone(), node_cfg.clone());
+
         let channel = node.channel();
 
         let api_thread = thread::spawn(move || {
@@ -221,7 +223,6 @@ fn land_titles_api<D: Database>(api: &mut Api,
                             .collect::<Vec<f64>>();
                 let tx = TxCreateObject::new(&public_key, &object_info.title, &points, object_info.owner_id, &secret_key);
                 send_tx(ObjectTx::CreateObject(tx), client, ch.clone())
-
              })
          });
 
