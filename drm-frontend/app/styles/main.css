@@ -158,7 +158,6 @@ a.button:focus, a.button:active, a.button:hover {
     background: #0e1f3e;
     color: #fff;
     text-align: center;
-    height: 60px;
     line-height: 60px;
     position: fixed;
     top:0;
@@ -174,14 +173,23 @@ a.button:focus, a.button:active, a.button:hover {
     background: url(../images/left_arrow.svg) center center no-repeat;
 }
 .toolbar-help-button {
-    width: 80px;
-    height: 60px;
-    text-align: center;
-    text-overflow: ellipsis;
-    cursor: pointer;
-    font-size: 10px;
-    overflow: hidden;
-    white-space: nowrap;
+    margin-bottom: 0;
+}
+.toolbar-help-button .icon-bar {
+    background-color: #fff;
+}
+.toolbar-dropdown a {
+    color: #fff;
+}
+@media (min-width: 768px) {
+    .toolbar-dropdown {
+        float: right;
+        margin: -60px 0 0;
+    }
+    .toolbar-username {
+        padding: 0!important;
+        line-height: 60px!important;
+    }
 }
 .toolbar-title {
     margin: 0 60px;
@@ -559,7 +567,7 @@ a.button:focus, a.button:active, a.button:hover {
     }
 }
 
-.pages, .toolbar, .app-content, #alert, .welcome-wrapper, #user {
+.pages, .toolbar, .app-content, #alert, .welcome-wrapper {
   display: none;
 }
 

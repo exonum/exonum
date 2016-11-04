@@ -10,7 +10,7 @@
       {% _.each(user.get("ownership"), function(ownership) { %}
         <tr data-fingerprint="{{ ownership.content.fingerprint }}">
           <td>{{ ownership.content.title }}</td>
-          <td class="text-right">{{ ownership.plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+          <td>{{ ownership.plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
           <td>£{{ Math.round(ownership.amount / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
         </tr>
       {% }) %}

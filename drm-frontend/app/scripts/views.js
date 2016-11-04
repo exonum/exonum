@@ -102,12 +102,12 @@ var BlockchainPage = Backbone.View.extend({
     app.router.navigate("block/" + height, {trigger: true});
   },
 
-  prevBlockchainPage: function () {
+  prevBlockchainPage: function() {
     var height = app.blocks.at(0).get('height') - 15;
     app.router.navigate("blockchain/" + height, {trigger: true});
   },
 
-  nextBlockchainPage: function () {
+  nextBlockchainPage: function() {
     var height = app.blocks.at(0).get('height') + 15;
     app.router.navigate("blockchain/" + height, {trigger: true});
   },
@@ -195,8 +195,8 @@ var DistributorDashboardPage = Backbone.View.extend({
   template: templates.distributorDashboard,
 
   events: {
-    "click .distributed tr": "showContent",
-    "click .available tr": "showContent",
+    "click .distributed tbody tr": "showContent",
+    "click .available tbody tr": "showContent",
   },
 
   showContent: function(e) {
@@ -444,6 +444,8 @@ var ContainerView = Backbone.View.extend({
   events: {
     "click .toolbar-return-button": "back",
     "click #user": "showDashboard",
+    "click": "collapseMenu",
+    "touchstart": "collapseMenu",
   },
 
   loadingStart: function() {
@@ -458,10 +460,12 @@ var ContainerView = Backbone.View.extend({
 
   updateUser: function() {
     if (app.user) {
-      var text = app.user.get("name") + " (#" + app.user.get("id") + ")";
-      this.$el.find("#user").text(text).show();
+      this.$el.find("#menu").removeClass('hidden');
+      this.$el.find("#user").removeClass('hidden');
+      this.$el.find("#username").text(app.user.get("name"));
     } else {
-      this.$el.find("#user").hide();
+      this.$el.find("#menu").addClass('hidden');
+      this.$el.find("#user").addClass('hidden');
     }
   },
 
@@ -498,6 +502,17 @@ var ContainerView = Backbone.View.extend({
 
   showDashboard: function() {
     app.router.navigate("dashboard", {trigger: true});
+  },
+
+  collapseMenu: function() {
+    var navbar = $('#navbar-collapse');
+
+    if (navbar.hasClass('in')) {
+      // setTimeout is used as hack to prevent blocking of other event attached to event target
+      setTimeout(function() {
+        navbar.collapse('hide');
+      }, 10);
+    }
   },
 
   render: function() {

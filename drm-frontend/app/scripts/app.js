@@ -73,7 +73,7 @@ var DRMRouter = Backbone.Router.extend({
 
       var def = $.when(d1, d2);
 
-      def.done(function () {
+      def.done(function() {
         app.views.block.render();
         app.views.container.changePage('block');
       });
@@ -213,6 +213,8 @@ var app = {
             app.user = model;
             app.views.container.updateUser();
             app.router.navigate("/dashboard", {trigger: true});
+
+            alertify.success('You have created ' + role + ' account');
           },
           error: app.onError("Authentification failed")
         });
@@ -239,6 +241,8 @@ var app = {
               success: function(model) {
                 app.user = model;
                 app.router.navigate('dashboard', {trigger: true});
+
+                alertify.success('You have added new content');
               },
               error: app.onError("Unable to create new content")
             });
@@ -272,6 +276,8 @@ var app = {
                   success: function(model) {
                     app.user = model;
                     app.router.navigate('dashboard', {trigger: true});
+
+                    alertify.success('You have purchased content');
                   },
                   error: app.onError("Unable to create new content")
                 });
@@ -309,6 +315,8 @@ var app = {
               success: function(model) {
                 app.user = model;
                 app.router.navigate('dashboard', {trigger: true});
+
+                alertify.success('You have updated distribution status');
               },
               error: app.onError("Unable to create new content")
             });

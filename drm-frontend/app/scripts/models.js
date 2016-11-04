@@ -13,7 +13,7 @@ Backbone.Model.prototype.failoverSave = function(attrs, options) {
     error: function(model, response) {
       if (response.status == 404 && options.retries > 0) {
         console.log("Got 404 status, retry #", options.retries);
-        setTimeout(function () {
+        setTimeout(function() {
           model.failoverSave(attrs, {
             success: options.success,
             error: options.error,
@@ -34,7 +34,7 @@ Backbone.Model.prototype.failoverFetch = function(options) {
     error: function(model, response) {
       if (response.status == 404 && options.retries > 0) {
         console.log("Got 404 status, retry #", options.retries);
-        setTimeout(function () {
+        setTimeout(function() {
           model.failoverFetch({
             success: options.success,
             error: options.error,

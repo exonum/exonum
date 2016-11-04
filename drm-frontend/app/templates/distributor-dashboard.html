@@ -4,7 +4,10 @@
   </div>
   <table class="table table-hover table-condensed distributed">
   <thead>
-    <tr><th>Title</th><th>Plays</th><tr>
+    <tr>
+      <th>Title</th>
+      <th class="text-right">Plays</th>
+    <tr>
   </thead>
   <tbody>
     {% _.each(user.get("contracts"), function(contract) { %}
@@ -26,13 +29,17 @@
 </div>
 <table class="table table-hover table-condensed available">
 <thead>
-  <tr><th>Title</th><th>Min. Plays</th><th>Price</th><tr>
+  <tr>
+    <th>Title</th>
+    <th class="text-right">Min. Plays</th>
+    <th class="text-right">Price</th>
+  <tr>
 </thead>
 <tbody>
   {% _.each(_.chain(user.get("available_content")).reverse().value(), function(content) { %}
     <tr data-fingerprint="{{ content.fingerprint }}">
       <td>{{ content.title }}</td>
-      <td class="text-right">{{ content.min_plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+      <td class="text-right">{{ content.min_plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td class="text-right">
       <td class="text-right">{{ content.price_per_listen }}¢</td>
     </tr>
   {% }) %}

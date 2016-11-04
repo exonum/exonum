@@ -5,8 +5,12 @@
 <div class="buttons-wrapper" id="registered-accounts">
   {% _.each(users, function(user, i) { %}
     <a class="button login" data-index="{{ i }}">
+      {% if (user.role == "distributor") { %}
+      <i class="glyphicon glyphicon-briefcase"></i>
+      {% } else { %}
       <i class="glyphicon glyphicon-user"></i>
-      <strong>{{ user.name }}</strong> (#{{ user.id }})
+      {% } %}
+      <strong>{{ user.name }}</strong>
     </a>
   {% }) %}
 </div>

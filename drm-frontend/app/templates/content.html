@@ -28,14 +28,14 @@
       {{ content.get("min_plays").toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
     </h4>
     <div class="buttons-wrapper">
-      <a class="button" id="content-update-status">Update distribution status</a>
+      <a class="button button-green" id="content-update-status">Update distribution status</a>
     </div>
   {% } else { %}
   <!-- Available content -->
   <div class="buttons-wrapper">
       <a class="button button-green" id="content-buy-inside">
         <i class="glyphicon glyphicon-shopping-cart"></i>
-        Buy
+        Purchase
       </a>
   </div>
   {% } %}
@@ -44,17 +44,15 @@
 <div class="app-list-headers clearfix">
   <div class="text-center">Owner information</div>
 </div>
-<div class="col-sm-offset-1 col-sm-10">
-  <table class="table">
-    {% _.each(content.get("owners"), function(owner) { %}
-      <tr>
-        <td>#{{ owner.id }}</td>
-        <td class="text-right">{{ owner.name }}</td>
-        <td class="text-right">{{ owner.share }}%</td>
-      </tr>
-    {% }) %}
-  </table>
-</div>
+<table class="table">
+  {% _.each(content.get("owners"), function(owner) { %}
+    <tr>
+      <td>#{{ owner.id }}</td>
+      <td class="text-right">{{ owner.name }}</td>
+      <td class="text-right">{{ owner.share }}%</td>
+    </tr>
+  {% }) %}
+</table>
 
 {% if (user.get("role") == "owner") { %}
   <!-- Owned content -->
