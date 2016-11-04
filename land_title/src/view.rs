@@ -11,9 +11,11 @@ pub type ObjectId = u64;
 
 storage_value! {
     Owner {
-        const SIZE = 64;
-        name:                  &str            [00 => 32]
-        ownership_hash:        &Hash           [32 => 64]
+        const SIZE = 128;
+        pub_key:               &PublicKey      [00 => 32]
+        firstname:             &str            [32 => 64]
+        lastname:              &str            [64 => 96]
+        ownership_hash:        &Hash           [96 => 128]
     }
 }
 
@@ -27,42 +29,47 @@ storage_value! {
 
 storage_value! {
     Object {
-        const SIZE = 137;
-        pub_key:               &PublicKey      [00  => 32]
-        title:                 &str            [32  => 64]
-        points:                &[u64]          [64  => 72]
-        owner_pub_key:         &PublicKey      [72  => 104]
-        deleted:               bool            [104 => 105]
-        history_hash:          &Hash           [105 => 137]
+        const SIZE = 81;
+        title:                 &str            [00 => 32]
+        points:                &[f64]          [32 => 40]
+        owner_id:              u64             [40 => 48]
+        deleted:               bool            [48 => 49]
+        history_hash:          &Hash           [49 => 81]
     }
 }
 
 impl Owner {
-    pub fn set_name(&mut self, name: &str){
-        Field::write(&name, &mut self.raw, 00, 32);
+    pub fn set_pub_key(&mut self, pub_key: &PublicKey){
+        Field::write(&pub_key, &mut self.raw, 00, 32);
+    }
+    pub fn set_firstname(&mut self, name: &str){
+        Field::write(&name, &mut self.raw, 32, 64);
+    }
+    pub fn set_lastname(&mut self, name: &str){
+        Field::write(&name, &mut self.raw, 64, 96);
     }
     pub fn set_ownership_hash(&mut self, hash: &Hash) {
-        Field::write(&hash, &mut self.raw, 32, 64);
+        Field::write(&hash, &mut self.raw, 96, 128);
     }
 }
 
 impl Object {
     pub fn set_title(&mut self, title: &str) {
-        Field::write(&title, &mut self.raw, 32, 64);
+        Field::write(&title, &mut self.raw, 00, 32);
     }
-    pub fn set_owner(&mut self, owner_pub_key: &PublicKey) {
-        Field::write(&owner_pub_key, &mut self.raw, 72, 104);
+    pub fn set_points(&mut self, points: &[f64]) {
+        Field::write(&points, &mut self.raw, 32, 40);
     }
-    pub fn set_history_hash(&mut self, hash: &Hash) {
-        Field::write(&hash, &mut self.raw, 105, 137);
-    }
-    pub fn set_points(&mut self, points: &[u64]) {
-        Field::write(&points, &mut self.raw, 64, 72);
+    pub fn set_owner(&mut self, owner_id: u64) {
+        Field::write(&owner_id, &mut self.raw, 40, 48);
     }
     pub fn set_deleted(&mut self, deleted: bool) {
-        Field::write(&deleted, &mut self.raw, 104, 105);
+        Field::write(&deleted, &mut self.raw, 48, 49);
     }
-    pub fn transfer_to(&mut self, other: &PublicKey) {
+    pub fn set_history_hash(&mut self, hash: &Hash) {
+        Field::write(&hash, &mut self.raw, 49, 81);
+    }
+    pub fn transfer_to(&mut self, other: u64) {
         self.set_owner(other);
     }
     pub fn in_mbr(&self, mbr: &MBR) -> bool {
@@ -100,27 +107,27 @@ impl<F> Deref for ObjectsView<F> where F: Fork
 
 impl<F> ObjectsView<F> where F: Fork
 {
-    pub fn  owners(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, Owner> {
-        MerklePatriciaTable::new(MapTable::new(vec![50], &self))
+    pub fn  owners(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Owner> {
+        MerkleTable::new(MapTable::new(vec![50], &self))
     }
     pub fn  objects(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Object> {
         MerkleTable::new(MapTable::new(vec![51], &self))
     }
-    pub fn owner_objects(&self, owner_pub_key: &PublicKey) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u16, Ownership> {
-        let mut prefix = vec![52; 33];
-        prefix[1..].copy_from_slice(owner_pub_key.as_ref());
+    pub fn owner_objects(&self, owner_id: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u16, Ownership> {
+        let mut prefix = vec![52; 9];
+        LittleEndian::write_u64(&mut prefix[1..], owner_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
     pub fn object_history(&self, object_id: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
-        let mut prefix = vec![52; 9];
+        let mut prefix = vec![53; 9];
         LittleEndian::write_u64(&mut prefix[1..], object_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
-    pub fn find_objects_for_owner(&self, owner_pub_key: &PublicKey) -> StorageResult<Vec<(ObjectId, Object)>> {
+    pub fn find_objects_for_owner(&self, owner_id: u64) -> StorageResult<Vec<(ObjectId, Object)>> {
         let mut v = Vec::new();
-        for ownership in self.owner_objects(owner_pub_key).values()? {
+        for ownership in self.owner_objects(owner_id).values()? {
             if let Some(object) = self.objects().get(ownership.object_id())? {
-                if object.owner_pub_key() == owner_pub_key && ownership.operation() && !object.deleted() {
+                if object.owner_id() == owner_id && ownership.operation() && !object.deleted() {
                     v.push((ownership.object_id(), object));
                 }
             }
@@ -144,16 +151,19 @@ mod tests {
 
     use exonum::crypto::{gen_keypair, hash};
     use super::{Owner, Object, Ownership};
-    use txs::{Point,MBR};
+    use txs::{Point, MBR};
 
     #[test]
     fn test_create_owner() {
         // Arrange
         let hash = hash(&[]);
+        let (p, _) = gen_keypair();
         // Act
-        let owner = Owner::new("test owner name", &hash);
+        let owner = Owner::new(&p, "firstname", "lastname", &hash);
         // Assert
-        assert_eq!(owner.name(), "test owner name");
+        assert_eq!(owner.pub_key(), &p);
+        assert_eq!(owner.firstname(), "firstname");
+        assert_eq!(owner.lastname(), "lastname");
         assert_eq!(owner.ownership_hash(), &hash);
     }
 
@@ -174,24 +184,21 @@ mod tests {
 
         // Arrange
         let hash = hash(&[]);
-        let (p, _) = gen_keypair();
-        let (p1, _) = gen_keypair();
-
-        let points = [Point::new(1, 2).into(), Point::new(3, 4).into(), Point::new(5, 6).into()];
+        let owner_id = 0_u64;
+        let points = [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into(), Point::new(5.0, 6.0).into()];
 
         // Act
-        let object = Object::new(&p, "test object title", points.as_ref(), &p1, false, &hash);
+        let object = Object::new("test object title", points.as_ref(), owner_id, false, &hash);
 
         // Assert
-        assert_eq!(object.pub_key(), &p);
         assert_eq!(object.title(), "test object title");
-        assert_eq!(object.points(), [Point::new(1,2).into(), Point::new(3,4).into(), Point::new(5,6).into()]);
-        assert_eq!(object.owner_pub_key(), &p1);
+        assert_eq!(object.points(), [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into(), Point::new(5.0, 6.0).into()]);
+        assert_eq!(object.owner_id(), owner_id);
         assert_eq!(object.history_hash(), &hash);
-        assert_eq!(object.in_mbr(&MBR::new(Point::new(0, 0), Point::new(1, 1))), false);
-        assert_eq!(object.in_mbr(&MBR::new(Point::new(0, 0), Point::new(2, 2))), true);
-        assert_eq!(object.in_mbr(&MBR::new(Point::new(2, 2), Point::new(3, 3))), false);
-        assert_eq!(object.in_mbr(&MBR::new(Point::new(2, 2), Point::new(4, 4))), true);
+        assert_eq!(object.in_mbr(&MBR::new(Point::new(0.0, 0.0), Point::new(1.0, 1.0))), false);
+        assert_eq!(object.in_mbr(&MBR::new(Point::new(0.0, 0.0), Point::new(2.0, 2.0))), true);
+        assert_eq!(object.in_mbr(&MBR::new(Point::new(2.0, 2.0), Point::new(3.0, 3.0))), false);
+        assert_eq!(object.in_mbr(&MBR::new(Point::new(2.0, 2.0), Point::new(4.0, 4.0))), true);
 
     }
 

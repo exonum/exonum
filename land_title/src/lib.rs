@@ -53,14 +53,6 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
         let mut hashes = Vec::new();
         hashes.extend_from_slice(view.owners().root_hash()?.as_ref());
         hashes.extend_from_slice(view.objects().root_hash()?.as_ref());
-
-        // for id in 0..view.owners().len()? as u64 {
-        //     b.extend_from_slice(view.distributor_contracts(id).root_hash()?.as_ref())
-        // }
-        // for id in 0..view.objects().len()? as u64 {
-        //     b.extend_from_slice(view.owner_contents(id).root_hash()?.as_ref())
-        // }
-
         Ok(hash(&hashes))
     }
 
@@ -69,11 +61,8 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
         match *tx {
 
             ObjectTx::CreateOwner(ref tx) => {
-                if view.owners().get(tx.pub_key())?.is_some() {
-                    return Err(Error::new(String::from("PublicKey already exists")));
-                }
-                let owner = Owner::new(tx.name(), &hash(&[]));
-                view.owners().put(tx.pub_key(), owner)?;
+                let owner = Owner::new(tx.pub_key(), tx.firstname(), tx.lastname(), &hash(&[]));
+                view.owners().append(owner)?;
             }
 
             ObjectTx::CreateObject(ref tx) => {
@@ -81,12 +70,12 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                 let object_id = objects.len()? as u64;
 
                 // update ownership hash
-                let owner_objects = view.owner_objects(tx.owner_pub_key());
+                let owner_objects = view.owner_objects(tx.owner_id());
                 owner_objects.append(Ownership::new(object_id, true))?;
                 let new_ownership_hash = owner_objects.root_hash()?;
-                let mut owner = view.owners().get(tx.owner_pub_key())?.unwrap();
+                let mut owner = view.owners().get(tx.owner_id())?.unwrap();
                 owner.set_ownership_hash(&new_ownership_hash);
-                view.owners().put(tx.owner_pub_key(), owner)?;
+                view.owners().set(tx.owner_id(), owner)?;
 
                 // update object history hash
                 let object_history = view.object_history(object_id);
@@ -95,7 +84,7 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                 let new_history_hash = object_history.root_hash()?;
 
                 // insert object
-                let object = Object::new(tx.pub_key(), tx.title(), tx.points(), tx.owner_pub_key(), false, &new_history_hash);
+                let object = Object::new(tx.title(), tx.points(), tx.owner_id(), false, &new_history_hash);
                 objects.append(object)?;
 
             }
@@ -125,22 +114,22 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                 if let Some(mut object) = view.objects().get(tx.object_id())? {
 
                         // update ownership hash
-                        let old_owner_objects = view.owner_objects(object.owner_pub_key());
+                        let old_owner_objects = view.owner_objects(object.owner_id());
                         old_owner_objects.append(Ownership::new(tx.object_id(), false))?;
                         let old_ownership_hash = old_owner_objects.root_hash()?;
 
-                        let new_owner_objects = view.owner_objects(tx.owner_pub_key());
+                        let new_owner_objects = view.owner_objects(tx.owner_id());
                         new_owner_objects.append(Ownership::new(tx.object_id(), true))?;
                         let new_ownership_hash = new_owner_objects.root_hash()?;
 
                         // update owners states
-                        let mut old_owner = view.owners().get(object.owner_pub_key())?.unwrap();
+                        let mut old_owner = view.owners().get(object.owner_id())?.unwrap();
                         old_owner.set_ownership_hash(&old_ownership_hash);
-                        view.owners().put(object.owner_pub_key(), old_owner)?;
+                        view.owners().set(object.owner_id(), old_owner)?;
 
-                        let mut new_owner = view.owners().get(tx.owner_pub_key())?.unwrap();
+                        let mut new_owner = view.owners().get(tx.owner_id())?.unwrap();
                         new_owner.set_ownership_hash(&new_ownership_hash);
-                        view.owners().put(tx.owner_pub_key(), new_owner)?;
+                        view.owners().set(tx.owner_id(), new_owner)?;
 
                         // update object history hash
                         let object_history = view.object_history(tx.object_id());
@@ -149,7 +138,7 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                         let new_history_hash = object_history.root_hash()?;
 
                         // update object
-                        object.set_owner(tx.owner_pub_key());
+                        object.set_owner(tx.owner_id());
                         object.set_history_hash(&new_history_hash);
                         view.objects().set(tx.object_id(), object)?;
 
@@ -206,17 +195,17 @@ mod tests {
         let b = ObjectsBlockchain { db: MemoryDB::new() };
         let v = b.view();
         let (p, s) = gen_keypair();
-        let tx_create_owner = TxCreateOwner::new(&p, "test owner name", &s);
+        let owner_id = 0_u64;
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
 
         // Act
         let ok_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
-        let err_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
-        let stored_owner = v.owners().get(&p).unwrap().unwrap();
+        let stored_owner = v.owners().get(owner_id).unwrap().unwrap();
 
         // Assert
         assert_eq!(ok_result.is_ok(), true);
-        assert_eq!(err_result.is_ok(), false);
-        assert_eq!(stored_owner.name(), "test owner name");
+        assert_eq!(stored_owner.firstname(), "firstname");
+        assert_eq!(stored_owner.lastname(), "lastname");
 
     }
 
@@ -227,28 +216,52 @@ mod tests {
         let b = ObjectsBlockchain { db: MemoryDB::new() };
         let v = b.view();
         let (p, s) = gen_keypair();
-        let tx_create_owner = TxCreateOwner::new(&p, "test owner name", &s);
-        let object_id = 0_u64;
-        let points = [Point::new(1, 2).into(), Point::new(3, 4).into()];
-        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, &p, &s);
+
+        let owners = v.owners();
+        let owner_id = owners.len().unwrap();
+
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
+
+        let object_id1 = 0_u64;
+        let points1 = [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into()];
+        let tx_create_object1 = TxCreateObject::new(&p, "test object title1", &points1, owner_id, &s);
+
+        let object_id2 = 1_u64;
+        let points2 = [Point::new(5.0, 6.0).into(), Point::new(7.0, 8.0).into()];
+        let tx_create_object2 = TxCreateObject::new(&p, "test object title2", &points2, owner_id, &s);
+
 
         // Act
         let create_owner_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
-        let create_object_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone()));
-        let stored_object = v.objects().get(object_id).unwrap().unwrap();
-        let stored_owner = v.owners().get(&p).unwrap().unwrap();
-        let history_hash = v.object_history(object_id).root_hash().unwrap();
-        let ownership_hash = v.owner_objects(&p).root_hash().unwrap();
+        let create_object_result1 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object1.clone()));
+        let create_object_result2 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object2.clone()));
+        let stored_object1 = v.objects().get(object_id1).unwrap().unwrap();
+        let stored_object2 = v.objects().get(object_id2).unwrap().unwrap();
+        let stored_owner = v.owners().get(owner_id).unwrap().unwrap();
+        let history_hash1 = v.object_history(object_id1).root_hash().unwrap();
+        let history_hash2 = v.object_history(object_id2).root_hash().unwrap();
+        let ownership_hash = v.owner_objects(owner_id).root_hash().unwrap();
+        let objects_for_owner = v.find_objects_for_owner(owner_id).unwrap();
 
-        // Assert
+        //Assert
         assert_eq!(create_owner_result.is_ok(), true);
-        assert_eq!(create_object_result.is_ok(), true);
-        assert_eq!(stored_object.title(), "test object title");
-        assert_eq!(stored_object.owner_pub_key(), &p);
-        assert_eq!(stored_object.points(), [Point::new(1, 2).into(), Point::new(3, 4).into()]);
-        assert_eq!(stored_object.deleted(), false);
-        assert_eq!(stored_object.history_hash(), &history_hash);
+        assert_eq!(create_object_result1.is_ok(), true);
+
+        assert_eq!(stored_object1.title(), "test object title1");
+        assert_eq!(stored_object1.owner_id(), owner_id);
+        assert_eq!(stored_object1.points(), [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into()]);
+        assert_eq!(stored_object1.deleted(), false);
+        assert_eq!(stored_object1.history_hash(), &history_hash1);
+
+        assert_eq!(create_object_result2.is_ok(), true);
+        assert_eq!(stored_object2.title(), "test object title2");
+        assert_eq!(stored_object2.owner_id(), owner_id);
+        assert_eq!(stored_object2.points(), [Point::new(5.0, 6.0).into(), Point::new(7.0, 8.0).into()]);
+        assert_eq!(stored_object2.deleted(), false);
+        assert_eq!(stored_object2.history_hash(), &history_hash2);
+
         assert_eq!(stored_owner.ownership_hash(), &ownership_hash);
+        assert_eq!(objects_for_owner.len(), 2);
     }
 
     #[test]
@@ -258,15 +271,16 @@ mod tests {
         let b = ObjectsBlockchain { db: MemoryDB::new() };
         let v = b.view();
         let (p, s) = gen_keypair();
-        let tx_create_owner = TxCreateOwner::new(&p, "test owner name", &s);
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
+        let owner_id = 0_u64;
         let object_id = 0_u64;
         let wrong_object_id = 1_u64;
-        let points = [Point::new(1, 2).into(), Point::new(3, 4).into()];
-        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, &p, &s);
+        let points = [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into()];
+        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, owner_id, &s);
         execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone())).unwrap();
         execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone())).unwrap();
         let modified_title = "modified object title";
-        let modified_points = [Point::new(5, 6).into(), Point::new(7, 8).into()];
+        let modified_points = [Point::new(5.0, 6.0).into(), Point::new(7.0, 8.0).into()];
         let test_tx_modify_object = TxModifyObject::new(&p, object_id, &modified_title, &modified_points, &s);
         let failed_tx_modify_object = TxModifyObject::new(&p, wrong_object_id, &modified_title, &modified_points, &s);
 
@@ -280,8 +294,8 @@ mod tests {
         assert_eq!(ok_modification_result.is_ok(), true);
         assert_eq!(err_modification_result.is_ok(), false);
         assert_eq!(modified_object.title(), "modified object title");
-        assert_eq!(modified_object.owner_pub_key(), &p);
-        assert_eq!(modified_object.points(), [Point::new(5, 6).into(), Point::new(7, 8).into()]);
+        assert_eq!(modified_object.owner_id(), owner_id);
+        assert_eq!(modified_object.points(), [Point::new(5.0, 6.0).into(), Point::new(7.0, 8.0).into()]);
         assert_eq!(modified_object.deleted(), false);
         assert_eq!(modified_object.history_hash(), &history_hash);
     }
@@ -294,32 +308,40 @@ mod tests {
         let v = b.view();
         let (p, s) = gen_keypair();
         let (p2, s2) = gen_keypair();
-        let tx_create_owner = TxCreateOwner::new(&p, "test owner name 1", &s);
-        let tx_create_owner2 = TxCreateOwner::new(&p2, "test owner name 2", &s2);
+
+        let owner_id1 = 0_u64;
+        let owner_id2 = 1_u64;
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname1", "lastname1", &s);
+        let tx_create_owner2 = TxCreateOwner::new(&p2, "firstname2", "lastname2", &s2);
         let object_id = 0_u64;
         let wrong_object_id = 1_u64;
-        let points = [Point::new(1, 2).into(), Point::new(3, 4).into()];
-        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, &p, &s);
-        execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone())).unwrap();
-        execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner2.clone())).unwrap();
-        execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone())).unwrap();
-        let test_tx_transfer_object = TxTransferObject::new(&p, object_id, &p2, &s);
-        let failed_tx_transfer_object = TxTransferObject::new(&p, wrong_object_id, &p2, &s);
+        let points = [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into()];
+        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, owner_id1, &s);
+        let create_owner_result1 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
+        let create_owner_result2 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner2.clone()));
+        let create_object_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone()));
+        let success_tx_transfer_object = TxTransferObject::new(&p, object_id, owner_id2, &s);
+        let failed_tx_transfer_object = TxTransferObject::new(&p, wrong_object_id, owner_id2, &s);
 
         // Act
-        let ok_transfer_result = execute_tx::<MemoryDB>(&v, ObjectTx::TransferObject(test_tx_transfer_object.clone()));
+        let ok_transfer_result = execute_tx::<MemoryDB>(&v, ObjectTx::TransferObject(success_tx_transfer_object.clone()));
         let err_transfer_result = execute_tx::<MemoryDB>(&v, ObjectTx::TransferObject(failed_tx_transfer_object.clone()));
+
         let modified_object = v.objects().get(object_id).unwrap().unwrap();
-        let modified_owner = v.owners().get(&p).unwrap().unwrap();
-        let modified_owner2 = v.owners().get(&p2).unwrap().unwrap();
+        let modified_owner = v.owners().get(owner_id1).unwrap().unwrap();
+        let modified_owner2 = v.owners().get(owner_id2).unwrap().unwrap();
         let history_hash = v.object_history(object_id).root_hash().unwrap();
-        let ownership_hash = v.owner_objects(&p).root_hash().unwrap();
-        let ownership_hash2 = v.owner_objects(&p2).root_hash().unwrap();
+        let ownership_hash = v.owner_objects(owner_id1).root_hash().unwrap();
+        let ownership_hash2 = v.owner_objects(owner_id2).root_hash().unwrap();
 
         // Assert
+        assert_eq!(create_owner_result1.is_ok(), true);
+        assert_eq!(create_owner_result2.is_ok(), true);
+        assert_eq!(create_object_result.is_ok(), true);
+
         assert_eq!(ok_transfer_result.is_ok(), true);
         assert_eq!(err_transfer_result.is_ok(), false);
-        assert_eq!(modified_object.owner_pub_key(), &p2);
+        assert_eq!(modified_object.owner_id(), owner_id2);
         assert_eq!(modified_object.history_hash(), &history_hash);
         assert_eq!(modified_owner.ownership_hash(), &ownership_hash);
         assert_eq!(modified_owner2.ownership_hash(), &ownership_hash2);
@@ -330,12 +352,13 @@ mod tests {
         // Arrange
         let b = ObjectsBlockchain { db: MemoryDB::new() };
         let v = b.view();
+        let owner_id = 0_u64;
         let (p, s) = gen_keypair();
-        let tx_create_owner = TxCreateOwner::new(&p, "test owner name", &s);
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
         let object_id = 0_u64;
         let wrong_object_id = 1_u64;
-        let points = [Point::new(1, 2).into(), Point::new(3, 4).into()];
-        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, &p, &s);
+        let points = [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into()];
+        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, owner_id, &s);
         execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone())).unwrap();
         execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone())).unwrap();
         let test_tx_remove_object = TxRemoveObject::new(&p, object_id, &s);
@@ -349,8 +372,8 @@ mod tests {
         assert_eq!(ok_remove_result.is_ok(), true);
         assert_eq!(err_remove_result.is_ok(), false);
         assert_eq!(removed_object.title(), "test object title");
-        assert_eq!(removed_object.owner_pub_key(), &p);
-        assert_eq!(removed_object.points(), [Point::new(1, 2).into(), Point::new(3, 4).into()]);
+        assert_eq!(removed_object.owner_id(), owner_id);
+        assert_eq!(removed_object.points(), [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into()]);
         assert_eq!(removed_object.deleted(), true);
         assert_eq!(removed_object.history_hash(), &history_hash);
 
