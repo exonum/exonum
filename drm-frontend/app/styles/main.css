@@ -7,6 +7,7 @@ body {
     background: #eceef2;
     min-height: 100%;
     display: table-cell;
+    position: relative;
 }
 
 html {
@@ -568,8 +569,9 @@ a.button:focus, a.button:active, a.button:hover {
 */
 .loading {
     position: absolute;
-    top: 0px;
-    left: 0px;
+    bottom: 0;
+    top: 0;
+    left: 0;
     background-color: rgba(255, 255, 255, 0.7);
     width: 100%;
     height: 100%;

@@ -198,6 +198,11 @@ var app = {
           retries: 20,
           timeout: 500,
           success: function(model, response) {
+            // add new user to localStorage
+            var users = JSON.parse(localStorage.getItem('users')) || [];
+            users.push(model.attributes);
+            localStorage.setItem('users', JSON.stringify(users));
+
             app.users.push(model.attributes);
             app.user = model;
             app.views.container.updateUser();

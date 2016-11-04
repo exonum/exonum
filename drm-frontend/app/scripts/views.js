@@ -43,6 +43,7 @@ var LoginPage = Backbone.View.extend({
   },
 
   render: function() {
+    app.users = JSON.parse(localStorage.getItem('users')) || [];
     this.$el.html(this.template({users: app.users}));
     return this;
   }
