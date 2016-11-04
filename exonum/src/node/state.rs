@@ -1,14 +1,15 @@
 use std::collections::{HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use time::Duration;
 
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
+
+// TODO: replace by in disk tx pool
+const TX_POOL_LIMIT: usize = 20000;
 
 // TODO: move request timeouts into node configuration
 
@@ -43,8 +44,6 @@ pub struct State<Tx> {
 
     // TODO replace by TxPool
     transactions: HashMap<Hash, Tx>,
-    tx_pool_is_open: Arc<AtomicBool>,
-    tx_pool_limit: usize,
 
     queued: Vec<ConsensusMessage>,
 
@@ -198,8 +197,7 @@ impl<Tx> State<Tx> {
                validators: Vec<PublicKey>,
                connect: Connect,
                last_hash: Hash,
-               last_height: u64,
-               tx_pool_limit: usize,)
+               last_height: u64)
                -> State<Tx> {
         let validators_len = validators.len();
 
@@ -221,8 +219,6 @@ impl<Tx> State<Tx> {
             precommits: HashMap::new(),
 
             transactions: HashMap::new(),
-            tx_pool_is_open: Arc::new(AtomicBool::new(true)),
-            tx_pool_limit: tx_pool_limit,
 
             queued: Vec::new(),
 
@@ -357,9 +353,6 @@ impl<Tx> State<Tx> {
                 }
             }
         }
-        if self.transactions.len() <= self.tx_pool_limit {
-            self.tx_pool_is_open.store(true, Ordering::SeqCst);
-        }
         // TODO: destruct/construct structure HeightState instead of call clear
         self.blocks.clear();
         self.proposes.clear();
@@ -393,14 +386,10 @@ impl<Tx> State<Tx> {
             }
         }
         self.transactions.insert(hash, msg);
-        if self.transactions.len() >= self.tx_pool_limit {
-            self.tx_pool_is_open.store(false, Ordering::SeqCst);
+        if self.transactions.len() >= TX_POOL_LIMIT {
+            panic!("Too many transactions in pool, txs={}", self.transactions.len());
         }
         full_proposes
-    }
-
-    pub fn tx_pool_handle(&self) -> Arc<AtomicBool> {
-        self.tx_pool_is_open.clone()
     }
 
     pub fn prevotes(&self,

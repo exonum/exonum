@@ -1,8 +1,6 @@
 use std::io;
 use std::net::SocketAddr;
 use std::marker::PhantomData;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use time::{Duration, Timespec};
 
@@ -47,7 +45,6 @@ pub struct TxSender<B, S>
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
 {
     inner: S,
-    tx_pool_handle: Arc<AtomicBool>,
     _b: PhantomData<B>,
 }
 
@@ -106,8 +103,7 @@ impl<B, S> NodeHandler<B, S>
                                config.validators,
                                connect,
                                last_hash,
-                               last_height,
-                               config.consensus.txs_pool_limit as usize);
+                               last_height);
         NodeHandler {
             public_key: config.listener.public_key,
             secret_key: config.listener.secret_key,
@@ -300,19 +296,14 @@ impl<B, S> TxSender<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
 {
-    pub fn new(inner: S, handle: Arc<AtomicBool>) -> TxSender<B, S> {
+    pub fn new(inner: S) -> TxSender<B, S> {
         TxSender {
             inner: inner,
-            tx_pool_handle: handle,
             _b: PhantomData,
         }
     }
 
     pub fn send(&self, tx: B::Transaction) -> EventsResult<()> {
-        if !self.tx_pool_handle.load(Ordering::SeqCst) {
-            return Err(EventsError::new("Transations pool is full"));
-        }
-
         if B::verify_tx(&tx) {
             let msg = ExternalMessage::Transaction(tx);
             self.inner.post_event(msg)?;
@@ -353,7 +344,6 @@ impl<B> Node<B>
     }
 
     pub fn channel(&self) -> TxSender<B, NodeChannel<B>> {
-        let handler = self.reactor.handler();
-        TxSender::new(handler.channel.clone(), handler.state.tx_pool_handle())
+        TxSender::new(self.reactor.handler().channel.clone())
     }
 }
