@@ -7,6 +7,7 @@ var DRMRouter = Backbone.Router.extend({
 
       // Blockchain Explorer
       "blockchain"            : "blockchain",
+      "blockchain/:page"      : "blockchain",
       "block/:height"         : "block",
 
       // DRM
@@ -34,10 +35,15 @@ var DRMRouter = Backbone.Router.extend({
 
     // Blockchain Explorer
 
-    blockchain: function() {
+    blockchain: function(height) {
       app.views.container.loadingStart();
+
+      var requestData = {count: 15,};
+
+      if (height) {requestData.from = height;}
+
       app.blocks.fetch({
-        data: {count: 12},
+        data: requestData,
         success: function() {
           app.last_height = app.blocks.isEmpty() ? 0 : app.blocks.at(0).get('height');
           app.views.blockchain.render();

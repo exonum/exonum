@@ -93,11 +93,23 @@ var BlockchainPage = Backbone.View.extend({
 
   events: {
     "click .blockchain tr": "showBlock",
+    "click #blockchain-page-prev": "prevBlockchainPage",
+    "click #blockchain-page-next": "nextBlockchainPage",
   },
 
   showBlock: function(e) {
     var height = $(e.target).parents("tr").data("block");
     app.router.navigate("block/" + height, {trigger: true});
+  },
+
+  prevBlockchainPage: function () {
+    var height = app.blocks.at(0).get('height') - 15;
+    app.router.navigate("blockchain/" + height, {trigger: true});
+  },
+
+  nextBlockchainPage: function () {
+    var height = app.blocks.at(0).get('height') + 15;
+    app.router.navigate("blockchain/" + height, {trigger: true});
   },
 
   render: function() {
@@ -408,7 +420,19 @@ var AddReportPage = Backbone.View.extend({
   },
 
   render: function() {
-    this.$el.html(this.template({content: this.model, user: app.user}));
+    // hack to provide correct timezone support
+    function getTodayDate() {
+      var local = new Date();
+      local.setMinutes(local.getMinutes() - local.getTimezoneOffset());
+      return local.toJSON().slice(0, 10);
+    }
+
+    this.$el.html(this.template({
+        content: this.model,
+        user: app.user,
+        today: getTodayDate()
+      })
+    );
     return this;
   }
 });
