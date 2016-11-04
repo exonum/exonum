@@ -13,7 +13,7 @@ use exonum::blockchain::Blockchain;
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
-                     Channel, EventHandler};
+                     Channel, EventHandler, Result as EventsResult};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
 
 use timestamping::TimestampingBlockchain;
@@ -78,9 +78,10 @@ impl<B> Channel for SandboxChannel<B>
         self.inner.lock().unwrap().time
     }
 
-    fn post_event(&self, event: Self::ApplicationEvent) {
+    fn post_event(&self, event: Self::ApplicationEvent) -> EventsResult<()>  {
         let msg = InternalEvent::Application(event);
         self.send_event(msg);
+        Ok(())
     }
 
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
@@ -394,6 +395,7 @@ pub fn timestamping_sandbox
             status_timeout: 5000,
             peers_timeout: 10000,
             propose_timeout: 200,
+            txs_block_limit: 1000,
         },
         network: NetworkConfiguration {
             max_incoming_connections: 8,
