@@ -14,10 +14,11 @@ impl Serialize for ObjectTx {
         let mut state;
         match *self {
             ObjectTx::CreateOwner(ref tx) => {
-                state = ser.serialize_struct("transaction", 3)?;
+                state = ser.serialize_struct("transaction", 4)?;
                 ser.serialize_struct_elt(&mut state, "type", "create_owner")?;
                 ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key())?;
-                ser.serialize_struct_elt(&mut state, "name", tx.name())?;
+                ser.serialize_struct_elt(&mut state, "firstname", tx.firstname())?;
+                ser.serialize_struct_elt(&mut state, "lastname", tx.lastname())?;
             }
             ObjectTx::CreateObject(ref tx) => {
                 state = ser.serialize_struct("transaction", 5)?;
@@ -25,7 +26,7 @@ impl Serialize for ObjectTx {
                 ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key())?;
                 ser.serialize_struct_elt(&mut state, "title", tx.title())?;
                 ser.serialize_struct_elt(&mut state, "points", tx.points())?;
-                ser.serialize_struct_elt(&mut state, "owner_pub_key", tx.owner_pub_key())?;
+                ser.serialize_struct_elt(&mut state, "owner_id", tx.owner_id())?;
             }
             ObjectTx::ModifyObject(ref tx) => {
                 state = ser.serialize_struct("transaction", 5)?;
@@ -40,7 +41,7 @@ impl Serialize for ObjectTx {
                 ser.serialize_struct_elt(&mut state, "type", "transfer_object")?;
                 ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key())?;
                 ser.serialize_struct_elt(&mut state, "object_id", tx.object_id())?;
-                ser.serialize_struct_elt(&mut state, "owner_pub_key", tx.owner_pub_key())?;
+                ser.serialize_struct_elt(&mut state, "owner_id", tx.owner_id())?;
 
             }
             ObjectTx::RemoveObject(ref tx) => {
@@ -59,16 +60,16 @@ impl TransactionInfo for ObjectTx {}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OwnerInfo {
     pub pub_key: HexField<PublicKey>,
-    pub name: String,
+    pub firstname: String,
+    pub lastname: String,
     pub ownership_hash: HexField<Hash>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ObjectInfo {
-    pub pub_key: HexField<PublicKey>,
     pub title: String,
     pub points: Vec<Point>,
-    pub owner_pub_key: HexField<PublicKey>,
+    pub owner_id: u64,
     pub deleted: bool,
     pub history_hash: HexField<Hash>,
 }
@@ -83,12 +84,13 @@ impl<D: Database> ObjectsApi<D> {
         ObjectsApi { blockchain: b }
     }
 
-    pub fn owner_info(&self, pub_key: &PublicKey) -> StorageResult<Option<OwnerInfo>> {
+    pub fn owner_info(&self, owner_id: u64) -> StorageResult<Option<OwnerInfo>> {
         let view = self.blockchain.view();
-        if let Some(owner) = view.owners().get(pub_key)? {
+        if let Some(owner) = view.owners().get(owner_id)? {
             let info = OwnerInfo {
-                name: owner.name().to_string(),
-                pub_key: HexField(*pub_key),
+                firstname: owner.firstname().to_string(),
+                lastname: owner.lastname().to_string(),
+                pub_key: HexField(*owner.pub_key()),
                 ownership_hash: HexField(*owner.ownership_hash()),
             };
             Ok(Some(info))
@@ -101,10 +103,9 @@ impl<D: Database> ObjectsApi<D> {
         let view = self.blockchain.view();
         if let Some(object) = view.objects().get(object_id)? {
             let info = ObjectInfo {
-                pub_key: HexField(*object.pub_key()),
                 title: object.title().to_string(),
-                points: object.points().iter().map(|x| (*x as u64).into()).collect::<Vec<Point>>(),
-                owner_pub_key: HexField(*object.owner_pub_key()),
+                points: object.points().iter().map(|x| (*x as f64).into()).collect::<Vec<Point>>(),
+                owner_id: object.owner_id(),
                 deleted: object.deleted(),
                 history_hash: HexField(*object.history_hash()),
             };
@@ -114,37 +115,5 @@ impl<D: Database> ObjectsApi<D> {
         }
     }
 
-    // pub fn distributor_info(&self, id: u16) -> StorageResult<Option<DistributorInfo>> {
-    //     let view = self.blockchain.view();
-    //     if let Some(distributor) = view.distributors().get(id as u64)? {
-    //         let info = DistributorInfo {
-    //             name: distributor.name().to_string(),
-    //             pub_key: HexField(*distributor.pub_key()),
-    //             contracts: HexField(*distributor.contracts_hash()),
-    //         };
-    //         Ok(Some(info))
-    //     } else {
-    //         Ok(None)
-    //     }
-    // }
-
-    // pub fn available_contents(&self, distributor_id: u16) -> StorageResult<Vec<ContentInfo>> {
-    //     let v = self.blockchain
-    //         .view()
-    //         .list_content()?
-    //         .into_iter()
-    //         .filter(|&(_, ref content)| !content.distributors().contains(&distributor_id))
-    //         .map(|(fingerprint, content)| {
-    //             ContentInfo {
-    //                 title: content.title().to_string(),
-    //                 fingerprint: HexField(fingerprint),
-    //                 additional_conditions: content.additional_conditions().to_string(),
-    //                 price_per_listen: content.price_per_listen(),
-    //                 min_plays: content.min_plays(),
-    //             }
-    //         })
-    //         .collect();
-    //     Ok(v)
-    // }
 }
 
