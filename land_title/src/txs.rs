@@ -8,58 +8,6 @@ pub const TX_MODIFY_OBJECT_ID: u16 = 130;
 pub const TX_TRANSFER_OBJECT_ID: u16 = 131;
 pub const TX_REMOVE_OBJECT_ID: u16 = 132;
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-// pub struct Point {
-//     pub x: u32,
-//     pub y: u32,
-// }
-
-// pub struct Point {
-//     pub x: f64,
-//     pub y: f64,
-// }
-
-// pub struct MBR {
-//     pub left: Point,
-//     pub right: Point
-// }
-
-// impl Point {
-//     pub fn new(x: u32, y: u32) -> Point {
-//         Point { x: x, y: y }
-//     }
-//     pub fn in_mbr(&self, mbr: &MBR) -> bool {
-//         self.x >= mbr.left.x && self.x <= mbr.right.x && self.y >= mbr.left.y && self.y <= mbr.right.y
-//     }
-// }
-
-// impl PartialEq for Point{
-//     fn eq(&self, other: &Point) -> bool {
-//         self.x == other.x && self.y == other.y
-//     }
-// }
-
-// impl From<Point> for u64{
-//     fn from(point: Point) -> u64 {
-//         let mut v = vec![0; 8];
-//         LittleEndian::write_u32(&mut v[0..4], point.x);
-//         LittleEndian::write_u32(&mut v[4..8], point.y);
-//         let u = LittleEndian::read_u64(&v[0..8]);
-//         u
-//     }
-// }
-
-// impl From<u64> for Point {
-//     fn from(n: u64) -> Point {
-//         let mut v = vec![0; 8];
-//         LittleEndian::write_u64(&mut v[0..8], n);
-//         Point {
-//             x: LittleEndian::read_u32(&v[0..4]),
-//             y: LittleEndian::read_u32(&v[4..8]),
-//         }
-//     }
-// }
-
 pub struct Point {
     pub x: f32,
     pub y: f32,

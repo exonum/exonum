@@ -31,6 +31,7 @@ use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning, Response, Client, ErrorResponse};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
 use rustless::batteries::swagger;
+use rustless::errors;
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use serde_json::value::from_value;
@@ -38,11 +39,11 @@ use serde_json::value::from_value;
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
-use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash};
+use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash, FromHexError};
 use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
-use blockchain_explorer::HexField;
+use blockchain_explorer::{HexField, ValueNotFound};
 
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
                      TxModifyObject, TxTransferObject, TxRemoveObject};
@@ -84,7 +85,7 @@ fn load_user(storage: &CookieJar) -> StorageResult<(String, PublicKey, SecretKey
 fn send_tx<'a, D: Database>(tx: ObjectTx, client: Client<'a>, ch: Channel<ObjectsBlockchain<D>>)
                             -> Result<Client<'a>, ErrorResponse> {
     let tx_hash = tx.hash().to_hex();
-    ch.send(tx);
+    let result = ch.send(tx);
     let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
     client.json(json)
 }
@@ -108,12 +109,30 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                 api.prefix("api");
 
                 api.error_formatter(|err, _media| {
+                    let body;
+                    let code;
                     if let Some(e) = err.downcast::<StorageError>() {
-                        let body = format!("An internal error occured: {}", e);
-                        Some(Response::from(StatusCode::InternalServerError, Box::new(body)))
+                        code = StatusCode::InternalServerError;
+                        body = format!("An error in backend occured: {}", e);
+                    } else if let Some(e) = err.downcast::<errors::NotMatch>() {
+                        code = StatusCode::NotFound;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<errors::Validation>() {
+                        code = StatusCode::BadRequest;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<ValueNotFound>() {
+                        code = StatusCode::NotFound;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<FromHexError>() {
+                        code = StatusCode::BadRequest;
+                        body = e.to_string();
                     } else {
-                        None
+                        code = StatusCode::NotImplemented;
+                        body = format!("Unspecified error: {:?}", err);
                     }
+
+                    let json = &jsonway::object(|json| json.set("message", body)).unwrap();
+                    Some(Response::from_json(code, &json))
                 });
 
                 blockchain_explorer_api(api, blockchain.clone(), node_cfg);
@@ -170,6 +189,38 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
     api.namespace("obm", move |api| {
 
+
+        let b = blockchain.clone();
+
+         api.get("owners", move |endpoint| {
+            endpoint.handle(move |client, params| {
+                let obm = ObjectsApi::new(b.clone());
+                match obm.owners_list() {
+                    Ok(Some(info)) => client.json(&info.to_json()),
+                    Ok(None) => client.error(ValueNotFound::new("Unable to find content")),
+                    Err(e) => client.error(e),
+                }
+            })
+         });
+
+        let b = blockchain.clone();
+         api.get("owners/:id", move |endpoint| {
+            endpoint.params(|params|{
+                params.req_typed("id", json_dsl::u64());
+            });
+            endpoint.handle(move |client, params|{
+
+                let id = params.find("id").unwrap().as_u64().unwrap();
+                let obm = ObjectsApi::new(b.clone());
+
+                match obm.owner_info(id as u64) {
+                    Ok(Some(info)) => client.json(&info.to_json()),
+                    Ok(None) => client.error(ValueNotFound::new("Unable to get owner")),
+                    Err(e) => client.error(e),
+                }
+            })
+         });
+
          let ch = channel.clone();
          api.post("owners", move |endpoint| {
 
@@ -197,10 +248,10 @@ fn land_titles_api<D: Database>(api: &mut Api,
              endpoint.params(|params| {
                  params.req_typed("title", json_dsl::string());
                  params.req_nested("points", json_dsl::array(), |params| {
-                     params.req_typed("x", json_dsl::u64());
-                     params.req_typed("y", json_dsl::u64());
+                     params.req_typed("x", json_dsl::f64());
+                     params.req_typed("y", json_dsl::f64());
                  });
-                 params.req_typed("owner_pub_key", json_dsl::string());
+                 params.req_typed("owner_id", json_dsl::u64());
                  params.req_typed("deleted", json_dsl::boolean());
              });
 
