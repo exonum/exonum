@@ -59,6 +59,7 @@ impl TransactionInfo for ObjectTx {}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OwnerInfo {
+    pub id: u64,
     pub pub_key: HexField<PublicKey>,
     pub firstname: String,
     pub lastname: String,
@@ -72,6 +73,7 @@ pub struct ObjectInfo {
     pub owner_id: u64,
     pub deleted: bool,
     pub history_hash: HexField<Hash>,
+    pub OwnerInfo: owner
 }
 
 pub struct ObjectsApi<D: Database> {
@@ -84,10 +86,32 @@ impl<D: Database> ObjectsApi<D> {
         ObjectsApi { blockchain: b }
     }
 
+    pub fn owners_list(&self) -> StorageResult<Option<Vec<OwnerInfo>>>{
+
+        let view = self.blockchain.view();
+
+        let owners = view.owners();
+        let values = owners.values()?;
+        let r = values.into_iter()
+            .enumerate()
+            .map(|(id, owner)| {
+                OwnerInfo {
+                    id: id as u64,
+                    pub_key: HexField(*owner.pub_key()),
+                    firstname: owner.firstname().to_string(),
+                    lastname: owner.lastname().to_string(),
+                    ownership_hash: HexField(*owner.ownership_hash()),
+                }
+            }).collect();
+
+        Ok(Some(r))
+    }
+
     pub fn owner_info(&self, owner_id: u64) -> StorageResult<Option<OwnerInfo>> {
         let view = self.blockchain.view();
         if let Some(owner) = view.owners().get(owner_id)? {
             let info = OwnerInfo {
+                id: owner_id,
                 firstname: owner.firstname().to_string(),
                 lastname: owner.lastname().to_string(),
                 pub_key: HexField(*owner.pub_key()),
@@ -107,7 +131,7 @@ impl<D: Database> ObjectsApi<D> {
                 points: object.points().iter().map(|x| (*x as f64).into()).collect::<Vec<Point>>(),
                 owner_id: object.owner_id(),
                 deleted: object.deleted(),
-                history_hash: HexField(*object.history_hash()),
+                history_hash: HexField(*object.history_hash())
             };
             Ok(Some(info))
         } else {
