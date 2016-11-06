@@ -44,6 +44,7 @@ use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 use blockchain_explorer::{HexField, ValueNotFound};
+use land_title::GeoPoint;
 
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
                      TxModifyObject, TxTransferObject, TxRemoveObject};
@@ -189,9 +190,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
     api.namespace("obm", move |api| {
 
-
         let b = blockchain.clone();
-
          api.get("owners", move |endpoint| {
             endpoint.handle(move |client, params| {
                 let obm = ObjectsApi::new(b.clone());
@@ -243,6 +242,18 @@ fn land_titles_api<D: Database>(api: &mut Api,
              })
          });
 
+         let b = blockchain.clone();
+         api.get("objects", move |endpoint| {
+            endpoint.handle(move |client, params| {
+                let obm = ObjectsApi::new(b.clone());
+                match obm.objects_list() {
+                    Ok(Some(info)) => client.json(&info.to_json()),
+                    Ok(None) => client.error(ValueNotFound::new("Unable to find content")),
+                    Err(e) => client.error(e),
+                }
+            })
+         });
+
          let ch = channel.clone();
          api.post("objects", move |endpoint| {
              endpoint.params(|params| {
@@ -267,11 +278,8 @@ fn land_titles_api<D: Database>(api: &mut Api,
                         Err(e) => return client.error(e),
                     }
                 };
-                let points = object_info.points
-                            .iter()
-                            .cloned()
-                            .map(|info| info.into())
-                            .collect::<Vec<f64>>();
+                let points = GeoPoint::to_vec(&object_info.points);
+
                 let tx = TxCreateObject::new(&public_key, &object_info.title, &points, object_info.owner_id, &secret_key);
                 send_tx(ObjectTx::CreateObject(tx), client, ch.clone())
              })

@@ -1,6 +1,6 @@
 use serde::{Serialize, Serializer};
-use txs::{ObjectTx, Point};
-use view::ObjectId;
+use txs::{ObjectTx, GeoPoint};
+use view::{ Object, Owner, ObjectId };
 use super::ObjectsBlockchain;
 use exonum::storage::{Map, List, Database, Result as StorageResult};
 use exonum::crypto::{PublicKey, Hash, HexValue};
@@ -66,14 +66,39 @@ pub struct OwnerInfo {
     pub ownership_hash: HexField<Hash>,
 }
 
+impl OwnerInfo {
+    pub fn from_owner(id: u64, owner: Owner) -> OwnerInfo {
+        OwnerInfo {
+            id: id,
+            pub_key: HexField(*owner.pub_key()),
+            firstname: owner.firstname().to_string(),
+            lastname: owner.lastname().to_string(),
+            ownership_hash: HexField(*owner.ownership_hash()),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ObjectInfo {
+    pub id: u64,
     pub title: String,
-    pub points: Vec<Point>,
+    pub points: Vec<GeoPoint>,
     pub owner_id: u64,
     pub deleted: bool,
-    pub history_hash: HexField<Hash>,
-    pub OwnerInfo: owner
+    pub history_hash: HexField<Hash>
+}
+
+impl ObjectInfo {
+    pub fn from_object(id: u64, object: Object) -> ObjectInfo {
+        ObjectInfo {
+            id: id,
+            title: object.title().to_string(),
+            points: GeoPoint::from_vec(object.points().iter().map(|x| (*x as f64)).collect::<Vec<f64>>()),
+            owner_id: object.owner_id(),
+            deleted: object.deleted(),
+            history_hash: HexField(*object.history_hash())
+        }
+    }
 }
 
 pub struct ObjectsApi<D: Database> {
@@ -94,15 +119,20 @@ impl<D: Database> ObjectsApi<D> {
         let values = owners.values()?;
         let r = values.into_iter()
             .enumerate()
-            .map(|(id, owner)| {
-                OwnerInfo {
-                    id: id as u64,
-                    pub_key: HexField(*owner.pub_key()),
-                    firstname: owner.firstname().to_string(),
-                    lastname: owner.lastname().to_string(),
-                    ownership_hash: HexField(*owner.ownership_hash()),
-                }
-            }).collect();
+            .map(|(id, owner)| OwnerInfo::from_owner(id as u64, owner)).collect();
+
+        Ok(Some(r))
+    }
+
+    pub fn objects_list(&self) -> StorageResult<Option<Vec<ObjectInfo>>>{
+
+        let view = self.blockchain.view();
+
+        let objects = view.objects();
+        let values = objects.values()?;
+        let r = values.into_iter()
+            .enumerate()
+            .map(|(id, object)| ObjectInfo::from_object(id as u64, object)).collect();
 
         Ok(Some(r))
     }
@@ -110,14 +140,7 @@ impl<D: Database> ObjectsApi<D> {
     pub fn owner_info(&self, owner_id: u64) -> StorageResult<Option<OwnerInfo>> {
         let view = self.blockchain.view();
         if let Some(owner) = view.owners().get(owner_id)? {
-            let info = OwnerInfo {
-                id: owner_id,
-                firstname: owner.firstname().to_string(),
-                lastname: owner.lastname().to_string(),
-                pub_key: HexField(*owner.pub_key()),
-                ownership_hash: HexField(*owner.ownership_hash()),
-            };
-            Ok(Some(info))
+            Ok(Some(OwnerInfo::from_owner(owner_id, owner)))
         } else {
             Ok(None)
         }
@@ -126,14 +149,7 @@ impl<D: Database> ObjectsApi<D> {
     pub fn object_info(&self, object_id: ObjectId) -> StorageResult<Option<ObjectInfo>> {
         let view = self.blockchain.view();
         if let Some(object) = view.objects().get(object_id)? {
-            let info = ObjectInfo {
-                title: object.title().to_string(),
-                points: object.points().iter().map(|x| (*x as f64).into()).collect::<Vec<Point>>(),
-                owner_id: object.owner_id(),
-                deleted: object.deleted(),
-                history_hash: HexField(*object.history_hash())
-            };
-            Ok(Some(info))
+            Ok(Some(ObjectInfo::from_object(object_id, object)))
         } else {
             Ok(None)
         }
