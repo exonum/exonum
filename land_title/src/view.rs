@@ -3,7 +3,7 @@ use exonum::blockchain::{View};
 use exonum::crypto::{ PublicKey, Hash, hash };
 use byteorder::{ByteOrder, LittleEndian};
 use exonum::storage::{Fork, MerklePatriciaTable, MapTable, MerkleTable, List, Result as StorageResult};
-use txs::{ObjectTx, Point, MBR};
+use txs::{ObjectTx, GeoPoint};
 use std::ops::Deref;
 
 
@@ -72,15 +72,7 @@ impl Object {
     pub fn transfer_to(&mut self, other: u64) {
         self.set_owner(other);
     }
-    pub fn in_mbr(&self, mbr: &MBR) -> bool {
-        for point_data in self.points() {
-            let point: Point = (*point_data).into();
-            if point.in_mbr(mbr) {
-                return true;
-            }
-        }
-        false
-    }
+
 }
 
 pub struct ObjectsView<F: Fork> {
@@ -135,15 +127,6 @@ impl<F> ObjectsView<F> where F: Fork
         Ok(v)
 
     }
-    pub fn find_objects_in_mbr(&self, mbr: &MBR) -> StorageResult<Option<(u16, Object)>> {
-        let objects = self.objects();
-        let values = objects.values()?;
-        let r = values.into_iter()
-            .enumerate()
-            .find(|&(_, ref c)| c.in_mbr(mbr))
-            .map(|(x, y)| (x as u16, y));
-        Ok(r)
-    }
 }
 
 #[cfg(test)]
@@ -151,7 +134,7 @@ mod tests {
 
     use exonum::crypto::{gen_keypair, hash};
     use super::{Owner, Object, Ownership};
-    use txs::{Point, MBR};
+    use txs::{GeoPoint};
 
     #[test]
     fn test_create_owner() {
@@ -185,20 +168,16 @@ mod tests {
         // Arrange
         let hash = hash(&[]);
         let owner_id = 0_u64;
-        let points = [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into(), Point::new(5.0, 6.0).into()];
+        let points = GeoPoint::to_vec(&vec![GeoPoint::new(1.0, 2.0), GeoPoint::new(3.0, 4.0), GeoPoint::new(5.0, 6.0)]);
 
         // Act
         let object = Object::new("test object title", points.as_ref(), owner_id, false, &hash);
 
         // Assert
         assert_eq!(object.title(), "test object title");
-        assert_eq!(object.points(), [Point::new(1.0, 2.0).into(), Point::new(3.0, 4.0).into(), Point::new(5.0, 6.0).into()]);
+        assert_eq!(object.points(), &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
         assert_eq!(object.owner_id(), owner_id);
         assert_eq!(object.history_hash(), &hash);
-        assert_eq!(object.in_mbr(&MBR::new(Point::new(0.0, 0.0), Point::new(1.0, 1.0))), false);
-        assert_eq!(object.in_mbr(&MBR::new(Point::new(0.0, 0.0), Point::new(2.0, 2.0))), true);
-        assert_eq!(object.in_mbr(&MBR::new(Point::new(2.0, 2.0), Point::new(3.0, 3.0))), false);
-        assert_eq!(object.in_mbr(&MBR::new(Point::new(2.0, 2.0), Point::new(4.0, 4.0))), true);
 
     }
 
