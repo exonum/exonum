@@ -2,6 +2,7 @@ use exonum::crypto::{Hash, PublicKey};
 use byteorder::{ByteOrder, LittleEndian};
 use exonum::messages::{RawMessage, Message, Error as MessageError};
 use serde::{Serialize,Deserialize};
+use geo::{Point, LineString, Polygon};
 
 pub const TX_CREATE_OWNER_ID: u16 = 128;
 pub const TX_CREATE_OBJECT_ID: u16 = 129;
@@ -22,14 +23,12 @@ impl GeoPoint {
             y: y
         }
     }
-
     pub fn from_vec(v: Vec<f64>) -> Vec<GeoPoint> {
         assert!(v.len() % 2 == 0);
         let x_coords = v.iter().enumerate().filter(|&(i, _)| i % 2 == 0).map(|(_, v)| *v);
         let y_coords = v.iter().enumerate().filter(|&(i, _)| i % 2 != 0).map(|(_, v)| *v);
         x_coords.zip(y_coords).map(|(x, y)| GeoPoint::new(x, y)).collect::<Vec<GeoPoint>>()
     }
-
     pub fn to_vec(points: &Vec<GeoPoint>) -> Vec<f64> {
         let mut result = vec![];
         for point in points {
@@ -37,6 +36,13 @@ impl GeoPoint {
             result.push(point.y);
         }
         result
+    }
+    pub fn to_polygon(geopoints: Vec<GeoPoint>) -> Polygon<f64> {
+        let mut points = geopoints.clone();
+        let start_point = points[0].clone();
+        points.push(start_point);
+        let v = Vec::new();
+        Polygon::new(LineString(points.iter().map(|item| Point::new(item.x, item.y)).collect::<Vec<Point<f64>>>()), v)
     }
 }
 
@@ -171,14 +177,6 @@ mod tests {
     use exonum::messages::Message;
     use byteorder::{ByteOrder, LittleEndian};
 
-    #[test]
-    fn test_f64(){
-        let mut v = vec![0; 8];
-        LittleEndian::write_f64(&mut v[0..8], 41.85123450747319_f64);
-        println!("v={:?}", v);
-        let vv = LittleEndian::read_f64(&v[0..8]);
-        println!("vv={:?}", vv);
-    }
     #[test]
     fn test_tx_create_owner() {
         // Arrange

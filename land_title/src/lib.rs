@@ -24,6 +24,10 @@ use exonum::crypto::{Hash, hash};
 use std::u64;
 use std::ops::Deref;
 
+use geo::{Polygon};
+use geo::algorithm::intersects::Intersects;
+use geo::algorithm::contains::Contains;
+
 pub use txs::{ObjectTx, TxCreateOwner, TxCreateObject, TxModifyObject,
               TxTransferObject, TxRemoveObject, GeoPoint};
 pub use view::{ObjectsView, Owner, Object, ObjectId, Ownership};
@@ -68,27 +72,46 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
             }
 
             ObjectTx::CreateObject(ref tx) => {
+
                 let objects = view.objects();
-                let object_id = objects.len()? as u64;
 
-                // update ownership hash
-                let owner_objects = view.owner_objects(tx.owner_id());
-                owner_objects.append(Ownership::new(object_id, true))?;
-                let new_ownership_hash = owner_objects.root_hash()?;
-                let mut owner = view.owners().get(tx.owner_id())?.unwrap();
-                owner.set_ownership_hash(&new_ownership_hash);
-                view.owners().set(tx.owner_id(), owner)?;
+                if let Some(owner) = view.owners().get(tx.owner_id())? {
 
-                // update object history hash
-                let object_history = view.object_history(object_id);
-                let hash = hash(&[]);
-                object_history.append(hash)?;
-                let new_history_hash = object_history.root_hash()?;
+                    let points = GeoPoint::from_vec(tx.points().to_vec());
+                    if points.len() < 3 {
+                        return Err(Error::new(String::from("At least 3 points should be defined.")));
+                    }
 
-                // insert object
-                let object = Object::new(tx.title(), tx.points(), tx.owner_id(), false, &new_history_hash);
-                objects.append(object)?;
+                    let ls_new = GeoPoint::to_polygon(points);
+                    for stored_object in objects.values()? {
+                        let stored_points = GeoPoint::from_vec(stored_object.points().to_vec());
+                        if ls_new.intersects(&GeoPoint::to_polygon(stored_points)) {
+                            return Err(Error::new(String::from("Cross titles detected.")));
+                        }
+                    }
 
+                    let object_id = objects.len()? as u64;
+
+                    // update ownership hash
+                    let owner_objects = view.owner_objects(tx.owner_id());
+                    owner_objects.append(Ownership::new(object_id, true))?;
+                    let new_ownership_hash = owner_objects.root_hash()?;
+                    let mut owner = view.owners().get(tx.owner_id())?.unwrap();
+                    owner.set_ownership_hash(&new_ownership_hash);
+                    view.owners().set(tx.owner_id(), owner)?;
+
+                    // update object history hash
+                    let object_history = view.object_history(object_id);
+                    let hash = hash(&[]);
+                    object_history.append(hash)?;
+                    let new_history_hash = object_history.root_hash()?;
+
+                    // insert object
+                    let object = Object::new(tx.title(), tx.points(), tx.owner_id(), false, &new_history_hash);
+                    objects.append(object)?;
+                } else {
+                    return Err(Error::new(String::from("Owner not found by id.")));
+                }
             }
 
             ObjectTx::ModifyObject(ref tx) => {
@@ -106,7 +129,7 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                     object.set_history_hash(&new_history_hash);
                     view.objects().set(tx.object_id(), object)?;
                 }else{
-                    return Err(Error::new(String::from("Object not found by id")));
+                    return Err(Error::new(String::from("Object not found by id.")));
                 }
 
             }
@@ -182,7 +205,7 @@ mod tests {
     use txs::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject, ObjectTx, GeoPoint};
     use exonum::crypto::{gen_keypair};
     use exonum::blockchain::Blockchain;
-    use exonum::storage::{Map, List, Database, MemoryDB, Result as StorageResult};
+    use exonum::storage::{Map, List, Error, Database, MemoryDB, Result as StorageResult};
 
     fn execute_tx<D: Database>(v: &ObjectsView<D::Fork>,
                                tx: ObjectTx)
@@ -212,6 +235,132 @@ mod tests {
     }
 
     #[test]
+    fn test_add_object_to_wrong_owner_fails(){
+        // Arrange
+        let b = ObjectsBlockchain { db: MemoryDB::new() };
+        let v = b.view();
+        let (p, s) = gen_keypair();
+
+        let wrong_owner_id = 0_u64;
+
+        let points = vec![1.0, 2.0, 3.0, 4.0];
+        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, wrong_owner_id, &s);
+
+        // Act
+        let create_object_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone()));
+
+        // Assert
+        assert_eq!(create_object_result.is_ok(), false);
+
+    }
+
+    #[test]
+    fn test_add_object_with_2_points_fails(){
+        // Arrange
+        let b = ObjectsBlockchain { db: MemoryDB::new() };
+        let v = b.view();
+        let (p, s) = gen_keypair();
+
+        let owner_id = 0_u64;
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
+        let create_owner_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
+
+        let points = vec![1.0, 2.0, 3.0, 4.0];
+        let tx_create_object = TxCreateObject::new(&p, "test object title", &points, owner_id, &s);
+
+        // Act
+        let create_object_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone()));
+
+        // Assert
+        assert_eq!(create_object_result.is_ok(), false);
+
+    }
+
+    #[test]
+    fn test_add_object_crossing_another_fails(){
+        // Arrange
+        let b = ObjectsBlockchain { db: MemoryDB::new() };
+        let v = b.view();
+        let (p, s) = gen_keypair();
+
+        let owner_id = 0_u64;
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
+        let create_owner_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
+
+        let points1 = vec![0.0, 0.0, 2.0, 0.0, 2.0, 2.0, 0.0, 2.0];
+        let tx_create_object1 = TxCreateObject::new(&p, "test object title1", &points1, owner_id, &s);
+
+        let points2 = vec![1.0, 1.0, 3.0, 1.0, 3.0, 3.0, 0.0, 3.0];
+        let tx_create_object2 = TxCreateObject::new(&p, "test object title2", &points2, owner_id, &s);
+
+
+        // Act
+        let create_object_result1 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object1.clone()));
+        let create_object_result2 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object2.clone()));
+
+        // Assert
+        assert_eq!(create_object_result1.is_ok(), true);
+        assert_eq!(create_object_result2.is_ok(), false);
+
+    }
+
+    #[test]
+    fn test_add_object_the_same_to_another_fails(){
+        // Arrange
+        let b = ObjectsBlockchain { db: MemoryDB::new() };
+        let v = b.view();
+        let (p, s) = gen_keypair();
+
+        let owner_id = 0_u64;
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
+        let create_owner_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
+
+        let points1 = vec![0.0, 0.0, 2.0, 0.0, 2.0, 2.0, 0.0, 2.0];
+        let tx_create_object1 = TxCreateObject::new(&p, "test object title1", &points1, owner_id, &s);
+
+        let points2 = vec![0.0, 0.0, 2.0, 0.0, 2.0, 2.0, 0.0, 2.0];
+        let tx_create_object2 = TxCreateObject::new(&p, "test object title2", &points2, owner_id, &s);
+
+
+        // Act
+        let create_object_result1 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object1.clone()));
+        let create_object_result2 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object2.clone()));
+
+        // Assert
+        assert_eq!(create_object_result1.is_ok(), true);
+        assert_eq!(create_object_result2.is_ok(), false);
+
+    }
+
+    #[test]
+    fn test_add_object_inside_another_fails(){
+        // Arrange
+        let b = ObjectsBlockchain { db: MemoryDB::new() };
+        let v = b.view();
+        let (p, s) = gen_keypair();
+
+        let owner_id = 0_u64;
+        let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
+        let create_owner_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
+
+        let points1 = vec![0.0, 0.0, 2.0, 0.0, 2.0, 2.0, 0.0, 2.0];
+        let tx_create_object1 = TxCreateObject::new(&p, "test object title1", &points1, owner_id, &s);
+
+        let points2 = vec![0.5, 0.5, 1.5, 0.5, 1.5, 1.5, 0.5, 1.5];
+        let tx_create_object2 = TxCreateObject::new(&p, "test object title2", &points2, owner_id, &s);
+
+
+        // Act
+        let create_object_result1 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object1.clone()));
+        let create_object_result2 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object2.clone()));
+
+        // Assert
+        assert_eq!(create_object_result1.is_ok(), true);
+        assert_eq!(create_object_result2.is_ok(), false);
+
+    }
+
+    #[test]
     fn test_add_object(){
 
         // Arrange
@@ -219,17 +368,16 @@ mod tests {
         let v = b.view();
         let (p, s) = gen_keypair();
 
-        let owners = v.owners();
-        let owner_id = owners.len().unwrap();
+        let owner_id = 0_u64;
 
         let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
 
         let object_id1 = 0_u64;
-        let points1 = vec![1.0, 2.0, 3.0, 4.0];
+        let points1 = vec![1.0, 1.0, 3.0, 1.0, 3.0, 4.0];
         let tx_create_object1 = TxCreateObject::new(&p, "test object title1", &points1, owner_id, &s);
 
         let object_id2 = 1_u64;
-        let points2 = vec![5.0, 6.0, 7.0, 8.0];
+        let points2 = vec![4.0, 2.0, 5.0, 2.0, 5.0, 4.0];
         let tx_create_object2 = TxCreateObject::new(&p, "test object title2", &points2, owner_id, &s);
 
 
@@ -237,6 +385,12 @@ mod tests {
         let create_owner_result = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
         let create_object_result1 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object1.clone()));
         let create_object_result2 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object2.clone()));
+
+        //Assert
+        assert_eq!(create_owner_result.is_ok(), true);
+        assert_eq!(create_object_result1.is_ok(), true);
+        assert_eq!(create_object_result2.is_ok(), true);
+
         let stored_object1 = v.objects().get(object_id1).unwrap().unwrap();
         let stored_object2 = v.objects().get(object_id2).unwrap().unwrap();
         let stored_owner = v.owners().get(owner_id).unwrap().unwrap();
@@ -245,20 +399,15 @@ mod tests {
         let ownership_hash = v.owner_objects(owner_id).root_hash().unwrap();
         let objects_for_owner = v.find_objects_for_owner(owner_id).unwrap();
 
-        //Assert
-        assert_eq!(create_owner_result.is_ok(), true);
-        assert_eq!(create_object_result1.is_ok(), true);
-
         assert_eq!(stored_object1.title(), "test object title1");
         assert_eq!(stored_object1.owner_id(), owner_id);
-        assert_eq!(stored_object1.points(), &[1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(stored_object1.points(), &[1.0, 1.0, 3.0, 1.0, 3.0, 4.0]);
         assert_eq!(stored_object1.deleted(), false);
         assert_eq!(stored_object1.history_hash(), &history_hash1);
 
-        assert_eq!(create_object_result2.is_ok(), true);
         assert_eq!(stored_object2.title(), "test object title2");
         assert_eq!(stored_object2.owner_id(), owner_id);
-        assert_eq!(stored_object2.points(), &[5.0, 6.0, 7.0, 8.0]);
+        assert_eq!(stored_object2.points(), &[4.0, 2.0, 5.0, 2.0, 5.0, 4.0]);
         assert_eq!(stored_object2.deleted(), false);
         assert_eq!(stored_object2.history_hash(), &history_hash2);
 
@@ -277,7 +426,7 @@ mod tests {
         let owner_id = 0_u64;
         let object_id = 0_u64;
         let wrong_object_id = 1_u64;
-        let points = vec![1.0, 2.0, 3.0, 4.0];
+        let points = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
         let tx_create_object = TxCreateObject::new(&p, "test object title", &points, owner_id, &s);
         execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone())).unwrap();
         execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone())).unwrap();
@@ -317,7 +466,7 @@ mod tests {
         let tx_create_owner2 = TxCreateOwner::new(&p2, "firstname2", "lastname2", &s2);
         let object_id = 0_u64;
         let wrong_object_id = 1_u64;
-        let points = vec![1.0, 2.0, 3.0, 4.0];
+        let points = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
         let tx_create_object = TxCreateObject::new(&p, "test object title", &points, owner_id1, &s);
         let create_owner_result1 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone()));
         let create_owner_result2 = execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner2.clone()));
@@ -359,7 +508,7 @@ mod tests {
         let tx_create_owner = TxCreateOwner::new(&p, "firstname", "lastname", &s);
         let object_id = 0_u64;
         let wrong_object_id = 1_u64;
-        let points = vec![1.0, 2.0, 3.0, 4.0];
+        let points = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
         let tx_create_object = TxCreateObject::new(&p, "test object title", &points, owner_id, &s);
         execute_tx::<MemoryDB>(&v, ObjectTx::CreateOwner(tx_create_owner.clone())).unwrap();
         execute_tx::<MemoryDB>(&v, ObjectTx::CreateObject(tx_create_object.clone())).unwrap();
@@ -375,7 +524,7 @@ mod tests {
         assert_eq!(err_remove_result.is_ok(), false);
         assert_eq!(removed_object.title(), "test object title");
         assert_eq!(removed_object.owner_id(), owner_id);
-        assert_eq!(removed_object.points(), &[1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(removed_object.points(), &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
         assert_eq!(removed_object.deleted(), true);
         assert_eq!(removed_object.history_hash(), &history_hash);
 
