@@ -259,7 +259,7 @@ impl<B, S> NodeHandler<B, S>
         let start_round = ::std::cmp::max(self.state.locked_round() + 1, propose_round);
         for round in start_round...self.state.round() {
             if self.state.has_majority_prevotes(round, hash) {
-                self.lock(round, hash);
+                self.has_majority_prevotes(round, &hash);
             }
         }
 
@@ -341,29 +341,27 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn lock(&mut self, round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", round, propose_hash);
-        // Change lock
-        self.state.lock(round, propose_hash);
-
-        // Send precommit
-        if !self.state.have_incompatible_prevotes() {
-            // Execute block and get state hash
-            let block_hash = self.execute(&propose_hash);
-            self.broadcast_precommit(round, &propose_hash, &block_hash);
-            // Commit if has consensus
-            if self.state.has_majority_precommits(round, block_hash) {
-                self.has_majority_precommits(round, &propose_hash, &block_hash);
-                return;
-            }
-        }
-
-        // Send prevotes
-        for round in self.state.locked_round() + 1...self.state.round() {
+        for round in round...self.state.round() {
+            // Send prevotes
             if !self.state.have_prevote(round) {
                 self.broadcast_prevote(round, &propose_hash);
-                if self.state.has_majority_prevotes(round, propose_hash) {
-                    // FIXME remove recursive lock call
-                    self.lock(round, propose_hash);
+            }
+            // Change lock
+            if self.state.has_majority_prevotes(round, propose_hash) {
+                self.state.lock(round, propose_hash);
+                // Send precommit
+                if !self.state.have_incompatible_prevotes() {
+                    // Execute block and get state hash
+                    let block_hash = self.execute(&propose_hash);
+                    self.broadcast_precommit(round, &propose_hash, &block_hash);
+                    // Commit if has consensus
+                    if self.state.has_majority_precommits(round, block_hash) {
+                        self.has_majority_precommits(round, &propose_hash, &block_hash);
+                        return;
+                    }
                 }
+                // Remove request info
+                self.remove_request(RequestData::Prevotes(round, propose_hash));
             }
         }
     }
@@ -505,7 +503,10 @@ impl<B, S> NodeHandler<B, S>
         // Send prevote if we are locked or propose if we are leader
         if let Some(hash) = self.state.locked_propose() {
             let round = self.state.round();
-            self.broadcast_prevote(round, &hash);
+            let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+            if has_majority_prevotes {
+                self.has_majority_prevotes(round, &hash);
+            }
         } else if self.is_leader() {
             self.add_propose_timeout();
         }
@@ -709,7 +710,7 @@ impl<B, S> NodeHandler<B, S>
         self.state.remove_request(&data)
     }
 
-    pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) {
+    pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(self.state.id(),
                                    self.state.height(),
@@ -720,9 +721,7 @@ impl<B, S> NodeHandler<B, S>
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
-        if has_majority_prevotes {
-            self.lock(round, *propose_hash);
-        }
+        has_majority_prevotes
     }
 
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
