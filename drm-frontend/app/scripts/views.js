@@ -272,17 +272,17 @@ var AddContentPage = Backbone.View.extend({
         result = result + i;
       }
       return result;
-    };
+    }
     this.$el.find("#add-content-fingerprint").val(generateFingerprint());
     this.$el.find("#add-content-fingerprint-group").removeClass("has-error");
   },
 
   getOwners: function() {
     var owners = [];
-    this.$el.find("#owners tbody tr").each(function(i, el) {
+    this.$el.find(".add-content-owner").each(function(i, el) {
       owners.push({
-        owner_id: $(el).data("id"),
-        share: Math.round($(el).find('input').val().replace(/[^0-9]/g, ''))
+        owner_id: $(el).find(".add-content-owner-id").val(),
+        share: Math.round($(el).find('.add-content-owner-share').val().replace(/[^0-9]/g, ''))
       });
     });
     console.log(owners);
@@ -290,24 +290,16 @@ var AddContentPage = Backbone.View.extend({
   },
 
   addCoowner: function() {
-    var that = this;
-    var id = this.$el.find('#add-content-user-id').val();
+    var to = $('#co-owners');
+    var tpl = $('#co-owner').html();
+
     app.views.container.loadingStart();
-    new Owner({id: id}).fetch({
-      success: function(model) {
-        app.views.container.loadingFinish();
-        var name = model.get('name');
-        that.$el.find("#owners tbody").append('<tr data-id="' + id + '"><td class="title col-sm-7">' + name + ' #' + id + '</td><td class="col-sm-3"><input type="input" class="form-control" value="0"></td><td class="col-sm-2"><a class="label label-danger add-content-remove-coowner">–</a></td></tr>');
-      },
-      error: function() {
-        app.views.container.loadingFinish();
-        that.$el.find('#add-content-user-id').val('');
-      }
-    });
+    to.append(tpl);
+    app.views.container.loadingFinish();
   },
 
   removeCoowner: function(e) {
-    $(e.target).parents('tr').remove();
+    $(e.target).parents('.add-content-owner').remove();
   },
 
   addContent: function() {
@@ -341,6 +333,7 @@ var AddContentPage = Backbone.View.extend({
       hasError = true;
       this.$el.find("#add-content-min-plays-group").addClass("has-error");
     }
+    // TODO check co-owners validity: totally 100%, non-repeatable
 
     if (!hasError) {
       content.price_per_listen = Math.round(content.price_per_listen * 100);

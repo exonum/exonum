@@ -1,13 +1,14 @@
-<div class="app-list-headers clearfix">
-    <div class="text-center">{{ content.get('fingerprint').substr(0, 8) }}-{{ content.get('fingerprint').substr(8, 4) }}-{{ content.get('fingerprint').substr(12, 4) }}-{{ content.get('fingerprint').substr(16, 4) }}-{{ content.get('fingerprint').substr(20, 12) }}</div>
-</div>
-
 <div class="form-horizontal">
   <div class="form-group">
-    <label class="col-sm-5 control-label"><strong>Content:</strong></label>
-    <div class="col-sm-7">
-      <input type="input" class="form-control" value="{{ content.get('title') }}" disabled>
-      <span class="help-block">by {{ content.get("owners")[0].name }} #{{ content.get("owners")[0].id }}</span>
+    <label class="col-sm-5 control-label"><strong>Title:</strong></label>
+    <div class="col-sm-7 form-control-static">
+      {{ content.get('title') }}
+    </div>
+  </div>
+  <div class="form-group">
+    <label class="col-sm-5 control-label"><strong>Owner:</strong></label>
+    <div class="col-sm-7 form-control-static">
+      {{ content.get("owners")[0].name }}
     </div>
   </div>
   <div class="form-group" id="add-report-time-group">
@@ -29,6 +30,7 @@
     </div>
   </div>
 </div>
+
 <div class="buttons-wrapper">
-    <a class="button button-red" id="add-report">Send report</a>
+    <a class="button button-green" id="add-report">Send report</a>
 </div>

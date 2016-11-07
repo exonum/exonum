@@ -554,12 +554,8 @@ a.button:focus, a.button:active, a.button:hover {
 .available > tbody > tr > td {
   cursor: pointer;
 }
-.owners > tbody > tr > td {
-    vertical-align: middle;
-    border-top: none;
-}
-.owners .title, .plays {
-    text-align: right;
+.owners {
+    margin-bottom: 23px;
 }
 @media (min-width: 768px) {
     .dl-horizontal dt {
@@ -573,10 +569,7 @@ a.button:focus, a.button:active, a.button:hover {
 }
 
 .pages, .toolbar, .app-content, #alert, .welcome-wrapper {
-  display: none;
-}
-.col-fixed-id {
-    width: 64px;
+    display: none;
 }
 .col-fixed-price {
     width: 64px;
@@ -589,6 +582,21 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .col-fixed-more {
     width: 32px;
+}
+.col-slim {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+.col-remove {
+    margin: 12px 0 0 0;
+    padding: 0;
+}
+textarea.form-control {
+    padding: 6px 0;
+    resize: vertical;
+}
+.input-group-addon {
+    padding: 6px;
 }
 
 

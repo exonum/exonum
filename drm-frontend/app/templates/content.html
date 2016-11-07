@@ -50,7 +50,6 @@
 <table class="table">
   {% _.each(content.get("owners"), function(owner) { %}
     <tr>
-      <td class="col-fixed-id">#{{ owner.id }}</td>
       <td>{{ owner.name }}</td>
       <td class="text-right">{{ owner.share }}%</td>
     </tr>
@@ -66,7 +65,6 @@
     <table class="table">
       {% _.each(content.get("distributors"), function(distributor) { %}
       <tr>
-        <td class="col-fixed-id">#{{ distributor.id }}</td>
         <td>{{ distributor.name }}</td>
       </tr>
       {% }) %}
@@ -86,6 +84,6 @@
     </table>
     {% } %}
   {% } else { %}
-    <h6 class="text-muted">No one distributes this content...</h6>
+    <h6 class="text-muted">No one still does not distribute this content...</h6>
   {% } %}
 {% } %}

@@ -6,12 +6,11 @@
 <table class="table table-hover table-condensed blockchain">
   <thead>
     <tr>
-      <td>Height</td>
-      <td>Time</td>
-      <td>Hash</td>
-      <td class="text-center">Txs</td>
-      <td class="col-fixed-more"></td>
-      <!-- <td>Anchoring</td> -->
+      <th>Height</th>
+      <th>Time</th>
+      <th>Hash</th>
+      <th class="text-center">Txs</th>
+      <th class="col-fixed-more"></th>
     </tr>
   </thead>
   <tbody>
@@ -22,9 +21,6 @@
         <td><samp>{{ block.get('hash').substr(0, 8) }}</samp></td>
         <td class="text-center">{{ block.get('tx_count') }}</td>
         <td class="text-center text-muted"><i class="glyphicon glyphicon-chevron-right"></i></td>
-<!--         <td class="text-right">
-          <div class="checker"></div>
-        </td> -->
       </tr>
     {% }) %}
   </tbody>
