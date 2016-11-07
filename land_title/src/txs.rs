@@ -4,11 +4,12 @@ use exonum::messages::{RawMessage, Message, Error as MessageError};
 use serde::{Serialize,Deserialize};
 use geo::{Point, LineString, Polygon};
 
-pub const TX_CREATE_OWNER_ID: u16 = 128;
-pub const TX_CREATE_OBJECT_ID: u16 = 129;
-pub const TX_MODIFY_OBJECT_ID: u16 = 130;
-pub const TX_TRANSFER_OBJECT_ID: u16 = 131;
-pub const TX_REMOVE_OBJECT_ID: u16 = 132;
+pub const TX_REGISTER: u16 = 128;
+pub const TX_CREATE_OWNER_ID: u16 = 129;
+pub const TX_CREATE_OBJECT_ID: u16 = 130;
+pub const TX_MODIFY_OBJECT_ID: u16 = 131;
+pub const TX_TRANSFER_OBJECT_ID: u16 = 132;
+pub const TX_REMOVE_OBJECT_ID: u16 = 133;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GeoPoint {
@@ -17,6 +18,7 @@ pub struct GeoPoint {
 }
 
 impl GeoPoint {
+
     pub fn new(x: f64, y: f64) -> GeoPoint {
         GeoPoint {
             x: x,
@@ -53,6 +55,14 @@ impl PartialEq for GeoPoint{
     }
 }
 
+message! {
+    TxRegister {
+        const ID = TX_REGISTER;
+        const SIZE = 64;
+        pub_key:               &PublicKey      [00 => 32]
+        name:                  &str            [32 => 64]
+    }
+}
 
 message! {
     TxCreateOwner {
@@ -107,6 +117,7 @@ message! {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum ObjectTx {
+    Register(TxRegister),
     CreateOwner(TxCreateOwner),
     CreateObject(TxCreateObject),
     ModifyObject(TxModifyObject),
@@ -117,6 +128,7 @@ pub enum ObjectTx {
 impl ObjectTx {
     pub fn pub_key(&self) -> &PublicKey {
         match *self {
+            ObjectTx::Register(ref msg) => msg.pub_key(),
             ObjectTx::CreateOwner(ref msg) => msg.pub_key(),
             ObjectTx::CreateObject(ref msg) => msg.pub_key(),
             ObjectTx::ModifyObject(ref msg) => msg.pub_key(),
@@ -129,6 +141,7 @@ impl ObjectTx {
 impl Message for ObjectTx {
     fn raw(&self) -> &RawMessage {
         match *self {
+            ObjectTx::Register(ref msg) => msg.raw(),
             ObjectTx::CreateOwner(ref msg) => msg.raw(),
             ObjectTx::CreateObject(ref msg) => msg.raw(),
             ObjectTx::ModifyObject(ref msg) => msg.raw(),
@@ -138,6 +151,7 @@ impl Message for ObjectTx {
     }
     fn from_raw(raw: RawMessage) -> Result<Self, MessageError> {
         Ok(match raw.message_type() {
+            TX_REGISTER => ObjectTx::Register(TxRegister::from_raw(raw)?),
             TX_CREATE_OWNER_ID => ObjectTx::CreateOwner(TxCreateOwner::from_raw(raw)?),
             TX_CREATE_OBJECT_ID => ObjectTx::CreateObject(TxCreateObject::from_raw(raw)?),
             TX_MODIFY_OBJECT_ID => ObjectTx::ModifyObject(TxModifyObject::from_raw(raw)?),
@@ -149,6 +163,7 @@ impl Message for ObjectTx {
 
     fn hash(&self) -> Hash {
         match *self {
+            ObjectTx::Register(ref msg) => msg.hash(),
             ObjectTx::CreateOwner(ref msg) => msg.hash(),
             ObjectTx::CreateObject(ref msg) => msg.hash(),
             ObjectTx::ModifyObject(ref msg) => msg.hash(),
@@ -159,6 +174,7 @@ impl Message for ObjectTx {
 
     fn verify(&self, pub_key: &PublicKey) -> bool {
         match *self {
+            ObjectTx::Register(ref msg) => msg.verify(pub_key),
             ObjectTx::CreateOwner(ref msg) => msg.verify(pub_key),
             ObjectTx::CreateObject(ref msg) => msg.verify(pub_key),
             ObjectTx::ModifyObject(ref msg) => msg.verify(pub_key),
@@ -172,10 +188,28 @@ impl Message for ObjectTx {
 mod tests {
 
     use exonum::crypto::gen_keypair;
-    use super::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject,
-                GeoPoint};
+    use super::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject, TxRegister, GeoPoint};
     use exonum::messages::Message;
     use byteorder::{ByteOrder, LittleEndian};
+
+    #[test]
+    fn test_register(){
+        // Arrange
+        let (p, s) = gen_keypair();
+
+        // Act
+        let tx = TxRegister::new(&p, "Test user", &s);
+
+        // Assert
+        assert_eq!(tx.pub_key(), &p);
+        assert_eq!(tx.name(), "Test user");
+
+        // Act
+        let tx2 = TxRegister::from_raw(tx.raw().clone()).unwrap();
+        // Assert
+        assert_eq!(tx2.pub_key(), &p);
+        assert_eq!(tx2.name(), "Test user");
+    }
 
     #[test]
     fn test_tx_create_owner() {
@@ -187,6 +221,12 @@ mod tests {
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.firstname(), "firstname");
         assert_eq!(tx.lastname(), "lastname");
+
+        // Act
+        let tx2 = TxCreateOwner::from_raw(tx.raw().clone()).unwrap();
+        // Assert
+        assert_eq!(tx2.firstname(), "firstname");
+        assert_eq!(tx2.lastname(), "lastname");
     }
 
     #[test]
@@ -220,14 +260,14 @@ mod tests {
         // Assert
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.title(), "test object title");
-        //assert_eq!(tx.points(), &[0x0000000200000001, 0x0000000400000003]);
+        assert_eq!(tx.points(), &[1.0, 2.0, 3.0, 4.0]);
         assert_eq!(tx.owner_id(), owner_id);
         // Act
         let tx2 = TxCreateObject::from_raw(tx.raw().clone()).unwrap();
         // Assert
         assert_eq!(tx2.pub_key(), &p);
         assert_eq!(tx2.title(), "test object title");
-        //assert_eq!(tx2.points(), &[0x0000000200000001, 0x0000000400000003]);
+        assert_eq!(tx2.points(), &[1.0, 2.0, 3.0, 4.0]);
         assert_eq!(tx2.owner_id(), owner_id);
     }
 

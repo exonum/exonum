@@ -21,12 +21,17 @@ extern crate exonum;
 extern crate blockchain_explorer;
 extern crate land_title;
 
+use land_title::cors::CORS;
+use iron::method::Method;
+use iron::status::Status;
+
 use std::net::SocketAddr;
 use std::path::Path;
 use std::thread;
 use std::default::Default;
 
 use clap::{Arg, App, SubCommand};
+use iron::{ AfterMiddleware, headers};
 use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning, Response, Client, ErrorResponse};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
@@ -37,7 +42,7 @@ use hyper::status::StatusCode;
 use serde_json::value::from_value;
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
-use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
+use exonum::storage::{Database, MemoryDB, LevelDB, Error, LevelDBOptions};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
 use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash, FromHexError};
 use exonum::messages::Message;
@@ -47,18 +52,22 @@ use blockchain_explorer::{HexField, ValueNotFound};
 use land_title::GeoPoint;
 
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
-                     TxModifyObject, TxTransferObject, TxRemoveObject};
-use land_title::api::{ObjectsApi, ObjectInfo};
+                     TxModifyObject, TxTransferObject, TxRemoveObject, TxRegister};
+use land_title::api::{ObjectsApi, ObjectInfo, NewOwner, NewObject};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
-// fn save_user(storage: &mut CookieJar, public_key: &PublicKey, secret_key: &SecretKey) {
-//     let p = storage.permanent();
-//     let e = p.encrypted();
-//     e.add(Cookie::new("public_key".to_string(), public_key.to_hex()));
-//     e.add(Cookie::new("secret_key".to_string(), secret_key.to_hex()));
-//     println!("cookies set");
-// }
+fn save_user(storage: &mut CookieJar, public_key: &PublicKey, secret_key: &SecretKey) {
+    let p = storage.permanent();
+    let add_cookie = |name: &str, value| {
+        let mut cookie = Cookie::new(name.to_string(), value);
+        cookie.path = Some("/".to_string());
+        p.add(cookie)
+    };
+
+    add_cookie("public_key", public_key.to_hex());
+    add_cookie("secret_key", secret_key.to_hex());
+}
 
 fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar, key: &str) -> StorageResult<Vec<u8>> {
     if let Some(cookie) = storage.find(key) {
@@ -70,23 +79,28 @@ fn load_hex_value_from_cookie<'a>(storage: &'a CookieJar, key: &str) -> StorageR
     Err(StorageError::new(format!("Unable to find value with given key {}", key)))
 }
 
-fn load_user(storage: &CookieJar) -> StorageResult<(String, PublicKey, SecretKey)> {
+fn load_user(storage: &CookieJar) -> StorageResult<(PublicKey, SecretKey)> {
     let p = storage.permanent();
-    let e = p.encrypted();
 
-    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&e, "public_key")?.as_ref());
-    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&e, "secret_key")?.as_ref());
+    let public_key = PublicKey::from_slice(load_hex_value_from_cookie(&p, "public_key")?.as_ref());
+    let secret_key = SecretKey::from_slice(load_hex_value_from_cookie(&p, "secret_key")?.as_ref());
 
     let public_key = public_key.ok_or(StorageError::new("Unable to read public key"))?;
     let secret_key = secret_key.ok_or(StorageError::new("Unable to read secret key"))?;
-    let role = e.find("role").ok_or(StorageError::new("Unable to read role"))?.value;
-    Ok((role, public_key, secret_key))
+    Ok((public_key, secret_key))
 }
 
-fn send_tx<'a, D: Database>(tx: ObjectTx, client: Client<'a>, ch: Channel<ObjectsBlockchain<D>>)
-                            -> Result<Client<'a>, ErrorResponse> {
+fn send_transaction<'a, D: Database>(tx: ObjectTx, client: &Client<'a>, ch: Channel<ObjectsBlockchain<D>>)
+                            -> String {
+
     let tx_hash = tx.hash().to_hex();
     let result = ch.send(tx);
+    println!("{:?}", result);
+    tx_hash
+}
+fn send_tx<'a, D: Database>(tx: ObjectTx, client: Client<'a>, ch: Channel<ObjectsBlockchain<D>>)
+                            -> Result<Client<'a>, ErrorResponse> {
+    let tx_hash = send_transaction(tx, &client, ch);
     let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
     client.json(json)
 }
@@ -168,7 +182,11 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
             let mut chain = iron::Chain::new(app);
             let api_key = b"abacabsasdainblabla23nx8Hasojd8";
             let cookie = ::rustless::batteries::cookie::new(api_key);
+            let cors = CORS::new(vec![
+                (vec![Method::Get, Method::Post], "owners".to_owned())
+            ]);
             chain.link(cookie);
+            chain.link_after(cors);
             iron::Iron::new(chain).http(listen_address).unwrap();
         });
 
@@ -189,6 +207,35 @@ fn land_titles_api<D: Database>(api: &mut Api,
                                    channel: Channel<ObjectsBlockchain<D>>) {
 
     api.namespace("obm", move |api| {
+
+        api.options("*", move |endpoint| {
+            endpoint.handle(move |mut client, params| {
+                //client.response.headers.set(headers::AccessControlAllowOrigin::Any);
+                client.empty()
+            })
+        });
+
+        let ch = channel.clone();
+        api.post("register", move |endpoint| {
+
+            endpoint.params(|params| {
+                params.req_typed("name", json_dsl::string());
+            });
+
+            endpoint.handle(move |client, params| {
+
+                let name = params.find("name").unwrap().as_str().unwrap();
+
+                let (pub_key, sec_key) = gen_keypair();
+                {
+                    let mut cookies = client.request.cookies();
+                    save_user(&mut cookies, &pub_key, &sec_key);
+                }
+                let tx = TxRegister::new(&pub_key, &name, &sec_key);
+                send_tx(ObjectTx::Register(tx), client, ch.clone())
+
+            })
+        });
 
         let b = blockchain.clone();
          api.get("owners", move |endpoint| {
@@ -233,9 +280,18 @@ fn land_titles_api<D: Database>(api: &mut Api,
                  let firstname = params.find("firstname").unwrap().as_str().unwrap();
                  let lastname = params.find("lastname").unwrap().as_str().unwrap();
 
-                 let (public_key, secret_key) = gen_keypair();
+                 let (pub_key, sec_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((p, s)) => (p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
 
-                 let tx = TxCreateOwner::new(&public_key, &firstname, &lastname, &secret_key);
+                 let tx = TxCreateOwner::new(&pub_key, &firstname, &lastname, &sec_key);
 
                  send_tx(ObjectTx::CreateOwner(tx), client, ch.clone())
 
@@ -254,8 +310,10 @@ fn land_titles_api<D: Database>(api: &mut Api,
             })
          });
 
+         let b = blockchain.clone();
          let ch = channel.clone();
          api.post("objects", move |endpoint| {
+
              endpoint.params(|params| {
                  params.req_typed("title", json_dsl::string());
                  params.req_nested("points", json_dsl::array(), |params| {
@@ -267,22 +325,41 @@ fn land_titles_api<D: Database>(api: &mut Api,
              });
 
              endpoint.handle(move |client, params| {
-                let object_info = from_value::<ObjectInfo>(params.clone()).unwrap();
-                let (role, public_key, secret_key) = {
+                let object_info = from_value::<NewObject>(params.clone()).unwrap();
+                let (pub_key, sec_key) = {
                     let r = {
                         let cookies = client.request.cookies();
                         load_user(&cookies)
                     };
                     match r {
-                        Ok((r, p, s)) => (r, p, s),
+                        Ok((p, s)) => (p, s),
                         Err(e) => return client.error(e),
                     }
                 };
                 let points = GeoPoint::to_vec(&object_info.points);
 
-                let tx = TxCreateObject::new(&public_key, &object_info.title, &points, object_info.owner_id, &secret_key);
-                send_tx(ObjectTx::CreateObject(tx), client, ch.clone())
+                let tx = TxCreateObject::new(&pub_key, &object_info.title, &points, object_info.owner_id, &sec_key);
+
+                let obm = ObjectsApi::new(b.clone());
+                // TODO: Костыль №1
+                let before_add = obm.last_object_id();
+                let tx_hash = send_transaction(ObjectTx::CreateObject(tx), &client, ch.clone());
+                // TODO: Костыль №2
+                let after_add = obm.last_object_id();
+
+                if before_add == after_add {
+                    // TODO: Костыль №3
+                    let json = &jsonway::object(|json| json.set("error", "Objects shouldn't intersect")).unwrap();
+                    return client.json(json);
+                } else {
+                    let json = &jsonway::object(|json| {json.set("tx_hash", tx_hash); json.set("id", obm.last_object_id())}).unwrap();
+                    return client.json(json);
+                }
+
+
+
              })
+
          });
 
     });
