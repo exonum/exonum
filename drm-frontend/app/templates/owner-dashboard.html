@@ -1,27 +1,33 @@
 {% if (user.get("ownership").length > 0) { %}
   <div class="app-list-headers clearfix">
-    <div class="pull-left">List of content that you own</div>
+    <div class="pull-left">List of content that you own:</div>
   </div>
   <table class="table table-hover table-condensed distributed owned">
     <thead>
-      <tr><th>Title</th><th>Plays</th><th>Revenue</th><tr>
+      <tr>
+        <th>Title</th>
+        <th class="col-fixed-plays text-right">Plays</th>
+        <th class="col-fixed-revenue text-right">Revenue</th>
+        <th class="col-fixed-more"></th>
+      </tr>
     </thead>
     <tbody>
       {% _.each(user.get("ownership"), function(ownership) { %}
         <tr data-fingerprint="{{ ownership.content.fingerprint }}">
           <td>{{ ownership.content.title }}</td>
-          <td>{{ ownership.plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
-          <td>£{{ Math.round(ownership.amount / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+          <td class="text-right">{{ ownership.plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+          <td class="text-right">£{{ Math.round(ownership.amount / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+          <td class="text-center text-muted"><i class="glyphicon glyphicon-chevron-right"></i></td>
         </tr>
       {% }) %}
     </tbody>
   </table>
 {% } else { %}
-  <h6 class="text-center text-muted">You have not registered any content yet.</h6>
+  <h6 class="text-center text-muted">You have not registered any content yet...</h6>
 {% } %}
 <div class="buttons-wrapper">
   <a class="button button-green" id="owner-dashboard-add-content">
-    <i class="glyphicon glyphicon-plus"></i>
+    <i class="glyphicon glyphicon-plus"></i>&nbsp;
     Add new content
   </a>
 </div>

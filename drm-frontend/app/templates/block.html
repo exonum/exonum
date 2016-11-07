@@ -8,25 +8,19 @@
 </div>
 
 <dl>
-  <dt>Hash</dt>
+  <dt>Hash:</dt>
   <dd><samp>{{ block.get('hash') }}</samp></dd>
-  <dt>Propose time</dt>
+  <dt>Propose time:</dt>
   <dd>{{ moment.unix(block.get('propose_time')).format() }}</dd>
-  <dt>Proposer</dt>
+  <dt>Proposer:</dt>
   <dd>Validator #{{ block.get('proposer') + 1 }}</dd>
-  <dt>Tx hash</dt>
+  <dt>Tx hash:</dt>
   <dd><samp>{{ block.get('tx_hash') }}</samp></dd>
-  <dt>State hash</dt>
+  <dt>State hash:</dt>
   <dd><samp>{{ block.get('state_hash') }}</samp></dd>
 </dl>
 
-<div class="col-xs-offset-2" style="margin-bottom: 23px;">
-    <div><div class="checker active"></div> <span>Approved by 4 validators</span></div>
-<!--     <div>
-      <div class="checker"></div>
-      <span><a href="#">Anchored to Bitcoin blockchain</a></span>
-    </div> -->
-</div>
+<div class="checker active"></div> <span>Approved by 4 validators</span>
 
 <!-- {% if (block.get('tx_count') != 0) { %}
   <dl>

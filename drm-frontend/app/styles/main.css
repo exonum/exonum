@@ -36,6 +36,7 @@ a {
 }
 .welcome-wrapper {
     width: 100%;
+    max-width: 100%;
     min-height: 100%;
     background: #0f2347;
     background: radial-gradient(circle farthest-corner at center center, #17428e, #112d60, #0e1f3f);
@@ -424,6 +425,10 @@ a.button:focus, a.button:active, a.button:hover {
     color: #7c8ba1;
     margin-bottom: 8px;
 }
+
+/*
+    Content
+*/
 .app-content p {
     font-size: 12px;
     margin-bottom: 20px;
@@ -569,6 +574,21 @@ a.button:focus, a.button:active, a.button:hover {
 
 .pages, .toolbar, .app-content, #alert, .welcome-wrapper {
   display: none;
+}
+.col-fixed-id {
+    width: 64px;
+}
+.col-fixed-price {
+    width: 64px;
+}
+.col-fixed-plays {
+    width: 128px;
+}
+.col-fixed-revenue {
+    width: 96px;
+}
+.col-fixed-more {
+    width: 32px;
 }
 
 
