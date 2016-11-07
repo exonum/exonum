@@ -412,6 +412,17 @@ fn digital_rights_api<D: Database>(api: &mut Api,
         });
 
         let b = blockchain.clone();
+        api.get("owners", move |endpoint| {
+            endpoint.handle(move |client, _| {
+                let drm = DigitalRightsApi::new(b.clone());
+                match drm.owner_short_infos() {
+                    Ok(infos) => client.json(&infos.to_json()),
+                    Err(e) => client.error(e),                
+                }
+            })
+        });
+
+        let b = blockchain.clone();
         api.get("find_user/:pub_key", move |endpoint| {
             endpoint.params(|params| {
                 params.req_typed("pub_key", json_dsl::string());
