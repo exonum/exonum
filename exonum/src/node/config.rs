@@ -17,6 +17,7 @@ pub struct ConsensusConfig {
     pub propose_timeout: u32,
     pub status_timeout: u32,
     pub peers_timeout: u32,
+    pub txs_block_limit: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,8 +53,7 @@ impl GenesisConfig {
         let port = port.unwrap_or(7000);
         for i in 0..validators_count {
             let addr = format!("127.0.0.1:{}", port + i as u16).parse().unwrap();
-            let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&[i; 32]).unwrap(),
-                                                     addr);
+            let pair = ListenerConfig::gen_from_seed(&Seed::from_slice(&[i; 32]).unwrap(), addr);
             pairs.push(pair);
         }
 
@@ -64,6 +64,7 @@ impl GenesisConfig {
                 status_timeout: 5000,
                 peers_timeout: 10000,
                 propose_timeout: 500,
+                txs_block_limit: 500,
             },
             network: NetworkConfiguration {
                 max_incoming_connections: 128,
@@ -77,9 +78,9 @@ impl GenesisConfig {
     }
 
     pub fn gen_node_configuration(self,
-                                 idx: usize,
-                                 known_peers: Vec<::std::net::SocketAddr>)
-                                 -> Configuration {
+                                  idx: usize,
+                                  known_peers: Vec<::std::net::SocketAddr>)
+                                  -> Configuration {
         let listener = self.validators[idx].clone();
         let validators: Vec<_> = self.validators
             .iter()
