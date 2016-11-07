@@ -15,6 +15,7 @@ extern crate geo;
 
 mod txs;
 mod view;
+pub mod cors;
 pub mod api;
 
 use exonum::storage::{Map, Database, Error, List};
@@ -29,8 +30,8 @@ use geo::algorithm::intersects::Intersects;
 use geo::algorithm::contains::Contains;
 
 pub use txs::{ObjectTx, TxCreateOwner, TxCreateObject, TxModifyObject,
-              TxTransferObject, TxRemoveObject, GeoPoint};
-pub use view::{ObjectsView, Owner, Object, ObjectId, Ownership};
+              TxTransferObject, TxRemoveObject, TxRegister, GeoPoint};
+pub use view::{ObjectsView, Owner, Object, User, ObjectId, Ownership};
 
 #[derive(Clone)]
 pub struct ObjectsBlockchain<D: Database> {
@@ -66,8 +67,51 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
 
         match *tx {
 
+            ObjectTx::Register(ref tx) => {
+                if let Some(user) = view.users().get(&tx.pub_key())? {
+
+                    // TODO: разобраться почему падает нода при возврате ошибки
+
+                    //return Err(Error::new(String::from("User with the same public key already exists.")));
+
+                    //thread 'main' panicked at 'called `Result::unwrap()` on an `Err` value: Error { message: "Cross titles detected." }', ../src/libcore/result.rs:799
+                    // stack backtrace:
+                    //    1:        0x10d1f1a48 - std::sys::backtrace::tracing::imp::write::h22f199c1dbb72ba2
+                    //    2:        0x10d1f4faf - std::panicking::default_hook::{{closure}}::h9a389c462b6a22dd
+                    //    3:        0x10d1f3b2f - std::panicking::default_hook::h852b4223c1c00c59
+                    //    4:        0x10d1f4156 - std::panicking::rust_panic_with_hook::hcd9d05f53fa0dafc
+                    //    5:        0x10d1f3ff4 - std::panicking::begin_panic::hf6c488cee66e7f17
+                    //    6:        0x10d1f3f12 - std::panicking::begin_panic_fmt::hb0a7126ee57cdd27
+                    //    7:        0x10d1f3e77 - rust_begin_unwind
+                    //    8:        0x10d21fcf0 - core::panicking::panic_fmt::h9af671b78898cdba
+                    //    9:        0x10c9dbc0c - core::result::unwrap_failed::h8dac70b2f56ab301
+                    //   10:        0x10c9a0570 - <core::result::Result<T, E>>::unwrap::h573785ac8a4426ee
+                    //   11:        0x10ca54934 - exonum::node::consensus::<impl exonum::node::NodeHandler<B, S>>::create_block::hdfdfe72f5d4e4cfb
+                    //   12:        0x10ca6b743 - exonum::node::consensus::<impl exonum::node::NodeHandler<B, S>>::execute::h8fd0f11a76058c36
+                    //   13:        0x10ca69b6b - exonum::node::consensus::<impl exonum::node::NodeHandler<B, S>>::lock::h4d8a3686f95a9263
+                    //   14:        0x10ca62979 - exonum::node::consensus::<impl exonum::node::NodeHandler<B, S>>::broadcast_prevote::hea78ec1bd0a0cd0f
+                    //   15:        0x10ca664f5 - exonum::node::consensus::<impl exonum::node::NodeHandler<B, S>>::handle_propose_timeout::hdc756ae58413465b
+                    //   16:        0x10cb4ef15 - <exonum::node::NodeHandler<B, S> as exonum::events::EventHandler>::handle_timeout::h8a29fc2eb64d94ad
+                    //   17:        0x10cace326 - <exonum::events::MioAdapter<H> as mio::handler::Handler>::timeout::hffc3c3de244e84e4
+                    //   18:        0x10c98e6fa - <mio::event_loop::EventLoop<H>>::timer_process::h76eb61940f9ec6c0
+                    //   19:        0x10c99016d - <mio::event_loop::EventLoop<H>>::run_once::hbc20c3b6730dae79
+                    //   20:        0x10c98ebf1 - <mio::event_loop::EventLoop<H>>::run::h4322cf0f5db91766
+                    //   21:        0x10cb116e8 - <exonum::events::Events<H> as exonum::events::Reactor<H>>::run::ha7cce77e0bd96a47
+                    //   22:        0x10c91d032 - <exonum::node::Node<B>>::run::hf208ca4bbeb05306
+                    //   23:        0x10cb746b9 - land_title::run_node::h0a2b799be0145bb2
+                    //   24:        0x10cb76715 - land_title::main::h104a68a11d49bb1d
+                    //   25:        0x10d1f556a - __rust_maybe_catch_panic
+                    //   26:        0x10d1f3616 - std::rt::lang_start::h14cbded5fe3cd915
+                    //   27:        0x10cb94809 - main
+
+                    return Ok(());
+                }
+                let user = User::new(tx.name());
+                view.users().put(&tx.pub_key(), user);
+            }
+
             ObjectTx::CreateOwner(ref tx) => {
-                let owner = Owner::new(tx.pub_key(), tx.firstname(), tx.lastname(), &hash(&[]));
+                let owner = Owner::new(tx.firstname(), tx.lastname(), &hash(&[]));
                 view.owners().append(owner)?;
             }
 
@@ -79,14 +123,16 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
 
                     let points = GeoPoint::from_vec(tx.points().to_vec());
                     if points.len() < 3 {
-                        return Err(Error::new(String::from("At least 3 points should be defined.")));
+                        //return Err(Error::new(String::from("At least 3 points should be defined.")));
+                        return Ok(());
                     }
 
                     let ls_new = GeoPoint::to_polygon(points);
                     for stored_object in objects.values()? {
                         let stored_points = GeoPoint::from_vec(stored_object.points().to_vec());
                         if ls_new.intersects(&GeoPoint::to_polygon(stored_points)) {
-                            return Err(Error::new(String::from("Cross titles detected.")));
+                            //return Err(Error::new(String::from("Cross titles detected.")));
+                            return Ok(());
                         }
                     }
 
@@ -110,7 +156,8 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                     let object = Object::new(tx.title(), tx.points(), tx.owner_id(), false, &new_history_hash);
                     objects.append(object)?;
                 } else {
-                    return Err(Error::new(String::from("Owner not found by id.")));
+                    //return Err(Error::new(String::from("Owner not found by id.")));
+                    return Ok(());
                 }
             }
 
@@ -129,7 +176,8 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                     object.set_history_hash(&new_history_hash);
                     view.objects().set(tx.object_id(), object)?;
                 }else{
-                    return Err(Error::new(String::from("Object not found by id.")));
+                    //return Err(Error::new(String::from("Object not found by id.")));
+                    return Ok(());
                 }
 
             }
@@ -168,7 +216,8 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                         view.objects().set(tx.object_id(), object)?;
 
                 }else{
-                    return Err(Error::new(String::from("Object not found by id")));
+                    // return Err(Error::new(String::from("Object not found by id")));
+                    return Ok(());
                 }
 
             }
@@ -188,7 +237,8 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                         view.objects().set(tx.object_id(), object)?;
 
                 }else{
-                    return Err(Error::new(String::from("Object not found by id")));
+                    //return Err(Error::new(String::from("Object not found by id")));
+                    return Ok(());
                 }
             }
 
@@ -202,7 +252,7 @@ mod tests {
 
     use super::ObjectsBlockchain;
     use view::ObjectsView;
-    use txs::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject, ObjectTx, GeoPoint};
+    use txs::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject, ObjectTx, TxRegister, GeoPoint};
     use exonum::crypto::{gen_keypair};
     use exonum::blockchain::Blockchain;
     use exonum::storage::{Map, List, Error, Database, MemoryDB, Result as StorageResult};
@@ -211,6 +261,25 @@ mod tests {
                                tx: ObjectTx)
                                -> StorageResult<()> {
         ObjectsBlockchain::<D>::execute(v, &tx)
+    }
+
+    #[test]
+    fn register(){
+        // Arrange
+        let b = ObjectsBlockchain { db: MemoryDB::new() };
+        let v = b.view();
+        let (p, s) = gen_keypair();
+        let tx_register = TxRegister::new(&p, "test user", &s);
+
+        // Act
+        let ok_result = execute_tx::<MemoryDB>(&v, ObjectTx::Register(tx_register.clone()));
+        let stored_user = v.users().get(&&p).unwrap().unwrap();
+        let err_result = execute_tx::<MemoryDB>(&v, ObjectTx::Register(tx_register.clone()));
+
+        // Assert
+        assert_eq!(ok_result.is_ok(), true);
+        assert_eq!(err_result.is_ok(), false);
+        assert_eq!(stored_user.name(), "test user");
     }
 
     #[test]

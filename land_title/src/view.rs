@@ -10,12 +10,18 @@ use std::ops::Deref;
 pub type ObjectId = u64;
 
 storage_value! {
+    User {
+        const SIZE = 32;
+        name:                 &str             [00 => 32]
+    }
+}
+
+storage_value! {
     Owner {
         const SIZE = 128;
-        pub_key:               &PublicKey      [00 => 32]
-        firstname:             &str            [32 => 64]
-        lastname:              &str            [64 => 96]
-        ownership_hash:        &Hash           [96 => 128]
+        firstname:             &str            [00 => 32]
+        lastname:              &str            [32 => 64]
+        ownership_hash:        &Hash           [64 => 96]
     }
 }
 
@@ -38,18 +44,21 @@ storage_value! {
     }
 }
 
-impl Owner {
-    pub fn set_pub_key(&mut self, pub_key: &PublicKey){
-        Field::write(&pub_key, &mut self.raw, 00, 32);
+impl User {
+    pub fn set_name(&mut self, name: &str){
+        Field::write(&name, &mut self.raw, 00, 32);
     }
+}
+
+impl Owner {
     pub fn set_firstname(&mut self, name: &str){
-        Field::write(&name, &mut self.raw, 32, 64);
+        Field::write(&name, &mut self.raw, 00, 32);
     }
     pub fn set_lastname(&mut self, name: &str){
-        Field::write(&name, &mut self.raw, 64, 96);
+        Field::write(&name, &mut self.raw, 32, 64);
     }
     pub fn set_ownership_hash(&mut self, hash: &Hash) {
-        Field::write(&hash, &mut self.raw, 96, 128);
+        Field::write(&hash, &mut self.raw, 64, 96);
     }
 }
 
@@ -99,19 +108,24 @@ impl<F> Deref for ObjectsView<F> where F: Fork
 
 impl<F> ObjectsView<F> where F: Fork
 {
-    pub fn  owners(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Owner> {
-        MerkleTable::new(MapTable::new(vec![50], &self))
+
+    pub fn users(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, &PublicKey, User> {
+        MerklePatriciaTable::new(MapTable::new(vec![50], &self))
     }
-    pub fn  objects(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Object> {
+
+    pub fn  owners(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Owner> {
         MerkleTable::new(MapTable::new(vec![51], &self))
     }
+    pub fn  objects(&self) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Object> {
+        MerkleTable::new(MapTable::new(vec![52], &self))
+    }
     pub fn owner_objects(&self, owner_id: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u16, Ownership> {
-        let mut prefix = vec![52; 9];
+        let mut prefix = vec![53; 9];
         LittleEndian::write_u64(&mut prefix[1..], owner_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
     pub fn object_history(&self, object_id: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
-        let mut prefix = vec![53; 9];
+        let mut prefix = vec![54; 9];
         LittleEndian::write_u64(&mut prefix[1..], object_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
@@ -133,8 +147,22 @@ impl<F> ObjectsView<F> where F: Fork
 mod tests {
 
     use exonum::crypto::{gen_keypair, hash};
-    use super::{Owner, Object, Ownership};
+    use super::{Owner, Object, Ownership, User};
     use txs::{GeoPoint};
+
+
+    #[test]
+    fn test_user(){
+        // Arrange
+        let name = "test user";
+
+        // Act
+        let user = User::new(name);
+
+        // Assert
+        assert_eq!(user.name(), "test user");
+
+    }
 
     #[test]
     fn test_create_owner() {
@@ -142,9 +170,8 @@ mod tests {
         let hash = hash(&[]);
         let (p, _) = gen_keypair();
         // Act
-        let owner = Owner::new(&p, "firstname", "lastname", &hash);
+        let owner = Owner::new("firstname", "lastname", &hash);
         // Assert
-        assert_eq!(owner.pub_key(), &p);
         assert_eq!(owner.firstname(), "firstname");
         assert_eq!(owner.lastname(), "lastname");
         assert_eq!(owner.ownership_hash(), &hash);

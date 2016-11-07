@@ -13,6 +13,11 @@ impl Serialize for ObjectTx {
     {
         let mut state;
         match *self {
+            ObjectTx::Register(ref tx) => {
+                state = ser.serialize_struct("transaction", 2)?;
+                ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key())?;
+                ser.serialize_struct_elt(&mut state, "name", tx.name())?;
+            }
             ObjectTx::CreateOwner(ref tx) => {
                 state = ser.serialize_struct("transaction", 4)?;
                 ser.serialize_struct_elt(&mut state, "type", "create_owner")?;
@@ -60,17 +65,21 @@ impl TransactionInfo for ObjectTx {}
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OwnerInfo {
     pub id: u64,
-    pub pub_key: HexField<PublicKey>,
     pub firstname: String,
     pub lastname: String,
     pub ownership_hash: HexField<Hash>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewOwner {
+    pub firstname: String,
+    pub lastname: String
 }
 
 impl OwnerInfo {
     pub fn from_owner(id: u64, owner: Owner) -> OwnerInfo {
         OwnerInfo {
             id: id,
-            pub_key: HexField(*owner.pub_key()),
             firstname: owner.firstname().to_string(),
             lastname: owner.lastname().to_string(),
             ownership_hash: HexField(*owner.ownership_hash()),
@@ -86,6 +95,14 @@ pub struct ObjectInfo {
     pub owner_id: u64,
     pub deleted: bool,
     pub history_hash: HexField<Hash>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewObject {
+    pub title: String,
+    pub points: Vec<GeoPoint>,
+    pub owner_id: u64,
+    pub deleted: bool
 }
 
 impl ObjectInfo {
@@ -144,6 +161,10 @@ impl<D: Database> ObjectsApi<D> {
         } else {
             Ok(None)
         }
+    }
+
+    pub fn last_object_id(&self) -> u64 {
+        self.blockchain.view().objects().len().unwrap() - 1
     }
 
     pub fn object_info(&self, object_id: ObjectId) -> StorageResult<Option<ObjectInfo>> {
