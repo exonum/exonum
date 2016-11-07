@@ -5,8 +5,31 @@ use time;
 use super::super::crypto::{hash, gen_keypair};
 use super::super::blockchain;
 use super::{Field, RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, Block,
-            RequestBlock};
+            RequestBlock, BitVec};
 
+#[test]
+fn test_bitvec() {
+    // TODO Think about BitVec len
+    // now if the size of the BitVec is not a multiple of eight 
+    // then trailing bits will be filled-in with false.
+
+    let mut b = BitVec::from_elem(14, false);
+    b.set(11, true);
+    b.set(4, true);
+    b.push(true);
+    b.push(true);
+    
+    let mut buf = vec![0; 8];
+    Field::write(&b, &mut buf, 0, 8);
+    <BitVec as Field>::check(&buf, 0, 8).unwrap();
+
+    let buf2 = buf.clone();
+    <BitVec as Field>::check(&buf2, 0, 8).unwrap();
+    let b2: BitVec = Field::read(&buf2, 0, 8);
+
+    assert_eq!(b2.len(), b.len());
+    assert_eq!(b2, b);
+}
 
 #[test]
 fn test_str_segment() {
