@@ -39,6 +39,7 @@ use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash, FromHexE
 use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
+use exonum::events::Error as EventsError;
 use blockchain_explorer::ValueNotFound;
 
 use digital_rights::{Fingerprint, DigitalRightsBlockchain, DigitalRightsTx, TxCreateOwner,
@@ -97,9 +98,13 @@ fn send_tx<'a, D: Database>(tx: DigitalRightsTx,
                             ch: Channel<DigitalRightsBlockchain<D>>)
                             -> Result<Client<'a>, ErrorResponse> {
     let tx_hash = tx.hash().to_hex();
-    ch.send(tx);
-    let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
-    client.json(json)
+    match ch.send(tx) {
+        Ok(_) => {
+            let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
+            client.json(json)
+        }
+        Err(e) => client.error(e)
+    }
 }
 
 fn add_participant<'a, D: Database>(tx: DigitalRightsTx,
@@ -109,14 +114,18 @@ fn add_participant<'a, D: Database>(tx: DigitalRightsTx,
                                     sec_key: &SecretKey)
                                     -> Result<Client<'a>, ErrorResponse> {
     let tx_hash = tx.hash().to_hex();
-    ch.send(tx);
-    let json = &jsonway::object(|json| {
-            json.set("tx_hash", tx_hash);
-            json.set("pub_key", pub_key.to_hex());
-            json.set("sec_key", sec_key.to_hex());
-        })
-        .unwrap();
-    client.json(json)
+    match ch.send(tx) {
+        Ok(_) => {
+            let json = &jsonway::object(|json| {
+                    json.set("tx_hash", tx_hash);
+                    json.set("pub_key", pub_key.to_hex());
+                    json.set("sec_key", sec_key.to_hex());
+                })
+                .unwrap();
+            client.json(json)
+        }
+        Err(e) => client.error(e)
+    }
 }
 
 fn digital_rights_api<D: Database>(api: &mut Api,
@@ -593,6 +602,9 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
                         body = e.to_string();
                     } else if let Some(e) = err.downcast::<FromHexError>() {
                         code = StatusCode::BadRequest;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<EventsError>() {
+                        code = StatusCode::ServiceUnavailable;
                         body = e.to_string();
                     } else {
                         code = StatusCode::NotImplemented;
