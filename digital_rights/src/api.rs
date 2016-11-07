@@ -535,6 +535,16 @@ impl<D: Database> DigitalRightsApi<D> {
         }
         Ok(out)
     }
+
+    pub fn owner_short_infos(&self) -> StorageResult<Vec<ParticipantInfo>> {
+        let view = self.view();
+        let infos = view.owners().values()?
+            .iter()
+            .enumerate()
+            .map(|(id, owner)| ParticipantInfo { id: id as u16, name: owner.name().into() })
+            .collect();
+        Ok(infos)
+    }
 }
 
 impl<D: Database> DigitalRightsApi<D> {
