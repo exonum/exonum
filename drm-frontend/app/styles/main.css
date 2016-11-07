@@ -148,8 +148,21 @@ a.button:focus, a.button:active, a.button:hover {
     width: 33%;
     border-radius: 0;
 }
-.button-group .button:first-child { border-radius: 21px 0 0 21px; }
-.button-group .button:last-child { border-radius: 0 21px 21px 0; }
+.button-group .button:first-child {
+    border-radius: 21px 0 0 21px;
+}
+
+.button-group .button:last-child {
+    border-radius: 0 21px 21px 0;
+}
+.button-inner {
+    max-width: 225px;
+    display: inline-block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: top;
+}
 
 
 /*
@@ -588,7 +601,7 @@ a.button:focus, a.button:active, a.button:hover {
     padding-right: 10px;
 }
 .col-remove {
-    margin: 12px 0 0 0;
+    margin: 8px 0 0 0;
     padding: 0;
 }
 textarea.form-control {

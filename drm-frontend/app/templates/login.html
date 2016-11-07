@@ -4,13 +4,13 @@
 </div>
 <div class="buttons-wrapper" id="registered-accounts">
   {% _.each(users, function(user, i) { %}
-    <a class="button login" data-index="{{ i }}">
+    <a class="button text-nowrap login" data-index="{{ i }}">
       {% if (user.role == "distributor") { %}
       <i class="glyphicon glyphicon-briefcase"></i>&nbsp;
       {% } else { %}
       <i class="glyphicon glyphicon-user"></i>&nbsp;
       {% } %}
-      <strong>{{ user.name }}</strong>
+      <span class="button-inner"><strong>{{ user.name }}</strong></span>
     </a>
   {% }) %}
 </div>

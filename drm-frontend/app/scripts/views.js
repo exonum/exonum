@@ -281,7 +281,7 @@ var AddContentPage = Backbone.View.extend({
     var owners = [];
     this.$el.find(".add-content-owner").each(function(i, el) {
       owners.push({
-        owner_id: $(el).find(".add-content-owner-id").val(),
+        owner_id: parseInt($(el).find(".add-content-owner-id").val()),
         share: Math.round($(el).find('.add-content-owner-share').val().replace(/[^0-9]/g, ''))
       });
     });
@@ -333,7 +333,9 @@ var AddContentPage = Backbone.View.extend({
       hasError = true;
       this.$el.find("#add-content-min-plays-group").addClass("has-error");
     }
-    // TODO check co-owners validity: totally 100%, non-repeatable
+    $.each(content.owners, function(i, owner) {
+      // TODO check co-owners validity: totally 100%, non-repeatable, non-empty
+    });
 
     if (!hasError) {
       content.price_per_listen = Math.round(content.price_per_listen * 100);
@@ -343,8 +345,28 @@ var AddContentPage = Backbone.View.extend({
 
   },
 
+  initialize: function() {
+    var that = this;
+    var a = new Owner();
+    a.fetch();
+
+    a.fetch({
+      success: function(model) {
+        that.owners = model.values();
+      },
+      error: function() {
+        app.onError("No owners were found");
+      },
+    });
+    this.owners = [1, 2, 3]
+  },
+
   render: function() {
-    this.$el.html(this.template({content: this.model, user: app.user}));
+    this.$el.html(this.template({
+      content: this.model,
+      user: app.user,
+      owners: this.owners
+    }));
     return this;
   }
 });
@@ -412,18 +434,18 @@ var AddReportPage = Backbone.View.extend({
 
   },
 
-  render: function() {
+  initialize: function() {
     // hack to provide correct timezone support
-    function getTodayDate() {
-      var local = new Date();
-      local.setMinutes(local.getMinutes() - local.getTimezoneOffset());
-      return local.toJSON().slice(0, 10);
-    }
+    var local = new Date();
+    local.setMinutes(local.getMinutes() - local.getTimezoneOffset());
+    this.today = local.toJSON().slice(0, 10);
+  },
 
+  render: function() {
     this.$el.html(this.template({
         content: this.model,
         user: app.user,
-        today: getTodayDate()
+        today: this.today
       })
     );
     return this;

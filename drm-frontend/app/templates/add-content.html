@@ -84,8 +84,12 @@
 <script id="co-owner" type="text/template">
   <div class="form-group row add-content-owner">
     <div class="col-xs-7 col-slim">
-      <input type="text" class="form-control" placeholder="Select co-owner">
-      <input type="hidden" class="add-content-owner-id">
+      <select type="text" class="form-control add-content-owner-id">
+        <option value="">Select co-owner</option>
+        {% _.each(owners, function(owner, i) { %}
+        <option value="{{ owner.id }}">{{ owner.name }}</option>
+        {% }) %}
+      </select>
     </div>
     <div class="col-xs-4 col-slim">
       <div class="input-group">
