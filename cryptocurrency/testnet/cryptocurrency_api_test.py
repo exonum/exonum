@@ -28,7 +28,6 @@ class CryptocurrencyApiTest(CryptocurrencyApi):
     def setUp(self):
         super().setUp()
         self.host = "http://127.0.0.1:8500/api/v1"
-        self.times = 50
 
     def create_many_users(self, txs):
         cookies = []
@@ -48,7 +47,7 @@ class CryptocurrencyApiTest(CryptocurrencyApi):
         
         delta = finish - start
         ms = delta.seconds * 1000 + delta.microseconds / 1000
-        print(" - Commited, txs={}, total time: {}ms".format(txs, ms))
+        print(" - Commited, txs={}, total time: {}s".format(txs, ms / 1000))
 
         start = datetime.datetime.now()
         for i in range(txs):
@@ -58,7 +57,7 @@ class CryptocurrencyApiTest(CryptocurrencyApi):
         
         delta = finish - start
         ms = delta.seconds * 1000 + delta.microseconds / 1000
-        print(" - All users found, total time: {}ms".format(ms))
+        print(" - All users found, total time: {}s".format(ms / 1000))
 
     def test_create_user(self):
         r, c = self.create_user("My First User")

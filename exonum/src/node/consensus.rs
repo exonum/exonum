@@ -24,8 +24,8 @@ impl<B, S> NodeHandler<B, S>
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
             warn!("Received consensus message from other height: msg.height={}, self.height={}",
-                   msg.height(),
-                   self.state.height());
+                  msg.height(),
+                  self.state.height());
             return;
         }
 
@@ -274,9 +274,8 @@ impl<B, S> NodeHandler<B, S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .unwrap()
                 .iter()
-                .map(|(_, x)| x.clone())
+                .cloned()
                 .collect::<Vec<_>>();
             self.commit(our_block_hash, precommits.iter());
         }
@@ -331,9 +330,8 @@ impl<B, S> NodeHandler<B, S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .unwrap()
                 .iter()
-                .map(|(_, x)| x.clone())
+                .cloned()
                 .collect::<Vec<_>>();
             self.commit(our_block_hash, precommits.iter());
         } else {
@@ -483,7 +481,6 @@ impl<B, S> NodeHandler<B, S>
             self.remove_request(RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
-
         // Broadcast transaction to validators
         trace!("Broadcast transactions: {:?}", msg);
         self.broadcast(msg.raw());
@@ -535,9 +532,12 @@ impl<B, S> NodeHandler<B, S>
         info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
         let round = self.state.round();
+        let max_count = ::std::cmp::min(self.txs_block_limit as usize,
+                                        self.state.transactions().len());
         let txs: Vec<Hash> = self.state
             .transactions()
             .keys()
+            .take(max_count)
             .cloned()
             .collect();
         let propose = Propose::new(self.state.id(),
@@ -597,6 +597,7 @@ impl<B, S> NodeHandler<B, S>
                                          self.state.height(),
                                          round,
                                          propose_hash,
+                                         self.state.known_prevotes(round, propose_hash),
                                          &self.secret_key)
                         .raw()
                         .clone()
@@ -609,6 +610,7 @@ impl<B, S> NodeHandler<B, S>
                                            round,
                                            propose_hash,
                                            block_hash,
+                                           self.state.known_precommits(round, propose_hash),
                                            &self.secret_key)
                         .raw()
                         .clone()

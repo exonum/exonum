@@ -11,6 +11,7 @@ mod fields;
 mod protocol;
 
 use time::Timespec;
+use bit_vec;
 
 use super::crypto::PublicKey;
 
@@ -18,6 +19,8 @@ pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SI
 pub use self::error::Error;
 pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;
+
+pub type BitVec = bit_vec::BitVec;
 
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify)
 // TODO: use macro for implementing enums

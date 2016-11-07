@@ -78,7 +78,7 @@ mod tests {
                 }
                 patch = fork.changes();
             }
-            db.merge(patch).unwrap();
+            db.merge(&patch).unwrap();
         });
     }
 
