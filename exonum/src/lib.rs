@@ -24,6 +24,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate toml;
 extern crate hex;
+extern crate bit_vec;
 
 #[cfg(test)]
 extern crate tempdir;

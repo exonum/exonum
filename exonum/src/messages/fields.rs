@@ -7,7 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::{Hash, PublicKey};
 
-use super::{Error, RawMessage, MessageBuffer, Message};
+use super::{Error, RawMessage, MessageBuffer, Message, BitVec};
 
 pub trait Field<'a> {
     // TODO: use Read and Cursor
@@ -508,6 +508,24 @@ impl<'a> Field<'a> for Vec<u8> {
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
         <&[u8] as Field>::write(&self.as_slice(), buffer, from, to);
+    }
+}
+
+impl<'a> Field<'a> for BitVec {
+    fn field_size() -> usize {
+        8
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> BitVec {
+        let data = <&[u8] as Field>::read(buffer, from, to);
+        BitVec::from_bytes(data)
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        // TODO avoid reallocation 
+        let vec = self.to_bytes();
+        let slice = vec.as_slice();
+        <&[u8] as Field>::write(&slice, buffer, from, to);
     }
 }
 

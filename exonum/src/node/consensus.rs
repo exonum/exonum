@@ -274,9 +274,8 @@ impl<B, S> NodeHandler<B, S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .unwrap()
                 .iter()
-                .map(|(_, x)| x.clone())
+                .cloned()
                 .collect::<Vec<_>>();
             self.commit(our_block_hash, precommits.iter());
         }
@@ -331,9 +330,8 @@ impl<B, S> NodeHandler<B, S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .unwrap()
                 .iter()
-                .map(|(_, x)| x.clone())
+                .cloned()
                 .collect::<Vec<_>>();
             self.commit(our_block_hash, precommits.iter());
         } else {
@@ -597,6 +595,7 @@ impl<B, S> NodeHandler<B, S>
                                          self.state.height(),
                                          round,
                                          propose_hash,
+                                         self.state.known_prevotes(round, propose_hash),
                                          &self.secret_key)
                         .raw()
                         .clone()
@@ -609,6 +608,7 @@ impl<B, S> NodeHandler<B, S>
                                            round,
                                            propose_hash,
                                            block_hash,
+                                           self.state.known_precommits(round, propose_hash),
                                            &self.secret_key)
                         .raw()
                         .clone()
