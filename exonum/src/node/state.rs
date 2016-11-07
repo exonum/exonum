@@ -9,6 +9,9 @@ use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMess
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
 
+// TODO: replace by in disk tx pool
+const TX_POOL_LIMIT: usize = 20000;
+
 // TODO: move request timeouts into node configuration
 
 const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
@@ -40,7 +43,9 @@ pub struct State<Tx> {
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
+    // TODO replace by TxPool
     transactions: HashMap<Hash, Tx>,
+
     queued: Vec<ConsensusMessage>,
 
     unknown_txs: HashMap<Hash, Vec<Hash>>,
@@ -270,6 +275,7 @@ impl<Tx> State<Tx> {
             precommits: HashMap::new(),
 
             transactions: HashMap::new(),
+
             queued: Vec::new(),
 
             unknown_txs: HashMap::new(),
@@ -436,6 +442,9 @@ impl<Tx> State<Tx> {
             }
         }
         self.transactions.insert(hash, msg);
+        if self.transactions.len() >= TX_POOL_LIMIT {
+            panic!("Too many transactions in pool, txs={}", self.transactions.len());
+        }
         full_proposes
     }
 

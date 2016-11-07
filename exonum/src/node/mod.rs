@@ -6,7 +6,8 @@ use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey, Hash, hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
-                    EventsConfiguration, Channel, EventHandler};
+                    EventsConfiguration, Channel, EventHandler, Result as EventsResult,
+                    Error as EventsError};
 use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
 
@@ -60,6 +61,7 @@ pub struct NodeHandler<B, S>
     pub propose_timeout: i64,
     pub status_timeout: i64,
     pub peers_timeout: i64,
+    pub txs_block_limit: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
 }
@@ -113,6 +115,7 @@ impl<B, S> NodeHandler<B, S>
             status_timeout: config.consensus.status_timeout as i64,
             peers_timeout: config.consensus.peers_timeout as i64,
             peer_discovery: config.peer_discovery,
+            txs_block_limit: config.consensus.txs_block_limit,
         }
     }
 
@@ -300,10 +303,13 @@ impl<B, S> TxSender<B, S>
         }
     }
 
-    pub fn send(&self, tx: B::Transaction) {
+    pub fn send(&self, tx: B::Transaction) -> EventsResult<()> {
         if B::verify_tx(&tx) {
             let msg = ExternalMessage::Transaction(tx);
-            self.inner.post_event(msg);
+            self.inner.post_event(msg)?;
+            Ok(())
+        } else {
+            Err(EventsError::new("Unable to verify transacion"))
         }
     }
 }

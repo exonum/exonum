@@ -108,7 +108,7 @@ impl Network {
                     let peer = IncomingConnection::new(stream, address);
                     self.add_incoming_connection(event_loop, peer)?;
 
-                    debug!("{}: Accepted incoming connection from {} id: {}",
+                    trace!("{}: Accepted incoming connection from {} id: {}",
                            self.address(),
                            address,
                            id.0);
@@ -121,7 +121,7 @@ impl Network {
                 }
 
                 if set.is_hup() | set.is_error() {
-                    debug!("{}: incoming connection with addr {} closed",
+                    trace!("{}: incoming connection with addr {} closed",
                            self.address(),
                            self.incoming[id].address());
 
@@ -130,13 +130,6 @@ impl Network {
                 }
 
                 if set.is_readable() {
-                    let address = *self.incoming[id].address();
-
-                    trace!("{}: Socket is readable {} id: {}",
-                           self.address(),
-                           address,
-                           id.0);
-
                     loop {
                         match self.incoming[id].try_read() {
                             Ok(Some(buf)) => {
@@ -160,7 +153,7 @@ impl Network {
                 if set.is_hup() | set.is_error() {
                     let address = *self.outgoing[id].address();
 
-                    debug!("{}: outgoing connection with addr {} closed",
+                    trace!("{}: outgoing connection with addr {} closed",
                            self.address(),
                            self.outgoing[id].address());
 
@@ -173,14 +166,8 @@ impl Network {
 
                 if set.is_writable() {
                     let address = *self.outgoing[id].address();
-
-                    trace!("{}: Socket is writable addr={}", self.address(), address);
-
                     let r = {
                         // Write data into socket
-                        let (len, bytes) = self.outgoing[id].writer_state();
-                        trace!("{}: position={}, queue={}", self.address(), bytes, len);
-
                         self.outgoing[id].try_write()?;
                         event_loop.reregister(self.outgoing[id].socket(),
                                         id,
@@ -244,7 +231,7 @@ impl Network {
             let peer = OutgoingConnection::new(stream, *address);
             let id = self.add_outgoing_connection(event_loop, peer)?;
 
-            debug!("{}: Establish connection with {}, id: {}",
+            trace!("{}: Establish connection with {}, id: {}",
                    self.address(),
                    address,
                    id.0);
@@ -262,7 +249,7 @@ impl Network {
         match timeout {
             InternalTimeout::Reconnect(addr, delay) => {
                 if self.reconnects.contains_key(&addr) {
-                    debug!("Try to reconnect with delay {}", delay);
+                    trace!("Try to reconnect with delay {}", delay);
 
                     if let Err(e) = self.connect(event_loop, &addr) {
                         error!("{}: Unable to create connection to addr {}, error: {:?}",
@@ -396,7 +383,7 @@ impl Network {
                                               address: SocketAddr,
                                               delay: u64)
                                               -> io::Result<()> {
-        debug!("{}: Add reconnect timeout to={}, delay={}",
+        trace!("{}: Add reconnect timeout to={}, delay={}",
                self.address(),
                address,
                delay);

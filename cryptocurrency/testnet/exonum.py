@@ -20,16 +20,19 @@ def random_hex(n=32):
 
 class ExonumApi(unittest.TestCase):
     def setUp(self):
-        self.times = 100
+        super().setUp()
+        self.times = 60
         self.timeout = 1
         # Configure http session
         self.session = requests.Session()
         retries = Retry(total=10,
-                backoff_factor=1,
+                backoff_factor=0.2,
                 status_forcelist=[ 500, 502, 503, 504 ])
-        self.session.mount('http://', HTTPAdapter(max_retries=retries))
+        adapter = requests.adapters.HTTPAdapter(max_retries=retries)
+        self.session.mount("http://", adapter)
 
     def tearDown(self):
+        super().tearDown()
         self.session.close()
         self.session = None
     
@@ -59,11 +62,25 @@ class ExonumApi(unittest.TestCase):
         return None
 
     def post_transaction(self, endpoint, payload, cookies=None):
-        r = self.post(endpoint, payload, cookies)
+        times = 0
+        r = None
+        while times < self.times: 
+            r = self.post(endpoint, payload, cookies)
+            if r.status_code != 503:
+                break
+            time.sleep(self.timeout)
+            times = times + 1
         return (r.json(), r.cookies)
 
     def put_transaction(self, endpoint, payload, cookies=None):
-        r = self.put(endpoint, payload, cookies)
+        times = 0
+        r = None
+        while times < self.times: 
+            r = self.put(endpoint, payload, cookies)
+            if r.status_code != 503:
+                break
+            time.sleep(self.timeout)
+            times = times + 1
         return (r.json(), r.cookies)
 
     def wait_for_transaction(self, hash):
