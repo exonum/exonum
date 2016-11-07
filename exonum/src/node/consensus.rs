@@ -357,14 +357,10 @@ impl<B, S> NodeHandler<B, S>
         }
 
         // Send prevotes
-        for round in self.state.locked_round() + 1...self.state.round() {
-            if !self.state.have_prevote(round) {
-                self.broadcast_prevote(round, &propose_hash);
-                if self.state.has_majority_prevotes(round, propose_hash) {
-                    // FIXME remove recursive lock call
-                    self.lock(round, propose_hash);
-                }
-            }
+        // FIXME rewrite it without spagetty
+        let round = self.state.locked_round() + 1;
+        if round <= self.state.round() && !self.state.have_prevote(round) {
+            self.broadcast_prevote(round, &propose_hash);
         }
     }
 
