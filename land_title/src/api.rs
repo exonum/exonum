@@ -1,6 +1,6 @@
 use serde::{Serialize, Serializer};
 use txs::{ObjectTx, GeoPoint};
-use view::{ Object, Owner, ObjectId };
+use view::{ Object, Owner, ObjectId, TxResult, ObjectHistory };
 use super::ObjectsBlockchain;
 use exonum::storage::{Map, List, Database, Result as StorageResult};
 use exonum::crypto::{PublicKey, Hash, HexValue};
@@ -76,6 +76,47 @@ pub struct NewOwner {
     pub lastname: String
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HistoryInfo {
+    pub old_owner: OwnerInfo,
+    pub new_owner: OwnerInfo,
+    pub operation: u8
+
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ShortObjectInfo {
+    pub id: u64,
+    pub title: String,
+    pub points: Vec<GeoPoint>,
+    pub owner_id: u64,
+    pub deleted: bool
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ObjectInfo {
+    pub id: u64,
+    pub title: String,
+    pub points: Vec<GeoPoint>,
+    pub owner_id: u64,
+    pub deleted: bool,
+    pub owner: OwnerInfo,
+    pub history: Vec<HistoryInfo>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NewObject {
+    pub title: String,
+    pub points: Vec<GeoPoint>,
+    pub owner_id: u64,
+    pub deleted: bool
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResultInfo {
+    pub result: u8
+}
+
 impl OwnerInfo {
     pub fn from_owner(id: u64, owner: Owner) -> OwnerInfo {
         OwnerInfo {
@@ -87,33 +128,38 @@ impl OwnerInfo {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ObjectInfo {
-    pub id: u64,
-    pub title: String,
-    pub points: Vec<GeoPoint>,
-    pub owner_id: u64,
-    pub deleted: bool,
-    pub history_hash: HexField<Hash>
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NewObject {
-    pub title: String,
-    pub points: Vec<GeoPoint>,
-    pub owner_id: u64,
-    pub deleted: bool
+impl HistoryInfo {
+    pub fn new(old_owner: OwnerInfo, new_owner: OwnerInfo, operation: u8) -> HistoryInfo {
+        HistoryInfo {
+            old_owner: old_owner,
+            new_owner: new_owner,
+            operation: operation
+        }
+    }
 }
 
 impl ObjectInfo {
-    pub fn from_object(id: u64, object: Object) -> ObjectInfo {
+    pub fn from_object(id: u64, object: Object, owner: OwnerInfo, history: Vec<HistoryInfo> ) -> ObjectInfo {
         ObjectInfo {
             id: id,
             title: object.title().to_string(),
             points: GeoPoint::from_vec(object.points().iter().map(|x| (*x as f64)).collect::<Vec<f64>>()),
             owner_id: object.owner_id(),
             deleted: object.deleted(),
-            history_hash: HexField(*object.history_hash())
+            owner: owner,
+            history: history
+        }
+    }
+}
+
+impl ShortObjectInfo {
+    pub fn from_object(id: u64, object: Object) -> ShortObjectInfo {
+        ShortObjectInfo {
+            id: id,
+            title: object.title().to_string(),
+            points: GeoPoint::from_vec(object.points().iter().map(|x| (*x as f64)).collect::<Vec<f64>>()),
+            owner_id: object.owner_id(),
+            deleted: object.deleted()
         }
     }
 }
@@ -141,7 +187,7 @@ impl<D: Database> ObjectsApi<D> {
         Ok(Some(r))
     }
 
-    pub fn objects_list(&self) -> StorageResult<Option<Vec<ObjectInfo>>>{
+    pub fn objects_list(&self) -> StorageResult<Option<Vec<ShortObjectInfo>>>{
 
         let view = self.blockchain.view();
 
@@ -149,7 +195,7 @@ impl<D: Database> ObjectsApi<D> {
         let values = objects.values()?;
         let r = values.into_iter()
             .enumerate()
-            .map(|(id, object)| ObjectInfo::from_object(id as u64, object)).collect();
+            .map(|(id, object)| ShortObjectInfo::from_object(id as u64, object)).collect();
 
         Ok(Some(r))
     }
@@ -163,17 +209,41 @@ impl<D: Database> ObjectsApi<D> {
         }
     }
 
-    pub fn last_object_id(&self) -> u64 {
-        self.blockchain.view().objects().len().unwrap() - 1
+    pub fn result(&self, tx_hash: Hash) -> StorageResult<Option<ResultInfo>>{
+        let view = self.blockchain.view();
+        if let Some(result) = view.results().get(&tx_hash)? {
+            Ok(Some(ResultInfo{
+                result: result.result()
+            }))
+        } else {
+            Ok(None)
+        }
+
     }
 
     pub fn object_info(&self, object_id: ObjectId) -> StorageResult<Option<ObjectInfo>> {
         let view = self.blockchain.view();
-        if let Some(object) = view.objects().get(object_id)? {
-            Ok(Some(ObjectInfo::from_object(object_id, object)))
-        } else {
-            Ok(None)
+        let owners = view.owners();
+        let objects = view.objects();
+        if let Some(object) = objects.get(object_id)? {
+            if let Some(owner) = owners.get(object.owner_id())? {
+
+                let mut object_history_records = Vec::new();
+                for object_history in view.object_history(object_id).values()? {
+                    object_history_records.push(
+                        HistoryInfo::new(
+                            OwnerInfo::from_owner(object_history.old_owner_id(), owners.get(object_history.old_owner_id()).unwrap().unwrap()),
+                            OwnerInfo::from_owner(object_history.new_owner_id(), owners.get(object_history.new_owner_id()).unwrap().unwrap()),
+                            object_history.operation()
+                        )
+                    );
+                }
+
+                let object_info = ObjectInfo::from_object(object_id, object.clone(), OwnerInfo::from_owner(object.owner_id(), owner), object_history_records);
+                return Ok(Some(object_info))
+            }
         }
+        Ok(None)
     }
 
 }

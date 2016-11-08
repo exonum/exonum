@@ -13,14 +13,16 @@ use self::hyper::header::{Headers, AccessControlAllowOrigin};
 pub type CORSEndpoint = (Vec<Method>, String);
 
 pub struct CORS {
+    pub origin: String,
     pub allowed_endpoints: Vec<CORSEndpoint>
 }
 
 impl CORS {
     #[allow(dead_code)]
-    pub fn new(endpoints: Vec<CORSEndpoint>) -> Self {
+    pub fn new(origin: String, endpoints: Vec<CORSEndpoint>) -> Self {
         CORS {
-            allowed_endpoints: endpoints
+            origin: origin,
+            allowed_endpoints: endpoints,
         }
     }
 
@@ -58,8 +60,8 @@ impl CORS {
         is_cors_endpoint
     }
 
-    pub fn add_headers(res: &mut Response, req: &Request) {
-        res.headers.set(AccessControlAllowOrigin::Value("http://127.0.0.1:9000".to_owned()));
+    pub fn add_headers(&self, res: &mut Response, req: &Request) {
+        res.headers.set(AccessControlAllowOrigin::Value(self.origin.clone()));
 
         res.headers.set(headers::AccessControlAllowHeaders(
             vec![
@@ -83,7 +85,7 @@ impl AfterMiddleware for CORS {
         }
 
         //if self.is_allowed(req) {
-            CORS::add_headers(&mut res, &req);
+            self.add_headers(&mut res, &req);
         //}
 
         Ok(res)
@@ -92,7 +94,7 @@ impl AfterMiddleware for CORS {
     fn catch(&self, req: &mut Request, mut err: IronError)
         -> IronResult<Response> {
         if self.is_allowed(req) {
-            CORS::add_headers(&mut err.response, &req);
+            self.add_headers(&mut err.response, &req);
         }
         Err(err)
     }

@@ -2,7 +2,7 @@ use exonum::messages::Field;
 use exonum::blockchain::{View};
 use exonum::crypto::{ PublicKey, Hash, hash };
 use byteorder::{ByteOrder, LittleEndian};
-use exonum::storage::{Fork, MerklePatriciaTable, MapTable, MerkleTable, List, Result as StorageResult};
+use exonum::storage::{Fork, MerklePatriciaTable, Map, MapTable, MerkleTable, List, Result as StorageResult};
 use txs::{ObjectTx, GeoPoint};
 use std::ops::Deref;
 
@@ -34,6 +34,15 @@ storage_value! {
 }
 
 storage_value! {
+    ObjectHistory {
+        const SIZE = 17;
+        operation:             u8              [00 => 01]
+        old_owner_id:          u64             [01 => 09]
+        new_owner_id:          u64             [09 => 17]
+    }
+}
+
+storage_value! {
     Object {
         const SIZE = 81;
         title:                 &str            [00 => 32]
@@ -41,6 +50,13 @@ storage_value! {
         owner_id:              u64             [40 => 48]
         deleted:               bool            [48 => 49]
         history_hash:          &Hash           [49 => 81]
+    }
+}
+
+storage_value! {
+    TxResult {
+        const SIZE = 01;
+        result:               u8               [00 => 01]
     }
 }
 
@@ -84,6 +100,25 @@ impl Object {
 
 }
 
+impl TxResult {
+    pub fn set_result(&mut self, result: u8) {
+        Field::write(&result, &mut self.raw, 00, 01);
+    }
+    pub fn ok() -> TxResult {
+        TxResult::new(1)
+    }
+    pub fn create_object_wrong_points() -> TxResult {
+        TxResult::new(2)
+    }
+    pub fn create_object_cross_neighbours() -> TxResult {
+        TxResult::new(3)
+    }
+    pub fn create_object_wrong_owner() -> TxResult {
+        TxResult::new(4)
+    }
+
+}
+
 pub struct ObjectsView<F: Fork> {
     pub fork: F,
 }
@@ -108,8 +143,7 @@ impl<F> Deref for ObjectsView<F> where F: Fork
 
 impl<F> ObjectsView<F> where F: Fork
 {
-
-    pub fn users(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, &PublicKey, User> {
+    pub fn users(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, User> {
         MerklePatriciaTable::new(MapTable::new(vec![50], &self))
     }
 
@@ -124,11 +158,17 @@ impl<F> ObjectsView<F> where F: Fork
         LittleEndian::write_u64(&mut prefix[1..], owner_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
-    pub fn object_history(&self, object_id: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, Hash> {
+
+    pub fn object_history(&self, object_id: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u64, ObjectHistory> {
         let mut prefix = vec![54; 9];
         LittleEndian::write_u64(&mut prefix[1..], object_id);
         MerkleTable::new(MapTable::new(prefix, &self))
     }
+
+    pub fn results(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, TxResult> {
+        MerklePatriciaTable::new(MapTable::new(vec![55], &self))
+    }
+
     pub fn find_objects_for_owner(&self, owner_id: u64) -> StorageResult<Vec<(ObjectId, Object)>> {
         let mut v = Vec::new();
         for ownership in self.owner_objects(owner_id).values()? {

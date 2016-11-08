@@ -16,6 +16,7 @@ extern crate serde;
 extern crate serde_json;
 extern crate time;
 extern crate rand;
+// extern crate hex;
 
 extern crate exonum;
 extern crate blockchain_explorer;
@@ -50,6 +51,7 @@ use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 use blockchain_explorer::{HexField, ValueNotFound};
 use land_title::GeoPoint;
+
 
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
                      TxModifyObject, TxTransferObject, TxRemoveObject, TxRegister};
@@ -107,7 +109,7 @@ fn send_tx<'a, D: Database>(tx: ObjectTx, client: Client<'a>, ch: Channel<Object
 
 fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                          node_cfg: Configuration,
-                         port: Option<u16>) {
+                         port: Option<u16>, origin: Option<String>) {
     if let Some(port) = port {
 
         let mut node = Node::new(blockchain.clone(), node_cfg.clone());
@@ -156,7 +158,6 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
             });
 
             let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
-            println!("LandTitles node server started on {}", listen_address);
 
             let mut app = Application::new(api);
 
@@ -182,9 +183,19 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
             let mut chain = iron::Chain::new(app);
             let api_key = b"abacabsasdainblabla23nx8Hasojd8";
             let cookie = ::rustless::batteries::cookie::new(api_key);
-            let cors = CORS::new(vec![
-                (vec![Method::Get, Method::Post], "owners".to_owned())
-            ]);
+
+            let originUrl = {
+                if let Some(origin) = origin {
+                    origin
+                }else{
+                    String::from("*")
+                }
+            };
+
+            println!("LandTitles node server started on {}, allowed origin is {}", listen_address, originUrl);
+
+            let cors = CORS::new(originUrl, vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
+
             chain.link(cookie);
             chain.link_after(cors);
             iron::Iron::new(chain).http(listen_address).unwrap();
@@ -210,7 +221,6 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
         api.options("*", move |endpoint| {
             endpoint.handle(move |mut client, params| {
-                //client.response.headers.set(headers::AccessControlAllowOrigin::Any);
                 client.empty()
             })
         });
@@ -233,6 +243,44 @@ fn land_titles_api<D: Database>(api: &mut Api,
                 }
                 let tx = TxRegister::new(&pub_key, &name, &sec_key);
                 send_tx(ObjectTx::Register(tx), client, ch.clone())
+
+            })
+        });
+
+        let ch = channel.clone();
+        let b = blockchain.clone();
+        api.get("result/:tx", move |endpoint| {
+
+            endpoint.params(|params| {
+                params.req_typed("tx", json_dsl::string());
+            });
+
+            endpoint.handle(move |client, params| {
+
+                let (pub_key, sec_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((p, s)) => (p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+
+                let hash = params.find("tx").unwrap().as_str().unwrap();
+                match Hash::from_hex(hash) {
+                    Ok(hash) => {
+                        let obm = ObjectsApi::new(b.clone());
+
+                        match obm.result(hash){
+                            Ok(Some(result)) => client.json(&result.to_json()),
+                            Ok(None) => client.error(ValueNotFound::new("Unable to find transaction")),
+                            Err(e) => client.error(e)
+                        }
+                    }
+                    Err(_) => client.error(StorageError::new("Unable to decode transaction hash")),
+                }
 
             })
         });
@@ -260,6 +308,24 @@ fn land_titles_api<D: Database>(api: &mut Api,
                 let obm = ObjectsApi::new(b.clone());
 
                 match obm.owner_info(id as u64) {
+                    Ok(Some(info)) => client.json(&info.to_json()),
+                    Ok(None) => client.error(ValueNotFound::new("Unable to get owner")),
+                    Err(e) => client.error(e),
+                }
+            })
+         });
+
+         let b = blockchain.clone();
+         api.get("objects/:id", move |endpoint| {
+            endpoint.params(|params|{
+                params.req_typed("id", json_dsl::u64());
+            });
+            endpoint.handle(move |client, params|{
+
+                let id = params.find("id").unwrap().as_u64().unwrap();
+                let obm = ObjectsApi::new(b.clone());
+
+                match obm.object_info(id as u64) {
                     Ok(Some(info)) => client.json(&info.to_json()),
                     Ok(None) => client.error(ValueNotFound::new("Unable to get owner")),
                     Err(e) => client.error(e),
@@ -340,23 +406,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
                 let tx = TxCreateObject::new(&pub_key, &object_info.title, &points, object_info.owner_id, &sec_key);
 
-                let obm = ObjectsApi::new(b.clone());
-                // TODO: Костыль №1
-                let before_add = obm.last_object_id();
-                let tx_hash = send_transaction(ObjectTx::CreateObject(tx), &client, ch.clone());
-                // TODO: Костыль №2
-                let after_add = obm.last_object_id();
-
-                if before_add == after_add {
-                    // TODO: Костыль №3
-                    let json = &jsonway::object(|json| json.set("error", "Objects shouldn't intersect")).unwrap();
-                    return client.json(json);
-                } else {
-                    let json = &jsonway::object(|json| {json.set("tx_hash", tx_hash); json.set("id", obm.last_object_id())}).unwrap();
-                    return client.json(json);
-                }
-
-
+                send_tx(ObjectTx::CreateObject(tx), client, ch.clone())
 
              })
 
@@ -403,6 +453,12 @@ fn main() {
                 .value_name("HTTP_PORT")
                 .help("Run http server on given port")
                 .takes_value(true))
+            .arg(Arg::with_name("ORIGIN")
+                .short("o")
+                .long("origin")
+                .value_name("ORIGIN")
+                .help("Set origin for CORS")
+                .takes_value(true))
             .arg(Arg::with_name("PEERS")
                 .long("known-peers")
                 .value_name("PEERS")
@@ -427,6 +483,7 @@ fn main() {
             let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
             let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let port: Option<u16> = matches.value_of("HTTP_PORT").map(|x| x.parse().unwrap());
+            let origin: Option<String> = matches.value_of("ORIGIN").map(|x| x.parse().unwrap());
             let peers = match matches.value_of("PEERS") {
                 Some(string) => {
                     string.split(" ")
@@ -450,13 +507,13 @@ fn main() {
                     let leveldb = LevelDB::new(&Path::new(db_path), options).unwrap();
 
                     let blockchain = ObjectsBlockchain { db: leveldb };
-                    run_node(blockchain, node_cfg, port);
+                    run_node(blockchain, node_cfg, port, origin);
                 }
                 None => {
                     println!("Using memorydb storage");
 
                     let blockchain = ObjectsBlockchain { db: MemoryDB::new() };
-                    run_node(blockchain, node_cfg, port);
+                    run_node(blockchain, node_cfg, port, origin);
                 }
             };
         }

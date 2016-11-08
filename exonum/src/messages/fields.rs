@@ -47,6 +47,20 @@ impl<'a> Field<'a> for bool {
     }
 }
 
+impl<'a> Field<'a> for u8 {
+    fn field_size() -> usize {
+        1
+    }
+
+    fn read(buffer: &'a [u8], from: usize, _: usize) -> u8 {
+        buffer[from]
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, _: usize) {
+        buffer[from] = *self;
+    }
+}
+
 impl<'a> Field<'a> for u16 {
     fn field_size() -> usize {
         2
