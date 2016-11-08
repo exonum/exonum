@@ -10,6 +10,7 @@ pub const TX_CREATE_OBJECT_ID: u16 = 130;
 pub const TX_MODIFY_OBJECT_ID: u16 = 131;
 pub const TX_TRANSFER_OBJECT_ID: u16 = 132;
 pub const TX_REMOVE_OBJECT_ID: u16 = 133;
+pub const TX_RESTORE_OBJECT_ID: u16 = 134;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GeoPoint {
@@ -88,30 +89,43 @@ message! {
 message! {
     TxModifyObject {
         const ID = TX_MODIFY_OBJECT_ID;
-        const SIZE = 80;
+        const SIZE = 88;
         pub_key:               &PublicKey      [00 => 32]
         object_id:             u64             [32 => 40]
         title:                 &str            [40 => 72]
         points:                &[f64]          [72 => 80]
+        created_at:            u64             [80 => 88]
     }
 }
 
 message! {
     TxTransferObject {
         const ID = TX_TRANSFER_OBJECT_ID;
-        const SIZE = 48;
+        const SIZE = 56;
         pub_key:               &PublicKey      [00 => 32]
         object_id:             u64             [32 => 40]
         owner_id:              u64             [40 => 48]
+        created_at:            u64             [48 => 56]
     }
 }
 
 message! {
     TxRemoveObject {
         const ID = TX_REMOVE_OBJECT_ID;
-        const SIZE = 40;
+        const SIZE = 48;
         pub_key:               &PublicKey      [00 => 32]
         object_id:             u64             [32 => 40]
+        created_at:            u64             [40 => 48]
+    }
+}
+
+message! {
+    TxRestoreObject {
+        const ID = TX_RESTORE_OBJECT_ID;
+        const SIZE = 48;
+        pub_key:               &PublicKey      [00 => 32]
+        object_id:             u64             [32 => 40]
+        created_at:            u64             [40 => 48]
     }
 }
 
@@ -123,6 +137,7 @@ pub enum ObjectTx {
     ModifyObject(TxModifyObject),
     TransferObject(TxTransferObject),
     RemoveObject(TxRemoveObject),
+    RestoreObject(TxRestoreObject),
 }
 
 impl ObjectTx {
@@ -134,6 +149,7 @@ impl ObjectTx {
             ObjectTx::ModifyObject(ref msg) => msg.pub_key(),
             ObjectTx::TransferObject(ref msg) => msg.pub_key(),
             ObjectTx::RemoveObject(ref msg) => msg.pub_key(),
+            ObjectTx::RestoreObject(ref msg) => msg.pub_key(),
         }
     }
 }
@@ -147,6 +163,7 @@ impl Message for ObjectTx {
             ObjectTx::ModifyObject(ref msg) => msg.raw(),
             ObjectTx::TransferObject(ref msg) => msg.raw(),
             ObjectTx::RemoveObject(ref msg) => msg.raw(),
+            ObjectTx::RestoreObject(ref msg) => msg.raw(),
         }
     }
     fn from_raw(raw: RawMessage) -> Result<Self, MessageError> {
@@ -157,6 +174,7 @@ impl Message for ObjectTx {
             TX_MODIFY_OBJECT_ID => ObjectTx::ModifyObject(TxModifyObject::from_raw(raw)?),
             TX_TRANSFER_OBJECT_ID => ObjectTx::TransferObject(TxTransferObject::from_raw(raw)?),
             TX_REMOVE_OBJECT_ID => ObjectTx::RemoveObject(TxRemoveObject::from_raw(raw)?),
+            TX_RESTORE_OBJECT_ID => ObjectTx::RestoreObject(TxRestoreObject::from_raw(raw)?),
             _ => panic!("Undefined message type"),
         })
     }
@@ -169,6 +187,7 @@ impl Message for ObjectTx {
             ObjectTx::ModifyObject(ref msg) => msg.hash(),
             ObjectTx::TransferObject(ref msg) => msg.hash(),
             ObjectTx::RemoveObject(ref msg) => msg.hash(),
+            ObjectTx::RestoreObject(ref msg) => msg.hash(),
         }
     }
 
@@ -180,6 +199,7 @@ impl Message for ObjectTx {
             ObjectTx::ModifyObject(ref msg) => msg.verify(pub_key),
             ObjectTx::TransferObject(ref msg) => msg.verify(pub_key),
             ObjectTx::RemoveObject(ref msg) => msg.verify(pub_key),
+            ObjectTx::RestoreObject(ref msg) => msg.verify(pub_key),
         }
     }
 }

@@ -31,12 +31,17 @@ use geo::algorithm::intersects::Intersects;
 use geo::algorithm::contains::Contains;
 
 pub use txs::{ObjectTx, TxCreateOwner, TxCreateObject, TxModifyObject,
-              TxTransferObject, TxRemoveObject, TxRegister, GeoPoint};
+              TxTransferObject, TxRemoveObject, TxRestoreObject, TxRegister, GeoPoint};
 pub use view::{ObjectsView, Owner, Object, User, ObjectId, Ownership, TxResult, ObjectHistory};
 
 #[derive(Clone)]
 pub struct ObjectsBlockchain<D: Database> {
     pub db: D,
+}
+
+pub fn timestamp () -> u64 {
+    let timespec = time::get_time();
+    timespec.sec as u64
 }
 
 impl<D: Database> Deref for ObjectsBlockchain<D> {
@@ -117,7 +122,7 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                     // update object history hash
                     let object_history = view.object_history(object_id);
                     let hash = hash(&[]);
-                    object_history.append(ObjectHistory::new(1, tx.owner_id(), tx.owner_id()))?;
+                    object_history.append(ObjectHistory::new_create_action(tx.owner_id(), tx.owner_id(), timestamp(), &tx.hash()))?;
                     let new_history_hash = object_history.root_hash()?;
 
                     // insert object
@@ -137,7 +142,7 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                     // update object history hash
                     let object_history = view.object_history(tx.object_id());
                     let hash = hash(&[]);
-                    object_history.append(ObjectHistory::new(2, object.owner_id(), object.owner_id()))?;
+                    object_history.append(ObjectHistory::new_modify_action(object.owner_id(), object.owner_id(), timestamp(), &tx.hash()))?;
                     let new_history_hash = object_history.root_hash()?;
 
                     // update object
@@ -178,7 +183,7 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                         // update object history hash
                         let object_history = view.object_history(tx.object_id());
                         let hash = hash(&[]);
-                        object_history.append(ObjectHistory::new(3, object.owner_id(), tx.owner_id()))?;
+                        object_history.append(ObjectHistory::new_transfer_action(object.owner_id(), tx.owner_id(), timestamp(), &tx.hash()))?;
                         let new_history_hash = object_history.root_hash()?;
 
                         // update object
@@ -203,11 +208,31 @@ impl<D> Blockchain for ObjectsBlockchain<D> where D: Database
                         // update object history hash
                         let object_history = view.object_history(tx.object_id());
                         let hash = hash(&[]);
-                        object_history.append(ObjectHistory::new(4, object.owner_id(), object.owner_id()))?;
+                        object_history.append(ObjectHistory::new_remove_action(object.owner_id(), object.owner_id(), timestamp(), &tx.hash()))?;
                         let new_history_hash = object_history.root_hash()?;
 
                         // update object
                         object.set_deleted(true);
+                        object.set_history_hash(&new_history_hash);
+                        view.objects().set(tx.object_id(), object)?;
+
+                }else{
+                    // Object not found by id
+                    return Ok(());
+                }
+            }
+
+            ObjectTx::RestoreObject(ref tx) => {
+                if let Some(mut object) = view.objects().get(tx.object_id())? {
+
+                        // update object history hash
+                        let object_history = view.object_history(tx.object_id());
+                        let hash = hash(&[]);
+                        object_history.append(ObjectHistory::new_restore_action(object.owner_id(), object.owner_id(), timestamp(), &tx.hash()))?;
+                        let new_history_hash = object_history.root_hash()?;
+
+                        // update object
+                        object.set_deleted(false);
                         object.set_history_hash(&new_history_hash);
                         view.objects().set(tx.object_id(), object)?;
 

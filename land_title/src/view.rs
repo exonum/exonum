@@ -35,10 +35,12 @@ storage_value! {
 
 storage_value! {
     ObjectHistory {
-        const SIZE = 17;
+        const SIZE = 57;
         operation:             u8              [00 => 01]
         old_owner_id:          u64             [01 => 09]
         new_owner_id:          u64             [09 => 17]
+        timestamp:             u64             [17 => 25]
+        tx_hash:              &Hash            [25 => 57]
     }
 }
 
@@ -57,6 +59,24 @@ storage_value! {
     TxResult {
         const SIZE = 01;
         result:               u8               [00 => 01]
+    }
+}
+
+impl ObjectHistory{
+    pub fn new_create_action(old_owner_id: u64, new_owner_id: u64, timestamp: u64, tx_hash: &Hash) -> ObjectHistory {
+        ObjectHistory::new(1, old_owner_id, new_owner_id, timestamp, tx_hash)
+    }
+    pub fn new_modify_action(old_owner_id: u64, new_owner_id: u64, timestamp: u64, tx_hash: &Hash) -> ObjectHistory {
+        ObjectHistory::new(2, old_owner_id, new_owner_id, timestamp, tx_hash)
+    }
+    pub fn new_transfer_action(old_owner_id: u64, new_owner_id: u64, timestamp: u64, tx_hash: &Hash) -> ObjectHistory {
+        ObjectHistory::new(3, old_owner_id, new_owner_id, timestamp, tx_hash)
+    }
+    pub fn new_remove_action(old_owner_id: u64, new_owner_id: u64, timestamp: u64, tx_hash: &Hash) -> ObjectHistory {
+        ObjectHistory::new(4, old_owner_id, new_owner_id, timestamp, tx_hash)
+    }
+    pub fn new_restore_action(old_owner_id: u64, new_owner_id: u64, timestamp: u64, tx_hash: &Hash) -> ObjectHistory {
+        ObjectHistory::new(5, old_owner_id, new_owner_id, timestamp, tx_hash)
     }
 }
 

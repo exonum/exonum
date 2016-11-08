@@ -55,6 +55,12 @@ impl Serialize for ObjectTx {
                 ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key())?;
                 ser.serialize_struct_elt(&mut state, "object_id", tx.object_id())?;
             }
+            ObjectTx::RestoreObject(ref tx) => {
+                state = ser.serialize_struct("transaction", 3)?;
+                ser.serialize_struct_elt(&mut state, "type", "restore_object")?;
+                ser.serialize_struct_elt(&mut state, "pub_key", tx.pub_key())?;
+                ser.serialize_struct_elt(&mut state, "object_id", tx.object_id())?;
+            }
         }
         ser.serialize_struct_end(state)
     }
@@ -80,7 +86,9 @@ pub struct NewOwner {
 pub struct HistoryInfo {
     pub old_owner: OwnerInfo,
     pub new_owner: OwnerInfo,
-    pub operation: u8
+    pub operation: u8,
+    pub timestamp: u64,
+    pub tx_hash: String
 
 }
 
@@ -129,11 +137,13 @@ impl OwnerInfo {
 }
 
 impl HistoryInfo {
-    pub fn new(old_owner: OwnerInfo, new_owner: OwnerInfo, operation: u8) -> HistoryInfo {
+    pub fn new(old_owner: OwnerInfo, new_owner: OwnerInfo, operation: u8, timestamp: u64, tx_hash: &Hash) -> HistoryInfo {
         HistoryInfo {
             old_owner: old_owner,
             new_owner: new_owner,
-            operation: operation
+            operation: operation,
+            timestamp: timestamp,
+            tx_hash: tx_hash.to_hex()
         }
     }
 }
@@ -222,9 +232,11 @@ impl<D: Database> ObjectsApi<D> {
     }
 
     pub fn object_info(&self, object_id: ObjectId) -> StorageResult<Option<ObjectInfo>> {
+
         let view = self.blockchain.view();
         let owners = view.owners();
         let objects = view.objects();
+
         if let Some(object) = objects.get(object_id)? {
             if let Some(owner) = owners.get(object.owner_id())? {
 
@@ -234,7 +246,9 @@ impl<D: Database> ObjectsApi<D> {
                         HistoryInfo::new(
                             OwnerInfo::from_owner(object_history.old_owner_id(), owners.get(object_history.old_owner_id()).unwrap().unwrap()),
                             OwnerInfo::from_owner(object_history.new_owner_id(), owners.get(object_history.new_owner_id()).unwrap().unwrap()),
-                            object_history.operation()
+                            object_history.operation(),
+                            object_history.timestamp(),
+                            object_history.tx_hash()
                         )
                     );
                 }

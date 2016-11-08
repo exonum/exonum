@@ -54,7 +54,7 @@ use land_title::GeoPoint;
 
 
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
-                     TxModifyObject, TxTransferObject, TxRemoveObject, TxRegister};
+                     TxModifyObject, TxTransferObject, TxRemoveObject, TxRestoreObject, TxRegister};
 use land_title::api::{ObjectsApi, ObjectInfo, NewOwner, NewObject};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
@@ -332,6 +332,87 @@ fn land_titles_api<D: Database>(api: &mut Api,
                 }
             })
          });
+
+         let ch = channel.clone();
+         let b = blockchain.clone();
+         api.post("objects/transfer", move |endpoint| {
+            endpoint.params(|params|{
+                params.req_typed("id", json_dsl::u64());
+                params.req_typed("owner_id", json_dsl::u64());
+            });
+            endpoint.handle(move |client, params|{
+
+                let (pub_key, sec_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((p, s)) => (p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+
+                let object_id = params.find("id").unwrap().as_u64().unwrap();
+                let owner_id = params.find("owner_id").unwrap().as_u64().unwrap();
+                let tx = TxTransferObject::new(&pub_key, object_id, owner_id, land_title::timestamp(), &sec_key);
+
+                 send_tx(ObjectTx::TransferObject(tx), client, ch.clone())
+            })
+         });
+
+        let ch = channel.clone();
+        let b = blockchain.clone();
+        api.delete("objects/:id", move |endpoint| {
+            endpoint.params(|params|{
+                params.req_typed("id", json_dsl::u64());
+            });
+            endpoint.handle(move |client, params|{
+
+                let (pub_key, sec_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((p, s)) => (p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+
+                let id = params.find("id").unwrap().as_u64().unwrap();
+                let tx = TxRemoveObject::new(&pub_key, id, land_title::timestamp(), &sec_key);
+
+                 send_tx(ObjectTx::RemoveObject(tx), client, ch.clone())
+            })
+         });
+
+        let ch = channel.clone();
+        api.post("objects/restore", move |endpoint| {
+            endpoint.params(|params|{
+                params.req_typed("id", json_dsl::u64());
+            });
+            endpoint.handle(move |client, params|{
+
+                let (pub_key, sec_key) = {
+                    let r = {
+                        let cookies = client.request.cookies();
+                        load_user(&cookies)
+                    };
+                    match r {
+                        Ok((p, s)) => (p, s),
+                        Err(e) => return client.error(e),
+                    }
+                };
+
+                let id = params.find("id").unwrap().as_u64().unwrap();
+                let tx = TxRestoreObject::new(&pub_key, id, land_title::timestamp(), &sec_key);
+
+                 send_tx(ObjectTx::RestoreObject(tx), client, ch.clone())
+            })
+         });
+
+
 
          let ch = channel.clone();
          api.post("owners", move |endpoint| {
