@@ -173,6 +173,7 @@ var app = {
       addReport: new AddReportPage(),
     };
     Backbone.history.start();
+    alertify.maxLogItems(10);
   },
 
   login: function(user) {
@@ -213,6 +214,13 @@ var app = {
             app.user = model;
             app.views.container.updateUser();
             app.router.navigate("/dashboard", {trigger: true});
+
+            if (model.get('role') == 'owner') {
+              app.owners.push({
+                id: model.get('id'),
+                name: model.get('name'),
+              });
+            }
 
             alertify.success('You have created ' + role + ' account');
           },

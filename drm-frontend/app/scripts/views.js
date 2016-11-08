@@ -71,8 +71,10 @@ var RegistrationPage = Backbone.View.extend({
 
     if (!name) {
       this.$el.find("#registration-name-form-group").addClass("has-error");
+      alertify.error('Name is not defined');
       return;
-    };
+    }
+
     app.registration(role, name);
   },
 
@@ -92,7 +94,7 @@ var BlockchainPage = Backbone.View.extend({
   template: templates.blockchain,
 
   events: {
-    "click .blockchain tr": "showBlock",
+    "click .blockchain tbody tr": "showBlock",
     "click #blockchain-page-prev": "prevBlockchainPage",
     "click #blockchain-page-next": "nextBlockchainPage",
   },
@@ -167,7 +169,7 @@ var OwnerDashboardPage = Backbone.View.extend({
 
   events: {
     "click #owner-dashboard-add-content": "addContent",
-    "click .owned tr": "showContent",
+    "click .owned tbody tr": "showContent",
   },
 
   addContent: function() {
@@ -255,6 +257,8 @@ var AddContentPage = Backbone.View.extend({
     "focus #add-content-title": "onFocus",
     "focus #add-content-min-plays": "onFocus",
     "focus #add-content-price-per-listen": "onFocus",
+    "focus .add-content-owner-id": "onFocus",
+    "focus .add-content-owner-share": "onFocus",
     "click #add-content-add-coowner": "addCoowner",
     "click .add-content-remove-coowner": "removeCoowner",
   },
@@ -285,7 +289,6 @@ var AddContentPage = Backbone.View.extend({
         share: Math.round($(el).find('.add-content-owner-share').val().replace(/[^0-9]/g, ''))
       });
     });
-    console.log(owners);
     return owners;
   },
 
@@ -320,22 +323,61 @@ var AddContentPage = Backbone.View.extend({
     if (!content.fingerprint) {
       hasError = true;
       this.$el.find("#add-content-fingerprint-group").addClass("has-error");
+      alertify.error('Fingerprint is not defined');
     }
     if (!content.title) {
       hasError = true;
       this.$el.find("#add-content-title-group").addClass("has-error");
+      alertify.error('Title is not defined');
     }
     if (!content.price_per_listen) {
       hasError = true;
       this.$el.find("#add-content-price-per-listen-group").addClass("has-error");
+      alertify.error('Price per each play is not defined');
     }
     if (!content.min_plays) {
       hasError = true;
       this.$el.find("#add-content-min-plays-group").addClass("has-error");
+      alertify.error('The minimum number of plays is not defined');
     }
+
+    // validate owners
+    var shareSum = 0;
+    var owners = this.$el.find(".add-content-owner");
     $.each(content.owners, function(i, owner) {
-      // TODO check co-owners validity: totally 100%, non-repeatable, non-empty
+      shareSum += owner.share;
+
+      // check if share is greater than 0
+      if (owner.share === 0) {
+        hasError = true;
+        owners.eq(i).addClass("has-error");
+        alertify.error('Share should be greater than zero');
+      }
+
+      // check if defined
+      if (isNaN(owner.owner_id)) {
+        hasError = true;
+        owners.eq(i).addClass("has-error");
+        alertify.error('Owner is not defined');
+      }
+
+      // check if unique
+      $.each(content.owners, function(j, o) {
+        if (i !== j && owner.owner_id === o.owner_id) {
+          hasError = true;
+          owners.eq(i).addClass("has-error");
+          owners.eq(j).addClass("has-error");
+          alertify.error('Owners should be unique');
+        }
+      });
     });
+
+    // check if total share is 100%
+    if (shareSum !== 100) {
+      hasError = true;
+      owners.addClass("has-error");
+      alertify.error('Total share should be 100%');
+    }
 
     if (!hasError) {
       content.price_per_listen = Math.round(content.price_per_listen * 100);
@@ -346,26 +388,22 @@ var AddContentPage = Backbone.View.extend({
   },
 
   initialize: function() {
-    var that = this;
-    var a = new Owner();
-    a.fetch();
-
-    a.fetch({
+    var owner = new Owner();
+    owner.fetch({
       success: function(model) {
-        that.owners = model.values();
+        app.owners = model.values();
       },
       error: function() {
         app.onError("No owners were found");
       },
     });
-    this.owners = [1, 2, 3]
   },
 
   render: function() {
     this.$el.html(this.template({
       content: this.model,
       user: app.user,
-      owners: this.owners
+      owners: app.owners,
     }));
     return this;
   }
@@ -417,14 +455,17 @@ var AddReportPage = Backbone.View.extend({
     if (!report.time) {
       hasError = true;
       this.$el.find("#add-report-time-group").addClass("has-error");
+      alertify.error('Date is not defined');
     }
     if (!report.plays) {
       hasError = true;
       this.$el.find("#add-report-plays-group").addClass("has-error");
+      alertify.error('Number of plays is not defined');
     }
     if (!report.comment) {
       hasError = true;
       this.$el.find("#add-report-comment-group").addClass("has-error");
+      alertify.error('Comment is not defined');
     }
 
     if (!hasError) {

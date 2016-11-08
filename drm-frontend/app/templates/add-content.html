@@ -87,7 +87,9 @@
       <select type="text" class="form-control add-content-owner-id">
         <option value="">Select co-owner</option>
         {% _.each(owners, function(owner, i) { %}
+        {% if (owner.id !== user.get('id')) { %}
         <option value="{{ owner.id }}">{{ owner.name }}</option>
+        {% } %}
         {% }) %}
       </select>
     </div>
