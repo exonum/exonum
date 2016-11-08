@@ -138,131 +138,32 @@
     }
 }
 
-/* Demo */
-.demo {
-    overflow: hidden;
-    padding-bottom: 40px;
-    padding-top: 40px;
-    text-align: center;
-}
-@media (min-width: 768px) {
-    .demo {
-        text-align: left;
-    }
-}
-.demo-container {
-    padding-bottom: 40px;
-    position: relative;
-}
-.demo-container + .demo-container {
-    margin-top: 40px;
-}
-@media (min-width: 768px) {
-    .demo-container {
-        height: 360px;
-        padding-bottom: 0;
-        padding-top: 20px;
-    }
-}
-@media (min-width: 992px) {
-    .demo-container {
-        height: 420px;
-        padding-top: 80px;
-    }
-}
-@media (min-width: 1200px) {
-    .demo-container {
-        height: 480px;
-        padding-top: 100px;
-    }
-}
-.demo-image-front {
-    left: 0;
-    margin: 0 0 0 -120px;
-    position: relative;
-    top: 0;
-    width: 200px;
-    z-index: 10;
-}
-.demo-image-front-reverse {
-    left: auto;
-    right: 0;
-}
-@media (min-width: 768px) {
-    .demo-image-front {
-        margin: -20px 0 0 100px;
-        position: absolute;
-        width: 220px;
-    }
-    .demo-image-front-reverse {
-        margin: -20px 100px 0 0;
-    }
-}
-@media (min-width: 992px) {
-    .demo-image-front {
-        margin: 0 0 0 140px;
-        width: 242px;
-    }
-    .demo-image-front-reverse {
-        margin: 0 140px 0 0;
-    }
-}
-@media (min-width: 1200px) {
-    .demo-image-front {
-        margin: -20px 0 0 170px;
-        width: 292px;
-    }
-    .demo-image-front-reverse {
-        margin: -20px 170px 0 0;
-    }
-}
-.demo-image-back {
-    left: 0;
-    margin: 10px 0 0 -15px;
-    position: relative;
-    top: 0;
-    width: 180px;
-    z-index: 5;
-}
-.demo-image-back-reverse {
-    left: auto;
-    right: 0;
-}
-@media (min-width: 768px) {
-    .demo-image-back {
-        margin: 0 0 0 30px;
-        position: absolute;
-        width: 200px;
-    }
-    .demo-image-back-reverse {
-        margin: 0 30px 0 0;
-    }
-}
-@media (min-width: 992px) {
-    .demo-image-back {
-        margin: 20px 0 0 60px;
-        width: 220px;
-    }
-    .demo-image-back-reverse {
-        margin: 20px 60px 0 0;
-    }
-}
-@media (min-width: 1200px) {
-    .demo-image-back {
-        margin: 20px 0 0 80px;
-        width: 260px;
-    }
-    .demo-image-back-reverse {
-        margin: 20px 80px 0 0;
-    }
-}
-
-/* Hero */
-.hero {}
-
 /* Piano */
-.piano-muted {
-    color: #9fa5ad;
+.piano {
+    overflow: hidden;
+    padding: 120px 0;
+    background: #444f5c;
+    background-color: #444f5c;
+    background-image: -webkit-gradient(radial,center center,0,center center,460,from(rgba(255, 255, 255, .25)),to(#444f5c));
+    background-image: -webkit-radial-gradient(circle closest-side,rgba(0, 0, 0, .25),#444f5c);
+    background-image: -o-radial-gradient(circle closest-side,rgba(255, 255, 255, .25),#444f5c);
+    background-position: -256px 0;
+    background-repeat: repeat-x;
+}
+.piano-tabs > li > a {
+    color: #5bc0de;
+}
+.piano-tabs > li > a:focus,
+.piano-tabs > li > a:hover {
+    background-color: #fff;
+    border-color: #fff;
+}
+.piano-tabs > li.active > a,
+.piano-tabs > li.active > a:focus,
+.piano-tabs > li.active > a:hover {
+    background-color: transparent;
+    border-bottom-color: #444f5c;
+    color: #fff;
 }
 .piano-pills {
     text-transform: uppercase;
@@ -281,16 +182,36 @@
 .piano-pills > li.active > a,
 .piano-pills > li.active > a:focus,
 .piano-pills > li.active > a:hover {
-    background-image: -webkit-linear-gradient(top, #5bc0de 0%, #2aabd2 100%);
-    background-image:      -o-linear-gradient(top, #5bc0de 0%, #2aabd2 100%);
-    background-image: -webkit-gradient(linear, left top, left bottom, from(#5bc0de), to(#2aabd2));
-    background-image:         linear-gradient(to bottom, #5bc0de 0%, #2aabd2 100%);
-    filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#ff5bc0de', endColorstr='#ff2aabd2', GradientType=0);
-    filter: progid:DXImageTransform.Microsoft.gradient(enabled = false);
-    background-repeat: repeat-x;
+    background-color: #5bc0de;
     border: none;
     color: #fff;
     padding: 6px 16px;
+}
+.piano-tab {
+    height: 248px;
+}
+.piano-muted {
+    color: #9fa5ad;
+}
+.piano-iphone {
+    position: absolute;
+    top: -160px;
+    left: 180px;
+    width: 300px;
+}
+.piano-iphones {
+    position: absolute;
+    top: -164px;
+    left: 80px;
+    width: 448px;
+    height: 512px;
+}
+.piano-ipad {
+    position: absolute;
+    top: -120px;
+    left: 0;
+    width: 570px;
+    height: 423px;
 }
 
 /* Typography */
