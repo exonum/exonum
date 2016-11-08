@@ -141,24 +141,40 @@
 /* Demo */
 .demo {
     overflow: hidden;
+    padding-bottom: 40px;
     padding-top: 40px;
     text-align: center;
 }
 @media (min-width: 768px) {
     .demo {
-        padding-bottom: 80px;
-        padding-top: 80px;
         text-align: left;
     }
 }
-@media (min-width: 1200px) {
-    .demo {
-        padding-bottom: 170px;
-        padding-top: 140px;
+.demo-container {
+    padding-bottom: 40px;
+    position: relative;
+}
+.demo-container + .demo-container {
+    margin-top: 40px;
+}
+@media (min-width: 768px) {
+    .demo-container {
+        height: 360px;
+        padding-bottom: 0;
+        padding-top: 20px;
     }
 }
-.demo-container {
-    position: relative;
+@media (min-width: 992px) {
+    .demo-container {
+        height: 420px;
+        padding-top: 80px;
+    }
+}
+@media (min-width: 1200px) {
+    .demo-container {
+        height: 480px;
+        padding-top: 100px;
+    }
 }
 .demo-image-front {
     left: 0;
@@ -168,23 +184,36 @@
     width: 200px;
     z-index: 10;
 }
+.demo-image-front-reverse {
+    left: auto;
+    right: 0;
+}
 @media (min-width: 768px) {
     .demo-image-front {
         margin: -20px 0 0 100px;
         position: absolute;
         width: 220px;
     }
+    .demo-image-front-reverse {
+        margin: -20px 100px 0 0;
+    }
 }
 @media (min-width: 992px) {
     .demo-image-front {
-        margin: -80px 0 0 140px;
+        margin: 0 0 0 140px;
         width: 242px;
+    }
+    .demo-image-front-reverse {
+        margin: 0 140px 0 0;
     }
 }
 @media (min-width: 1200px) {
     .demo-image-front {
-        margin: -120px 0 0 170px;
+        margin: -20px 0 0 170px;
         width: 292px;
+    }
+    .demo-image-front-reverse {
+        margin: -20px 170px 0 0;
     }
 }
 .demo-image-back {
@@ -195,23 +224,36 @@
     width: 180px;
     z-index: 5;
 }
+.demo-image-back-reverse {
+    left: auto;
+    right: 0;
+}
 @media (min-width: 768px) {
     .demo-image-back {
         margin: 0 0 0 30px;
         position: absolute;
         width: 200px;
     }
+    .demo-image-back-reverse {
+        margin: 0 30px 0 0;
+    }
 }
 @media (min-width: 992px) {
     .demo-image-back {
-        margin: -54px 0 0 60px;
+        margin: 20px 0 0 60px;
         width: 220px;
+    }
+    .demo-image-back-reverse {
+        margin: 20px 60px 0 0;
     }
 }
 @media (min-width: 1200px) {
     .demo-image-back {
-        margin: -80px 0 0 80px;
+        margin: 20px 0 0 80px;
         width: 260px;
+    }
+    .demo-image-back-reverse {
+        margin: 20px 80px 0 0;
     }
 }
 
