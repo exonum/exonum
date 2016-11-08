@@ -287,7 +287,7 @@ impl<B, S> NodeHandler<B, S>
         let has_consensus = self.state.add_prevote(&prevote);
 
         // Request propose or transactions
-        self.request_propose_or_txs(prevote.propose_hash(), prevote.validator());
+        let has_propose_with_txs = self.request_propose_or_txs(prevote.propose_hash(), prevote.validator());
 
         // Request prevotes
         if prevote.locked_round() > self.state.locked_round() {
@@ -297,7 +297,7 @@ impl<B, S> NodeHandler<B, S>
         }
 
         // Lock to propose
-        if has_consensus {
+        if has_consensus && has_propose_with_txs {
             self.has_majority_prevotes(prevote.round(), prevote.propose_hash());
         }
     }
@@ -668,7 +668,7 @@ impl<B, S> NodeHandler<B, S>
         block_hash
     }
 
-    pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) {
+    pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) -> bool {
         let requested_data = match self.state.propose(propose_hash) {
             Some(state) => {
                 // Request transactions
@@ -684,9 +684,12 @@ impl<B, S> NodeHandler<B, S>
             }
         };
 
-        if let Some(data) = requested_data {
+        if let Some(data) = requested_data.clone() {
             let key = self.public_key_of(validator);
             self.request(data, key);
+            false
+        } else {
+            true
         }
     }
 
