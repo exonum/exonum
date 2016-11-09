@@ -14,7 +14,7 @@ var DRMRouter = Backbone.Router.extend({
       "dashboard"             : "dashboard",
       "content/:fingerprint"  : "content",
       "add-report/:fingerprint" : "addReport",
-      "add-content"           : "addContent",
+      "add-content"           : "addContent"
     },
 
     // Main pages
@@ -38,7 +38,7 @@ var DRMRouter = Backbone.Router.extend({
     blockchain: function(height) {
       app.views.container.loadingStart();
 
-      var requestData = {count: 15,};
+      var requestData = {count: 15};
 
       if (height) {requestData.from = height;}
 
@@ -113,7 +113,7 @@ var DRMRouter = Backbone.Router.extend({
         },
         error: function() {
           app.onError("Content with given fingerprint not found");
-        },
+        }
       });
     },
 
@@ -144,7 +144,7 @@ var DRMRouter = Backbone.Router.extend({
         },
         error: function() {
           app.onError("Content with given fingerprint not found");
-        },
+        }
       });
     }
 });
@@ -170,7 +170,7 @@ var app = {
       distributorDashboard: new DistributorDashboardPage(),
       content: new ContentPage(),
       addContent: new AddContentPage(),
-      addReport: new AddReportPage(),
+      addReport: new AddReportPage()
     };
     Backbone.history.start();
     alertify.maxLogItems(10);
@@ -184,7 +184,7 @@ var app = {
     }, {
       retries: 20,
       timeout: 500,
-      success: function(model, response) {
+      success: function(model) {
         app.user = model;
         app.views.container.updateUser();
         app.router.navigate("/dashboard", {trigger: true});
@@ -193,7 +193,7 @@ var app = {
     });
   },
 
-  registration: function(role, name) {
+  registration: function(role, name, callback) {
     app.views.container.loadingStart();
     var Model = role == 'owner' ? Owner : Distributor;
     new Model().save({name: name}, {
@@ -204,7 +204,7 @@ var app = {
         }, {
           retries: 20,
           timeout: 500,
-          success: function(model, response) {
+          success: function(model) {
             // add new user to localStorage
             var users = JSON.parse(localStorage.getItem('users')) || [];
             users.push(model.attributes);
@@ -218,9 +218,11 @@ var app = {
             if (model.get('role') == 'owner') {
               app.owners.push({
                 id: model.get('id'),
-                name: model.get('name'),
+                name: model.get('name')
               });
             }
+
+            callback();
 
             alertify.success('You have created ' + role + ' account');
           },
@@ -296,9 +298,9 @@ var app = {
             },
             error: function() {
               app.onError("Content with given fingerprint not found");
-            },
+            }
           });
-        };
+        }
         waitForContract();
       },
       error: app.onError("Unable to create new content")

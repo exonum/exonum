@@ -6,7 +6,7 @@ var WelcomePage = Backbone.View.extend({
   el: ".page[data-page='welcome']",
 
   events: {
-    "click #proceed-demo": 'proceedDemo',
+    "click #proceed-demo": 'proceedDemo'
   },
 
   proceedDemo: function() {
@@ -26,7 +26,7 @@ var LoginPage = Backbone.View.extend({
   events: {
     "click .login": 'login',
     "click #login-registration": 'registration',
-    "click #login-blockchain": 'blockchain',
+    "click #login-blockchain": 'blockchain'
   },
 
   login: function(e) {
@@ -58,7 +58,7 @@ var RegistrationPage = Backbone.View.extend({
 
   events: {
     'click #registration-submit': 'registrationSubmit',
-    'focus #registration-name': 'focusName',
+    'focus #registration-name': 'focusName'
   },
 
   focusName: function() {
@@ -66,8 +66,14 @@ var RegistrationPage = Backbone.View.extend({
   },
 
   registrationSubmit: function() {
-    var name = $.trim(this.$el.find('#registration-name').val()),
-        role = this.$el.find("#registration-form input[type=radio]:checked").val();
+    var nameField = this.$el.find('#registration-name');
+    var name = $.trim(nameField.val());
+    var role = this.$el.find("#registration-form input[type=radio]:checked").val();
+
+    // reset name input
+    function callback() {
+      nameField.val('');
+    }
 
     if (!name) {
       this.$el.find("#registration-name-form-group").addClass("has-error");
@@ -75,12 +81,10 @@ var RegistrationPage = Backbone.View.extend({
       return;
     }
 
-    app.registration(role, name);
+    app.registration(role, name, callback);
   },
 
   render: function() {
-  //   this.$el.html(this.template({block: this.model}));
-  //   return this;
   }
 });
 
@@ -96,7 +100,7 @@ var BlockchainPage = Backbone.View.extend({
   events: {
     "click .blockchain tbody tr": "showBlock",
     "click #blockchain-page-prev": "prevBlockchainPage",
-    "click #blockchain-page-next": "nextBlockchainPage",
+    "click #blockchain-page-next": "nextBlockchainPage"
   },
 
   showBlock: function(e) {
@@ -136,7 +140,7 @@ var BlockPage = Backbone.View.extend({
 
   events: {
     "click #block-prev": "prevBlock",
-    "click #block-next": "nextBlock",
+    "click #block-next": "nextBlock"
   },
 
   prevBlock: function() {
@@ -169,7 +173,7 @@ var OwnerDashboardPage = Backbone.View.extend({
 
   events: {
     "click #owner-dashboard-add-content": "addContent",
-    "click .owned tbody tr": "showContent",
+    "click .owned tbody tr": "showContent"
   },
 
   addContent: function() {
@@ -198,7 +202,7 @@ var DistributorDashboardPage = Backbone.View.extend({
 
   events: {
     "click .distributed tbody tr": "showContent",
-    "click .available tbody tr": "showContent",
+    "click .available tbody tr": "showContent"
   },
 
   showContent: function(e) {
@@ -225,7 +229,7 @@ var ContentPage = Backbone.View.extend({
 
   events: {
     "click #content-buy-inside": "buyContract",
-    "click #content-update-status": "addReport",
+    "click #content-update-status": "addReport"
   },
 
   buyContract: function() {
@@ -260,7 +264,7 @@ var AddContentPage = Backbone.View.extend({
     "focus .add-content-owner-id": "onFocus",
     "focus .add-content-owner-share": "onFocus",
     "click #add-content-add-coowner": "addCoowner",
-    "click .add-content-remove-coowner": "removeCoowner",
+    "click .add-content-remove-coowner": "removeCoowner"
   },
 
   onFocus: function(e) {
@@ -395,7 +399,7 @@ var AddContentPage = Backbone.View.extend({
       },
       error: function() {
         app.onError("No owners were found");
-      },
+      }
     });
   },
 
@@ -403,7 +407,7 @@ var AddContentPage = Backbone.View.extend({
     this.$el.html(this.template({
       content: this.model,
       user: app.user,
-      owners: app.owners,
+      owners: app.owners
     }));
     return this;
   }
@@ -422,7 +426,7 @@ var AddReportPage = Backbone.View.extend({
     "click #add-report": "addReport",
     "focus #add-report-time": "onFocus",
     "focus #add-report-plays": "onFocus",
-    "focus #add-report-comment": "onFocus",
+    "focus #add-report-comment": "onFocus"
   },
 
   onFocus: function(e) {
@@ -440,14 +444,14 @@ var AddReportPage = Backbone.View.extend({
         result = result + i;
       }
       return result;
-    };
+    }
 
     var report = {
       uuid: generateUUID(),
       fingerprint: this.model.get("fingerprint"),
       time: this.$el.find("#add-report-time").val(),
       plays: this.$el.find("#add-report-plays").val(),
-      comment: this.$el.find("#add-report-comment").val(),
+      comment: this.$el.find("#add-report-comment").val()
     };
 
     console.log(report);
@@ -501,7 +505,7 @@ var ContainerView = Backbone.View.extend({
     "click .toolbar-return-button": "back",
     "click #user": "showDashboard",
     "click": "collapseMenu",
-    "touchstart": "collapseMenu",
+    "touchstart": "collapseMenu"
   },
 
   loadingStart: function() {
@@ -544,7 +548,7 @@ var ContainerView = Backbone.View.extend({
     } else {
       this.$el.find('.app-content').hide();
       this.$el.find('.toolbar').hide();
-    };
+    }
     $(".page[data-page!='" + page + "']").hide();
     $(".page[data-page='" + page + "']").show();
     $("title").text(title + " – Exonum");
