@@ -18,6 +18,9 @@ html {
 a {
     color: #266be9;
 }
+samp {
+    word-wrap: break-word;
+}
 
 .page {
     margin: 0 auto;
