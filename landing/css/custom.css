@@ -155,7 +155,7 @@
 }
 @media (min-width: 1200px) {
     .piano {
-        padding: 120px 0;
+        padding: 100px 0;
     }
 }
 .piano-tabs > li > a {
@@ -173,32 +173,24 @@
     border-bottom-color: #334159;
     color: #fff;
 }
-.piano-pills {
-    text-transform: uppercase;
-}
-.piano-pills > li > a {
-    border: 1px solid transparent;
-    color: #fff;
-    padding: 5px 15px;
-}
-.piano-pills > li > a:focus,
-.piano-pills > li > a:hover {
-    color: #5bc0de;
-    border-color: #5bc0de;
-    background-color: transparent;
-}
-.piano-pills > li.active > a,
-.piano-pills > li.active > a:focus,
-.piano-pills > li.active > a:hover {
-    background-color: #5bc0de;
-    border: none;
-    color: #fff;
-    padding: 6px 16px;
-}
 @media (min-width: 768px) {
     .piano-tab {
-        height: 248px;
+        height: 340px;
     }
+}
+@media (min-width: 992px) {
+    .piano-tab {
+        height: 300px;
+    }
+}
+@media (min-width: 1200px) {
+    .piano-tab {
+        height: 272px;
+    }
+}
+.piano-subtitle {
+    margin-bottom: 20px;
+    letter-spacing: 0.05em;
 }
 .piano-muted {
     color: #9fa5ad;
