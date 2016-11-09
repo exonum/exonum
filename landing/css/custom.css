@@ -142,13 +142,7 @@
 .piano {
     overflow: hidden;
     padding: 120px 0;
-    background: #444f5c;
     background-color: #444f5c;
-    background-image: -webkit-gradient(radial,center center,0,center center,460,from(rgba(255, 255, 255, .25)),to(#444f5c));
-    background-image: -webkit-radial-gradient(circle closest-side,rgba(0, 0, 0, .25),#444f5c);
-    background-image: -o-radial-gradient(circle closest-side,rgba(255, 255, 255, .25),#444f5c);
-    background-position: -256px 0;
-    background-repeat: repeat-x;
 }
 .piano-tabs > li > a {
     color: #5bc0de;
