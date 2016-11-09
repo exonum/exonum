@@ -313,7 +313,21 @@ impl<B, S> NodeHandler<B, S>
         self.remove_request(RequestData::Precommits(round, *propose_hash, *block_hash));
         // Commit
         if self.state.propose(propose_hash).is_some() {
-            // FIXME: проверка что у нас есть все транзакции
+            // Check for unknown txs
+            let has_unknown_txs = {
+                let state = self.state.propose(propose_hash).unwrap();
+                if state.has_unknown_txs() {
+                    Some(state.message().validator())
+                } else {
+                    None
+                }
+            };
+            if let Some(validator) = has_unknown_txs {
+                let data = RequestData::Transactions(*propose_hash);
+                let key = self.public_key_of(validator);
+                self.request(data, key);   
+                return;
+            }
 
             // Execute block and get state hash
             let our_block_hash = self.execute(propose_hash);
