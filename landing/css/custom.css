@@ -141,8 +141,17 @@
 /* Piano */
 .piano {
     overflow: hidden;
-    padding: 120px 0;
-    background-color: #444f5c;
+    background-color: #334159;
+}
+@media (min-width: 768px) {
+    .piano {
+        padding: 120px 0 80px;
+    }
+}
+@media (min-width: 1200px) {
+    .piano {
+        padding: 120px 0;
+    }
 }
 .piano-tabs > li > a {
     color: #5bc0de;
@@ -156,7 +165,7 @@
 .piano-tabs > li.active > a:focus,
 .piano-tabs > li.active > a:hover {
     background-color: transparent;
-    border-bottom-color: #444f5c;
+    border-bottom-color: #334159;
     color: #fff;
 }
 .piano-pills {
@@ -181,31 +190,88 @@
     color: #fff;
     padding: 6px 16px;
 }
-.piano-tab {
-    height: 248px;
+@media (min-width: 768px) {
+    .piano-tab {
+        height: 248px;
+    }
 }
 .piano-muted {
     color: #9fa5ad;
 }
 .piano-iphone {
-    position: absolute;
-    top: -160px;
-    left: 180px;
-    width: 300px;
+    width: 260px;
+}
+@media (min-width: 768px) {
+    .piano-iphone {
+        position: absolute;
+        top: -140px;
+        left: 0;
+        width: 300px;
+    }
+}
+@media (min-width: 992px) {
+    .piano-iphone {
+        top: -160px;
+        left: 100px;
+    }
+}
+@media (min-width: 1200px) {
+    .piano-iphone {
+        left: 180px;
+    }
 }
 .piano-iphones {
-    position: absolute;
-    top: -164px;
-    left: 80px;
-    width: 448px;
-    height: 512px;
+    width: 260px;
+    margin-top: 20px;
+}
+@media (min-width: 768px) {
+    .piano-iphones {
+        position: absolute;
+        top: -96px;
+        left: 0;
+        width: 330px;
+        margin-top: 0;
+    }
+}
+@media (min-width: 992px) {
+    .piano-iphones {
+        top: -164px;
+        left: 0;
+        width: 440px;
+    }
+}
+@media (min-width: 1200px) {
+    .piano-iphones {
+        top: -144px;
+        left: 50px;
+    }
 }
 .piano-ipad {
-    position: absolute;
-    top: -120px;
-    left: 0;
-    width: 570px;
-    height: 423px;
+    width: 260px;
+    margin-top: 40px;
+}
+@media (min-width: 768px) {
+    .piano-ipad {
+        position: absolute;
+        top: -60px;
+        left: 0;
+        width: 330px;
+        margin-top: 0;
+    }
+}
+@media (min-width: 992px) {
+    .piano-ipad {
+        top: -80px;
+        left: 0;
+        width: 440px;
+    }
+}
+@media (min-width: 1200px) {
+    .piano-ipad {
+        top: -100px;
+        left: 0;
+        width: 540px;
+    }
 }
 
 /* Typography */
