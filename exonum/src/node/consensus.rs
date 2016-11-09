@@ -103,14 +103,8 @@ impl<B, S> NodeHandler<B, S>
         if self.state.propose(&msg.hash()).is_some() {
             return;
         }
-
+        
         trace!("Handle propose");
-        for hash in msg.transactions() {
-            if view.transactions().get(hash).unwrap().is_some() {
-                return;
-            }
-        }
-
         // Add propose
         let (hash, has_unknown_txs) = match self.state.add_propose(msg.clone()) {
             Some(state) => (state.hash(), state.has_unknown_txs()),
