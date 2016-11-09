@@ -50,9 +50,6 @@ samp {
 }
 .app-logo {
     margin: 0 auto 15px auto;
-    background-image: url(../images/bf_logo.svg);
-    background-repeat: no-repeat;
-    background-position: center center;
     width: 60px;
     height: 40px;
 }
@@ -184,11 +181,7 @@ a.button:focus, a.button:active, a.button:hover {
 .toolbar-return-button {
     width: 80px;
     height: 60px;
-    text-align: center;
     cursor: pointer;
-    background-image: url(../images/left_arrow.svg);
-    background-repeat: no-repeat;
-    background-position: center center;
 }
 .toolbar-help-button {
     margin-bottom: 0;
@@ -329,13 +322,12 @@ a.button:focus, a.button:active, a.button:hover {
     margin-right: 7px;
     margin-bottom: 3px;
     margin-top: 3px;
+    text-align: center;
+    line-height: 15px;
 }
 .checker.active {
     border-color: #00d66a;
     background-color: #00d66a;
-    background-image: url(../images/icon_check.svg);
-    background-repeat: no-repeat;
-    background-position: center center;
 }
 
 
