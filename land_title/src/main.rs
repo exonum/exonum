@@ -123,7 +123,7 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
             let api = Api::build(move |api| {
                 // Specify API version
                 api.version("v1", Versioning::Path);
-                api.prefix("api");
+                api.prefix("registry");
 
                 api.error_formatter(|err, _media| {
                     let body;
