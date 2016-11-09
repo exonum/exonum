@@ -1,3 +1,8 @@
+/* Navbar */
+.navbar-toggle .icon-bar {
+    background-color: #111;
+}
+
 /* Home */
 .home-wrapper {
     padding: 80px 0 20px 0;
