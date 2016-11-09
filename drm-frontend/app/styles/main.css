@@ -1,25 +1,22 @@
 @import 'https://fonts.googleapis.com/css?family=Open+Sans';
 body {
-    /*font-family: "myriad-pro", "Myriad Pro", Myriad, "Liberation Sans", "Nimbus Sans L", "Helvetica Neue", Helvetica, Arial, sans-serif;*/
     font-family: 'Open Sans', sans-serif;
     color: #647082;
     width: 100%;
     background: #eceef2;
+    height: 100%;
     min-height: 100%;
-    display: table-cell;
     position: relative;
 }
 
 html {
     background: #eceef2;
     height: 100%;
-    display: table;
     margin: auto;
     width: 100%;
 }
 a {
     color: #266be9;
-    /*text-decoration: underline;*/
 }
 
 .page {
