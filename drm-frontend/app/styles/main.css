@@ -47,7 +47,9 @@ a {
 }
 .app-logo {
     margin: 0 auto 15px auto;
-    background: url(../images/bf_logo.svg) center center no-repeat;
+    background-image: url(../images/bf_logo.svg);
+    background-repeat: no-repeat;
+    background-position: center center;
     width: 60px;
     height: 40px;
 }
@@ -181,7 +183,9 @@ a.button:focus, a.button:active, a.button:hover {
     height: 60px;
     text-align: center;
     cursor: pointer;
-    background: url(../images/left_arrow.svg) center center no-repeat;
+    background-image: url(../images/left_arrow.svg);
+    background-repeat: no-repeat;
+    background-position: center center;
 }
 .toolbar-help-button {
     margin-bottom: 0;
@@ -325,7 +329,10 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .checker.active {
     border-color: #00d66a;
-    background: #00d66a url(../images/icon_check.svg) center center no-repeat;
+    background-color: #00d66a;
+    background-image: url(../images/icon_check.svg);
+    background-repeat: no-repeat;
+    background-position: center center;
 }
 
 
@@ -341,7 +348,9 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .modal-cross {
     cursor: pointer;
-    background: url(../images/cross_gray.svg) center center no-repeat;
+    background-image: url(../images/cross_gray.svg);
+    background-repeat: no-repeat;
+    background-position: center center;
     width: 30px;
     height: 30px;
     position: absolute;
@@ -556,7 +565,9 @@ a.button:focus, a.button:active, a.button:hover {
     vertical-align: middle;
     width: 10px;
     height: 20px;
-    background: url(../images/right_arrow.svg) center center no-repeat;
+    background-image: url(../images/right_arrow.svg);
+    background-repeat: no-repeat;
+    background-position: center center;
 }
 .blockchain > tbody > tr > td,
 .owned > tbody > tr > td,
