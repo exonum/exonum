@@ -91,3 +91,7 @@ var Report = Backbone.Model.extend({
   idAttribute: "uuid",
   urlRoot: settings.api_endpoint + "drm/reports"
 });
+
+var Flows = Backbone.Collection.extend({
+  url: settings.api_endpoint + "drm/flow"
+});

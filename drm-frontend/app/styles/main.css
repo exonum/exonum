@@ -95,7 +95,6 @@ samp {
 }
 a.button:focus, a.button:active, a.button:hover {
     text-decoration: none;
-    /*color: #647082;*/
 }
 .button:focus, .button:active { background: #e1e6ec; border-color: #657082; }
 .welcome-wrapper .button {
@@ -368,7 +367,6 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .modal-decrypt .modal-content {
     background-color: rgba(51, 51, 51, 0.97);
-    /*min-height: 607px;*/
     color: #fff;
     min-height: 100%;
 }
@@ -377,7 +375,6 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .modal-decrypt.modal-decrypt-dark .modal-content {
     background-color: rgba(25, 25, 25, 0.97);
-    /*min-height: 667px;*/
 }
 .modal-decrypt .modal-cross {
     top: 25px;
@@ -533,7 +530,6 @@ a.button:focus, a.button:active, a.button:hover {
     padding: 13px 30px 13px 105px;
     font-size: 18px;
     width: 100%;
-    /*font-family: "Myriad Pro", Myriad, "Liberation Sans", "Nimbus Sans L", "Helvetica Neue", Helvetica, Arial, sans-serif;*/
     font-family: 'Open Sans', sans-serif;
 }
 .app-content-divider {

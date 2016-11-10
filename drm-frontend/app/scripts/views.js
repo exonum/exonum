@@ -26,7 +26,8 @@ var LoginPage = Backbone.View.extend({
   events: {
     "click .login": 'login',
     "click #login-registration": 'registration',
-    "click #login-blockchain": 'blockchain'
+    "click #login-blockchain": 'blockchain',
+    "click #login-flows": 'flows'
   },
 
   login: function(e) {
@@ -40,6 +41,10 @@ var LoginPage = Backbone.View.extend({
 
   blockchain: function() {
     app.router.navigate("blockchain", {trigger: true});
+  },
+
+  flows: function() {
+    app.router.navigate("flows", {trigger: true});
   },
 
   render: function() {
@@ -504,6 +509,8 @@ var ContainerView = Backbone.View.extend({
   events: {
     "click .toolbar-return-button": "back",
     "click #user": "showDashboard",
+    "click #blockchain-exporer": "showBlockchain",
+    "click #flows": "showFlows",
     "click": "collapseMenu",
     "touchstart": "collapseMenu"
   },
@@ -564,6 +571,14 @@ var ContainerView = Backbone.View.extend({
     app.router.navigate("dashboard", {trigger: true});
   },
 
+  showBlockchain: function() {
+    app.router.navigate("blockchain", {trigger: true});
+  },
+
+  showFlows: function() {
+    app.router.navigate("flows", {trigger: true});
+  },
+
   collapseMenu: function() {
     var navbar = $('#navbar-collapse');
 
@@ -583,4 +598,23 @@ var ContainerView = Backbone.View.extend({
     }
   }
 
+});
+
+var FlowsPage = Backbone.View.extend({
+  title: "Money Flows",
+  showToolbar: true,
+  backPage: 'login',
+
+  el: ".page[data-page='flows']",
+
+  template: templates.flows,
+
+  events: {},
+
+  render: function() {
+    this.$el.html(this.template({
+      flows: app.flows
+    }));
+    return this;
+  }
 });
