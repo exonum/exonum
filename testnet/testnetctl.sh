@@ -10,7 +10,7 @@ enable() {
     mkdir -p ${destdir}/log/supervisor
     mkdir ${destdir}/run
     mkdir ${destdir}/db
-    cp -R ${scriptdir}/supervisord/etc ${destdir} || exit 1
+    rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc || exit 1
 
     cd ${destdir}
     if [ -e /tmp/supervisord.sock ]
@@ -29,6 +29,15 @@ disable() {
     fi 
 }
 
+update() {
+    test -e /tmp/supervisord.sock || exit 1
+
+    rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc/ || exit 1
+    cd ${destdir}
+    supervisorctl reread || exit 1
+    supervisorctl update || exit 1
+}
+
 clear() {
     cd ${destdir}
     if [ -e /tmp/supervisord.sock ]
@@ -39,8 +48,6 @@ clear() {
 }
 
 start() {
-    echo $1
-    echo ${destdir}
     test -e /tmp/supervisord.sock || exit 1
 
     template=$1
@@ -49,8 +56,6 @@ start() {
 }
 
 restart() {
-    echo $1
-    echo ${destdir}
     test -e /tmp/supervisord.sock || exit 1
 
     template=$1
@@ -66,7 +71,6 @@ stop() {
     supervisorctl stop ${template}:* || exit 1
 }
 
-echo $3
 case "$1" in
     start)
         start $3
@@ -82,6 +86,9 @@ case "$1" in
         ;;
     disable) 
         disable $2
+        ;;
+    update) 
+        update $2
         ;;
     clear) 
         clear $2

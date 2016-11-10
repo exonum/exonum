@@ -555,7 +555,10 @@ impl<B, S> NodeHandler<B, S>
         let hash = self.state.add_self_propose(propose);
 
         // Send prevote
-        self.broadcast_prevote(round, &hash);
+        let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+        if has_majority_prevotes {
+            self.has_majority_prevotes(round, &hash);
+        }
     }
 
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {

@@ -50,7 +50,7 @@ class DigitalRightsApi(ExonumApi):
 class DigitalRightsApiTest(DigitalRightsApi):
     def setUp(self):
         super().setUp()
-        self.host = "http://127.0.0.1:8100/api/v1"
+        self.host = "http://127.0.0.1:8600/api/v1"
 
     def test_create_owner(self):
         owner = self.create_owner("Unknown Artist")
