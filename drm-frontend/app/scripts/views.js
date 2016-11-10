@@ -521,7 +521,7 @@ var ContainerView = Backbone.View.extend({
   updateUser: function() {
     if (app.user) {
       this.$el.find('#menu').removeClass('hidden');
-      this.$el.find('#user').removeClass('hidden').data('type', app.user.get('role'));
+      this.$el.find('#user').removeClass('hidden').attr('data-type', app.user.get('role'));
       this.$el.find('#username').text(app.user.get('name'));
     } else {
       this.$el.find('#menu').addClass('hidden');
