@@ -53,7 +53,7 @@ gulp.task('images', function () {
 gulp.task('fonts', function () {
   return gulp.src(require('main-bower-files')({
     filter: '**/*.{eot,svg,ttf,woff,woff2}'
-  }).concat('app/fonts/**/*'))
+  }).concat(['app/fonts/**/*', 'bower_components/bootswatch-dist/fonts/**/*']))
     .pipe(gulp.dest('.tmp/fonts'))
     .pipe(gulp.dest('dist/fonts'));
 });

@@ -171,10 +171,36 @@ $ tx_generator -c /tmp/exonum/testnet.conf run 1 -p "0" -t 100 -d 256 -x 10 1000
 
 TODO
 
-# Разворачивание фронтенда DRM
-1. установить node.js http://nodejs.org/ (если Windows, то добавить её в PATH)
-2. установить gulp, bower и yeoman `npm install -g gulp-cli bower yo`
-3. перейти в папку `drm-frontend`
-4. запустить команду `npm install`
-5. запустить команду `bower install`
-6. запустить `gulp serve` (может потребоваться запуск через `sudo`)
+# DRM Demo 
+
+Во-первых, должен быть установлен [Node.js](http://nodejs.org/).
+
+Желательно настроить Node.js таким образом, чтобы, можно было устанавливать npm пакеты глобально без sudo. Как это сделать написано [здесь](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
+
+Далее, требуется установка пакета Yeoman, его генератора, gulp и bower:
+
+```
+npm install --global yo generator-gulp-webapp gulp-cli bower
+```
+
+Далее, требуется установить все npm зависимости:
+
+```
+npm install
+```
+
+И bower зависимости:
+
+```
+bower install
+```
+
+Теперь, чтобы запустить проект локально, требуеться выполнить команду:
+```
+gulp serve
+```
+
+Чтобы собрать файлы для выгрузки в продакшн:
+```
+gulp build
+```
