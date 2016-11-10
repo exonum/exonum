@@ -1,16 +1,16 @@
 var WelcomePage = Backbone.View.extend({
-  title: "DRM Demo",
+  title: 'DRM Demo',
   showToolbar: false,
   backPage: undefined,
 
-  el: ".page[data-page='welcome']",
+  el: '.page[data-page="welcome"]',
 
   events: {
-    "click #proceed-demo": 'proceedDemo'
+    'click #proceed-demo': 'proceedDemo'
   },
 
   proceedDemo: function() {
-    app.router.navigate("login", {trigger: true});
+    app.router.navigate('login', {trigger: true});
   }
 });
 
@@ -19,28 +19,28 @@ var LoginPage = Backbone.View.extend({
   showToolbar: true,
   backPage: undefined,
 
-  el: ".page[data-page='login']",
+  el: '.page[data-page="login"]',
 
   template: templates.login,
 
   events: {
-    "click .login": 'login',
-    "click #login-registration": 'registration',
-    "click #login-blockchain": 'blockchain',
-    "click #login-flow": 'flow'
+    'click .login': 'login',
+    'click #login-registration': 'registration',
+    'click #login-blockchain': 'blockchain',
+    'click #login-flow': 'flow'
   },
 
   login: function(e) {
-    var index = $(e.currentTarget).data("index");
+    var index = $(e.currentTarget).data('index');
     app.login(app.users[index]);
   },
 
   registration: function() {
-    app.router.navigate("registration", {trigger: true});
+    app.router.navigate('registration', {trigger: true});
   },
 
   blockchain: function() {
-    app.router.navigate("blockchain", {trigger: true});
+    app.router.navigate('blockchain', {trigger: true});
   },
 
   flow: function() {
@@ -55,11 +55,11 @@ var LoginPage = Backbone.View.extend({
 });
 
 var RegistrationPage = Backbone.View.extend({
-  title: "Registration",
+  title: 'Registration',
   showToolbar: true,
   backPage: 'login',
 
-  el: ".page[data-page='registration']",
+  el: '.page[data-page="registration"]',
 
   events: {
     'click #registration-submit': 'registrationSubmit',
@@ -67,13 +67,13 @@ var RegistrationPage = Backbone.View.extend({
   },
 
   focusName: function() {
-    this.$el.find("#registration-name-form-group").removeClass("has-error");
+    this.$el.find('#registration-name-form-group').removeClass('has-error');
   },
 
   registrationSubmit: function() {
     var nameField = this.$el.find('#registration-name');
     var name = $.trim(nameField.val());
-    var role = this.$el.find("#registration-form input[type=radio]:checked").val();
+    var role = this.$el.find('#registration-form input[type=radio]:checked').val();
 
     // reset name input
     function callback() {
@@ -81,7 +81,7 @@ var RegistrationPage = Backbone.View.extend({
     }
 
     if (!name) {
-      this.$el.find("#registration-name-form-group").addClass("has-error");
+      this.$el.find('#registration-name-form-group').addClass('has-error');
       alertify.error('Name is not defined');
       return;
     }
@@ -94,39 +94,59 @@ var RegistrationPage = Backbone.View.extend({
 });
 
 var BlockchainPage = Backbone.View.extend({
-  title: "Blockchain Explorer",
+  title: 'Blockchain Explorer',
   showToolbar: true,
   backPage: 'login',
 
-  el: ".page[data-page='blockchain']",
+  el: '.page[data-page="blockchain"]',
 
   template: templates.blockchain,
 
   events: {
-    "click .blockchain tbody tr": "showBlock",
-    "click #blockchain-page-prev": "prevBlockchainPage",
-    "click #blockchain-page-next": "nextBlockchainPage"
+    'click .blockchain tbody tr': 'showBlock',
+    'click #blockchain-page-prev': 'prevPage',
+    'click #blockchain-page-next': 'nextPage',
+    'click #blockchain-refresh': 'refresh'
   },
 
   showBlock: function(e) {
-    var height = $(e.target).parents("tr").data("block");
-    app.router.navigate("block/" + height, {trigger: true});
+    var height = $(e.target).parents('tr').data('block');
+    app.router.navigate('block/' + height, {trigger: true});
   },
 
-  prevBlockchainPage: function() {
-    var height = app.blocks.at(0).get('height') - 15;
-    app.router.navigate("blockchain/" + height, {trigger: true});
+  prevPage: function() {
+    var currentHeight = app.blocks.at(0).get('height');
+    var newHeight = currentHeight - 15;
+
+    if (currentHeight == 14) {
+      return false;
+    } else if (newHeight <= 14) {
+      newHeight = 14;
+    }
+
+    app.router.navigate('blockchain/' + newHeight, {trigger: true});
   },
 
-  nextBlockchainPage: function() {
-    var height = app.blocks.at(0).get('height') + 15;
-    app.router.navigate("blockchain/" + height, {trigger: true});
+  nextPage: function() {
+    var currentHeight = app.blocks.at(0).get('height');
+    var newHeight = currentHeight + 15;
+
+    if (newHeight < app.newestHeight) {
+      app.router.navigate('blockchain/' + newHeight, {trigger: true});
+    } else {
+      app.router.navigate('blockchain', {trigger: true});
+    }
+  },
+
+  refresh: function() {
+    app.router.blockchain();
   },
 
   render: function() {
     this.$el.html(this.template({
       blocks: app.blocks,
-      last_height: app.last_height
+      lastHeight: app.lastHeight,
+      newestHeight: app.newestHeight
     }));
     return this;
   }
@@ -134,60 +154,60 @@ var BlockchainPage = Backbone.View.extend({
 
 var BlockPage = Backbone.View.extend({
   title: function() {
-    return "Block #" + this.model.get('height')
+    return 'Block #' + this.model.get('height')
   },
   showToolbar: true,
   backPage: 'blockchain',
 
-  el: ".page[data-page='block']",
+  el: '.page[data-page="block"]',
 
   template: templates.block,
 
   events: {
-    "click #block-prev": "prevBlock",
-    "click #block-next": "nextBlock"
+    'click #block-prev': 'prevBlock',
+    'click #block-next': 'nextBlock'
   },
 
   prevBlock: function() {
     var height = this.model.get('height') + 1;
-    app.router.navigate("block/" + height, {trigger: true});
+    app.router.navigate('block/' + height, {trigger: true});
   },
 
   nextBlock: function() {
     var height = this.model.get('height') - 1;
-    app.router.navigate("block/" + height, {trigger: true});
+    app.router.navigate('block/' + height, {trigger: true});
   },
 
   render: function() {
     this.$el.html(this.template({
       block: this.model,
-      last_height: app.last_height
+      lastHeight: app.lastHeight
     }));
     return this;
   }
 });
 
 var OwnerDashboardPage = Backbone.View.extend({
-  title: "Owner Dashboard",
+  title: 'Owner Dashboard',
   showToolbar: true,
   backPage: 'login',
 
-  el: ".page[data-page='ownerDashboard']",
+  el: '.page[data-page="ownerDashboard"]',
 
   template: templates.ownerDashboard,
 
   events: {
-    "click #owner-dashboard-add-content": "addContent",
-    "click .owned tbody tr": "showContent"
+    'click #owner-dashboard-add-content': 'addContent',
+    'click .owned tbody tr': 'showContent'
   },
 
   addContent: function() {
-    app.router.navigate("add-content", {trigger: true});
+    app.router.navigate('add-content', {trigger: true});
   },
 
   showContent: function(e) {
-    var fingerprint = $(e.target).parents("tr").data("fingerprint");
-    app.router.navigate("content/" + fingerprint, {trigger: true});
+    var fingerprint = $(e.target).parents('tr').data('fingerprint');
+    app.router.navigate('content/' + fingerprint, {trigger: true});
   },
 
   render: function() {
@@ -197,22 +217,22 @@ var OwnerDashboardPage = Backbone.View.extend({
 });
 
 var DistributorDashboardPage = Backbone.View.extend({
-  title: "Distributor Dashboard",
+  title: 'Distributor Dashboard',
   showToolbar: true,
   backPage: 'login',
 
-  el: ".page[data-page='distributorDashboard']",
+  el: '.page[data-page="distributorDashboard"]',
 
   template: templates.distributorDashboard,
 
   events: {
-    "click .distributed tbody tr": "showContent",
-    "click .available tbody tr": "showContent"
+    'click .distributed tbody tr': 'showContent',
+    'click .available tbody tr': 'showContent'
   },
 
   showContent: function(e) {
-    var fingerprint = $(e.currentTarget).data("fingerprint");
-    app.router.navigate("content/" + fingerprint, {trigger: true});
+    var fingerprint = $(e.currentTarget).data('fingerprint');
+    app.router.navigate('content/' + fingerprint, {trigger: true});
   },
 
   render: function() {
@@ -228,13 +248,13 @@ var ContentPage = Backbone.View.extend({
   showToolbar: true,
   backPage: 'dashboard',
 
-  el: ".page[data-page='content']",
+  el: '.page[data-page="content"]',
 
   template: templates.content,
 
   events: {
-    "click #content-buy-inside": "buyContract",
-    "click #content-update-status": "addReport"
+    'click #content-buy-inside': 'buyContract',
+    'click #content-update-status': 'addReport'
   },
 
   buyContract: function() {
@@ -242,7 +262,7 @@ var ContentPage = Backbone.View.extend({
   },
 
   addReport: function() {
-    app.router.navigate("add-report/" + this.model.get("fingerprint"), {trigger: true});
+    app.router.navigate('add-report/' + this.model.get('fingerprint'), {trigger: true});
   },
 
   render: function() {
@@ -252,28 +272,28 @@ var ContentPage = Backbone.View.extend({
 });
 
 var AddContentPage = Backbone.View.extend({
-  title: "Add Content",
+  title: 'Add Content',
   showToolbar: true,
   backPage: 'dashboard',
 
-  el: ".page[data-page='addContent']",
+  el: '.page[data-page="addContent"]',
 
   template: templates.addContent,
 
   events: {
-    "click #add-content-select-file": "generateFingerprint",
-    "click #add-content-publish": "addContent",
-    "focus #add-content-title": "onFocus",
-    "focus #add-content-min-plays": "onFocus",
-    "focus #add-content-price-per-listen": "onFocus",
-    "focus .add-content-owner-id": "onFocus",
-    "focus .add-content-owner-share": "onFocus",
-    "click #add-content-add-coowner": "addCoowner",
-    "click .add-content-remove-coowner": "removeCoowner"
+    'click #add-content-select-file': 'generateFingerprint',
+    'click #add-content-publish': 'addContent',
+    'focus #add-content-title': 'onFocus',
+    'focus #add-content-min-plays': 'onFocus',
+    'focus #add-content-price-per-listen': 'onFocus',
+    'focus .add-content-owner-id': 'onFocus',
+    'focus .add-content-owner-share': 'onFocus',
+    'click #add-content-add-coowner': 'addCoowner',
+    'click .add-content-remove-coowner': 'removeCoowner'
   },
 
   onFocus: function(e) {
-    $(e.target).parents(".form-group").removeClass("has-error");
+    $(e.target).parents('.form-group').removeClass('has-error');
   },
 
   generateFingerprint: function() {
@@ -286,15 +306,15 @@ var AddContentPage = Backbone.View.extend({
       }
       return result;
     }
-    this.$el.find("#add-content-fingerprint").val(generateFingerprint());
-    this.$el.find("#add-content-fingerprint-group").removeClass("has-error");
+    this.$el.find('#add-content-fingerprint').val(generateFingerprint());
+    this.$el.find('#add-content-fingerprint-group').removeClass('has-error');
   },
 
   getOwners: function() {
     var owners = [];
-    this.$el.find(".add-content-owner").each(function(i, el) {
+    this.$el.find('.add-content-owner').each(function(i, el) {
       owners.push({
-        owner_id: parseInt($(el).find(".add-content-owner-id").val()),
+        owner_id: parseInt($(el).find('.add-content-owner-id').val()),
         share: Math.round($(el).find('.add-content-owner-share').val().replace(/[^0-9]/g, ''))
       });
     });
@@ -315,15 +335,15 @@ var AddContentPage = Backbone.View.extend({
   },
 
   addContent: function() {
-    console.log("!! Add content");
+    console.log('!! Add content');
     var hasError = false;
 
     var content = {
-      fingerprint: this.$el.find("#add-content-fingerprint").val(),
-      title: this.$el.find("#add-content-title").val(),
-      price_per_listen: this.$el.find("#add-content-price-per-listen").val(),
-      min_plays: this.$el.find("#add-content-min-plays").val(),
-      additional_conditions: this.$el.find("#add-content-additional-conditions").val(),
+      fingerprint: this.$el.find('#add-content-fingerprint').val(),
+      title: this.$el.find('#add-content-title').val(),
+      price_per_listen: this.$el.find('#add-content-price-per-listen').val(),
+      min_plays: this.$el.find('#add-content-min-plays').val(),
+      additional_conditions: this.$el.find('#add-content-additional-conditions').val(),
       owners: this.getOwners()
     };
 
@@ -331,42 +351,42 @@ var AddContentPage = Backbone.View.extend({
 
     if (!content.fingerprint) {
       hasError = true;
-      this.$el.find("#add-content-fingerprint-group").addClass("has-error");
+      this.$el.find('#add-content-fingerprint-group').addClass('has-error');
       alertify.error('Fingerprint is not defined');
     }
     if (!content.title) {
       hasError = true;
-      this.$el.find("#add-content-title-group").addClass("has-error");
+      this.$el.find('#add-content-title-group').addClass('has-error');
       alertify.error('Title is not defined');
     }
     if (!content.price_per_listen) {
       hasError = true;
-      this.$el.find("#add-content-price-per-listen-group").addClass("has-error");
+      this.$el.find('#add-content-price-per-listen-group').addClass('has-error');
       alertify.error('Price per each play is not defined');
     }
     if (!content.min_plays) {
       hasError = true;
-      this.$el.find("#add-content-min-plays-group").addClass("has-error");
+      this.$el.find('#add-content-min-plays-group').addClass('has-error');
       alertify.error('The minimum number of plays is not defined');
     }
 
     // validate owners
     var shareSum = 0;
-    var owners = this.$el.find(".add-content-owner");
+    var owners = this.$el.find('.add-content-owner');
     $.each(content.owners, function(i, owner) {
       shareSum += owner.share;
 
       // check if share is greater than 0
       if (owner.share === 0) {
         hasError = true;
-        owners.eq(i).addClass("has-error");
+        owners.eq(i).addClass('has-error');
         alertify.error('Share should be greater than zero');
       }
 
       // check if defined
       if (isNaN(owner.owner_id)) {
         hasError = true;
-        owners.eq(i).addClass("has-error");
+        owners.eq(i).addClass('has-error');
         alertify.error('Owner is not defined');
       }
 
@@ -374,8 +394,8 @@ var AddContentPage = Backbone.View.extend({
       $.each(content.owners, function(j, o) {
         if (i !== j && owner.owner_id === o.owner_id) {
           hasError = true;
-          owners.eq(i).addClass("has-error");
-          owners.eq(j).addClass("has-error");
+          owners.eq(i).addClass('has-error');
+          owners.eq(j).addClass('has-error');
           alertify.error('Owners should be unique');
         }
       });
@@ -384,7 +404,7 @@ var AddContentPage = Backbone.View.extend({
     // check if total share is 100%
     if (shareSum !== 100) {
       hasError = true;
-      owners.addClass("has-error");
+      owners.addClass('has-error');
       alertify.error('Total share should be 100%');
     }
 
@@ -403,7 +423,7 @@ var AddContentPage = Backbone.View.extend({
         app.owners = model.values();
       },
       error: function() {
-        app.onError("No owners were found");
+        app.onError('No owners were found');
       }
     });
   },
@@ -419,23 +439,23 @@ var AddContentPage = Backbone.View.extend({
 });
 
 var AddReportPage = Backbone.View.extend({
-  title: "Add Report",
+  title: 'Add Report',
   showToolbar: true,
   backPage: 'dashboard',
 
-  el: ".page[data-page='addReport']",
+  el: '.page[data-page="addReport"]',
 
   template: templates.addReport,
 
   events: {
-    "click #add-report": "addReport",
-    "focus #add-report-time": "onFocus",
-    "focus #add-report-plays": "onFocus",
-    "focus #add-report-comment": "onFocus"
+    'click #add-report': 'addReport',
+    'focus #add-report-time': 'onFocus',
+    'focus #add-report-plays': 'onFocus',
+    'focus #add-report-comment': 'onFocus'
   },
 
   onFocus: function(e) {
-    $(e.target).parents(".form-group").removeClass("has-error");
+    $(e.target).parents('.form-group').removeClass('has-error');
   },
 
   addReport: function() {
@@ -453,27 +473,27 @@ var AddReportPage = Backbone.View.extend({
 
     var report = {
       uuid: generateUUID(),
-      fingerprint: this.model.get("fingerprint"),
-      time: this.$el.find("#add-report-time").val(),
-      plays: this.$el.find("#add-report-plays").val(),
-      comment: this.$el.find("#add-report-comment").val()
+      fingerprint: this.model.get('fingerprint'),
+      time: this.$el.find('#add-report-time').val(),
+      plays: this.$el.find('#add-report-plays').val(),
+      comment: this.$el.find('#add-report-comment').val()
     };
 
     console.log(report);
 
     if (!report.time) {
       hasError = true;
-      this.$el.find("#add-report-time-group").addClass("has-error");
+      this.$el.find('#add-report-time-group').addClass('has-error');
       alertify.error('Date is not defined');
     }
     if (!report.plays) {
       hasError = true;
-      this.$el.find("#add-report-plays-group").addClass("has-error");
+      this.$el.find('#add-report-plays-group').addClass('has-error');
       alertify.error('Number of plays is not defined');
     }
     if (!report.comment) {
       hasError = true;
-      this.$el.find("#add-report-comment-group").addClass("has-error");
+      this.$el.find('#add-report-comment-group').addClass('has-error');
       alertify.error('Comment is not defined');
     }
 
@@ -504,15 +524,15 @@ var AddReportPage = Backbone.View.extend({
 
 var ContainerView = Backbone.View.extend({
 
-  el: "body",
+  el: 'body',
 
   events: {
-    "click .toolbar-return-button": "back",
-    "click #user": "showDashboard",
-    "click #blockchain-exporer": "showBlockchain",
-    "click #flow": "showFlow",
-    "click": "collapseMenu",
-    "touchstart": "collapseMenu"
+    'click .toolbar-return-button': 'back',
+    'click #user': 'showDashboard',
+    'click #blockchain-exporer': 'showBlockchain',
+    'click #flow': 'showFlow',
+    'click': 'collapseMenu',
+    'touchstart': 'collapseMenu'
   },
 
   loadingStart: function() {
@@ -527,17 +547,17 @@ var ContainerView = Backbone.View.extend({
 
   updateUser: function() {
     if (app.user) {
-      this.$el.find("#menu").removeClass('hidden');
-      this.$el.find("#user").removeClass('hidden');
-      this.$el.find("#username").text(app.user.get("name"));
+      this.$el.find('#menu').removeClass('hidden');
+      this.$el.find('#user').removeClass('hidden').attr('data-type', app.user.get('role'));
+      this.$el.find('#username').text(app.user.get('name'));
     } else {
-      this.$el.find("#menu").addClass('hidden');
-      this.$el.find("#user").addClass('hidden');
+      this.$el.find('#menu').addClass('hidden');
+      this.$el.find('#user').addClass('hidden');
     }
   },
 
   changePage: function(page) {
-    console.log("change page", page);
+    console.log('change page', page);
     var title = $.isFunction(app.views[page].title) ?
                 app.views[page].title() :
                 app.views[page].title;
@@ -549,26 +569,26 @@ var ContainerView = Backbone.View.extend({
         this.$el.find('.toolbar-return-button').hide();
       } else {
         this.$el.find('.toolbar-return-button')
-                .data("page", app.views[page].backPage)
+                .data('page', app.views[page].backPage)
                 .show();
       }
     } else {
       this.$el.find('.app-content').hide();
       this.$el.find('.toolbar').hide();
     }
-    $(".page[data-page!='" + page + "']").hide();
-    $(".page[data-page='" + page + "']").show();
-    $("title").text(title + " – Exonum");
+    $('.page[data-page!="' + page + '"]').hide();
+    $('.page[data-page="' + page + '"]').show();
+    $('title').text(title + ' – Exonum');
     this.loadingFinish();
   },
 
   back: function() {
-    var page = this.$el.find('.toolbar-return-button').data("page");
+    var page = this.$el.find('.toolbar-return-button').data('page');
     app.router.navigate(page, {trigger: true});
   },
 
   showDashboard: function() {
-    app.router.navigate("dashboard", {trigger: true});
+    app.router.navigate('dashboard', {trigger: true});
   },
 
   showBlockchain: function() {
@@ -592,9 +612,9 @@ var ContainerView = Backbone.View.extend({
 
   render: function() {
     if (this.loading) {
-      this.$el.find("#loading").show();
+      this.$el.find('#loading').show();
     } else {
-      this.$el.find("#loading").hide();
+      this.$el.find('#loading').hide();
     }
   }
 

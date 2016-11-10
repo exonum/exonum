@@ -1,19 +1,21 @@
-<div class="app-list-headers clearfix">
-    {% if (block.get('height') < last_height) { %}
-      <div class="pull-left"><a id="block-prev" role="button">← {{ block.get('height') + 1 }}</a></div>
-    {% } %}
-    {% if (block.get('height') > 1) { %}
-      <div class="pull-right"><a id="block-next" role="button">{{ block.get('height') - 1 }} →</a></div>
-    {% } %}
-</div>
+<ul class="pager">
+  {% if (block.get('height') < lastHeight) { %}
+  <li class="previous">
+    <a id="block-prev" role="button">← #{{ block.get('height') + 1 }}</a>
+  </li>
+  {% } %}
+  {% if (block.get('height') > 1) { %}
+  <li class="next">
+    <a id="block-next" role="button"># {{ block.get('height') - 1 }} →</a>
+  </li>
+  {% } %}
+</ul>
 
 <dl>
   <dt>Hash:</dt>
   <dd><samp>{{ block.get('hash') }}</samp></dd>
   <dt>Propose time:</dt>
   <dd>{{ moment.unix(block.get('propose_time')).format() }}</dd>
-  <dt>Proposer:</dt>
-  <dd>Validator #{{ block.get('proposer') + 1 }}</dd>
   <dt>Tx hash:</dt>
   <dd><samp>{{ block.get('tx_hash') }}</samp></dd>
   <dt>State hash:</dt>

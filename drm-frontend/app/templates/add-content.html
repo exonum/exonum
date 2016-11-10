@@ -1,89 +1,98 @@
-<div class="form-horizontal">
-  <div class="form-group">
-    <label class="col-sm-3 control-label"><strong>Audio file:</strong></label>
-    <div class="col-sm-9">
-      <button type="button" class="btn btn-primary btn-xs form-control" id="add-content-select-file">Upload file</button>
-      <span class="help-block">By pressing this button we pretend that you have uploaded the audio file. Based on this file, we generate a unique fingerprint. So you don't need to load a real audio file to see the capabilities of the system operation.</span>
-    </div>
-  </div>
-  <div class="form-group" id="add-content-fingerprint-group">
-    <label for="add-content-fingerprint" class="col-sm-3 control-label"><strong>Audio fingerprint:</strong></label>
-    <div class="col-sm-9">
-      <input type="input" class="form-control" id="add-content-fingerprint" disabled>
-    </div>
-  </div>
-  <div class="form-group" id="add-content-title-group">
-    <label for="add-content-title" class="col-sm-3 control-label"><strong>Title:</strong></label>
-    <div class="col-sm-9">
-      <input type="input" class="form-control" id="add-content-title">
-    </div>
-  </div>
-</div>
-
-<div class="form-horizontal">
-  <div class="form-group" id="add-content-price-per-listen-group">
-    <label for="add-content-price-per-listen" class="col-sm-3 control-label"><strong>Price, £:</strong></label>
-    <div class="col-sm-9">
-      <input type="number" step="0.01" min="0" class="form-control" id="add-content-price-per-listen" >
-      <span class="help-block">Price for each play</span>
-    </div>
-  </div>
-  <div class="form-group" id="add-content-min-plays-group">
-    <label for="add-content-min-plays" class="col-sm-3 control-label"><strong>Min.&nbsp;Plays:</strong></label>
-    <div class="col-sm-9">
-      <input type="number" step="1" min="0" class="form-control" id="add-content-min-plays" placeholder="100000">
-      <span class="help-block">The minimum number of plays to be paid</span>
-    </div>
-  </div>
-  <div class="form-group">
-    <label for="add-content-additional-conditions" class="col-sm-3 control-label"><strong>Additional conditions:</strong></label>
-    <div class="col-sm-9">
-      <textarea class="form-control" id="add-content-additional-conditions"></textarea>
-      <span class="help-block">Any additional conditions that you want to add to your offer</span>
-    </div>
-  </div>
-</div>
-
-<div class="well">
-  <div class="form-group">
-    <div class="form-group row">
-      <div class="col-xs-7 col-slim">
-        <strong>Owner</strong>
+<div class="panel panel-default">
+  <div class="panel-heading text-uppercase">Content meta data</div>
+  <div class="panel-body">
+    <div class="form-horizontal">
+      <div class="form-group">
+        <label class="col-sm-3 control-label"><strong>Audio file:</strong></label>
+        <div class="col-sm-9">
+          <button type="button" class="btn btn-primary btn-xs form-control" id="add-content-select-file">Upload file</button>
+          <span class="help-block">By pressing this button we pretend that you have uploaded the audio file. Based on this file, we generate a unique audio fingerprint. So you don't need to load a real audio file to see the process workflow.</span>
+        </div>
       </div>
-      <div class="col-xs-5 col-slim">
-        <strong><span class="hidden-xs">Revenue</span><span class="visible-xs-inline">Rev.</span> Share</strong>
+      <div class="form-group" id="add-content-fingerprint-group">
+        <label for="add-content-fingerprint" class="col-sm-3 control-label"><strong>Audio fingerprint:</strong></label>
+        <div class="col-sm-9">
+          <input type="input" class="form-control" id="add-content-fingerprint" disabled>
+        </div>
       </div>
-    </div>
-
-    <div class="form-group row add-content-owner">
-      <div class="col-xs-7 col-slim">
-        <input type="text" class="form-control" disabled="disabled" value="{{ user.get('name') }}">
-        <input type="hidden" class="add-content-owner-id" value="{{ user.get('id') }}">
-      </div>
-      <div class="col-xs-4 col-slim">
-        <div class="input-group">
-          <input type="number" class="form-control add-content-owner-share" value="100" min="0" max="100" step="1">
-          <span class="input-group-addon">%</span>
+      <div class="form-group" id="add-content-title-group">
+        <label for="add-content-title" class="col-sm-3 control-label"><strong>Title:</strong></label>
+        <div class="col-sm-9">
+          <input type="input" class="form-control" id="add-content-title">
         </div>
       </div>
     </div>
+  </div>
+  <div class="panel-footer">
+    <div class="form-group">
+      <div class="form-group row">
+        <div class="col-xs-7">
+          <strong>Owner</strong>
+        </div>
+        <div class="col-xs-5">
+          <strong><span class="hidden-xs">Revenue</span><span class="visible-xs-inline">Rev.</span> Share</strong>
+        </div>
+      </div>
 
-    <div id="co-owners"></div>
+      <div class="form-group row add-content-owner">
+        <div class="col-xs-7">
+          <input type="text" class="form-control" disabled="disabled" value="{{ user.get('name') }}">
+          <input type="hidden" class="add-content-owner-id" value="{{ user.get('id') }}">
+        </div>
+        <div class="col-xs-4">
+          <div class="input-group">
+            <input type="number" class="form-control add-content-owner-share" value="100" min="0" max="100" step="1">
+            <span class="input-group-addon">%</span>
+          </div>
+        </div>
+      </div>
 
-    <a class="button" id="add-content-add-coowner" role="button">
-      <i class="glyphicon glyphicon-plus"></i>&nbsp;
-      Add co-owner
-    </a>
+      <div id="co-owners"></div>
+
+      <div class="buttons-wrapper">
+        <a class="button button-white" id="add-content-add-coowner" role="button">
+          <i class="glyphicon glyphicon-plus"></i>&nbsp;
+          Add co-owner
+        </a>
+      </div>
+    </div>
   </div>
 </div>
 
-<div class="text-center">
-  <a class="button button-green" id="add-content-publish">Publish</a>
+<div class="panel panel-default">
+  <div class="panel-heading text-uppercase">Distribution contract</div>
+  <div class="panel-body">
+    <div class="form-horizontal">
+      <div class="form-group" id="add-content-price-per-listen-group">
+        <label for="add-content-price-per-listen" class="col-sm-3 control-label"><strong>Price, £:</strong></label>
+        <div class="col-sm-9">
+          <input type="number" step="0.01" min="0" class="form-control" id="add-content-price-per-listen" >
+          <span class="help-block">Price for each play</span>
+        </div>
+      </div>
+      <div class="form-group" id="add-content-min-plays-group">
+        <label for="add-content-min-plays" class="col-sm-3 control-label"><strong>Min.&nbsp;Plays:</strong></label>
+        <div class="col-sm-9">
+          <input type="number" step="1" min="0" class="form-control" id="add-content-min-plays" placeholder="100000">
+          <span class="help-block">The distribution company, in case it signs the contract, guarantees that your content will be played at least this number of times</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="add-content-additional-conditions" class="col-sm-3 control-label"><strong>Additional conditions:</strong></label>
+        <div class="col-sm-9">
+          <textarea class="form-control" id="add-content-additional-conditions"></textarea>
+          <span class="help-block">Any additional conditions that you want to add to your offer</span>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
+
+<a class="button button-green" id="add-content-publish">Publish</a>
 
 <script id="co-owner" type="text/template">
   <div class="form-group row add-content-owner">
-    <div class="col-xs-7 col-slim">
+    <div class="col-xs-7">
       <select type="text" class="form-control add-content-owner-id">
         <option value="">Select co-owner</option>
         {% _.each(owners, function(owner, i) { %}
@@ -93,7 +102,7 @@
         {% }) %}
       </select>
     </div>
-    <div class="col-xs-4 col-slim">
+    <div class="col-xs-4">
       <div class="input-group">
         <input type="number" class="form-control add-content-owner-share" value="0" min="0" max="100" step="1">
         <span class="input-group-addon">%</span>
