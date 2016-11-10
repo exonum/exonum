@@ -26,16 +26,33 @@
     </div>
 
     <div class="toolbar">
-        <a class="toolbar-return-button pull-left"></a>
-        <div class="toolbar-help-button pull-right" id="user"></div>
+        <a class="toolbar-return-button pull-left">
+          <img src="images/left_arrow.svg" alt="">
+        </a>
+        <div class="toolbar-help-button navbar-toggle hidden pull-right" id="menu" role="button" data-toggle="collapse" data-target="#navbar-collapse" aria-expanded="false">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </div>
         <div class="toolbar-title"></div>
+        <div class="toolbar-dropdown collapse navbar-collapse" id="navbar-collapse">
+          <ul class="nav navbar-nav">
+            <li>
+              <div class="toolbar-username hidden" id="user" role="button">
+                <i class="glyphicon glyphicon-user"></i>&nbsp;<span id="username"></span>
+              </div>
+            </li>
+          </ul>
+        </div>
     </div>
 
     <div class="welcome-wrapper page" data-page="welcome">
         <div class="welcome-intro">
-            <div class="app-logo"></div>
+            <div class="app-logo">
+              <img src="images/bf_logo.svg" alt="">
+            </div>
             <div class="app-header">EXONUM</div>
-            <div class="app-subheader">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</div>
+            <div class="app-subheader">Mobile digital rights management solution to track content distribution, rights management, and&nbsp;reporting with automated payments of royalties.</div>
         </div>
         <div class="buttons-wrapper">
             <a class="button button-red" id="proceed-demo">Proceed to demo</a>
@@ -50,34 +67,34 @@
       <div class="page" data-page="registration">
         <div class="form-horizontal" id="registration-form">
           <div class="form-group" id="registration-name-form-group">
-            <label for="inputEmail3" class="col-sm-2 control-label">Name:</label>
+            <label for="registration-name" class="col-sm-2 control-label"><strong>Name:</strong></label>
             <div class="col-sm-10">
-              <input type="text" class="form-control" id="registration-name" placeholder="John Galt">
-              <span class="help-block">Come up with name that will identify you in the app.</span>
+              <input type="text" class="form-control" id="registration-name" placeholder="John Galt" autocomplete="off">
+              <span class="help-block">Come up with name that will identify you in the app</span>
             </div>
           </div>
           <div class="form-group">
-            <label for="inputEmail3" class="col-sm-2 control-label">Role:</label>
+            <label for="role1" class="col-sm-2 control-label"><strong>Role:</strong></label>
             <div class="col-sm-10">
               <div class="radio">
                 <label>
                   <input type="radio" name="role" id="role1" value="owner" checked>
-                  I want to act as <strong>a content creator or publisher</strong>.
+                  I want to act as <strong>a content owner</strong>
                 </label>
               </div>
-              <span class="help-block">With this role you may to do some beautiful music.</span>
+              <span class="help-block">With this role you can upload content you own and sell it to distributors</span>
               <div class="radio">
                 <label>
                   <input type="radio" name="role" id="role2" value="distributor">
-                  I want to act as <strong>a distributor</strong>.
+                  I want to act as <strong>a distributor</strong>
                 </label>
               </div>
-              <span class="help-block">With that role you may to do other things.</span>
+              <span class="help-block">With that role you may buy rights to available content</span>
             </div>
           </div>
         </div>
         <div class="buttons-wrapper">
-          <a class="button button-red" id="registration-submit">Create new account</a>
+          <a class="button button-green" id="registration-submit">Submit</a>
         </div>
         <span class="list-option-link">Find out more on <a target="_blank" href="http://exonum.com/">exonum.com</a></span>
       </div>
@@ -111,13 +128,13 @@
     <script src="/bower_components/backbone-forms/distribution/backbone-forms.js"></script>
     <script src="/bower_components/moment/moment.js"></script>
     <script src="/bower_components/cookie/cookie.js"></script>
+    <script src="/bower_components/alertifyjs/dist/js/alertify.js"></script>
     <!-- endbower -->
     <!-- endbuild -->
 
     <!-- build:js scripts/main.js -->
     <script src="/scripts/settings.js"></script>
     <script src="/scripts/models.js"></script>
-    <script src="/scripts/forms.js"></script>
     <script src="/scripts/views.js"></script>
     <script src="/scripts/app.js"></script>
     <!-- endbuild -->

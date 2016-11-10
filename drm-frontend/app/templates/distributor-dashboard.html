@@ -1,10 +1,14 @@
 {% if (user.get("contracts").length > 0) { %}
   <div class="app-list-headers clearfix">
-    <div class="pull-left">List of content under contract</div>
+    <div class="pull-left">List of content under contract:</div>
   </div>
   <table class="table table-hover table-condensed distributed">
   <thead>
-    <tr><th>Title</th><th>Plays</th><tr>
+    <tr>
+      <th>Title</th>
+      <th class="text-right">Plays</th>
+      <th class="col-fixed-more"></th>
+    <tr>
   </thead>
   <tbody>
     {% _.each(user.get("contracts"), function(contract) { %}
@@ -15,6 +19,7 @@
           /
           {{ contract.content.min_plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
         </td>
+        <td class="text-center text-muted"><i class="glyphicon glyphicon-chevron-right"></i></td>
       </tr>
     {% }) %}
   </tbody>
@@ -22,18 +27,24 @@
 {% } %}
 {% if (user.get("available_content").length > 0) { %}
 <div class="app-list-headers clearfix">
-  <div class="pull-left">Music marketplace</div>
+  <div class="pull-left">Music marketplace:</div>
 </div>
 <table class="table table-hover table-condensed available">
 <thead>
-  <tr><th>Title</th><th>Min. Plays</th><th>Price</th><tr>
+  <tr>
+    <th>Title</th>
+    <th class="col-fixed-plays text-right">Min. Plays</th>
+    <th class="col-fixed-price text-right">Price</th>
+    <th class="col-fixed-more"></th>
+  <tr>
 </thead>
 <tbody>
   {% _.each(_.chain(user.get("available_content")).reverse().value(), function(content) { %}
     <tr data-fingerprint="{{ content.fingerprint }}">
       <td>{{ content.title }}</td>
-      <td class="text-right">{{ content.min_plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+      <td class="text-right">{{ content.min_plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td class="text-right">
       <td class="text-right">{{ content.price_per_listen }}¢</td>
+      <td class="text-center text-muted"><i class="glyphicon glyphicon-chevron-right"></i></td>
     </tr>
   {% }) %}
 </tbody>

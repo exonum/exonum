@@ -7,13 +7,14 @@ var DRMRouter = Backbone.Router.extend({
 
       // Blockchain Explorer
       "blockchain"            : "blockchain",
+      "blockchain/:page"      : "blockchain",
       "block/:height"         : "block",
 
       // DRM
       "dashboard"             : "dashboard",
       "content/:fingerprint"  : "content",
       "add-report/:fingerprint" : "addReport",
-      "add-content"           : "addContent",
+      "add-content"           : "addContent"
     },
 
     // Main pages
@@ -34,10 +35,15 @@ var DRMRouter = Backbone.Router.extend({
 
     // Blockchain Explorer
 
-    blockchain: function() {
+    blockchain: function(height) {
       app.views.container.loadingStart();
+
+      var requestData = {count: 15};
+
+      if (height) {requestData.from = height;}
+
       app.blocks.fetch({
-        data: {count: 12},
+        data: requestData,
         success: function() {
           app.last_height = app.blocks.isEmpty() ? 0 : app.blocks.at(0).get('height');
           app.views.blockchain.render();
@@ -67,7 +73,7 @@ var DRMRouter = Backbone.Router.extend({
 
       var def = $.when(d1, d2);
 
-      def.done(function () {
+      def.done(function() {
         app.views.block.render();
         app.views.container.changePage('block');
       });
@@ -107,7 +113,7 @@ var DRMRouter = Backbone.Router.extend({
         },
         error: function() {
           app.onError("Content with given fingerprint not found");
-        },
+        }
       });
     },
 
@@ -138,7 +144,7 @@ var DRMRouter = Backbone.Router.extend({
         },
         error: function() {
           app.onError("Content with given fingerprint not found");
-        },
+        }
       });
     }
 });
@@ -164,9 +170,10 @@ var app = {
       distributorDashboard: new DistributorDashboardPage(),
       content: new ContentPage(),
       addContent: new AddContentPage(),
-      addReport: new AddReportPage(),
+      addReport: new AddReportPage()
     };
     Backbone.history.start();
+    alertify.maxLogItems(10);
   },
 
   login: function(user) {
@@ -177,7 +184,7 @@ var app = {
     }, {
       retries: 20,
       timeout: 500,
-      success: function(model, response) {
+      success: function(model) {
         app.user = model;
         app.views.container.updateUser();
         app.router.navigate("/dashboard", {trigger: true});
@@ -186,7 +193,7 @@ var app = {
     });
   },
 
-  registration: function(role, name) {
+  registration: function(role, name, callback) {
     app.views.container.loadingStart();
     var Model = role == 'owner' ? Owner : Distributor;
     new Model().save({name: name}, {
@@ -197,11 +204,27 @@ var app = {
         }, {
           retries: 20,
           timeout: 500,
-          success: function(model, response) {
+          success: function(model) {
+            // add new user to localStorage
+            var users = JSON.parse(localStorage.getItem('users')) || [];
+            users.push(model.attributes);
+            localStorage.setItem('users', JSON.stringify(users));
+
             app.users.push(model.attributes);
             app.user = model;
             app.views.container.updateUser();
             app.router.navigate("/dashboard", {trigger: true});
+
+            if (model.get('role') == 'owner') {
+              app.owners.push({
+                id: model.get('id'),
+                name: model.get('name')
+              });
+            }
+
+            callback();
+
+            alertify.success('You have created ' + role + ' account');
           },
           error: app.onError("Authentification failed")
         });
@@ -228,6 +251,8 @@ var app = {
               success: function(model) {
                 app.user = model;
                 app.router.navigate('dashboard', {trigger: true});
+
+                alertify.success('You have added new content');
               },
               error: app.onError("Unable to create new content")
             });
@@ -261,6 +286,8 @@ var app = {
                   success: function(model) {
                     app.user = model;
                     app.router.navigate('dashboard', {trigger: true});
+
+                    alertify.success('You have purchased content');
                   },
                   error: app.onError("Unable to create new content")
                 });
@@ -271,9 +298,9 @@ var app = {
             },
             error: function() {
               app.onError("Content with given fingerprint not found");
-            },
+            }
           });
-        };
+        }
         waitForContract();
       },
       error: app.onError("Unable to create new content")
@@ -298,6 +325,8 @@ var app = {
               success: function(model) {
                 app.user = model;
                 app.router.navigate('dashboard', {trigger: true});
+
+                alertify.success('You have updated distribution status');
               },
               error: app.onError("Unable to create new content")
             });

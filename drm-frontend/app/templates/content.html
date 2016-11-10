@@ -1,17 +1,14 @@
-<div class="app-list-headers clearfix">
-  <div class="text-center">
-    {{ content.get('fingerprint').substr(0, 8) }}-{{ content.get('fingerprint').substr(8, 4) }}-{{ content.get('fingerprint').substr(12, 4) }}-{{ content.get('fingerprint').substr(16, 4) }}-{{ content.get('fingerprint').substr(20, 12) }}
-  </div>
-</div>
 <dl class="dl-horizontal">
-  <dt>Title</dt>
+  <dt>Fingerprint:</dt>
+  <dd>{{ content.get('fingerprint').substr(0, 8) }}-{{ content.get('fingerprint').substr(8, 4) }}-{{ content.get('fingerprint').substr(12, 4) }}-{{ content.get('fingerprint').substr(16, 4) }}-{{ content.get('fingerprint').substr(20, 12) }}</dd>
+  <dt>Title:</dt>
   <dd>{{ content.get('title') }}</dd>
-  <dt>Price per play</dt>
+  <dt>Price per play:</dt>
   <dd>{{ content.get('price_per_listen') }}¢</dd>
-  <dt>Min. Plays</dt>
+  <dt>Min. Plays:</dt>
   <dd>{{ content.get('min_plays').toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</dd>
   {% if (content.get('additional_conditions')) { %}
-    <dt>Aditional conditions</dt>
+    <dt>Aditional conditions:</dt>
     <dd>{{ content.get('additional_conditions') }} </dd>
   {% } %}
 </dl>
@@ -20,55 +17,61 @@
   {% if (content.get("contract")) { %}
     <!-- Distributed content -->
     <div class="app-list-headers clearfix">
-      <div class="text-center">Current distribution status</div>
+      <div class="pull-left">Current distribution status:</div>
     </div>
-    <h4 class="text-center text-{{ content.get("contract").plays >= content.get("min_plays") ? "success" : "warning" }}">
+    <h4 class="text-{{ content.get("contract").plays >= content.get("min_plays") ? "success" : "warning" }}">
       {{ content.get("contract").plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
       /
       {{ content.get("min_plays").toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}
     </h4>
+    <div class="progress">
+      <div class="progress-bar progress-bar-{{ content.get("contract").plays >= content.get("min_plays") ? "success" : "warning" }}" style="width: {{ content.get("contract").plays / content.get("min_plays") * 100 }}%;"></div>
+    </div>
     <div class="buttons-wrapper">
-      <a class="button" id="content-update-status">Update distribution status</a>
+      <a class="button button-{{ content.get("contract").plays >= content.get("min_plays") ? "green" : "orange" }}" id="content-update-status">
+        <i class="glyphicon glyphicon-refresh"></i>&nbsp;
+        Update distribution status
+      </a>
     </div>
   {% } else { %}
   <!-- Available content -->
   <div class="buttons-wrapper">
-      <a class="button button-red" id="content-buy-inside">Buy inside the platform</a>
-      <a class="button" id="content-buy-outside">Buy outside the platform</a>
+      <a class="button button-green" id="content-buy-inside">
+        <i class="glyphicon glyphicon-shopping-cart"></i>&nbsp;
+        Purchase
+      </a>
   </div>
   {% } %}
 {% } %}
 
 <div class="app-list-headers clearfix">
-  <div class="text-center">Owner information</div>
+  <div class="pull-left">Owner information:</div>
 </div>
-<div class="col-sm-offset-1 col-sm-10">
-  <table class="table">
-    {% _.each(content.get("owners"), function(owner) { %}
-      <tr>
-        <td>#{{ owner.id }}</td>
-        <td class="text-right">{{ owner.name }}</td>
-        <td class="text-right">{{ owner.share }}%</td>
-      </tr>
-    {% }) %}
-  </table>
-</div>
+<table class="table">
+  {% _.each(content.get("owners"), function(owner) { %}
+    <tr>
+      <td>{{ owner.name }}</td>
+      <td class="text-right">{{ owner.share }}%</td>
+    </tr>
+  {% }) %}
+</table>
 
 {% if (user.get("role") == "owner") { %}
   <!-- Owned content -->
   <div class="app-list-headers clearfix">
-    <div class="text-center">Current status</div>
+    <div class="pull-left">Distributors:</div>
   </div>
   {% if (content.get("distributors").length > 0 ) { %}
-    <h5 class="text-center text-success">
-      Distribution rights have been bought by
+    <table class="table">
       {% _.each(content.get("distributors"), function(distributor) { %}
-        <br>{{ distributor.name }} #{{ distributor.id }}
+      <tr>
+        <td>{{ distributor.name }}</td>
+      </tr>
       {% }) %}
-    </h5>
+    </table>
     {% if (content.get("reports")) { %}
     <div class="app-list-headers clearfix">
-      <div class="text-center">Revenue</div>
+      <div class="pull-left">Revenue:</div>
     </div>
     <table class="table">
       {% _.each(content.get("reports"), function(report) { %}
@@ -81,6 +84,6 @@
     </table>
     {% } %}
   {% } else { %}
-    <h5 class="text-center text-muted">No one distributes this content.</h5>
+    <h6 class="text-muted">No one still does not distribute this content...</h6>
   {% } %}
 {% } %}
