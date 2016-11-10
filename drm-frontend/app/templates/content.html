@@ -78,7 +78,7 @@
       <tr>
         <td>{{ report.comment }}</td>
         <td class="text-right">{{ moment.unix(report.time / 1000).format('YYYY-MM-DD') }}</td>
-        <td class="text-right">£{{ Math.round(report.amount / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+        <td class="text-right">${{ Math.round(report.amount / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
       </tr>
       {% }) %}
     </table>

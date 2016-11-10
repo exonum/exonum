@@ -16,7 +16,7 @@
         <tr data-fingerprint="{{ ownership.content.fingerprint }}">
           <td>{{ ownership.content.title }}</td>
           <td class="text-right">{{ ownership.plays.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
-          <td class="text-right">£{{ Math.round(ownership.amount / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+          <td class="text-right">${{ Math.round(ownership.amount / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
           <td class="text-center text-muted"><i class="glyphicon glyphicon-chevron-right"></i></td>
         </tr>
       {% }) %}
