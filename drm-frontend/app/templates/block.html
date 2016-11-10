@@ -1,11 +1,15 @@
-<div class="app-list-headers clearfix">
-    {% if (block.get('height') < lastHeight) { %}
-      <div class="pull-left"><a id="block-prev" role="button">← {{ block.get('height') + 1 }}</a></div>
-    {% } %}
-    {% if (block.get('height') > 1) { %}
-      <div class="pull-right"><a id="block-next" role="button">{{ block.get('height') - 1 }} →</a></div>
-    {% } %}
-</div>
+<ul class="pager">
+  {% if (block.get('height') < lastHeight) { %}
+  <li class="previous">
+    <a id="block-prev" role="button">← #{{ block.get('height') + 1 }}</a>
+  </li>
+  {% } %}
+  {% if (block.get('height') > 1) { %}
+  <li class="next">
+    <a id="block-next" role="button"># {{ block.get('height') - 1 }} →</a>
+  </li>
+  {% } %}
+</ul>
 
 <dl>
   <dt>Hash:</dt>

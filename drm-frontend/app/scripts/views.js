@@ -99,8 +99,9 @@ var BlockchainPage = Backbone.View.extend({
 
   events: {
     'click .blockchain tbody tr': 'showBlock',
-    'click #blockchain-page-prev': 'prevBlockchainPage',
-    'click #blockchain-page-next': 'nextBlockchainPage'
+    'click #blockchain-page-prev': 'prevPage',
+    'click #blockchain-page-next': 'nextPage',
+    'click #blockchain-refresh': 'refresh'
   },
 
   showBlock: function(e) {
@@ -108,20 +109,39 @@ var BlockchainPage = Backbone.View.extend({
     app.router.navigate('block/' + height, {trigger: true});
   },
 
-  prevBlockchainPage: function() {
-    var height = app.blocks.at(0).get('height') - 15;
-    app.router.navigate('blockchain/' + height, {trigger: true});
+  prevPage: function() {
+    var currentHeight = app.blocks.at(0).get('height');
+    var newHeight = currentHeight - 15;
+
+    if (currentHeight == 14) {
+      return false;
+    } else if (newHeight <= 14) {
+      newHeight = 14;
+    }
+
+    app.router.navigate('blockchain/' + newHeight, {trigger: true});
   },
 
-  nextBlockchainPage: function() {
-    var height = app.blocks.at(0).get('height') + 15;
-    app.router.navigate('blockchain/' + height, {trigger: true});
+  nextPage: function() {
+    var currentHeight = app.blocks.at(0).get('height');
+    var newHeight = currentHeight + 15;
+
+    if (newHeight < app.newestHeight) {
+      app.router.navigate('blockchain/' + newHeight, {trigger: true});
+    } else {
+      app.router.navigate('blockchain', {trigger: true});
+    }
+  },
+
+  refresh: function() {
+    app.router.blockchain();
   },
 
   render: function() {
     this.$el.html(this.template({
       blocks: app.blocks,
-      lastHeight: app.lastHeight
+      lastHeight: app.lastHeight,
+      newestHeight: app.newestHeight
     }));
     return this;
   }

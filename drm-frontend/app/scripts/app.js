@@ -38,14 +38,23 @@ var DRMRouter = Backbone.Router.extend({
     blockchain: function(height) {
       app.views.container.loadingStart();
 
-      var requestData = {count: 15};
+      var requestData = {
+        count: 15
+      };
 
-      if (height) {requestData.from = height;}
+      if (height) {
+        requestData.from = height;
+      }
 
       app.blocks.fetch({
         data: requestData,
         success: function() {
+          // save last height in current fetch
           app.lastHeight = app.blocks.isEmpty() ? 0 : app.blocks.at(0).get('height');
+
+          // save newest height we know about
+          app.newestHeight = (app.newestHeight === undefined || app.newestHeight < app.lastHeight) ? app.lastHeight : app.newestHeight;
+
           app.views.blockchain.render();
           app.views.container.changePage('blockchain');
         },
@@ -187,7 +196,7 @@ var app = {
       success: function(model) {
         app.user = model;
         app.views.container.updateUser();
-        app.router.navigate('/dashboard', {trigger: true});
+        app.router.navigate('dashboard', {trigger: true});
       },
       error: app.onError('Authentification failed')
     });
@@ -213,7 +222,7 @@ var app = {
             app.users.push(model.attributes);
             app.user = model;
             app.views.container.updateUser();
-            app.router.navigate('/dashboard', {trigger: true});
+            app.router.navigate('dashboard', {trigger: true});
 
             if (model.get('role') == 'owner') {
               app.owners.push({
