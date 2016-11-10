@@ -27,7 +27,7 @@ var LoginPage = Backbone.View.extend({
     "click .login": 'login',
     "click #login-registration": 'registration',
     "click #login-blockchain": 'blockchain',
-    "click #login-flows": 'flows'
+    "click #login-flow": 'flow'
   },
 
   login: function(e) {
@@ -43,8 +43,8 @@ var LoginPage = Backbone.View.extend({
     app.router.navigate("blockchain", {trigger: true});
   },
 
-  flows: function() {
-    app.router.navigate("flows", {trigger: true});
+  flow: function() {
+    app.router.navigate("flow", {trigger: true});
   },
 
   render: function() {
@@ -510,7 +510,7 @@ var ContainerView = Backbone.View.extend({
     "click .toolbar-return-button": "back",
     "click #user": "showDashboard",
     "click #blockchain-exporer": "showBlockchain",
-    "click #flows": "showFlows",
+    "click #flow": "showFlow",
     "click": "collapseMenu",
     "touchstart": "collapseMenu"
   },
@@ -575,8 +575,8 @@ var ContainerView = Backbone.View.extend({
     app.router.navigate("blockchain", {trigger: true});
   },
 
-  showFlows: function() {
-    app.router.navigate("flows", {trigger: true});
+  showFlow: function() {
+    app.router.navigate("flow", {trigger: true});
   },
 
   collapseMenu: function() {
@@ -600,20 +600,20 @@ var ContainerView = Backbone.View.extend({
 
 });
 
-var FlowsPage = Backbone.View.extend({
+var FlowPage = Backbone.View.extend({
   title: "Money Flows",
   showToolbar: true,
   backPage: 'login',
 
-  el: ".page[data-page='flows']",
+  el: ".page[data-page='flow']",
 
-  template: templates.flows,
+  template: templates.flow,
 
   events: {},
 
   render: function() {
     this.$el.html(this.template({
-      flows: app.flows
+      flow: app.flow
     }));
     return this;
   }

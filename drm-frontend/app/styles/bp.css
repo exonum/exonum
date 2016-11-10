@@ -1,0 +1,29 @@
+text {
+    font-size: 12px;
+}
+
+.mainBars rect {
+    shape-rendering: auto;
+    fill-opacity: 0;
+    stroke-width: 0.5px;
+    stroke: rgb(0, 0, 0);
+    stroke-opacity: 0;
+}
+
+.subBars {
+    shape-rendering: crispEdges;
+}
+
+.edges {
+    stroke: none;
+    fill-opacity: 0.5;
+}
+
+.header {
+    text-anchor: middle;
+    font-size: 16px;
+}
+
+line {
+    stroke: grey;
+}

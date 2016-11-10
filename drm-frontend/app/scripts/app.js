@@ -15,7 +15,7 @@ var DRMRouter = Backbone.Router.extend({
       "content/:fingerprint"  : "content",
       "add-report/:fingerprint" : "addReport",
       "add-content"           : "addContent",
-      "flows"                 : "flows"
+      "flow"                  : "flow"
     },
 
     // Main pages
@@ -149,13 +149,13 @@ var DRMRouter = Backbone.Router.extend({
       });
     },
 
-    flows: function() {
+    flow: function() {
       app.views.container.loadingStart();
 
-      app.flows.fetch({
+      app.flow.fetch({
         success: function() {
-          app.views.flows.render();
-          app.views.container.changePage('flows');
+          app.views.flow.render();
+          app.views.container.changePage('flow');
         },
         error: function() {
           app.views.container.changePage('error');
@@ -171,7 +171,7 @@ var app = {
   initialize: function() {
     this.last_height = 0;
     this.blocks = new Blocks();
-    this.flows = new Flows();
+    this.flow = new Flow();
     this.users = [];
     this.views = {
       container: new ContainerView(),
@@ -187,7 +187,7 @@ var app = {
       content: new ContentPage(),
       addContent: new AddContentPage(),
       addReport: new AddReportPage(),
-      flows: new FlowsPage()
+      flow: new FlowPage()
     };
     Backbone.history.start();
     alertify.maxLogItems(10);
