@@ -529,7 +529,7 @@ var ContainerView = Backbone.View.extend({
   events: {
     'click .toolbar-return-button': 'back',
     'click #user': 'showDashboard',
-    'click #blockchain-exporer': 'showBlockchain',
+    'click #blockchain-explorer': 'showBlockchain',
     'click #flow': 'showFlow',
     'click': 'collapseMenu',
     'touchstart': 'collapseMenu'
