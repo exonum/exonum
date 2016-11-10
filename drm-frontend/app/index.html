@@ -7,7 +7,7 @@
     <title>DRM Exonum Demo</title>
     <!-- build:css styles/vendor.css -->
     <!-- bower:css -->
-    <link rel="stylesheet" href="/bower_components/bootswatch-dist/css/bootstrap.css" />
+    <link rel="stylesheet" href="/bower_components/bootswatch-dist/css/bootstrap.css">
     <!-- endbower -->
     <!-- endbuild -->
 
@@ -22,7 +22,9 @@
     <![endif]-->
 
     <div class="loading" id="loading">
-      <i class="glyphicon glyphicon-refresh spinner"></i>
+      <div class="spinner">
+        <i class="glyphicon glyphicon-refresh"></i>
+      </div>
     </div>
 
     <div class="toolbar">
@@ -39,7 +41,9 @@
           <ul class="nav navbar-nav">
             <li>
               <div class="toolbar-username hidden" id="user" role="button">
-                <i class="glyphicon glyphicon-user"></i>&nbsp;<span id="username"></span>
+                <i class="glyphicon glyphicon-briefcase"></i>&nbsp;
+                <i class="glyphicon glyphicon-user"></i>
+                &nbsp;<span id="username"></span>
               </div>
             </li>
           </ul>
@@ -61,7 +65,7 @@
     <div class="app-content">
       <div class="alert alert-dismissible alert-danger" id="alert">
         <button type="button" class="close" data-dismiss="alert">×</button>
-        <h4>Something goes wrong!</h4><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+        <h4>Something goes wrong!</h4>
       </div>
       <div class="page" data-page="login"></div>
       <div class="page" data-page="registration">
@@ -82,7 +86,7 @@
                   I want to act as <strong>a content owner</strong>
                 </label>
               </div>
-              <span class="help-block">With this role you can upload content you own and sell it to distributors</span>
+              <span class="help-block">With this role you can upload content and sell it to distributors</span>
               <div class="radio">
                 <label>
                   <input type="radio" name="role" id="role2" value="distributor">
@@ -122,11 +126,11 @@
     <!-- build:js scripts/vendor.js -->
     <!-- bower:js -->
     <script src="/bower_components/jquery/dist/jquery.js"></script>
-    <script src="/bower_components/bootswatch-dist/js/bootstrap.js"></script>
+    <script src="/bower_components/moment/moment.js"></script>
     <script src="/bower_components/underscore/underscore.js"></script>
     <script src="/bower_components/backbone/backbone.js"></script>
     <script src="/bower_components/backbone-forms/distribution/backbone-forms.js"></script>
-    <script src="/bower_components/moment/moment.js"></script>
+    <script src="/bower_components/bootswatch-dist/js/bootstrap.js"></script>
     <script src="/bower_components/cookie/cookie.js"></script>
     <script src="/bower_components/alertifyjs/dist/js/alertify.js"></script>
     <!-- endbower -->

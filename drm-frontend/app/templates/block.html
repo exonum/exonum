@@ -1,5 +1,5 @@
 <div class="app-list-headers clearfix">
-    {% if (block.get('height') < last_height) { %}
+    {% if (block.get('height') < lastHeight) { %}
       <div class="pull-left"><a id="block-prev" role="button">← {{ block.get('height') + 1 }}</a></div>
     {% } %}
     {% if (block.get('height') > 1) { %}
@@ -12,8 +12,6 @@
   <dd><samp>{{ block.get('hash') }}</samp></dd>
   <dt>Propose time:</dt>
   <dd>{{ moment.unix(block.get('propose_time')).format() }}</dd>
-  <dt>Proposer:</dt>
-  <dd>Validator #{{ block.get('proposer') + 1 }}</dd>
   <dt>Tx hash:</dt>
   <dd><samp>{{ block.get('tx_hash') }}</samp></dd>
   <dt>State hash:</dt>

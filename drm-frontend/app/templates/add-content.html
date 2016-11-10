@@ -3,7 +3,7 @@
     <label class="col-sm-3 control-label"><strong>Audio file:</strong></label>
     <div class="col-sm-9">
       <button type="button" class="btn btn-primary btn-xs form-control" id="add-content-select-file">Upload file</button>
-      <span class="help-block">By pressing this button we pretend that you have uploaded the audio file. Based on this file, we generate a unique fingerprint. So you don't need to load a real audio file to see the capabilities of the system operation.</span>
+      <span class="help-block">By pressing this button we pretend that you have uploaded the audio file. Based on this file, we generate a unique audio fingerprint. So you don't need to load a real audio file to see the process workflow.</span>
     </div>
   </div>
   <div class="form-group" id="add-content-fingerprint-group">
@@ -16,30 +16,6 @@
     <label for="add-content-title" class="col-sm-3 control-label"><strong>Title:</strong></label>
     <div class="col-sm-9">
       <input type="input" class="form-control" id="add-content-title">
-    </div>
-  </div>
-</div>
-
-<div class="form-horizontal">
-  <div class="form-group" id="add-content-price-per-listen-group">
-    <label for="add-content-price-per-listen" class="col-sm-3 control-label"><strong>Price, £:</strong></label>
-    <div class="col-sm-9">
-      <input type="number" step="0.01" min="0" class="form-control" id="add-content-price-per-listen" >
-      <span class="help-block">Price for each play</span>
-    </div>
-  </div>
-  <div class="form-group" id="add-content-min-plays-group">
-    <label for="add-content-min-plays" class="col-sm-3 control-label"><strong>Min.&nbsp;Plays:</strong></label>
-    <div class="col-sm-9">
-      <input type="number" step="1" min="0" class="form-control" id="add-content-min-plays" placeholder="100000">
-      <span class="help-block">The minimum number of plays to be paid</span>
-    </div>
-  </div>
-  <div class="form-group">
-    <label for="add-content-additional-conditions" class="col-sm-3 control-label"><strong>Additional conditions:</strong></label>
-    <div class="col-sm-9">
-      <textarea class="form-control" id="add-content-additional-conditions"></textarea>
-      <span class="help-block">Any additional conditions that you want to add to your offer</span>
     </div>
   </div>
 </div>
@@ -74,6 +50,34 @@
       <i class="glyphicon glyphicon-plus"></i>&nbsp;
       Add co-owner
     </a>
+  </div>
+</div>
+
+<div class="form-group">
+  <label class="control-label"><strong>Distribution contract:</strong></label>
+</div>
+
+<div class="form-horizontal">
+  <div class="form-group" id="add-content-price-per-listen-group">
+    <label for="add-content-price-per-listen" class="col-sm-3 control-label"><strong>Price, £:</strong></label>
+    <div class="col-sm-9">
+      <input type="number" step="0.01" min="0" class="form-control" id="add-content-price-per-listen" >
+      <span class="help-block">Price for each play</span>
+    </div>
+  </div>
+  <div class="form-group" id="add-content-min-plays-group">
+    <label for="add-content-min-plays" class="col-sm-3 control-label"><strong>Min.&nbsp;Plays:</strong></label>
+    <div class="col-sm-9">
+      <input type="number" step="1" min="0" class="form-control" id="add-content-min-plays" placeholder="100000">
+      <span class="help-block">The distribution company, in case it signs the contract, guarantees that your content will be played at least this number of times</span>
+    </div>
+  </div>
+  <div class="form-group">
+    <label for="add-content-additional-conditions" class="col-sm-3 control-label"><strong>Additional conditions:</strong></label>
+    <div class="col-sm-9">
+      <textarea class="form-control" id="add-content-additional-conditions"></textarea>
+      <span class="help-block">Any additional conditions that you want to add to your offer</span>
+    </div>
   </div>
 </div>
 

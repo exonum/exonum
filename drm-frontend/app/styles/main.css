@@ -4,7 +4,6 @@ body {
     color: #647082;
     width: 100%;
     background: #eceef2;
-    height: 100%;
     min-height: 100%;
     position: relative;
 }
@@ -43,6 +42,9 @@ samp {
     text-align: center;
     color: #fff;
     overflow: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 .welcome-intro {
     padding-top: 60px;
@@ -191,6 +193,13 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .toolbar-dropdown a {
     color: #fff;
+}
+.toolbar-username .glyphicon {
+    display: none;
+}
+.toolbar-username[data-type="owner"] .glyphicon,
+.toolbar-username[data-type="distributor"] .glyphicon {
+    display: inline-block;
 }
 @media (min-width: 768px) {
     .toolbar-dropdown {
@@ -634,20 +643,32 @@ textarea.form-control {
 }
 
 .spinner {
-  position: fixed;
-  top: 150px;
-  font-size: 32px;
-  color: #000;
-  -webkit-animation: spin 2s infinite linear;
-          animation: spin 2s infinite linear;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin: -30px 0 0 -16px;
+    font-size: 32px;
+    color: #000;
+    -webkit-animation: spin 2s infinite linear;
+    animation: spin 2s infinite linear;
 }
 
 @-webkit-keyframes spin {
-    from { -webkit-transform: rotate(0deg); }
-    to { -webkit-transform: rotate(360deg); }
+    from {
+        -webkit-transform: rotate(0deg);
+    }
+    to {
+        -webkit-transform: rotate(360deg);
+    }
 }
 
 @keyframes spin {
-    from { -webkit-transform:rotate(0deg); transform:rotate(0deg); }
-    to { -webkit-transform:rotate(360deg); transform:rotate(360deg); }
+    from {
+        -webkit-transform: rotate(0deg);
+        transform: rotate(0deg);
+    }
+    to {
+        -webkit-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
 }
