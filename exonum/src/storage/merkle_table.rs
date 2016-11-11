@@ -15,25 +15,31 @@ use ::crypto::{hash, Hash};
 /// 1  | Хэши от исходных данных
 /// 2..| Дерево хешей, где каждая новая высота считает Hash(Hash(h - 1, i), Hash(h - 1, i + 1))
 
+#[derive(Copy, Clone)]
 enum NeighbourPosition {
-        Left(Hash), 
-        Right(Hash)
+        Left, 
+        Right
 }
 
 pub struct MerkleTreePath {
-    path: Vec<NeighbourPosition>
+    path: Vec<(Option<Hash>, NeighbourPosition)>
 }
 
 impl<V:StorageValue> InclusionProof<V> for MerkleTreePath {
-    fn verify(&self, value : &V, roothash: Hash) -> bool {        
+    fn verify(&self, value : &V, root_hash: Hash) -> bool {        
         let mut result = value.hash(); 
         for elem in &self.path {
-            result = match *elem {
-                     NeighbourPosition::Left(neighbour_hash) => hash(&[neighbour_hash.as_ref(), result.as_ref()].concat()),                     
-                     NeighbourPosition::Right(neighbour_hash) => hash(&[result.as_ref(), neighbour_hash.as_ref()].concat()),
-                }; 
+            let (hash_option, position) = *elem; 
+            if let Some(neighbour_hash) = hash_option {
+                result = match position {
+                    NeighbourPosition::Left => hash(&[neighbour_hash.as_ref(), result.as_ref()].concat()),
+                    NeighbourPosition::Right => hash(&[result.as_ref(), neighbour_hash.as_ref()].concat()),
+                }
+            } else {
+                result = hash(result.as_ref()); 
+            }                             
         }           
-        result == roothash
+        result == root_hash
     }
 }
 
@@ -81,24 +87,18 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         let height = self.height()?; 
 
         while current_height != height {
-            let neighbour_on_left = !self_index.is_even(); 
-            let neighbour_index = if !neighbour_on_left {
-                self_index + K::one()
+            let pos: NeighbourPosition; 
+            let neighbour_index: K; 
+            if self_index.is_even() {
+                neighbour_index = self_index + K::one(); 
+                pos = NeighbourPosition::Right; 
             } else {
-                self_index - K::one()
+                neighbour_index = self_index - K::one(); 
+                pos = NeighbourPosition::Left; 
             };
-            let self_hash = self.get_hash(current_height, self_index)?.unwrap();
-            let neighbour_hash = self.get_hash(current_height, neighbour_index)?;
-            let path_element = if let Some(neighbour_hash) = neighbour_hash {
-                neighbour_hash
-            } else {
-                self_hash
-            }; 
-            if neighbour_on_left{
-                res.path.push(NeighbourPosition::Left(path_element)) 
-            } else {
-                res.path.push(NeighbourPosition::Right(path_element))
-            }
+            let neighbour_hash = self.get_hash(current_height, neighbour_index)?;            
+            res.path.push((neighbour_hash, pos)); 
+            
             
             current_height = current_height + K::one(); 
             self_index = self_index / (K::one() + K::one()) ; 
@@ -153,16 +153,13 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     }
 
     fn append_hash(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
-        if index != self.len()? {
-            return Err(Error::new("Appending hash not to the end of list in MerkleTable")); 
-        }
         self.set_hash(K::one(), index, bytes)?;
         let mut current_height = K::one();
         while index != K::zero() {
             // Left leaf, Right leaf is empty
             let new_hash = if index.is_even() {
                 let h1 = self.get_hash(current_height, index)?.unwrap(); 
-                hash(&[h1.as_ref(), h1.as_ref()].concat())
+                hash(h1.as_ref())
                 // TODO replace by error
                 
             } else {
@@ -195,7 +192,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
             let new_hash = if let Some(h2) = h2 {
                 hash(&[h1.as_ref(), h2.as_ref()].concat())
             } else {
-                hash(&[h1.as_ref(), h1.as_ref()].concat())                
+                hash(h1.as_ref())                
             };
 
             current_height = current_height + K::one();
@@ -278,7 +275,6 @@ mod tests {
     use ::crypto::hash;
     use ::storage::{MemoryDB, List, MapTable, MerkleTable, InclusionProof};
 
-
     #[test]
     fn test_list_methods() {
         let storage = MemoryDB::new();
@@ -343,54 +339,98 @@ mod tests {
         let h7 = hash(&[7]);
         let h8 = hash(&[8]);
         let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
-        let h33 = hash(&[h3.as_ref(), h3.as_ref()].concat());
-        let h123 = hash(&[h12.as_ref(), h33.as_ref()].concat());
+        let h3up = hash(h3.as_ref());
+        let h123 = hash(&[h12.as_ref(), h3up.as_ref()].concat());
 
         let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
         let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
 
-        let h55 = hash(&[h5.as_ref(), h5.as_ref()].concat());
-        let h5555 = hash(&[h55.as_ref(), h55.as_ref()].concat());
-        let h12345 = hash(&[h1234.as_ref(), h5555.as_ref()].concat());
+        let h5up = hash(h5.as_ref());
+        let h5upup = hash(h5up.as_ref());
+        let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
         let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());
-        let h5656 = hash(&[h56.as_ref(), h56.as_ref()].concat());
-        let h123456 = hash(&[h1234.as_ref(), h5656.as_ref()].concat());
+        let h56up = hash(h56.as_ref());
+        let h123456 = hash(&[h1234.as_ref(), h56up.as_ref()].concat());
 
         let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());
-        let h77 = hash(&[h7.as_ref(), h7.as_ref()].concat());
-        let h567 = hash(&[h56.as_ref(), h77.as_ref()].concat());
+        let h7up = hash(h7.as_ref());
+        let h567 = hash(&[h56.as_ref(), h7up.as_ref()].concat());
         let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());
 
         let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
         let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
+        let mut path_result = table.construct_path_for_index(0); 
+        assert!(path_result.is_err());
+
+
         table.append(vec![1]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h1);
+        let mut path = table.construct_path_for_index(0).unwrap(); 
+        assert_eq!(path.path.len(), 0);
+        assert!(path.verify(&vec![1], h1));
+        assert!(!path.verify(&vec![254], h1));
+
 
         table.append(vec![2]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h12);
+        path = table.construct_path_for_index(1).unwrap(); 
+        assert_eq!(path.path.len(), 1 );
+        assert!(path.verify(&vec![2], h12));
+        assert!(!path.verify(&vec![1], h12));
 
         table.append(vec![3]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h123);
+        path = table.construct_path_for_index(2).unwrap(); 
+        assert_eq!(path.path.len(), 2 );
+        assert!(path.verify(&vec![3], h123));
+        assert!(!path.verify(&vec![2], h12));
 
         table.append(vec![4]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h1234);
-
-        let path_of_third = table.construct_path_for_index(2).unwrap(); 
-        assert!(path_of_third.verify(&vec![3], table.root_hash().unwrap())); 
+        path = table.construct_path_for_index(3).unwrap(); 
+        assert_eq!(path.path.len(), 2 );
+        assert!(path.verify(&vec![4], h1234));
+        assert!(!path.verify(&vec![3], h1234));
+      
 
         table.append(vec![5]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h12345);
+        path = table.construct_path_for_index(4).unwrap(); 
+        assert_eq!(path.path.len(), 3 );
+        assert!(path.verify(&vec![5], h12345));
+        assert!(!path.verify(&vec![4], h12345));
 
         table.append(vec![6]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h123456);
+        path = table.construct_path_for_index(5).unwrap(); 
+        assert_eq!(path.path.len(), 3 );
+        assert!(path.verify(&vec![6], h123456));
+        assert!(!path.verify(&vec![5], h123456));
 
         table.append(vec![7]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h1234567);
+        path = table.construct_path_for_index(6).unwrap(); 
+        assert_eq!(path.path.len(), 3 );
+        assert!(path.verify(&vec![7], h1234567));
+        assert!(!path.verify(&vec![6], h12345));
 
         table.append(vec![8]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h12345678);
+        path = table.construct_path_for_index(7).unwrap(); 
+        assert_eq!(path.path.len(), 3 );
+        assert!(path.verify(&vec![8], h12345678));
+        assert!(!path.verify(&vec![7], h12345678));
+
+        path = table.construct_path_for_index(4).unwrap(); 
+        assert_eq!(path.path.len(), 3 );
+        assert!(path.verify(&vec![5], h12345678));
+        assert!(!path.verify(&vec![8], h12345678));
+
+        path_result = table.construct_path_for_index(8); 
+        assert!(path_result.is_err());
+      
 
         assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
     }
