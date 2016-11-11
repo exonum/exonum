@@ -629,11 +629,102 @@ var FlowPage = Backbone.View.extend({
 
   template: templates.flow,
 
-  events: {},
+  events: {
+    'click .flow-toggle': 'toggle'
+  },
+
+  toggle: function(e) {
+    var type = $(e.target).data('type');
+
+    if (type) {
+      app.router.navigate('flow/' + type, {trigger: true});
+    } else {
+      app.router.navigate('flow', {trigger: true});
+    }
+  },
+
+  /**
+
+   [flow]
+   | [contents]
+   | | {finterprint, title}
+   | |
+   | [contracts]
+   | | {amount, finterprint, id, plays}
+   | |
+   | [distributors]
+   | | {id, name}
+   | |
+   | [owners]
+   | | {id, name}
+   | |
+   | [ownership]
+   | | {amount, finterprint, id, plays}
+
+   */
 
   render: function() {
+
+    function buildFlowChart(options) {
+      var svg = d3.select("body").append("svg").attr("width", 280).attr("height", 800);
+
+      var g = svg.append("g").attr("transform", "translate(150,100)");
+
+      var bp = viz.bP()
+          .data(options.data)
+          .min(12)
+          .pad(1)
+          .height(600)
+          .width(200)
+          .barSize(35)
+          .fill(d => options.colors[d.primary]);
+
+      g.call(bp);
+
+      g.append("text").attr("x", -50).attr("y", -8).style("text-anchor", "middle").text("Distributor");
+      g.append("text").attr("x", 250).attr("y", -8).style("text-anchor", "middle").text("Owner");
+
+      g.append("line").attr("x1", -100).attr("x2", 0);
+      g.append("line").attr("x1", 200).attr("x2", 300);
+
+      g.append("line").attr("y1", 610).attr("y2", 610).attr("x1", -100).attr("x2", 0);
+      g.append("line").attr("y1", 610).attr("y2", 610).attr("x1", 200).attr("x2", 300);
+
+      g.selectAll(".mainBars").append("text").attr("class", "label")
+        .attr("x",d=>(d.part=="primary" ? -30: 30))
+        .attr("y",d=>+6)
+        .text(d=>d.key)
+        .attr("text-anchor",d=>(d.part=="primary"? "end": "start"));
+
+      g.selectAll(".mainBars").append("text").attr("class","perc")
+        .attr("x",d=>(d.part=="primary"? -100: 80))
+        .attr("y",d=>+6)
+        .text(function(d) {
+          return '$' + Math.round(d.value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+        })
+        .attr("text-anchor", d=> (d.part == "primary" ? "end": "start"));
+    }
+
+    buildFlowChart.call(this, {
+      data: [
+        ['SonyInd', 'KS', 1738],
+        ['PPAP', 'Jack', 12925],
+        ['SonyInd', 'Lady Gaga', 15413],
+        ['AMCP', 'GA', 2166]
+      ],
+      colors: {
+        'SonyInd': "#3366CC",
+        'PPAP': "#DC3912",
+        'AMCProduction': "#FF9900"
+      },
+      title: 'Revenue Flow From Distributor to Owner',
+      leftSubtitle: 'Distributors',
+      rightSubtitle: 'Owners'
+    });
+
     this.$el.html(this.template({
-      flow: app.flow
+      flow: app.flow,
+      type: this.type
     }));
     return this;
   }

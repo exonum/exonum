@@ -15,7 +15,8 @@ var DRMRouter = Backbone.Router.extend({
       'content/:fingerprint'  : 'content',
       'add-report/:fingerprint' : 'addReport',
       'add-content'           : 'addContent',
-      'flow'                  : 'flow'
+      'flow'                  : 'flow',
+      'flow/:type'            : 'flow'
     },
 
     // Main pages
@@ -158,11 +159,12 @@ var DRMRouter = Backbone.Router.extend({
       });
     },
 
-    flow: function() {
+    flow: function(type) {
       app.views.container.loadingStart();
 
       app.flow.fetch({
         success: function() {
+          app.views.flow.type = type || 'revenue';
           app.views.flow.render();
           app.views.container.changePage('flow');
         },
