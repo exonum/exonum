@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import unittest
-import pprint
 
 from exonum import ExonumApi, random_hex
 
@@ -66,8 +65,6 @@ class DigitalRightsApiTest(DigitalRightsApi):
         self.assertEqual(info["name"], "Bitfury Music")
 
     def test_complex(self):
-        pp = pprint.PrettyPrinter(indent=4)
-
         owner0 = self.create_owner("Unknown Artist")
         owner1 = self.create_owner("Garage Band")
 
@@ -206,8 +203,6 @@ class DigitalRightsApiTest(DigitalRightsApi):
         self.assertEqual(owners_info[1][1]["amount"], 2850)
 
     def test_add_content(self):
-        pp = pprint.PrettyPrinter(indent=4)
-
         owner = self.create_owner("Unknown Artist")
         contents = [
             {
@@ -231,26 +226,58 @@ class DigitalRightsApiTest(DigitalRightsApi):
                 ]
             }
         ]
+
         tx = self.add_content(contents[0], owner["cookies"])
         self.assertNotEqual(tx, None)
-        
-        print("Get content info for owner")
-        info = self.content_info(contents[0]["fingerprint"], owner["cookies"])
-        pp.pprint(info)
-        print("Get content info for unregistred user")
+
         info = self.content_info(contents[0]["fingerprint"], None)
-        pp.pprint(info)
+        self.assertEqual(info["fingerprint"], contents[0]["fingerprint"])
+        self.assertEqual(info["title"], contents[0]["title"])
+        self.assertEqual(info["additional_conditions"], contents[0]["additional_conditions"])
+        self.assertEqual(info["price_per_listen"], contents[0]["price_per_listen"])
+        self.assertEqual(info["min_plays"], contents[0]["min_plays"])
+        self.assertEqual(info["owners"][0]["id"], contents[0]["owners"][0]["owner_id"])
+        self.assertEqual(info["owners"][0]["share"], contents[0]["owners"][0]["share"])
+        self.assertEqual(info["distributors"], [])
+
+        info = self.content_info(contents[0]["fingerprint"], owner["cookies"])
+        self.assertEqual(info["fingerprint"], contents[0]["fingerprint"])
+        self.assertEqual(info["title"], contents[0]["title"])
+        self.assertEqual(info["additional_conditions"], contents[0]["additional_conditions"])
+        self.assertEqual(info["price_per_listen"], contents[0]["price_per_listen"])
+        self.assertEqual(info["min_plays"], contents[0]["min_plays"])
+        self.assertEqual(info["owners"][0]["id"], contents[0]["owners"][0]["owner_id"])
+        self.assertEqual(info["owners"][0]["share"], contents[0]["owners"][0]["share"])
+        self.assertEqual(info["distributors"], [])
+        self.assertEqual(info["reports"], [])
+        self.assertEqual(info["amount"], 0)
+        self.assertEqual(info["plays"], 0)
 
         tx = self.add_content(contents[1], owner["cookies"])
         self.assertNotEqual(tx, None)
 
-        print("Get content info for owner")        
-        info = self.content_info(contents[1]["fingerprint"], owner["cookies"])
-        pp.pprint(info)
-        print("Get content info for unregistred user")        
         info = self.content_info(contents[1]["fingerprint"], None)
-        pp.pprint(info)
+        self.assertEqual(info["fingerprint"], contents[1]["fingerprint"])
+        self.assertEqual(info["title"], contents[1]["title"])
+        self.assertEqual(info["additional_conditions"], contents[1]["additional_conditions"])
+        self.assertEqual(info["price_per_listen"], contents[1]["price_per_listen"])
+        self.assertEqual(info["min_plays"], contents[1]["min_plays"])
+        self.assertEqual(info["owners"][0]["id"], contents[1]["owners"][0]["owner_id"])
+        self.assertEqual(info["owners"][0]["share"], contents[1]["owners"][0]["share"])
+        self.assertEqual(info["distributors"], [])
 
+        info = self.content_info(contents[1]["fingerprint"], owner["cookies"])
+        self.assertEqual(info["fingerprint"], contents[1]["fingerprint"])
+        self.assertEqual(info["title"], contents[1]["title"])
+        self.assertEqual(info["additional_conditions"], contents[1]["additional_conditions"])
+        self.assertEqual(info["price_per_listen"], contents[1]["price_per_listen"])
+        self.assertEqual(info["min_plays"], contents[1]["min_plays"])
+        self.assertEqual(info["owners"][0]["id"], contents[1]["owners"][0]["owner_id"])
+        self.assertEqual(info["owners"][0]["share"], contents[1]["owners"][0]["share"])
+        self.assertEqual(info["distributors"], [])
+        self.assertEqual(info["reports"], [])
+        self.assertEqual(info["amount"], 0)
+        self.assertEqual(info["plays"], 0)
 
 if __name__ == '__main__':
-    unittest.main()
+    unittest.main(verbosity=2, buffer=None)
