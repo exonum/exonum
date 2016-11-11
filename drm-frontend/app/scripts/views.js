@@ -651,25 +651,9 @@ var FlowPage = Backbone.View.extend({
   },
 
   /**
-
-   [flow]
-   | [contents]
-   | | {finterprint, title}
-   | |
-   | [contracts]
-   | | {amount, finterprint, id, plays}
-   | |
-   | [distributors]
-   | | {id, name}
-   | |
-   | [owners]
-   | | {id, name}
-   | |
-   | [ownership]
-   | | {amount, finterprint, id, plays}
-
+   * Draw flow chart and insert it into view
+   * @returns {boolean}
    */
-
   draw: function() {
     var that = this;
     var data = [];
@@ -677,20 +661,22 @@ var FlowPage = Backbone.View.extend({
     var leftTitle;
     var rightTitle;
 
-    function getRandomUniqueColor() {
+    /**
+     * Get random unique color
+     * @returns {string}
+     */
+    function getColor() {
       var color = that.colorBase[Math.floor(Math.random() * that.colorBase.length)];
       var isUnique = true;
+
       $.each(colors, function(i, c) {
         if (c === color) {
           isUnique = false;
           return false;
         }
       });
-      if (isUnique) {
-        return color;
-      } else {
-        return getRandomUniqueColor();
-      }
+
+      return isUnique ? color : getColor();
     }
 
     switch (app.views.flow.type) {
@@ -698,36 +684,55 @@ var FlowPage = Backbone.View.extend({
         leftTitle = 'Distributors';
         rightTitle = 'Owners';
 
-        // console.log(app.flow.get('contents'));
-        // console.log(app.flow.get('contracts'));
-        // console.log(app.flow.get('distributors'));
-        // console.log(app.flow.get('owners'));
-        // console.log(app.flow.get('ownerships'));
-
-        data = [
-          ['SonyInd', 'KS', 1738],
-          ['PPAP', 'Jack', 12925],
-          ['SonyInd', 'Lady Gaga', 15413],
-          ['AMCP', 'GA', 2166]
-        ];
-
-        // Set distributor colors
-        $.each(data, function(i, element) {
-          if (colors[element[0]] === undefined) {
-            colors[element[0]] = getRandomUniqueColor();
+        $.each(app.flow.get('ownerships'), function(i, ownership) {
+          if (ownership.amount === 0) {
+            return true;
           }
+
+          var amount = ownership.amount / 100;
+          var ownerName;
+
+          $.each(app.flow.get('owners'), function(j, owner) {
+            if (owner.id === ownership.id) {
+              ownerName = owner.name;
+              return false;
+            }
+          });
+
+          $.each(app.flow.get('contracts'), function(j, contract) {
+            if (contract.finterprint === ownership.finterprint) {
+              $.each(app.flow.get('distributors'), function(k, distributor) {
+                if (distributor.id === contract.id) {
+                  data.push([distributor.name, ownerName, amount]);
+                  return false;
+                }
+              });
+            }
+          });
         });
+
         break;
       case 'plays':
+        leftTitle = 'Owners';
+        rightTitle = 'Content';
+
+        // TODO
         break;
       default:
         return false;
     }
 
+    // Set distributor colors
+    $.each(data, function(i, element) {
+      if (colors[element[0]] === undefined) {
+        colors[element[0]] = getColor();
+      }
+    });
+
     var chart = document.getElementById('flow-chart');
-    var svg = d3.select(chart).append('svg').attr('width', 280).attr('height', 530);
+    var svg = d3.select(chart).append('svg').attr('width', 280).attr('height', 590);
     var g = svg.append('g').attr('transform', 'translate(90, 50)');
-    var bp = viz.bP().data(data).min(12).pad(1).height(480).width(100).barSize(15).fill(function(d) {
+    var bp = viz.bP().data(data).min(12).pad(1).height(540).width(100).barSize(15).fill(function(d) {
       return '#' + colors[d.primary];
     });
 

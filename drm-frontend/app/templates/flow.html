@@ -8,3 +8,19 @@
 </ul>
 
 <div class="flow-chart" id="flow-chart"></div>
+
+<table class="table table-condensed flow-total">
+  <tbody>
+  <tr>
+    {% if (type === 'revenue') { %}
+    <th class="col-xs-6 text-right">Total payout:</th>
+    <td>$5 132 507</td><!-- TODO -->
+    {% } %}
+
+    {% if (type === 'plays') { %}
+    <th class="col-xs-6 text-right">Total played:</th>
+    <td>650 098 507 times</td><!-- TODO -->
+    {% } %}
+  </tr>
+  </tbody>
+</table>

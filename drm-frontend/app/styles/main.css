@@ -699,6 +699,7 @@ textarea.form-control {
 }
 .flow-label {
     font-size: 10px;
+    fill: #647082;
 }
 .flow-value {
     font-size: 10px;
@@ -719,6 +720,9 @@ textarea.form-control {
 }
 line {
     stroke: grey;
+}
+.flow-total {
+    margin-top: 20px;
 }
 
 
