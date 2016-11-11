@@ -660,6 +660,7 @@ var FlowPage = Backbone.View.extend({
     var colors = {};
     var leftTitle;
     var rightTitle;
+    var valuePrefix;
 
     /**
      * Get random unique color
@@ -683,6 +684,7 @@ var FlowPage = Backbone.View.extend({
       case 'revenue':
         leftTitle = 'Distributors';
         rightTitle = 'Owners';
+        valuePrefix = '$'
 
         $.each(app.flow.get('ownerships'), function(i, ownership) {
           if (ownership.amount === 0) {
@@ -715,8 +717,35 @@ var FlowPage = Backbone.View.extend({
       case 'plays':
         leftTitle = 'Owners';
         rightTitle = 'Content';
+        valuePrefix = '';
 
-        // TODO
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          if (contract.plays === 0) {
+            return true;
+          }
+
+          var plays = contract.plays;
+          var contentTitle;
+
+          $.each(app.flow.get('contents'), function(j, content) {
+            if (content.fingerprint === contract.fingerprint) {
+              contentTitle = content.title;
+              return false;
+            }
+          });
+
+          $.each(app.flow.get('ownerships'), function(j, ownership) {
+            if (ownership.fingerprint === contract.fingerprint) {
+              $.each(app.flow.get('owners'), function(k, owner) {
+                if (owner.id === ownership.id) {
+                  data.push([owner.name, contentTitle, plays]);
+                  return false;
+                }
+              });
+            }
+          });
+        });
+
         break;
       default:
         return false;
@@ -766,7 +795,7 @@ var FlowPage = Backbone.View.extend({
         return +6;
       })
       .text(function(d) {
-        return '$' + Math.round(d.value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        return valuePrefix + Math.round(d.value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
       })
       .attr('text-anchor', 'start');
   },
