@@ -633,6 +633,13 @@ var FlowPage = Backbone.View.extend({
     'click .flow-toggle': 'toggle'
   },
 
+  // Color base generated with http://paletton.com/
+  colorBase: [
+    "6AF400", "5CD500", "6AF500", "67ED00", "63E400", "00E27B", "00A65A", "00E37C", "00CD70", "00B563", "C8FB00", "B7E600", "C8FB00", "C6F800", "C3F500",
+    "FF3100", "F02E00", "FF3100", "FF3100", "FF3100", "FF8300", "F07B00", "FF8300", "FF8300", "FF8300", "F30056", "D2004A", "F40056", "EB0053", "E10050",
+    "0D50E0", "0536A0", "1456E1", "0645C9", "053CB0", "390FE2", "2506A5", "4018E3", "2E08CD", "2907B5", "01D0DA", "008B91", "01D1DB", "00B6BF", "0099A0"
+  ],
+
   toggle: function(e) {
     var type = $(e.target).data('type');
 
@@ -664,17 +671,39 @@ var FlowPage = Backbone.View.extend({
    */
 
   draw: function() {
+    var that = this;
     var data = [];
     var colors = {};
     var leftTitle;
     var rightTitle;
+
+    function getRandomUniqueColor() {
+      var color = that.colorBase[Math.floor(Math.random() * that.colorBase.length)];
+      var isUnique = true;
+      $.each(colors, function(i, c) {
+        if (c === color) {
+          isUnique = false;
+          return false;
+        }
+      });
+      if (isUnique) {
+        return color;
+      } else {
+        return getRandomUniqueColor();
+      }
+    }
 
     switch (app.views.flow.type) {
       case 'revenue':
         leftTitle = 'Distributors';
         rightTitle = 'Owners';
 
-        // TODO data
+        // console.log(app.flow.get('contents'));
+        // console.log(app.flow.get('contracts'));
+        // console.log(app.flow.get('distributors'));
+        // console.log(app.flow.get('owners'));
+        // console.log(app.flow.get('ownerships'));
+
         data = [
           ['SonyInd', 'KS', 1738],
           ['PPAP', 'Jack', 12925],
@@ -682,12 +711,12 @@ var FlowPage = Backbone.View.extend({
           ['AMCP', 'GA', 2166]
         ];
 
-        // TODO colors
-        colors = {
-          'SonyInd': "#3366CC",
-          'PPAP': "#DC3912",
-          'AMCP': "#FF9900"
-        };
+        // Set distributor colors
+        $.each(data, function(i, element) {
+          if (colors[element[0]] === undefined) {
+            colors[element[0]] = getRandomUniqueColor();
+          }
+        });
         break;
       case 'plays':
         break;
@@ -699,7 +728,7 @@ var FlowPage = Backbone.View.extend({
     var svg = d3.select(chart).append('svg').attr('width', 280).attr('height', 530);
     var g = svg.append('g').attr('transform', 'translate(90, 50)');
     var bp = viz.bP().data(data).min(12).pad(1).height(480).width(100).barSize(15).fill(function(d) {
-      return colors[d.primary];
+      return '#' + colors[d.primary];
     });
 
     g.call(bp);
@@ -739,7 +768,6 @@ var FlowPage = Backbone.View.extend({
 
   render: function() {
     this.$el.html(this.template({
-      flow: app.flow,
       type: this.type
     }));
     return this;
