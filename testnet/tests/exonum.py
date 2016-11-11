@@ -21,7 +21,7 @@ def random_hex(n=32):
 class ExonumApi(unittest.TestCase):
     def setUp(self):
         super().setUp()
-        self.times = 60
+        self.times = 10
         self.timeout = 1
         # Configure http session
         self.session = requests.Session()

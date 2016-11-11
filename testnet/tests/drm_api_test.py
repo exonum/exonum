@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 
 import unittest
-import requests
-import json
-import time
-import base64
-import random
 import pprint
 
 from exonum import ExonumApi, random_hex
-        
+
 class DigitalRightsApi(ExonumApi):
+
     def find_user(self, pub_key, cookies):
         r = self.get("drm/find_user/" + pub_key, cookies)
         return r.json()
@@ -24,33 +20,40 @@ class DigitalRightsApi(ExonumApi):
     def content_info(self, fingerprint, cookies):
         return self.get("drm/contents/" + fingerprint, cookies).json()
 
-    def create_owner(self, name): 
+    def create_owner(self, name):
         tx, c = self.send_transaction("drm/owners", {"name": name})
         user = self.find_user(tx["pub_key"], c)
-        return {"info":user, "cookies":c}
+        return {"info": user, "cookies": c}
 
-    def create_distributor(self, name): 
+    def create_distributor(self, name):
         tx, c = self.send_transaction("drm/distributors", {"name": name})
         user = self.find_user(tx["pub_key"], c)
-        return {"info":user, "cookies":c}
+        return {"info": user, "cookies": c}
 
     def add_content(self, content, cookies):
-        tx, c = self.send_transaction("drm/contents", content, cookies, method="put")
+        tx, c = self.send_transaction(
+            "drm/contents", content, cookies, method="put")
         return tx
 
     def add_contract(self, id, fingerprint, cookies):
         endpoint = "drm/contracts/" + fingerprint
-        tx, c = self.send_transaction(endpoint, payload=None, cookies=cookies, method="put")
+        tx, c = self.send_transaction(
+            endpoint, payload=None, cookies=cookies, method="put")
         return tx
 
     def report(self, report, cookies):
-        tx, c = self.send_transaction("drm/reports", report, cookies, method="put")
-        return tx 
+        tx, c = self.send_transaction(
+            "drm/reports", report, cookies, method="put")
+        return tx
+
 
 class DigitalRightsApiTest(DigitalRightsApi):
+
     def setUp(self):
         super().setUp()
         self.host = "http://127.0.0.1:8600/api/v1"
+        self.times = 60
+        self.timeout = 1
 
     def test_create_owner(self):
         owner = self.create_owner("Unknown Artist")
@@ -68,62 +71,60 @@ class DigitalRightsApiTest(DigitalRightsApi):
         owner0 = self.create_owner("Unknown Artist")
         owner1 = self.create_owner("Garage Band")
 
-        content0 = {  
+        content0 = {
             "title": "Unknown Album - Track 1",
             "fingerprint": random_hex(),
             "additional_conditions": "",
             "price_per_listen": 1,
             "min_plays": 100,
-            "owners": [  
-                { "owner_id":owner0["info"]["id"], "share":60 },
-                { "owner_id":owner1["info"]["id"], "share":40 }
+            "owners": [
+                {"owner_id": owner0["info"]["id"], "share":60},
+                {"owner_id": owner1["info"]["id"], "share":40}
             ]
         }
-        content1 = {  
+        content1 = {
             "title": "Unknown Album - Track 2",
             "fingerprint": random_hex(),
             "additional_conditions": "",
             "price_per_listen": 10,
             "min_plays": 100,
-            "owners": [  
-                { "owner_id":owner0["info"]["id"], "share":5 },
-                { "owner_id":owner1["info"]["id"], "share":95 }
+            "owners": [
+                {"owner_id": owner0["info"]["id"], "share":5},
+                {"owner_id": owner1["info"]["id"], "share":95}
             ]
         }
 
         tx = self.add_content(content0, owner0["cookies"])
         self.assertNotEqual(tx, None)
-        pp.pprint(tx)
         tx = self.add_content(content1, owner1["cookies"])
-        pp.pprint(tx)
         self.assertNotEqual(tx, None)
 
         distributor0 = self.create_distributor("Exonum Entertaiment")
         distributor1 = self.create_distributor("Bitfury Music")
 
         tx = self.add_contract(
-            distributor0["info"]["id"], 
+            distributor0["info"]["id"],
             content0["fingerprint"],
             distributor0["cookies"]
         )
         self.assertNotEqual(tx, None)
 
         tx = self.add_contract(
-            distributor0["info"]["id"], 
+            distributor0["info"]["id"],
             content1["fingerprint"],
             distributor0["cookies"]
         )
         self.assertNotEqual(tx, None)
 
         tx = self.add_contract(
-            distributor1["info"]["id"], 
+            distributor1["info"]["id"],
             content0["fingerprint"],
             distributor1["cookies"]
         )
         self.assertNotEqual(tx, None)
 
         tx = self.add_contract(
-            distributor1["info"]["id"], 
+            distributor1["info"]["id"],
             content1["fingerprint"],
             distributor1["cookies"]
         )
@@ -160,19 +161,27 @@ class DigitalRightsApiTest(DigitalRightsApi):
             },
         ]
 
-        self.assertNotEqual(self.report(reports[0], distributor0["cookies"]), None)
-        self.assertNotEqual(self.report(reports[1], distributor1["cookies"]), None)
-        self.assertNotEqual(self.report(reports[2], distributor0["cookies"]), None)
-        self.assertNotEqual(self.report(reports[3], distributor0["cookies"]), None)
+        self.assertNotEqual(self.report(
+            reports[0], distributor0["cookies"]), None)
+        self.assertNotEqual(self.report(
+            reports[1], distributor1["cookies"]), None)
+        self.assertNotEqual(self.report(
+            reports[2], distributor0["cookies"]), None)
+        self.assertNotEqual(self.report(
+            reports[3], distributor0["cookies"]), None)
 
         distributors_info = [
             [
-                self.content_info(content0["fingerprint"], distributor0["cookies"]),
-                self.content_info(content1["fingerprint"], distributor0["cookies"])
+                self.content_info(
+                    content0["fingerprint"], distributor0["cookies"]),
+                self.content_info(
+                    content1["fingerprint"], distributor0["cookies"])
             ],
             [
-                self.content_info(content0["fingerprint"], distributor1["cookies"]),
-                self.content_info(content1["fingerprint"], distributor1["cookies"])
+                self.content_info(
+                    content0["fingerprint"], distributor1["cookies"]),
+                self.content_info(
+                    content1["fingerprint"], distributor1["cookies"])
             ]
         ]
         owners_info = [
@@ -185,11 +194,6 @@ class DigitalRightsApiTest(DigitalRightsApi):
                 self.content_info(content1["fingerprint"], owner1["cookies"])
             ]
         ]
-
-        print("Get content for distributor")
-        pp.pprint(distributors_info)
-        print("Get content for owners")
-        pp.pprint(owners_info)
 
         self.assertEqual(distributors_info[0][0]["contract"]["amount"], 500)
         self.assertEqual(distributors_info[0][1]["contract"]["amount"], 3000)
@@ -206,42 +210,44 @@ class DigitalRightsApiTest(DigitalRightsApi):
 
         owner = self.create_owner("Unknown Artist")
         contents = [
-            {  
+            {
                 "title": "Unknown Album - Track 1",
                 "fingerprint": random_hex(),
                 "additional_conditions": "",
                 "price_per_listen": 1,
                 "min_plays": 100,
-                "owners": [  
-                    { "owner_id":owner["info"]["id"], "share":100 },
+                "owners": [
+                    {"owner_id": owner["info"]["id"], "share":100},
                 ]
             },
-            {  
+            {
                 "title": "Unknown Album - Track 2",
                 "fingerprint": random_hex(),
                 "additional_conditions": "",
                 "price_per_listen": 25,
                 "min_plays": 10000,
-                "owners": [  
-                    { "owner_id":owner["info"]["id"], "share":100 },
+                "owners": [
+                    {"owner_id": owner["info"]["id"], "share":100},
                 ]
             }
         ]
-        print(owner["cookies"])
-
         tx = self.add_content(contents[0], owner["cookies"])
         self.assertNotEqual(tx, None)
-        pp.pprint(tx)
+        
+        print("Get content info for owner")
         info = self.content_info(contents[0]["fingerprint"], owner["cookies"])
         pp.pprint(info)
+        print("Get content info for unregistred user")
         info = self.content_info(contents[0]["fingerprint"], None)
         pp.pprint(info)
 
         tx = self.add_content(contents[1], owner["cookies"])
         self.assertNotEqual(tx, None)
-        pp.pprint(tx)
+
+        print("Get content info for owner")        
         info = self.content_info(contents[1]["fingerprint"], owner["cookies"])
         pp.pprint(info)
+        print("Get content info for unregistred user")        
         info = self.content_info(contents[1]["fingerprint"], None)
         pp.pprint(info)
 
