@@ -3,7 +3,7 @@ use num::{Integer, range, ToPrimitive};
 use std::marker::PhantomData;
 use std::cell::Cell;
 
-use super::{Map, List, Error, StorageValue};
+use super::{Map, List, Error, StorageValue, InclusionProof};
 
 use ::crypto::{hash, Hash};
 
@@ -14,6 +14,29 @@ use ::crypto::{hash, Hash};
 /// 0  | Записанные данные
 /// 1  | Хэши от исходных данных
 /// 2..| Дерево хешей, где каждая новая высота считает Hash(Hash(h - 1, i), Hash(h - 1, i + 1))
+
+enum NeighbourPosition {
+        Left(Hash), 
+        Right(Hash)
+}
+
+pub struct MerkleTreePath {
+    path: Vec<NeighbourPosition>
+}
+
+impl<V:StorageValue> InclusionProof<V> for MerkleTreePath {
+    fn verify(&self, value : &V, roothash: Hash) -> bool {        
+        let mut result = value.hash(); 
+        for elem in &self.path {
+            result = match *elem {
+                     NeighbourPosition::Left(neighbour_hash) => hash(&[neighbour_hash.as_ref(), result.as_ref()].concat()),                     
+                     NeighbourPosition::Right(neighbour_hash) => hash(&[result.as_ref(), neighbour_hash.as_ref()].concat()),
+                }; 
+        }           
+        result == roothash
+    }
+}
+
 pub struct MerkleTable<T: Map<[u8], Vec<u8>>, K, V> {
     map: T,
     count: Cell<Option<K>>,
@@ -46,6 +69,41 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         self.get_hash(self.height()?, K::zero())
             .map(|h| h.unwrap_or_else(|| hash(&[])))
     }
+
+    pub fn construct_path_for_index(&self, mut self_index: K) -> Result<MerkleTreePath, Error>{ 
+        if self_index >= self.len()? || self_index < K::zero() {
+            return Err(Error::new("Wrong index for MerkleTable!"));
+        }
+        let mut res = MerkleTreePath {
+            path: Vec::new(),
+        }; 
+        let mut current_height = K::one();
+        let height = self.height()?; 
+
+        while current_height != height {
+            let neighbour_on_left = !self_index.is_even(); 
+            let neighbour_index = if !neighbour_on_left {
+                self_index + K::one()
+            } else {
+                self_index - K::one()
+            };
+            let self_hash = self.get_hash(current_height, self_index)?.unwrap();
+            let neighbour_hash = self.get_hash(current_height, neighbour_index)?;
+            let path_element = if let Some(neighbour_hash) = neighbour_hash {
+                neighbour_hash
+            } else {
+                self_hash
+            }; 
+            match neighbour_on_left {
+                true => res.path.push(NeighbourPosition::Left(path_element)), 
+                false => res.path.push(NeighbourPosition::Right(path_element))
+            }
+            current_height = current_height + K::one(); 
+            self_index = self_index / (K::one() + K::one()) ; 
+        } 
+        Ok(res)
+
+    } 
 
     fn height(&self) -> Result<K, Error> {
         let len = self.len()?;
@@ -93,13 +151,18 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     }
 
     fn append_hash(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
+        if index != self.len()? {
+            return Err(Error::new("Appending hash not to the end of list in MerkleTable")); 
+        }
         self.set_hash(K::one(), index, bytes)?;
         let mut current_height = K::one();
         while index != K::zero() {
             // Left leaf, Right leaf is empty
             let new_hash = if index.is_even() {
+                let h1 = self.get_hash(current_height, index)?.unwrap(); 
+                hash(&[h1.as_ref(), h1.as_ref()].concat())
                 // TODO replace by error
-                self.get_hash(current_height, index)?.unwrap()
+                
             } else {
                 // Right leaf
                 let h1 = self.get_hash(current_height, index - K::one())?.unwrap();
@@ -130,7 +193,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
             let new_hash = if let Some(h2) = h2 {
                 hash(&[h1.as_ref(), h2.as_ref()].concat())
             } else {
-                h1
+                hash(&[h1.as_ref(), h1.as_ref()].concat())                
             };
 
             current_height = current_height + K::one();
@@ -170,7 +233,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
     }
 
     fn set(&self, index: K, value: V) -> Result<(), Error> {
-        if index >= self.len()? {
+        if index >= self.len()? || index < K::zero() {
             return Err(Error::new("Wrong index!"));
         }
 
@@ -211,7 +274,7 @@ mod tests {
     extern crate rand;
 
     use ::crypto::hash;
-    use ::storage::{MemoryDB, List, MapTable, MerkleTable};
+    use ::storage::{MemoryDB, List, MapTable, MerkleTable, InclusionProof};
 
 
     #[test]
@@ -278,15 +341,25 @@ mod tests {
         let h7 = hash(&[7]);
         let h8 = hash(&[8]);
         let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
-        let h123 = hash(&[h12.as_ref(), h3.as_ref()].concat());
+        let h33 = hash(&[h3.as_ref(), h3.as_ref()].concat());
+        let h123 = hash(&[h12.as_ref(), h33.as_ref()].concat());
+
         let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
         let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
-        let h12345 = hash(&[h1234.as_ref(), h5.as_ref()].concat());
+
+        let h55 = hash(&[h5.as_ref(), h5.as_ref()].concat());
+        let h5555 = hash(&[h55.as_ref(), h55.as_ref()].concat());
+        let h12345 = hash(&[h1234.as_ref(), h5555.as_ref()].concat());
+
         let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());
-        let h123456 = hash(&[h1234.as_ref(), h56.as_ref()].concat());
+        let h5656 = hash(&[h56.as_ref(), h56.as_ref()].concat());
+        let h123456 = hash(&[h1234.as_ref(), h5656.as_ref()].concat());
+
         let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());
-        let h567 = hash(&[h56.as_ref(), h7.as_ref()].concat());
+        let h77 = hash(&[h7.as_ref(), h7.as_ref()].concat());
+        let h567 = hash(&[h56.as_ref(), h77.as_ref()].concat());
         let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());
+
         let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
         let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
@@ -301,6 +374,9 @@ mod tests {
 
         table.append(vec![4]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h1234);
+
+        let path_of_third = table.construct_path_for_index(2).unwrap(); 
+        assert!(path_of_third.verify(&vec![3], table.root_hash().unwrap())); 
 
         table.append(vec![5]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h12345);
