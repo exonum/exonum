@@ -1,10 +1,13 @@
 #!/bin/bash
 
-destdir=$2
+if [ -z "$TESTNET_DESTDIR" ]; then
+    echo "Need to set TESTNET_DESTDIR"
+    exit 1
+fi 
 
+destdir=$TESTNET_DESTDIR
 scriptdir=`dirname "$BASH_SOURCE"`
 supervisor_conf=${destdir}/etc/supervisord.conf
-sock_file=/tmp/
 
 enable() {
     mkdir -p ${destdir}/log/supervisor
@@ -73,13 +76,13 @@ stop() {
 
 case "$1" in
     start)
-        start $3
+        start $2
         ;;
     stop) 
-        stop $3
+        stop $2
         ;;
     restart)
-        restart $3
+        restart $2
         ;;
     enable) 
         enable $2
