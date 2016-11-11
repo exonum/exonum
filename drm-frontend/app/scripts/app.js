@@ -167,6 +167,7 @@ var DRMRouter = Backbone.Router.extend({
           app.views.flow.type = type || 'revenue';
           app.views.flow.render();
           app.views.container.changePage('flow');
+          app.views.flow.draw();
         },
         error: function() {
           app.views.container.changePage('error');

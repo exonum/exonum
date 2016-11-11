@@ -663,65 +663,81 @@ var FlowPage = Backbone.View.extend({
 
    */
 
-  render: function() {
+  draw: function() {
+    var data = [];
+    var colors = {};
+    var leftTitle;
+    var rightTitle;
 
-    function buildFlowChart(options) {
-      var svg = d3.select("body").append("svg").attr("width", 280).attr("height", 800);
+    switch (app.views.flow.type) {
+      case 'revenue':
+        leftTitle = 'Distributors';
+        rightTitle = 'Owners';
 
-      var g = svg.append("g").attr("transform", "translate(150,100)");
+        // TODO data
+        data = [
+          ['SonyInd', 'KS', 1738],
+          ['PPAP', 'Jack', 12925],
+          ['SonyInd', 'Lady Gaga', 15413],
+          ['AMCP', 'GA', 2166]
+        ];
 
-      var bp = viz.bP()
-          .data(options.data)
-          .min(12)
-          .pad(1)
-          .height(600)
-          .width(200)
-          .barSize(35)
-          .fill(d => options.colors[d.primary]);
-
-      g.call(bp);
-
-      g.append("text").attr("x", -50).attr("y", -8).style("text-anchor", "middle").text("Distributor");
-      g.append("text").attr("x", 250).attr("y", -8).style("text-anchor", "middle").text("Owner");
-
-      g.append("line").attr("x1", -100).attr("x2", 0);
-      g.append("line").attr("x1", 200).attr("x2", 300);
-
-      g.append("line").attr("y1", 610).attr("y2", 610).attr("x1", -100).attr("x2", 0);
-      g.append("line").attr("y1", 610).attr("y2", 610).attr("x1", 200).attr("x2", 300);
-
-      g.selectAll(".mainBars").append("text").attr("class", "label")
-        .attr("x",d=>(d.part=="primary" ? -30: 30))
-        .attr("y",d=>+6)
-        .text(d=>d.key)
-        .attr("text-anchor",d=>(d.part=="primary"? "end": "start"));
-
-      g.selectAll(".mainBars").append("text").attr("class","perc")
-        .attr("x",d=>(d.part=="primary"? -100: 80))
-        .attr("y",d=>+6)
-        .text(function(d) {
-          return '$' + Math.round(d.value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-        })
-        .attr("text-anchor", d=> (d.part == "primary" ? "end": "start"));
+        // TODO colors
+        colors = {
+          'SonyInd': "#3366CC",
+          'PPAP': "#DC3912",
+          'AMCP': "#FF9900"
+        };
+        break;
+      case 'plays':
+        break;
+      default:
+        return false;
     }
 
-    buildFlowChart.call(this, {
-      data: [
-        ['SonyInd', 'KS', 1738],
-        ['PPAP', 'Jack', 12925],
-        ['SonyInd', 'Lady Gaga', 15413],
-        ['AMCP', 'GA', 2166]
-      ],
-      colors: {
-        'SonyInd': "#3366CC",
-        'PPAP': "#DC3912",
-        'AMCProduction': "#FF9900"
-      },
-      title: 'Revenue Flow From Distributor to Owner',
-      leftSubtitle: 'Distributors',
-      rightSubtitle: 'Owners'
+    var chart = document.getElementById('flow-chart');
+    var svg = d3.select(chart).append('svg').attr('width', 280).attr('height', 530);
+    var g = svg.append('g').attr('transform', 'translate(90, 50)');
+    var bp = viz.bP().data(data).min(12).pad(1).height(480).width(100).barSize(15).fill(function(d) {
+      return colors[d.primary];
     });
 
+    g.call(bp);
+
+    // Top subtitles and their underlines
+    g.append('text').attr('x', -57).attr('y', -8).attr('class', 'flow-subtitle').text(leftTitle);
+    g.append('text').attr('x', 155).attr('y', -8).attr('class', 'flow-subtitle').text(rightTitle);
+    g.append('line').attr('x1', -95).attr('x2', -15);
+    g.append('line').attr('x1', 115).attr('x2', 195);
+
+    // Add labels
+    g.selectAll('.mainBars').append('text').attr('class', 'flow-label')
+      .attr('x', function(d) {
+        return d.part == 'primary' ? -70 : 60;
+      })
+      .attr('y', function(d) {
+        return +6;
+      })
+      .text(function(d) {
+        return d.key;
+      })
+      .attr('text-anchor', 'end');
+
+    // Add values
+    g.selectAll('.mainBars').append('text').attr('class', 'flow-value')
+      .attr('x', function(d) {
+        return d.part == 'primary' ? -65 : 65;
+      })
+      .attr('y', function(d) {
+        return +6;
+      })
+      .text(function(d) {
+        return '$' + Math.round(d.value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+      })
+      .attr('text-anchor', 'start');
+  },
+
+  render: function() {
     this.$el.html(this.template({
       flow: app.flow,
       type: this.type

@@ -676,6 +676,13 @@ textarea.form-control {
 /*
     Flow chart
 */
+.flow-chart {
+    width: 280px;
+    margin: 0 auto;
+}
+.flow-chart > svg {
+    overflow: visible;
+}
 .flow-nav {
     font-size: 0;
     text-align: center;
@@ -686,8 +693,15 @@ textarea.form-control {
     float: none;
     vertical-align: top;
 }
-text {
-    font-size: 12px;
+.flow-subtitle {
+    text-anchor: middle;
+    font-size: 10px;
+}
+.flow-label {
+    font-size: 10px;
+}
+.flow-value {
+    font-size: 10px;
 }
 .mainBars rect {
     shape-rendering: auto;
