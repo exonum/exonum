@@ -650,102 +650,158 @@ var FlowPage = Backbone.View.extend({
     }
   },
 
+  mouseover: function(g, bp, formatter, element) {
+    bp.mouseover(element);
+
+    g.selectAll('.mainBars').select('.flow-value')
+      .text(function(d) {
+        return element.part === d.part ? formatter(d) : d3.format('0.0%')(d.percent)
+      });
+  },
+
+  mouseout: function(g, bp, formatter, element) {
+    bp.mouseout(element);
+    g.selectAll('.mainBars').select('.flow-value')
+      .text(formatter);
+  },
+
+  /**
+   * Get random unique color
+   * @returns {string}
+   */
+  getColor: function(colors) {
+    var color = this.colorBase[Math.floor(Math.random() * this.colorBase.length)];
+    var isUnique = true;
+
+    $.each(colors, function(i, c) {
+      if (c === color) {
+        isUnique = false;
+        return false;
+      }
+    });
+
+    return isUnique ? color : this.getColor(colors);
+  },
+
+  /**
+   * Do distributor-amount-owner binding
+   * @returns {Array}
+   */
+  collectByRevenue: function() {
+    var data = [];
+    $.each(app.flow.get('ownerships'), function(i, ownership) {
+      if (ownership.amount === 0) {
+        return true;
+      }
+
+      var amount;
+      var ownerName;
+
+      $.each(app.flow.get('owners'), function(j, owner) {
+        if (owner.id === ownership.id) {
+          ownerName = owner.name;
+          return false;
+        }
+      });
+
+      $.each(app.flow.get('contracts'), function(j, contract) {
+        if (contract.fingerprint === ownership.fingerprint) {
+          $.each(app.flow.get('distributors'), function(k, distributor) {
+            if (distributor.id === contract.id) {
+              amount = Math.min(contract.amount, ownership.amount);
+              if (amount > 0) {
+                data.push([distributor.name, ownerName, amount]);
+              }
+              return false;
+            }
+          });
+        }
+      });
+    });
+    return data;
+  },
+
+  /**
+   * Do owner-amount-content binding
+   * @returns {Array}
+   */
+  collectByContent: function() {
+    var data = [];
+    $.each(app.flow.get('ownerships'), function(i, ownership) {
+      if (ownership.amount === 0) {
+        return true;
+      }
+
+      var amount;
+      var ownerName;
+
+      $.each(app.flow.get('owners'), function(j, owner) {
+        if (owner.id === ownership.id) {
+          ownerName = owner.name;
+          return false;
+        }
+      });
+
+      var contentTitle;
+
+      $.each(app.flow.get('contents'), function(j, content) {
+        if (content.fingerprint === ownership.fingerprint) {
+          contentTitle = content.title;
+          return false;
+        }
+      });
+
+      $.each(app.flow.get('contracts'), function(j, contract) {
+        if (contract.fingerprint === ownership.fingerprint) {
+          $.each(app.flow.get('distributors'), function(k, distributor) {
+            if (distributor.id === contract.id) {
+              amount = Math.min(contract.amount, ownership.amount);
+              if (amount > 0) {
+                data.push([ownerName, contentTitle, amount]);
+              }
+              return false;
+            }
+          });
+        }
+      });
+    });
+    return data;
+  },
+
   /**
    * Draw flow chart and insert it into view
    * @returns {boolean}
    */
   draw: function() {
     var that = this;
-    var data = [];
+    var data;
     var colors = {};
     var leftTitle;
+    var leftSubtitle;
     var rightTitle;
-    var valuePrefix;
-
-    /**
-     * Get random unique color
-     * @returns {string}
-     */
-    function getColor() {
-      var color = that.colorBase[Math.floor(Math.random() * that.colorBase.length)];
-      var isUnique = true;
-
-      $.each(colors, function(i, c) {
-        if (c === color) {
-          isUnique = false;
-          return false;
-        }
-      });
-
-      return isUnique ? color : getColor();
-    }
+    var rightSubtitle;
+    var valueFormatter;
 
     switch (app.views.flow.type) {
       case 'revenue':
+        leftSubtitle = 'Spent by';
         leftTitle = 'Distributors';
+        rightSubtitle = 'Earned by';
         rightTitle = 'Owners';
-        valuePrefix = '$'
-
-        $.each(app.flow.get('ownerships'), function(i, ownership) {
-          if (ownership.amount === 0) {
-            return true;
-          }
-
-          var amount = ownership.amount / 100;
-          var ownerName;
-
-          $.each(app.flow.get('owners'), function(j, owner) {
-            if (owner.id === ownership.id) {
-              ownerName = owner.name;
-              return false;
-            }
-          });
-
-          $.each(app.flow.get('contracts'), function(j, contract) {
-            if (contract.finterprint === ownership.finterprint) {
-              $.each(app.flow.get('distributors'), function(k, distributor) {
-                if (distributor.id === contract.id) {
-                  data.push([distributor.name, ownerName, amount]);
-                  return false;
-                }
-              });
-            }
-          });
-        });
-
+        valueFormatter = function(d) {
+          return '$' + Math.round(d.value / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        };
+        data = this.collectByRevenue();
         break;
-      case 'plays':
+      case 'content':
+        leftSubtitle = 'Earned by';
         leftTitle = 'Owners';
+        rightSubtitle = 'Earned by';
         rightTitle = 'Content';
-        valuePrefix = '';
-
-        $.each(app.flow.get('contracts'), function(i, contract) {
-          if (contract.plays === 0) {
-            return true;
-          }
-
-          var plays = contract.plays;
-          var contentTitle;
-
-          $.each(app.flow.get('contents'), function(j, content) {
-            if (content.fingerprint === contract.fingerprint) {
-              contentTitle = content.title;
-              return false;
-            }
-          });
-
-          $.each(app.flow.get('ownerships'), function(j, ownership) {
-            if (ownership.fingerprint === contract.fingerprint) {
-              $.each(app.flow.get('owners'), function(k, owner) {
-                if (owner.id === ownership.id) {
-                  data.push([owner.name, contentTitle, plays]);
-                  return false;
-                }
-              });
-            }
-          });
-        });
-
+        valueFormatter = function(d) {
+          return '$' + Math.round(d.value / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        };
+        data = this.collectByContent();
         break;
       default:
         return false;
@@ -754,55 +810,70 @@ var FlowPage = Backbone.View.extend({
     // Set distributor colors
     $.each(data, function(i, element) {
       if (colors[element[0]] === undefined) {
-        colors[element[0]] = getColor();
+        colors[element[0]] = that.getColor(colors);
       }
     });
 
+    // Initialize svg object
     var chart = document.getElementById('flow-chart');
     var svg = d3.select(chart).append('svg').attr('width', 280).attr('height', 590);
     var g = svg.append('g').attr('transform', 'translate(90, 50)');
     var bp = viz.bP().data(data).min(12).pad(1).height(540).width(100).barSize(15).fill(function(d) {
       return '#' + colors[d.primary];
     });
-
     g.call(bp);
 
-    // Top subtitles and their underlines
-    g.append('text').attr('x', -57).attr('y', -8).attr('class', 'flow-subtitle').text(leftTitle);
-    g.append('text').attr('x', 155).attr('y', -8).attr('class', 'flow-subtitle').text(rightTitle);
+    // Create subtitles and their underlines
+    g.append('text').attr('x', -57).attr('y', -8).attr('class', 'flow-title').text(leftTitle);
+    g.append('text').attr('x', -57).attr('y', -22).attr('class', 'flow-subtitle').text(leftSubtitle);
+    g.append('text').attr('x', 155).attr('y', -8).attr('class', 'flow-title').text(rightTitle);
+    g.append('text').attr('x', 155).attr('y', -22).attr('class', 'flow-subtitle').text(rightSubtitle);
+
     g.append('line').attr('x1', -95).attr('x2', -15);
     g.append('line').attr('x1', 115).attr('x2', 195);
 
     // Add labels
     g.selectAll('.mainBars').append('text').attr('class', 'flow-label')
       .attr('x', function(d) {
-        return d.part == 'primary' ? -70 : 60;
+        return d.part == 'primary' ? -60 : 60;
       })
-      .attr('y', function(d) {
-        return +6;
-      })
+      .attr('y', 6)
       .text(function(d) {
         return d.key;
       })
-      .attr('text-anchor', 'end');
+      .attr('text-anchor', function(d) {
+        return d.part == 'primary' ? 'end' : 'start';
+      });
 
     // Add values
     g.selectAll('.mainBars').append('text').attr('class', 'flow-value')
       .attr('x', function(d) {
-        return d.part == 'primary' ? -65 : 65;
+        return d.part == 'primary' ? -55 : 55;
       })
-      .attr('y', function(d) {
-        return +6;
-      })
-      .text(function(d) {
-        return valuePrefix + Math.round(d.value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-      })
-      .attr('text-anchor', 'start');
+      .attr('y', 6)
+      .text(valueFormatter)
+      .attr('text-anchor', function(d) {
+        return d.part == 'primary' ? 'start' : 'end';
+      });
+
+    // Assign changes on hover
+    g.selectAll('.mainBars')
+      .on('mouseover', this.mouseover.bind(this, g, bp, valueFormatter))
+      .on('mouseout', this.mouseout.bind(this, g, bp, valueFormatter));
+  },
+
+  getTotal: function() {
+    var total = 0;
+    $.each(app.flow.get('contracts'), function(i, contract) {
+      total += contract.amount;
+    });
+    return total;
   },
 
   render: function() {
     this.$el.html(this.template({
-      type: this.type
+      type: this.type,
+      total: this.getTotal()
     }));
     return this;
   }

@@ -2,8 +2,8 @@
   <li class="{% if (type === 'revenue') { %}active{% } %}">
     <a class="flow-toggle" role="button" data-type="revenue">By Revenue</a>
   </li>
-  <li class="{% if (type === 'plays') { %}active{% } %}">
-    <a class="flow-toggle" role="button" data-type="plays">By Plays</a>
+  <li class="{% if (type === 'content') { %}active{% } %}">
+    <a class="flow-toggle" role="button" data-type="content">By Content</a>
   </li>
 </ul>
 
@@ -12,15 +12,8 @@
 <table class="table table-condensed flow-total">
   <tbody>
   <tr>
-    {% if (type === 'revenue') { %}
     <th class="col-xs-6 text-right">Total payout:</th>
-    <td>$5 132 507</td><!-- TODO -->
-    {% } %}
-
-    {% if (type === 'plays') { %}
-    <th class="col-xs-6 text-right">Total played:</th>
-    <td>650 098 507 times</td><!-- TODO -->
-    {% } %}
+    <td>${{ Math.round(total / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
   </tr>
   </tbody>
 </table>

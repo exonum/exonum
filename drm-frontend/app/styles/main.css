@@ -235,7 +235,7 @@ a.button:focus, a.button:active, a.button:hover {
         float: right;
         margin: -60px 0 0;
     }
-    .toolbar-username {
+    .toolbar-link {
         padding: 0!important;
         line-height: 60px!important;
     }
@@ -696,6 +696,10 @@ textarea.form-control {
 .flow-subtitle {
     text-anchor: middle;
     font-size: 10px;
+}
+.flow-title {
+    text-anchor: middle;
+    font-size: 12px;
 }
 .flow-label {
     font-size: 10px;
