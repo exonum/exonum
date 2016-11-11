@@ -94,10 +94,12 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
             } else {
                 self_hash
             }; 
-            match neighbour_on_left {
-                true => res.path.push(NeighbourPosition::Left(path_element)), 
-                false => res.path.push(NeighbourPosition::Right(path_element))
+            if neighbour_on_left{
+                res.path.push(NeighbourPosition::Left(path_element)) 
+            } else {
+                res.path.push(NeighbourPosition::Right(path_element))
             }
+            
             current_height = current_height + K::one(); 
             self_index = self_index / (K::one() + K::one()) ; 
         } 
