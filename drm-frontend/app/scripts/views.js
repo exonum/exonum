@@ -690,12 +690,12 @@ var FlowPage = Backbone.View.extend({
   collectByRevenue: function() {
     var data = [];
     $.each(app.flow.get('ownerships'), function(i, ownership) {
-      if (ownership.amount === 0) {
+      var amount = ownership.amount;
+      var ownerName;
+
+      if (amount === 0) {
         return true;
       }
-
-      var amount;
-      var ownerName;
 
       $.each(app.flow.get('owners'), function(j, owner) {
         if (owner.id === ownership.id) {
@@ -705,13 +705,11 @@ var FlowPage = Backbone.View.extend({
       });
 
       $.each(app.flow.get('contracts'), function(j, contract) {
-        if (contract.fingerprint === ownership.fingerprint) {
+        if (contract.amount > 0 && contract.fingerprint === ownership.fingerprint) {
           $.each(app.flow.get('distributors'), function(k, distributor) {
             if (distributor.id === contract.id) {
-              amount = Math.min(contract.amount, ownership.amount);
-              if (amount > 0) {
-                data.push([distributor.name, ownerName, amount]);
-              }
+              amount = Math.min(contract.amount, amount);
+              data.push([distributor.name, ownerName, amount]);
               return false;
             }
           });
@@ -728,12 +726,13 @@ var FlowPage = Backbone.View.extend({
   collectByContent: function() {
     var data = [];
     $.each(app.flow.get('ownerships'), function(i, ownership) {
-      if (ownership.amount === 0) {
+      var amount = ownership.amount;
+      var ownerName;
+      var contentTitle;
+
+      if (amount === 0) {
         return true;
       }
-
-      var amount;
-      var ownerName;
 
       $.each(app.flow.get('owners'), function(j, owner) {
         if (owner.id === ownership.id) {
@@ -741,8 +740,6 @@ var FlowPage = Backbone.View.extend({
           return false;
         }
       });
-
-      var contentTitle;
 
       $.each(app.flow.get('contents'), function(j, content) {
         if (content.fingerprint === ownership.fingerprint) {
@@ -752,16 +749,44 @@ var FlowPage = Backbone.View.extend({
       });
 
       $.each(app.flow.get('contracts'), function(j, contract) {
-        if (contract.fingerprint === ownership.fingerprint) {
+        if (contract.amount > 0 && contract.fingerprint === ownership.fingerprint) {
           $.each(app.flow.get('distributors'), function(k, distributor) {
             if (distributor.id === contract.id) {
-              amount = Math.min(contract.amount, ownership.amount);
-              if (amount > 0) {
-                data.push([ownerName, contentTitle, amount]);
-              }
+              amount = Math.min(contract.amount, amount);
+              data.push([ownerName, contentTitle, amount]);
               return false;
             }
           });
+        }
+      });
+    });
+    return data;
+  },
+
+  /**
+   * Do distributor-plays-content binding
+   * @returns {Array}
+   */
+  collectByPlays: function() {
+    var data = [];
+    $.each(app.flow.get('contracts'), function(i, contract) {
+      var plays = contract.plays;
+      var distributorName;
+
+      if (plays === 0) {
+        return true;
+      }
+
+      $.each(app.flow.get('distributors'), function(j, distributor) {
+        if (distributor.id === contract.id) {
+          distributorName = distributor.name;
+          return false;
+        }
+      });
+
+      $.each(app.flow.get('contents'), function(j, content) {
+        if (content.fingerprint === contract.fingerprint) {
+          data.push([distributorName, content.title, plays]);
         }
       });
     });
@@ -796,12 +821,22 @@ var FlowPage = Backbone.View.extend({
       case 'content':
         leftSubtitle = 'Earned by';
         leftTitle = 'Owners';
-        rightSubtitle = 'Earned by';
+        rightSubtitle = 'Earned using';
         rightTitle = 'Content';
         valueFormatter = function(d) {
           return '$' + Math.round(d.value / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
         };
         data = this.collectByContent();
+        break;
+      case 'plays':
+        leftSubtitle = 'Played by';
+        leftTitle = 'Distributors';
+        rightSubtitle = 'By';
+        rightTitle = 'Contents';
+        valueFormatter = function(d) {
+          return d.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        };
+        data = this.collectByPlays();
         break;
       default:
         return false;
@@ -864,9 +899,25 @@ var FlowPage = Backbone.View.extend({
 
   getTotal: function() {
     var total = 0;
-    $.each(app.flow.get('contracts'), function(i, contract) {
-      total += contract.amount;
-    });
+    switch (this.type) {
+      case 'revenue':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.amount;
+        });
+        break;
+      case 'content':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.amount;
+        });
+        break;
+      case 'plays':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.plays;
+        });
+        break;
+      default:
+        return '-'
+    }
     return total;
   },
 
