@@ -25,6 +25,7 @@ pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::merkle_table::MerkleTable;
 pub use self::fields::{StorageValue, HeightBytes};
+pub use self::merkle_table::MerkleRangeProof; 
 pub use self::merkle_patricia_table::MerklePatriciaTable;
 use ::crypto::Hash;
 

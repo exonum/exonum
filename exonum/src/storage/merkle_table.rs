@@ -1,4 +1,4 @@
-use num::{Integer, range, ToPrimitive};
+use num::{Integer, range, ToPrimitive, pow};
 
 use std::marker::PhantomData;
 use std::cell::Cell;
@@ -6,6 +6,7 @@ use std::cell::Cell;
 use super::{Map, List, Error, StorageValue, InclusionProof};
 
 use ::crypto::{hash, Hash};
+use std::collections::HashMap;
 
 /// Merkle tree over list.
 /// Данные в таблице хранятся в строчках,
@@ -18,6 +19,167 @@ use ::crypto::{hash, Hash};
 enum NeighbourPosition {
     Left,
     Right,
+}
+
+pub struct MerkleRangeProof<K> {
+    tree_height: K,
+    range_start: K,
+    // end - exclusive
+    range_end: K,
+    merkle_elements_table: HashMap<K, (Option<Hash>, NeighbourPosition)>,
+}
+
+impl<K> MerkleRangeProof<K>
+    where K: Integer + Copy + Clone + ToPrimitive + StorageValue + ::std::hash::Hash
+{
+    fn new(max_height: K, range_start: K, range_end: K) -> MerkleRangeProof<K> {
+        MerkleRangeProof {
+            tree_height: max_height,
+            range_start: range_start,
+            range_end: range_end,
+            merkle_elements_table: HashMap::with_capacity(max_height.to_usize().unwrap()),
+        }
+    }
+
+    fn construct_proof<T, V>(&mut self, source: &MerkleTable<T, K, V>) -> Result<(), Error>
+        where T: Map<[u8], Vec<u8>>,
+              V: StorageValue
+    {
+        if self.tree_height == K::one() {
+            Ok(()) //no elements in path as there's single hash in the tree - the root
+        } else if self.tree_height > K::one() {
+            let subtree_hight = self.tree_height - K::one();
+            let right_subtree_first_index = Self::index_of_first_element_in_subtree(subtree_hight,
+                                                                                    K::one());
+            let (left_range, right_range) =
+                Self::split_range(self.range_start, right_subtree_first_index, self.range_end);
+            match (left_range, right_range) {
+                (Some((l_s, l_e)), Some((r_s, r_e))) => {
+                    self.construct_proof_subtree(subtree_hight, K::zero(), l_s, l_e, source)?;
+                    self.construct_proof_subtree(subtree_hight, K::one(), r_s, r_e, source)?;
+                } 
+                (Some((l_s, l_e)), None) => {
+                    self.construct_proof_subtree(subtree_hight, K::zero(), l_s, l_e, source)?;
+                }
+                (None, Some((r_s, r_e))) => {
+                    self.construct_proof_subtree(subtree_hight, K::one(), r_s, r_e, source)?;
+                }
+                (None, None) => {
+                    unreachable!();
+                }
+
+            };
+            Ok(())
+        } else {
+            unreachable!();
+        }
+    }
+
+    fn construct_proof_subtree<T, V>(&mut self,
+                                     node_height: K,
+                                     node_index: K,
+                                     range_start: K,
+                                     range_end: K,
+                                     source: &MerkleTable<T, K, V>)
+                                     -> Result<(), Error>
+        where T: Map<[u8], Vec<u8>>,
+              V: StorageValue
+    {
+        if node_height > K::zero() {
+            let (hash_option, position) = source.get_neighbour_hash(node_height, node_index)?;
+            let ordinal =
+                Self::convert_to_ordinal_number(self.tree_height, node_height, node_index);
+            self.merkle_elements_table.insert(ordinal, (hash_option, position));
+            if node_height > K::one() {
+                let subtree_hight = node_height - K::one();
+                let left_child_index = node_index * (K::one() + K::one());
+                let righ_child_index = node_index * (K::one() + K::one()) + K::one();
+                let right_subtree_first_index =
+                    Self::index_of_first_element_in_subtree(subtree_hight, righ_child_index);
+                let (left_range, right_range) =
+                    Self::split_range(range_start, right_subtree_first_index, range_end);
+                match (left_range, right_range) {
+                    (Some((l_s, l_e)), Some((r_s, r_e))) => {
+                        self.construct_proof_subtree(subtree_hight,
+                                                     left_child_index,
+                                                     l_s,
+                                                     l_e,
+                                                     source)?;
+                        self.construct_proof_subtree(subtree_hight,
+                                                     righ_child_index,
+                                                     r_s,
+                                                     r_e,
+                                                     source)?;
+                    } 
+                    (Some((l_s, l_e)), None) => {
+                        self.construct_proof_subtree(subtree_hight,
+                                                     left_child_index,
+                                                     l_s,
+                                                     l_e,
+                                                     source)?;
+                    }
+                    (None, Some((r_s, r_e))) => {
+                        self.construct_proof_subtree(subtree_hight,
+                                                     righ_child_index,
+                                                     r_s,
+                                                     r_e,
+                                                     source)?;
+                    }
+                    (None, None) => {
+                        unreachable!();
+                    }
+
+                };
+            }
+            Ok(())
+        } else {
+            unreachable!();
+        }
+    }
+
+    fn split_range(start: K, middle: K, end: K) -> (Option<((K, K))>, Option<((K, K))>) {
+        debug_assert!(start < end);
+        if middle >= end {
+            (Some((start, end)), None)
+        } else if middle <= start {
+            (None, Some((start, end)))
+        } else {
+            // start < middle < end
+            (Some((start, middle)), Some((middle, end)))
+        }
+    }
+
+    fn index_of_first_element_in_subtree(subtree_root_height: K, subtree_root_index: K) -> K {
+        pow(K::one() + K::one(),
+            (subtree_root_height - K::one()).to_usize().unwrap()) * subtree_root_index
+    }
+
+    fn convert_to_ordinal_number(max_height: K, height: K, index_in_row: K) -> K {
+        debug_assert!(max_height >= height);
+        let pow = pow((K::one() + K::one()),
+                      (max_height - height).to_usize().unwrap());
+        debug_assert!(index_in_row < pow);
+
+        pow + index_in_row
+    }
+
+    fn convert_to_height_and_index(max_height: K, ordinal_number: K) -> (K, K) {
+        debug_assert!(ordinal_number >= K::one());
+        let depth_diff = Self::upper_power_of_two(ordinal_number) - K::one();
+        let power_of_two = pow((K::one() + K::one()), depth_diff.to_usize().unwrap());
+        let index_in_row = ordinal_number.mod_floor(&power_of_two);
+        (max_height - depth_diff, index_in_row)
+    }
+
+    fn upper_power_of_two(v: K) -> K {
+        let mut p = K::one();
+        let mut i = K::zero();
+        while p <= v {
+            p = p * (K::one() + K::one());
+            i = i + K::one();
+        }
+        i
+    }
 }
 
 pub struct MerkleTreePath {
@@ -54,7 +216,7 @@ pub struct MerkleTable<T: Map<[u8], Vec<u8>>, K, V> {
 
 impl<'a, T, K, V> MerkleTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+          K: Integer + Copy + Clone + ToPrimitive + StorageValue + ::std::hash::Hash,
           V: StorageValue
 {
     pub fn new(map: T) -> Self {
@@ -79,6 +241,24 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
             .map(|h| h.unwrap_or_else(|| hash(&[])))
     }
 
+    fn get_neighbour_hash(&self,
+                          self_height: K,
+                          self_index: K)
+                          -> Result<(Option<Hash>, NeighbourPosition), Error> {
+        let pos: NeighbourPosition;
+        let neighbour_index: K;
+
+        if self_index.is_even() {
+            neighbour_index = self_index + K::one();
+            pos = NeighbourPosition::Right;
+        } else {
+            neighbour_index = self_index - K::one();
+            pos = NeighbourPosition::Left;
+        };
+        let neighbour_hash = self.get_hash(self_height, neighbour_index)?;
+        Ok((neighbour_hash, pos))
+    }
+
     pub fn construct_path_for_index(&self, mut self_index: K) -> Result<MerkleTreePath, Error> {
         if self_index >= self.len()? || self_index < K::zero() {
             return Err(Error::new("Wrong index for MerkleTable!"));
@@ -88,24 +268,30 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         let height = self.height()?;
 
         while current_height != height {
-            let pos: NeighbourPosition;
-            let neighbour_index: K;
-            if self_index.is_even() {
-                neighbour_index = self_index + K::one();
-                pos = NeighbourPosition::Right;
-            } else {
-                neighbour_index = self_index - K::one();
-                pos = NeighbourPosition::Left;
-            };
-            let neighbour_hash = self.get_hash(current_height, neighbour_index)?;
-            res.path.push((neighbour_hash, pos));
-
+            let neighbour_hash_tuple = self.get_neighbour_hash(current_height, self_index)?;
+            res.path.push(neighbour_hash_tuple);
 
             current_height = current_height + K::one();
             self_index = self_index / (K::one() + K::one());
         }
         Ok(res)
+    }
 
+    pub fn construct_path_for_range(&self,
+                                    range_start: K,
+                                    range_end: K)
+                                    -> Result<MerkleRangeProof<K>, Error> {
+        if (range_start < K::zero() || range_end > self.len()?) || range_end <= range_start {
+            return Err(Error::new(format!("Illegal range boundaries for MerkleTable. len: \
+                                           {:?}, range start: {:?}, range_end: {:?}",
+                                          self.len()?.to_usize().unwrap(),
+                                          range_start.to_usize().unwrap(),
+                                          range_end.to_usize().unwrap())));
+        }
+        let max_height = self.height()?;
+        let mut res = MerkleRangeProof::new(max_height, range_start, range_end);
+        res.construct_proof(self)?;
+        Ok(res)
     }
 
     fn height(&self) -> Result<K, Error> {
@@ -206,7 +392,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
 impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+          K: Integer + Copy + Clone + ToPrimitive + StorageValue + ::std::hash::Hash,
           V: StorageValue
 {
     fn append(&self, value: V) -> Result<(), Error> {
@@ -274,7 +460,8 @@ mod tests {
     extern crate rand;
 
     use ::crypto::hash;
-    use ::storage::{MemoryDB, List, MapTable, MerkleTable, InclusionProof};
+    use ::storage::{MemoryDB, List, MapTable, MerkleTable, InclusionProof, MerkleRangeProof};
+    use std::collections::HashMap;
 
     #[test]
     fn test_list_methods() {
@@ -429,6 +616,17 @@ mod tests {
         assert!(path.verify(&vec![5], h12345678));
         assert!(!path.verify(&vec![8], h12345678));
 
+        let mut range_proof = table.construct_path_for_range(0, 1).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 3);
+        range_proof = table.construct_path_for_range(0, 3).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 6);
+        range_proof = table.construct_path_for_range(0, 4).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 7);
+        range_proof = table.construct_path_for_range(0, 5).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 10);
+
+
+
         path_result = table.construct_path_for_index(8);
         assert!(path_result.is_err());
 
@@ -485,5 +683,55 @@ mod tests {
         t2.append(vec![1]).unwrap();
 
         assert_eq!(t1.root_hash().unwrap(), t2.root_hash().unwrap());
+    }
+
+    #[test]
+    fn test_indices_converting_for_merkle_range_proof() {
+        let mut map_tested_values = HashMap::new();
+        map_tested_values.insert(1u32, (5u32, 5u32, 0u32));
+        map_tested_values.insert(3u32, (5u32, 4u32, 1u32));
+        map_tested_values.insert(6u32, (4u32, 2u32, 2u32));
+        map_tested_values.insert(15u32, (4u32, 1u32, 7u32));
+        map_tested_values.insert(12u32, (3u32, 0u32, 4u32));
+        map_tested_values.insert(8u32, (4u32, 1u32, 0u32));
+        map_tested_values.insert(13u32, (4u32, 1u32, 5u32));
+        map_tested_values.insert(25u32, (5u32, 1u32, 9u32));
+        map_tested_values.insert(16u32, (7u32, 3u32, 0u32));
+        map_tested_values.insert(31u32, (4u32, 0u32, 15u32));
+        map_tested_values.insert(129u32, (8u32, 1u32, 1u32));
+
+
+
+        for key in map_tested_values.keys() {
+            let expected_ordinal = *key;
+            let (max_height, height, index) = *map_tested_values.get(key).unwrap();
+            assert_eq!(expected_ordinal,
+                       MerkleRangeProof::convert_to_ordinal_number(max_height, height, index));
+            assert_eq!((height, index),
+                       MerkleRangeProof::convert_to_height_and_index(max_height, expected_ordinal));
+        }
+
+        assert_eq!(MerkleRangeProof::index_of_first_element_in_subtree(4u32, 1u32),
+                   8);
+        assert_eq!(MerkleRangeProof::index_of_first_element_in_subtree(5u32, 1u32),
+                   16);
+        assert_eq!(MerkleRangeProof::index_of_first_element_in_subtree(3u32, 3u32),
+                   12);
+        assert_eq!(MerkleRangeProof::index_of_first_element_in_subtree(2u32, 3u32),
+                   6);
+        assert_eq!(MerkleRangeProof::index_of_first_element_in_subtree(1u32, 7u32),
+                   7);
+
+
+    }
+
+    #[test]
+    fn test_split_range() {
+        assert_eq!((Some((0u32, 17u32)), Some((17u32, 31u32))),
+                   MerkleRangeProof::split_range(0u32, 17u32, 31u32));
+        assert_eq!((Some((0u32, 31u32)), None),
+                   MerkleRangeProof::split_range(0u32, 31u32, 31u32));
+        assert_eq!((None, Some((5u32, 31u32))),
+                   MerkleRangeProof::split_range(5u32, 0u32, 31u32));
     }
 }
