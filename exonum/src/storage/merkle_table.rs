@@ -8,6 +8,7 @@ use super::{Map, List, Error, StorageValue, InclusionProof};
 use ::crypto::{hash, Hash};
 use std::collections::HashMap;
 
+type Range<K> = Option<(K, K)>;
 /// Merkle tree over list.
 /// Данные в таблице хранятся в строчках,
 /// высота определяется количеством записаных значений H = len / 2 +1
@@ -137,7 +138,7 @@ impl<K> MerkleRangeProof<K>
         }
     }
 
-    fn split_range(start: K, middle: K, end: K) -> (Option<((K, K))>, Option<((K, K))>) {
+    fn split_range(start: K, middle: K, end: K) -> (Range<K>, Range<K>) {
         debug_assert!(start < end);
         if middle >= end {
             (Some((start, end)), None)
@@ -163,23 +164,23 @@ impl<K> MerkleRangeProof<K>
         pow + index_in_row
     }
 
-    fn convert_to_height_and_index(max_height: K, ordinal_number: K) -> (K, K) {
-        debug_assert!(ordinal_number >= K::one());
-        let depth_diff = Self::upper_power_of_two(ordinal_number) - K::one();
-        let power_of_two = pow((K::one() + K::one()), depth_diff.to_usize().unwrap());
-        let index_in_row = ordinal_number.mod_floor(&power_of_two);
-        (max_height - depth_diff, index_in_row)
-    }
+    // fn convert_to_height_and_index(max_height: K, ordinal_number: K) -> (K, K) {
+    //     debug_assert!(ordinal_number >= K::one());
+    //     let depth_diff = Self::upper_power_of_two(ordinal_number) - K::one();
+    //     let power_of_two = pow((K::one() + K::one()), depth_diff.to_usize().unwrap());
+    //     let index_in_row = ordinal_number.mod_floor(&power_of_two);
+    //     (max_height - depth_diff, index_in_row)
+    // }
 
-    fn upper_power_of_two(v: K) -> K {
-        let mut p = K::one();
-        let mut i = K::zero();
-        while p <= v {
-            p = p * (K::one() + K::one());
-            i = i + K::one();
-        }
-        i
-    }
+    // fn upper_power_of_two(v: K) -> K {
+    //     let mut p = K::one();
+    //     let mut i = K::zero();
+    //     while p <= v {
+    //         p = p * (K::one() + K::one());
+    //         i = i + K::one();
+    //     }
+    //     i
+    // }
 }
 
 pub struct MerkleTreePath {
@@ -707,8 +708,8 @@ mod tests {
             let (max_height, height, index) = *map_tested_values.get(key).unwrap();
             assert_eq!(expected_ordinal,
                        MerkleRangeProof::convert_to_ordinal_number(max_height, height, index));
-            assert_eq!((height, index),
-                       MerkleRangeProof::convert_to_height_and_index(max_height, expected_ordinal));
+            // assert_eq!((height, index),
+            // MerkleRangeProof::convert_to_height_and_index(max_height, expected_ordinal));
         }
 
         assert_eq!(MerkleRangeProof::index_of_first_element_in_subtree(4u32, 1u32),
