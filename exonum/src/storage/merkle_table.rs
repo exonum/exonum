@@ -42,40 +42,6 @@ impl<K> MerkleRangeProof<K>
         }
     }
 
-    fn construct_proof<T, V>(&mut self, source: &MerkleTable<T, K, V>) -> Result<(), Error>
-        where T: Map<[u8], Vec<u8>>,
-              V: StorageValue
-    {
-        if self.tree_height == K::one() {
-            Ok(()) //no elements in path as there's single hash in the tree - the root
-        } else if self.tree_height > K::one() {
-            let subtree_hight = self.tree_height - K::one();
-            let right_subtree_first_index = Self::index_of_first_element_in_subtree(subtree_hight,
-                                                                                    K::one());
-            let (left_range, right_range) =
-                Self::split_range(self.range_start, right_subtree_first_index, self.range_end);
-            match (left_range, right_range) {
-                (Some((l_s, l_e)), Some((r_s, r_e))) => {
-                    self.construct_proof_subtree(subtree_hight, K::zero(), l_s, l_e, source)?;
-                    self.construct_proof_subtree(subtree_hight, K::one(), r_s, r_e, source)?;
-                } 
-                (Some((l_s, l_e)), None) => {
-                    self.construct_proof_subtree(subtree_hight, K::zero(), l_s, l_e, source)?;
-                }
-                (None, Some((r_s, r_e))) => {
-                    self.construct_proof_subtree(subtree_hight, K::one(), r_s, r_e, source)?;
-                }
-                (None, None) => {
-                    unreachable!();
-                }
-
-            };
-            Ok(())
-        } else {
-            unreachable!();
-        }
-    }
-
     fn construct_proof_subtree<T, V>(&mut self,
                                      node_height: K,
                                      node_index: K,
@@ -87,10 +53,12 @@ impl<K> MerkleRangeProof<K>
               V: StorageValue
     {
         if node_height > K::zero() {
-            let (hash_option, position) = source.get_neighbour_hash(node_height, node_index)?;
-            let ordinal =
-                Self::convert_to_ordinal_number(self.tree_height, node_height, node_index);
-            self.merkle_elements_table.insert(ordinal, (hash_option, position));
+            if node_height < self.tree_height {
+                let (hash_option, position) = source.get_neighbour_hash(node_height, node_index)?;
+                let ordinal =
+                    Self::convert_to_ordinal_number(self.tree_height, node_height, node_index);
+                self.merkle_elements_table.insert(ordinal, (hash_option, position));
+            }
             if node_height > K::one() {
                 let subtree_hight = node_height - K::one();
                 let left_child_index = node_index * (K::one() + K::one());
@@ -164,6 +132,28 @@ impl<K> MerkleRangeProof<K>
         pow + index_in_row
     }
 
+    fn combine_hashes(&self, hash_in_position: Hash, element_height: K, element_index: K) -> Hash {
+        let ordinal_of_merkle_el =
+            Self::convert_to_ordinal_number(self.tree_height, element_height, element_index);
+        let (merkle_element, position) = *(self.merkle_elements_table
+            .get(&ordinal_of_merkle_el)
+            .expect(&format!("No merkle path element in table for height: {:?}, index: {:?} ",
+                             element_height.to_usize().unwrap(),
+                             element_index.to_usize().unwrap())));
+        if let Some(elem_hash) = merkle_element {
+            match position {
+                NeighbourPosition::Left => {
+                    hash(&[elem_hash.as_ref(), hash_in_position.as_ref()].concat())
+                } 
+                NeighbourPosition::Right => {
+                    hash(&[hash_in_position.as_ref(), elem_hash.as_ref()].concat())
+                } 
+            }
+        } else {
+            hash(hash_in_position.as_ref())
+        }
+    }
+
     // fn convert_to_height_and_index(max_height: K, ordinal_number: K) -> (K, K) {
     //     debug_assert!(ordinal_number >= K::one());
     //     let depth_diff = Self::upper_power_of_two(ordinal_number) - K::one();
@@ -183,29 +173,56 @@ impl<K> MerkleRangeProof<K>
     // }
 }
 
-pub struct MerkleTreePath {
-    path: Vec<(Option<Hash>, NeighbourPosition)>,
-}
+impl<V: StorageValue, K> InclusionProof<V> for MerkleRangeProof<K>
+    where K: Integer + Copy + Clone + ToPrimitive + StorageValue + ::std::hash::Hash
+{
+    fn verify(&self, values: Vec<&V>, root_hash: Hash) -> bool {
+        let mut len_range = (self.range_end - self.range_start).to_usize().unwrap();
+        debug_assert!(values.len() == len_range);
 
-impl<V: StorageValue> InclusionProof<V> for MerkleTreePath {
-    fn verify(&self, value: &V, root_hash: Hash) -> bool {
-        let mut result = value.hash();
-        for elem in &self.path {
-            let (hash_option, position) = *elem;
-            if let Some(neighbour_hash) = hash_option {
-                result = match position {
-                    NeighbourPosition::Left => {
-                        hash(&[neighbour_hash.as_ref(), result.as_ref()].concat())
-                    }
-                    NeighbourPosition::Right => {
-                        hash(&[result.as_ref(), neighbour_hash.as_ref()].concat())
-                    }
-                }
-            } else {
-                result = hash(result.as_ref());
-            }
+        let mut value_iter = values.into_iter();
+        let mut previous_row: Vec<(K, Hash)> = Vec::with_capacity(len_range);
+        for index in range(self.range_start, self.range_end) {
+            previous_row.push((index, (value_iter.next().unwrap()).hash()));
         }
-        result == root_hash
+
+        let mut current_height = K::one();
+        if current_height == self.tree_height {
+            debug_assert!(previous_row.len() == 1);
+            let (_, only_hash) = previous_row[0];
+            return only_hash == root_hash;
+        }
+
+        let mut combined_hashes_row: Vec<(K, Hash)>;
+
+        while current_height < self.tree_height {
+            let mut last_upper_index: K = self.range_end; // we need to initialize with something, that doesn't coincide with possible values of upper_index below
+            len_range = len_range / 2 + len_range % 2;
+            combined_hashes_row = Vec::with_capacity(len_range);
+
+            for (index, hash_in_table) in previous_row {
+                let upper_index = index / (K::one() + K::one());
+                let upper_hash_candidate =
+                    self.combine_hashes(hash_in_table, current_height, index);
+                if last_upper_index == upper_index {
+                    let (_, prev_combined_hash) = combined_hashes_row[combined_hashes_row.len() -
+                                                                      1];
+                    if prev_combined_hash != upper_hash_candidate {
+                        return false;
+                    }
+                } else {
+                    combined_hashes_row.push((upper_index, upper_hash_candidate));
+                }
+                last_upper_index = upper_index;
+            }
+
+            previous_row = combined_hashes_row;
+            current_height = current_height + K::one();
+        }
+
+        debug_assert!(previous_row.len() == 1);
+        let (_, only_hash) = previous_row[0];
+        only_hash == root_hash
     }
 }
 
@@ -260,24 +277,6 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         Ok((neighbour_hash, pos))
     }
 
-    pub fn construct_path_for_index(&self, mut self_index: K) -> Result<MerkleTreePath, Error> {
-        if self_index >= self.len()? || self_index < K::zero() {
-            return Err(Error::new("Wrong index for MerkleTable!"));
-        }
-        let mut res = MerkleTreePath { path: Vec::new() };
-        let mut current_height = K::one();
-        let height = self.height()?;
-
-        while current_height != height {
-            let neighbour_hash_tuple = self.get_neighbour_hash(current_height, self_index)?;
-            res.path.push(neighbour_hash_tuple);
-
-            current_height = current_height + K::one();
-            self_index = self_index / (K::one() + K::one());
-        }
-        Ok(res)
-    }
-
     pub fn construct_path_for_range(&self,
                                     range_start: K,
                                     range_end: K)
@@ -291,7 +290,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         }
         let max_height = self.height()?;
         let mut res = MerkleRangeProof::new(max_height, range_start, range_end);
-        res.construct_proof(self)?;
+        res.construct_proof_subtree(max_height, K::zero(), range_start, range_end, self)?;
         Ok(res)
     }
 
@@ -550,87 +549,123 @@ mod tests {
         let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
         let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
-        let mut path_result = table.construct_path_for_index(0);
+        let mut path_result = table.construct_path_for_range(0, 1);
         assert!(path_result.is_err());
 
 
         table.append(vec![1]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h1);
-        let mut path = table.construct_path_for_index(0).unwrap();
-        assert_eq!(path.path.len(), 0);
-        assert!(path.verify(&vec![1], h1));
-        assert!(!path.verify(&vec![254], h1));
+
+        let mut range_proof = table.construct_path_for_range(0, 1).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 0);
+        assert!(range_proof.verify(vec![&vec![1]], h1));
+        assert!(!range_proof.verify(vec![&vec![254]], h1));
 
 
         table.append(vec![2]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h12);
-        path = table.construct_path_for_index(1).unwrap();
-        assert_eq!(path.path.len(), 1);
-        assert!(path.verify(&vec![2], h12));
-        assert!(!path.verify(&vec![1], h12));
+        range_proof = table.construct_path_for_range(1, 2).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 1);
+        assert!(range_proof.verify(vec![&vec![2]], h12));
+        assert!(!range_proof.verify(vec![&vec![1]], h12));
+        range_proof = table.construct_path_for_range(0, 2).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 2);
+        assert!(range_proof.verify(vec![&vec![1], &vec![2]], h12));
+        assert!(!range_proof.verify(vec![&vec![2], &vec![1]], h12));
 
         table.append(vec![3]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h123);
-        path = table.construct_path_for_index(2).unwrap();
-        assert_eq!(path.path.len(), 2);
-        assert!(path.verify(&vec![3], h123));
-        assert!(!path.verify(&vec![2], h12));
+        range_proof = table.construct_path_for_range(2, 3).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 2);
+        assert!(range_proof.verify(vec![&vec![3]], h123));
+        let (hash_option, _) = *range_proof.merkle_elements_table.get(&6).unwrap();
+        assert!(hash_option.is_none());
+        let (hash_option, _) = *range_proof.merkle_elements_table.get(&3).unwrap();
+        assert!(hash_option.unwrap() == h12);
+        range_proof = table.construct_path_for_range(0, 3).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 5);
+        assert!(range_proof.verify(vec![&vec![1], &vec![2], &vec![3]], h123));
+        assert!(!range_proof.verify(vec![&vec![2], &vec![2], &vec![3]], h123));
+
 
         table.append(vec![4]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h1234);
-        path = table.construct_path_for_index(3).unwrap();
-        assert_eq!(path.path.len(), 2);
-        assert!(path.verify(&vec![4], h1234));
-        assert!(!path.verify(&vec![3], h1234));
+        range_proof = table.construct_path_for_range(3, 4).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 2);
+        assert!(range_proof.verify(vec![&vec![4]], h1234));
+        let (hash_option, _) = *range_proof.merkle_elements_table.get(&7).unwrap();
+        assert!(hash_option.unwrap() == h3);
+        let (hash_option, _) = *range_proof.merkle_elements_table.get(&3).unwrap();
+        assert!(hash_option.unwrap() == h12);
+        range_proof = table.construct_path_for_range(0, 4).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 6);
+        assert!(range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4]], h1234));
+        assert!(!range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![3]], h1234));
+
 
 
         table.append(vec![5]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h12345);
-        path = table.construct_path_for_index(4).unwrap();
-        assert_eq!(path.path.len(), 3);
-        assert!(path.verify(&vec![5], h12345));
-        assert!(!path.verify(&vec![4], h12345));
+        range_proof = table.construct_path_for_range(4, 5).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 3);
+        assert!(range_proof.verify(vec![&vec![5]], h12345));
+        let (hash_option, _) = *range_proof.merkle_elements_table.get(&12).unwrap();
+        assert!(hash_option.is_none());
+        let (hash_option, _) = *range_proof.merkle_elements_table.get(&6).unwrap();
+        assert!(hash_option.is_none());
+        let (hash_option, _) = *range_proof.merkle_elements_table.get(&3).unwrap();
+        assert!(hash_option.unwrap() == h1234);
+        range_proof = table.construct_path_for_range(0, 5).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 10);
+        assert!(range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4], &vec![5]],
+                                   h12345));
+        assert!(!range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4], &vec![11]],
+                                    h12345));
 
         table.append(vec![6]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h123456);
-        path = table.construct_path_for_index(5).unwrap();
-        assert_eq!(path.path.len(), 3);
-        assert!(path.verify(&vec![6], h123456));
-        assert!(!path.verify(&vec![5], h123456));
+        range_proof = table.construct_path_for_range(5, 6).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 3);
+        assert!(range_proof.verify(vec![&vec![6]], h123456));
+        range_proof = table.construct_path_for_range(0, 6).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 11);
+        assert!(range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4], &vec![5], &vec![6]],
+                    h123456));
+        assert!(!range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4], &vec![11], &vec![6]], h123456));
 
         table.append(vec![7]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h1234567);
-        path = table.construct_path_for_index(6).unwrap();
-        assert_eq!(path.path.len(), 3);
-        assert!(path.verify(&vec![7], h1234567));
-        assert!(!path.verify(&vec![6], h12345));
+        range_proof = table.construct_path_for_range(6, 7).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 3);
+        assert!(range_proof.verify(vec![&vec![7]], h1234567));
+        range_proof = table.construct_path_for_range(0, 7).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 13);
+        assert!(range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4], &vec![5], &vec![6], &vec![7]], h1234567));
+        assert!(!range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4], &vec![5], &vec![6], &vec![23]], h1234567));
 
         table.append(vec![8]).unwrap();
         assert_eq!(table.root_hash().unwrap(), h12345678);
-        path = table.construct_path_for_index(7).unwrap();
-        assert_eq!(path.path.len(), 3);
-        assert!(path.verify(&vec![8], h12345678));
-        assert!(!path.verify(&vec![7], h12345678));
-
-        path = table.construct_path_for_index(4).unwrap();
-        assert_eq!(path.path.len(), 3);
-        assert!(path.verify(&vec![5], h12345678));
-        assert!(!path.verify(&vec![8], h12345678));
-
-        let mut range_proof = table.construct_path_for_range(0, 1).unwrap();
+        range_proof = table.construct_path_for_range(7, 8).unwrap();
         assert_eq!(range_proof.merkle_elements_table.len(), 3);
-        range_proof = table.construct_path_for_range(0, 3).unwrap();
+        assert!(range_proof.verify(vec![&vec![8]], h12345678));
+        range_proof = table.construct_path_for_range(0, 7).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 13);
+        assert!(range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4], &vec![5], &vec![6], &vec![7]], h12345678));
+        range_proof = table.construct_path_for_range(0, 8).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 14);
+        assert!(range_proof.verify(vec![&vec![1], &vec![2], &vec![3], &vec![4], &vec![5], &vec![6], &vec![7], &vec![8]], h12345678));
+        range_proof = table.construct_path_for_range(3, 5).unwrap();
         assert_eq!(range_proof.merkle_elements_table.len(), 6);
-        range_proof = table.construct_path_for_range(0, 4).unwrap();
-        assert_eq!(range_proof.merkle_elements_table.len(), 7);
-        range_proof = table.construct_path_for_range(0, 5).unwrap();
-        assert_eq!(range_proof.merkle_elements_table.len(), 10);
+        assert!(range_proof.verify(vec![&vec![4], &vec![5]], h12345678));
+        range_proof = table.construct_path_for_range(2, 6).unwrap();
+        assert_eq!(range_proof.merkle_elements_table.len(), 8);
+        assert!(range_proof.verify(vec![&vec![3], &vec![4], &vec![5], &vec![6]], h12345678));
 
-
-
-        path_result = table.construct_path_for_index(8);
+        path_result = table.construct_path_for_range(8, 9);
         assert!(path_result.is_err());
 
+        path_result = table.construct_path_for_range(6, 6);
+        assert!(path_result.is_err());
 
         assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
     }
@@ -722,8 +757,6 @@ mod tests {
                    6);
         assert_eq!(MerkleRangeProof::index_of_first_element_in_subtree(1u32, 7u32),
                    7);
-
-
     }
 
     #[test]
