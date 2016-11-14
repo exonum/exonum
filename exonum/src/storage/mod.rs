@@ -68,7 +68,7 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
 }
 
 pub trait InclusionProof<V: StorageValue> {
-    fn verify(&self, value: &V, root_hash: Hash) -> bool;
+    fn verify(&self, value: Vec<&V>, root_hash: Hash) -> bool;
 }
 
 impl Error {
