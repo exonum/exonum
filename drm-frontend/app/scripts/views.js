@@ -633,11 +633,10 @@ var FlowPage = Backbone.View.extend({
     'click .flow-toggle': 'toggle'
   },
 
-  // Color base generated with http://paletton.com/
   colorBase: [
-    "6AF400", "5CD500", "6AF500", "67ED00", "63E400", "00E27B", "00A65A", "00E37C", "00CD70", "00B563", "C8FB00", "B7E600", "C8FB00", "C6F800", "C3F500",
-    "FF3100", "F02E00", "FF3100", "FF3100", "FF3100", "FF8300", "F07B00", "FF8300", "FF8300", "FF8300", "F30056", "D2004A", "F40056", "EB0053", "E10050",
-    "0D50E0", "0536A0", "1456E1", "0645C9", "053CB0", "390FE2", "2506A5", "4018E3", "2E08CD", "2907B5", "01D0DA", "008B91", "01D1DB", "00B6BF", "0099A0"
+    'f33d54', 'b10632', '39b54a', '22752f', 'f7941d', 'be7214', '0054a6', '172f5d',
+    '095256', '087F8C', '5AAA95', '86A873', 'BB9F06', '804E49', 'E7DECD', '0A122A',
+    'FFCAB1', 'ECDCB0', 'C1D7AE', '8CC084', 'A3333D', '477998', '698F3F', '7E8287'
   ],
 
   toggle: function(e) {
@@ -720,7 +719,7 @@ var FlowPage = Backbone.View.extend({
   },
 
   /**
-   * Do owner-amount-content binding
+   * Do content-amount-owner binding
    * @returns {Array}
    */
   collectByContent: function() {
@@ -753,7 +752,7 @@ var FlowPage = Backbone.View.extend({
           $.each(app.flow.get('distributors'), function(k, distributor) {
             if (distributor.id === contract.id) {
               amount = Math.min(contract.amount, amount);
-              data.push([ownerName, contentTitle, amount]);
+              data.push([contentTitle, ownerName, amount]);
               return false;
             }
           });
@@ -802,16 +801,12 @@ var FlowPage = Backbone.View.extend({
     var data;
     var colors = {};
     var leftTitle;
-    var leftSubtitle;
     var rightTitle;
-    var rightSubtitle;
     var valueFormatter;
 
     switch (app.views.flow.type) {
       case 'revenue':
-        leftSubtitle = 'Spent by';
         leftTitle = 'Distributors';
-        rightSubtitle = 'Earned by';
         rightTitle = 'Owners';
         valueFormatter = function(d) {
           return '$' + Math.round(d.value / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -819,19 +814,15 @@ var FlowPage = Backbone.View.extend({
         data = this.collectByRevenue();
         break;
       case 'content':
-        leftSubtitle = 'Earned by';
-        leftTitle = 'Owners';
-        rightSubtitle = 'Earned using';
-        rightTitle = 'Content';
+        leftTitle = 'Contents';
+        rightTitle = 'Owners';
         valueFormatter = function(d) {
           return '$' + Math.round(d.value / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
         };
         data = this.collectByContent();
         break;
       case 'plays':
-        leftSubtitle = 'Played by';
         leftTitle = 'Distributors';
-        rightSubtitle = 'By';
         rightTitle = 'Contents';
         valueFormatter = function(d) {
           return d.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -858,12 +849,11 @@ var FlowPage = Backbone.View.extend({
     });
     g.call(bp);
 
-    // Create subtitles and their underlines
-    g.append('text').attr('x', -57).attr('y', -8).attr('class', 'flow-title').text(leftTitle);
-    g.append('text').attr('x', -57).attr('y', -22).attr('class', 'flow-subtitle').text(leftSubtitle);
+    // Create titles
+    g.append('text').attr('x', -55).attr('y', -8).attr('class', 'flow-title').text(leftTitle);
     g.append('text').attr('x', 155).attr('y', -8).attr('class', 'flow-title').text(rightTitle);
-    g.append('text').attr('x', 155).attr('y', -22).attr('class', 'flow-subtitle').text(rightSubtitle);
 
+    // Create underlines for titles
     g.append('line').attr('x1', -95).attr('x2', -15);
     g.append('line').attr('x1', 115).attr('x2', 195);
 
