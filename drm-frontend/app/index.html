@@ -1,20 +1,21 @@
 <!doctype html>
-<html lang="">
+<html class="no-js" lang="">
   <head>
     <meta charset="utf-8">
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>DRM Exonum Demo</title>
+
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <!-- Place favicon.ico in the root directory -->
+
     <!-- build:css styles/vendor.css -->
-    <!-- bower:css -->
     <link rel="stylesheet" href="/bower_components/bootswatch-dist/css/bootstrap.css">
-    <!-- endbower -->
     <!-- endbuild -->
 
     <!-- build:css styles/main.css -->
     <link rel="stylesheet" href="styles/main.css">
     <!-- endbuild -->
-
   </head>
   <body>
     <!--[if lt IE 10]>
@@ -28,40 +29,41 @@
     </div>
 
     <div class="toolbar">
-        <a class="toolbar-return-button pull-left">
-          <img src="images/left_arrow.svg" alt="">
-        </a>
-        <div class="toolbar-help-button navbar-toggle hidden pull-right" id="menu" role="button" data-toggle="collapse" data-target="#navbar-collapse" aria-expanded="false">
-          <span class="icon-bar"></span>
-          <span class="icon-bar"></span>
-          <span class="icon-bar"></span>
-        </div>
-        <div class="toolbar-title"></div>
-        <div class="toolbar-dropdown collapse navbar-collapse" id="navbar-collapse">
-          <ul class="nav navbar-nav">
-            <li>
-              <div class="toolbar-username hidden" id="user" role="button">
-                <i class="glyphicon glyphicon-briefcase"></i>&nbsp;
-                <i class="glyphicon glyphicon-user"></i>
-                &nbsp;<span id="username"></span>
-              </div>
-            </li>
-          </ul>
-        </div>
+      <a class="toolbar-return-button pull-left">
+        <img src="images/left_arrow.svg" alt="">
+      </a>
+      <div class="toolbar-help-button navbar-toggle hidden pull-right" id="menu" role="button" data-toggle="collapse" data-target="#navbar-collapse" aria-expanded="false">
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+        <span class="icon-bar"></span>
+      </div>
+      <div class="toolbar-title"></div>
+      <div class="toolbar-dropdown collapse navbar-collapse" id="navbar-collapse">
+        <ul class="nav navbar-nav">
+          <li>
+            <div class="toolbar-username hidden" id="user" role="button">
+              <i class="glyphicon glyphicon-briefcase"></i>&nbsp;
+              <i class="glyphicon glyphicon-user"></i>
+              &nbsp;<span id="username"></span>
+            </div>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <div class="welcome-wrapper page" data-page="welcome">
-        <div class="welcome-intro">
-            <div class="app-logo">
-              <img src="images/bf_logo.svg" alt="">
-            </div>
-            <div class="app-header">EXONUM</div>
-            <div class="app-subheader">Mobile digital rights management solution to track content distribution, rights management, and&nbsp;reporting with automated payments of royalties.</div>
+      <div class="welcome-intro">
+        <div class="app-logo">
+          <img src="images/bf_logo.svg" alt="">
         </div>
-        <div class="buttons-wrapper">
-            <a class="button button-red" id="proceed-demo">Proceed to demo</a>
-        </div>
+        <div class="app-header">EXONUM</div>
+        <div class="app-subheader">Mobile digital rights management solution to track content distribution, rights management, and&nbsp;reporting with automated payments of royalties.</div>
+      </div>
+      <div class="buttons-wrapper">
+        <a class="button button-red" id="proceed-demo">Proceed to demo</a>
+      </div>
     </div>
+
     <div class="app-content">
       <div class="alert alert-dismissible alert-danger" id="alert">
         <button type="button" class="close" data-dismiss="alert">×</button>
@@ -129,9 +131,7 @@
     <script src="/bower_components/moment/moment.js"></script>
     <script src="/bower_components/underscore/underscore.js"></script>
     <script src="/bower_components/backbone/backbone.js"></script>
-    <script src="/bower_components/backbone-forms/distribution/backbone-forms.js"></script>
     <script src="/bower_components/bootswatch-dist/js/bootstrap.js"></script>
-    <script src="/bower_components/cookie/cookie.js"></script>
     <script src="/bower_components/alertifyjs/dist/js/alertify.js"></script>
     <!-- endbower -->
     <!-- endbuild -->
@@ -142,5 +142,5 @@
     <script src="/scripts/views.js"></script>
     <script src="/scripts/app.js"></script>
     <!-- endbuild -->
-</body>
+  </body>
 </html>

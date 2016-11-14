@@ -1,4 +1,4 @@
-// We teach Backbone to make crossdomain requests and store cookie
+// We teach Backbone to make crossdomain requests
 Backbone.ajax = function(options) {
   options.crossDomain = true;
   options.xhrFields = {

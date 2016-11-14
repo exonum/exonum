@@ -1,3 +1,6 @@
+// bower:scss
+// endbower
+
 @import 'https://fonts.googleapis.com/css?family=Open+Sans';
 body {
     font-family: 'Open Sans', sans-serif;
@@ -8,6 +11,9 @@ body {
     position: relative;
 }
 
+/*
+    Global
+*/
 html {
     background: #eceef2;
     height: 100%;
@@ -21,6 +27,19 @@ samp {
     word-wrap: break-word;
 }
 
+/*
+    Browser upgrade
+*/
+.browserupgrade {
+    margin: 0.2em 0;
+    background: #ccc;
+    color: #000;
+    padding: 0.2em 0;
+}
+
+/*
+    Page
+*/
 .page {
     margin: 0 auto;
     max-width: 640px;
@@ -623,7 +642,7 @@ a.button:focus, a.button:active, a.button:hover {
 .owned > tbody > tr > td,
 .distributed > tbody > tr > td,
 .available > tbody > tr > td {
-  cursor: pointer;
+    cursor: pointer;
 }
 .owners {
     margin-bottom: 23px;

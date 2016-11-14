@@ -15,7 +15,7 @@ var WelcomePage = Backbone.View.extend({
 });
 
 var LoginPage = Backbone.View.extend({
-  title: "Login",
+  title: 'Login',
   showToolbar: true,
   backPage: undefined,
 
@@ -493,7 +493,7 @@ var AddReportPage = Backbone.View.extend({
     }
 
     if (!hasError) {
-      report.time = Math.round(moment(report.time).format("x"));
+      report.time = Math.round(moment(report.time).format('x'));
       app.addReport(report);
     }
 
