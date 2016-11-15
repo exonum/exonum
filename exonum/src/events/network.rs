@@ -77,7 +77,7 @@ impl Network {
 
     // TODO use error trait
     pub fn bind<H: EventHandler>(&mut self, event_loop: &mut EventLoop<H>) -> io::Result<()> {
-        if let Some(_) = self.listener {
+        if self.listener.is_some() {
             return Err(make_io_error("Already binded"));
         }
         let listener = TcpListener::bind(&self.listen_address)?;
