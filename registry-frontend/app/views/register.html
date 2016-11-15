@@ -1,0 +1,42 @@
+<div class="modal-header">
+  <h3 class="modal-title" id="modal-title">New owner registration</h3>
+</div>
+<div class="modal-body" id="modal-body">
+  <form>
+    <div class="form-group">
+      <label for="firstname">First name</label>
+      <input type="text" class="form-control" ng-model="owner.firstname" id="firstname" placeholder="First name">
+    </div>
+    <div class="form-group">
+      <label for="lastname">Last name</label>
+      <input type="text" class="form-control" ng-model="owner.lastname" id="lastname" placeholder="Last name">
+    </div>
+  </form>
+</div>
+<div class="modal-footer">
+  <button class="btn btn-success" type="button" ng-click="register()"><span class="glyphicon glyphicon-ok"></span> Register</button>
+  <button class="btn btn-default" type="button" ng-click="cancel()"><span class="glyphicon glyphicon-remove"></span> Cancel</button>
+</div>
+
+<script type="text/ng-template" id="result.html">
+  <div class="modal-header">
+    <h3 class="modal-title">{{success ? 'Success!':'Error!'}}</h3>
+  </div>
+  <div class="modal-body">
+
+    <div ng-if="success">
+      <div style="font-size: 3em; text-align: center; color: green"><span class="glyphicon glyphicon-ok-circle"></span></div>
+      <div>Owner {{owner.firstname}} {{owner.lastname}} has been successfully registered !</div>
+      <div>Tx Hash: {{tx}}</div>
+    </div>
+    <div ng-if="!success">
+      <div style="font-size: 3em; text-align: center; color: red"><span class="glyphicon glyphicon-remove-circle"></span></div>
+      <div>{{error}}</div>
+    </div>
+
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-default btn-sm" ng-click="ok()">Ok</button>
+  </div>
+</script>

@@ -47,6 +47,20 @@ impl<'a> Field<'a> for bool {
     }
 }
 
+impl<'a> Field<'a> for u8 {
+    fn field_size() -> usize {
+        1
+    }
+
+    fn read(buffer: &'a [u8], from: usize, _: usize) -> u8 {
+        buffer[from]
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, _: usize) {
+        buffer[from] = *self;
+    }
+}
+
 impl<'a> Field<'a> for u16 {
     fn field_size() -> usize {
         2
@@ -297,6 +311,52 @@ impl<'a> SegmentField<'a> for &'a [u32] {
     fn from_slice(slice: &'a [u8]) -> Self {
         unsafe {
             ::std::slice::from_raw_parts(slice.as_ptr() as *const u32,
+                                         slice.len() / Self::item_size())
+        }
+    }
+
+    fn as_slice(&self) -> &'a [u8] {
+        unsafe {
+            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size())
+        }
+    }
+
+    fn count(&self) -> u32 {
+        self.len() as u32
+    }
+}
+
+impl<'a> SegmentField<'a> for &'a [u64] {
+    fn item_size() -> usize {
+        mem::size_of::<u64>()
+    }
+
+    fn from_slice(slice: &'a [u8]) -> Self {
+        unsafe {
+            ::std::slice::from_raw_parts(slice.as_ptr() as *const u64,
+                                         slice.len() / Self::item_size())
+        }
+    }
+
+    fn as_slice(&self) -> &'a [u8] {
+        unsafe {
+            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size())
+        }
+    }
+
+    fn count(&self) -> u32 {
+        self.len() as u32
+    }
+}
+
+impl<'a> SegmentField<'a> for &'a [f64] {
+    fn item_size() -> usize {
+        mem::size_of::<f64>()
+    }
+
+    fn from_slice(slice: &'a [u8]) -> Self {
+        unsafe {
+            ::std::slice::from_raw_parts(slice.as_ptr() as *const f64,
                                          slice.len() / Self::item_size())
         }
     }

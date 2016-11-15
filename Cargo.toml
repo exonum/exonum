@@ -8,5 +8,6 @@ members = [
     "digital_rights",
     "exonum",
     "sandbox",
-    "timestamping"
+    "timestamping",
+    "land_title"
 ]
