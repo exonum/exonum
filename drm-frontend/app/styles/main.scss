@@ -415,12 +415,14 @@ samp {
         }
     }
 
-    &-username {
+    &-username, &-link {
         @media (min-width: 768px) {
             padding: 0 !important;
             line-height: 60px !important;
         }
+    }
 
+    &-username {
         .glyphicon {
             display: none;
         }
@@ -802,4 +804,74 @@ textarea.form-control {
         -webkit-transform: rotate(360deg);
         transform: rotate(360deg);
     }
+}
+
+/*
+    Flow chart
+*/
+.flow {
+    &-chart {
+        width: 280px;
+        margin: 0 auto;
+    }
+
+    &-chart > svg {
+        overflow: visible;
+    }
+
+    &-nav {
+        font-size: 0;
+        text-align: center;
+    }
+
+    &-nav > li {
+        display: inline-block;
+        font-size: 13px;
+        float: none;
+        vertical-align: top;
+    }
+
+    &-subtitle {
+        text-anchor: middle;
+        font-size: 10px;
+    }
+
+    &-title {
+        text-anchor: middle;
+        font-size: 12px;
+    }
+
+    &-label {
+        font-size: 10px;
+        fill: #647082;
+    }
+
+    &-value {
+        font-size: 10px;
+    }
+
+    &-total {
+        margin-top: 20px;
+    }
+}
+
+.mainBars rect {
+    shape-rendering: auto;
+    fill-opacity: 0;
+    stroke-width: 0.5px;
+    stroke: rgb(0, 0, 0);
+    stroke-opacity: 0;
+}
+
+.subBars {
+    shape-rendering: crispEdges;
+}
+
+.edges {
+    stroke: none;
+    fill-opacity: 0.5;
+}
+
+line {
+    stroke: grey;
 }
