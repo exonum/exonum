@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 
 import unittest
-import requests
-import json
-import time
-import base64
-import random
 import datetime
 
 from exonum import ExonumApi, random_hex
-        
+
 class CryptocurrencyApi(ExonumApi):
-    def create_user(self, name): 
+
+    def create_user(self, name):
         tx, c = self.send_transaction("wallets/create", {"name": name})
         return (self.find_user(c), c)
 
@@ -20,11 +16,12 @@ class CryptocurrencyApi(ExonumApi):
         return r.json()
 
     def issue(self, cookies, amount):
-        tx, _ = self.send_transaction("wallets/create", {"amount": amount}, cookies=cookies)
-    
+        tx, _ = self.send_transaction(
+            "wallets/create", {"amount": amount}, cookies=cookies)
 
 
 class CryptocurrencyApiTest(CryptocurrencyApi):
+
     def setUp(self):
         super().setUp()
         self.host = "http://127.0.0.1:8500/api/v1"
@@ -37,14 +34,15 @@ class CryptocurrencyApiTest(CryptocurrencyApi):
         print(" - Create {} users".format(txs))
         start = datetime.datetime.now()
         for i in range(txs):
-            r, c = self.post_transaction("wallets/create", {"name":"name_" + str(i)})
+            r, c = self.post_transaction(
+                "wallets/create", {"name": "name_" + str(i)})
             cookies.append(c)
             final_tx = r["tx_hash"]
 
         tx = self.wait_for_transaction(final_tx)
         self.assertNotEqual(tx, None)
         finish = datetime.datetime.now()
-        
+
         delta = finish - start
         ms = delta.seconds * 1000 + delta.microseconds / 1000
         print(" - Commited, txs={}, total time: {}s".format(txs, ms / 1000))
@@ -54,7 +52,7 @@ class CryptocurrencyApiTest(CryptocurrencyApi):
             info = self.find_user(cookies[i])
             self.assertEqual(info["name"], "name_" + str(i))
         finish = datetime.datetime.now()
-        
+
         delta = finish - start
         ms = delta.seconds * 1000 + delta.microseconds / 1000
         print(" - All users found, total time: {}s".format(ms / 1000))
