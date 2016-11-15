@@ -381,7 +381,7 @@ impl<B, S> NodeHandler<B, S>
 
         let peer = self.public_key_of(msg.validator());
         // Request propose
-        if let None = self.state.propose(msg.propose_hash()) {
+        if self.state.propose(msg.propose_hash()).is_none() {
             self.request(RequestData::Propose(*msg.propose_hash()), peer);
         }
 
