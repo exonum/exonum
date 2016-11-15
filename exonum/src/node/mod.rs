@@ -124,7 +124,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn initialize(&mut self) {
-        info!("Start listening...");
+        info!("Start listening address={}", self.channel.address());
         for address in &self.peer_discovery.clone() {
             if address == &self.channel.address() {
                 continue;
