@@ -1,3 +1,11 @@
+/* Navbar */
+.navbar-toggle {
+    margin-top: 12px;
+}
+.navbar-toggle .icon-bar {
+    background-color: #111;
+}
+
 /* Home */
 .home-wrapper {
     padding: 80px 0 20px 0;
@@ -38,22 +46,12 @@
     padding-top: 0;
     padding-bottom: 0;
     text-transform: uppercase;
-}
-.logo-icon {
-    display: inline-block;
     height: 60px;
-    margin-right: 15px;
-    vertical-align: middle;
-    width: 60px;
+    line-height: 60px;
+    font-size: 26px;
 }
-.logo-big {
-    margin: 0 auto;
-    width: 256px;
-}
-@media (min-width: 768px) {
-    .logo-big {
-        margin: 0;
-    }
+.logo-light {
+    color: #cdd3dc!important;
 }
 
 /* Feature */
@@ -138,80 +136,140 @@
     }
 }
 
-/* Demo */
-.demo {
+/* Piano */
+.piano {
     overflow: hidden;
-    padding-top: 40px;
-    text-align: center;
+    background-color: #334159;
 }
 @media (min-width: 768px) {
-    .demo {
-        padding-bottom: 80px;
-        padding-top: 80px;
-        text-align: left;
+    .piano {
+        /*padding: 120px 0 80px;*/
     }
 }
 @media (min-width: 1200px) {
-    .demo {
-        padding-bottom: 170px;
-        padding-top: 140px;
+    .piano {
+        /*padding: 100px 0;*/
     }
 }
-.demo-container {
-    position: relative;
-}
-.demo-image-front {
-    left: 0;
-    margin: 0 0 0 -120px;
-    position: relative;
-    top: 0;
-    width: 200px;
-    z-index: 10;
+.piano-tabs {
+    margin: 32px 0 0 0;
 }
 @media (min-width: 768px) {
-    .demo-image-front {
-        margin: -20px 0 0 100px;
-        position: absolute;
-        width: 220px;
+    .piano-tabs {
+        margin: 64px 0 0 0;
+    }
+}
+
+@media (min-width: 768px) {
+    .piano-tabs {
+        margin: 96px 0 0 0;
+    }
+}
+.piano-tabs > li > a {
+    color: #5bc0de;
+}
+.piano-tabs > li > a:focus,
+.piano-tabs > li > a:hover {
+    background-color: #fff;
+    border-color: #fff;
+}
+.piano-tabs > li.active > a,
+.piano-tabs > li.active > a:focus,
+.piano-tabs > li.active > a:hover {
+    background-color: transparent;
+    border-bottom-color: #334159;
+    color: #fff;
+}
+@media (min-width: 768px) {
+    .piano-tab {
+        height: 340px;
     }
 }
 @media (min-width: 992px) {
-    .demo-image-front {
-        margin: -80px 0 0 140px;
-        width: 242px;
+    .piano-tab {
+        height: 300px;
     }
 }
 @media (min-width: 1200px) {
-    .demo-image-front {
-        margin: -120px 0 0 170px;
-        width: 292px;
+    .piano-tab {
+        height: 272px;
     }
 }
-.demo-image-back {
-    left: 0;
-    margin: 10px 0 0 -15px;
-    position: relative;
-    top: 0;
-    width: 180px;
-    z-index: 5;
+.piano-muted {
+    color: #9fa5ad;
+}
+.piano-iphone {
+    width: 260px;
 }
 @media (min-width: 768px) {
-    .demo-image-back {
-        margin: 0 0 0 30px;
+    .piano-iphone {
         position: absolute;
-        width: 200px;
+        top: -140px;
+        left: 0;
+        width: 300px;
     }
 }
 @media (min-width: 992px) {
-    .demo-image-back {
-        margin: -54px 0 0 60px;
-        width: 220px;
+    .piano-iphone {
+        top: -160px;
+        left: 100px;
     }
 }
 @media (min-width: 1200px) {
-    .demo-image-back {
-        margin: -80px 0 0 80px;
-        width: 260px;
+    .piano-iphone {
+        left: 180px;
+    }
+}
+.piano-iphones {
+    width: 260px;
+    margin-top: 20px;
+}
+@media (min-width: 768px) {
+    .piano-iphones {
+        position: absolute;
+        top: -96px;
+        left: 0;
+        width: 330px;
+        margin-top: 0;
+    }
+}
+@media (min-width: 992px) {
+    .piano-iphones {
+        top: -144px;
+        left: 0;
+        width: 440px;
+    }
+}
+@media (min-width: 1200px) {
+    .piano-iphones {
+        left: 50px;
+    }
+}
+.piano-ipad {
+    width: 260px;
+    margin-top: 40px;
+}
+@media (min-width: 768px) {
+    .piano-ipad {
+        position: absolute;
+        top: -60px;
+        left: 0;
+        width: 330px;
+        margin-top: 0;
+    }
+}
+@media (min-width: 992px) {
+    .piano-ipad {
+        top: -80px;
+        left: 0;
+        width: 440px;
+    }
+}
+@media (min-width: 1200px) {
+    .piano-ipad {
+        top: -100px;
+        left: 0;
+        width: 540px;
     }
 }
 
