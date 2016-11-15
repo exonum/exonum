@@ -26,7 +26,8 @@ var LoginPage = Backbone.View.extend({
   events: {
     'click .login': 'login',
     'click #login-registration': 'registration',
-    'click #login-blockchain': 'blockchain'
+    'click #login-blockchain': 'blockchain',
+    'click #login-flow': 'flow'
   },
 
   login: function(e) {
@@ -40,6 +41,10 @@ var LoginPage = Backbone.View.extend({
 
   blockchain: function() {
     app.router.navigate('blockchain', {trigger: true});
+  },
+
+  flow: function() {
+    app.router.navigate("flow", {trigger: true});
   },
 
   render: function() {
@@ -524,6 +529,8 @@ var ContainerView = Backbone.View.extend({
   events: {
     'click .toolbar-return-button': 'back',
     'click #user': 'showDashboard',
+    'click #blockchain-explorer': 'showBlockchain',
+    'click #flow': 'showFlow',
     'click': 'collapseMenu',
     'touchstart': 'collapseMenu'
   },
@@ -584,6 +591,14 @@ var ContainerView = Backbone.View.extend({
     app.router.navigate('dashboard', {trigger: true});
   },
 
+  showBlockchain: function() {
+    app.router.navigate("blockchain", {trigger: true});
+  },
+
+  showFlow: function() {
+    app.router.navigate("flow", {trigger: true});
+  },
+
   collapseMenu: function() {
     var navbar = $('#navbar-collapse');
 
@@ -603,4 +618,304 @@ var ContainerView = Backbone.View.extend({
     }
   }
 
+});
+
+var FlowPage = Backbone.View.extend({
+  title: "Money Flows",
+  showToolbar: true,
+  backPage: 'login',
+
+  el: ".page[data-page='flow']",
+
+  template: templates.flow,
+
+  events: {
+    'click .flow-toggle': 'toggle'
+  },
+
+  colorBase: [
+    'f33d54', 'b10632', '39b54a', '22752f', 'f7941d', 'be7214', '0054a6', '172f5d',
+    '095256', '087F8C', '5AAA95', '86A873', 'BB9F06', '804E49', 'E7DECD', '0A122A',
+    'FFCAB1', 'ECDCB0', 'C1D7AE', '8CC084', 'A3333D', '477998', '698F3F', '7E8287'
+  ],
+
+  toggle: function(e) {
+    var type = $(e.target).data('type');
+
+    if (type) {
+      app.router.navigate('flow/' + type, {trigger: true});
+    } else {
+      app.router.navigate('flow', {trigger: true});
+    }
+  },
+
+  mouseover: function(g, bp, formatter, element) {
+    bp.mouseover(element);
+
+    g.selectAll('.mainBars').select('.flow-value')
+      .text(function(d) {
+        return element.part === d.part ? formatter(d) : d3.format('0.0%')(d.percent)
+      });
+  },
+
+  mouseout: function(g, bp, formatter, element) {
+    bp.mouseout(element);
+    g.selectAll('.mainBars').select('.flow-value')
+      .text(formatter);
+  },
+
+  /**
+   * Get random unique color
+   * @returns {string}
+   */
+  getColor: function(colors) {
+    var color = this.colorBase[Math.floor(Math.random() * this.colorBase.length)];
+    var isUnique = true;
+
+    $.each(colors, function(i, c) {
+      if (c === color) {
+        isUnique = false;
+        return false;
+      }
+    });
+
+    return isUnique ? color : this.getColor(colors);
+  },
+
+  /**
+   * Do distributor-amount-owner binding
+   * @returns {Array}
+   */
+  collectByRevenue: function() {
+    var data = [];
+    $.each(app.flow.get('ownerships'), function(i, ownership) {
+      var amount = ownership.amount;
+      var ownerName;
+
+      if (amount === 0) {
+        return true;
+      }
+
+      $.each(app.flow.get('owners'), function(j, owner) {
+        if (owner.id === ownership.id) {
+          ownerName = owner.name;
+          return false;
+        }
+      });
+
+      $.each(app.flow.get('contracts'), function(j, contract) {
+        if (contract.amount > 0 && contract.fingerprint === ownership.fingerprint) {
+          $.each(app.flow.get('distributors'), function(k, distributor) {
+            if (distributor.id === contract.id) {
+              amount = Math.min(contract.amount, amount);
+              data.push([distributor.name, ownerName, amount]);
+              return false;
+            }
+          });
+        }
+      });
+    });
+    return data;
+  },
+
+  /**
+   * Do content-amount-owner binding
+   * @returns {Array}
+   */
+  collectByContent: function() {
+    var data = [];
+    $.each(app.flow.get('ownerships'), function(i, ownership) {
+      var amount = ownership.amount;
+      var ownerName;
+      var contentTitle;
+
+      if (amount === 0) {
+        return true;
+      }
+
+      $.each(app.flow.get('owners'), function(j, owner) {
+        if (owner.id === ownership.id) {
+          ownerName = owner.name;
+          return false;
+        }
+      });
+
+      $.each(app.flow.get('contents'), function(j, content) {
+        if (content.fingerprint === ownership.fingerprint) {
+          contentTitle = content.title;
+          return false;
+        }
+      });
+
+      $.each(app.flow.get('contracts'), function(j, contract) {
+        if (contract.amount > 0 && contract.fingerprint === ownership.fingerprint) {
+          $.each(app.flow.get('distributors'), function(k, distributor) {
+            if (distributor.id === contract.id) {
+              amount = Math.min(contract.amount, amount);
+              data.push([contentTitle, ownerName, amount]);
+              return false;
+            }
+          });
+        }
+      });
+    });
+    return data;
+  },
+
+  /**
+   * Do distributor-plays-content binding
+   * @returns {Array}
+   */
+  collectByPlays: function() {
+    var data = [];
+    $.each(app.flow.get('contracts'), function(i, contract) {
+      var plays = contract.plays;
+      var distributorName;
+
+      if (plays === 0) {
+        return true;
+      }
+
+      $.each(app.flow.get('distributors'), function(j, distributor) {
+        if (distributor.id === contract.id) {
+          distributorName = distributor.name;
+          return false;
+        }
+      });
+
+      $.each(app.flow.get('contents'), function(j, content) {
+        if (content.fingerprint === contract.fingerprint) {
+          data.push([distributorName, content.title, plays]);
+        }
+      });
+    });
+    return data;
+  },
+
+  /**
+   * Draw flow chart and insert it into view
+   * @returns {boolean}
+   */
+  draw: function() {
+    var that = this;
+    var data;
+    var colors = {};
+    var leftTitle;
+    var rightTitle;
+    var valueFormatter;
+
+    switch (app.views.flow.type) {
+      case 'revenue':
+        leftTitle = 'Distributors';
+        rightTitle = 'Owners';
+        valueFormatter = function(d) {
+          return '$' + Math.round(d.value / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        };
+        data = this.collectByRevenue();
+        break;
+      case 'content':
+        leftTitle = 'Contents';
+        rightTitle = 'Owners';
+        valueFormatter = function(d) {
+          return '$' + Math.round(d.value / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        };
+        data = this.collectByContent();
+        break;
+      case 'plays':
+        leftTitle = 'Distributors';
+        rightTitle = 'Contents';
+        valueFormatter = function(d) {
+          return d.value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        };
+        data = this.collectByPlays();
+        break;
+      default:
+        return false;
+    }
+
+    // Set distributor colors
+    $.each(data, function(i, element) {
+      if (colors[element[0]] === undefined) {
+        colors[element[0]] = that.getColor(colors);
+      }
+    });
+
+    // Initialize svg object
+    var chart = document.getElementById('flow-chart');
+    var svg = d3.select(chart).append('svg').attr('width', 280).attr('height', 590);
+    var g = svg.append('g').attr('transform', 'translate(90, 50)');
+    var bp = viz.bP().data(data).min(12).pad(1).height(540).width(100).barSize(15).fill(function(d) {
+      return '#' + colors[d.primary];
+    });
+    g.call(bp);
+
+    // Create titles
+    g.append('text').attr('x', -55).attr('y', -8).attr('class', 'flow-title').text(leftTitle);
+    g.append('text').attr('x', 155).attr('y', -8).attr('class', 'flow-title').text(rightTitle);
+
+    // Create underlines for titles
+    g.append('line').attr('x1', -95).attr('x2', -15);
+    g.append('line').attr('x1', 115).attr('x2', 195);
+
+    // Add labels
+    g.selectAll('.mainBars').append('text').attr('class', 'flow-label')
+      .attr('x', function(d) {
+        return d.part == 'primary' ? -60 : 60;
+      })
+      .attr('y', 6)
+      .text(function(d) {
+        return d.key;
+      })
+      .attr('text-anchor', function(d) {
+        return d.part == 'primary' ? 'end' : 'start';
+      });
+
+    // Add values
+    g.selectAll('.mainBars').append('text').attr('class', 'flow-value')
+      .attr('x', function(d) {
+        return d.part == 'primary' ? -55 : 55;
+      })
+      .attr('y', 6)
+      .text(valueFormatter)
+      .attr('text-anchor', function(d) {
+        return d.part == 'primary' ? 'start' : 'end';
+      });
+
+    // Assign changes on hover
+    g.selectAll('.mainBars')
+      .on('mouseover', this.mouseover.bind(this, g, bp, valueFormatter))
+      .on('mouseout', this.mouseout.bind(this, g, bp, valueFormatter));
+  },
+
+  getTotal: function() {
+    var total = 0;
+    switch (this.type) {
+      case 'revenue':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.amount;
+        });
+        break;
+      case 'content':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.amount;
+        });
+        break;
+      case 'plays':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.plays;
+        });
+        break;
+      default:
+        return '-'
+    }
+    return total;
+  },
+
+  render: function() {
+    this.$el.html(this.template({
+      type: this.type,
+      total: this.getTotal()
+    }));
+    return this;
+  }
 });

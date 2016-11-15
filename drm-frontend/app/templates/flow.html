@@ -1,0 +1,36 @@
+<ul class="nav nav-tabs flow-nav">
+  <li class="{% if (type === 'revenue') { %}active{% } %}">
+    <a class="flow-toggle" role="button" data-type="revenue">Revenue</a>
+  </li>
+  <li class="{% if (type === 'content') { %}active{% } %}">
+    <a class="flow-toggle" role="button" data-type="content">Content</a>
+  </li>
+  <li class="{% if (type === 'plays') { %}active{% } %}">
+    <a class="flow-toggle" role="button" data-type="plays">Plays</a>
+  </li>
+</ul>
+
+<div class="flow-chart" id="flow-chart"></div>
+
+<table class="table table-condensed flow-total">
+  <tbody>
+  {% if (type === 'revenue') { %}
+  <tr>
+    <th class="col-xs-6 text-right">Total payout:</th>
+    <td>${{ Math.round(total / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+  </tr>
+  {% } %}
+  {% if (type === 'content') { %}
+  <tr>
+    <th class="col-xs-6 text-right">Total payout:</th>
+    <td>${{ Math.round(total / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
+  </tr>
+  {% } %}
+  {% if (type === 'plays') { %}
+  <tr>
+    <th class="col-xs-6 text-right">All content have been played:</th>
+    <td>{{ total.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }} times in total</td>
+  </tr>
+  {% } %}
+  </tbody>
+</table>

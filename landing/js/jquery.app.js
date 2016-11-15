@@ -26,6 +26,11 @@ $(function() {
             location.hash = ahcnor;
         }
     });
+
+    // Collapse navbar on navbar item click
+    $('.navbar-nav a').bind('click', function() {
+        $('.navbar-collapse').collapse('hide');
+    });
 });
 
 /* ==============================================

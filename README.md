@@ -173,7 +173,7 @@ TODO
 
 # DRM Demo 
 
-Во-первых, должен быть установлен [Node.js](http://nodejs.org/).
+Во-первых, должен быть установлен [Node.js 4.2.1](https://nodejs.org/dist/v4.2.1/).
 
 При работе локально желательно настроить Node.js таким образом, чтобы, можно было устанавливать npm пакеты глобально без sudo. Как это сделать написано [здесь](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
 

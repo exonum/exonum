@@ -103,7 +103,7 @@ fn send_tx<'a, D: Database>(tx: DigitalRightsTx,
             let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
             client.json(json)
         }
-        Err(e) => client.error(e)
+        Err(e) => client.error(e),
     }
 }
 
@@ -124,7 +124,7 @@ fn add_participant<'a, D: Database>(tx: DigitalRightsTx,
                 .unwrap();
             client.json(json)
         }
-        Err(e) => client.error(e)
+        Err(e) => client.error(e),
     }
 }
 

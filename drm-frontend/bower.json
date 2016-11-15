@@ -6,7 +6,9 @@
     "moment": "~2.15.1",
     "backbone": "~1.3.3",
     "bootswatch-dist": "paper",
-    "alertifyjs": "~1.0.11"
+    "alertifyjs": "~1.0.11",
+    "d3": "^4.3.0",
+    "Viz": "NPashaP/Viz"
   },
   "devDependencies": {
     "chai": "^3.5.0",

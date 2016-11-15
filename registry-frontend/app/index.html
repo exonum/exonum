@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title></title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width">
+    <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
+    <!-- build:css(.) styles/vendor.css -->
+    <!-- bower:css -->
+    <!-- endbower -->
+    <!-- endbuild -->
+    <!-- build:css(.tmp) styles/main.css -->
+    <link rel="stylesheet" href="styles/main.css">
+    <!-- endbuild -->
+  </head>
+  <body ng-app="landTitleUi1App">
+
+    <ui-view></ui-view>
+
+    <!-- build:js(.) scripts/vendor.js -->
+    <!-- bower:js -->
+    <script src="bower_components/jquery/dist/jquery.js"></script>
+    <script src="bower_components/angular/angular.js"></script>
+    <script src="bower_components/bootstrap-sass-official/assets/javascripts/bootstrap.js"></script>
+    <script src="bower_components/angular-animate/angular-animate.js"></script>
+    <script src="bower_components/angular-aria/angular-aria.js"></script>
+    <script src="bower_components/angular-cookies/angular-cookies.js"></script>
+    <script src="bower_components/angular-messages/angular-messages.js"></script>
+    <script src="bower_components/angular-resource/angular-resource.js"></script>
+    <script src="bower_components/angular-sanitize/angular-sanitize.js"></script>
+    <script src="bower_components/angular-touch/angular-touch.js"></script>
+    <script src="bower_components/angular-ui-router/release/angular-ui-router.js"></script>
+    <script src="bower_components/ngmap/build/scripts/ng-map.js"></script>
+    <script src="bower_components/angular-bootstrap/ui-bootstrap-tpls.js"></script>
+    <script src="bower_components/tweetnacl/nacl.js"></script>
+    <script src="bower_components/tweetnacl-util/nacl-util.js"></script>
+    <script src="bower_components/ngstorage/ngStorage.js"></script>
+    <!-- endbower -->
+    <!-- endbuild -->
+
+    <!-- build:js({.tmp,app}) scripts/scripts.js -->
+      <script src="https://maps.google.com/maps/api/js?key=AIzaSyD62yubgCOHsqNjXqAMywfLMBKRaAidHiY&libraries=placeses,visualization,drawing,geometry,places"></script>
+
+      <script src="scripts/app.js"></script>
+      <script src="config.js"></script>
+
+      <!-- Controllers -->
+      <script src="scripts/controllers/map.js"></script>
+      <script src="scripts/controllers/register.js"></script>
+      <script src="scripts/controllers/title.js"></script>
+      <script src="scripts/controllers/user_register.js"></script>
+      <script src="scripts/controllers/owner.js"></script>
+
+      <!-- Services -->
+      <script src="scripts/services/api.js"></script>
+      <script src="scripts/services/titlesManager.js"></script>
+
+      <!-- 3rd party -->
+      <script src="scripts/lib/md5.js"></script>
+    <!-- endbuild -->
+</body>
+</html>
