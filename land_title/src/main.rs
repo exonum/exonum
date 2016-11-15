@@ -1,6 +1,5 @@
 #![feature(custom_attribute)]
 #![feature(type_ascription)]
-#![feature(question_mark)]
 #![feature(custom_derive)]
 #![feature(plugin)]
 
@@ -24,7 +23,6 @@ extern crate land_title;
 
 use land_title::cors::CORS;
 use iron::method::Method;
-use iron::status::Status;
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -32,7 +30,6 @@ use std::thread;
 use std::default::Default;
 
 use clap::{Arg, App, SubCommand};
-use iron::{ AfterMiddleware, headers};
 use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning, Response, Client, ErrorResponse};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
@@ -43,19 +40,19 @@ use hyper::status::StatusCode;
 use serde_json::value::from_value;
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
-use exonum::storage::{Database, MemoryDB, LevelDB, Error, LevelDBOptions};
+use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
 use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash, FromHexError};
 use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
-use blockchain_explorer::{HexField, ValueNotFound};
+use blockchain_explorer::ValueNotFound;
 use land_title::GeoPoint;
 
 
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
-                     TxModifyObject, TxTransferObject, TxRemoveObject, TxRestoreObject, TxRegister};
-use land_title::api::{ObjectsApi, ObjectInfo, NewOwner, NewObject};
+                     TxTransferObject, TxRemoveObject, TxRestoreObject, TxRegister};
+use land_title::api::{ObjectsApi, NewObject};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
 
@@ -92,7 +89,7 @@ fn load_user(storage: &CookieJar) -> StorageResult<(PublicKey, SecretKey)> {
     Ok((public_key, secret_key))
 }
 
-fn send_transaction<'a, D: Database>(tx: ObjectTx, client: &Client<'a>, ch: Channel<ObjectsBlockchain<D>>)
+fn send_transaction<'a, D: Database>(tx: ObjectTx, _: &Client<'a>, ch: Channel<ObjectsBlockchain<D>>)
                             -> String {
 
     let tx_hash = tx.hash().to_hex();
@@ -184,7 +181,7 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
             let api_key = b"abacabsasdainblabla23nx8Hasojd8";
             let cookie = ::rustless::batteries::cookie::new(api_key);
 
-            let originUrl = {
+            let origin_url = {
                 if let Some(origin) = origin {
                     origin
                 }else{
@@ -192,9 +189,9 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                 }
             };
 
-            println!("LandTitles node server started on {}, allowed origin is {}", listen_address, originUrl);
+            println!("LandTitles node server started on {}, allowed origin is {}", listen_address, origin_url);
 
-            let cors = CORS::new(originUrl, vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
+            let cors = CORS::new(origin_url, vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
 
             chain.link(cookie);
             chain.link_after(cors);
@@ -220,7 +217,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
     api.namespace("obm", move |api| {
 
         api.options("*", move |endpoint| {
-            endpoint.handle(move |mut client, params| {
+            endpoint.handle(move |client, _ | {
                 client.empty()
             })
         });
@@ -247,7 +244,6 @@ fn land_titles_api<D: Database>(api: &mut Api,
             })
         });
 
-        let ch = channel.clone();
         let b = blockchain.clone();
         api.get("result/:tx", move |endpoint| {
 
@@ -257,7 +253,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
             endpoint.handle(move |client, params| {
 
-                let (pub_key, sec_key) = {
+                let (_, _) = {
                     let r = {
                         let cookies = client.request.cookies();
                         load_user(&cookies)
@@ -287,7 +283,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
         let b = blockchain.clone();
          api.get("owners", move |endpoint| {
-            endpoint.handle(move |client, params| {
+            endpoint.handle(move |client, _ | {
                 let obm = ObjectsApi::new(b.clone());
                 match obm.owners_list() {
                     Ok(Some(info)) => client.json(&info.to_json()),
@@ -334,7 +330,6 @@ fn land_titles_api<D: Database>(api: &mut Api,
          });
 
          let ch = channel.clone();
-         let b = blockchain.clone();
          api.post("objects/transfer", move |endpoint| {
             endpoint.params(|params|{
                 params.req_typed("id", json_dsl::u64());
@@ -362,7 +357,6 @@ fn land_titles_api<D: Database>(api: &mut Api,
          });
 
         let ch = channel.clone();
-        let b = blockchain.clone();
         api.delete("objects/:id", move |endpoint| {
             endpoint.params(|params|{
                 params.req_typed("id", json_dsl::u64());
@@ -447,7 +441,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
          let b = blockchain.clone();
          api.get("objects", move |endpoint| {
-            endpoint.handle(move |client, params| {
+            endpoint.handle(move |client, _| {
                 let obm = ObjectsApi::new(b.clone());
                 match obm.objects_list() {
                     Ok(Some(info)) => client.json(&info.to_json()),
@@ -457,7 +451,6 @@ fn land_titles_api<D: Database>(api: &mut Api,
             })
          });
 
-         let b = blockchain.clone();
          let ch = channel.clone();
          api.post("objects", move |endpoint| {
 

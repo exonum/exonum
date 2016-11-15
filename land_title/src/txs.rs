@@ -1,8 +1,7 @@
 use exonum::crypto::{Hash, PublicKey};
-use byteorder::{ByteOrder, LittleEndian};
 use exonum::messages::{RawMessage, Message, Error as MessageError};
-use serde::{Serialize,Deserialize};
 use geo::{Point, LineString, Polygon};
+use time;
 
 pub const TX_REGISTER: u16 = 128;
 pub const TX_CREATE_OWNER_ID: u16 = 129;
@@ -129,6 +128,11 @@ message! {
     }
 }
 
+pub fn timestamp () -> u64 {
+    let timespec = time::get_time();
+    timespec.sec as u64
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum ObjectTx {
     Register(TxRegister),
@@ -208,9 +212,8 @@ impl Message for ObjectTx {
 mod tests {
 
     use exonum::crypto::gen_keypair;
-    use super::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject, TxRegister, GeoPoint};
+    use super::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject, TxRegister, GeoPoint, timestamp};
     use exonum::messages::Message;
-    use byteorder::{ByteOrder, LittleEndian};
 
     #[test]
     fn test_register(){
@@ -298,8 +301,9 @@ mod tests {
         let object_id = 1_u64;
         let title = "test object title";
         let points = GeoPoint::to_vec(&vec![GeoPoint::new(1.0, 2.0), GeoPoint::new(3.0, 4.0)]);
+        let created_at = timestamp();
         // Act
-        let tx = TxModifyObject::new(&p, object_id, title, &points, &s);
+        let tx = TxModifyObject::new(&p, object_id, title, &points, created_at, &s);
         // Assert
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.object_id(), 1_u64);
@@ -320,9 +324,9 @@ mod tests {
         let (p, s) = gen_keypair();
         let object_id = 1_u64;
         let owner_id = 1_u64;
-        let (owner_pub_key, _) = gen_keypair();
+        let created_at = timestamp();
         // Act
-        let tx = TxTransferObject::new(&p, object_id, owner_id, &s);
+        let tx = TxTransferObject::new(&p, object_id, owner_id, created_at, &s);
         // Assert
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.object_id(), 1_u64);
@@ -340,8 +344,9 @@ mod tests {
         // Arrange
         let (p, s) = gen_keypair();
         let object_id = 1_u64;
+        let created_at = timestamp();
         // Act
-        let tx = TxRemoveObject::new(&p, object_id, &s);
+        let tx = TxRemoveObject::new(&p, object_id, created_at, &s);
         // Assert
         assert_eq!(tx.pub_key(), &p);
         assert_eq!(tx.object_id(), 1_u64);
