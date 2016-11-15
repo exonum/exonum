@@ -93,5 +93,5 @@ var Report = Backbone.Model.extend({
 });
 
 var Flow = Backbone.Model.extend({
-  url: settings.api_endpoint + "drm/flow"
+  url: settings.api_endpoint + 'drm/flow'
 });

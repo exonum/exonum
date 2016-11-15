@@ -27,7 +27,8 @@ var LoginPage = Backbone.View.extend({
     'click .login': 'login',
     'click #login-registration': 'registration',
     'click #login-blockchain': 'blockchain',
-    'click #login-flow': 'flow'
+    'click #login-flow': 'flow',
+    'click #login-reset': 'reset'
   },
 
   login: function(e) {
@@ -44,7 +45,13 @@ var LoginPage = Backbone.View.extend({
   },
 
   flow: function() {
-    app.router.navigate("flow", {trigger: true});
+    app.router.navigate('flow', {trigger: true});
+  },
+
+  reset: function() {
+    localStorage.setItem('users', JSON.stringify([]));
+    app.users = [];
+    Backbone.history.loadUrl(Backbone.history.fragment);
   },
 
   render: function() {
@@ -592,11 +599,11 @@ var ContainerView = Backbone.View.extend({
   },
 
   showBlockchain: function() {
-    app.router.navigate("blockchain", {trigger: true});
+    app.router.navigate('blockchain', {trigger: true});
   },
 
   showFlow: function() {
-    app.router.navigate("flow", {trigger: true});
+    app.router.navigate('flow', {trigger: true});
   },
 
   collapseMenu: function() {
@@ -621,11 +628,11 @@ var ContainerView = Backbone.View.extend({
 });
 
 var FlowPage = Backbone.View.extend({
-  title: "Money Flows",
+  title: 'Money Flows',
   showToolbar: true,
   backPage: 'login',
 
-  el: ".page[data-page='flow']",
+  el: '.page[data-page=\'flow\']',
 
   template: templates.flow,
 
