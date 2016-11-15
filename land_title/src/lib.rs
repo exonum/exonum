@@ -1,10 +1,7 @@
 #![feature(custom_attribute)]
 #![feature(type_ascription)]
-#![feature(custom_derive)]
-#![feature(plugin)]
-#![plugin(serde_macros)]
-#![feature(question_mark)]
 #![feature(associated_consts)]
+#![feature(proc_macro)]
 
 #[macro_use(message, storage_value)]
 extern crate exonum;
@@ -13,6 +10,8 @@ extern crate byteorder;
 extern crate blockchain_explorer;
 extern crate geo;
 extern crate time;
+#[macro_use]
+extern crate serde_derive;
 
 mod txs;
 mod view;
