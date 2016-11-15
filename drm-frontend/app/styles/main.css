@@ -97,7 +97,6 @@ samp {
 }
 a.button:focus, a.button:active, a.button:hover {
     text-decoration: none;
-    /*color: #647082;*/
 }
 .button:focus, .button:active {
     background: #e1e6ec;
@@ -236,7 +235,7 @@ a.button:focus, a.button:active, a.button:hover {
         float: right;
         margin: -60px 0 0;
     }
-    .toolbar-username {
+    .toolbar-link {
         padding: 0!important;
         line-height: 60px!important;
     }
@@ -416,7 +415,6 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .modal-decrypt .modal-content {
     background-color: rgba(51, 51, 51, 0.97);
-    /*min-height: 607px;*/
     color: #fff;
     min-height: 100%;
 }
@@ -425,7 +423,6 @@ a.button:focus, a.button:active, a.button:hover {
 }
 .modal-decrypt.modal-decrypt-dark .modal-content {
     background-color: rgba(25, 25, 25, 0.97);
-    /*min-height: 667px;*/
 }
 .modal-decrypt .modal-cross {
     top: 25px;
@@ -588,7 +585,6 @@ a.button:focus, a.button:active, a.button:hover {
     padding: 13px 30px 13px 105px;
     font-size: 18px;
     width: 100%;
-    /*font-family: "Myriad Pro", Myriad, "Liberation Sans", "Nimbus Sans L", "Helvetica Neue", Helvetica, Arial, sans-serif;*/
     font-family: 'Open Sans', sans-serif;
 }
 .app-content-divider {
@@ -674,6 +670,63 @@ textarea.form-control {
 }
 .input-group-addon {
     padding: 6px;
+}
+
+
+/*
+    Flow chart
+*/
+.flow-chart {
+    width: 280px;
+    margin: 0 auto;
+}
+.flow-chart > svg {
+    overflow: visible;
+}
+.flow-nav {
+    font-size: 0;
+    text-align: center;
+}
+.flow-nav > li {
+    display: inline-block;
+    font-size: 13px;
+    float: none;
+    vertical-align: top;
+}
+.flow-subtitle {
+    text-anchor: middle;
+    font-size: 10px;
+}
+.flow-title {
+    text-anchor: middle;
+    font-size: 12px;
+}
+.flow-label {
+    font-size: 10px;
+    fill: #647082;
+}
+.flow-value {
+    font-size: 10px;
+}
+.mainBars rect {
+    shape-rendering: auto;
+    fill-opacity: 0;
+    stroke-width: 0.5px;
+    stroke: rgb(0, 0, 0);
+    stroke-opacity: 0;
+}
+.subBars {
+    shape-rendering: crispEdges;
+}
+.edges {
+    stroke: none;
+    fill-opacity: 0.5;
+}
+line {
+    stroke: grey;
+}
+.flow-total {
+    margin-top: 20px;
 }
 
 

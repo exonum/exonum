@@ -14,7 +14,9 @@ var DRMRouter = Backbone.Router.extend({
       'dashboard'             : 'dashboard',
       'content/:fingerprint'  : 'content',
       'add-report/:fingerprint' : 'addReport',
-      'add-content'           : 'addContent'
+      'add-content'           : 'addContent',
+      'flow'                  : 'flow',
+      'flow/:type'            : 'flow'
     },
 
     // Main pages
@@ -155,6 +157,22 @@ var DRMRouter = Backbone.Router.extend({
           app.onError('Content with given fingerprint not found');
         }
       });
+    },
+
+    flow: function(type) {
+      app.views.container.loadingStart();
+
+      app.flow.fetch({
+        success: function() {
+          app.views.flow.type = type || 'revenue';
+          app.views.flow.render();
+          app.views.container.changePage('flow');
+          app.views.flow.draw();
+        },
+        error: function() {
+          app.views.container.changePage('error');
+        }
+      });
     }
 });
 
@@ -165,6 +183,7 @@ var app = {
   initialize: function() {
     this.lastHeight = 0;
     this.blocks = new Blocks();
+    this.flow = new Flow();
     this.users = [];
     this.views = {
       container: new ContainerView(),
@@ -179,7 +198,8 @@ var app = {
       distributorDashboard: new DistributorDashboardPage(),
       content: new ContentPage(),
       addContent: new AddContentPage(),
-      addReport: new AddReportPage()
+      addReport: new AddReportPage(),
+      flow: new FlowPage()
     };
     Backbone.history.start();
     alertify.maxLogItems(10);
