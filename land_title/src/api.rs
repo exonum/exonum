@@ -1,9 +1,9 @@
 use serde::{Serialize, Serializer};
 use txs::{ObjectTx, GeoPoint};
-use view::{ Object, Owner, ObjectId, TxResult, ObjectHistory };
+use view::{Object, Owner, ObjectId};
 use super::ObjectsBlockchain;
 use exonum::storage::{Map, List, Database, Result as StorageResult};
-use exonum::crypto::{PublicKey, Hash, HexValue};
+use exonum::crypto::{Hash, HexValue};
 use exonum::blockchain::Blockchain;
 use blockchain_explorer::{TransactionInfo, HexField};
 
