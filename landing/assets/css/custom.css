@@ -277,9 +277,92 @@
 .sub-title {
     margin-bottom: 20px;
 }
+.margin-t-30 {
+    margin-top: 30px;
+}
 
 /* Footer */
 .footer {
     padding-bottom: 10px;
     padding-top: 40px;
+}
+
+/* Blog */
+.blog-section {
+    padding-bottom: 30px;
+}
+.blog-details {
+    padding-bottom: 0;
+}
+.blog-post .post-info {
+    margin-bottom: 20px;
+}
+.blog-post .post-info .date {
+    float: left;
+    border-bottom: 3px solid #fb6d9d;
+}
+.blog-post .post-info .meta-container {
+    padding-left: 55px;
+}
+.blog-post .post-info .meta-container h3 {
+    margin-top: 0;
+}
+.blog-post .meta {
+    padding-left: 0;
+}
+.blog-post .meta li {
+    padding-right: 15px;
+    color: #aaa;
+    line-height: 22px;
+    list-style: none;
+}
+.blog-post .meta i {
+    margin-right: 5px;
+}
+.blog-detail-header span {
+    padding: 0 10px;
+    font-size: 16px;
+}
+.blog-detail-header span i {
+    padding-right: 5px;
+}
+.blog-detail-header span a {
+    color: #fff;
+}
+.blog-post .read-more {
+    font-weight: 600;
+    margin-top: 20px;
+    display: block;
+    color: #fb6d9d;
+}
+.blog-post a {
+    color: #333;
+    font-size: 13px;
+}
+.post-info .date .day {
+    font-size: 26px;
+    color: #333;
+    font-weight: 600;
+}
+.post-info .date .month {
+    text-transform: uppercase;
+    text-align: center;
+    width: 100%;
+    display: inline-block;
+}
+.post-body p {
+    color: #97a0af;
+}
+.share {
+    position: absolute;
+    top: 3rem;
+    right: 0;
+    width: 140px;
+}
+.share a {
+    font-size: 1.8rem;
+    display: inline-block;
+    margin: 1rem 1.6rem 1.6rem 0;
+    color: #BBC7CC;
+    text-decoration: none;
 }

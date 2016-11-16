@@ -1,0 +1,11 @@
+<nav>
+    <ul class="pager text-center">
+        {{#if prev}}
+            <li class="pull-left"><a href="{{page_url prev}}"> <span aria-hidden="true">&larr;</span>Older Posts</a></li>
+        {{/if}}
+        <li>Page {{page}} of {{pages}}</li>
+        {{#if next}}
+            <li class="pull-right"><a href="{{page_url next}}">Newer Posts <span aria-hidden="true">&rarr;</span></a></li>
+        {{/if}}
+    </ul>
+</nav>

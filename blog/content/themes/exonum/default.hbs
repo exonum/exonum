@@ -36,16 +36,108 @@
         <div class="status">&nbsp;</div>
     </div>
 
-    {{!-- The blog navigation links --}}
-    {{navigation}}
+    {{!-- Header --}}
+    <section class="home">
+        <div class="navbar navbar-custom navbar-fixed-top" role="navigation">
+            <div class="container">
+                {{!-- Navbar-header --}}
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+
+                    {{!-- Logo --}}
+                    <a class="navbar-brand logo" href="/">Exonum</a>
+                </div>
+
+                {{!-- Menu --}}
+                <div class="navbar-collapse collapse">
+                    <ul class="nav navbar-nav navbar-right">
+                        <li>
+                            <a href="#about">About</a>
+                        </li>
+                        <li>
+                            <a href="#use-cases">Use cases</a>
+                        </li>
+                        <li>
+                            <a href="#how-it-works">How It Works</a>
+                        </li>
+                        <li>
+                            <a href="#demo">Demo</a>
+                        </li>
+                        <li>
+                            <a href="/blog">Blog</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
 
     {{!-- All the main content gets inserted here, index.hbs, post.hbs, etc --}}
     {{{body}}}
 
-    {{!-- The tiny footer at the very bottom --}}
-    <footer class="site-footer clearfix">
-        <section class="copyright"><a href="{{@blog.url}}">{{@blog.title}}</a> &copy; {{date format="YYYY"}}</section>
-        <section class="poweredby">Proudly published with <a href="https://ghost.org">Ghost</a></section>
+    {{!-- Footer --}}
+    <footer class="section bg-gray footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6 col-sm-4">
+                    <div class="logo logo-light">Exonum</div>
+                </div>
+
+                <div class="col-md-3 col-sm-4">
+                    <h5>Exonum</h5>
+                    <ul class="list-unstyled">
+                        <li>
+                            <a class="pseudo-link" href="#about">About</a>
+                        </li>
+                        <li>
+                            <a class="pseudo-link" href="#use-cases">Use cases</a>
+                        </li>
+                        <li>
+                            <a class="pseudo-link" href="#how-it-works">How It Works</a>
+                        </li>
+                        <li>
+                            <a class="pseudo-link" href="#demo">Demo</a>
+                        </li>
+                        <li>
+                            <a class="pseudo-link" href="/">Blog</a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="col-md-3 col-sm-4">
+                    <h5>Contact</h5>
+                    <address>
+                        Level39<br>
+                        One Canada Square<br>
+                        Canary Wharf, London, E14 5AB<br>
+                        E: <a href="mailto:exonum@bitfury.com">exonum@bitfury.com</a>
+                    </address>
+                </div>
+
+            </div>
+
+            <div class="row">
+                <div class="col-sm-12">
+                    <div class="footer-alt">
+                        <ul class="list-unstyled text-right list-inline">
+                            <li class="pull-left">
+                                2016 &copy; Exonum
+                            </li>
+                            <li>
+                                <a href="/terms-of-use.html">Terms of Use</a>
+                            </li>
+                            <li>
+                                <a href="/privacy-policy.html">Privacy Policy</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
     </footer>
 
     {{!-- jQuery needs to come before `{{ghost_foot}}` so that jQuery can be used in code injection --}}
