@@ -207,6 +207,24 @@ gulp
 ```
 Собранный проект будет находиться в папке `dist`.
 
-# Exonum blog
+# Blog
 
-Описание работы с блогом
+Устанавливаем зависимости:
+
+```
+npm install --production
+```
+
+Запускаем локально:
+
+```
+npm start
+```
+
+Административная панель [http://localhost:2368/ghost](http://localhost:2368/ghost). 
+
+Запускаем на сервере:
+
+```
+npm start --production
+```
