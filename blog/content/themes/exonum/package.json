@@ -6,7 +6,7 @@
         "ghost": ">=0.9.0 <1.0.0"
     },
     "screenshots": {
-        "desktop": "assets/screenshot-desktop.jpg",
-        "mobile": "assets/screenshot-mobile.jpg"
+        "desktop": "screenshot-desktop.jpg",
+        "mobile": "screenshot-mobile.jpg"
     }
 }

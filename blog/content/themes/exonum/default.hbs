@@ -7,14 +7,14 @@
     <title>{{meta_title}}</title>
     <meta name="description" content="{{meta_description}}" />
 
-    <!-- Favicon -->
+    {{!-- Favicon --}}
     <link rel="shortcut icon" href="{{asset "favicon.ico"}}" type="image/x-icon"/>
     <link rel="icon" type="image/png" href="{{asset "images/favicon/favicon-32x32.png"}}" sizes="32x32"/>
     <link rel="icon" type="image/png" href="{{asset "images/favicon/favicon-16x16.png"}}" sizes="16x16"/>
     <link rel="apple-touch-icon-precomposed" href="{{asset "images/favicon/favicon-152x152.png"}}"/>
 
     {{!-- Bootstrap core CSS --}}
-    <link href="{{asset "css/bootstrap.min.css"}}" rel="stylesheet">
+    <link href="{{asset "/css/bootstrap.min.css"}}" rel="stylesheet">
 
     {{!-- Animate --}}
     <link href="{{asset "css/animate.css"}}" rel="stylesheet">
@@ -29,23 +29,24 @@
     {{!-- Ghost outputs important style and meta data with this tag --}}
     {{ghost_head}}
 </head>
-<body class="{{body_class}} nav-closed">
+<body>
+
+    {{!-- Pre-loader --}}
+    <div class="preloader">
+        <div class="status">&nbsp;</div>
+    </div>
 
     {{!-- The blog navigation links --}}
     {{navigation}}
 
-    <div class="site-wrapper">
+    {{!-- All the main content gets inserted here, index.hbs, post.hbs, etc --}}
+    {{{body}}}
 
-        {{!-- All the main content gets inserted here, index.hbs, post.hbs, etc --}}
-        {{{body}}}
-
-        {{!-- The tiny footer at the very bottom --}}
-        <footer class="site-footer clearfix">
-            <section class="copyright"><a href="{{@blog.url}}">{{@blog.title}}</a> &copy; {{date format="YYYY"}}</section>
-            <section class="poweredby">Proudly published with <a href="https://ghost.org">Ghost</a></section>
-        </footer>
-
-    </div>
+    {{!-- The tiny footer at the very bottom --}}
+    <footer class="site-footer clearfix">
+        <section class="copyright"><a href="{{@blog.url}}">{{@blog.title}}</a> &copy; {{date format="YYYY"}}</section>
+        <section class="poweredby">Proudly published with <a href="https://ghost.org">Ghost</a></section>
+    </footer>
 
     {{!-- jQuery needs to come before `{{ghost_foot}}` so that jQuery can be used in code injection --}}
     <script src="{{asset "js/jquery.js"}}"></script>
