@@ -2,8 +2,8 @@ use exonum::messages::Field;
 use exonum::blockchain::{View};
 use exonum::crypto::{ PublicKey, Hash, hash };
 use byteorder::{ByteOrder, LittleEndian};
-use exonum::storage::{Fork, MerklePatriciaTable, Map, MapTable, MerkleTable, List, Result as StorageResult};
-use txs::{ObjectTx, GeoPoint};
+use exonum::storage::{Fork, MerklePatriciaTable, MapTable, MerkleTable, List, Result as StorageResult};
+use txs::ObjectTx;
 use std::ops::Deref;
 
 
@@ -121,20 +121,50 @@ impl Object {
 }
 
 impl TxResult {
+
+    pub const RESULT_OK: u8 = 1;
+    pub const RESULT_WRONG_POINTS: u8 = 2;
+    pub const RESULT_WRONG_NEIGHBOURS: u8 = 3;
+    pub const RESULT_CREATE_WRONG_OWNER: u8 = 4;
+    pub const RESULT_TRANSFER_WRONG_OWNER: u8 = 5;
+    pub const RESULT_TRANSFER_WRONG_OBJECT: u8 = 6;
+    pub const RESULT_REMOVE_WRONG_OBJECT: u8 = 7;
+    pub const RESULT_RESTORE_WRONG_OBJECT: u8 = 8;
+    pub const RESULT_MODIFY_WRONG_OBJECT: u8 = 9;
+    pub const RESULT_ALREADY_REGISTERED: u8 = 10;
+
     pub fn set_result(&mut self, result: u8) {
         Field::write(&result, &mut self.raw, 00, 01);
     }
     pub fn ok() -> TxResult {
-        TxResult::new(1)
+        TxResult::new(TxResult::RESULT_OK)
     }
     pub fn create_object_wrong_points() -> TxResult {
-        TxResult::new(2)
+        TxResult::new(TxResult::RESULT_WRONG_POINTS)
     }
     pub fn create_object_cross_neighbours() -> TxResult {
-        TxResult::new(3)
+        TxResult::new(TxResult::RESULT_WRONG_NEIGHBOURS)
     }
     pub fn create_object_wrong_owner() -> TxResult {
-        TxResult::new(4)
+        TxResult::new(TxResult::RESULT_CREATE_WRONG_OWNER)
+    }
+    pub fn transfer_object_wrong_owner() -> TxResult {
+        TxResult::new(TxResult::RESULT_TRANSFER_WRONG_OWNER)
+    }
+    pub fn transfer_object_wrong_object() -> TxResult {
+        TxResult::new(TxResult::RESULT_TRANSFER_WRONG_OBJECT)
+    }
+    pub fn remove_object_wrong_object() -> TxResult {
+        TxResult::new(TxResult::RESULT_REMOVE_WRONG_OBJECT)
+    }
+    pub fn restore_object_wrong_object() -> TxResult {
+        TxResult::new(TxResult::RESULT_RESTORE_WRONG_OBJECT)
+    }
+    pub fn modify_object_wrong_object() -> TxResult {
+        TxResult::new(TxResult::RESULT_MODIFY_WRONG_OBJECT)
+    }
+    pub fn register_already_registered() -> TxResult {
+        TxResult::new(TxResult::RESULT_ALREADY_REGISTERED)
     }
 
 }
@@ -206,7 +236,7 @@ impl<F> ObjectsView<F> where F: Fork
 #[cfg(test)]
 mod tests {
 
-    use exonum::crypto::{gen_keypair, hash};
+    use exonum::crypto::hash;
     use super::{Owner, Object, Ownership, User};
     use txs::{GeoPoint};
 
@@ -228,7 +258,6 @@ mod tests {
     fn test_create_owner() {
         // Arrange
         let hash = hash(&[]);
-        let (p, _) = gen_keypair();
         // Act
         let owner = Owner::new("firstname", "lastname", &hash);
         // Assert
