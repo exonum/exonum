@@ -1,20 +1,24 @@
 <!doctype html>
-<html lang="">
+<html class="no-js" lang="">
   <head>
     <meta charset="utf-8">
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>DRM Exonum Demo</title>
+
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon"/>
+    <link rel="icon" type="image/png" href="images/favicon-32x32.png" sizes="32x32"/>
+    <link rel="icon" type="image/png" href="images/favicon-16x16.png" sizes="16x16"/>
+    <link rel="apple-touch-icon-precomposed" href="images/favicon-152x152.png"/>
+
     <!-- build:css styles/vendor.css -->
-    <!-- bower:css -->
     <link rel="stylesheet" href="/bower_components/bootswatch-dist/css/bootstrap.css">
-    <!-- endbower -->
     <!-- endbuild -->
 
     <!-- build:css styles/main.css -->
     <link rel="stylesheet" href="styles/main.css">
     <!-- endbuild -->
-
   </head>
   <body>
     <!--[if lt IE 10]>
@@ -61,17 +65,18 @@
     </div>
 
     <div class="welcome-wrapper page" data-page="welcome">
-        <div class="welcome-intro">
-            <div class="app-logo">
-              <img src="images/bf_logo.svg" alt="">
-            </div>
-            <div class="app-header">EXONUM</div>
-            <div class="app-subheader">Mobile digital rights management solution to track content distribution, rights management, and&nbsp;reporting with automated payments of royalties.</div>
+      <div class="welcome-intro">
+        <div class="app-logo">
+          <img src="images/bf_logo.svg" alt="">
         </div>
-        <div class="buttons-wrapper">
-            <a class="button button-red" id="proceed-demo">Proceed to demo</a>
-        </div>
+        <div class="app-header">EXONUM</div>
+        <div class="app-subheader">Mobile digital rights management solution to track content distribution, rights management, and&nbsp;reporting with automated payments of royalties.</div>
+      </div>
+      <div class="buttons-wrapper">
+        <a class="button button-red button-welcome" id="proceed-demo">Proceed to demo</a>
+      </div>
     </div>
+
     <div class="app-content">
       <div class="alert alert-dismissible alert-danger" id="alert">
         <button type="button" class="close" data-dismiss="alert">×</button>
@@ -140,13 +145,11 @@
     <script src="/bower_components/moment/moment.js"></script>
     <script src="/bower_components/underscore/underscore.js"></script>
     <script src="/bower_components/backbone/backbone.js"></script>
-    <script src="/bower_components/backbone-forms/distribution/backbone-forms.js"></script>
     <script src="/bower_components/bootswatch-dist/js/bootstrap.js"></script>
-    <script src="/bower_components/cookie/cookie.js"></script>
     <script src="/bower_components/alertifyjs/dist/js/alertify.js"></script>
     <script src="/bower_components/d3/d3.js"></script>
-    <script src="/bower_components/Viz/viz.v1.js"></script>
     <!-- endbower -->
+    <script src="/bower_components/Viz/viz.v1.js"></script>
     <!-- endbuild -->
 
     <!-- build:js scripts/main.js -->
@@ -155,5 +158,5 @@
     <script src="/scripts/views.js"></script>
     <script src="/scripts/app.js"></script>
     <!-- endbuild -->
-</body>
+  </body>
 </html>
