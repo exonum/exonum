@@ -22,9 +22,11 @@
                                     <i class="glyphicon glyphicon-user"></i> <a href="{{url}}">{{name}}</a>
                                 </span>
                             {{/author}}
-                            <span>
+                            {{#if tags}}
+                                <span>
                                 <i class="glyphicon glyphicon-tags"></i> {{tags}}
                             </span>
+                            {{/if}}
                         </div>
                     </div>
                 </div>

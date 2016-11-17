@@ -27,9 +27,11 @@
                                                 <i class="glyphicon glyphicon-user"></i> <a href="{{url}}">{{name}}</a>
                                             </li>
                                         {{/author}}
-                                        <li>
-                                            <i class="glyphicon glyphicon-tags"></i> {{tags}}
-                                        </li>
+                                        {{#if tags}}
+                                            <li>
+                                                <i class="glyphicon glyphicon-tags"></i> {{tags}}
+                                            </li>
+                                        {{/if}}
                                     </ul>
                             </div>
                         </div>

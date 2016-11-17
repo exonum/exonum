@@ -14,7 +14,7 @@
                             </h4>
                         {{else}}
                             <h4 class="page-sub-title animated fadeInDown wow" data-wow-delay=".3s">
-                                A {{../pagination.total}}-post collection
+                                {{plural ../pagination.total empty='No posts' singular='% post' plural='% posts'}}
                             </h4>
                         {{/if}}
                     </div>
