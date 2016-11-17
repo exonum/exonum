@@ -53,8 +53,8 @@ var overrides      = require('./core/server/overrides'),
             watch: {
                 livereload: {
                     files: [
-                        'content/themes/casper/assets/css/*.css',
-                        'content/themes/casper/assets/js/*.js',
+                        'content/themes/exonum/assets/css/*.css',
+                        'content/themes/exonum/assets/js/*.js',
                         'core/built/assets/*.js',
                         'core/client/dist/index.html'
                     ],
