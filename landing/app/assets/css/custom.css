@@ -305,7 +305,7 @@
 }
 .blog-post .post-info .date {
     float: left;
-    border-bottom: 3px solid #fb6d9d;
+    border-bottom: 3px solid #0ccfa8;
 }
 .blog-post .post-info .meta-container {
     padding-left: 55px;
@@ -348,7 +348,7 @@
     font-weight: 600;
     margin-top: 20px;
     display: block;
-    color: #fb6d9d;
+    color: #0ccfa8;
 }
 .blog-post a {
     color: #333;
