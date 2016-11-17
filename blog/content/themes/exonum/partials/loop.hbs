@@ -4,6 +4,10 @@
 
             {{!-- This is the post loop - each post will be output using this markup --}}
             {{#foreach posts}}
+                {{#is_multiple_of_three @index}}
+                </div>
+                <div class="row">
+                {{/is_multiple_of_three}}
                 <div class="blog-post col-md-4">
                     <article class="post-body">
                         <div class="post-info">

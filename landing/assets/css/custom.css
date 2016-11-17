@@ -294,6 +294,12 @@
 .blog-details {
     padding-bottom: 0;
 }
+.blog-content img {
+    max-width: 100%;
+}
+.blog-post {
+    margin-bottom: 40px;
+}
 .blog-post .post-info {
     margin-bottom: 20px;
 }
@@ -403,6 +409,9 @@
     background-size: cover;
     background-position: center center;
     border-radius: 100%;
+}
+.author-image-header {
+    margin: 20px 0 0;
 }
 .author-name {
     margin-bottom: 0;

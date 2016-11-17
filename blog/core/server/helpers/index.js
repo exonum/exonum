@@ -44,6 +44,9 @@ coreHelpers.input_email = require('./input_email');
 coreHelpers.page_url = require('./page_url');
 coreHelpers.pageUrl = require('./page_url').deprecated;
 
+// Custom user helpers
+coreHelpers.is_multiple_of_three = require('./is_multiple_of_three');
+
 coreHelpers.helperMissing = function (arg) {
     if (arguments.length === 2) {
         return undefined;
@@ -115,6 +118,9 @@ registerHelpers = function (adminHbs) {
     registerThemeHelper('twitter_url', coreHelpers.twitter_url);
     registerThemeHelper('facebook_url', coreHelpers.facebook_url);
     registerThemeHelper('url', coreHelpers.url);
+
+    // Custom user helper
+    registerAsyncThemeHelper('is_multiple_of_three', coreHelpers.is_multiple_of_three);
 
     // Async theme helpers
     registerAsyncThemeHelper('ghost_foot', coreHelpers.ghost_foot);
