@@ -56,7 +56,10 @@ themeHandler = {
     // Helper for updateActiveTheme
     activateTheme: function activateTheme(blogApp, activeTheme) {
         var hbsOptions,
-            themePartials = path.join(config.paths.themePath, activeTheme, 'partials');
+            themePartials = [
+                path.join(config.paths.themePath, activeTheme, 'partials'),
+                path.join(config.paths.themePath, activeTheme, 'templates')
+            ];
 
         // clear the view cache
         blogApp.cache = {};
@@ -71,11 +74,13 @@ themeHandler = {
             }
         };
 
-        fs.stat(themePartials, function stat(err, stats) {
-            // Check that the theme has a partials directory before trying to use it
-            if (!err && stats && stats.isDirectory()) {
-                hbsOptions.partialsDir.push(themePartials);
-            }
+        themePartials.forEach(function(partials) {
+            fs.stat(partials, function stat(err, stats) {
+                // Check that the theme has a partials directory before trying to use it
+                if (!err && stats && stats.isDirectory()) {
+                    hbsOptions.partialsDir.push(partials);
+                }
+            });
         });
 
         blogApp.engine('hbs', hbs.express3(hbsOptions));
