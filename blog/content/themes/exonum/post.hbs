@@ -47,7 +47,12 @@
                         {{!-- Author --}}
                         {{#author}}
                             <section class="col-md-6">
-                                <h4>{{name}}</h4>
+                                {{#if image}}
+                                    <figure class="author-image pull-left">
+                                        <a class="img" href="{{url}}" style="background-image: url({{image}})"><span class="hidden">{{name}}'s Picture</span></a>
+                                    </figure>
+                                {{/if}}
+                                <h4 class="author-name">{{name}}</h4>
                                 {{#if bio}}
                                     <p class="text-muted">{{bio}}</p>
                                 {{/if}}
@@ -56,7 +61,8 @@
                         {{/author}}
 
                         {{!-- Share to social networks --}}
-                        <section class="share">
+                        <section class="col-md-6 share">
+                            <hr class="hidden-md hidden-lg">
                             <h4>Share this post</h4>
                             <a href="https://twitter.com/intent/tweet?text={{encode title}}&amp;url={{url absolute="true"}}" onclick="window.open(this.href, 'twitter-share', 'width=550,height=235');return false;">
                                 <i class="icomoon-twitter"></i>
@@ -85,10 +91,10 @@
                     <nav>
                         <ul class="pager">
                             {{#prev_post}}
-                                <li class="pull-left"><a href="{{url}}"><span aria-hidden="true">&larr;</span> {{title}}</a></li>
+                                <li class="pager-prev"><a href="{{url}}"><span aria-hidden="true">&larr;</span> {{title}}</a></li>
                             {{/prev_post}}
                             {{#next_post}}
-                                <li class="pull-right"><a href="{{url}}">{{title}} <span aria-hidden="true">&rarr;</span></a></li>
+                                <li class="pager-next"><a href="{{url}}">{{title}} <span aria-hidden="true">&rarr;</span></a></li>
                             {{/next_post}}
                         </ul>
                     </nav>
