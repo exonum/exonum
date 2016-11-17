@@ -1,10 +1,10 @@
 <nav>
     <ul class="pager text-center">
         {{#if prev}}
-            <li class="pager-prev"><a href="{{page_url prev}}"> <span aria-hidden="true">&larr;</span> Older Posts</a></li>
+            <li class="pager-prev"><a href="{{page_url prev}}"><span aria-hidden="true">&larr;</span> Newer Posts</a></li>
         {{/if}}
         {{#if next}}
-            <li class="pager-next"><a href="{{page_url next}}">Newer Posts <span aria-hidden="true">&rarr;</span></a></li>
+            <li class="pager-next"><a href="{{page_url next}}">Older Posts <span aria-hidden="true">&rarr;</span></a></li>
         {{/if}}
         <li>Page {{page}} of {{pages}}</li>
     </ul>
