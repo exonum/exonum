@@ -420,7 +420,13 @@
     display: block;
     margin-bottom: 20px;
 }
+.pager .pager-total {
+    padding: 6px 0;
+}
 @media (min-width: 992px) {
+    .pager li {
+        margin-bottom: 0;
+    }
     .pager .pager-prev {
         float: left;
     }
