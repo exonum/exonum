@@ -92,12 +92,12 @@
                     {{!-- Paging  --}}
                     <nav>
                         <ul class="pager">
-                            {{#prev_post}}
-                                <li class="pager-prev"><a href="{{url}}"><span aria-hidden="true">&larr;</span> {{title}}</a></li>
-                            {{/prev_post}}
                             {{#next_post}}
-                                <li class="pager-next"><a href="{{url}}">{{title}} <span aria-hidden="true">&rarr;</span></a></li>
+                                <li class="pager-prev"><a href="{{url}}"><span aria-hidden="true">&larr;</span> {{title}}</a></li>
                             {{/next_post}}
+                            {{#prev_post}}
+                                <li class="pager-next"><a href="{{url}}">{{title}} <span aria-hidden="true">&rarr;</span></a></li>
+                            {{/prev_post}}
                         </ul>
                     </nav>
                 </div>
