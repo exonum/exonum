@@ -69,7 +69,8 @@ gulp.task('html', ['styles', 'scripts'], () => {
     .pipe(rename({
       extname: ".html"
     }))
-    .pipe(gulp.dest('.tmp'));
+    .pipe(gulp.dest('.tmp'))
+    .pipe(gulp.dest('dist'));
 });
 
 gulp.task('images', () => {
