@@ -21,8 +21,8 @@ extern crate exonum;
 extern crate blockchain_explorer;
 extern crate land_title;
 
-use land_title::cors::CORS;
-use iron::method::Method;
+//use land_title::cors::CORS;
+//use iron::method::Method;
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -198,11 +198,10 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                      listen_address,
                      origin_url);
 
-            let cors = CORS::new(origin_url,
-                                 vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
+            //let cors = CORS::new(origin_url, vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
 
             chain.link(cookie);
-            chain.link_after(cors);
+            //chain.link_after(cors);
             iron::Iron::new(chain).http(listen_address).unwrap();
         });
 
