@@ -9,6 +9,13 @@
                 <div class="row">
                 {{/is_multiple_of_three}}
                 <div class="blog-post col-md-4">
+                    {{#if image}}
+                        <div class="post-media">
+                            <a href="{{url}}">
+                                <img class="img-responsive" src="{{image}}" alt="{{title}}"/>
+                            </a>
+                        </div>
+                    {{/if}}
                     <article class="post-body">
                         <div class="post-info">
                             <div class="date">

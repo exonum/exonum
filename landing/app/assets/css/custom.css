@@ -303,6 +303,22 @@ blockquote {
 .blog-post {
     margin-bottom: 40px;
 }
+.blog-post .post-media {
+    width: 100%;
+    margin-bottom: 30px;
+}
+.blog-post .post-media img {
+    opacity: 1;
+    -webkit-transition: all 0.2s ease 0s;
+    -moz-transition: all 0.2s ease 0s;
+    -o-transition: all 0.2s ease 0s;
+    -ms-transition: all 0.2s ease 0s;
+    transition: all 0.2s ease 0s;
+    border-radius: 4px;
+}
+.blog-post .post-media img:hover {
+    opacity: 0.7;
+}
 .blog-post .post-info {
     margin-bottom: 20px;
 }
