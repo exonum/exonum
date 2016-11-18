@@ -21,8 +21,8 @@ extern crate exonum;
 extern crate blockchain_explorer;
 extern crate land_title;
 
-use land_title::cors::CORS;
-use iron::method::Method;
+//use land_title::cors::CORS;
+//use iron::method::Method;
 
 use std::net::SocketAddr;
 use std::path::Path;
@@ -50,8 +50,8 @@ use blockchain_explorer::ValueNotFound;
 use land_title::GeoPoint;
 
 
-use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject,
-                     TxTransferObject, TxRemoveObject, TxRestoreObject, TxRegister};
+use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject, TxTransferObject,
+                 TxRemoveObject, TxRestoreObject, TxRegister};
 use land_title::api::{ObjectsApi, NewObject};
 
 pub type Channel<B> = TxSender<B, NodeChannel<B>>;
@@ -89,15 +89,19 @@ fn load_user(storage: &CookieJar) -> StorageResult<(PublicKey, SecretKey)> {
     Ok((public_key, secret_key))
 }
 
-fn send_transaction<'a, D: Database>(tx: ObjectTx, _: &Client<'a>, ch: Channel<ObjectsBlockchain<D>>)
-                            -> String {
+fn send_transaction<'a, D: Database>(tx: ObjectTx,
+                                     _: &Client<'a>,
+                                     ch: Channel<ObjectsBlockchain<D>>)
+                                     -> String {
 
     let tx_hash = tx.hash().to_hex();
     let result = ch.send(tx);
     println!("{:?}", result);
     tx_hash
 }
-fn send_tx<'a, D: Database>(tx: ObjectTx, client: Client<'a>, ch: Channel<ObjectsBlockchain<D>>)
+fn send_tx<'a, D: Database>(tx: ObjectTx,
+                            client: Client<'a>,
+                            ch: Channel<ObjectsBlockchain<D>>)
                             -> Result<Client<'a>, ErrorResponse> {
     let tx_hash = send_transaction(tx, &client, ch);
     let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
@@ -106,7 +110,8 @@ fn send_tx<'a, D: Database>(tx: ObjectTx, client: Client<'a>, ch: Channel<Object
 
 fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                          node_cfg: Configuration,
-                         port: Option<u16>, origin: Option<String>) {
+                         port: Option<u16>,
+                         origin: Option<String>) {
     if let Some(port) = port {
 
         let mut node = Node::new(blockchain.clone(), node_cfg.clone());
@@ -184,17 +189,19 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
             let origin_url = {
                 if let Some(origin) = origin {
                     origin
-                }else{
+                } else {
                     String::from("*")
                 }
             };
 
-            println!("LandTitles node server started on {}, allowed origin is {}", listen_address, origin_url);
+            println!("LandTitles node server started on {}, allowed origin is {}",
+                     listen_address,
+                     origin_url);
 
-            let cors = CORS::new(origin_url, vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
+            //let cors = CORS::new(origin_url, vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
 
             chain.link(cookie);
-            chain.link_after(cors);
+            //chain.link_after(cors);
             iron::Iron::new(chain).http(listen_address).unwrap();
         });
 
@@ -205,22 +212,21 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
     }
 }
 
-fn blockchain_explorer_api<D: Database>(api: &mut Api, b1: ObjectsBlockchain<D>, cfg: Configuration) {
+fn blockchain_explorer_api<D: Database>(api: &mut Api,
+                                        b1: ObjectsBlockchain<D>,
+                                        cfg: Configuration) {
     blockchain_explorer::make_api::<ObjectsBlockchain<D>, ObjectTx>(api, b1, cfg);
 }
 
 
 fn land_titles_api<D: Database>(api: &mut Api,
-                                   blockchain: ObjectsBlockchain<D>,
-                                   channel: Channel<ObjectsBlockchain<D>>) {
+                                blockchain: ObjectsBlockchain<D>,
+                                channel: Channel<ObjectsBlockchain<D>>) {
 
     api.namespace("obm", move |api| {
 
-        api.options("*", move |endpoint| {
-            endpoint.handle(move |client, _ | {
-                client.empty()
-            })
-        });
+        api.options("*",
+                    move |endpoint| endpoint.handle(move |client, _| client.empty()));
 
         let ch = channel.clone();
         api.post("register", move |endpoint| {
@@ -269,10 +275,12 @@ fn land_titles_api<D: Database>(api: &mut Api,
                     Ok(hash) => {
                         let obm = ObjectsApi::new(b.clone());
 
-                        match obm.result(hash){
+                        match obm.result(hash) {
                             Ok(Some(result)) => client.json(&result.to_json()),
-                            Ok(None) => client.error(ValueNotFound::new("Unable to find transaction")),
-                            Err(e) => client.error(e)
+                            Ok(None) => {
+                                client.error(ValueNotFound::new("Unable to find transaction"))
+                            }
+                            Err(e) => client.error(e),
                         }
                     }
                     Err(_) => client.error(StorageError::new("Unable to decode transaction hash")),
@@ -282,8 +290,8 @@ fn land_titles_api<D: Database>(api: &mut Api,
         });
 
         let b = blockchain.clone();
-         api.get("owners", move |endpoint| {
-            endpoint.handle(move |client, _ | {
+        api.get("owners", move |endpoint| {
+            endpoint.handle(move |client, _| {
                 let obm = ObjectsApi::new(b.clone());
                 match obm.owners_list() {
                     Ok(Some(info)) => client.json(&info.to_json()),
@@ -291,14 +299,14 @@ fn land_titles_api<D: Database>(api: &mut Api,
                     Err(e) => client.error(e),
                 }
             })
-         });
+        });
 
         let b = blockchain.clone();
-         api.get("owners/:id", move |endpoint| {
-            endpoint.params(|params|{
+        api.get("owners/:id", move |endpoint| {
+            endpoint.params(|params| {
                 params.req_typed("id", json_dsl::u64());
             });
-            endpoint.handle(move |client, params|{
+            endpoint.handle(move |client, params| {
 
                 let id = params.find("id").unwrap().as_u64().unwrap();
                 let obm = ObjectsApi::new(b.clone());
@@ -309,14 +317,14 @@ fn land_titles_api<D: Database>(api: &mut Api,
                     Err(e) => client.error(e),
                 }
             })
-         });
+        });
 
-         let b = blockchain.clone();
-         api.get("objects/:id", move |endpoint| {
-            endpoint.params(|params|{
+        let b = blockchain.clone();
+        api.get("objects/:id", move |endpoint| {
+            endpoint.params(|params| {
                 params.req_typed("id", json_dsl::u64());
             });
-            endpoint.handle(move |client, params|{
+            endpoint.handle(move |client, params| {
 
                 let id = params.find("id").unwrap().as_u64().unwrap();
                 let obm = ObjectsApi::new(b.clone());
@@ -327,15 +335,15 @@ fn land_titles_api<D: Database>(api: &mut Api,
                     Err(e) => client.error(e),
                 }
             })
-         });
+        });
 
-         let ch = channel.clone();
-         api.post("objects/transfer", move |endpoint| {
-            endpoint.params(|params|{
+        let ch = channel.clone();
+        api.post("objects/transfer", move |endpoint| {
+            endpoint.params(|params| {
                 params.req_typed("id", json_dsl::u64());
                 params.req_typed("owner_id", json_dsl::u64());
             });
-            endpoint.handle(move |client, params|{
+            endpoint.handle(move |client, params| {
 
                 let (pub_key, sec_key) = {
                     let r = {
@@ -350,18 +358,22 @@ fn land_titles_api<D: Database>(api: &mut Api,
 
                 let object_id = params.find("id").unwrap().as_u64().unwrap();
                 let owner_id = params.find("owner_id").unwrap().as_u64().unwrap();
-                let tx = TxTransferObject::new(&pub_key, object_id, owner_id, land_title::timestamp(), &sec_key);
+                let tx = TxTransferObject::new(&pub_key,
+                                               object_id,
+                                               owner_id,
+                                               land_title::timestamp(),
+                                               &sec_key);
 
-                 send_tx(ObjectTx::TransferObject(tx), client, ch.clone())
+                send_tx(ObjectTx::TransferObject(tx), client, ch.clone())
             })
-         });
+        });
 
         let ch = channel.clone();
         api.delete("objects/:id", move |endpoint| {
-            endpoint.params(|params|{
+            endpoint.params(|params| {
                 params.req_typed("id", json_dsl::u64());
             });
-            endpoint.handle(move |client, params|{
+            endpoint.handle(move |client, params| {
 
                 let (pub_key, sec_key) = {
                     let r = {
@@ -377,16 +389,16 @@ fn land_titles_api<D: Database>(api: &mut Api,
                 let id = params.find("id").unwrap().as_u64().unwrap();
                 let tx = TxRemoveObject::new(&pub_key, id, land_title::timestamp(), &sec_key);
 
-                 send_tx(ObjectTx::RemoveObject(tx), client, ch.clone())
+                send_tx(ObjectTx::RemoveObject(tx), client, ch.clone())
             })
-         });
+        });
 
         let ch = channel.clone();
         api.post("objects/restore", move |endpoint| {
-            endpoint.params(|params|{
+            endpoint.params(|params| {
                 params.req_typed("id", json_dsl::u64());
             });
-            endpoint.handle(move |client, params|{
+            endpoint.handle(move |client, params| {
 
                 let (pub_key, sec_key) = {
                     let r = {
@@ -402,26 +414,26 @@ fn land_titles_api<D: Database>(api: &mut Api,
                 let id = params.find("id").unwrap().as_u64().unwrap();
                 let tx = TxRestoreObject::new(&pub_key, id, land_title::timestamp(), &sec_key);
 
-                 send_tx(ObjectTx::RestoreObject(tx), client, ch.clone())
+                send_tx(ObjectTx::RestoreObject(tx), client, ch.clone())
             })
-         });
+        });
 
 
 
-         let ch = channel.clone();
-         api.post("owners", move |endpoint| {
+        let ch = channel.clone();
+        api.post("owners", move |endpoint| {
 
-             endpoint.params(|params| {
-                 params.req_typed("firstname", json_dsl::string());
-                 params.req_typed("lastname", json_dsl::string());
-             });
+            endpoint.params(|params| {
+                params.req_typed("firstname", json_dsl::string());
+                params.req_typed("lastname", json_dsl::string());
+            });
 
-             endpoint.handle(move |client, params| {
+            endpoint.handle(move |client, params| {
 
-                 let firstname = params.find("firstname").unwrap().as_str().unwrap();
-                 let lastname = params.find("lastname").unwrap().as_str().unwrap();
+                let firstname = params.find("firstname").unwrap().as_str().unwrap();
+                let lastname = params.find("lastname").unwrap().as_str().unwrap();
 
-                 let (pub_key, sec_key) = {
+                let (pub_key, sec_key) = {
                     let r = {
                         let cookies = client.request.cookies();
                         load_user(&cookies)
@@ -432,15 +444,15 @@ fn land_titles_api<D: Database>(api: &mut Api,
                     }
                 };
 
-                 let tx = TxCreateOwner::new(&pub_key, &firstname, &lastname, &sec_key);
+                let tx = TxCreateOwner::new(&pub_key, &firstname, &lastname, &sec_key);
 
-                 send_tx(ObjectTx::CreateOwner(tx), client, ch.clone())
+                send_tx(ObjectTx::CreateOwner(tx), client, ch.clone())
 
-             })
-         });
+            })
+        });
 
-         let b = blockchain.clone();
-         api.get("objects", move |endpoint| {
+        let b = blockchain.clone();
+        api.get("objects", move |endpoint| {
             endpoint.handle(move |client, _| {
                 let obm = ObjectsApi::new(b.clone());
                 match obm.objects_list() {
@@ -449,22 +461,22 @@ fn land_titles_api<D: Database>(api: &mut Api,
                     Err(e) => client.error(e),
                 }
             })
-         });
+        });
 
-         let ch = channel.clone();
-         api.post("objects", move |endpoint| {
+        let ch = channel.clone();
+        api.post("objects", move |endpoint| {
 
-             endpoint.params(|params| {
-                 params.req_typed("title", json_dsl::string());
-                 params.req_nested("points", json_dsl::array(), |params| {
-                     params.req_typed("x", json_dsl::f64());
-                     params.req_typed("y", json_dsl::f64());
-                 });
-                 params.req_typed("owner_id", json_dsl::u64());
-                 params.req_typed("deleted", json_dsl::boolean());
-             });
+            endpoint.params(|params| {
+                params.req_typed("title", json_dsl::string());
+                params.req_nested("points", json_dsl::array(), |params| {
+                    params.req_typed("x", json_dsl::f64());
+                    params.req_typed("y", json_dsl::f64());
+                });
+                params.req_typed("owner_id", json_dsl::u64());
+                params.req_typed("deleted", json_dsl::boolean());
+            });
 
-             endpoint.handle(move |client, params| {
+            endpoint.handle(move |client, params| {
                 let object_info = from_value::<NewObject>(params.clone()).unwrap();
                 let (pub_key, sec_key) = {
                     let r = {
@@ -478,13 +490,17 @@ fn land_titles_api<D: Database>(api: &mut Api,
                 };
                 let points = GeoPoint::to_vec(&object_info.points);
 
-                let tx = TxCreateObject::new(&pub_key, &object_info.title, &points, object_info.owner_id, &sec_key);
+                let tx = TxCreateObject::new(&pub_key,
+                                             &object_info.title,
+                                             &points,
+                                             object_info.owner_id,
+                                             &sec_key);
 
                 send_tx(ObjectTx::CreateObject(tx), client, ch.clone())
 
-             })
+            })
 
-         });
+        });
 
     });
 }
@@ -507,6 +523,12 @@ fn main() {
             .about("Generates default configuration file")
             .version(env!("CARGO_PKG_VERSION"))
             .author("Aleksandr M. <aleksandr.marinenko@xdev.re>")
+            .arg(Arg::with_name("START_PORT")
+                .short("p")
+                .long("port")
+                .value_name("START_PORT")
+                .help("Port for first validator")
+                .takes_value(true))
             .arg(Arg::with_name("COUNT")
                 .help("Validators count")
                 .required(true)
@@ -551,7 +573,8 @@ fn main() {
             let port: Option<u16> = matches.value_of("START_PORT").map(|x| x.parse().unwrap());
             let cfg = GenesisConfig::gen(count, port);
             ConfigFile::save(&cfg, &path).unwrap();
-            println!("The configuration was successfully written to file {:?}", path);
+            println!("The configuration was successfully written to file {:?}",
+                     path);
         }
         ("run", Some(matches)) => {
             let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
