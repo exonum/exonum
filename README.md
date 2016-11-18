@@ -175,12 +175,12 @@ TODO
 
 Во-первых, должен быть установлен [Node.js 4.2.1](https://nodejs.org/dist/v4.2.1/).
 
-Желательно настроить Node.js таким образом, чтобы, можно было устанавливать npm пакеты глобально без sudo. Как это сделать написано [здесь](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
+При работе локально желательно настроить Node.js таким образом, чтобы, можно было устанавливать npm пакеты глобально без sudo. Как это сделать написано [здесь](https://docs.npmjs.com/getting-started/fixing-npm-permissions).
 
-Далее, требуется установка пакета Yeoman, его генератора, gulp и bower:
+Далее, требуется установка следующих зависимостей:
 
 ```
-npm install --global yo generator-gulp-webapp gulp-cli bower
+npm install --global yo gulp-cli bower
 ```
 
 Далее, требуется установить все npm зависимости:
@@ -199,8 +199,10 @@ bower install
 ```
 gulp serve
 ```
+_**Важно**! Нужно, чтобы локально сайт открывался под доменом `exonum.pro`. Иначе не будет работать  API._
 
 Чтобы собрать файлы для выгрузки в продакшн:
 ```
-gulp build
+gulp
 ```
+Собранный проект будет находиться в папке `dist`.

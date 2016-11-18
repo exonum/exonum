@@ -24,6 +24,6 @@ trim_trailing_whitespace = false
 indent_style = space
 indent_size = 2
 
-[app/styles/**.css]
+[app/styles/**.{css,scss}]
 indent_style = space
 indent_size = 4
