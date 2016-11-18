@@ -19,6 +19,9 @@ pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 11;
 
+pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 12;
+pub const CONFIG_VOTE_MESSAGE_ID: u16 = 13;
+
 message! {
     Connect {
         const ID = CONNECT_MESSAGE_ID;
@@ -171,5 +174,23 @@ message! {
         to:             &PublicKey  [32 => 64]
         time:           Timespec    [64 => 72]
         height:         u64         [72 => 80]
+    }
+}
+
+message !{
+    RequestConfigPropose{
+        const ID = CONFIG_PROPOSE_MESSAGE_ID;
+        const SIZE = 8;
+        config:        &[u8]        [00 => 08] // serialized config bytes
+    }
+}
+
+message !{
+    RequestConfigVote {
+        const ID = CONFIG_VOTE_MESSAGE_ID;
+        const SIZE = 41;
+        hash_propose:   &Hash       [00 => 32] // hash of transacion we're voting for
+        seed:           u64         [32 => 40] // incremental (1, 2, 3, 4, 5, 6, 7) проверять +1
+        revoke:         bool        [40 => 41] // голос_за=false / отозвать=true
     }
 }
