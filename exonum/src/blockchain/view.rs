@@ -1,9 +1,9 @@
 use std::slice::SliceConcatExt;
 use std::ops::Deref;
 
-use ::crypto::Hash;
-use ::messages::{Precommit, Message};
-use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable};
+use ::crypto::{Hash, PublicKey};
+use ::messages::{Precommit, Message, ConfigPropose};
+use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatriciaTable};
 
 use super::Block;
 
@@ -31,4 +31,20 @@ pub trait View<F: Fork>: Deref<Target = F> {
     fn precommits(&self, hash: &Hash) -> ListTable<MapTable<F, [u8], Vec<u8>>, u32, Precommit> {
         ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self))
     }
+
+    fn config_proposes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, ConfigPropose> {
+        //config_propose paricia merkletree <hash_tx> транзакция пропоз
+        MerklePatriciaTable::new(MapTable::new(vec![04], &self))
+    }
+
+    fn config_votes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, Self::Transaction> {
+        //config_votes patricia merkletree <pub_key> последний голос
+        MerklePatriciaTable::new(MapTable::new(vec![05], &self))
+    }
+
+    fn configs(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, u64, Vec<u8>> {
+        //configs patricia merkletree <высота блока> json
+        MerklePatriciaTable::new(MapTable::new(vec![06], &self))
+    }
+
 }

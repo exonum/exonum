@@ -3,10 +3,9 @@ use super::super::crypto::PublicKey;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
-    version: u16,
+    actual_from: u64,
     validators: Vec<PublicKey>,
-    consensus: ConsensusCfg,
-    network: NetworkCfg
+    consensus: ConsensusCfg
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -16,16 +15,6 @@ pub struct ConsensusCfg {
     peers_timeout: u64,    // 10000
     propose_timeout: u64,  // 500
     txs_block_limit: u16   // 500
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct NetworkCfg {
-    max_incoming_connections: u16, // 128
-    max_outgoing_connections: u16, // 128,
-    tcp_keep_alive: Option<u32>,   // None,
-    tcp_nodelay: bool,             // false,
-    tcp_reconnect_timeout: u64,    // 5000,
-    tcp_reconnect_timeout_max: u64 // 600000,
 }
 
 trait ConfigurationValidator {
@@ -38,22 +27,16 @@ impl ConfigurationValidator for ConsensusCfg {
     }
 }
 
-impl ConfigurationValidator for NetworkCfg {
-    fn is_valid(&self) -> bool {
-        true
-    }
-}
-
 impl Configuration {
 
     #[allow(dead_code)]
-    fn serialize(&self) -> String {
-        serde_json::to_string(&self).unwrap()
+    fn serialize(&self) -> Vec<u8> {
+        serde_json::to_vec(&self).unwrap()
     }
 
     #[allow(dead_code)]
-    fn deserialize(serialized: &str) -> Result<Configuration, &str> {
-        let cfg: Configuration = serde_json::from_str(serialized).unwrap();
+    fn deserialize(serialized: &[u8]) -> Result<Configuration, &str> {
+        let cfg: Configuration = serde_json::from_slice(serialized).unwrap();
         if cfg.is_valid() {
             return Ok(cfg);
         }
@@ -63,7 +46,7 @@ impl Configuration {
 
 impl ConfigurationValidator for Configuration {
     fn is_valid(&self) -> bool {
-        self.consensus.is_valid() && self.network.is_valid()
+        self.consensus.is_valid()
     }
 }
 
@@ -90,16 +73,7 @@ mod tests {
                 peers_timeout: 10000,
                 propose_timeout: 500,
                 txs_block_limit: 500
-            },
-            network: NetworkCfg {
-                max_incoming_connections: 128,
-                max_outgoing_connections: 128,
-                tcp_keep_alive: None,
-                tcp_nodelay: false,
-                tcp_reconnect_timeout: 5000,
-                tcp_reconnect_timeout_max: 600000
             }
-
         };
 
         // Assert
@@ -109,10 +83,10 @@ mod tests {
     #[test]
     fn deserialize_correct_configuration(){
         // Arrange
-        let json = "{\"version\":1,\"validators\":[[255,110,239,100,242,107,33,125,149,196,6,71,45,5,143,15,66,144,168,233,171,18,1,81,183,253,49,72,248,226,88,224],[100,2,253,143,161,127,247,209,175,28,191,6,240,0,255,119,238,66,101,154,110,219,187,25,28,34,69,65,223,131,163,227],[185,187,188,22,223,202,133,226,118,76,203,52,17,132,193,213,117,57,36,15,106,67,129,218,175,32,34,235,240,51,83,81]],\"consensus\":{\"round_timeout\":2000,\"status_timeout\":5000,\"peers_timeout\":10000,\"propose_timeout\":500,\"txs_block_limit\":500},\"network\":{\"max_incoming_connections\":128,\"max_outgoing_connections\":128,\"tcp_keep_alive\":null,\"tcp_nodelay\":false,\"tcp_reconnect_timeout\":5000,\"tcp_reconnect_timeout_max\":600000}}";
+        let json = String::from("{\"actual_from\":1,\"validators\":[[255,110,239,100,242,107,33,125,149,196,6,71,45,5,143,15,66,144,168,233,171,18,1,81,183,253,49,72,248,226,88,224],[100,2,253,143,161,127,247,209,175,28,191,6,240,0,255,119,238,66,101,154,110,219,187,25,28,34,69,65,223,131,163,227],[185,187,188,22,223,202,133,226,118,76,203,52,17,132,193,213,117,57,36,15,106,67,129,218,175,32,34,235,240,51,83,81]],\"consensus\":{\"round_timeout\":2000,\"status_timeout\":5000,\"peers_timeout\":10000,\"propose_timeout\":500,\"txs_block_limit\":500}}").into_bytes().as_slice();
 
         // Act
-        let cfg = Configuration::deserialize(json);
+        let cfg = Configuration::deserialize(&json);
 
         // Assert
         assert_eq!(cfg.is_ok(), true);
@@ -122,7 +96,7 @@ mod tests {
     #[test]
     fn deserialize_wrong_configuration(){
         // Arrange
-        let json = "{\"version\":1,\"validators\":[[255,110,239,100,242,107,33,125,149,196,6,71,45,5,143,15,66,144,168,233,171,18,1,81,183,253,49,72,248,226,88,224],[100,2,253,143,161,127,247,209,175,28,191,6,240,0,255,119,238,66,101,154,110,219,187,25,28,34,69,65,223,131,163,227],[185,187,188,22,223,202,133,226,118,76,203,52,17,132,193,213,117,57,36,15,106,67,129,218,175,32,34,235,240,51,83,81]],\"consensus\":{\"round_timeout\":11000,\"status_timeout\":5000,\"peers_timeout\":10000,\"propose_timeout\":500,\"txs_block_limit\":500},\"network\":{\"max_incoming_connections\":128,\"max_outgoing_connections\":128,\"tcp_keep_alive\":null,\"tcp_nodelay\":false,\"tcp_reconnect_timeout\":5000,\"tcp_reconnect_timeout_max\":600000}}";
+        let json = String::from("{\"actual_from\":1,\"validators\":[[255,110,239,100,242,107,33,125,149,196,6,71,45,5,143,15,66,144,168,233,171,18,1,81,183,253,49,72,248,226,88,224],[100,2,253,143,161,127,247,209,175,28,191,6,240,0,255,119,238,66,101,154,110,219,187,25,28,34,69,65,223,131,163,227],[185,187,188,22,223,202,133,226,118,76,203,52,17,132,193,213,117,57,36,15,106,67,129,218,175,32,34,235,240,51,83,81]],\"consensus\":{\"round_timeout\":11000,\"status_timeout\":5000,\"peers_timeout\":10000,\"propose_timeout\":500,\"txs_block_limit\":500}}").into_bytes().as_slice();
 
         // Act
         let cfg = Configuration::deserialize(json);
