@@ -7729,7 +7729,7 @@ a.user-list-item {
   font-family: inherit;
   font-weight: 500;
   line-height: 1.1;
-  color: inherit;
+  color: #4c5667;
 }
 
 .content-preview-content h1,
@@ -7747,6 +7747,10 @@ a.user-list-item {
 .rendered-markdown h1 {
   font-size: 36px;
   font-weight: 700;
+}
+
+.content-preview-content .content-preview-title h1 {
+  margin-top: 0;
 }
 
 .content-preview-content h2,
@@ -7844,6 +7848,16 @@ a.user-list-item {
   background-color: #f5f5f5;
   border: 1px solid #ccc;
   border-radius: 4px;
+}
+
+.content-preview-content pre code,
+.rendered-markdown pre code {
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+  white-space: pre-wrap;
+  background-color: transparent;
+  border-radius: 0;
 }
 
 .content-preview-content a,
