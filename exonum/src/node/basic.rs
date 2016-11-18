@@ -29,6 +29,7 @@ impl<B, S> NodeHandler<B, S>
             Any::Consensus(message) => self.handle_consensus(message),
             Any::Request(message) => self.handle_request(message),
             Any::Block(message) => self.handle_block(message),
+            // добавить свои сообщения и реализовать обработчики
         }
     }
 
