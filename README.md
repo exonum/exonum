@@ -235,10 +235,12 @@ npm start
 
 Административная панель [http://localhost:2368/ghost](http://localhost:2368/ghost). 
 
-Запускаем на сервере:
+Запускаем в режиме production like:
 
 ```
 npm start --production
 ```
 
-Чтобы настроить работу блога на сервере смотри радел `production` файла `config.js`.
+Запущеный в режиме production like блог будет висеть на `127.0.0.1:2368`.
+
+Эта и другие настройки хранятся в файле `config.js` в корне.
