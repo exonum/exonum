@@ -25,9 +25,8 @@ pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::merkle_table::MerkleTable;
 pub use self::fields::{StorageValue, HeightBytes};
-pub use self::merkle_table::MerkleRangeProof; 
+pub use self::merkle_table::proof_indices_values; 
 pub use self::merkle_patricia_table::MerklePatriciaTable;
-use ::crypto::Hash;
 
 #[derive(Debug)]
 pub struct Error {
@@ -65,10 +64,6 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
     fn last(&self) -> Result<Option<V>>;
     fn is_empty(&self) -> Result<bool>;
     fn len(&self) -> Result<K>;
-}
-
-pub trait InclusionProof<V: StorageValue> {
-    fn verify(&self, value: Vec<&V>, root_hash: Hash) -> bool;
 }
 
 impl Error {
