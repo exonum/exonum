@@ -199,9 +199,17 @@ impl BranchNode {
     }
 
     fn hash(&self) -> Hash {
-        hash(&[self.child_hash(ChildKind::Left).as_ref(),
-               self.child_hash(ChildKind::Right).as_ref()]
-            .concat())
+        hash(self.raw.as_slice()) // which is effectively the same as written below
+        // === hash(&[self.child_hash(ChildKind::Left).as_ref(),
+        // self.child_hash(ChildKind::Right).as_ref(),
+        // &self.child_slice(ChildKind::Left).to_db_key(),
+        // &self.child_slice(ChildKind::Right).to_db_key()]
+        // .concat())
+
+        // removed for now for proofs construction testing purposes. 
+        // hash(&[self.child_hash(ChildKind::Left).as_ref(),
+        //        self.child_hash(ChildKind::Right).as_ref()]
+        //     .concat())
     }
 
     fn child_hash(&self, kind: ChildKind) -> &Hash {
@@ -272,16 +280,11 @@ impl BranchNode {
         }
     }
     fn write_slice(&mut self, from: usize, slice: &BitSlice) -> usize {
-        debug_assert!(slice.data.len() <= KEY_SIZE);
+        debug_assert!(slice.data.len() == KEY_SIZE);
 
-        if slice.is_leaf_key() {
-            self.raw[from] = LEAF_KEY_PREFIX;
-            self.raw[from + DB_KEY_SIZE - 1] = 0;
-        } else {
-            self.raw[from] = BRANCH_KEY_PREFIX;
-            self.raw[from + DB_KEY_SIZE - 1] = slice.to as u8;
-        };
-        self.raw[from + 1..from + DB_KEY_SIZE - 1].copy_from_slice(slice.data);
+        let db_key = slice.to_db_key();
+
+        self.raw[from..from + DB_KEY_SIZE].copy_from_slice(db_key.as_slice());
         from + DB_KEY_SIZE
     }
 }
@@ -300,6 +303,8 @@ impl StorageValue for BranchNode {
     }
 }
 
+type Entry<V> = (Vec<u8>, Node<V>);
+
 pub struct MerklePatriciaTable<T: Map<[u8], Vec<u8>>, K: ?Sized, V> {
     map: T,
     _k: PhantomData<K>,
@@ -313,7 +318,6 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
-type Entry<V> = (Vec<u8>, Node<V>);
 
 // TODO avoid reallocations where is possible.
 impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaTable<T, K, V> {
@@ -327,9 +331,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
         match self.root_node()? {
-            Some((prefix, Node::Leaf(value))) => {
-                let prefix_slice = BitSlice::from_db_key(&prefix);
-                Ok(Self::hash_leaf(&prefix_slice, &value))
+            Some((_, Node::Leaf(value))) => {
+                // let prefix_slice = BitSlice::from_db_key(&prefix);
+                Ok(Self::hash_leaf(&value))
             }
             Some((_, Node::Branch(branch))) => Ok(branch.hash()),
             None => Ok(hash(&[])),
@@ -363,7 +367,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                     branch.set_child(key_slice.at(i), &key_slice.mid(i), &leaf_hash);
                     branch.set_child(prefix_slice.at(i),
                                      &prefix_slice.mid(i),
-                                     &Self::hash_leaf(&prefix_slice, &prefix_data));
+                                     &Self::hash_leaf(&prefix_data));
                     let new_prefix = key_slice.truncate(i);
                     self.insert_branch(&new_prefix, branch)?;
                 }
@@ -458,8 +462,8 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         }
     }
 
-    fn hash_leaf(key: &BitSlice, value: &V) -> Hash {
-        hash(&[key.data, value.hash().as_ref()].concat())
+    fn hash_leaf(value: &V) -> Hash {
+        value.hash()
     }
 
     fn remove(&self, key_slice: BitSlice) -> Result<(), Error> {
@@ -575,7 +579,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     fn insert_leaf(&self, key: &BitSlice, value: V) -> Result<Hash, Error> {
         debug_assert!(key.is_leaf_key());
 
-        let hash = Self::hash_leaf(key, &value);
+        let hash = Self::hash_leaf(&value);
         let db_key = key.to_db_key();
         let bytes = value.serialize();
         self.map.put(&db_key, bytes)?;
@@ -629,7 +633,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
 
     fn put(&self, key: &K, value: V) -> Result<(), Error> {
         // FIXME avoid reallocation
-        self.insert(&key.as_ref().to_vec(), value)
+        self.insert(key.as_ref(), value)
     }
 
     fn delete(&self, key: &K) -> Result<(), Error> {
@@ -669,23 +673,23 @@ fn bytes_to_hex<T: AsRef<[u8]>>(bytes: &T) -> String {
 impl<'a> fmt::Debug for BitSlice<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let bytes = self.to_db_key();
-        let key = &bytes[1..];
+        let key = &bytes[0..];
         if key.is_empty() {
-            f.debug_struct("BitSlice").finish()
+            f.debug_struct("").finish()
         } else if self.is_leaf_key() {
-            f.debug_struct("BitSlice")
+            f.debug_struct("")
                 .field("type", &"leaf")
                 .field("key", &format!("0x{}", &bytes_to_hex(&key)))
                 .field("from", &self.from)
                 .field("to", &self.to)
                 .finish()
         } else {
-            f.debug_struct("BitSlice")
+            f.debug_struct("")
                 .field("type", &"branch")
                 .field("key", &format!("0x{}", &bytes_to_hex(&key)))
                 .field("from", &self.from)
                 .field("to", &self.to)
-                .field("len", &key[32])
+                .field("len", &key[33])
                 .finish()
         }
     }
@@ -814,6 +818,7 @@ mod tests {
 
         assert_eq!(b.len(), 8);
         assert_eq!(b.truncate(1).at(0), Right);
+        assert_eq!(b.truncate(1).len(), 1);
     }
 
     #[test]
@@ -837,7 +842,7 @@ mod tests {
     fn bitslice_mid_overflow() {
         let v1 = vec![255;32];
         let b = BitSlice::from_bytes(&v1);
-        b.mid(255).mid(255);
+        b.mid(255).mid(2);
     }
 
     #[test]
@@ -875,6 +880,8 @@ mod tests {
         assert_eq!(b3.common_prefix(&b3), 226);
         let b3 = b3.truncate(200);
         assert_eq!(b3.common_prefix(&b3), 200);
+        let b5 = BitSlice::from_bytes(v1);
+        assert_eq!(b5.truncate(0).common_prefix(&b3), 0);
     }
 
     #[test]
@@ -953,9 +960,9 @@ mod tests {
 
         assert_eq!(node.child_hash(Left), &lh);
         assert_eq!(node.child_hash(Right), &rh);
-        assert_eq!(node.child_slice(Left).data, lp.data);
+        assert_eq!(node.child_slice(Left).to_db_key(), lp.to_db_key());
         assert_eq!(node.child_slice(Left).to, lp.to);
-        assert_eq!(node.child_slice(Right).data, rp.data);
+        assert_eq!(node.child_slice(Right).to_db_key(), rp.to_db_key());
         assert_eq!(node.child_slice(Right).to, rp.to);
         // assert_eq!(node.child_db_key(Left), lp.to_db_key().as_slice());
         // assert_eq!(node.child_db_key(Right), rp.to_db_key().as_slice());
@@ -996,7 +1003,7 @@ mod tests {
         let storage = MemoryDB::new();
         let map = MapTable::new(vec![255], &storage);
         let table = MerklePatriciaTable::new(map);
-        let hash = hash([&[255; 32], hash(&[2]).as_ref()].concat().as_ref());
+        let hash = hash(&[2]);
 
         table.put(&vec![255; 32], vec![1]).unwrap();
         table.put(&vec![255; 32], vec![2]).unwrap();
@@ -1024,6 +1031,14 @@ mod tests {
         table2.put(&vec![254; 32], vec![5]).unwrap();
 
         assert!(table1.root_hash().unwrap() != hash(&[]));
+        // if let Some((_, Node::Branch(branch))) = table1.root_node().unwrap() {
+        //     println!("{:?}", branch);
+
+        // }
+        // if let Some((_, Node::Branch(branch))) = table2.root_node().unwrap() {
+        //     println!("{:?}", branch);
+        // }
+
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
 
@@ -1048,6 +1063,7 @@ mod tests {
         table2.put(&vec![240; 32], vec![3]).unwrap();
         table2.put(&vec![64; 32], vec![2]).unwrap();
         table2.put(&vec![42; 32], vec![1]).unwrap();
+
 
         assert!(table2.root_hash().unwrap() != hash(&[]));
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
@@ -1095,6 +1111,10 @@ mod tests {
 
         assert_eq!(table2.get(&vec![250; 32]).unwrap(), Some(vec![2]));
         assert_eq!(table1.get(&vec![250; 32]).unwrap(), Some(vec![2]));
+        assert!(table1.get(&vec![255; 32]).unwrap().is_none());
+        assert!(table2.get(&vec![255; 32]).unwrap().is_none());
+        assert!(table1.get(&vec![245; 32]).unwrap().is_none());
+        assert!(table2.get(&vec![245; 32]).unwrap().is_none());
 
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
@@ -1221,6 +1241,11 @@ mod tests {
         rng.shuffle(&mut keys_to_remove);
         for key in &keys_to_remove {
             table2.delete(key).unwrap();
+        }
+
+        for key in &keys_to_remove {
+            assert!(table1.get(key).unwrap().is_none());
+            assert!(table2.get(key).unwrap().is_none());
         }
 
         assert!(table2.root_hash().unwrap() != hash(&[]));
