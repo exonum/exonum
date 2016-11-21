@@ -188,19 +188,23 @@ message! {
 }
 
 message !{
-    RequestConfigPropose{
+    ConfigPropose{
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 8;
-        config:        &[u8]        [00 => 08] // serialized config bytes
+        const SIZE = 24;
+        validator:      u32         [00 => 04]
+        height:         u64         [08 => 16]
+        config:        &[u8]        [16 => 24] // serialized config bytes
     }
 }
 
 message !{
-    RequestConfigVote {
+    ConfigVote {
         const ID = CONFIG_VOTE_MESSAGE_ID;
-        const SIZE = 41;
-        hash_propose:   &Hash       [00 => 32] // hash of transacion we're voting for
-        seed:           u64         [32 => 40] // incremental (1, 2, 3, 4, 5, 6, 7) проверять +1
-        revoke:         bool        [40 => 41] // голос_за=false / отозвать=true
+        const SIZE = 57;
+        validator:      u32         [00 => 04]
+        height:         u64         [08 => 16]
+        hash_propose:   &Hash       [16 => 48] // hash of transacion we're voting for
+        seed:           u64         [48 => 56] // incremental (1, 2, 3, 4, 5, 6, 7) проверять +1
+        revoke:         bool        [56 => 57] // голос_за=false / отозвать=true
     }
 }
