@@ -21,6 +21,7 @@ enum ChildKind {
     Right,
 }
 
+
 struct BitSlice<'a> {
     data: &'a [u8],
     from: u16,
@@ -167,6 +168,7 @@ impl<'a> BitSlice<'a> {
     }
 }
 
+
 impl<'a> PartialEq for BitSlice<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.starts_with(other)
@@ -206,7 +208,7 @@ impl BranchNode {
         // &self.child_slice(ChildKind::Right).to_db_key()]
         // .concat())
 
-        // removed for now for proofs construction testing purposes. 
+        // removed for now for proofs construction testing purposes.
         // hash(&[self.child_hash(ChildKind::Left).as_ref(),
         //        self.child_hash(ChildKind::Right).as_ref()]
         //     .concat())
@@ -318,6 +320,110 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
+pub struct KeySearchResult<V> {
+    pub searched_db_key: Vec<u8>,
+    pub found: bool,
+    pub proof_path: ProofPathToKey<V>,
+}
+
+pub enum ProofPathToKey<V> {
+    EmptyTree,
+    LeafRoot(Vec<u8>, V), // to match a leaf root with the same or differing key;
+    // left_hash, right_hash, left_slice_db_key, right_slice_db_key
+    BranchRootKeyNotFound(Hash, Hash, Vec<u8>, Vec<u8>), /* to prove exclusion for a root with root_key != prefix(searched_key) */
+    KeyNotFound(Hash), // indicates, that a slice != prefix(searched_key)
+
+    LeftBranch(Box<ProofPathToKey<V>>, Hash, Vec<u8>, Vec<u8>), /* proof, right_slice_hash, left_slice_db_key, right_slice_db_key */
+    RightBranch(Hash, Box<ProofPathToKey<V>>, Vec<u8>, Vec<u8>), /* left_slice_hash, proof, left_slice_db_key, right_slice_db_key */
+    Leaf(V),
+}
+
+impl<V: StorageValue> ProofPathToKey<V> {
+    pub fn compute_proof_root(&self) -> Hash {
+        use self::ProofPathToKey::*;
+        match *self {
+            EmptyTree => hash(&[]), 
+            LeafRoot(ref root_key, ref root_val) => {
+                hash(&[root_key.as_slice(), root_val.hash().as_ref()].concat())
+            } 
+            BranchRootKeyNotFound(ref l_h, ref r_h, ref l_s, ref r_s) => {
+                let full_slice = &[l_h.as_ref(), r_h.as_ref(), l_s.as_slice(), r_s.as_slice()]
+                    .concat();
+                hash(full_slice)
+            } 
+            KeyNotFound(ref hash) => *hash, 
+            LeftBranch(ref l_proof, ref right_hash, ref l_s, ref r_s) => {
+                let full_slice = &[l_proof.compute_proof_root().as_ref(),
+                                   right_hash.as_ref(),
+                                   l_s.as_slice(),
+                                   r_s.as_slice()]
+                    .concat();
+                hash(full_slice)
+            } 
+            RightBranch(ref left_hash, ref r_proof, ref l_s, ref r_s) => {
+                let full_slice = &[left_hash.as_ref(),
+                                   r_proof.compute_proof_root().as_ref(),
+                                   l_s.as_slice(),
+                                   r_s.as_slice()]
+                    .concat();
+                hash(full_slice)
+            } 
+            Leaf(ref val) => val.hash(),            
+        }
+    }
+}
+
+impl<V: fmt::Debug> fmt::Debug for ProofPathToKey<V> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use self::ProofPathToKey::*;
+        match *self {
+            LeftBranch(ref proof, ref hash, ref left_slice_key, ref right_slice_key) => {
+                write!(f,
+                       "{{ left: {:?}, right: {:?}, left_slice: {:?},  right_slice: {:?} }}",
+                       proof,
+                       bytes_to_hex(hash),
+                       BitSlice::from_db_key(left_slice_key),
+                       BitSlice::from_db_key(right_slice_key))
+            } 
+            RightBranch(ref hash, ref proof, ref left_slice_key, ref right_slice_key) => {
+                write!(f,
+                       "{{ left: {:?}, right: {:?}, left_slice: {:?},  right_slice: {:?} }}",
+                       bytes_to_hex(hash),
+                       proof,
+                       BitSlice::from_db_key(left_slice_key),
+                       BitSlice::from_db_key(right_slice_key))
+            } 
+            Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
+            BranchRootKeyNotFound(ref l_hash,
+                                  ref r_hash,
+                                  ref left_slice_key,
+                                  ref right_slice_key) => {
+                write!(f,
+                       "{{left: {:?}, right: {:?}, left_slice: {:?},  \
+                        right_slice: {:?} }}",
+                       bytes_to_hex(l_hash),
+                       bytes_to_hex(r_hash),
+                       BitSlice::from_db_key(left_slice_key),
+                       BitSlice::from_db_key(right_slice_key))
+            }
+            KeyNotFound(ref hash) => write!(f, "{{key_not_found: {:?} }}", bytes_to_hex(hash)), 
+            LeafRoot(ref db_key, ref val) => write!(f, "{{ slice: {:?}, val: {:?} }}", db_key, val), 
+            EmptyTree => write!(f, "{{ empty_tree }}"),
+        }
+    }
+}
+
+impl<V: fmt::Debug> fmt::Debug for KeySearchResult<V> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f,
+               "{{ searched_db_key: {:?}, found: {}, proof_path: {:?} }}",
+               BitSlice::from_db_key(&self.searched_db_key),
+               self.found,
+               self.proof_path)
+    }
+}
+
+
 
 // TODO avoid reallocations where is possible.
 impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaTable<T, K, V> {
@@ -331,9 +437,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
         match self.root_node()? {
-            Some((_, Node::Leaf(value))) => {
+            Some((prefix, Node::Leaf(value))) => {
                 // let prefix_slice = BitSlice::from_db_key(&prefix);
-                Ok(Self::hash_leaf(&value))
+                Ok(hash(&[prefix.as_slice(), Self::hash_leaf(&value).as_ref()].concat()))
             }
             Some((_, Node::Branch(branch))) => Ok(branch.hash()),
             None => Ok(hash(&[])),
@@ -558,6 +664,121 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         Ok(RemoveResult::KeyNotFound)
     }
 
+    pub fn construct_path_to_key<A: AsRef<[u8]>>(&self,
+                                                 searched_key: A)
+                                                 -> Result<KeySearchResult<V>, Error> {
+        let searched_key = searched_key.as_ref();
+        debug_assert_eq!(searched_key.len(), KEY_SIZE);
+        let searched_slice = BitSlice::from_bytes(searched_key);
+        let searched_db_key = searched_slice.to_db_key();
+        let found: bool;
+        let proof_path: ProofPathToKey<V>;
+
+        match self.root_node()? {
+            Some((root_db_key, Node::Leaf(root_value))) => {
+                if searched_db_key == root_db_key {
+                    found = true;
+                } else {
+                    found = false;
+                }
+                proof_path = ProofPathToKey::LeafRoot(root_db_key, root_value);
+            }
+            Some((root_db_key, Node::Branch(branch))) => {
+                let root_slice = BitSlice::from_db_key(&root_db_key);
+                let l_s_db_key = branch.child_slice(ChildKind::Left).to_db_key();
+                let r_s_db_key = branch.child_slice(ChildKind::Right).to_db_key();
+
+                let c_pr_l = root_slice.common_prefix(&searched_slice);
+                if c_pr_l == root_slice.len() {
+                    let suf_searched_slice = searched_slice.mid(c_pr_l);
+                    let child_proof_pos = suf_searched_slice.at(0);
+                    let neighbour_child_hash = *branch.child_hash(!child_proof_pos);
+                    let recursive_res =
+                        self.construct_path_to_key_in_branch(&branch, &suf_searched_slice)?;
+                    found = recursive_res.0;
+                    let child_proof = recursive_res.1;
+
+                    match child_proof_pos {
+                        ChildKind::Left => {
+                            proof_path = ProofPathToKey::LeftBranch(Box::new(child_proof),
+                                                                    neighbour_child_hash,
+                                                                    l_s_db_key,
+                                                                    r_s_db_key);
+                        } 
+                        ChildKind::Right => {
+                            proof_path = ProofPathToKey::RightBranch(neighbour_child_hash,
+                                                                     Box::new(child_proof),
+                                                                     l_s_db_key,
+                                                                     r_s_db_key);
+                        }
+                    }
+                } else {
+                    // if common prefix length with root_slice is less than root_slice length
+                    let l_h = *branch.child_hash(ChildKind::Left); //copy
+                    let r_h = *branch.child_hash(ChildKind::Right);//copy
+                    found = false;
+                    proof_path =
+                        ProofPathToKey::BranchRootKeyNotFound(l_h, r_h, l_s_db_key, r_s_db_key);
+                    // proof of exclusion of a key, because root_slice != prefix(searched_slice)
+                }
+            }
+            None => {
+                found = false;
+                proof_path = ProofPathToKey::EmptyTree;
+            }
+        }
+        Ok(KeySearchResult {
+            searched_db_key: searched_db_key,
+            found: found,
+            proof_path: proof_path,
+        })
+    }
+
+    fn construct_path_to_key_in_branch(&self,
+                                       current_branch: &BranchNode,
+                                       searched_slice: &BitSlice)
+                                       -> Result<(bool, ProofPathToKey<V>), Error> {
+
+        let mut child_slice = current_branch.child_slice(searched_slice.at(0));
+        child_slice.from = searched_slice.from;
+        let c_pr_l = child_slice.common_prefix(searched_slice);
+        debug_assert!(c_pr_l > 0);
+        if c_pr_l == child_slice.len() {
+            match self.read_node(child_slice.to_db_key())? {
+                Node::Leaf(child_value) => Ok((true, ProofPathToKey::Leaf(child_value))), 
+                Node::Branch(child_branch) => {
+                    let l_s_db_key = child_branch.child_slice(ChildKind::Left).to_db_key();
+                    let r_s_db_key = child_branch.child_slice(ChildKind::Right).to_db_key();
+                    let suf_searched_slice = searched_slice.mid(c_pr_l);
+                    let child_proof_pos = suf_searched_slice.at(0);
+                    let neighbour_child_hash = *child_branch.child_hash(!child_proof_pos);
+                    let (found, child_proof) =
+                        self.construct_path_to_key_in_branch(&child_branch, &suf_searched_slice)?;
+
+                    match child_proof_pos {
+                        ChildKind::Left => {
+                            Ok((found,
+                                ProofPathToKey::LeftBranch(Box::new(child_proof),
+                                                           neighbour_child_hash,
+                                                           l_s_db_key,
+                                                           r_s_db_key)))
+                        }
+                        ChildKind::Right => {
+                            Ok((found,
+                                ProofPathToKey::RightBranch(neighbour_child_hash,
+                                                            Box::new(child_proof),
+                                                            l_s_db_key,
+                                                            r_s_db_key)))
+                        } 
+                    }
+                }
+            }
+        } else {
+            Ok((false,
+                ProofPathToKey::KeyNotFound(*current_branch.child_hash(searched_slice.at(0)))))
+        }
+    }
+
     fn root_prefix(&self) -> Result<Option<Vec<u8>>, Error> {
         self.map.find_key(&[])
     }
@@ -633,7 +854,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
 
     fn put(&self, key: &K, value: V) -> Result<(), Error> {
         // FIXME avoid reallocation
-        self.insert(key.as_ref(), value)
+        self.insert(key, value)
     }
 
     fn delete(&self, key: &K) -> Result<(), Error> {
@@ -654,7 +875,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
 }
 
 // TODO move to utils mod
-fn bytes_to_hex<T: AsRef<[u8]>>(bytes: &T) -> String {
+fn bytes_to_hex<T: AsRef<[u8]> + ?Sized>(bytes: &T) -> String {
     let strs: Vec<String> = bytes.as_ref()
         .iter()
         .map(|b| format!("{:02X}", b))
@@ -673,23 +894,24 @@ fn bytes_to_hex<T: AsRef<[u8]>>(bytes: &T) -> String {
 impl<'a> fmt::Debug for BitSlice<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let bytes = self.to_db_key();
-        let key = &bytes[0..];
-        if key.is_empty() {
+        if bytes.is_empty() {
             f.debug_struct("").finish()
         } else if self.is_leaf_key() {
             f.debug_struct("")
                 .field("type", &"leaf")
-                .field("key", &format!("0x{}", &bytes_to_hex(&key)))
+                .field("key",
+                       &format!("0x{}", &bytes_to_hex(&bytes[1..bytes.len() - 1])))
                 .field("from", &self.from)
                 .field("to", &self.to)
                 .finish()
         } else {
             f.debug_struct("")
                 .field("type", &"branch")
-                .field("key", &format!("0x{}", &bytes_to_hex(&key)))
+                .field("key",
+                       &format!("0x{}", &bytes_to_hex(&bytes[1..bytes.len() - 1])))
                 .field("from", &self.from)
                 .field("to", &self.to)
-                .field("len", &key[33])
+                .field("len", &bytes[33])
                 .finish()
         }
     }
@@ -734,7 +956,7 @@ mod tests {
     use ::crypto::{hash, Hash};
     use ::storage::{Map, MemoryDB, MapTable};
 
-    use super::{BitSlice, BranchNode, MerklePatriciaTable};
+    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX};
     use super::ChildKind::{Left, Right};
     use super::KEY_SIZE;
 
@@ -1003,7 +1225,9 @@ mod tests {
         let storage = MemoryDB::new();
         let map = MapTable::new(vec![255], &storage);
         let table = MerklePatriciaTable::new(map);
-        let hash = hash(&[2]);
+        assert_eq!(table.root_hash().unwrap(), hash(&[]));
+        let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0u8]].concat();
+        let hash = hash(&[root_prefix, hash(&[2]).as_ref()].concat());
 
         table.put(&vec![255; 32], vec![1]).unwrap();
         table.put(&vec![255; 32], vec![2]).unwrap();
@@ -1031,14 +1255,6 @@ mod tests {
         table2.put(&vec![254; 32], vec![5]).unwrap();
 
         assert!(table1.root_hash().unwrap() != hash(&[]));
-        // if let Some((_, Node::Branch(branch))) = table1.root_node().unwrap() {
-        //     println!("{:?}", branch);
-
-        // }
-        // if let Some((_, Node::Branch(branch))) = table2.root_node().unwrap() {
-        //     println!("{:?}", branch);
-        // }
-
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
 
@@ -1188,6 +1404,9 @@ mod tests {
         assert!(table2.root_hash().unwrap() != hash(&[]));
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
 
+        // let proof_path = table1.construct_path_to_key(&data[0].0).unwrap();
+        // println!("{:?}", proof_path);
+
         // Test same keys
         rng.shuffle(&mut data);
         for item in &data {
@@ -1205,6 +1424,28 @@ mod tests {
             assert_eq!(v2.as_ref(), Some(&vec![1]));
         }
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
+    }
+
+    #[test]
+    fn fuzz_insert_build_proofs() {
+        let data = generate_random_data(100);
+
+        let storage = MemoryDB::new();
+        let map = MapTable::new(vec![255], &storage);
+        let table = MerklePatriciaTable::new(map);
+        for item in &data {
+            table.put(&item.0, item.1.clone()).unwrap();
+        }
+
+        let table_root_hash = table.root_hash().unwrap();
+
+        for item in &data {
+            let search_res = table.construct_path_to_key(&item.0).unwrap();
+            assert_eq!(search_res.searched_db_key,
+                       BitSlice::from_bytes(item.0.as_slice()).to_db_key());
+            assert_eq!(search_res.found, true);
+            assert_eq!(search_res.proof_path.compute_proof_root(), table_root_hash);
+        }
     }
 
     #[test]
@@ -1267,6 +1508,38 @@ mod tests {
         }
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
         assert_eq!(table2.root_hash().unwrap(), saved_hash);
+    }
+
+    #[test]
+    fn fuzz_delete_build_proofs() {
+        let data = generate_random_data(100);
+        let mut rng = rand::thread_rng();
+
+        let storage1 = MemoryDB::new();
+        let map1 = MapTable::new(vec![255], &storage1);
+        let table1 = MerklePatriciaTable::new(map1);
+        for item in &data {
+            table1.put(&item.0, item.1.clone()).unwrap();
+        }
+
+        let mut keys_to_remove = data.iter()
+            .take(50)
+            .map(|item| item.0.clone())
+            .collect::<Vec<_>>();
+
+        rng.shuffle(&mut keys_to_remove);
+        for key in &keys_to_remove {
+            table1.delete(key).unwrap();
+        }
+        let table_root_hash = table1.root_hash().unwrap();
+        for key in &keys_to_remove {
+            let search_res = table1.construct_path_to_key(key).unwrap();
+            assert_eq!(search_res.searched_db_key,
+                       BitSlice::from_bytes(key.as_slice()).to_db_key());
+            assert_eq!(search_res.found, false);
+            assert_eq!(search_res.proof_path.compute_proof_root(), table_root_hash);
+            println!("{:?}", search_res);
+        }
     }
 
     #[test]

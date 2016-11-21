@@ -24,6 +24,7 @@ pub enum Proofnode<V: StorageValue> {
     Right(Option<Hash>, Box<Proofnode<V>>),
     Leaf(V),
 }
+
 pub fn proof_indices_values<V: StorageValue>(proof: &Proofnode<V>) -> Vec<(usize, &V)> {
     let mut res = Vec::new();
     proof.indices_and_values(0usize, &mut res);
@@ -76,18 +77,18 @@ impl<V: StorageValue> Proofnode<V> {
 
 impl<V: StorageValue + fmt::Debug> fmt::Debug for Proofnode<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-
+        use self::Proofnode::*; 
         match *self {
-            Proofnode::Full(ref left, ref right) => {
+            Full(ref left, ref right) => {
                 write!(f, "{{ left: {:#?}, right: {:#?} }}", left, right)
             }
-            Proofnode::Left(ref left_proof, ref right_hash) => {
+            Left(ref left_proof, ref right_hash) => {
                 write!(f, "{{ left: {:#?}, right: {:#?} }}", left_proof, right_hash)
             } 
-            Proofnode::Right(ref left_hash, ref right) => {
+            Right(ref left_hash, ref right) => {
                 write!(f, "{{ left: {:#?}, right: {:#?} }}", left_hash, right)
             }
-            Proofnode::Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
+            Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
         }
     }
 }
