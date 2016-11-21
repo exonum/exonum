@@ -9,9 +9,5 @@
     "alertifyjs": "~1.0.11",
     "d3": "^4.3.0",
     "Viz": "NPashaP/Viz"
-  },
-  "devDependencies": {
-    "chai": "^3.5.0",
-    "mocha": "^3.1.2"
   }
 }

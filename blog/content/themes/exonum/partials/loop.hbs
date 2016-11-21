@@ -1,0 +1,70 @@
+<div class="section blog-section">
+    <div class="container">
+        <div class="row">
+
+            {{!-- This is the post loop - each post will be output using this markup --}}
+            {{#foreach posts}}
+                {{#is_multiple_of_three @index}}
+                </div>
+                <div class="row">
+                {{/is_multiple_of_three}}
+                <div class="blog-post col-md-4">
+                    {{#if image}}
+                        <div class="post-media">
+                            <a href="{{url}}">
+                                <img class="img-responsive" src="{{image}}" alt="{{title}}"/>
+                            </a>
+                        </div>
+                    {{/if}}
+                    <article class="post-body">
+                        <div class="post-info">
+                            <div class="date">
+                                <span class="day">{{date format="DD"}}</span><br>
+                                <span class="month">{{date format="MMM"}}</span>
+                            </div>
+
+                            <div class="meta-container">
+                                <a href="{{url}}">
+                                    <h3>{{title}}</h3>
+                                </a>
+
+                                    <ul class="meta">
+                                        {{#author}}
+                                            <li>
+                                                <i class="glyphicon glyphicon-user"></i> <a href="{{url}}">{{name}}</a>
+                                            </li>
+                                        {{/author}}
+                                        {{#if tags}}
+                                            <li>
+                                                <i class="glyphicon glyphicon-tags"></i> {{tags}}
+                                            </li>
+                                        {{/if}}
+                                    </ul>
+                            </div>
+                        </div>
+
+                        <p>{{excerpt words="26"}}</p>
+
+                        <div class="text-right">
+                            <a href="{{url}}" class="read-more text-uppercase">Read more &raquo;</a>
+                        </div>
+                    </article>
+                </div>
+            {{/foreach}}
+
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-12">
+
+                {{!-- Previous/next page links - displayed on every page --}}
+                {{pagination}}
+
+            </div>
+        </div>
+    </div>
+</div>
