@@ -370,11 +370,19 @@ var AddContentPage = Backbone.View.extend({
       hasError = true;
       this.$el.find('#add-content-price-per-listen-group').addClass('has-error');
       alertify.error('Price per each play is not defined');
+    } else if (content.price_per_listen.length > 6) {
+      hasError = true;
+      this.$el.find('#add-content-price-per-listen-group').addClass('has-error');
+      alertify.error('Price per each play cannot be larger than 999 999');
     }
     if (!content.min_plays) {
       hasError = true;
       this.$el.find('#add-content-min-plays-group').addClass('has-error');
       alertify.error('The minimum number of plays is not defined');
+    } else if (content.min_plays.length > 8) {
+      hasError = true;
+      this.$el.find('#add-content-min-plays-group').addClass('has-error');
+      alertify.error('The minimum number of plays cannot be larger than 99 999 999');
     }
 
     // validate owners
@@ -497,6 +505,10 @@ var AddReportPage = Backbone.View.extend({
       hasError = true;
       this.$el.find('#add-report-plays-group').addClass('has-error');
       alertify.error('Number of plays is not defined');
+    } else if (report.plays.length > 6) {
+      hasError = true;
+      this.$el.find('#add-report-plays-group').addClass('has-error');
+      alertify.error('Number of plays cannot be larger than 999 999');
     }
     if (!report.comment) {
       hasError = true;
