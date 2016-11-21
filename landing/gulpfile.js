@@ -21,10 +21,6 @@ gulp.task('styles', () => {
 
 gulp.task('scripts', () => {
   return gulp.src('app/assets/js/**/*.js')
-    .pipe($.plumber())
-    .pipe($.sourcemaps.init())
-    .pipe($.babel())
-    .pipe($.sourcemaps.write('.'))
     .pipe(gulp.dest('.tmp/assets/js'))
     .pipe(reload({stream: true}));
 });
@@ -40,10 +36,6 @@ function lint(files, options) {
 gulp.task('lint', () => {
   return lint('app/assets/js/**/*.js')
     .pipe(gulp.dest('app/assets'));
-});
-gulp.task('lint:test', () => {
-  return lint('test/spec/**/*.js')
-    .pipe(gulp.dest('test/spec'));
 });
 
 gulp.task('html', ['styles', 'scripts'], () => {
@@ -122,35 +114,6 @@ gulp.task('serve', () => {
   });
 });
 
-gulp.task('serve:dist', ['default'], () => {
-  browserSync.init({
-    notify: false,
-    port: 9000,
-    server: {
-      baseDir: ['dist']
-    }
-  });
-});
-
-gulp.task('serve:test', ['scripts'], () => {
-  browserSync.init({
-    notify: false,
-    port: 9000,
-    ui: false,
-    server: {
-      baseDir: 'test',
-      routes: {
-        '/scripts': '.tmp/scripts',
-        '/bower_components': 'bower_components'
-      }
-    }
-  });
-
-  gulp.watch('app/scripts/**/*.js', ['scripts']);
-  gulp.watch(['test/spec/**/*.js', 'test/index.html']).on('change', reload);
-  gulp.watch('test/spec/**/*.js', ['lint:test']);
-});
-
 // inject bower components
 gulp.task('wiredep', () => {
   gulp.src('app/styles/*.scss')
@@ -162,7 +125,6 @@ gulp.task('wiredep', () => {
 
   gulp.src('app/*.html')
     .pipe(wiredep({
-      exclude: ['bootstrap-sass'],
       ignorePath: /^(\.\.\/)*\.\./
     }))
     .pipe(gulp.dest('app'));
