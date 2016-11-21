@@ -875,7 +875,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
 }
 
 // TODO move to utils mod
-fn bytes_to_hex<T: AsRef<[u8]> + ?Sized>(bytes: &T) -> String {
+pub fn bytes_to_hex<T: AsRef<[u8]> + ?Sized>(bytes: &T) -> String {
     let strs: Vec<String> = bytes.as_ref()
         .iter()
         .map(|b| format!("{:02X}", b))

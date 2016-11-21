@@ -2,6 +2,7 @@ use num::{Integer, range, ToPrimitive, pow};
 
 use std::marker::PhantomData;
 use std::cell::Cell;
+use super::merkle_patricia_table::bytes_to_hex; 
 
 use super::{Map, List, Error, StorageValue};
 
@@ -83,10 +84,22 @@ impl<V: StorageValue + fmt::Debug> fmt::Debug for Proofnode<V> {
                 write!(f, "{{ left: {:#?}, right: {:#?} }}", left, right)
             }
             Left(ref left_proof, ref right_hash) => {
-                write!(f, "{{ left: {:#?}, right: {:#?} }}", left_proof, right_hash)
+                let hash_repr: String; 
+                if let Some(ref digest) = *right_hash {
+                    hash_repr = bytes_to_hex(digest); 
+                } else {
+                    hash_repr = "None".to_string(); 
+                }
+                write!(f, "{{ left: {:#?}, right_hash: {:#?} }}", left_proof, hash_repr)
             } 
             Right(ref left_hash, ref right) => {
-                write!(f, "{{ left: {:#?}, right: {:#?} }}", left_hash, right)
+                let hash_repr: String; 
+                if let Some(ref digest) = *left_hash {
+                    hash_repr = bytes_to_hex(digest); 
+                } else {
+                    hash_repr = "None".to_string(); 
+                }
+                write!(f, "{{ left_hash: {:#?}, right: {:#?} }}", hash_repr, right)
             }
             Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
         }
@@ -541,11 +554,11 @@ mod tests {
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
-        let h1 = hash(&[1]);
-        let h2 = hash(&[2]);
-        let h3 = hash(&[3]);
-        let h4 = hash(&[4]);
-        let h5 = hash(&[5]);
+        let h1 = hash(&[0]);
+        let h2 = hash(&[1]);
+        let h3 = hash(&[2]);
+        let h4 = hash(&[3]);
+        let h5 = hash(&[4]);
         let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
         let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
         let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
@@ -553,7 +566,7 @@ mod tests {
         let h5upup = hash(h5up.as_ref());
         let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
-        for i in 1u8...5 {
+        for i in 0u8...4 {
             table.append(vec![i]).unwrap();
         }
 
@@ -561,7 +574,7 @@ mod tests {
         let range_proof = table.construct_path_for_range(4u32, 5).unwrap();
         assert_eq!(range_proof.compute_proof_root(), h12345);
 
-        assert_eq!(vec![5], *(proof_indices_values(&range_proof)[0].1));
+        assert_eq!(vec![4], *(proof_indices_values(&range_proof)[0].1));
         if let Proofnode::Right(left_hash1, right_proof1) = range_proof {
             assert_eq!(left_hash1.unwrap(), h1234);
             let unboxed_proof = *right_proof1;
@@ -580,6 +593,9 @@ mod tests {
         } else {
             assert!(false);
         }
+        table.append(vec![5]).unwrap(); 
+        let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
+        println!("{:?}", range_proof);
     }
 
     #[test]
