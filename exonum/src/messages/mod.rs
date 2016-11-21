@@ -31,8 +31,15 @@ pub enum Any<Tx: Message> {
     Status(Status),
     Block(Block),
     Consensus(ConsensusMessage),
+    Config(ConfigMessage),
     Request(RequestMessage),
-    Transaction(Tx),
+    Transaction(Tx)
+}
+
+#[derive(Clone, PartialEq)]
+pub enum ConfigMessage{
+    ConfigPropose(ConfigPropose),
+    ConfigVote(ConfigVote),
 }
 
 #[derive(Clone, PartialEq)]
@@ -175,6 +182,46 @@ impl fmt::Debug for RequestMessage {
     }
 }
 
+impl ConfigMessage{
+    pub fn validator(&self) -> u32 {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.validator(),
+            ConfigMessage::ConfigVote(ref msg) => msg.validator(),
+        }
+    }
+
+    pub fn height(&self) -> u64 {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.height(),
+            ConfigMessage::ConfigVote(ref msg) => msg.height(),
+        }
+    }
+
+    pub fn raw(&self) -> &RawMessage {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.raw(),
+            ConfigMessage::ConfigVote(ref msg) => msg.raw()
+        }
+
+    }
+
+    pub fn veify(&self, public_key: &PublicKey) -> bool {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.verify(public_key),
+            ConfigMessage::ConfigVote(ref msg) => msg.verify(public_key),
+        }
+    }
+}
+
+impl fmt::Debug for ConfigMessage {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
+            ConfigMessage::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
+        }
+    }
+}
+
 impl ConsensusMessage {
     pub fn validator(&self) -> u32 {
         match *self {
@@ -263,6 +310,12 @@ impl<Tx: Message> Any<Tx> {
             REQUEST_BLOCK_MESSAGE_ID => {
                 Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
             }
+            CONFIG_PROPOSE_MESSAGE_ID => {
+                Any::Config(ConfigMessage::ConfigPropose(ConfigPropose::from_raw(raw)?))
+            }
+            CONFIG_VOTE_MESSAGE_ID => {
+                Any::Config(ConfigMessage::ConfigVote(ConfigVote::from_raw(raw)?))
+            }
             _ => Any::Transaction(Tx::from_raw(raw)?),
         })
     }
@@ -277,6 +330,7 @@ impl<Tx: Message> fmt::Debug for Any<Tx> {
             Any::Request(ref msg) => write!(fmt, "{:?}", msg),
             Any::Transaction(ref msg) => write!(fmt, "{:?}", msg),
             Any::Block(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Config(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }

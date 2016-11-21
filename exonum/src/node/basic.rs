@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use rand::Rng;
 
 use super::super::blockchain::Blockchain;
-use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
+use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers, ConfigMessage};
 use super::{NodeHandler, RequestData};
 
 use super::super::events::Channel;
@@ -29,10 +29,13 @@ impl<B, S> NodeHandler<B, S>
             Any::Consensus(message) => self.handle_consensus(message),
             Any::Request(message) => self.handle_request(message),
             Any::Block(message) => self.handle_block(message),
-            // добавить свои сообщения и реализовать обработчики
+            Any::Config(message) => self.handle_config(message)
         }
     }
 
+    pub fn handle_config(&mut self, config_message: ConfigMessage) {
+        //....
+    }
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
         info!("Connected to: {}", addr);
         let message = self.state.our_connect_message().clone();
