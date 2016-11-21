@@ -956,7 +956,7 @@ mod tests {
     use ::crypto::{hash, Hash};
     use ::storage::{Map, MemoryDB, MapTable};
 
-    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX};
+    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX, ProofPathToKey};
     use super::ChildKind::{Left, Right};
     use super::KEY_SIZE;
 
@@ -1427,6 +1427,113 @@ mod tests {
     }
 
     #[test]
+    fn build_proof_in_empty_tree() {
+        let storage = MemoryDB::new();
+        let map = MapTable::new(vec![255], &storage);
+        let table = MerklePatriciaTable::new(map);
+
+        table.put(&vec![230;32], vec![1]).unwrap(); //just to notify the compiler of the types used; same key is added and then removed from tree
+        table.delete(&vec![230;32]).unwrap();
+
+        let search_res = table.construct_path_to_key(&vec![244; 32]).unwrap();
+        assert_eq!(search_res.searched_db_key,
+                   BitSlice::from_bytes(&vec![244;32]).to_db_key());
+        assert_eq!(search_res.found, false);
+        match search_res.proof_path {
+            ProofPathToKey::EmptyTree => {} 
+            _ => assert!(false), 
+        }
+        assert_eq!(search_res.proof_path.compute_proof_root(),
+                   table.root_hash().unwrap());
+    }
+
+    #[test]
+    fn build_proof_in_leaf_tree() {
+        let storage = MemoryDB::new();
+        let map = MapTable::new(vec![255], &storage);
+        let table = MerklePatriciaTable::new(map);
+        let root_key = vec![230;32];
+        let root_val = vec![1];
+        let searched_key = vec![244; 32];
+
+        table.put(&root_key, root_val.clone()).unwrap();
+
+        let search_res = table.construct_path_to_key(&searched_key).unwrap();
+        assert_eq!(search_res.searched_db_key,
+                   BitSlice::from_bytes(&searched_key).to_db_key());
+        assert_eq!(search_res.found, false);
+        assert_eq!(search_res.proof_path.compute_proof_root(),
+                   table.root_hash().unwrap());
+        match search_res.proof_path {
+            ProofPathToKey::LeafRoot(key, val) => {
+                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
+                assert_eq!(val, root_val);
+            } 
+            _ => assert!(false), 
+        }
+
+        let search_res = table.construct_path_to_key(&root_key).unwrap();
+        assert_eq!(search_res.searched_db_key,
+                   BitSlice::from_bytes(&root_key).to_db_key());
+        assert_eq!(search_res.found, true);
+        assert_eq!(search_res.proof_path.compute_proof_root(),
+                   table.root_hash().unwrap());
+        match search_res.proof_path {
+            ProofPathToKey::LeafRoot(key, val) => {
+                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
+                assert_eq!(val, root_val);
+            } 
+            _ => assert!(false), 
+        }
+    }
+
+    #[test]
+    fn build_proof_no_match() {
+        let storage = MemoryDB::new();
+        let map = MapTable::new(vec![255], &storage);
+        let table = MerklePatriciaTable::new(map);
+        table.put(&vec![240; 32], vec![3]).unwrap();  //1111 0000
+        table.put(&vec![245; 32], vec![4]).unwrap();  //1111 0101
+        table.put(&vec![250; 32], vec![5]).unwrap();  //1111 1010
+        table.put(&vec![255; 32], vec![6]).unwrap();  //1111 1111
+
+        let search_res = table.construct_path_to_key(&vec![239; 32]).unwrap();  //1110 1111
+        assert_eq!(search_res.searched_db_key,
+                   BitSlice::from_bytes(&vec![239;32]).to_db_key());
+        assert_eq!(search_res.found, false);
+        assert_eq!(search_res.proof_path.compute_proof_root(),
+                   table.root_hash().unwrap());
+        match search_res.proof_path {
+            ProofPathToKey::BranchRootKeyNotFound(_, _, _, _) => {} 
+            _ => assert!(false), 
+        }
+
+        let search_res = table.construct_path_to_key(&vec![244; 32]).unwrap(); //1111 0100
+        assert_eq!(search_res.found, false);
+        assert_eq!(search_res.proof_path.compute_proof_root(),
+                   table.root_hash().unwrap());
+        // println!("{:?}", search_res);
+        match search_res.proof_path {
+            ProofPathToKey::LeftBranch(proof, _, _, _) => {
+                let proof_unb = *proof;
+                match proof_unb {
+                    ProofPathToKey::RightBranch(_, proof1, _, _) => {
+                        let proof_unb1 = *proof1;
+                        match proof_unb1 {
+                            ProofPathToKey::KeyNotFound(_) => {} 
+                            _ => assert!(false), 
+                        }
+                    } 
+                    _ => assert!(false), 
+                }
+            } 
+            _ => assert!(false), 
+        }
+    }
+
+
+
+    #[test]
     fn fuzz_insert_build_proofs() {
         let data = generate_random_data(100);
 
@@ -1445,6 +1552,38 @@ mod tests {
                        BitSlice::from_bytes(item.0.as_slice()).to_db_key());
             assert_eq!(search_res.found, true);
             assert_eq!(search_res.proof_path.compute_proof_root(), table_root_hash);
+        }
+    }
+
+    #[test]
+    fn fuzz_delete_build_proofs() {
+        let data = generate_random_data(100);
+        let mut rng = rand::thread_rng();
+
+        let storage1 = MemoryDB::new();
+        let map1 = MapTable::new(vec![255], &storage1);
+        let table1 = MerklePatriciaTable::new(map1);
+        for item in &data {
+            table1.put(&item.0, item.1.clone()).unwrap();
+        }
+
+        let mut keys_to_remove = data.iter()
+            .take(50)
+            .map(|item| item.0.clone())
+            .collect::<Vec<_>>();
+
+        rng.shuffle(&mut keys_to_remove);
+        for key in &keys_to_remove {
+            table1.delete(key).unwrap();
+        }
+        let table_root_hash = table1.root_hash().unwrap();
+        for key in &keys_to_remove {
+            let search_res = table1.construct_path_to_key(key).unwrap();
+            assert_eq!(search_res.searched_db_key,
+                       BitSlice::from_bytes(key.as_slice()).to_db_key());
+            assert_eq!(search_res.found, false);
+            assert_eq!(search_res.proof_path.compute_proof_root(), table_root_hash);
+            // println!("{:?}", search_res);
         }
     }
 
@@ -1508,38 +1647,6 @@ mod tests {
         }
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
         assert_eq!(table2.root_hash().unwrap(), saved_hash);
-    }
-
-    #[test]
-    fn fuzz_delete_build_proofs() {
-        let data = generate_random_data(100);
-        let mut rng = rand::thread_rng();
-
-        let storage1 = MemoryDB::new();
-        let map1 = MapTable::new(vec![255], &storage1);
-        let table1 = MerklePatriciaTable::new(map1);
-        for item in &data {
-            table1.put(&item.0, item.1.clone()).unwrap();
-        }
-
-        let mut keys_to_remove = data.iter()
-            .take(50)
-            .map(|item| item.0.clone())
-            .collect::<Vec<_>>();
-
-        rng.shuffle(&mut keys_to_remove);
-        for key in &keys_to_remove {
-            table1.delete(key).unwrap();
-        }
-        let table_root_hash = table1.root_hash().unwrap();
-        for key in &keys_to_remove {
-            let search_res = table1.construct_path_to_key(key).unwrap();
-            assert_eq!(search_res.searched_db_key,
-                       BitSlice::from_bytes(key.as_slice()).to_db_key());
-            assert_eq!(search_res.found, false);
-            assert_eq!(search_res.proof_path.compute_proof_root(), table_root_hash);
-            println!("{:?}", search_res);
-        }
     }
 
     #[test]
