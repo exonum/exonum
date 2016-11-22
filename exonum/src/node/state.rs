@@ -433,15 +433,15 @@ impl<Tx> State<Tx> {
         &self.transactions
     }
 
-    pub fn add_transaction(&mut self, hash: Hash, msg: Tx) -> Vec<(Hash, Round)> {
+    pub fn add_transaction(&mut self, tx_hash: Hash, msg: Tx) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
-        for (hash, state) in &mut self.proposes {
-            state.unknown_txs.remove(hash);
-            if state.unknown_txs.is_empty() {
-                full_proposes.push((*hash, state.message().round()));
+        for (propose_hash, propose_state) in &mut self.proposes {
+            propose_state.unknown_txs.remove(&tx_hash);
+            if propose_state.unknown_txs.is_empty() {
+                full_proposes.push((*propose_hash, propose_state.message().round()));
             }
         }
-        self.transactions.insert(hash, msg);
+        self.transactions.insert(tx_hash, msg);
         if self.transactions.len() >= TX_POOL_LIMIT {
             panic!("Too many transactions in pool, txs={}", self.transactions.len());
         }
