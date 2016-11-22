@@ -352,7 +352,6 @@ impl<Tx: Message> fmt::Debug for Any<Tx> {
             Any::Request(ref msg) => write!(fmt, "{:?}", msg),
             Any::Transaction(ref msg) => write!(fmt, "{:?}", msg),
             Any::Block(ref msg) => write!(fmt, "{:?}", msg),
-            Any::Transaction(TransactionMessage::Service(ServiceTransaction::ConfigChange(ref msg))) => write!(fmt, "{:?}", msg),
         }
     }
 }
