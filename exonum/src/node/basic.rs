@@ -22,17 +22,24 @@ impl<B, S> NodeHandler<B, S>
         //         return;
         //     }
 
-        let msg = Any::<Message>::from_raw(raw).unwrap();
+        let msg = Any::<B::Transaction>::from_raw(raw).unwrap();
         match msg {
             Any::Connect(msg) => self.handle_connect(msg),
             Any::Status(msg) => self.handle_status(msg),
-            Any::Consensus(message) => self.handle_consensus(message),
-            Any::Request(message) => self.handle_request(message),
-            Any::Block(message) => self.handle_block(message),
-            Any::Transaction(TransactionMessage::Service(ServiceTransaction::ConfigChange(message))) => self.handle_config(message)
+            Any::Consensus(msg) => self.handle_consensus(msg),
+            Any::Request(msg) => self.handle_request(msg),
+            Any::Block(msg) => self.handle_block(msg),
+            Any::Transaction(TransactionMessage::Service(msg)) => self.handle_service_tx(msg),
+            Any::Transaction(TransactionMessage::Application(msg)) => self.handle_tx(msg),
         }
     }
 
+    pub fn handle_service_tx(&mut self, message: ServiceTransaction)
+    {
+        match message {
+            ServiceTransaction::ConfigChange(message) => self.handle_config(message),
+        }
+    }
     pub fn handle_config(&mut self, config_message: ConfigMessage) {
         //....
     }
