@@ -10,7 +10,7 @@ clap = {version="2.13", features=["unstable"]}
 env_logger = "0.3"
 byteorder = "0.5"
 serde = "0.8"
-serde_macros = "0.8"
+serde_derive = "0.8"
 valico = "1.0"
 serde_json = "0.8"
 jsonway = "1.0"

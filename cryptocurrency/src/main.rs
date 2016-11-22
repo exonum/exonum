@@ -11,6 +11,7 @@ extern crate clap;
 extern crate serde;
 extern crate time;
 extern crate rand;
+#[macro_use]
 extern crate log;
 extern crate colored;
 
@@ -29,6 +30,7 @@ use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning, Response};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
 use rustless::batteries::swagger;
+use rustless::errors;
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use rand::{Rng, thread_rng};
@@ -39,10 +41,13 @@ use colored::*;
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
-use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue};
+use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, FromHexError};
 use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
+use exonum::events::Error as EventsError;
+
+use blockchain_explorer::ValueNotFound;
 
 use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer, TxCreateWallet};
 use cryptocurrency::api::CurrencyApi;
@@ -108,9 +113,13 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                 let tx = TxCreateWallet::new(&public_key, &name, &secret_key);
 
                 let tx_hash = tx.hash().to_hex();
-                ch.send(CurrencyTx::CreateWallet(tx));
-                let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
-                client.json(json)
+                match ch.send(CurrencyTx::CreateWallet(tx)) {
+                    Ok(_) => {
+                        let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
+                        client.json(json)
+                    }
+                    Err(e) => client.error(e)
+                }
             })
         });
 
@@ -137,9 +146,13 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                 let tx = TxIssue::new(&public_key, amount, seed, &secret_key);
 
                 let tx_hash = tx.hash().to_hex();
-                ch.send(CurrencyTx::Issue(tx));
-                let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
-                client.json(json)
+                match ch.send(CurrencyTx::Issue(tx)) {
+                    Ok(_) => {
+                        let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
+                        client.json(json)
+                    }
+                    Err(e) => client.error(e)
+                }
             })
         });
 
@@ -170,9 +183,13 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         let tx = TxTransfer::new(&from_key, &to_key, amount, seed, &secret_key);
 
                         let tx_hash = tx.hash().to_hex();
-                        ch.send(CurrencyTx::Transfer(tx));
-                        let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
-                        client.json(json)
+                        match ch.send(CurrencyTx::Transfer(tx)) {
+                            Ok(_) => {
+                                let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
+                                client.json(json)
+                            }
+                            Err(e) => client.error(e)
+                        }
                     }
                     Err(e) => return client.error(e),
                 }
@@ -218,14 +235,36 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                 // Specify API version
                 api.version("v1", Versioning::Path);
                 api.prefix("api");
-
+                
                 api.error_formatter(|err, _media| {
+                    let body;
+                    let code;
                     if let Some(e) = err.downcast::<StorageError>() {
-                        let body = format!("An internal error occured: {}", e);
-                        Some(Response::from(StatusCode::InternalServerError, Box::new(body)))
+                        code = StatusCode::InternalServerError;
+                        body = format!("An error in backend occured: {}", e);
+                    } else if let Some(e) = err.downcast::<errors::NotMatch>() {
+                        code = StatusCode::NotFound;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<errors::Validation>() {
+                        code = StatusCode::BadRequest;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<ValueNotFound>() {
+                        code = StatusCode::NotFound;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<FromHexError>() {
+                        code = StatusCode::BadRequest;
+                        body = e.to_string();
+                    } else if let Some(e) = err.downcast::<EventsError>() {
+                        code = StatusCode::ServiceUnavailable;
+                        body = e.to_string();
                     } else {
-                        None
+                        code = StatusCode::NotImplemented;
+                        body = format!("Unspecified error: {:?}", err);
                     }
+                    trace!("RestApi: code={}, body={}", code, body);
+
+                    let json = &jsonway::object(|json| json.set("message", body)).unwrap();
+                    Some(Response::from_json(code, &json))
                 });
 
                 blockchain_explorer_api(api, blockchain.clone(), node_cfg.clone());
