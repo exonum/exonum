@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use rand::Rng;
 
 use super::super::blockchain::Blockchain;
-use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers, ConfigMessage};
+use super::super::messages::{Any, TransactionMessage, ServiceTransaction, RawMessage, Connect, Status, Message, RequestPeers, ConfigMessage};
 use super::{NodeHandler, RequestData};
 
 use super::super::events::Channel;
@@ -21,15 +21,15 @@ impl<B, S> NodeHandler<B, S>
         //     if !raw.verify() {
         //         return;
         //     }
-        let msg = Any::from_raw(raw).unwrap();
+
+        let msg = Any::<Message>::from_raw(raw).unwrap();
         match msg {
             Any::Connect(msg) => self.handle_connect(msg),
             Any::Status(msg) => self.handle_status(msg),
-            Any::Transaction(message) => self.handle_tx(message),
             Any::Consensus(message) => self.handle_consensus(message),
             Any::Request(message) => self.handle_request(message),
             Any::Block(message) => self.handle_block(message),
-            Any::Config(message) => self.handle_config(message)
+            Any::Transaction(TransactionMessage::Service(ServiceTransaction::ConfigChange(message))) => self.handle_config(message)
         }
     }
 
