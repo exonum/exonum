@@ -1,0 +1,3 @@
+node_modules
+content/data/*.db
+content/images/**/*[.jpg,.jpeg,.png,.gif]

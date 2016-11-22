@@ -8,7 +8,7 @@ use self::iron::method::Method::*;
 use self::iron::prelude::*;
 use self::iron::status::Status;
 use self::unicase::UniCase;
-use self::hyper::header::{Headers, AccessControlAllowOrigin};
+use self::hyper::header::AccessControlAllowOrigin;
 
 pub type CORSEndpoint = (Vec<Method>, String);
 
@@ -60,7 +60,7 @@ impl CORS {
         is_cors_endpoint
     }
 
-    pub fn add_headers(&self, res: &mut Response, req: &Request) {
+    pub fn add_headers(&self, res: &mut Response, _: &Request) {
         res.headers.set(AccessControlAllowOrigin::Value(self.origin.clone()));
 
         res.headers.set(headers::AccessControlAllowHeaders(

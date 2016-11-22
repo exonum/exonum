@@ -102,8 +102,8 @@ pub trait LevelDBIterator<'a> {
     #[inline]
     fn started(&mut self);
 
-    fn from(mut self, key: &'a [u8]) -> Self;
-    fn to(mut self, key: &'a [u8]) -> Self;
+    fn from(self, key: &'a [u8]) -> Self;
+    fn to(self, key: &'a [u8]) -> Self;
 
     fn from_key(&self) -> Option<&'a [u8]>;
     fn to_key(&self) -> Option<&'a [u8]>;

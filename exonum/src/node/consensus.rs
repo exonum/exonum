@@ -24,8 +24,8 @@ impl<B, S> NodeHandler<B, S>
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
             warn!("Received consensus message from other height: msg.height={}, self.height={}",
-                   msg.height(),
-                   self.state.height());
+                  msg.height(),
+                  self.state.height());
             return;
         }
 
@@ -103,14 +103,8 @@ impl<B, S> NodeHandler<B, S>
         if self.state.propose(&msg.hash()).is_some() {
             return;
         }
-
+        
         trace!("Handle propose");
-        for hash in msg.transactions() {
-            if view.transactions().get(hash).unwrap().is_some() {
-                return;
-            }
-        }
-
         // Add propose
         let (hash, has_unknown_txs) = match self.state.add_propose(msg.clone()) {
             Some(state) => (state.hash(), state.has_unknown_txs()),
@@ -259,7 +253,7 @@ impl<B, S> NodeHandler<B, S>
         let start_round = ::std::cmp::max(self.state.locked_round() + 1, propose_round);
         for round in start_round...self.state.round() {
             if self.state.has_majority_prevotes(round, hash) {
-                self.lock(round, hash);
+                self.has_majority_prevotes(round, &hash);
             }
         }
 
@@ -274,9 +268,8 @@ impl<B, S> NodeHandler<B, S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .unwrap()
                 .iter()
-                .map(|(_, x)| x.clone())
+                .cloned()
                 .collect::<Vec<_>>();
             self.commit(our_block_hash, precommits.iter());
         }
@@ -288,7 +281,7 @@ impl<B, S> NodeHandler<B, S>
         let has_consensus = self.state.add_prevote(&prevote);
 
         // Request propose or transactions
-        self.request_propose_or_txs(prevote.propose_hash(), prevote.validator());
+        let has_propose_with_txs = self.request_propose_or_txs(prevote.propose_hash(), prevote.validator());
 
         // Request prevotes
         if prevote.locked_round() > self.state.locked_round() {
@@ -298,7 +291,7 @@ impl<B, S> NodeHandler<B, S>
         }
 
         // Lock to propose
-        if has_consensus {
+        if has_consensus && has_propose_with_txs {
             self.has_majority_prevotes(prevote.round(), prevote.propose_hash());
         }
     }
@@ -320,7 +313,21 @@ impl<B, S> NodeHandler<B, S>
         self.remove_request(RequestData::Precommits(round, *propose_hash, *block_hash));
         // Commit
         if self.state.propose(propose_hash).is_some() {
-            // FIXME: проверка что у нас есть все транзакции
+            // Check for unknown txs
+            let has_unknown_txs = {
+                let state = self.state.propose(propose_hash).unwrap();
+                if state.has_unknown_txs() {
+                    Some(state.message().validator())
+                } else {
+                    None
+                }
+            };
+            if let Some(validator) = has_unknown_txs {
+                let data = RequestData::Transactions(*propose_hash);
+                let key = self.public_key_of(validator);
+                self.request(data, key);   
+                return;
+            }
 
             // Execute block and get state hash
             let our_block_hash = self.execute(propose_hash);
@@ -331,9 +338,8 @@ impl<B, S> NodeHandler<B, S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .unwrap()
                 .iter()
-                .map(|(_, x)| x.clone())
+                .cloned()
                 .collect::<Vec<_>>();
             self.commit(our_block_hash, precommits.iter());
         } else {
@@ -343,29 +349,27 @@ impl<B, S> NodeHandler<B, S>
 
     pub fn lock(&mut self, round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", round, propose_hash);
-        // Change lock
-        self.state.lock(round, propose_hash);
-
-        // Send precommit
-        if !self.state.have_incompatible_prevotes() {
-            // Execute block and get state hash
-            let block_hash = self.execute(&propose_hash);
-            self.broadcast_precommit(round, &propose_hash, &block_hash);
-            // Commit if has consensus
-            if self.state.has_majority_precommits(round, block_hash) {
-                self.has_majority_precommits(round, &propose_hash, &block_hash);
-                return;
-            }
-        }
-
-        // Send prevotes
-        for round in self.state.locked_round() + 1...self.state.round() {
+        for round in round...self.state.round() {
+            // Send prevotes
             if !self.state.have_prevote(round) {
                 self.broadcast_prevote(round, &propose_hash);
-                if self.state.has_majority_prevotes(round, propose_hash) {
-                    // FIXME remove recursive lock call
-                    self.lock(round, propose_hash);
+            }
+            // Change lock
+            if self.state.has_majority_prevotes(round, propose_hash) {
+                self.state.lock(round, propose_hash);
+                // Send precommit
+                if !self.state.have_incompatible_prevotes() {
+                    // Execute block and get state hash
+                    let block_hash = self.execute(&propose_hash);
+                    self.broadcast_precommit(round, &propose_hash, &block_hash);
+                    // Commit if has consensus
+                    if self.state.has_majority_precommits(round, block_hash) {
+                        self.has_majority_precommits(round, &propose_hash, &block_hash);
+                        return;
+                    }
                 }
+                // Remove request info
+                self.remove_request(RequestData::Prevotes(round, propose_hash));
             }
         }
     }
@@ -377,7 +381,7 @@ impl<B, S> NodeHandler<B, S>
 
         let peer = self.public_key_of(msg.validator());
         // Request propose
-        if let None = self.state.propose(msg.propose_hash()) {
+        if self.state.propose(msg.propose_hash()).is_none() {
             self.request(RequestData::Propose(*msg.propose_hash()), peer);
         }
 
@@ -483,7 +487,6 @@ impl<B, S> NodeHandler<B, S>
             self.remove_request(RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
-
         // Broadcast transaction to validators
         trace!("Broadcast transactions: {:?}", msg);
         self.broadcast(msg.raw());
@@ -508,7 +511,10 @@ impl<B, S> NodeHandler<B, S>
         // Send prevote if we are locked or propose if we are leader
         if let Some(hash) = self.state.locked_propose() {
             let round = self.state.round();
-            self.broadcast_prevote(round, &hash);
+            let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+            if has_majority_prevotes {
+                self.has_majority_prevotes(round, &hash);
+            }
         } else if self.is_leader() {
             self.add_propose_timeout();
         }
@@ -535,9 +541,12 @@ impl<B, S> NodeHandler<B, S>
         info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
         let round = self.state.round();
+        let max_count = ::std::cmp::min(self.txs_block_limit as usize,
+                                        self.state.transactions().len());
         let txs: Vec<Hash> = self.state
             .transactions()
             .keys()
+            .take(max_count)
             .cloned()
             .collect();
         let propose = Propose::new(self.state.id(),
@@ -554,7 +563,10 @@ impl<B, S> NodeHandler<B, S>
         let hash = self.state.add_self_propose(propose);
 
         // Send prevote
-        self.broadcast_prevote(round, &hash);
+        let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+        if has_majority_prevotes {
+            self.has_majority_prevotes(round, &hash);
+        }
     }
 
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
@@ -597,6 +609,7 @@ impl<B, S> NodeHandler<B, S>
                                          self.state.height(),
                                          round,
                                          propose_hash,
+                                         self.state.known_prevotes(round, propose_hash),
                                          &self.secret_key)
                         .raw()
                         .clone()
@@ -609,6 +622,7 @@ impl<B, S> NodeHandler<B, S>
                                            round,
                                            propose_hash,
                                            block_hash,
+                                           self.state.known_precommits(round, propose_hash),
                                            &self.secret_key)
                         .raw()
                         .clone()
@@ -665,7 +679,7 @@ impl<B, S> NodeHandler<B, S>
         block_hash
     }
 
-    pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) {
+    pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) -> bool {
         let requested_data = match self.state.propose(propose_hash) {
             Some(state) => {
                 // Request transactions
@@ -681,9 +695,12 @@ impl<B, S> NodeHandler<B, S>
             }
         };
 
-        if let Some(data) = requested_data {
+        if let Some(data) = requested_data.clone() {
             let key = self.public_key_of(validator);
             self.request(data, key);
+            false
+        } else {
+            true
         }
     }
 
@@ -707,7 +724,7 @@ impl<B, S> NodeHandler<B, S>
         self.state.remove_request(&data)
     }
 
-    pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) {
+    pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(self.state.id(),
                                    self.state.height(),
@@ -718,9 +735,7 @@ impl<B, S> NodeHandler<B, S>
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
-        if has_majority_prevotes {
-            self.lock(round, *propose_hash);
-        }
+        has_majority_prevotes
     }
 
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {

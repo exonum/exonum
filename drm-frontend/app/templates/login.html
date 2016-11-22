@@ -1,31 +1,62 @@
 {% if (users.length > 0) { %}
 <div class="app-list-headers clearfix">
-  <div class="pull-left">You can log in using existing accounts</div>
+  <div class="text-center">Log in using one of existing accounts:</div>
 </div>
 <div class="buttons-wrapper" id="registered-accounts">
   {% _.each(users, function(user, i) { %}
-    <a class="button login" data-index="{{ i }}">
-      <b>{{ user.name }}</b> (#{{ user.id }})
+    <a class="button text-nowrap login" data-index="{{ i }}">
+      {% if (user.role == "distributor") { %}
+      <i class="glyphicon glyphicon-briefcase"></i>&nbsp;
+      {% } else { %}
+      <i class="glyphicon glyphicon-user"></i>&nbsp;
+      {% } %}
+      <span class="button-inner"><strong>{{ user.name }}</strong></span>
     </a>
   {% }) %}
 </div>
 <div class="app-list-headers clearfix">
-  <div class="pull-left">Or you can create a new account</div>
+  <div class="text-center">Or you can create a new account:</div>
 </div>
 {% } else { %}
 <div class="app-list-headers clearfix">
-  <div class="pull-left">You have not registered any accounts yet</div>
+  <div class="text-center">You have not registered any accounts yet</div>
 </div>
 {% } %}
 <div class="buttons-wrapper">
-  <a class="button" id="login-registration">Create new account</a>
+  <a class="button button-green" id="login-registration">
+    <i class="glyphicon glyphicon-plus"></i>
+    Create new account
+  </a>
 </div>
 <div class="app-list-headers clearfix">
-  <div class="pull-left">Or just explore blockchain</div>
+  <div class="text-center">
+    {% if (users.length > 0) { %}
+      Explore blockchain:
+    {% } else { %}
+      Check latest blocks:
+    {% } %}
+  </div>
 </div>
 <div class="buttons-wrapper">
-  <a class="button" id="login-blockchain">Blockchain explorer</a>
+  <a class="button" id="login-blockchain">
+    <i class="glyphicon glyphicon-search"></i>&nbsp;
+    Blockchain explorer
+  </a>
+</div>
+<div class="app-list-headers clearfix">
+  <div class="text-center">
+    Track the flow of money:
+  </div>
+</div>
+<div class="buttons-wrapper">
+  <a class="button" id="login-flow">
+    <i class="glyphicon glyphicon glyphicon-stats"></i>&nbsp;
+    Money Flows
+  </a>
 </div>
 <span class="list-option-link">
-  Find out more on <a target="_blank" href="http://exonum.com/">exonum.com</a>
+  Find out more on <a target="_blank" href="http://exonum.com/">exonum.com</a><br/>
+  <span class="text-muted">
+    <a role="button" id="login-reset"><i class="glyphicon glyphicon-refresh"></i>&nbsp;Reset</a> local accounts storage
+  </span>
 </span>

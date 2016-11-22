@@ -1,11 +1,25 @@
+<ul class="pager">
+  {% if (lastHeight > 14) { %}
+  <li class="previous" id="blockchain-page-prev"><a role="button"><i class="glyphicon glyphicon-chevron-left"></i>&nbsp;Older</a></li>
+  {% } else { %}
+  <li class="previous disabled"><a role="button"><i class="glyphicon glyphicon-chevron-left"></i>&nbsp;Older</a></li>
+  {% } %}
+
+  {% if (lastHeight < newestHeight) { %}
+  <li class="next" id="blockchain-page-next"><a role="button">Newer&nbsp;<i class="glyphicon glyphicon-chevron-right"></i></a></li>
+  {% } else { %}
+  <li class="next"><a id="blockchain-refresh" role="button"><i class="glyphicon glyphicon-refresh"></i>&nbsp;Refresh</a></li>
+  {% } %}
+</ul>
+
 <table class="table table-hover table-condensed blockchain">
   <thead>
     <tr>
-      <td>Height</td>
-      <td>Time</td>
-      <td>Hash</td>
-      <td>Txs</td>
-      <!-- <td>Anchoring</td> -->
+      <th>Height</th>
+      <th>Time</th>
+      <th>Hash</th>
+      <th class="text-center">Txs</th>
+      <th class="col-fixed-more"></th>
     </tr>
   </thead>
   <tbody>
@@ -14,16 +28,9 @@
         <td>{{ block.get('height').toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ") }}</td>
         <td title="{{ moment.unix(block.get('propose_time')).format() }}">{{ moment.unix(block.get('propose_time')).fromNow() }}</td>
         <td><samp>{{ block.get('hash').substr(0, 8) }}</samp></td>
-        <td>{{ block.get('tx_count') }}</td>
-<!--         <td class="text-right">
-          <div class="checker"></div>
-        </td> -->
+        <td class="text-center">{{ block.get('tx_count') }}</td>
+        <td class="text-center text-muted"><i class="glyphicon glyphicon-chevron-right"></i></td>
       </tr>
     {% }) %}
   </tbody>
 </table>
-<!-- <div class="app-list-headers clearfix">
-  <div class="pull-left"><a href="#">← Newer</a></div>
-  <div class="pull-right"><a href="#">Older →</a></div>
-</div>
- -->

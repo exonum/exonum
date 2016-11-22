@@ -1,0 +1,12 @@
+{
+    "name": "exonum",
+    "description": "Exonum blogging theme for Ghost.",
+    "version": "1.0.0",
+    "engines": {
+        "ghost": ">=0.9.0 <1.0.0"
+    },
+    "screenshots": {
+        "desktop": "screenshot-desktop.jpg",
+        "mobile": "screenshot-mobile.jpg"
+    }
+}

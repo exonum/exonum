@@ -1,19 +1,22 @@
 var DRMRouter = Backbone.Router.extend({
     routes: {
       // Main pages
-      ""                      : "welcome",
-      "login"                 : "login",
-      "registration"          : "registration",
+      ''                      : 'welcome',
+      'login'                 : 'login',
+      'registration'          : 'registration',
 
       // Blockchain Explorer
-      "blockchain"            : "blockchain",
-      "block/:height"         : "block",
+      'blockchain'            : 'blockchain',
+      'blockchain/:page'      : 'blockchain',
+      'block/:height'         : 'block',
 
       // DRM
-      "dashboard"             : "dashboard",
-      "content/:fingerprint"  : "content",
-      "add-report/:fingerprint" : "addReport",
-      "add-content"           : "addContent",
+      'dashboard'             : 'dashboard',
+      'content/:fingerprint'  : 'content',
+      'add-report/:fingerprint' : 'addReport',
+      'add-content'           : 'addContent',
+      'flow'                  : 'flow',
+      'flow/:type'            : 'flow'
     },
 
     // Main pages
@@ -34,12 +37,26 @@ var DRMRouter = Backbone.Router.extend({
 
     // Blockchain Explorer
 
-    blockchain: function() {
+    blockchain: function(height) {
       app.views.container.loadingStart();
+
+      var requestData = {
+        count: 15
+      };
+
+      if (height) {
+        requestData.from = height;
+      }
+
       app.blocks.fetch({
-        data: {count: 12},
+        data: requestData,
         success: function() {
-          app.last_height = app.blocks.isEmpty() ? 0 : app.blocks.at(0).get('height');
+          // save last height in current fetch
+          app.lastHeight = app.blocks.isEmpty() ? 0 : app.blocks.at(0).get('height');
+
+          // save newest height we know about
+          app.newestHeight = (app.newestHeight === undefined || app.newestHeight < app.lastHeight) ? app.lastHeight : app.newestHeight;
+
           app.views.blockchain.render();
           app.views.container.changePage('blockchain');
         },
@@ -61,13 +78,13 @@ var DRMRouter = Backbone.Router.extend({
       var d2 = new Blocks().fetch({
         data: {count: 1},
         success: function(blocks) {
-          app.last_height = blocks.isEmpty() ? 0 : blocks.at(0).get('height');
+          app.lastHeight = blocks.isEmpty() ? 0 : blocks.at(0).get('height');
         }
       });
 
       var def = $.when(d1, d2);
 
-      def.done(function () {
+      def.done(function() {
         app.views.block.render();
         app.views.container.changePage('block');
       });
@@ -83,12 +100,12 @@ var DRMRouter = Backbone.Router.extend({
       if (!app.user) {
         this.navigate('login', {trigger: true});
       } else {
-        if (app.user.get('role') == "owner") {
+        if (app.user.get('role') === 'owner') {
           app.views.ownerDashboard.render();
-          app.views.container.changePage("ownerDashboard");
+          app.views.container.changePage('ownerDashboard');
         } else {
           app.views.distributorDashboard.render();
-          app.views.container.changePage("distributorDashboard");
+          app.views.container.changePage('distributorDashboard');
         }
       }
     },
@@ -103,17 +120,17 @@ var DRMRouter = Backbone.Router.extend({
         success: function(model) {
           app.views.content.model = model;
           app.views.content.render();
-          app.views.container.changePage("content");
+          app.views.container.changePage('content');
         },
         error: function() {
-          app.onError("Content with given fingerprint not found");
-        },
+          app.onError('Content with given fingerprint not found');
+        }
       });
     },
 
     addContent: function() {
       app.views.container.loadingStart();
-      if (!app.user || app.user.get("role") != "owner") {
+      if (!app.user || app.user.get('role') !== 'owner') {
         return this.navigate('login', {trigger: true});
       }
       app.views.addContent.render();
@@ -122,7 +139,7 @@ var DRMRouter = Backbone.Router.extend({
 
     addReport: function(fingerprint) {
       app.views.container.loadingStart();
-      if (!app.user || app.user.get("role") != "distributor") {
+      if (!app.user || app.user.get('role') !== 'distributor') {
         return this.navigate('login', {trigger: true});
       }
 
@@ -134,11 +151,27 @@ var DRMRouter = Backbone.Router.extend({
         success: function(model) {
           app.views.addReport.model = model;
           app.views.addReport.render();
-          app.views.container.changePage("addReport");
+          app.views.container.changePage('addReport');
         },
         error: function() {
-          app.onError("Content with given fingerprint not found");
+          app.onError('Content with given fingerprint not found');
+        }
+      });
+    },
+
+    flow: function(type) {
+      app.views.container.loadingStart();
+
+      app.flow.fetch({
+        success: function() {
+          app.views.flow.type = type || 'revenue';
+          app.views.flow.render();
+          app.views.container.changePage('flow');
+          app.views.flow.draw();
         },
+        error: function() {
+          app.views.container.changePage('error');
+        }
       });
     }
 });
@@ -148,8 +181,9 @@ var app = {
   router: new DRMRouter(),
 
   initialize: function() {
-    this.last_height = 0;
+    this.lastHeight = 0;
     this.blocks = new Blocks();
+    this.flow = new Flow();
     this.users = [];
     this.views = {
       container: new ContainerView(),
@@ -165,8 +199,10 @@ var app = {
       content: new ContentPage(),
       addContent: new AddContentPage(),
       addReport: new AddReportPage(),
+      flow: new FlowPage()
     };
     Backbone.history.start();
+    alertify.maxLogItems(10);
   },
 
   login: function(user) {
@@ -177,18 +213,18 @@ var app = {
     }, {
       retries: 20,
       timeout: 500,
-      success: function(model, response) {
+      success: function(model) {
         app.user = model;
         app.views.container.updateUser();
-        app.router.navigate("/dashboard", {trigger: true});
+        app.router.navigate('dashboard', {trigger: true});
       },
-      error: app.onError("Authentification failed")
+      error: app.onError('Authentification failed')
     });
   },
 
-  registration: function(role, name) {
+  registration: function(role, name, callback) {
     app.views.container.loadingStart();
-    var Model = role == 'owner' ? Owner : Distributor;
+    var Model = (role === 'owner') ? Owner : Distributor;
     new Model().save({name: name}, {
       success: function(model, response) {
         new Auth().failoverSave({
@@ -197,13 +233,29 @@ var app = {
         }, {
           retries: 20,
           timeout: 500,
-          success: function(model, response) {
+          success: function(model) {
+            // add new user to localStorage
+            var users = JSON.parse(localStorage.getItem('users')) || [];
+            users.push(model.attributes);
+            localStorage.setItem('users', JSON.stringify(users));
+
             app.users.push(model.attributes);
             app.user = model;
             app.views.container.updateUser();
-            app.router.navigate("/dashboard", {trigger: true});
+            app.router.navigate('dashboard', {trigger: true});
+
+            if (model.get('role') == 'owner') {
+              app.owners.push({
+                id: model.get('id'),
+                name: model.get('name')
+              });
+            }
+
+            callback();
+
+            alertify.success('You have created ' + role + ' account');
           },
-          error: app.onError("Authentification failed")
+          error: app.onError('Authentification failed')
         });
       },
       error: function() {
@@ -222,20 +274,22 @@ var app = {
           timeout: 500,
           success: function() {
             new Auth().save({
-              pub_key: app.user.get("pub_key"),
-              sec_key: app.user.get("sec_key")
+              pub_key: app.user.get('pub_key'),
+              sec_key: app.user.get('sec_key')
             }, {
               success: function(model) {
                 app.user = model;
                 app.router.navigate('dashboard', {trigger: true});
+
+                alertify.success('You have added new content');
               },
-              error: app.onError("Unable to create new content")
+              error: app.onError('Unable to create new content')
             });
           },
-          error: app.onError("Unable to create new content")
+          error: app.onError('Unable to create new content')
         });
       },
-      error: app.onError("Unable to create new content")
+      error: app.onError('Unable to create new content')
     });
   },
 
@@ -251,18 +305,20 @@ var app = {
           });
           content.fetch({
             success: function(model) {
-              var ready = model.get("contract");
-              console.log("ready", ready);
+              var ready = model.get('contract');
+              console.log('ready', ready);
               if (ready) {
                 new Auth().save({
-                  pub_key: app.user.get("pub_key"),
-                  sec_key: app.user.get("sec_key")
+                  pub_key: app.user.get('pub_key'),
+                  sec_key: app.user.get('sec_key')
                 }, {
                   success: function(model) {
                     app.user = model;
                     app.router.navigate('dashboard', {trigger: true});
+
+                    alertify.success('You have purchased distribution rights');
                   },
-                  error: app.onError("Unable to create new content")
+                  error: app.onError('Unable to create new content')
                 });
 
               } else {
@@ -270,18 +326,18 @@ var app = {
               }
             },
             error: function() {
-              app.onError("Content with given fingerprint not found");
-            },
+              app.onError('Content with given fingerprint not found');
+            }
           });
-        };
+        }
         waitForContract();
       },
-      error: app.onError("Unable to create new content")
+      error: app.onError('Unable to create new content')
     });
   },
 
   addReport: function(report) {
-    console.log("report", report);
+    console.log('report', report);
     app.views.container.loadingStart();
     new Report().save(report, {
       type: 'PUT',
@@ -292,20 +348,22 @@ var app = {
           timeout: 500,
           success: function() {
             new Auth().save({
-              pub_key: app.user.get("pub_key"),
-              sec_key: app.user.get("sec_key")
+              pub_key: app.user.get('pub_key'),
+              sec_key: app.user.get('sec_key')
             }, {
               success: function(model) {
                 app.user = model;
                 app.router.navigate('dashboard', {trigger: true});
+
+                alertify.success('You have updated distribution status');
               },
-              error: app.onError("Unable to create new content")
+              error: app.onError('Unable to create new content')
             });
           },
-          error: app.onError("Unable to add new report")
+          error: app.onError('Unable to add new report')
         });
       },
-      error: app.onError("Unable to add new report")
+      error: app.onError('Unable to add new report')
     });
   },
 
