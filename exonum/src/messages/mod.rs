@@ -31,9 +31,19 @@ pub enum Any<Tx: Message> {
     Status(Status),
     Block(Block),
     Consensus(ConsensusMessage),
-    Config(ConfigMessage),
     Request(RequestMessage),
-    Transaction(Tx)
+    Transaction(TransactionMessage<Tx>)
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum TransactionMessage<Tx: Message> {
+   Service(ServiceTransaction),
+   Application(Tx),
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum ServiceTransaction{
+    ConfigChange(ConfigMessage)
 }
 
 #[derive(Clone, PartialEq)]
@@ -311,12 +321,24 @@ impl<Tx: Message> Any<Tx> {
                 Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
             }
             CONFIG_PROPOSE_MESSAGE_ID => {
-                Any::Config(ConfigMessage::ConfigPropose(ConfigPropose::from_raw(raw)?))
+                Any::Transaction(
+                    TransactionMessage::Service(
+                        ServiceTransaction::ConfigChange(
+                            ConfigMessage::ConfigPropose(ConfigPropose::from_raw(raw)?)
+                        )
+                    )
+                )
             }
             CONFIG_VOTE_MESSAGE_ID => {
-                Any::Config(ConfigMessage::ConfigVote(ConfigVote::from_raw(raw)?))
+                Any::Transaction(
+                    TransactionMessage::Service(
+                        ServiceTransaction::ConfigChange(
+                            ConfigMessage::ConfigVote(ConfigVote::from_raw(raw)?)
+                        )
+                    )
+                )
             }
-            _ => Any::Transaction(Tx::from_raw(raw)?),
+            _ => Any::Transaction(TransactionMessage::Application(Tx::from_raw(raw)?)),
         })
     }
 }
@@ -330,7 +352,7 @@ impl<Tx: Message> fmt::Debug for Any<Tx> {
             Any::Request(ref msg) => write!(fmt, "{:?}", msg),
             Any::Transaction(ref msg) => write!(fmt, "{:?}", msg),
             Any::Block(ref msg) => write!(fmt, "{:?}", msg),
-            Any::Config(ref msg) => write!(fmt, "{:?}", msg),
+            Any::Transaction(TransactionMessage::Service(ServiceTransaction::ConfigChange(ref msg))) => write!(fmt, "{:?}", msg),
         }
     }
 }
