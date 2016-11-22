@@ -1,0 +1,19 @@
+<div class="app-list-headers clearfix">
+    <div class="pull-left">ELECTION TITLE</div>
+    <div class="pull-right">ELECTION TYPE</div>
+</div>
+<table class="app-list">
+    <tr ng-repeat="election in appData.elections" ng-click="toggle(election)" class="app-list-option">
+        <td class="cell-light">{{election.id}}</td>
+        <td>{{election.name}}</td>
+        <td class="cell-light cell-small">{{election.type}}</td>
+        <td>
+            <div class="checker" ng-class="{'active': election.id === currentElection.id}"></div>
+        </td>
+    </tr>
+</table>
+<div class="list-option-description">{{currentElection.description}}</div>
+<div class="list-option-ends"><strong>Remote voting period ends:</strong><br> {{currentElection.ends}}</div>
+<div class="buttons-wrapper">
+    <div class="button button-red" ui-sref="candidates">VOTE IN ELECTION</div>
+</div>

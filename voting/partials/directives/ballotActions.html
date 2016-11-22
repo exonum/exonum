@@ -1,0 +1,105 @@
+<div class="buttons-wrapper">
+    <div class="button">Save 3-word memo and ballot hash</div>
+    <div class="button-group">
+        <div class="button button-red" ng-click="electionWizardReset()">DISCARD</div>
+        <div class="button button-orange" ng-click="decryptModal()">DECRYPT</div>
+        <div class="button button-green" ng-click="signModal()">SIGN</div>
+    </div>
+</div>
+
+<div class="modal modal-decrypt fade" tabindex="-1" role="dialog" id="decryptModal">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-cross" data-dismiss="modal"></div>
+                <div class="decrypt-desc">
+                    <p>Are you sure you want to proceed with decrypting your ballot?</p>
+                    <p>This function is intended for audit purposes only and you won’t be able to sign and submit this specific ballot to voting system later via this application.</p>
+                    <p>The reason is due to decryption details providing a proof of what specific vote has been cast and may be used for coercion purposes otherwise.</p>
+                </div>
+                <div class="clearfix">
+                    <div class="col-xs-6">
+                        <div class="button button-light" data-dismiss="modal">CANCEL</div>
+                    </div>
+                    <div class="col-xs-6">
+                        <div class="button button-orange" ng-click="submitDecrypt()">DECRYPT BALLOT</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal modal-decrypt modal-decrypt-dark fade" tabindex="-1" role="dialog" id="signModal">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-cross" data-dismiss="modal"></div>
+                <div class="decrypt-desc">
+                    <p>Input your secret PIN2 to authorize a digital signature request with your private key on crypto SIM-card, thus signing your anonymous ballot.</p>
+                </div>
+                <div class="keyboard-inputs">
+                    <div class="keyboard-input" ng-repeat="n in [1, 2, 3, 4]" ng-class="{'active': n <= numbersEntered}"></div>
+                </div>
+                <div class="keyboard-buttons">
+                    <div class="clearfix">
+                        <div class="keyboard-button pull-left" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">1</div>
+                            <div class="keyboard-button-letters"></div>
+                        </div>
+                        <div class="keyboard-button pull-right" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">3</div>
+                            <div class="keyboard-button-letters">DEF</div>
+                        </div>
+                        <div class="keyboard-button" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">2</div>
+                            <div class="keyboard-button-letters">ABC</div>
+                        </div>
+                    </div>
+                    <div class="clearfix">
+                        <div class="keyboard-button pull-left" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">4</div>
+                            <div class="keyboard-button-letters">GHI</div>
+                        </div>
+                        <div class="keyboard-button pull-right" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">6</div>
+                            <div class="keyboard-button-letters">MNO</div>
+                        </div>
+                        <div class="keyboard-button" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">5</div>
+                            <div class="keyboard-button-letters">JKL</div>
+                        </div>
+                    </div>
+                    <div class="clearfix">
+                        <div class="keyboard-button pull-left" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">7</div>
+                            <div class="keyboard-button-letters">PQRS</div>
+                        </div>
+                        <div class="keyboard-button pull-right" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">9</div>
+                            <div class="keyboard-button-letters">WXYZ</div>
+                        </div>
+                        <div class="keyboard-button" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">8</div>
+                            <div class="keyboard-button-letters">TUV</div>
+                        </div>
+                    </div>
+                    <div class="clearfix">
+                        <div class="keyboard-button" ng-click="keyboardButtonClick()">
+                            <div class="keyboard-button-digit">0</div>
+                            <div class="keyboard-button-letters"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="clearfix">
+                    <div class="col-xs-6">
+                        <div class="button button-light" data-dismiss="modal">CANCEL</div>
+                    </div>
+                    <div class="col-xs-6">
+                        <div class="button button-green" ng-click="submitSign()">SIGN BALLOT</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
