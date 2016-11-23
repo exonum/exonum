@@ -26,7 +26,7 @@ pub use self::list_table::ListTable;
 pub use self::merkle_table::MerkleTable;
 pub use self::fields::{StorageValue, HeightBytes};
 pub use self::merkle_table::proof_indices_values; 
-pub use self::merkle_patricia_table::MerklePatriciaTable;
+pub use self::merkle_patricia_table::{MerklePatriciaTable, verify_proof_consistency};
 
 #[derive(Debug)]
 pub struct Error {
