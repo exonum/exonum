@@ -1,5 +1,11 @@
 use node::serde_json;
+use events::Channel;
+use node::{ExternalMessage, NodeHandler, NodeTimeout};
+use super::super::messages::{ConfigPropose, ConfigVote};
+use super::super::blockchain::{Blockchain, View};
 use super::super::crypto::PublicKey;
+use super::super::storage::Map;
+use super::super::messages::Message;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
@@ -47,6 +53,56 @@ impl Configuration {
 impl ConfigurationValidator for Configuration {
     fn is_valid(&self) -> bool {
         self.consensus.is_valid()
+    }
+}
+
+
+impl<B, S> NodeHandler<B, S>
+    where B: Blockchain,
+          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+{
+    pub fn handle_config_propose(&self, config_propose: ConfigPropose) {
+
+        if config_propose.height() < self.state.height() || config_propose.height() > self.state.height() + 1 {
+            warn!("Received ConfigPropose message from other height: msg.height={}, self.height={}",
+                  config_propose.height(),
+                  self.state.height());
+            return;
+        }
+
+        if !self.state.validators().contains(config_propose.from()){
+            error!("ConfigPropose from unknown validator: {:?}", config_propose.from());
+            return;
+        }
+
+        let view = self.blockchain.view();
+        if view.config_proposes().get(&config_propose.hash()).unwrap().is_some() {
+            error!("Received config_propose has already been handled, msg={:?}", config_propose);
+            return;
+        }
+
+        trace!("Handle ConfigPropose");
+        let _ = view.config_proposes().put(&config_propose.hash(), config_propose);
+
+    }
+
+    pub fn handle_config_vote(&self, config_vote: ConfigVote){
+        if config_vote.height() < self.state.height() || config_vote.height() > self.state.height() + 1 {
+            warn!("Received ConfigVote message from other height: msg.height={}, self.height={}",
+                  config_vote.height(),
+                  self.state.height());
+            return;
+        }
+
+        if !self.state.validators().contains(config_vote.from()){
+            error!("ConfigVote from unknown validator: {:?}", config_vote.from());
+            return;
+        }
+
+        let view = self.blockchain.view();
+        let msg = config_vote.clone();
+        let _ = view.config_votes().put(msg.from(), config_vote);
+
     }
 }
 
