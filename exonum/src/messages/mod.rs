@@ -13,7 +13,7 @@ mod protocol;
 use time::Timespec;
 use bit_vec;
 
-use super::crypto::PublicKey;
+use super::crypto::{PublicKey, Hash};
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::Error;
@@ -193,10 +193,11 @@ impl fmt::Debug for RequestMessage {
 }
 
 impl ConfigMessage{
-    pub fn validator(&self) -> u32 {
+
+    pub fn from(&self) -> &PublicKey {
         match *self {
-            ConfigMessage::ConfigPropose(ref msg) => msg.validator(),
-            ConfigMessage::ConfigVote(ref msg) => msg.validator(),
+            ConfigMessage::ConfigPropose(ref msg) => msg.from(),
+            ConfigMessage::ConfigVote(ref msg) => msg.from()
         }
     }
 
@@ -221,6 +222,15 @@ impl ConfigMessage{
             ConfigMessage::ConfigVote(ref msg) => msg.verify(public_key),
         }
     }
+
+    pub fn hash(&self) -> Hash {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.hash(),
+            ConfigMessage::ConfigVote(ref msg) => msg.hash(),
+        }
+    }
+
+
 }
 
 impl fmt::Debug for ConfigMessage {
