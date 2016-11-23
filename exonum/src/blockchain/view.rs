@@ -2,7 +2,7 @@ use std::slice::SliceConcatExt;
 use std::ops::Deref;
 
 use ::crypto::{Hash, PublicKey};
-use ::messages::{Precommit, Message, ConfigPropose};
+use ::messages::{Precommit, Message, ConfigPropose, ConfigVote};
 use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatriciaTable};
 
 use super::Block;
@@ -37,7 +37,7 @@ pub trait View<F: Fork>: Deref<Target = F> {
         MerklePatriciaTable::new(MapTable::new(vec![04], &self))
     }
 
-    fn config_votes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, Self::Transaction> {
+    fn config_votes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, ConfigVote> {
         //config_votes patricia merkletree <pub_key> последний голос
         MerklePatriciaTable::new(MapTable::new(vec![05], &self))
     }
