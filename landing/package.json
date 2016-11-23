@@ -9,7 +9,6 @@
     "gulp": "^3.9.0",
     "gulp-cache": "^0.4.2",
     "gulp-compile-handlebars": "^0.6.1",
-    "gulp-eslint": "^3.0.0",
     "gulp-filter": "^4.0.0",
     "gulp-if": "^2.0.2",
     "gulp-imagemin": "^3.0.1",
@@ -19,18 +18,5 @@
     "main-bower-files": "^2.5.0",
     "run-sequence": "^1.2.2",
     "wiredep": "^4.0.0"
-  },
-  "eslintConfig": {
-    "env": {
-      "es6": true,
-      "node": true,
-      "browser": true
-    },
-    "rules": {
-      "quotes": [
-        2,
-        "single"
-      ]
-    }
   }
 }
