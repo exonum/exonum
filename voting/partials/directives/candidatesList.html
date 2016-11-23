@@ -1,0 +1,48 @@
+<div class="app-list-headers clearfix">
+    <div class="pull-left">CANDIDATE LIST</div>
+    <div class="pull-right">enctypted name</div>
+</div>
+<table class="app-list">
+    <tr ng-repeat="candidate in currentElection.candidates" ng-click="toggle(candidate)" class="app-list-option">
+        <td class="cell-light">{{candidate.id}}</td>
+        <td class="cell-photo"><img ng-src="{{candidate.photo}}" /></td>
+        <td>{{candidate.name}}</td>
+        <td class="cell-smaller">{{candidate.code}}</td>
+        <td>
+            <div class="checker" ng-class="{'active': candidate.id == currentCandidate.id}"></div>
+        </td>
+    </tr>
+</table>
+<div class="list-option-description">{{currentCandidate.description}}</div>
+<a class="list-option-link" ng-href="{{currentCandidate.link}}" target="_blank">Official candidate page</a>
+<div class="buttons-wrapper">
+    <div class="button button-red" ng-click="chooseCandidate()">VOTE IN ELECTION</div>
+</div>
+
+<div class="modal modal-candidate fade" tabindex="-1" role="dialog" id="candidateModal">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-cross" data-dismiss="modal"></div>
+                <div class="confirm-choise-block">
+                    <div class="confirm-choise-block-title">Are you sure you want to prepare<br>an&nbsp;anonymous ballot with<br>following candidate selected?</div>
+                    <div class="confirm-choise-block-subtitle">Your choice is:</div>
+                    <div class="confirm-choise-block-photo"><img ng-src="{{currentCandidate.photo}}" /></div>
+                    <div class="confirm-choise-block-name">{{currentCandidate.name}}</div>
+                    <div class="confirm-choise-block-addition">
+                        It’s recommended that you take a  look at corresponding election legislation details first.
+                        <a class="confirm-choise-block-addition-link" target="_blank" href="http://www.vvk.ee/?lang=en">http://www.vvk.ee/?lang=en</a>
+                    </div>
+                </div>
+                <div class="clearfix">
+                    <div class="col-xs-6">
+                        <div class="button" data-dismiss="modal">CANCEL</div>
+                    </div>
+                    <div class="col-xs-6">
+                        <div class="button button-red" ng-click="submitCandidate()">YES</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

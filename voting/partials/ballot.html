@@ -1,0 +1,32 @@
+<div class="app-content-header"><span>Ballot Receipt</span></div>
+<div class="inner-header">Ballot reciept 3-word memo</div>
+<div class="code-box code-box-bigger">{{currentCandidate.data[dataIndex].memo}}</div>
+<div class="inner-header">Ballot  SHA256 hash</div>
+<div class="code-box">{{currentCandidate.data[dataIndex].hash}}</div>
+<p>
+    You will be able to find this ballot by
+    short 3-word memo or ballot SHA-256 hash
+    on public bulletin board after it has been published
+    via “Blockchain Explorer” button in “Monitor Elections”.
+</p>
+<p>
+    It is recommended to save these details at once at all times
+    with button below  to ensure encryption correctness and absence of fraud with which candidate is selected and which
+    one is encrypted to the resulting ballot. You may delete these details later when the ballot has been published and
+    just memorize or write down the 3-word memo.
+</p>
+<p>
+    Cryptographic SHA-256 hash here plays the key role in ensuring that current client cannot backdatingly change the
+    candidate-option, chosen by you. As of contemporary technology, it’s impossible to replace the ballot within 10
+    years so that it matches the same hash.
+</p>
+<p>
+    This application cannot possibly know whether you’re going to decrypt the ballot obtained or to sign it.
+</p>
+<p>
+    If fraud is detected after the ballot is decrypted, it should be reported.
+</p>
+<ballot-actions></ballot-actions>
+
+
+

@@ -1,0 +1,43 @@
+<div class="app-content-header"><span>Full Ballot Encryption Details</span></div>
+<p class="text-center">
+    On this page all encryption details are revealed,
+    so that a voter or an auditor can verify that
+    the ballot has been encrypted correctly. It can be done automatically via trusted 3rd party help or manually for each operation.
+</p>
+<table class="app-list">
+    <tr ui-sref="tallying" class="app-list-option">
+        <td>Tallying authorities aggregate public key</td><td><div class="right-arrow"></div></td>
+    </tr>
+    <tr ui-sref="randomness" class="app-list-option">
+        <td>Candidate option selected and encryption randomness</td><td><div class="right-arrow"></div></td>
+    </tr>
+    <tr ui-sref="encrypted" class="app-list-option">
+        <td>Encrypted ballot</td><td><div class="right-arrow"></div></td>
+    </tr>
+    <tr ui-sref="hash" class="app-list-option">
+        <td>Ballot SHA-256 hash</td><td><div class="right-arrow"></div></td>
+    </tr>
+    <tr ui-sref="memo" class="app-list-option">
+        <td>3-word memo by BIP 0039 Mnemonic code algorithm</td><td><div class="right-arrow"></div></td>
+    </tr>
+</table>
+<p class="blacked text-center">Links on independent 3rd party resources for automatic ballot validation</p>
+<table class="app-list">
+    <tr class="app-list-option">
+        <td class="cell-link"><a href="http://travistidwell.com/jsencrypt/#" target="_blank">http://travistidwell.com/jsencrypt/#</a></td><td class="cell-action-type">Save & UPLOAD</td>
+    </tr>
+    <tr class="app-list-option">
+        <td class="cell-link"><a href="http://extranet.cryptomathic.com" target="_blank">http://extranet.cryptomathic.com</a></td><td class="cell-action-type">Save & UPLOAD</td>
+    </tr>
+    <tr class="app-list-option">
+        <td class="cell-link"><a href="http://fiddle.jshell.net/mindoftea/bud9V/" target="_blank">http://fiddle.jshell.net/mindoftea/bud9V/</a></td><td class="cell-action-type">ONE CLICK VALIDATION</td>
+    </tr>
+    <tr class="app-list-option">
+        <td class="cell-link"><a href="http://www-cs-students.stanford.edu/" target="_blank">http://www-cs-students.stanford.edu/...</a></td><td class="cell-action-type">ONE CLICK VALIDATION</td>
+    </tr>
+</table>
+
+<div class="buttons-wrapper">
+    <div class="button button-blue">SAVE BALLOT DETAILS</div>
+    <div class="button button-link" ng-click="electionWizardReset()">RETURN</div>
+</div>

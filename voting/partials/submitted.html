@@ -1,0 +1,31 @@
+<div class="grats">
+    <div class="grats-title">Congratulations!</div>
+    <p>Your ballot has been submitted<br>to voting system.</p>
+    <p>You can vote again later,<br>if you change your mind.</p>
+</div>
+<div class="app-content-divider"></div>
+<div class="inner-header">Ballot confirmation on public bulletin board</div>
+<div class="input-wrapper">
+    <div class="input-wrapper-prefix">E-mail:</div>
+    <input placeholder="Your mail" ng-model="inputs.email">
+</div>
+<p>Within a few minutes, after the block with your ballot gets confirmed on blockchain, you will receive an e-mail onto the above address with a link to a specific transaction.</p>
+<p>If you chose not to enter any e-mail, you can alternatively browse public bulletin board via built-in or 3rd party blockchain explorers, find your ballot there and confirm that it is valid and will be taken into acount during final tally.</p>
+<p>If you receive a 2nd mail with a link to a newer ballot,
+which replaces your current ballot, its either expression of your own will or a ballot, cast by unauthorized parties.
+In the latter case you should contact election authorities or other trusted parties, which participate in ensuring election fairness. You should also contact election authorities  if current ballot doesn’t appear on public bulletin board.</p>
+<div class="buttons-wrapper">
+    <div class="button">CONTACT INFORMATION</div>
+</div>
+<div class="app-content-divider"></div>
+<div class="inner-header">Ballot receipt 3-word memo and hash</div>
+<div class="code-box code-box-bigger">{{currentCandidate.data[dataIndex].memo}}</div>
+<div class="code-box">{{currentCandidate.data[dataIndex].hash}}</div>
+<p>
+    You can find the ballot by 3-word memo. Alternatively, you can compare against  your saved ballot details and
+    issue search requests by full 256 bit ballot hash.
+</p>
+<div class="buttons-wrapper">
+    <a class="button" ng-href="{{currentCandidate.data[dataIndex].txLink}}" target="_blank">Blockchain explorer</a>
+    <div class="button button-link" ng-click="electionWizardReset()">RETURN</div>
+</div>

@@ -1,0 +1,19 @@
+<div class="app-content-header"><span>Tallying Authorities Aggregate Public Key</span></div>
+<p class="text-center">You may check that counter key that was used for ballot encryption is valid by visiting following links, where it
+    has been published independently before election start:</p>
+<p class="blacked text-center">
+    <a href="http://url1.gov" target="_blank">http://url1.gov</a><br>
+    <a href="http://url1.gov" target="_blank">http://url1.gov</a>
+</p>
+<div class="app-content-divider"></div>
+<div class="inner-header">Modulus hexadecimal (1024 bit)</div>
+<div class="code-box">{{currentElection.modulusHexadecimal}}</div>
+<div class="inner-header">Public exponent</div>
+<div class="code-box">{{currentElection.publicExponentHexadecimal}}</div>
+<p class="blacked text-center">Step-by-step instructions:</p>
+<ol>
+    <li>Open link: <a href="http://www.mobilefish.com/services/rsa_key_generation/rsa_key_generation.php" target="_blank">http://www.mobilefish.com/services/rsa_key_generation/rsa_key_generation.php</a></li>
+    <li>Copy and paste Modulus hexadecimal from aboveinto “<b>Enter modulus (n)*</b>:” field on site. </li>
+    <li>Copy and paste Public exponent from aboveinto “<b>Public exponent (e)*</b>:” field on site.</li>
+    <li>Expand “<b>Candidate option selected and encryption randomness</b>” on this page below.</li>
+</ol>
