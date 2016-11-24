@@ -22,11 +22,11 @@ angular
     'ngMap',
     'ngStorage'
   ])
-  .config(function ($stateProvider, $urlRouterProvider) {
+  .config(function($stateProvider, $urlRouterProvider) {
 
     $urlRouterProvider.when('', '/');
 
-      $stateProvider
+    $stateProvider
       .state('map', {
         url: '/',
         templateUrl: 'views/map.html',
@@ -41,10 +41,10 @@ angular
         }
       })
   })
-  .run(['$rootScope', '$state', '$stateParams', '$cookies',  function ($rootScope, $state, $stateParams, $cookies) {
+  .run(['$rootScope', '$state', '$stateParams', '$cookies', function($rootScope, $state, $stateParams, $cookies) {
     $rootScope.$on('$stateChangeStart',
-      function (event, toState, toParams, fromState, fromParams) {
-        if (toState.name != 'register' && !$cookies.get('public_key')){
+      function(event, toState, toParams, fromState, fromParams) {
+        if (toState.name != 'register' && !$cookies.get('public_key')) {
           console.log('needs to register');
           event.preventDefault();
           $state.go('register');
