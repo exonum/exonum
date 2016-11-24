@@ -1,7 +1,5 @@
-.idea
-node_modules
-dist
-.tmp
-.sass-cache
-bower_components
-app/config.js
+/node_modules
+/bower_components
+/dist
+/.tmp
+

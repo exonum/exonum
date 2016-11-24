@@ -8,7 +8,7 @@
  * Controller of the landTitleUi1App
  */
 angular.module('landTitleUi1App')
-  .controller('MapCtrl', function ($rootScope, $scope,  NgMap, $uibModal, $titlesManager, $api) {
+  .controller('MapCtrl', function($rootScope, $scope, NgMap, $uibModal, $titlesManager, $api) {
 
     var drawingManager = null;
     var chicago = new google.maps.LatLng(41.850033, -87.6500523);
@@ -25,14 +25,16 @@ angular.module('landTitleUi1App')
         map: map
       });
 
-      google.maps.event.addListener(drawingManager, 'polygoncomplete', function(polygon){
+      google.maps.event.addListener(drawingManager, 'polygoncomplete', function(polygon) {
         drawingManager.setDrawingMode(null);
         $titlesManager.registerTitle(selectedOwner, polygon, enteredTitle);
       });
 
-      google.maps.Polygon.prototype.getBounds=function(){
-        var bounds = new google.maps.LatLngBounds()
-        this.getPath().forEach(function(element,index){bounds.extend(element)})
+      google.maps.Polygon.prototype.getBounds = function() {
+        var bounds = new google.maps.LatLngBounds();
+        this.getPath().forEach(function(element, index) {
+          bounds.extend(element)
+        });
         return bounds
       }
 
@@ -40,26 +42,26 @@ angular.module('landTitleUi1App')
 
     });
 
-    $rootScope.$on('titleCreateStatusStart', function (event){
+    $rootScope.$on('titleCreateStatusStart', function(event) {
       console.log('start');
-      if (progressInstance == null){
-          var modalInstance = $uibModal.open({
+      if (progressInstance == null) {
+        var modalInstance = $uibModal.open({
           animation: true,
           ariaLabelledBy: 'modal-title',
           ariaDescribedBy: 'modal-body',
           templateUrl: 'views/title.status.html',
-          controller: function ($scope, $uibModalInstance){
-              progressInstance = $uibModalInstance;
-          }
+          controller: ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
+            progressInstance = $uibModalInstance;
+          }]
         });
       }
 
     });
 
-    $rootScope.$on('titleCreationFailed', function (event, data){
+    $rootScope.$on('titleCreationFailed', function(event, data) {
 
       console.log('failure');
-      if (progressInstance != null){
+      if (progressInstance != null) {
         progressInstance.dismiss('');
       }
 
@@ -68,26 +70,26 @@ angular.module('landTitleUi1App')
         ariaLabelledBy: 'modal-title',
         ariaDescribedBy: 'modal-body',
         templateUrl: 'views/title.error.html',
-        controller: function ($scope, $uibModalInstance){
-            $scope.result = data.result;
-            $scope.ok = function (){
-              $uibModalInstance.dismiss();
-              failedInstance = null;
-            }
-        }
+        controller: ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
+          $scope.result = data.result;
+          $scope.ok = function() {
+            $uibModalInstance.dismiss();
+            failedInstance = null;
+          }
+        }]
       });
 
     });
 
-    $rootScope.$on('titleCreateStatusFinished', function (event){
+    $rootScope.$on('titleCreateStatusFinished', function(event) {
       console.log('finish');
-      if (progressInstance){
+      if (progressInstance) {
         progressInstance.dismiss();
         progressInstance = null;
       }
     });
 
-    $rootScope.$on('titleInfo', function (event, info){
+    $rootScope.$on('titleInfo', function(event, info) {
 
       var modalInstance = $uibModal.open({
         animation: true,
@@ -97,13 +99,13 @@ angular.module('landTitleUi1App')
         controller: 'TitleInfoCtrl',
         size: 'lg',
         resolve: {
-          info: function () {
+          info: function() {
             return {titleInfo: info.titleInfo, center: info.polygon.getBounds().getCenter(), polygon: info.polygon};
           }
         }
       });
 
-      modalInstance.result.then(function (owner) {
+      modalInstance.result.then(function(owner) {
       });
     });
 
@@ -112,7 +114,7 @@ angular.module('landTitleUi1App')
       $scope.map.setZoom(18);
     };
 
-    $scope.ownersList = function (){
+    $scope.ownersList = function() {
       var modalInstance = $uibModal.open({
         animation: true,
         ariaLabelledBy: 'modal-title',
@@ -122,14 +124,14 @@ angular.module('landTitleUi1App')
         controllerAs: 'this',
         size: 'lg',
         resolve: {
-          items: function () {
+          items: function() {
             return {};
           }
         }
       });
     };
 
-    $scope.titlesList = function (){
+    $scope.titlesList = function() {
       var modalInstance = $uibModal.open({
         animation: true,
         ariaLabelledBy: 'modal-title',
@@ -139,7 +141,7 @@ angular.module('landTitleUi1App')
         controllerAs: 'this',
         size: 'lg',
         resolve: {
-          items: function () {
+          items: function() {
             return {};
           }
         }
@@ -147,7 +149,7 @@ angular.module('landTitleUi1App')
     };
 
 
-    $scope.auth = function (){
+    $scope.auth = function() {
       var modalInstance = $uibModal.open({
         animation: true,
         ariaLabelledBy: 'modal-title',
@@ -157,14 +159,14 @@ angular.module('landTitleUi1App')
         controllerAs: 'this',
         size: 'lg',
         resolve: {
-          items: function () {
+          items: function() {
             return {};
           }
         }
       });
     };
 
-    $scope.register = function (){
+    $scope.register = function() {
       var modalInstance = $uibModal.open({
         animation: true,
         ariaLabelledBy: 'modal-title',
@@ -174,42 +176,42 @@ angular.module('landTitleUi1App')
         controllerAs: 'this',
         size: 'lg',
         resolve: {
-          items: function () {
+          items: function() {
             return {};
           }
         }
       });
     };
 
-    $scope.createTitle = function (){
-      $api.getOwnersList().then(function (success){
+    $scope.createTitle = function() {
+      $api.getOwnersList().then(function(success) {
         var modalInstance = $uibModal.open({
           animation: true,
           ariaLabelledBy: 'modal-title',
           ariaDescribedBy: 'modal-body',
           templateUrl: 'views/title.create.info.html',
-          controller: function ($scope, $uibModalInstance){
+          controller: ['$scope', '$uibModalInstance', function($scope, $uibModalInstance) {
             $scope.owners = success.data;
-            $scope.confirm = function (){
-              if ($scope.title && $scope.owner){
+            $scope.confirm = function() {
+              if ($scope.title && $scope.owner) {
                 $uibModalInstance.close({title: $scope.title, owner: $scope.owner});
-              }else{
-                if (!$scope.title){
+              } else {
+                if (!$scope.title) {
                   $scope.titleNotValid = true;
                 }
-                if (!$scope.owner){
+                if (!$scope.owner) {
                   $scope.ownerNotValid = true;
                 }
               }
 
             };
-            $scope.decline = function (){
+            $scope.decline = function() {
               $uibModalInstance.dismiss('cancel');
             }
-          },
+          }],
           size: 'lg'
         });
-        modalInstance.result.then(function (data) {
+        modalInstance.result.then(function(data) {
           enteredTitle = data.title;
           selectedOwner = data.owner.id;
           drawingManager.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
