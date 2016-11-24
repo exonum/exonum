@@ -42,7 +42,7 @@ pub trait View<F: Fork>: Deref<Target = F> {
         MerklePatriciaTable::new(MapTable::new(vec![05], &self))
     }
 
-    fn configs(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, u64, Vec<u8>> {
+    fn configs(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, Vec<u8>> {
         //configs patricia merkletree <высота блока> json
         MerklePatriciaTable::new(MapTable::new(vec![06], &self))
     }
