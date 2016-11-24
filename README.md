@@ -244,3 +244,35 @@ npm start --production
 Запущеный в режиме production like блог будет висеть на `127.0.0.1:2368`.
 
 Эта и другие настройки хранятся в файле `config.js` в корне.
+
+# Land Registry Demo
+
+Устанавливаем следующие зависимости:
+
+```
+npm install --global grunt-cli bower yo generator-karma generator-angular
+```
+
+Далее, требуется установить все npm зависимости:
+
+```
+npm install
+```
+
+И bower зависимости:
+
+```
+bower install
+```
+
+Запускаем локально:
+
+```
+grunt serve
+```
+
+Билдим для продакшена:
+
+```
+grunt build
+```
