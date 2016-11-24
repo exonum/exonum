@@ -190,17 +190,18 @@ message! {
 message !{
     ConfigPropose{
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 48;
+        const SIZE = 56;
         from:           &PublicKey  [00 => 32]
         height:         u64         [32 => 40]
         config:        &[u8]        [40 => 48] // serialized config bytes
+        actual_from_height: u64     [48 => 56] // с какой высоты становится актуальным
     }
 }
 
 message !{
     ConfigVote {
         const ID = CONFIG_VOTE_MESSAGE_ID;
-        const SIZE = 57;
+        const SIZE = 81;
         from:           &PublicKey  [00 => 32]
         height:         u64         [32 => 40]
         hash_propose:   &Hash       [40 => 72] // hash of transacion we're voting for
