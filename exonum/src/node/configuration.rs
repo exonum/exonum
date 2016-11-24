@@ -3,9 +3,10 @@ use events::Channel;
 use node::{ExternalMessage, NodeHandler, NodeTimeout};
 use super::super::messages::{ConfigPropose, ConfigVote};
 use super::super::blockchain::{Blockchain, View};
-use super::super::crypto::PublicKey;
+use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Map;
 use super::super::messages::Message;
+use byteorder::{ByteOrder, LittleEndian};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Configuration {
@@ -70,6 +71,12 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
+        if config_propose.actual_from_height() < self.state.height() {
+            error!("Received config for past height: msg.actual_from_height={}, self.height={}",
+                config_propose.actual_from_height(), self.state.height());
+            return;
+        }
+
         if !self.state.validators().contains(config_propose.from()){
             error!("ConfigPropose from unknown validator: {:?}", config_propose.from());
             return;
@@ -87,6 +94,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_config_vote(&self, config_vote: ConfigVote){
+
         if config_vote.height() < self.state.height() || config_vote.height() > self.state.height() + 1 {
             warn!("Received ConfigVote message from other height: msg.height={}, self.height={}",
                   config_vote.height(),
@@ -100,9 +108,42 @@ impl<B, S> NodeHandler<B, S>
         }
 
         let view = self.blockchain.view();
-        let msg = config_vote.clone();
-        let _ = view.config_votes().put(msg.from(), config_vote);
+        if view.config_proposes().get(&config_vote.hash_propose()).unwrap().is_some() {
+            error!("Received config_vote for unknown transaciton, msg={:?}", config_vote);
+            return;
+        }
 
+        if let Some(vote) = view.config_votes().get(&config_vote.from()).unwrap() {
+            if vote.seed() != config_vote.seed() -1 {
+                error!("Received config_vote with wrong seed, msg={:?}", config_vote);
+                return;
+            }
+        }
+
+        let msg = config_vote.clone();
+        let _ = view.config_votes().put(msg.from(), config_vote.clone());
+
+        let mut votes_count = 0;
+        for pub_key in self.state.validators(){
+            if let Some(vote) = view.config_votes().get(&pub_key).unwrap() {
+                if !vote.revoke() {
+                    votes_count = votes_count + 1;
+                }
+            }
+        }
+
+        if votes_count >= 2/3 * self.state.validators().len(){
+            if let Some(config_propose) = view.config_proposes().get(&config_vote.hash_propose()).unwrap() {
+                view.configs().put(&Hash(self.height_to_slice(config_propose.actual_from_height())), config_propose.config().to_vec()).unwrap();
+                // TODO: clear storages
+            }
+        }
+    }
+
+    fn height_to_slice(&self, height: u64) -> [u8;32] {
+        let mut result = [0; 32];
+        LittleEndian::write_u64(&mut result[24..], height);
+        result
     }
 }
 
