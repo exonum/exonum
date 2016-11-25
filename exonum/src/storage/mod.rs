@@ -24,7 +24,7 @@ pub use self::memorydb::MemoryDB;
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::merkle_table::MerkleTable;
-pub use self::fields::{StorageValue, HeightBytes};
+pub use self::fields::{StorageValue, HeightBytes, Base64Field};
 pub use self::merkle_table::proof_indices_values; 
 pub use self::merkle_patricia_table::{MerklePatriciaTable, verify_proof_consistency};
 
