@@ -2,9 +2,9 @@ use num::{Integer, range, ToPrimitive, pow};
 
 use std::marker::PhantomData;
 use std::cell::Cell;
-use super::merkle_patricia_table::bytes_to_hex; 
+use super::merkle_patricia_table::bytes_to_hex;  
 
-use super::{Map, List, Error, StorageValue};
+use super::{Map, List, Error, StorageValue, Base64Field};
 
 use ::crypto::{hash, Hash};
 use std::fmt;
@@ -19,20 +19,21 @@ type Range<K> = Option<(K, K)>;
 /// 1  | Хэши от исходных данных
 /// 2..| Дерево хешей, где каждая новая высота считает Hash(Hash(h - 1, i), Hash(h - 1, i + 1))
 
-pub enum Proofnode<V: StorageValue> {
+#[derive(Serialize, Deserialize)]
+pub enum Proofnode<V: StorageValue + Clone> {
     Full(Box<Proofnode<V>>, Box<Proofnode<V>>),
-    Left(Box<Proofnode<V>>, Option<Hash>),
-    Right(Option<Hash>, Box<Proofnode<V>>),
-    Leaf(V),
+    Left(Box<Proofnode<V>>, Option<Base64Field<Hash>>),
+    Right(Base64Field<Hash>, Box<Proofnode<V>>),
+    Leaf(Base64Field<V>),
 }
 
-pub fn proof_indices_values<V: StorageValue>(proof: &Proofnode<V>) -> Vec<(usize, &V)> {
+pub fn proof_indices_values<V: StorageValue + Clone>(proof: &Proofnode<V>) -> Vec<(usize, &V)> {
     let mut res = Vec::new();
     proof.indices_and_values(0usize, &mut res);
     res
 }
 
-impl<V: StorageValue> Proofnode<V> {
+impl<V: StorageValue + Clone> Proofnode<V> {
     pub fn compute_proof_root(&self) -> Hash {
         match *self {
             Proofnode::Full(ref left, ref right) => {
@@ -47,11 +48,7 @@ impl<V: StorageValue> Proofnode<V> {
                 }
             } 
             Proofnode::Right(ref left_hash, ref right_proof) => {
-                if let Some(ref hash_val) = *left_hash {
-                    hash(&[hash_val.as_ref(), right_proof.compute_proof_root().as_ref()].concat())
-                } else {
-                    hash(right_proof.compute_proof_root().as_ref())
-                }
+                hash(&[left_hash.as_ref(), right_proof.compute_proof_root().as_ref()].concat())
             }
             Proofnode::Leaf(ref val) => val.hash(), 
         }
@@ -76,7 +73,7 @@ impl<V: StorageValue> Proofnode<V> {
     }
 }
 
-impl<V: StorageValue + fmt::Debug> fmt::Debug for Proofnode<V> {
+impl<V: StorageValue + fmt::Debug + Clone> fmt::Debug for Proofnode<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Proofnode::*; 
         match *self {
@@ -86,7 +83,7 @@ impl<V: StorageValue + fmt::Debug> fmt::Debug for Proofnode<V> {
             Left(ref left_proof, ref right_hash) => {
                 let hash_repr: String; 
                 if let Some(ref digest) = *right_hash {
-                    hash_repr = bytes_to_hex(digest); 
+                    hash_repr = bytes_to_hex(&digest.0); 
                 } else {
                     hash_repr = "None".to_string(); 
                 }
@@ -94,11 +91,7 @@ impl<V: StorageValue + fmt::Debug> fmt::Debug for Proofnode<V> {
             } 
             Right(ref left_hash, ref right) => {
                 let hash_repr: String; 
-                if let Some(ref digest) = *left_hash {
-                    hash_repr = bytes_to_hex(digest); 
-                } else {
-                    hash_repr = "None".to_string(); 
-                }
+                hash_repr = bytes_to_hex(&left_hash.0); 
                 write!(f, "{{ left_hash: {:#?}, right: {:#?} }}", hash_repr, right)
             }
             Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
@@ -136,7 +129,7 @@ pub struct MerkleTable<T: Map<[u8], Vec<u8>>, K, V> {
 impl<'a, T, K, V> MerkleTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
           K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue
+          V: StorageValue + Clone
 {
     pub fn new(map: T) -> Self {
         MerkleTable {
@@ -168,7 +161,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
                                -> Result<Proofnode<V>, Error> {
 
         if node_height == K::one() {
-            Ok(Proofnode::Leaf(self.get(node_index)?.unwrap()))
+            Ok(Proofnode::Leaf(Base64Field(self.get(node_index)?.unwrap())))
         } else if node_height > K::one() {
             let subtree_hight = node_height - K::one();
             let left_child_index = node_index * (K::one() + K::one());
@@ -190,13 +183,13 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
                     let left_proof =
                         self.construct_proof_subtree(subtree_hight, left_child_index, l_s, l_e)?;
                     let right_hash = self.get_hash(subtree_hight, righ_child_index)?;
-                    Ok(Proofnode::Left(Box::new(left_proof), right_hash))
+                    Ok(Proofnode::Left(Box::new(left_proof), right_hash.map(Base64Field)))
                 } 
                 (None, Some((r_s, r_e))) => {
-                    let left_hash = self.get_hash(subtree_hight, left_child_index)?;
+                    let left_hash = self.get_hash(subtree_hight, left_child_index)?.unwrap();
                     let right_proof =
                         self.construct_proof_subtree(subtree_hight, righ_child_index, r_s, r_e)?;
-                    Ok(Proofnode::Right(left_hash, Box::new(right_proof)))
+                    Ok(Proofnode::Right(Base64Field(left_hash), Box::new(right_proof)))
                 } 
                 (None, None) => {
                     unreachable!();
@@ -321,7 +314,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
           K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue
+          V: StorageValue + Clone
 {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
@@ -389,6 +382,7 @@ mod tests {
 
     use ::crypto::{Hash, hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
+    use serde_json; 
     use super::{split_range, index_of_first_element_in_subtree, proof_indices_values, Proofnode};
 
     #[test]
@@ -492,11 +486,19 @@ mod tests {
             let range_proof = table.construct_path_for_range(proof_ind, proof_ind + 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(), 1);
+
+            let json_repre = serde_json::to_string(&range_proof).unwrap(); 
+            println!("{}", json_repre);
+            let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+            assert_eq!(proof_indices_values(&deserialized_proof).len(), 1); 
+            assert_eq!(deserialized_proof.compute_proof_root(), exp_root);
+
             let range_proof = table.construct_path_for_range(0, proof_ind + 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(),
                        (proof_ind + 1) as usize);
         }
+
         let range_proof = table.construct_path_for_range(0, 8).unwrap();
         let (inds, val_refs): (Vec<_>, Vec<_>) =
             proof_indices_values(&range_proof).into_iter().unzip();
@@ -576,7 +578,7 @@ mod tests {
 
         assert_eq!(vec![4], *(proof_indices_values(&range_proof)[0].1));
         if let Proofnode::Right(left_hash1, right_proof1) = range_proof {
-            assert_eq!(left_hash1.unwrap(), h1234);
+            assert_eq!(*left_hash1, h1234);
             let unboxed_proof = *right_proof1;
             if let Proofnode::Left(left_proof2, right_hash2) = unboxed_proof {
                 assert!(right_hash2.is_none());
@@ -595,7 +597,8 @@ mod tests {
         }
         table.append(vec![5]).unwrap(); 
         let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
-        println!("{:?}", range_proof);
+        // println!("{}", serde_json::to_string(&range_proof).unwrap()); 
+        // println!("{:?}", range_proof);
     }
 
     #[test]

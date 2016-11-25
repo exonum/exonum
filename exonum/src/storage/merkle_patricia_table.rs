@@ -2,11 +2,11 @@ use std::mem;
 use std::cmp::{min, PartialEq};
 use std::marker::PhantomData;
 use std::fmt;
-use std::ops::Not;
+use std::ops::Not; 
 
 use ::crypto::{hash, Hash, HASH_SIZE};
 
-use super::{Map, Error, StorageValue};
+use super::{Map, Error, StorageValue, Base64Field};
 
 const BRANCH_KEY_PREFIX: u8 = 00;
 const LEAF_KEY_PREFIX: u8 = 01;
@@ -322,17 +322,18 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
-pub enum ProofPathToKey<V> {
-    LeafRootInclusive(Vec<u8>, V),                      // to match a leaf root with found key; (root_db_key= searched_db_key, value)
-    LeafRootExclusive(Vec<u8>, Hash),                   // to prove exclusion for a leaf root when root_db_key != searched db_key
+#[derive(Serialize, Deserialize)]
+pub enum ProofPathToKey<V: StorageValue + Clone> {
+    LeafRootInclusive(Base64Field<Vec<u8>>, Base64Field<V>),                      // to match a leaf root with found key; (root_db_key= searched_db_key, value)
+    LeafRootExclusive(Base64Field<Vec<u8>>, Base64Field<Hash>),                   // to prove exclusion for a leaf root when root_db_key != searched db_key
 
     // left_hash, right_hash, left_slice_db_key, right_slice_db_key
-    BranchKeyNotFound(Hash, Hash, Vec<u8>, Vec<u8>),    // to prove exclusion for a branch with both child_key(s) != prefix(searched_key)
+    BranchKeyNotFound(Base64Field<Hash>, Base64Field<Hash>, Base64Field<Vec<u8>>, Base64Field<Vec<u8>>),    // to prove exclusion for a branch with both child_key(s) != prefix(searched_key)
     // proof, right_slice_hash, left_slice_db_key, right_slice_db_key
-    LeftBranch(Box<ProofPathToKey<V>>, Hash, Vec<u8>, Vec<u8>),
+    LeftBranch(Box<ProofPathToKey<V>>, Base64Field<Hash>, Base64Field<Vec<u8>>, Base64Field<Vec<u8>>),
     // left_slice_hash, proof, left_slice_db_key, right_slice_db_key
-    RightBranch(Hash, Box<ProofPathToKey<V>>, Vec<u8>, Vec<u8>),
-    Leaf(V),                                             // to prove inclusion of a value under searched_key below root level
+    RightBranch(Base64Field<Hash>, Box<ProofPathToKey<V>>, Base64Field<Vec<u8>>, Base64Field<Vec<u8>>),
+    Leaf(Base64Field<V>),                                            // to prove inclusion of a value under searched_key below root level
 }
 
 /// Returnes Ok(Some(Value)), if the proof proves inclusion of the Value in the `MerklePatriciaTable` for `the searched_key`
@@ -340,11 +341,12 @@ pub enum ProofPathToKey<V> {
 /// Err(Error): if it's inconsistent a) with `root_hash` (its hash doesn't match the `root_hash`)  check
 ///                                 b) its structure is inconsistent with `searched_key`
 ///                                 c) its structure is inconsistent with itself (invalid enum variants are met or inconsistent parent and child bitslices)
-pub fn verify_proof_consistency<V: fmt::Debug + StorageValue, A: AsRef<[u8]>>
+pub fn verify_proof_consistency<V: StorageValue + Clone, A: AsRef<[u8]>>
     (proof: &ProofPathToKey<V>,
      searched_key: A,
      root_hash: Hash)
-     -> Result<Option<&V>, Error> {
+     -> Result<Option<&V>, Error> 
+{
     let searched_key = searched_key.as_ref();
     debug_assert_eq!(searched_key.len(), KEY_SIZE);
     let searched_slice = BitSlice::from_bytes(searched_key);
@@ -361,11 +363,12 @@ pub fn verify_proof_consistency<V: fmt::Debug + StorageValue, A: AsRef<[u8]>>
     }
 }
 
-impl<V: fmt::Debug + StorageValue> ProofPathToKey<V> {
+impl<V: StorageValue + Clone> ProofPathToKey<V> {
     fn verify_proof_consistency<'a, 'c>(&'a self,
                                         parent_slice: Option<BitSlice<'c>>,
                                         searched_slice: &BitSlice<'c>)
-                                        -> Result<Option<&'a V>, Error> {
+                                        -> Result<Option<&'a V>, Error> 
+    {
         use self::ProofPathToKey::*;
         if let Some(p_slice) = parent_slice {
             // if we inspect sub-proofs of a proof
@@ -569,7 +572,7 @@ fn empty_tree_hash() -> Hash {
         Hash::from_slice(&EMPTY_HASH_BASE).unwrap()
 }
 // TODO avoid reallocations where is possible.
-impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaTable<T, K, V> {
+impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePatriciaTable<T, K, V> {
     pub fn new(map: T) -> Self {
         MerklePatriciaTable {
             map: map,
@@ -818,9 +821,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         match self.root_node()? {
             Some((root_db_key, Node::Leaf(root_value))) => {
                 if searched_slice.to_db_key() == root_db_key {
-                    Ok(Some(ProofPathToKey::LeafRootInclusive(root_db_key, root_value)))
+                    Ok(Some(ProofPathToKey::LeafRootInclusive(Base64Field(root_db_key), Base64Field(root_value))))
                 } else {
-                    Ok(Some(ProofPathToKey::LeafRootExclusive(root_db_key, root_value.hash())))
+                    Ok(Some(ProofPathToKey::LeafRootExclusive(Base64Field(root_db_key), Base64Field(root_value.hash()))))
                 }
             } 
             Some((root_db_key, Node::Branch(branch))) => {
@@ -840,24 +843,24 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                         match child_proof_pos {
                             ChildKind::Left => {
                                 Ok(Some(ProofPathToKey::LeftBranch(Box::new(child_proof),
-                                                                   neighbour_child_hash,
-                                                                   l_s_db_key,
-                                                                   r_s_db_key)))
+                                                                   Base64Field(neighbour_child_hash),
+                                                                   Base64Field(l_s_db_key),
+                                                                   Base64Field(r_s_db_key))))
                             } 
                             ChildKind::Right => {
-                                Ok(Some(ProofPathToKey::RightBranch(neighbour_child_hash,
+                                Ok(Some(ProofPathToKey::RightBranch(Base64Field(neighbour_child_hash),
                                                                     Box::new(child_proof),
-                                                                    l_s_db_key,
-                                                                    r_s_db_key)))
+                                                                    Base64Field(l_s_db_key),
+                                                                    Base64Field(r_s_db_key))))
                             }
                         }
                     } else {
                         let l_h = *branch.child_hash(ChildKind::Left); //copy
                         let r_h = *branch.child_hash(ChildKind::Right);//copy
-                        Ok(Some(ProofPathToKey::BranchKeyNotFound(l_h,
-                                                                  r_h,
-                                                                  l_s_db_key,
-                                                                  r_s_db_key)))
+                        Ok(Some(ProofPathToKey::BranchKeyNotFound(Base64Field(l_h),
+                                                                  Base64Field(r_h),
+                                                                  Base64Field(l_s_db_key),
+                                                                  Base64Field(r_s_db_key))))
                         // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                     }
                 } else {
@@ -865,7 +868,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                     let l_h = *branch.child_hash(ChildKind::Left); //copy
                     let r_h = *branch.child_hash(ChildKind::Right);//copy
 
-                    Ok(Some(ProofPathToKey::BranchKeyNotFound(l_h, r_h, l_s_db_key, r_s_db_key)))
+                    Ok(Some(ProofPathToKey::BranchKeyNotFound(Base64Field(l_h), Base64Field(r_h), Base64Field(l_s_db_key), Base64Field(r_s_db_key))))
                     // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
             } 
@@ -884,7 +887,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         debug_assert!(c_pr_l > 0);
         if c_pr_l == child_slice.len() {
             match self.read_node(child_slice.to_db_key())? {
-                Node::Leaf(child_value) => Ok(Some(ProofPathToKey::Leaf(child_value))), 
+                Node::Leaf(child_value) => Ok(Some(ProofPathToKey::Leaf(Base64Field(child_value)))), 
                 Node::Branch(child_branch) => {
                     let l_s_db_key = child_branch.child_slice(ChildKind::Left).to_db_key();
                     let r_s_db_key = child_branch.child_slice(ChildKind::Right).to_db_key();
@@ -898,24 +901,24 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                         match child_proof_pos {
                             ChildKind::Left => {
                                 Ok(Some(ProofPathToKey::LeftBranch(Box::new(child_proof),
-                                                                   neighbour_child_hash,
-                                                                   l_s_db_key,
-                                                                   r_s_db_key)))
+                                                                   Base64Field(neighbour_child_hash),
+                                                                   Base64Field(l_s_db_key),
+                                                                   Base64Field(r_s_db_key))))
                             }
                             ChildKind::Right => {
-                                Ok(Some(ProofPathToKey::RightBranch(neighbour_child_hash,
+                                Ok(Some(ProofPathToKey::RightBranch(Base64Field(neighbour_child_hash),
                                                                     Box::new(child_proof),
-                                                                    l_s_db_key,
-                                                                    r_s_db_key)))
+                                                                    Base64Field(l_s_db_key),
+                                                                    Base64Field(r_s_db_key))))
                             } 
                         }
                     } else {
                         let l_h = *child_branch.child_hash(ChildKind::Left); //copy
                         let r_h = *child_branch.child_hash(ChildKind::Right);//copy
-                        Ok(Some(ProofPathToKey::BranchKeyNotFound(l_h,
-                                                                  r_h,
-                                                                  l_s_db_key,
-                                                                  r_s_db_key)))
+                        Ok(Some(ProofPathToKey::BranchKeyNotFound(Base64Field(l_h),
+                                                                  Base64Field(r_h),
+                                                                  Base64Field(l_s_db_key),
+                                                                  Base64Field(r_s_db_key))))
                         // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                     }
 
@@ -991,7 +994,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
           K: AsRef<[u8]>,
-          V: StorageValue
+          V: StorageValue + Clone
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
         let db_key = BitSlice::from_bytes(key.as_ref()).to_db_key();
@@ -1059,7 +1062,7 @@ impl fmt::Debug for BranchNode {
     }
 }
 
-impl<V: fmt::Debug> fmt::Debug for ProofPathToKey<V> {
+impl<V: StorageValue + Clone> fmt::Debug for ProofPathToKey<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::ProofPathToKey::*;
         match *self {
@@ -1067,25 +1070,25 @@ impl<V: fmt::Debug> fmt::Debug for ProofPathToKey<V> {
                 write!(f,
                        "{{ left: {:?}, right: {:?}, left_slice: {:?},  right_slice: {:?} }}",
                        proof,
-                       bytes_to_hex(hash),
+                       bytes_to_hex(&hash.0),
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             } 
             RightBranch(ref hash, ref proof, ref left_slice_key, ref right_slice_key) => {
                 write!(f,
                        "{{ left: {:?}, right: {:?}, left_slice: {:?},  right_slice: {:?} }}",
-                       bytes_to_hex(hash),
+                       bytes_to_hex(&hash.0),
                        proof,
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             } 
-            Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
+            Leaf(ref val) => write!(f, "{{ val: {:?} }}", bytes_to_hex(&val.0.clone().serialize())), 
             BranchKeyNotFound(ref l_hash, ref r_hash, ref left_slice_key, ref right_slice_key) => {
                 write!(f,
                        "{{left: {:?}, right: {:?}, left_slice: {:?},  \
                         right_slice: {:?} }}",
-                       bytes_to_hex(l_hash),
-                       bytes_to_hex(r_hash),
+                       bytes_to_hex(&l_hash.0),
+                       bytes_to_hex(&r_hash.0),
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             }
@@ -1093,13 +1096,13 @@ impl<V: fmt::Debug> fmt::Debug for ProofPathToKey<V> {
                 write!(f,
                        "{{ slice: {:?}, val: {:?} }}",
                        BitSlice::from_db_key(db_key),
-                       val)
+                       bytes_to_hex(&val.0.clone().serialize()))
             } 
             LeafRootExclusive(ref db_key, ref val_hash) => {
                 write!(f,
                        "{{ slice: {:?}, val_hash: {:?} }}",
                        BitSlice::from_db_key(db_key),
-                       bytes_to_hex(val_hash))
+                       bytes_to_hex(&val_hash.0))
             }
         }
     }
@@ -1130,6 +1133,7 @@ mod tests {
 
     use ::crypto::{hash, Hash};
     use ::storage::{Map, MemoryDB, MapTable};
+    use serde_json;
 
     use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX, ProofPathToKey, verify_proof_consistency, empty_tree_hash};
     use super::ChildKind::{Left, Right};
@@ -1656,8 +1660,8 @@ mod tests {
 
         match proof_path {
             ProofPathToKey::LeafRootExclusive(key, hash_val) => {
-                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
-                assert_eq!(hash_val, hash(&root_val));
+                assert_eq!(*key, BitSlice::from_bytes(&root_key).to_db_key());
+                assert_eq!(*hash_val, hash(&root_val));
             }
             _ => assert!(false),
         }
@@ -1671,8 +1675,8 @@ mod tests {
         
         match proof_path {
             ProofPathToKey::LeafRootInclusive(key, val) => {
-                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
-                assert_eq!(val, root_val);
+                assert_eq!(*key, BitSlice::from_bytes(&root_key).to_db_key());
+                assert_eq!(*val, root_val);
             }
             _ => assert!(false),
         }
@@ -1742,7 +1746,15 @@ mod tests {
             assert!(check_res.is_ok());
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert_eq!(*proved_value.unwrap(), item.1);
-            println!("Proofpath {:?}", proof_path_to_key);
+
+            let json_repre = serde_json::to_string(&proof_path_to_key).unwrap(); 
+            println!("{}", json_repre);
+            let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+            let check_res = verify_proof_consistency(&deserialized_proof, &item.0, table_root_hash);
+            assert!(check_res.is_ok());
+            let proved_value: Option<&Vec<u8>> = check_res.unwrap();
+            assert_eq!(*proved_value.unwrap(), item.1);
+            // println!("Proofpath {:?}", proof_path_to_key);
         }
     }
 
@@ -1776,7 +1788,15 @@ mod tests {
             assert!(check_res.is_ok());
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert!(proved_value.is_none());
-            println!("Proofpath {:?}", proof_path_to_key);
+
+            let json_repre = serde_json::to_string(&proof_path_to_key).unwrap(); 
+            println!("{}", json_repre);
+            let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+            let check_res = verify_proof_consistency(&deserialized_proof, key, table_root_hash);
+            assert!(check_res.is_ok());
+            let proved_value: Option<&Vec<u8>> = check_res.unwrap();
+            assert!(proved_value.is_none());
+            // println!("Proofpath {:?}", proof_path_to_key);
         }
     }
 
