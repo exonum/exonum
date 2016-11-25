@@ -1,0 +1,3 @@
+# Run blog backup each Wednesday at midnight
+
+0 0 * * 3 * /var/www/exonum.com/blog/backup.sh >> /etc/db-backups/blog/backup.log
