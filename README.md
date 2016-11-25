@@ -245,6 +245,8 @@ npm start --production
 
 Эта и другие настройки хранятся в файле `config.js` в корне.
 
+Бэкапы базы хранятся в `/etc/db-backups/blog/`.
+
 # Land Registry Demo
 
 Устанавливаем следующие зависимости:
