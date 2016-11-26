@@ -182,7 +182,7 @@
 }
 @media (min-width: 768px) {
     .piano-tab {
-        height: 340px;
+        height: 320px;
     }
 }
 @media (min-width: 992px) {
@@ -192,7 +192,7 @@
 }
 @media (min-width: 1200px) {
     .piano-tab {
-        height: 272px;
+        height: 320px;
     }
 }
 .piano-muted {
@@ -282,6 +282,9 @@
 }
 blockquote {
     border-left: 5px solid #eee;
+}
+.text-uppercase {
+    letter-spacing: 0.05em;
 }
 
 /* Footer */
