@@ -2,7 +2,7 @@ use std::mem;
 use std::cmp::{min, PartialEq};
 use std::marker::PhantomData;
 use std::fmt;
-use std::ops::Not; 
+use std::ops::Not;
 
 use ::crypto::{hash, Hash, HASH_SIZE};
 
@@ -14,7 +14,7 @@ const LEAF_KEY_PREFIX: u8 = 01;
 const KEY_SIZE: usize = HASH_SIZE;
 const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
-const EMPTY_HASH_BASE: [u8; HASH_SIZE] = [0; HASH_SIZE]; 
+const EMPTY_HASH_BASE: [u8; HASH_SIZE] = [0; HASH_SIZE];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ChildKind {
@@ -202,18 +202,18 @@ impl BranchNode {
     }
 
     fn hash(&self) -> Hash {
-        hash(self.raw.as_slice()) 
+        hash(self.raw.as_slice())
         // which is effectively the same as written below
-            // === hash(&[self.child_hash(ChildKind::Left).as_ref(),
-            // self.child_hash(ChildKind::Right).as_ref(),
-            // &self.child_slice(ChildKind::Left).to_db_key(),
-            // &self.child_slice(ChildKind::Right).to_db_key()]
-            // .concat())
+        // === hash(&[self.child_hash(ChildKind::Left).as_ref(),
+        // self.child_hash(ChildKind::Right).as_ref(),
+        // &self.child_slice(ChildKind::Left).to_db_key(),
+        // &self.child_slice(ChildKind::Right).to_db_key()]
+        // .concat())
 
-        // removed for now for proofs' construction testing purposes: 
-            // hash(&[self.child_hash(ChildKind::Left).as_ref(),
-            //        self.child_hash(ChildKind::Right).as_ref()]
-            //     .concat())
+        // as it used to be: 
+        // hash(&[self.child_hash(ChildKind::Left).as_ref(),
+        //        self.child_hash(ChildKind::Right).as_ref()]
+        //     .concat())
     }
 
     fn child_hash(&self, kind: ChildKind) -> &Hash {
@@ -324,202 +324,207 @@ enum RemoveResult {
 
 #[derive(Serialize, Deserialize)]
 pub enum ProofPathToKey<V: StorageValue + Clone> {
-    LeafRootInclusive(Base64Field<Vec<u8>>, Base64Field<V>),                      // to match a leaf root with found key; (root_db_key= searched_db_key, value)
-    LeafRootExclusive(Base64Field<Vec<u8>>, Base64Field<Hash>),                   // to prove exclusion for a leaf root when root_db_key != searched db_key
+    LeafRootInclusive(Base64Field<Vec<u8>>, Base64Field<V>), /* to match a leaf root with found key; (root_db_key= searched_db_key, value) */
+    LeafRootExclusive(Base64Field<Vec<u8>>, Base64Field<Hash>), /* to prove exclusion for a leaf root when root_db_key != searched db_key */
 
     // left_hash, right_hash, left_slice_db_key, right_slice_db_key
-    BranchKeyNotFound(Base64Field<Hash>, Base64Field<Hash>, Base64Field<Vec<u8>>, Base64Field<Vec<u8>>),    // to prove exclusion for a branch with both child_key(s) != prefix(searched_key)
+    BranchKeyNotFound(Base64Field<Hash>,
+                      Base64Field<Hash>,
+                      Base64Field<Vec<u8>>,
+                      Base64Field<Vec<u8>>), /* to prove exclusion for a branch with both child_key(s) != prefix(searched_key) */
     // proof, right_slice_hash, left_slice_db_key, right_slice_db_key
-    LeftBranch(Box<ProofPathToKey<V>>, Base64Field<Hash>, Base64Field<Vec<u8>>, Base64Field<Vec<u8>>),
+    LeftBranch(Box<ProofPathToKey<V>>,
+               Base64Field<Hash>,
+               Base64Field<Vec<u8>>,
+               Base64Field<Vec<u8>>),
     // left_slice_hash, proof, left_slice_db_key, right_slice_db_key
-    RightBranch(Base64Field<Hash>, Box<ProofPathToKey<V>>, Base64Field<Vec<u8>>, Base64Field<Vec<u8>>),
-    Leaf(Base64Field<V>),                                            // to prove inclusion of a value under searched_key below root level
+    RightBranch(Base64Field<Hash>,
+                Box<ProofPathToKey<V>>,
+                Base64Field<Vec<u8>>,
+                Base64Field<Vec<u8>>),
+    Leaf(Base64Field<V>), // to prove inclusion of a value under searched_key below root level
 }
 
 /// Returnes Ok(Some(Value)), if the proof proves inclusion of the Value in the `MerklePatriciaTable` for `the searched_key`
 /// Ok(None): if it proves that the `searched_key` is excluded from the `MerklePatriciaTable`
-/// Err(Error): if it's inconsistent a) with `root_hash` (its hash doesn't match the `root_hash`)  check
+/// Err(Error): if it's inconsistent a) with `root_hash` (its hash doesn't match the `root_hash`)  
 ///                                 b) its structure is inconsistent with `searched_key`
 ///                                 c) its structure is inconsistent with itself (invalid enum variants are met or inconsistent parent and child bitslices)
 pub fn verify_proof_consistency<V: StorageValue + Clone, A: AsRef<[u8]>>
     (proof: &ProofPathToKey<V>,
      searched_key: A,
      root_hash: Hash)
-     -> Result<Option<&V>, Error> 
-{
+     -> Result<Option<&V>, Error> {
     let searched_key = searched_key.as_ref();
     debug_assert_eq!(searched_key.len(), KEY_SIZE);
     let searched_slice = BitSlice::from_bytes(searched_key);
-    let result = proof.verify_proof_consistency(None, &searched_slice)?;
+    let result = proof.verify_root_proof_consistency(&searched_slice)?;
 
     let proof_hash = proof.compute_proof_root();
     if proof_hash != root_hash {
-        Err(Error::new(format!("The proof doesn't match the expected hash! Expected: \
+        return Err(Error::new(format!("The proof doesn't match the expected hash! Expected: \
                                        {:?} , from proof: {:?}",
                                       root_hash,
-                                      proof_hash)))
-    } else {
-        Ok(result)
+                                      proof_hash)));
     }
+    Ok(result)
+
 }
 
 impl<V: StorageValue + Clone> ProofPathToKey<V> {
-    fn verify_proof_consistency<'a, 'c>(&'a self,
-                                        parent_slice: Option<BitSlice<'c>>,
-                                        searched_slice: &BitSlice<'c>)
-                                        -> Result<Option<&'a V>, Error> 
-    {
+    fn verify_root_proof_consistency(&self,
+                                     searched_slice: &BitSlice)
+                                     -> Result<Option<&V>, Error> {
         use self::ProofPathToKey::*;
-        if let Some(p_slice) = parent_slice {
-            // if we inspect sub-proofs of a proof
-            match *self {
-                LeafRootInclusive(_, _) => {
-                    Err(Error::new(format!("Invalid proof: LeafRootInclusive enum variant found \
-                                            not at top level. Proof: {:?}",
-                                           self)))
-                } 
-                LeafRootExclusive(_, _) => {
-                    Err(Error::new(format!("Invalid proof: LeafRootExclusive enum variant found \
-                                            not at top level. Proof: {:?}",
-                                           self)))
-                } 
-                Leaf(ref val) => {
-                    if (*searched_slice) == (p_slice) {
-                        Ok(Some(val))
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with searched_key: {:?}. \
-                                                Parent slice: {:?} ",
-                                               searched_slice,
-                                               p_slice)))
-                    }
-                } 
-                LeftBranch(ref proof, _, ref left_slice_key, ref right_slice_key) => {
-                    let left_slice = BitSlice::from_db_key(left_slice_key);
-                    let right_slice = BitSlice::from_db_key(right_slice_key);
-                    if left_slice.starts_with(&p_slice) && right_slice.starts_with(&p_slice) {
-                        if searched_slice.starts_with(&left_slice) {
-                            proof.verify_proof_consistency(Some(left_slice), searched_slice)
-                        } else {
-                            Err(Error::new(format!("Proof is inconsistent with searched_key: \
-                                                    {:?}. Proof: {:?}",
-                                                   searched_slice,
-                                                   self)))
-                        }
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with itself: Proof: {:?} \
-                                                . Parent slice: {:?}",
-                                               self,
-                                               p_slice)))
-                    }
-                } 
-                RightBranch(_, ref proof, ref left_slice_key, ref right_slice_key) => {
-                    let left_slice = BitSlice::from_db_key(left_slice_key);
-                    let right_slice = BitSlice::from_db_key(right_slice_key);
-                    if left_slice.starts_with(&p_slice) && right_slice.starts_with(&p_slice) {
-                        if searched_slice.starts_with(&right_slice) {
-                            proof.verify_proof_consistency(Some(right_slice), searched_slice)
-                        } else {
-                            Err(Error::new(format!("Proof is inconsistent with searched_key: \
-                                                    {:?}. Proof: {:?}",
-                                                   searched_slice,
-                                                   self)))
-                        }
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with itself: Proof: {:?} \
-                                                . Parent slice: {:?}",
-                                               self,
-                                               p_slice)))
-                    }
-                } 
-                BranchKeyNotFound(_, _, ref left_slice_key, ref right_slice_key) => {
-                    let left_slice = BitSlice::from_db_key(left_slice_key);
-                    let right_slice = BitSlice::from_db_key(right_slice_key);
-                    if left_slice.starts_with(&p_slice) && right_slice.starts_with(&p_slice) {
-                        if (!searched_slice.starts_with(&left_slice)) &&
-                           (!searched_slice.starts_with(&right_slice)) {
-                            Ok(None)
-                        } else {
-                            Err(Error::new(format!("Proof is inconsistent with searched_key: \
-                                                    {:?}. Proof: {:?}",
-                                                   searched_slice,
-                                                   self)))
-                        }
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with itself: Proof: {:?} \
-                                                . Parent slice: {:?}",
-                                               self,
-                                               p_slice)))
-                    }
-                } 
-            }
-        } else {
-            // if we inspect the topmost level of a proof
-            match *self {
-                LeafRootInclusive(ref root_db_key, ref root_val) => {
-                    let root_slice = BitSlice::from_db_key(root_db_key);
-                    if root_slice == *searched_slice {
-                        Ok(Some(root_val))
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with searched_key: {:?}. \
-                                                Proof: {:?}. ",
-                                               searched_slice,
-                                               self)))
-                    }
-                } 
-                LeafRootExclusive(ref root_db_key, _) => {
-                    let root_slice = BitSlice::from_db_key(root_db_key);
-                    if root_slice != *searched_slice {
-                        Ok(None)
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with searched_key: {:?}. \
-                                                Proof: {:?} ",
-                                               searched_slice,
-                                               self)))
-                    }
-                } 
-                Leaf(_) => {
-                    Err(Error::new(format!("Invalid proof: Leaf enum variant found at top \
-                                            level. Proof: {:?}",
-                                           self)))
-                } 
-                LeftBranch(ref proof, _, ref left_slice_key, _) => {
-                    let left_slice = BitSlice::from_db_key(left_slice_key);
-                    if searched_slice.starts_with(&left_slice) {
-                        proof.verify_proof_consistency(Some(left_slice), searched_slice)
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with searched_key: {:?}. \
-                                                Proof: {:?}",
-                                               searched_slice,
-                                               self)))
-                    }
-                } 
-                RightBranch(_, ref proof, _, ref right_slice_key) => {
-                    let right_slice = BitSlice::from_db_key(right_slice_key);
-                    if searched_slice.starts_with(&right_slice) {
-                        proof.verify_proof_consistency(Some(right_slice), searched_slice)
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with searched_key: {:?}. \
-                                                Proof: {:?}",
-                                               searched_slice,
-                                               self)))
-                    }
-                } 
-                BranchKeyNotFound(_, _, ref left_slice_key, ref right_slice_key) => {
-                    let left_slice = BitSlice::from_db_key(left_slice_key);
-                    let right_slice = BitSlice::from_db_key(right_slice_key);
-                    if (!searched_slice.starts_with(&left_slice)) &&
-                       (!searched_slice.starts_with(&right_slice)) {
-                        Ok(None)
-                    } else {
-                        Err(Error::new(format!("Proof is inconsistent with searched_key: {:?}. \
-                                                Proof: {:?}",
-                                               searched_slice,
-                                               self)))
-                    }
-                } 
-            }
 
-        }
+        // if we inspect the topmost level of a proof
+        let res: Option<&V> = match *self {
+            LeafRootInclusive(ref root_db_key, ref root_val) => {
+                let root_slice = BitSlice::from_db_key(root_db_key);
+                if root_slice != *searched_slice {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Proof: {:?}. ",
+                                                  searched_slice,
+                                                  self)));
+                }
+                Some(root_val)
+            } 
+            LeafRootExclusive(ref root_db_key, _) => {
+                let root_slice = BitSlice::from_db_key(root_db_key);
+                if root_slice == *searched_slice {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Proof: {:?} ",
+                                                  searched_slice,
+                                                  self)));
+                }
+                None
+            } 
+            Leaf(_) => {
+                return Err(Error::new(format!("Invalid proof: Leaf enum variant found at top \
+                                               level. Proof: {:?}",
+                                              self)))
+            } 
+
+            LeftBranch(ref proof, _, ref left_slice_key, _) => {
+                let left_slice = BitSlice::from_db_key(left_slice_key);
+                if !searched_slice.starts_with(&left_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Proof: {:?}",
+                                                  searched_slice,
+                                                  self)));
+                }
+                proof.verify_proof_consistency(left_slice, searched_slice)?
+            } 
+            RightBranch(_, ref proof, _, ref right_slice_key) => {
+                let right_slice = BitSlice::from_db_key(right_slice_key);
+                if !searched_slice.starts_with(&right_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Proof: {:?}",
+                                                  searched_slice,
+                                                  self)));
+                }
+                proof.verify_proof_consistency(right_slice, searched_slice)?
+            } 
+            BranchKeyNotFound(_, _, ref left_slice_key, ref right_slice_key) => {
+                let left_slice = BitSlice::from_db_key(left_slice_key);
+                let right_slice = BitSlice::from_db_key(right_slice_key);
+                if searched_slice.starts_with(&left_slice) ||
+                   searched_slice.starts_with(&right_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Proof: {:?}",
+                                                  searched_slice,
+                                                  self)));
+                }
+                None
+            } 
+        };
+        Ok(res)
+    }
+
+    fn verify_proof_consistency<'a, 'c>(&'a self,
+                                        parent_slice: BitSlice<'c>,
+                                        searched_slice: &BitSlice<'c>)
+                                        -> Result<Option<&'a V>, Error> {
+        use self::ProofPathToKey::*;
+
+        // if we inspect sub-proofs of a proof
+        let res: Option<&V> = match *self {
+            LeafRootInclusive(_, _) => {
+                return Err(Error::new(format!("Invalid proof: LeafRootInclusive enum variant \
+                                               found not at top level. Proof: {:?}",
+                                              self)))
+            } 
+            LeafRootExclusive(_, _) => {
+                return Err(Error::new(format!("Invalid proof: LeafRootExclusive enum variant \
+                                               found not at top level. Proof: {:?}",
+                                              self)))
+            } 
+            Leaf(ref val) => {
+                if (*searched_slice) != parent_slice {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Parent slice: {:?} ",
+                                                  searched_slice,
+                                                  parent_slice)));
+                }
+                Some(val)
+            } 
+            LeftBranch(ref proof, _, ref left_slice_key, ref right_slice_key) => {
+                let left_slice = BitSlice::from_db_key(left_slice_key);
+                let right_slice = BitSlice::from_db_key(right_slice_key);
+                if !left_slice.starts_with(&parent_slice) ||
+                   !right_slice.starts_with(&parent_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
+                                                   {:?} . Parent slice: {:?}",
+                                                  self,
+                                                  parent_slice)));
+                }
+                if !searched_slice.starts_with(&left_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Proof: {:?}",
+                                                  searched_slice,
+                                                  self)));
+                }
+                proof.verify_proof_consistency(left_slice, searched_slice)?
+            } 
+            RightBranch(_, ref proof, ref left_slice_key, ref right_slice_key) => {
+                let left_slice = BitSlice::from_db_key(left_slice_key);
+                let right_slice = BitSlice::from_db_key(right_slice_key);
+                if !left_slice.starts_with(&parent_slice) ||
+                   !right_slice.starts_with(&parent_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
+                                                   {:?} . Parent slice: {:?}",
+                                                  self,
+                                                  parent_slice)));
+                }
+                if !searched_slice.starts_with(&right_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Proof: {:?}",
+                                                  searched_slice,
+                                                  self)));
+                }
+                proof.verify_proof_consistency(right_slice, searched_slice)?
+            } 
+            BranchKeyNotFound(_, _, ref left_slice_key, ref right_slice_key) => {
+                let left_slice = BitSlice::from_db_key(left_slice_key);
+                let right_slice = BitSlice::from_db_key(right_slice_key);
+                if !left_slice.starts_with(&parent_slice) ||
+                   !right_slice.starts_with(&parent_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
+                                                   {:?} . Parent slice: {:?}",
+                                                  self,
+                                                  parent_slice)));
+                }
+                if searched_slice.starts_with(&left_slice) ||
+                   searched_slice.starts_with(&right_slice) {
+                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                                                   {:?}. Proof: {:?}",
+                                                  searched_slice,
+                                                  self)));
+                }
+                None
+            } 
+        };
+        Ok(res)
     }
 
     fn compute_proof_root(&self) -> Hash {
@@ -559,7 +564,10 @@ impl<V: StorageValue + Clone> ProofPathToKey<V> {
     pub fn compute_height(&self, start_height: u16) -> u16 {
         use self::ProofPathToKey::*;
         match *self { 
-            LeafRootInclusive(_, _) | LeafRootExclusive(_, _) | BranchKeyNotFound(_, _, _, _) | Leaf(_) => start_height, 
+            LeafRootInclusive(_, _) |
+            LeafRootExclusive(_, _) |
+            BranchKeyNotFound(_, _, _, _) |
+            Leaf(_) => start_height, 
 
             LeftBranch(ref l_proof, _, _, _) => l_proof.compute_height(start_height + 1), 
 
@@ -569,10 +577,12 @@ impl<V: StorageValue + Clone> ProofPathToKey<V> {
 }
 
 fn empty_tree_hash() -> Hash {
-        Hash::from_slice(&EMPTY_HASH_BASE).unwrap()
+    Hash::from_slice(&EMPTY_HASH_BASE).unwrap()
 }
 // TODO avoid reallocations where is possible.
-impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePatriciaTable<T, K, V> {
+impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue + Clone> MerklePatriciaTable<T,
+                                                                                             K,
+                                                                                             V> {
     pub fn new(map: T) -> Self {
         MerklePatriciaTable {
             map: map,
@@ -584,12 +594,10 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePat
     pub fn root_hash(&self) -> Result<Hash, Error> {
         match self.root_node()? {
             Some((root_db_key, Node::Leaf(value))) => {
-                Ok(hash(&[root_db_key.as_slice(), Self::hash_leaf(&value).as_ref()].concat()))
+                Ok(hash(&[root_db_key.as_slice(), value.hash().as_ref()].concat()))
             }
             Some((_, Node::Branch(branch))) => Ok(branch.hash()),
-            None => {
-                Ok(empty_tree_hash())
-            }
+            None => Ok(empty_tree_hash()),
         }
     }
 
@@ -620,7 +628,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePat
                     branch.set_child(key_slice.at(i), &key_slice.mid(i), &leaf_hash);
                     branch.set_child(prefix_slice.at(i),
                                      &prefix_slice.mid(i),
-                                     &Self::hash_leaf(&prefix_data));
+                                     &prefix_data.hash());
                     let new_prefix = key_slice.truncate(i);
                     self.insert_branch(&new_prefix, branch)?;
                 }
@@ -715,9 +723,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePat
         }
     }
 
-    fn hash_leaf(value: &V) -> Hash {
-        value.hash()
-    }
+    // fn hash_leaf(value: &V) -> Hash {
+    //     value.hash()
+    // }
 
     fn remove(&self, key_slice: BitSlice) -> Result<(), Error> {
         match self.root_node()? {
@@ -818,12 +826,14 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePat
         debug_assert_eq!(searched_key.len(), KEY_SIZE);
         let searched_slice = BitSlice::from_bytes(searched_key);
 
-        match self.root_node()? {
+        let res: ProofPathToKey<V> = match self.root_node()? {
             Some((root_db_key, Node::Leaf(root_value))) => {
                 if searched_slice.to_db_key() == root_db_key {
-                    Ok(Some(ProofPathToKey::LeafRootInclusive(Base64Field(root_db_key), Base64Field(root_value))))
+                    ProofPathToKey::LeafRootInclusive(Base64Field(root_db_key),
+                                                      Base64Field(root_value))
                 } else {
-                    Ok(Some(ProofPathToKey::LeafRootExclusive(Base64Field(root_db_key), Base64Field(root_value.hash()))))
+                    ProofPathToKey::LeafRootExclusive(Base64Field(root_db_key),
+                                                      Base64Field(root_value.hash()))
                 }
             } 
             Some((root_db_key, Node::Branch(branch))) => {
@@ -842,25 +852,25 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePat
                         let neighbour_child_hash = *branch.child_hash(!child_proof_pos);
                         match child_proof_pos {
                             ChildKind::Left => {
-                                Ok(Some(ProofPathToKey::LeftBranch(Box::new(child_proof),
-                                                                   Base64Field(neighbour_child_hash),
-                                                                   Base64Field(l_s_db_key),
-                                                                   Base64Field(r_s_db_key))))
+                                ProofPathToKey::LeftBranch(Box::new(child_proof),
+                                                           Base64Field(neighbour_child_hash),
+                                                           Base64Field(l_s_db_key),
+                                                           Base64Field(r_s_db_key))
                             } 
                             ChildKind::Right => {
-                                Ok(Some(ProofPathToKey::RightBranch(Base64Field(neighbour_child_hash),
-                                                                    Box::new(child_proof),
-                                                                    Base64Field(l_s_db_key),
-                                                                    Base64Field(r_s_db_key))))
+                                ProofPathToKey::RightBranch(Base64Field(neighbour_child_hash),
+                                                            Box::new(child_proof),
+                                                            Base64Field(l_s_db_key),
+                                                            Base64Field(r_s_db_key))
                             }
                         }
                     } else {
                         let l_h = *branch.child_hash(ChildKind::Left); //copy
                         let r_h = *branch.child_hash(ChildKind::Right);//copy
-                        Ok(Some(ProofPathToKey::BranchKeyNotFound(Base64Field(l_h),
-                                                                  Base64Field(r_h),
-                                                                  Base64Field(l_s_db_key),
-                                                                  Base64Field(r_s_db_key))))
+                        ProofPathToKey::BranchKeyNotFound(Base64Field(l_h),
+                                                          Base64Field(r_h),
+                                                          Base64Field(l_s_db_key),
+                                                          Base64Field(r_s_db_key))
                         // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                     }
                 } else {
@@ -868,12 +878,16 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePat
                     let l_h = *branch.child_hash(ChildKind::Left); //copy
                     let r_h = *branch.child_hash(ChildKind::Right);//copy
 
-                    Ok(Some(ProofPathToKey::BranchKeyNotFound(Base64Field(l_h), Base64Field(r_h), Base64Field(l_s_db_key), Base64Field(r_s_db_key))))
+                    ProofPathToKey::BranchKeyNotFound(Base64Field(l_h),
+                                                      Base64Field(r_h),
+                                                      Base64Field(l_s_db_key),
+                                                      Base64Field(r_s_db_key))
                     // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
             } 
-            None => Ok(None),
-        }
+            None => return Ok(None),
+        };
+        Ok(Some(res))
     }
 
     fn construct_path_to_key_in_branch(&self,
@@ -885,48 +899,48 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePat
         child_slice.from = searched_slice.from;
         let c_pr_l = child_slice.common_prefix(searched_slice);
         debug_assert!(c_pr_l > 0);
-        if c_pr_l == child_slice.len() {
-            match self.read_node(child_slice.to_db_key())? {
-                Node::Leaf(child_value) => Ok(Some(ProofPathToKey::Leaf(Base64Field(child_value)))), 
-                Node::Branch(child_branch) => {
-                    let l_s_db_key = child_branch.child_slice(ChildKind::Left).to_db_key();
-                    let r_s_db_key = child_branch.child_slice(ChildKind::Right).to_db_key();
-                    let suf_searched_slice = searched_slice.mid(c_pr_l);
-                    let proof_from_level_below: Option<ProofPathToKey<V>> =
-                        self.construct_path_to_key_in_branch(&child_branch, &suf_searched_slice)?;
+        if c_pr_l < child_slice.len() {
+            return Ok(None);
+        }
 
-                    if let Some(child_proof) = proof_from_level_below {
-                        let child_proof_pos = suf_searched_slice.at(0);
-                        let neighbour_child_hash = *child_branch.child_hash(!child_proof_pos);
-                        match child_proof_pos {
-                            ChildKind::Left => {
-                                Ok(Some(ProofPathToKey::LeftBranch(Box::new(child_proof),
-                                                                   Base64Field(neighbour_child_hash),
-                                                                   Base64Field(l_s_db_key),
-                                                                   Base64Field(r_s_db_key))))
-                            }
-                            ChildKind::Right => {
-                                Ok(Some(ProofPathToKey::RightBranch(Base64Field(neighbour_child_hash),
-                                                                    Box::new(child_proof),
-                                                                    Base64Field(l_s_db_key),
-                                                                    Base64Field(r_s_db_key))))
-                            } 
+        let res: ProofPathToKey<V> = match self.read_node(child_slice.to_db_key())? {
+            Node::Leaf(child_value) => ProofPathToKey::Leaf(Base64Field(child_value)), 
+            Node::Branch(child_branch) => {
+                let l_s_db_key = child_branch.child_slice(ChildKind::Left).to_db_key();
+                let r_s_db_key = child_branch.child_slice(ChildKind::Right).to_db_key();
+                let suf_searched_slice = searched_slice.mid(c_pr_l);
+                let proof_from_level_below: Option<ProofPathToKey<V>> =
+                    self.construct_path_to_key_in_branch(&child_branch, &suf_searched_slice)?;
+
+                if let Some(child_proof) = proof_from_level_below {
+                    let child_proof_pos = suf_searched_slice.at(0);
+                    let neighbour_child_hash = *child_branch.child_hash(!child_proof_pos);
+                    match child_proof_pos {
+                        ChildKind::Left => {
+                            ProofPathToKey::LeftBranch(Box::new(child_proof),
+                                                       Base64Field(neighbour_child_hash),
+                                                       Base64Field(l_s_db_key),
+                                                       Base64Field(r_s_db_key))
                         }
-                    } else {
-                        let l_h = *child_branch.child_hash(ChildKind::Left); //copy
-                        let r_h = *child_branch.child_hash(ChildKind::Right);//copy
-                        Ok(Some(ProofPathToKey::BranchKeyNotFound(Base64Field(l_h),
-                                                                  Base64Field(r_h),
-                                                                  Base64Field(l_s_db_key),
-                                                                  Base64Field(r_s_db_key))))
-                        // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
+                        ChildKind::Right => {
+                            ProofPathToKey::RightBranch(Base64Field(neighbour_child_hash),
+                                                        Box::new(child_proof),
+                                                        Base64Field(l_s_db_key),
+                                                        Base64Field(r_s_db_key))
+                        } 
                     }
-
+                } else {
+                    let l_h = *child_branch.child_hash(ChildKind::Left); //copy
+                    let r_h = *child_branch.child_hash(ChildKind::Right);//copy
+                    ProofPathToKey::BranchKeyNotFound(Base64Field(l_h),
+                                                      Base64Field(r_h),
+                                                      Base64Field(l_s_db_key),
+                                                      Base64Field(r_s_db_key))
+                    // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                 }
             }
-        } else {
-            Ok(None)
-        }
+        };
+        Ok(Some(res))
     }
 
     fn root_prefix(&self) -> Result<Option<Vec<u8>>, Error> {
@@ -950,7 +964,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue+Clone> MerklePat
     fn insert_leaf(&self, key: &BitSlice, value: V) -> Result<Hash, Error> {
         debug_assert!(key.is_leaf_key());
 
-        let hash = Self::hash_leaf(&value);
+        let hash = value.hash();
         let db_key = key.to_db_key();
         let bytes = value.serialize();
         self.map.put(&db_key, bytes)?;
@@ -1082,7 +1096,11 @@ impl<V: StorageValue + Clone> fmt::Debug for ProofPathToKey<V> {
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             } 
-            Leaf(ref val) => write!(f, "{{ val: {:?} }}", bytes_to_hex(&val.0.clone().serialize())), 
+            Leaf(ref val) => {
+                write!(f,
+                       "{{ val: {:?} }}",
+                       bytes_to_hex(&val.0.clone().serialize()))
+            } 
             BranchKeyNotFound(ref l_hash, ref r_hash, ref left_slice_key, ref right_slice_key) => {
                 write!(f,
                        "{{left: {:?}, right: {:?}, left_slice: {:?},  \
@@ -1135,7 +1153,8 @@ mod tests {
     use ::storage::{Map, MemoryDB, MapTable};
     use serde_json;
 
-    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX, ProofPathToKey, verify_proof_consistency, empty_tree_hash};
+    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX, ProofPathToKey,
+                verify_proof_consistency, empty_tree_hash};
     use super::ChildKind::{Left, Right};
     use super::KEY_SIZE;
 
@@ -1649,12 +1668,13 @@ mod tests {
         let searched_key = vec![244; 32];
 
         table.put(&root_key, root_val.clone()).unwrap();
-        let table_root = table.root_hash().unwrap(); 
+        let table_root = table.root_hash().unwrap();
 
         let search_option = table.construct_path_to_key(&searched_key).unwrap();
-        let proof_path = search_option.unwrap(); 
+        let proof_path = search_option.unwrap();
         {
-            let check_res = verify_proof_consistency(&proof_path, &searched_key, table_root).unwrap(); 
+            let check_res = verify_proof_consistency(&proof_path, &searched_key, table_root)
+                .unwrap();
             assert!(check_res.is_none());
         }
 
@@ -1667,12 +1687,12 @@ mod tests {
         }
 
         let search_option = table.construct_path_to_key(&root_key).unwrap();
-        let proof_path = search_option.unwrap(); 
+        let proof_path = search_option.unwrap();
         {
             let check_res = verify_proof_consistency(&proof_path, &root_key, table_root).unwrap();
-           assert_eq!(*check_res.unwrap(), root_val);  
+            assert_eq!(*check_res.unwrap(), root_val);
         }
-        
+
         match proof_path {
             ProofPathToKey::LeafRootInclusive(key, val) => {
                 assert_eq!(*key, BitSlice::from_bytes(&root_key).to_db_key());
@@ -1681,50 +1701,6 @@ mod tests {
             _ => assert!(false),
         }
     }
-
-    // #[test]
-    // fn build_proof_no_match() {
-    //     let storage = MemoryDB::new();
-    //     let map = MapTable::new(vec![255], &storage);
-    //     let table = MerklePatriciaTable::new(map);
-    //     table.put(&vec![240; 32], vec![3]).unwrap();  //1111 0000
-    //     table.put(&vec![245; 32], vec![4]).unwrap();  //1111 0101
-    //     table.put(&vec![250; 32], vec![5]).unwrap();  //1111 1010
-    //     table.put(&vec![255; 32], vec![6]).unwrap();  //1111 1111
-
-    //     let search_res = table.construct_path_to_key(&vec![239; 32]).unwrap();  //1110 1111
-    //     assert_eq!(search_res.searched_db_key,
-    //                BitSlice::from_bytes(&vec![239;32]).to_db_key());
-    //     assert_eq!(search_res.found, false);
-    //     assert_eq!(search_res.proof_path.compute_proof_root(),
-    //                table.root_hash().unwrap());
-    //     match search_res.proof_path {
-    //         ProofPathToKey::BranchRootKeyNotFound(_, _, _, _) => {}
-    //         _ => assert!(false),
-    //     }
-
-    //     let search_res = table.construct_path_to_key(&vec![244; 32]).unwrap(); //1111 0100
-    //     assert_eq!(search_res.found, false);
-    //     assert_eq!(search_res.proof_path.compute_proof_root(),
-    //                table.root_hash().unwrap());
-    //     // println!("{:?}", search_res);
-    //     match search_res.proof_path {
-    //         ProofPathToKey::LeftBranch(proof, _, _, _) => {
-    //             let proof_unb = *proof;
-    //             match proof_unb {
-    //                 ProofPathToKey::RightBranch(_, proof1, _, _) => {
-    //                     let proof_unb1 = *proof1;
-    //                     match proof_unb1 {
-    //                         ProofPathToKey::KeyNotFound(_) => {}
-    //                         _ => assert!(false),
-    //                     }
-    //                 }
-    //                 _ => assert!(false),
-    //             }
-    //         }
-    //         _ => assert!(false),
-    //     }
-    // }
 
     #[test]
     fn fuzz_insert_build_proofs() {
@@ -1747,9 +1723,10 @@ mod tests {
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert_eq!(*proved_value.unwrap(), item.1);
 
-            let json_repre = serde_json::to_string(&proof_path_to_key).unwrap(); 
+            let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
             println!("{}", json_repre);
-            let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+            let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre)
+                .unwrap();
             let check_res = verify_proof_consistency(&deserialized_proof, &item.0, table_root_hash);
             assert!(check_res.is_ok());
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
@@ -1789,9 +1766,10 @@ mod tests {
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert!(proved_value.is_none());
 
-            let json_repre = serde_json::to_string(&proof_path_to_key).unwrap(); 
+            let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
             println!("{}", json_repre);
-            let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+            let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre)
+                .unwrap();
             let check_res = verify_proof_consistency(&deserialized_proof, key, table_root_hash);
             assert!(check_res.is_ok());
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
