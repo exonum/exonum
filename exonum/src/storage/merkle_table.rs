@@ -78,7 +78,7 @@ impl<V: StorageValue + fmt::Debug + Clone> fmt::Debug for Proofnode<V> {
         use self::Proofnode::*; 
         match *self {
             Full(ref left, ref right) => {
-                write!(f, "{{ left: {:#?}, right: {:#?} }}", left, right)
+                write!(f, "{{ left: {:?}, right: {:?} }}", left, right)
             }
             Left(ref left_proof, ref right_hash) => {
                 let hash_repr: String; 
@@ -87,12 +87,12 @@ impl<V: StorageValue + fmt::Debug + Clone> fmt::Debug for Proofnode<V> {
                 } else {
                     hash_repr = "None".to_string(); 
                 }
-                write!(f, "{{ left: {:#?}, right_hash: {:#?} }}", left_proof, hash_repr)
+                write!(f, "{{ left: {:?}, right_hash: {:?} }}", left_proof, hash_repr)
             } 
             Right(ref left_hash, ref right) => {
                 let hash_repr: String; 
                 hash_repr = bytes_to_hex(&left_hash.0); 
-                write!(f, "{{ left_hash: {:#?}, right: {:#?} }}", hash_repr, right)
+                write!(f, "{{ left_hash: {:?}, right: {:?} }}", hash_repr, right)
             }
             Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
         }
@@ -160,8 +160,9 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
                                range_end: K)
                                -> Result<Proofnode<V>, Error> {
 
+        let res: Proofnode<V>; 
         if node_height == K::one() {
-            Ok(Proofnode::Leaf(Base64Field(self.get(node_index)?.unwrap())))
+            res = Proofnode::Leaf(Base64Field(self.get(node_index)?.unwrap())); 
         } else if node_height > K::one() {
             let subtree_hight = node_height - K::one();
             let left_child_index = node_index * (K::one() + K::one());
@@ -171,33 +172,34 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
             let (left_range, right_range) =
                 split_range(range_start, right_subtree_first_index, range_end);
 
-            match (left_range, right_range) {
+            res = match (left_range, right_range) {
                 (Some((l_s, l_e)), Some((r_s, r_e))) => {
                     let left_proof =
                         self.construct_proof_subtree(subtree_hight, left_child_index, l_s, l_e)?;
                     let right_proof =
                         self.construct_proof_subtree(subtree_hight, righ_child_index, r_s, r_e)?;
-                    Ok(Proofnode::Full(Box::new(left_proof), Box::new(right_proof)))
+                    Proofnode::Full(Box::new(left_proof), Box::new(right_proof))
                 } 
                 (Some((l_s, l_e)), None) => {
                     let left_proof =
                         self.construct_proof_subtree(subtree_hight, left_child_index, l_s, l_e)?;
                     let right_hash = self.get_hash(subtree_hight, righ_child_index)?;
-                    Ok(Proofnode::Left(Box::new(left_proof), right_hash.map(Base64Field)))
+                    Proofnode::Left(Box::new(left_proof), right_hash.map(Base64Field))
                 } 
                 (None, Some((r_s, r_e))) => {
                     let left_hash = self.get_hash(subtree_hight, left_child_index)?.unwrap();
                     let right_proof =
                         self.construct_proof_subtree(subtree_hight, righ_child_index, r_s, r_e)?;
-                    Ok(Proofnode::Right(Base64Field(left_hash), Box::new(right_proof)))
+                    Proofnode::Right(Base64Field(left_hash), Box::new(right_proof))
                 } 
                 (None, None) => {
                     unreachable!();
                 } 
-            }
+            }; 
         } else {
             unreachable!();
         }
+        Ok(res)
     }
 
     pub fn construct_path_for_range(&self,
@@ -497,6 +499,12 @@ mod tests {
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(),
                        (proof_ind + 1) as usize);
+
+            let json_repre = serde_json::to_string(&range_proof).unwrap(); 
+            println!("{}", json_repre);
+            let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+            assert_eq!(proof_indices_values(&deserialized_proof).len(), (proof_ind +1) as usize); 
+            assert_eq!(deserialized_proof.compute_proof_root(), exp_root);
         }
 
         let range_proof = table.construct_path_for_range(0, 8).unwrap();
@@ -597,8 +605,7 @@ mod tests {
         }
         table.append(vec![5]).unwrap(); 
         let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
-        // println!("{}", serde_json::to_string(&range_proof).unwrap()); 
-        // println!("{:?}", range_proof);
+        println!("{}", serde_json::to_string(&range_proof).unwrap()); 
     }
 
     #[test]

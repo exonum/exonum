@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::Arc;
 use std::ops::Deref;
 use std::marker::PhantomData;
-use base64::{encode, decode, Base64Error};
+use base64::{encode, decode};
 use serde::{Serialize, Serializer};
 use serde::de;
 use serde::de::{Visitor, Deserialize, Deserializer};
@@ -15,18 +15,10 @@ use ::messages::{MessageBuffer, Message, AnyTx};
 #[derive(Clone)]
 pub struct HeightBytes(pub [u8; 32]);
 
-pub trait StorageValue: Sized {
+pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;
     fn deserialize(v: Vec<u8>) -> Self;
-    fn hash(&self) -> Hash;
-    fn to_base64_string(self) -> String {
-        let vec_bytes = self.serialize(); 
-        encode(&vec_bytes)
-    }
-    fn from_base64_string(base64_string: &str) -> Result<Self, Base64Error>{
-        let vec_bytes = decode(base64_string)?; 
-        Ok(Self::deserialize(vec_bytes))
-    }
+    fn hash(&self) -> Hash;   
 }
 
 #[derive(Clone, Debug)]
@@ -48,7 +40,8 @@ impl<T> Serialize for Base64Field<T>
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        ser.serialize_str(&(self.0.clone().to_base64_string()))
+        let vec_bytes = self.0.clone().serialize(); 
+        ser.serialize_str(&(encode(&vec_bytes)))
     }
 }
 
@@ -66,7 +59,9 @@ impl<T> Visitor for Base64Visitor<T>
     fn visit_str<E>(&mut self, s: &str) -> Result<Base64Field<T>, E>
         where E: de::Error
     {
-        let v = T::from_base64_string(s).map_err(|_| de::Error::custom("Invalid base64 representation"))?;
+        
+        let vec_bytes = decode(s).map_err(|_| de::Error::custom("Invalid base64 representation"))?; 
+        let v = T::deserialize(vec_bytes);
         Ok(Base64Field(v))
     }
 }
