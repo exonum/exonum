@@ -105,7 +105,7 @@ impl<B, S> NodeHandler<B, S>
 
         let has_precommits = msg.validators();
         let precommits = self.state
-            .precommits(msg.round(), *msg.propose_hash())
+            .precommits(msg.round(), *msg.block_hash())
             .iter()
             .filter(|p| !has_precommits[p.validator() as usize])
             .map(|p| p.raw().clone())
