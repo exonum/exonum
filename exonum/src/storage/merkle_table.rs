@@ -381,11 +381,35 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
 #[cfg(test)]
 mod tests {
     extern crate rand;
+    use rand::{thread_rng, Rng};
+    use std::collections::HashSet;
 
     use ::crypto::{Hash, hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
     use serde_json; 
     use super::{split_range, index_of_first_element_in_subtree, proof_indices_values, Proofnode};
+    const KEY_SIZE:usize = 10; 
+
+    fn generate_fully_random_data_keys(len: usize) -> Vec<(Vec<u8>)> {
+        let mut rng = thread_rng();
+
+        let mut exists_keys = HashSet::new();
+
+        let kv_generator = |_| {
+            let mut new_val: Vec<u8> = vec![0; KEY_SIZE];
+            rng.fill_bytes(&mut new_val);
+
+            while exists_keys.contains(&new_val) {
+                rng.fill_bytes(&mut new_val);
+            }
+            exists_keys.insert(new_val.clone());
+            new_val
+        };
+
+        (0..len)
+            .map(kv_generator)
+            .collect::<Vec<_>>()
+    }
 
     #[test]
     fn test_list_methods() {
@@ -434,6 +458,41 @@ mod tests {
 
         table.set(1, vec![10]).unwrap();
         assert_eq!(table.get(1).unwrap(), Some(vec![10]));
+    }
+
+    #[test]
+    fn randomly_generate_proofs() {
+        let storage = MemoryDB::new();
+        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
+        let num_vals = 100u32; 
+        let values = generate_fully_random_data_keys(num_vals as usize); 
+        let mut rng = thread_rng();
+        for value in &values {
+            table.append(value.clone()).unwrap(); 
+        }
+        table.get(0u32).unwrap(); 
+        let table_root_hash = table.root_hash().unwrap();
+
+        for _ in 0..50 {
+            let start_range = rng.gen_range(0u32, num_vals); 
+            let end_range = rng.gen_range(start_range+1, num_vals + 1); 
+            let range_proof = table.construct_path_for_range(start_range, end_range).unwrap();
+            assert_eq!(range_proof.compute_proof_root(), table_root_hash);
+            let (inds, actual_vals): (Vec<_>, Vec<_>) =
+            proof_indices_values(&range_proof).into_iter().unzip();
+            assert_eq!(inds, (start_range as usize..end_range as usize).collect::<Vec<_>>());
+            let expect_vals = &values[start_range as usize..end_range as usize];
+            let paired = expect_vals.iter().zip(actual_vals);
+            for pair in paired {
+                assert_eq!(*pair.0, *pair.1);
+            }
+
+            let json_repre = serde_json::to_string(&range_proof).unwrap(); 
+            println!("{}", json_repre);
+            let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+            assert_eq!(proof_indices_values(&deserialized_proof).len(), (end_range - start_range) as usize); 
+            assert_eq!(deserialized_proof.compute_proof_root(), table_root_hash);
+        } 
     }
 
     #[test]
