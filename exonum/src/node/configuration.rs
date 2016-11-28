@@ -108,12 +108,12 @@ impl<B, S> NodeHandler<B, S>
         }
 
         let view = self.blockchain.view();
-        if view.config_proposes().get(&config_vote.hash_propose()).unwrap().is_some() {
+        if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_some() {
             error!("Received config_vote for unknown transaciton, msg={:?}", config_vote);
             return;
         }
 
-        if let Some(vote) = view.config_votes().get(&config_vote.from()).unwrap() {
+        if let Some(vote) = view.config_votes().get(config_vote.from()).unwrap() {
             if vote.seed() != config_vote.seed() -1 {
                 error!("Received config_vote with wrong seed, msg={:?}", config_vote);
                 return;
@@ -125,15 +125,15 @@ impl<B, S> NodeHandler<B, S>
 
         let mut votes_count = 0;
         for pub_key in self.state.validators(){
-            if let Some(vote) = view.config_votes().get(&pub_key).unwrap() {
+            if let Some(vote) = view.config_votes().get(pub_key).unwrap() {
                 if !vote.revoke() {
-                    votes_count = votes_count + 1;
+                    votes_count += 1;
                 }
             }
         }
 
         if votes_count >= 2/3 * self.state.validators().len(){
-            if let Some(config_propose) = view.config_proposes().get(&config_vote.hash_propose()).unwrap() {
+            if let Some(config_propose) = view.config_proposes().get(config_vote.hash_propose()).unwrap() {
                 view.configs().put(&Hash(self.height_to_slice(config_propose.actual_from_height())), config_propose.config().to_vec()).unwrap();
                 // TODO: clear storages
             }
