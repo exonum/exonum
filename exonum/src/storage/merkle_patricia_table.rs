@@ -3,6 +3,7 @@ use std::cmp::{min, PartialEq};
 use std::marker::PhantomData;
 use std::fmt;
 use std::ops::Not;
+use super::utils::bytes_to_hex; 
 
 use ::crypto::{hash, Hash, HASH_SIZE};
 
@@ -350,7 +351,8 @@ pub enum ProofPathToKey<V: StorageValue + Clone> {
 /// Err(Error): if it's inconsistent a) with `root_hash` (its hash doesn't match the `root_hash`)  
 ///                                 b) its structure is inconsistent with `searched_key`
 ///                                 c) its structure is inconsistent with itself (invalid enum variants are met or inconsistent parent and child bitslices)
-pub fn verify_proof_consistency<V: StorageValue + Clone, A: AsRef<[u8]>>
+#[allow(dead_code)]
+fn verify_proof_consistency<V: StorageValue + Clone, A: AsRef<[u8]>>
     (proof: &ProofPathToKey<V>,
      searched_key: A,
      root_hash: Hash)
@@ -1038,15 +1040,6 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
     }
 }
 
-// TODO move to utils mod
-pub fn bytes_to_hex<T: AsRef<[u8]> + ?Sized>(bytes: &T) -> String {
-    let strs: Vec<String> = bytes.as_ref()
-        .iter()
-        .map(|b| format!("{:02X}", b))
-        .collect();
-    strs.join("")
-}
-
 // fn bytes_to_binary<T: AsRef<[u8]>>(bytes: &T) -> String {
 //     let strs: Vec<String> = bytes.as_ref()
 //         .iter()
@@ -1724,7 +1717,7 @@ mod tests {
             assert_eq!(*proved_value.unwrap(), item.1);
 
             let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
-            println!("{}", json_repre);
+            // println!("{}", json_repre);
             let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre)
                 .unwrap();
             let check_res = verify_proof_consistency(&deserialized_proof, &item.0, table_root_hash);
@@ -1767,7 +1760,7 @@ mod tests {
             assert!(proved_value.is_none());
 
             let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
-            println!("{}", json_repre);
+            // println!("{}", json_repre);
             let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre)
                 .unwrap();
             let check_res = verify_proof_consistency(&deserialized_proof, key, table_root_hash);
