@@ -7,6 +7,8 @@ use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatr
 
 use super::Block;
 
+type ConfigurationData = Vec<u8>;
+
 pub trait View<F: Fork>: Deref<Target = F> {
     type Transaction: Message + StorageValue;
 
@@ -34,17 +36,17 @@ pub trait View<F: Fork>: Deref<Target = F> {
 
     fn config_proposes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, ConfigPropose> {
         //config_propose paricia merkletree <hash_tx> транзакция пропоз
-        MerklePatriciaTable::new(MapTable::new(vec![04], &self))
+        MerklePatriciaTable::new(MapTable::new(vec![04], self))
     }
 
     fn config_votes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, ConfigVote> {
         //config_votes patricia merkletree <pub_key> последний голос
-        MerklePatriciaTable::new(MapTable::new(vec![05], &self))
+        MerklePatriciaTable::new(MapTable::new(vec![05], self))
     }
 
-    fn configs(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, Vec<u8>> {
+    fn configs(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, ConfigurationData> {
         //configs patricia merkletree <высота блока> json
-        MerklePatriciaTable::new(MapTable::new(vec![06], &self))
+        MerklePatriciaTable::new(MapTable::new(vec![06], self))
     }
 
 }
