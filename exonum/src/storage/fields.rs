@@ -1,12 +1,6 @@
 use std::mem;
 use std::sync::Arc;
-use std::ops::Deref;
-use std::marker::PhantomData;
-use base64::{encode, decode};
-use serde::{Serialize, Serializer};
-use serde::de;
-use serde::de::{Visitor, Deserialize, Deserializer};
-
+use base64::{encode};
 use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{Hash, hash};
@@ -21,59 +15,9 @@ pub trait StorageValue {
     fn hash(&self) -> Hash;   
 }
 
-#[derive(Clone, Debug)]
-pub struct Base64Field<T: StorageValue + Clone>(pub T);
-
-impl<T> Deref for Base64Field<T>
-    where T: StorageValue + Clone
-{
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T> Serialize for Base64Field<T>
-    where T: StorageValue + Clone
-{
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let vec_bytes = self.0.clone().serialize(); 
-        ser.serialize_str(&(encode(&vec_bytes)))
-    }
-}
-
-struct Base64Visitor<T>
-    where T: StorageValue
-{
-    _p: PhantomData<T>,
-}
-
-impl<T> Visitor for Base64Visitor<T>
-    where T: StorageValue + Clone
-{
-    type Value = Base64Field<T>;
-
-    fn visit_str<E>(&mut self, s: &str) -> Result<Base64Field<T>, E>
-        where E: de::Error
-    {
-        
-        let vec_bytes = decode(s).map_err(|_| de::Error::custom("Invalid base64 representation"))?; 
-        let v = T::deserialize(vec_bytes);
-        Ok(Base64Field(v))
-    }
-}
-
-impl<T> Deserialize for Base64Field<T>
-    where T: StorageValue + Clone
-{
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        deserializer.deserialize_str(Base64Visitor { _p: PhantomData })
-    }
+pub fn repr_stor_val<T: StorageValue + Clone>(value: &T) -> String {
+    let vec_bytes = value.clone().serialize();
+    encode(&vec_bytes)
 }
 
 impl StorageValue for u16 {

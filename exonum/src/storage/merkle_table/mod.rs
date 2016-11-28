@@ -1,14 +1,14 @@
 use num::{Integer, range, ToPrimitive, pow};
 
 use std::marker::PhantomData;
-use std::cell::Cell;  
+use std::cell::Cell;
 
 use super::{Map, List, Error, StorageValue};
 
 use ::crypto::{hash, Hash};
-use self::proofnode::Proofnode; 
+use self::proofnode::Proofnode;
 
-mod proofnode; 
+mod proofnode;
 
 
 type Range<K> = Option<(K, K)>;
@@ -81,9 +81,9 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
                                range_end: K)
                                -> Result<Proofnode<V>, Error> {
 
-        let res: Proofnode<V>; 
+        let res: Proofnode<V>;
         if node_height == K::one() {
-            res = Proofnode::Leaf(self.get(node_index)?.unwrap()); 
+            res = Proofnode::Leaf(self.get(node_index)?.unwrap());
         } else if node_height > K::one() {
             let subtree_hight = node_height - K::one();
             let left_child_index = node_index * (K::one() + K::one());
@@ -116,7 +116,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
                 (None, None) => {
                     unreachable!();
                 } 
-            }; 
+            };
         } else {
             unreachable!();
         }
@@ -307,10 +307,10 @@ mod tests {
 
     use ::crypto::{Hash, hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
-    use serde_json; 
+    use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
-    use super::proofnode::{proof_indices_values, Proofnode}; 
-    const KEY_SIZE:usize = 10; 
+    use super::proofnode::{proof_indices_values, Proofnode};
+    const KEY_SIZE: usize = 10;
 
     fn generate_fully_random_data_keys(len: usize) -> Vec<(Vec<u8>)> {
         let mut rng = thread_rng();
@@ -386,35 +386,36 @@ mod tests {
     fn randomly_generate_proofs() {
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        let num_vals = 100u32; 
-        let values = generate_fully_random_data_keys(num_vals as usize); 
+        let num_vals = 100u32;
+        let values = generate_fully_random_data_keys(num_vals as usize);
         let mut rng = thread_rng();
         for value in &values {
-            table.append(value.clone()).unwrap(); 
+            table.append(value.clone()).unwrap();
         }
-        table.get(0u32).unwrap(); 
+        table.get(0u32).unwrap();
         let table_root_hash = table.root_hash().unwrap();
 
         for _ in 0..50 {
-            let start_range = rng.gen_range(0u32, num_vals); 
-            let end_range = rng.gen_range(start_range+1, num_vals + 1); 
+            let start_range = rng.gen_range(0u32, num_vals);
+            let end_range = rng.gen_range(start_range + 1, num_vals + 1);
             let range_proof = table.construct_path_for_range(start_range, end_range).unwrap();
             assert_eq!(range_proof.compute_proof_root(), table_root_hash);
             let (inds, actual_vals): (Vec<_>, Vec<_>) =
-            proof_indices_values(&range_proof).into_iter().unzip();
-            assert_eq!(inds, (start_range as usize..end_range as usize).collect::<Vec<_>>());
+                proof_indices_values(&range_proof).into_iter().unzip();
+            assert_eq!(inds,
+                       (start_range as usize..end_range as usize).collect::<Vec<_>>());
             let expect_vals = &values[start_range as usize..end_range as usize];
             let paired = expect_vals.iter().zip(actual_vals);
             for pair in paired {
                 assert_eq!(*pair.0, *pair.1);
             }
 
-            let json_repre = serde_json::to_string(&range_proof).unwrap(); 
+            let json_repre = serde_json::to_string(&range_proof).unwrap();
             println!("{}", json_repre);
             // let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
-            // assert_eq!(proof_indices_values(&deserialized_proof).len(), (end_range - start_range) as usize); 
+            // assert_eq!(proof_indices_values(&deserialized_proof).len(), (end_range - start_range) as usize);
             // assert_eq!(deserialized_proof.compute_proof_root(), table_root_hash);
-        } 
+        }
     }
 
     #[test]
@@ -470,10 +471,10 @@ mod tests {
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(), 1);
 
-            let json_repre = serde_json::to_string(&range_proof).unwrap(); 
+            let json_repre = serde_json::to_string(&range_proof).unwrap();
             println!("{}", json_repre);
             // let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
-            // assert_eq!(proof_indices_values(&deserialized_proof).len(), 1); 
+            // assert_eq!(proof_indices_values(&deserialized_proof).len(), 1);
             // assert_eq!(deserialized_proof.compute_proof_root(), exp_root);
 
             let range_proof = table.construct_path_for_range(0, proof_ind + 1).unwrap();
@@ -481,10 +482,10 @@ mod tests {
             assert_eq!(proof_indices_values(&range_proof).len(),
                        (proof_ind + 1) as usize);
 
-            let json_repre = serde_json::to_string(&range_proof).unwrap(); 
+            // let json_repre = serde_json::to_string(&range_proof).unwrap();
             // println!("{}", json_repre);
             // let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
-            // assert_eq!(proof_indices_values(&deserialized_proof).len(), (proof_ind +1) as usize); 
+            // assert_eq!(proof_indices_values(&deserialized_proof).len(), (proof_ind +1) as usize);
             // assert_eq!(deserialized_proof.compute_proof_root(), exp_root);
         }
 
@@ -584,9 +585,9 @@ mod tests {
         } else {
             assert!(false);
         }
-        table.append(vec![5]).unwrap(); 
-        let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
-        // println!("{:?}", range_proof); 
+        table.append(vec![5]).unwrap();
+        // let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
+        // println!("{:?}", range_proof);
     }
 
     #[test]
