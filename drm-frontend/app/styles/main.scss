@@ -825,6 +825,10 @@ textarea.form-control {
     &-chart {
         width: 280px;
         margin: 0 auto;
+
+        @media (min-width: 768px) {
+            width: 600px;
+        }
     }
 
     &-chart > svg {
@@ -841,6 +845,10 @@ textarea.form-control {
         font-size: 13px;
         float: none;
         vertical-align: top;
+
+        @media (min-width: 768px) {
+            width: 120px;
+        }
     }
 
     &-subtitle {

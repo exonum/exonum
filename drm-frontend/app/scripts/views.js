@@ -658,6 +658,75 @@ var FlowPage = Backbone.View.extend({
     'FFCAB1', 'ECDCB0', 'C1D7AE', '8CC084', 'A3333D', '477998', '698F3F', '7E8287'
   ],
 
+  dimensions: {
+    default: {
+      width: 280,
+      height: 590,
+      left: 90,
+      top: 50,
+      chart: {
+        width: 100,
+        height: 540,
+        barSize: 15
+      },
+      title: {
+        left: -55,
+        right: 155
+      },
+      underline: {
+        left: {
+          start: -95,
+          end: -15
+        },
+        right: {
+          start: 115,
+          end: 195
+        }
+      },
+      label: {
+        left: -60,
+        right: 60
+      },
+      value: {
+        left: -55,
+        right: 55
+      }
+    },
+    small: {
+      width: 600,
+      height: 590,
+      left: 140,
+      top: 50,
+      chart: {
+        width: 320,
+        height: 540,
+        barSize: 30
+      },
+      title: {
+        left: -70,
+        right: 390
+      },
+      underline: {
+        left: {
+          start: -125,
+          end: -15
+        },
+        right: {
+          start: 335,
+          end: 445
+        }
+      },
+      label: {
+        left: -85,
+        right: 85
+      },
+      value: {
+        left: -80,
+        right: 80
+      }
+    }
+  },
+
   toggle: function(e) {
     var type = $(e.target).data('type');
 
@@ -811,6 +880,48 @@ var FlowPage = Backbone.View.extend({
     return data;
   },
 
+  getTotal: function() {
+    var total = 0;
+    switch (this.type) {
+      case 'revenue':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.amount;
+        });
+        break;
+      case 'content':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.amount;
+        });
+        break;
+      case 'plays':
+        $.each(app.flow.get('contracts'), function(i, contract) {
+          total += contract.plays;
+        });
+        break;
+      default:
+        return '-'
+    }
+    return total;
+  },
+
+  getState: function() {
+    var width = $(window).width();
+    var state;
+    if (width > 768) {
+      state = 'small';
+    } else {
+      state = 'default';
+    }
+    return state;
+  },
+
+  resize: function() {
+    if (this.getState() !== this.state) {
+      document.getElementById('flow-body').remove();
+      this.draw();
+    }
+  },
+
   /**
    * Draw flow chart and insert it into view
    * @returns {boolean}
@@ -861,25 +972,27 @@ var FlowPage = Backbone.View.extend({
 
     // Initialize svg object
     var chart = document.getElementById('flow-chart');
-    var svg = d3.select(chart).append('svg').attr('width', 280).attr('height', 590);
-    var g = svg.append('g').attr('transform', 'translate(90, 50)');
-    var bp = viz.bP().data(data).min(12).pad(1).height(540).width(100).barSize(15).fill(function(d) {
+    var state = this.getState();
+    var dimensions = this.dimensions[state];
+    var svg = d3.select(chart).append('svg').attr('width', dimensions.width).attr('height', dimensions.height).attr('id', 'flow-body');
+    var g = svg.append('g').attr('transform', 'translate(' + dimensions.left + ', ' + dimensions.top + ')');
+    var bp = viz.bP().data(data).min(12).pad(1).height(dimensions.chart.height).width(dimensions.chart.width).barSize(dimensions.chart.barSize).fill(function(d) {
       return '#' + colors[d.primary];
     });
     g.call(bp);
 
     // Create titles
-    g.append('text').attr('x', -55).attr('y', -8).attr('class', 'flow-title').text(leftTitle);
-    g.append('text').attr('x', 155).attr('y', -8).attr('class', 'flow-title').text(rightTitle);
+    g.append('text').attr('x', dimensions.title.left).attr('y', -8).attr('class', 'flow-title').text(leftTitle);
+    g.append('text').attr('x', dimensions.title.right).attr('y', -8).attr('class', 'flow-title').text(rightTitle);
 
     // Create underlines for titles
-    g.append('line').attr('x1', -95).attr('x2', -15);
-    g.append('line').attr('x1', 115).attr('x2', 195);
+    g.append('line').attr('x1', dimensions.underline.left.start).attr('x2', dimensions.underline.left.end);
+    g.append('line').attr('x1', dimensions.underline.right.start).attr('x2', dimensions.underline.right.end);
 
     // Add labels
     g.selectAll('.mainBars').append('text').attr('class', 'flow-label')
       .attr('x', function(d) {
-        return d.part == 'primary' ? -60 : 60;
+        return d.part == 'primary' ? dimensions.label.left : dimensions.label.right;
       })
       .attr('y', 6)
       .text(function(d) {
@@ -892,7 +1005,7 @@ var FlowPage = Backbone.View.extend({
     // Add values
     g.selectAll('.mainBars').append('text').attr('class', 'flow-value')
       .attr('x', function(d) {
-        return d.part == 'primary' ? -55 : 55;
+        return d.part == 'primary' ? dimensions.value.left : dimensions.value.right;
       })
       .attr('y', 6)
       .text(valueFormatter)
@@ -904,30 +1017,9 @@ var FlowPage = Backbone.View.extend({
     g.selectAll('.mainBars')
       .on('mouseover', this.mouseover.bind(this, g, bp, valueFormatter))
       .on('mouseout', this.mouseout.bind(this, g, bp, valueFormatter));
-  },
 
-  getTotal: function() {
-    var total = 0;
-    switch (this.type) {
-      case 'revenue':
-        $.each(app.flow.get('contracts'), function(i, contract) {
-          total += contract.amount;
-        });
-        break;
-      case 'content':
-        $.each(app.flow.get('contracts'), function(i, contract) {
-          total += contract.amount;
-        });
-        break;
-      case 'plays':
-        $.each(app.flow.get('contracts'), function(i, contract) {
-          total += contract.plays;
-        });
-        break;
-      default:
-        return '-'
-    }
-    return total;
+    this.state = state;
+    $(window).on('resize', this.resize.bind(this))
   },
 
   render: function() {
