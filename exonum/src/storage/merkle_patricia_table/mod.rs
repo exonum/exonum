@@ -1353,8 +1353,24 @@ mod tests {
                 .unwrap();
             assert!(check_res.is_none());
         }
+        let json_repre = serde_json::to_string(&proof_path).unwrap();
+        let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
+        let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
+        {
+            let check_res = verify_proof_consistency(&deser_proof, &searched_key, table_root)
+                .unwrap();
+            assert!(check_res.is_none());
+        }
 
         match proof_path {
+            ProofPathToKey::LeafRootExclusive(key, hash_val) => {
+                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
+                assert_eq!(hash_val, hash(&root_val));
+            }
+            _ => assert!(false),
+        }
+
+        match deser_proof {
             ProofPathToKey::LeafRootExclusive(key, hash_val) => {
                 assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
                 assert_eq!(hash_val, hash(&root_val));
@@ -1368,8 +1384,23 @@ mod tests {
             let check_res = verify_proof_consistency(&proof_path, &root_key, table_root).unwrap();
             assert_eq!(*check_res.unwrap(), root_val);
         }
+        let json_repre = serde_json::to_string(&proof_path).unwrap();
+        let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
+        let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
+        {
+            let check_res = verify_proof_consistency(&deser_proof, &root_key, table_root).unwrap();
+            assert_eq!(*check_res.unwrap(), root_val);
+        }
 
         match proof_path {
+            ProofPathToKey::LeafRootInclusive(key, val) => {
+                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
+                assert_eq!(val, root_val);
+            }
+            _ => assert!(false),
+        }
+
+        match deser_proof {
             ProofPathToKey::LeafRootInclusive(key, val) => {
                 assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
                 assert_eq!(val, root_val);
@@ -1395,19 +1426,17 @@ mod tests {
             let search_res = table.construct_path_to_key(&item.0).unwrap();
             let proof_path_to_key = search_res.unwrap();
             let check_res = verify_proof_consistency(&proof_path_to_key, &item.0, table_root_hash);
-            assert!(check_res.is_ok());
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert_eq!(*proved_value.unwrap(), item.1);
 
             let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
             // println!("{}", json_repre);
-            // let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre)
-            //     .unwrap();
-            // let check_res = verify_proof_consistency(&deserialized_proof, &item.0, table_root_hash);
-            // assert!(check_res.is_ok());
-            // let proved_value: Option<&Vec<u8>> = check_res.unwrap();
-            // assert_eq!(*proved_value.unwrap(), item.1);
-            // println!("Proofpath {:?}", proof_path_to_key);
+            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
+            let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
+            let check_res = verify_proof_consistency(&deser_proof, &item.0, table_root_hash);
+            let proved_value: Option<&Vec<u8>> = check_res.unwrap();
+            assert_eq!(*proved_value.unwrap(), item.1);
+            // println!("Proofpath {:?}", deser_proof);
         }
     }
 
@@ -1444,12 +1473,11 @@ mod tests {
 
             let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
             // println!("{}", json_repre);
-            // let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre)
-            //     .unwrap();
-            // let check_res = verify_proof_consistency(&deserialized_proof, key, table_root_hash);
-            // assert!(check_res.is_ok());
-            // let proved_value: Option<&Vec<u8>> = check_res.unwrap();
-            // assert!(proved_value.is_none());
+            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
+            let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
+            let check_res = verify_proof_consistency(&deser_proof, key, table_root_hash);
+            let proved_value: Option<&Vec<u8>> = check_res.unwrap();
+            assert!(proved_value.is_none());
             // println!("Proofpath {:?}", proof_path_to_key);
         }
     }
