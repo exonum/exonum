@@ -1,27 +1,28 @@
-use ::storage::StorageValue;
+use ::storage::{StorageValue, Error};
 use ::storage::utils::bytes_to_hex;
-use ::storage::fields::repr_stor_val; 
+use ::storage::fields::{repr_stor_val, decode_from_b64_string};
 use ::crypto::{hash, Hash};
 use std::fmt;
 use serde::{Serialize, Serializer};
-const LEFT_DESC: &'static str = "L";
-const RIGHT_DESC: &'static str = "R";
+use serde_json::Value;
+const LEFT_DESC: &'static str = "left";
+const RIGHT_DESC: &'static str = "rigth";
 const VAL_DESC: &'static str = "val";
 #[allow(dead_code)]
-pub fn proof_indices_values<V: StorageValue + Clone>(proof: &Proofnode<V>) -> Vec<(usize, &V)> {
+pub fn proof_indices_values<V: StorageValue>(proof: &Proofnode<V>) -> Vec<(usize, &V)> {
     let mut res = Vec::new();
     proof.indices_and_values(0usize, &mut res);
     res
 }
 
-pub enum Proofnode<V: StorageValue + Clone> {
+pub enum Proofnode<V: StorageValue> {
     Full(Box<Proofnode<V>>, Box<Proofnode<V>>),
     Left(Box<Proofnode<V>>, Option<Hash>),
     Right(Hash, Box<Proofnode<V>>),
     Leaf(V),
 }
 
-impl<V: StorageValue + Clone> Serialize for Proofnode<V> {
+impl<V: StorageValue> Serialize for Proofnode<V> {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
@@ -60,7 +61,95 @@ impl<V: StorageValue + Clone> Serialize for Proofnode<V> {
     }
 }
 
-impl<V: StorageValue + Clone> Proofnode<V> {
+impl<V: StorageValue> Proofnode<V> {
+    pub fn deserialize(json: &Value) -> Result<Self, Error> {
+        if !json.is_object() {
+            return Err(Error::new(format!("Invalid json: it is expected to be json Object. \
+                                           Value: {:?}",
+                                          json)));
+        }
+        let map_key_value = json.as_object().unwrap();
+        let res: Self = match map_key_value.len() {
+            2 => {
+                let left_value: &Value = match map_key_value.get(LEFT_DESC) {
+                    None => {
+                        return Err(Error::new(format!("Invalid json: Key {} not found. Value: \
+                                                       {:?}",
+                                                      LEFT_DESC,
+                                                      json)))
+                    } 
+                    Some(left) => left, 
+                };
+                let right_value: &Value = match map_key_value.get(RIGHT_DESC) {
+                    None => {
+                        return Err(Error::new(format!("Invalid json: Key {} not found. Value: \
+                                                       {:?}",
+                                                      RIGHT_DESC,
+                                                      json)))
+                    } 
+                    Some(right) => right, 
+                };
+                if right_value.is_string() {
+                    let left_proof = Self::deserialize(left_value)?;
+                    let val_repr = right_value.as_str().unwrap();
+                    let right_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    Proofnode::Left(Box::new(left_proof), Some(right_hash))
+                } else if left_value.is_string() {
+                    let right_proof = Self::deserialize(right_value)?;
+                    let val_repr = left_value.as_str().unwrap();
+                    let left_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    Proofnode::Right(left_hash, Box::new(right_proof))
+                } else {
+                    let left_proof = Self::deserialize(left_value)?;
+                    let right_proof = Self::deserialize(right_value)?;
+                    Proofnode::Full(Box::new(left_proof), Box::new(right_proof))
+                }
+            } 
+            1 => {
+                if map_key_value.get(VAL_DESC).is_none() && map_key_value.get(LEFT_DESC).is_none() {
+                    return Err(Error::new(format!("Invalid json: unknown key met. Value: {:?}",
+                                                  json)));
+                }
+                if let Some(leaf_value) = map_key_value.get(VAL_DESC) {
+                    if !leaf_value.is_string() {
+                        return Err(Error::new(format!("Invalid json: leaf value is expected to \
+                                                       be a string. Value: {:?}",
+                                                      leaf_value)));
+                    }
+                    let val_repr = leaf_value.as_str().unwrap();
+                    let val: V = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    Proofnode::Leaf(val)
+
+                } else {
+                    let left_proof_value = map_key_value.get(LEFT_DESC).unwrap();
+                    let left_proof = Self::deserialize(left_proof_value)?;
+                    Proofnode::Left(Box::new(left_proof), None)
+                }
+            } 
+            _ => {
+                return Err(Error::new(format!("Invalid json: Number of keys should be either 1 \
+                                               or 2. Value: {:?}",
+                                              json)))
+            } 
+        };
+        Ok(res)
+    }
+
     pub fn compute_proof_root(&self) -> Hash {
         match *self {
             Proofnode::Full(ref left, ref right) => {
@@ -100,7 +189,7 @@ impl<V: StorageValue + Clone> Proofnode<V> {
     }
 }
 
-impl<V: StorageValue + fmt::Debug + Clone> fmt::Debug for Proofnode<V> {
+impl<V: StorageValue + fmt::Debug> fmt::Debug for Proofnode<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Proofnode::*;
         match *self {

@@ -1,6 +1,6 @@
 use std::mem;
 use std::sync::Arc;
-use base64::{encode};
+use base64::{encode, decode, Base64Error};
 use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{Hash, hash};
@@ -9,15 +9,20 @@ use ::messages::{MessageBuffer, Message, AnyTx};
 #[derive(Clone)]
 pub struct HeightBytes(pub [u8; 32]);
 
-pub trait StorageValue {
+pub trait StorageValue: Clone {
     fn serialize(self) -> Vec<u8>;
     fn deserialize(v: Vec<u8>) -> Self;
     fn hash(&self) -> Hash;   
 }
 
-pub fn repr_stor_val<T: StorageValue + Clone>(value: &T) -> String {
+pub fn repr_stor_val<T: StorageValue>(value: &T) -> String {
     let vec_bytes = value.clone().serialize();
     encode(&vec_bytes)
+}
+
+pub fn decode_from_b64_string<T: StorageValue>(b64: &str) -> Result<T, Base64Error> {
+    let vec_bytes = decode(b64)?; 
+    Ok(StorageValue::deserialize(vec_bytes))
 }
 
 impl StorageValue for u16 {

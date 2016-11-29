@@ -1,20 +1,20 @@
 use ::storage::{StorageValue, Error};
 use ::storage::utils::bytes_to_hex;
-use ::storage::fields::repr_stor_val; 
+use ::storage::fields::repr_stor_val;
 use ::crypto::{hash, Hash};
 use std::fmt;
 use super::{BitSlice, KEY_SIZE};
 use serde::{Serialize, Serializer};
 const LEFT_HASH_DESC: &'static str = "LH";
 const RIGHT_HASH_DESC: &'static str = "RH";
-const LEFT_SLICE_DESC: &'static str = "LK"; 
-const RIGHT_SLICE_DESC: &'static str = "RK"; 
-const VAL_DESC: &'static str = "val"; 
-const ROOT_KEY_DESC: &'static str = "root_key"; 
-const ROOT_VAL_HASH: &'static str = "hash"; 
+const LEFT_SLICE_DESC: &'static str = "LK";
+const RIGHT_SLICE_DESC: &'static str = "RK";
+const VAL_DESC: &'static str = "val";
+const ROOT_KEY_DESC: &'static str = "root_key";
+const ROOT_VAL_HASH: &'static str = "hash";
 
 
-pub enum ProofPathToKey<V: StorageValue + Clone> {
+pub enum ProofPathToKey<V: StorageValue> {
     LeafRootInclusive(Vec<u8>, V), /* to match a leaf root with found key; (root_db_key= searched_db_key, value) */
     LeafRootExclusive(Vec<u8>, Hash), /* to prove exclusion for a leaf root when root_db_key != searched db_key */
 
@@ -27,44 +27,44 @@ pub enum ProofPathToKey<V: StorageValue + Clone> {
     Leaf(V), // to prove inclusion of a value under searched_key below root level
 }
 
-impl<V: StorageValue + Clone> Serialize for ProofPathToKey<V> {
+impl<V: StorageValue> Serialize for ProofPathToKey<V> {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        use self::ProofPathToKey::*; 
-        let mut state; 
+        use self::ProofPathToKey::*;
+        let mut state;
         match *self {
             LeafRootInclusive(ref key, ref value) => {
-                state = ser.serialize_struct("LeafRootInclusive", 2)?;  
+                state = ser.serialize_struct("LeafRootInclusive", 2)?;
                 ser.serialize_struct_elt(&mut state, ROOT_KEY_DESC, repr_stor_val(key))?;
                 ser.serialize_struct_elt(&mut state, VAL_DESC, repr_stor_val(value))?;
-            }, 
+            } 
             LeafRootExclusive(ref key, ref hash) => {
-                state = ser.serialize_struct("LeafRootExclusive", 2)?;  
+                state = ser.serialize_struct("LeafRootExclusive", 2)?;
                 ser.serialize_struct_elt(&mut state, ROOT_KEY_DESC, repr_stor_val(key))?;
                 ser.serialize_struct_elt(&mut state, ROOT_VAL_HASH, repr_stor_val(hash))?;
-            }, 
+            } 
             BranchKeyNotFound(ref lhash, ref rhash, ref lkey, ref rkey) => {
-                state = ser.serialize_struct("BranchKeyNotFound", 4)?;  
+                state = ser.serialize_struct("BranchKeyNotFound", 4)?;
                 ser.serialize_struct_elt(&mut state, LEFT_HASH_DESC, repr_stor_val(lhash))?;
                 ser.serialize_struct_elt(&mut state, RIGHT_HASH_DESC, repr_stor_val(rhash))?;
                 ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, repr_stor_val(lkey))?;
                 ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, repr_stor_val(rkey))?;
-            }, 
+            } 
             LeftBranch(ref proof, ref rhash, ref lkey, ref rkey) => {
-                state = ser.serialize_struct("LeftBranch", 4)?;  
+                state = ser.serialize_struct("LeftBranch", 4)?;
                 ser.serialize_struct_elt(&mut state, LEFT_HASH_DESC, proof)?;
                 ser.serialize_struct_elt(&mut state, RIGHT_HASH_DESC, repr_stor_val(rhash))?;
                 ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, repr_stor_val(lkey))?;
                 ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, repr_stor_val(rkey))?;
-            },
+            }
             RightBranch(ref lhash, ref proof, ref lkey, ref rkey) => {
-                state = ser.serialize_struct("RightBranch", 4)?;  
+                state = ser.serialize_struct("RightBranch", 4)?;
                 ser.serialize_struct_elt(&mut state, LEFT_HASH_DESC, repr_stor_val(lhash))?;
                 ser.serialize_struct_elt(&mut state, RIGHT_HASH_DESC, proof)?;
                 ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, repr_stor_val(lkey))?;
                 ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, repr_stor_val(rkey))?;
-            }, 
+            } 
             Leaf(ref value) => {
                 state = ser.serialize_struct("Leaf", 1)?;
                 ser.serialize_struct_elt(&mut state, VAL_DESC, repr_stor_val(value))?;
@@ -74,17 +74,18 @@ impl<V: StorageValue + Clone> Serialize for ProofPathToKey<V> {
     }
 }
 
+
+
 /// Returnes Ok(Some(Value)), if the proof proves inclusion of the Value in the `MerklePatriciaTable` for `the searched_key`
 /// Ok(None): if it proves that the `searched_key` is excluded from the `MerklePatriciaTable`
 /// Err(Error): if it's inconsistent a) with `root_hash` (its hash doesn't match the `root_hash`)
 ///                                 b) its structure is inconsistent with `searched_key`
 ///                                 c) its structure is inconsistent with itself (invalid enum variants are met or inconsistent parent and child bitslices)
 #[allow(dead_code)]
-pub fn verify_proof_consistency<V: StorageValue + Clone, A: AsRef<[u8]>>
-    (proof: &ProofPathToKey<V>,
-     searched_key: A,
-     root_hash: Hash)
-     -> Result<Option<&V>, Error> {
+pub fn verify_proof_consistency<V: StorageValue, A: AsRef<[u8]>>(proof: &ProofPathToKey<V>,
+                                                                 searched_key: A,
+                                                                 root_hash: Hash)
+                                                                 -> Result<Option<&V>, Error> {
     let searched_key = searched_key.as_ref();
     debug_assert_eq!(searched_key.len(), KEY_SIZE);
     let searched_slice = BitSlice::from_bytes(searched_key);
@@ -101,7 +102,7 @@ pub fn verify_proof_consistency<V: StorageValue + Clone, A: AsRef<[u8]>>
 
 }
 
-impl<V: StorageValue + Clone> ProofPathToKey<V> {
+impl<V: StorageValue> ProofPathToKey<V> {
     fn verify_root_proof_consistency(&self,
                                      searched_slice: &BitSlice)
                                      -> Result<Option<&V>, Error> {
@@ -306,7 +307,7 @@ impl<V: StorageValue + Clone> ProofPathToKey<V> {
     }
 }
 
-impl<V: StorageValue + Clone> fmt::Debug for ProofPathToKey<V> {
+impl<V: StorageValue> fmt::Debug for ProofPathToKey<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::ProofPathToKey::*;
         match *self {
@@ -326,11 +327,7 @@ impl<V: StorageValue + Clone> fmt::Debug for ProofPathToKey<V> {
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             } 
-            Leaf(ref val) => {
-                write!(f,
-                       "{{ val: {:?} }}",
-                       bytes_to_hex(&val.clone().serialize()))
-            } 
+            Leaf(ref val) => write!(f, "{{ val: {:?} }}", bytes_to_hex(&val.clone().serialize())), 
             BranchKeyNotFound(ref l_hash, ref r_hash, ref left_slice_key, ref right_slice_key) => {
                 write!(f,
                        "{{left: {:?}, right: {:?}, left_slice: {:?},  \

@@ -50,7 +50,7 @@ pub struct MerkleTable<T: Map<[u8], Vec<u8>>, K, V> {
 impl<'a, T, K, V> MerkleTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
           K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue + Clone
+          V: StorageValue
 {
     pub fn new(map: T) -> Self {
         MerkleTable {
@@ -237,7 +237,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
           K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue + Clone
+          V: StorageValue
 {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
@@ -411,10 +411,13 @@ mod tests {
             }
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
-            println!("{}", json_repre);
-            // let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
-            // assert_eq!(proof_indices_values(&deserialized_proof).len(), (end_range - start_range) as usize);
-            // assert_eq!(deserialized_proof.compute_proof_root(), table_root_hash);
+
+            // println!("{}", json_repre);
+            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
+            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            assert_eq!(proof_indices_values(&deser_proof).len(),
+                       (end_range - start_range) as usize);
+            assert_eq!(deser_proof.compute_proof_root(), table_root_hash);
         }
     }
 
@@ -472,21 +475,24 @@ mod tests {
             assert_eq!(proof_indices_values(&range_proof).len(), 1);
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
-            println!("{}", json_repre);
-            // let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
-            // assert_eq!(proof_indices_values(&deserialized_proof).len(), 1);
-            // assert_eq!(deserialized_proof.compute_proof_root(), exp_root);
+            // println!("{}", json_repre);
+            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
+            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            assert_eq!(proof_indices_values(&deser_proof).len(), 1);
+            assert_eq!(deser_proof.compute_proof_root(), exp_root);
 
             let range_proof = table.construct_path_for_range(0, proof_ind + 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(),
                        (proof_ind + 1) as usize);
 
-            // let json_repre = serde_json::to_string(&range_proof).unwrap();
+            let json_repre = serde_json::to_string(&range_proof).unwrap();
             // println!("{}", json_repre);
-            // let deserialized_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
-            // assert_eq!(proof_indices_values(&deserialized_proof).len(), (proof_ind +1) as usize);
-            // assert_eq!(deserialized_proof.compute_proof_root(), exp_root);
+            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
+            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            assert_eq!(proof_indices_values(&deser_proof).len(),
+                       (proof_ind + 1) as usize);
+            assert_eq!(deser_proof.compute_proof_root(), exp_root);
         }
 
         let range_proof = table.construct_path_for_range(0, 8).unwrap();
