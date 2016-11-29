@@ -184,6 +184,7 @@ impl<'a> PartialEq for BitSlice<'a> {
 //     left_prefix:    &BitSlice    DB_KEY_SIZE,
 //     right_prefix:   &BitSlice    DB_KEY_SIZE
 // }
+#[derive(Clone)]
 struct BranchNode {
     raw: Vec<u8>,
 }
@@ -327,9 +328,7 @@ fn empty_tree_hash() -> Hash {
     Hash::from_slice(&EMPTY_HASH_BASE).unwrap()
 }
 // TODO avoid reallocations where is possible.
-impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue + Clone> MerklePatriciaTable<T,
-                                                                                             K,
-                                                                                             V> {
+impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaTable<T, K, V> {
     pub fn new(map: T) -> Self {
         MerklePatriciaTable {
             map: map,
@@ -576,11 +575,9 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue + Clone> MerkleP
         let res: ProofPathToKey<V> = match self.root_node()? {
             Some((root_db_key, Node::Leaf(root_value))) => {
                 if searched_slice.to_db_key() == root_db_key {
-                    ProofPathToKey::LeafRootInclusive(root_db_key,
-                                                      root_value)
+                    ProofPathToKey::LeafRootInclusive(root_db_key, root_value)
                 } else {
-                    ProofPathToKey::LeafRootExclusive(root_db_key,
-                                                      root_value.hash())
+                    ProofPathToKey::LeafRootExclusive(root_db_key, root_value.hash())
                 }
             } 
             Some((root_db_key, Node::Branch(branch))) => {
@@ -614,10 +611,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue + Clone> MerkleP
                     } else {
                         let l_h = *branch.child_hash(ChildKind::Left); //copy
                         let r_h = *branch.child_hash(ChildKind::Right);//copy
-                        ProofPathToKey::BranchKeyNotFound(l_h,
-                                                          r_h,
-                                                          l_s_db_key,
-                                                          r_s_db_key)
+                        ProofPathToKey::BranchKeyNotFound(l_h, r_h, l_s_db_key, r_s_db_key)
                         // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                     }
                 } else {
@@ -625,10 +619,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue + Clone> MerkleP
                     let l_h = *branch.child_hash(ChildKind::Left); //copy
                     let r_h = *branch.child_hash(ChildKind::Right);//copy
 
-                    ProofPathToKey::BranchKeyNotFound(l_h,
-                                                      r_h,
-                                                      l_s_db_key,
-                                                      r_s_db_key)
+                    ProofPathToKey::BranchKeyNotFound(l_h, r_h, l_s_db_key, r_s_db_key)
                     // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
             } 
@@ -679,10 +670,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue + Clone> MerkleP
                 } else {
                     let l_h = *child_branch.child_hash(ChildKind::Left); //copy
                     let r_h = *child_branch.child_hash(ChildKind::Right);//copy
-                    ProofPathToKey::BranchKeyNotFound(l_h,
-                                                      r_h,
-                                                      l_s_db_key,
-                                                      r_s_db_key)
+                    ProofPathToKey::BranchKeyNotFound(l_h, r_h, l_s_db_key, r_s_db_key)
                     // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                 }
             }
@@ -755,7 +743,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue + Clone> MerkleP
 impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
     where T: Map<[u8], Vec<u8>>,
           K: AsRef<[u8]>,
-          V: StorageValue + Clone
+          V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
         let db_key = BitSlice::from_bytes(key.as_ref()).to_db_key();
@@ -1412,7 +1400,7 @@ mod tests {
             assert_eq!(*proved_value.unwrap(), item.1);
 
             let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
-            println!("{}", json_repre);
+            // println!("{}", json_repre);
             // let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre)
             //     .unwrap();
             // let check_res = verify_proof_consistency(&deserialized_proof, &item.0, table_root_hash);
@@ -1455,7 +1443,7 @@ mod tests {
             assert!(proved_value.is_none());
 
             let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
-            println!("{}", json_repre);
+            // println!("{}", json_repre);
             // let deserialized_proof: ProofPathToKey<Vec<u8>> = serde_json::from_str(&json_repre)
             //     .unwrap();
             // let check_res = verify_proof_consistency(&deserialized_proof, key, table_root_hash);
