@@ -13,7 +13,7 @@ mod protocol;
 use time::Timespec;
 use bit_vec;
 
-use super::crypto::PublicKey;
+use super::crypto::{PublicKey, Hash};
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::Error;
@@ -32,7 +32,24 @@ pub enum Any<Tx: Message> {
     Block(Block),
     Consensus(ConsensusMessage),
     Request(RequestMessage),
-    Transaction(Tx),
+    Transaction(TransactionMessage<Tx>)
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum TransactionMessage<Tx: Message> {
+   Service(ServiceTransaction),
+   Application(Tx),
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub enum ServiceTransaction{
+    ConfigChange(ConfigMessage)
+}
+
+#[derive(Clone, PartialEq)]
+pub enum ConfigMessage{
+    ConfigPropose(ConfigPropose),
+    ConfigVote(ConfigVote),
 }
 
 #[derive(Clone, PartialEq)]
@@ -175,6 +192,56 @@ impl fmt::Debug for RequestMessage {
     }
 }
 
+impl ConfigMessage{
+
+    pub fn from(&self) -> &PublicKey {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.from(),
+            ConfigMessage::ConfigVote(ref msg) => msg.from()
+        }
+    }
+
+    pub fn height(&self) -> u64 {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.height(),
+            ConfigMessage::ConfigVote(ref msg) => msg.height(),
+        }
+    }
+
+    pub fn raw(&self) -> &RawMessage {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.raw(),
+            ConfigMessage::ConfigVote(ref msg) => msg.raw()
+        }
+
+    }
+
+    pub fn veify(&self, public_key: &PublicKey) -> bool {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.verify(public_key),
+            ConfigMessage::ConfigVote(ref msg) => msg.verify(public_key),
+        }
+    }
+
+    pub fn hash(&self) -> Hash {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => msg.hash(),
+            ConfigMessage::ConfigVote(ref msg) => msg.hash(),
+        }
+    }
+
+
+}
+
+impl fmt::Debug for ConfigMessage {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        match *self {
+            ConfigMessage::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
+            ConfigMessage::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
+        }
+    }
+}
+
 impl ConsensusMessage {
     pub fn validator(&self) -> u32 {
         match *self {
@@ -263,7 +330,25 @@ impl<Tx: Message> Any<Tx> {
             REQUEST_BLOCK_MESSAGE_ID => {
                 Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
             }
-            _ => Any::Transaction(Tx::from_raw(raw)?),
+            CONFIG_PROPOSE_MESSAGE_ID => {
+                Any::Transaction(
+                    TransactionMessage::Service(
+                        ServiceTransaction::ConfigChange(
+                            ConfigMessage::ConfigPropose(ConfigPropose::from_raw(raw)?)
+                        )
+                    )
+                )
+            }
+            CONFIG_VOTE_MESSAGE_ID => {
+                Any::Transaction(
+                    TransactionMessage::Service(
+                        ServiceTransaction::ConfigChange(
+                            ConfigMessage::ConfigVote(ConfigVote::from_raw(raw)?)
+                        )
+                    )
+                )
+            }
+            _ => Any::Transaction(TransactionMessage::Application(Tx::from_raw(raw)?)),
         })
     }
 }

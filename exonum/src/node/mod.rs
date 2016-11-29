@@ -1,3 +1,5 @@
+extern crate serde_json;
+
 use std::io;
 use std::net::SocketAddr;
 use std::marker::PhantomData;
@@ -15,6 +17,7 @@ mod state;
 mod basic;
 mod consensus;
 mod requests;
+mod configuration;
 pub mod config;
 
 pub use self::config::{ListenerConfig, ConsensusConfig};

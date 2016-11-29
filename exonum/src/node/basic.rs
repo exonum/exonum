@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use rand::Rng;
 
 use super::super::blockchain::Blockchain;
-use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
+use super::super::messages::{Any, TransactionMessage, ServiceTransaction, RawMessage, Connect, Status, Message, RequestPeers, ConfigMessage};
 use super::{NodeHandler, RequestData};
 
 use super::super::events::Channel;
@@ -21,14 +21,29 @@ impl<B, S> NodeHandler<B, S>
         //     if !raw.verify() {
         //         return;
         //     }
-        let msg = Any::from_raw(raw).unwrap();
+
+        let msg = Any::<B::Transaction>::from_raw(raw).unwrap();
         match msg {
             Any::Connect(msg) => self.handle_connect(msg),
             Any::Status(msg) => self.handle_status(msg),
-            Any::Transaction(message) => self.handle_tx(message),
-            Any::Consensus(message) => self.handle_consensus(message),
-            Any::Request(message) => self.handle_request(message),
-            Any::Block(message) => self.handle_block(message),
+            Any::Consensus(msg) => self.handle_consensus(msg),
+            Any::Request(msg) => self.handle_request(msg),
+            Any::Block(msg) => self.handle_block(msg),
+            Any::Transaction(TransactionMessage::Service(msg)) => self.handle_service_tx(msg),
+            Any::Transaction(TransactionMessage::Application(msg)) => self.handle_tx(msg),
+        }
+    }
+
+    pub fn handle_service_tx(&mut self, message: ServiceTransaction)
+    {
+        match message {
+            ServiceTransaction::ConfigChange(message) => self.handle_config(message),
+        }
+    }
+    pub fn handle_config(&mut self, config_message: ConfigMessage) {
+        match config_message{
+            ConfigMessage::ConfigPropose(msg) => self.handle_config_propose(msg),
+            ConfigMessage::ConfigVote(msg) => self.handle_config_vote(msg)
         }
     }
 

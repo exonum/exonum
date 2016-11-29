@@ -19,6 +19,10 @@ pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 11;
 
+pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 12;
+pub const CONFIG_VOTE_MESSAGE_ID: u16 = 13;
+
+// когда присоединяются узлы
 message! {
     Connect {
         const ID = CONNECT_MESSAGE_ID;
@@ -30,6 +34,7 @@ message! {
     }
 }
 
+// консенсус
 message! {
     Propose {
         const ID = PROPOSE_MESSAGE_ID;
@@ -44,6 +49,7 @@ message! {
     }
 }
 
+// консенсус
 message! {
     Prevote {
         const ID = PREVOTE_MESSAGE_ID;
@@ -57,6 +63,7 @@ message! {
     }
 }
 
+// консенсус
 message! {
     Precommit {
         const ID = PRECOMMIT_MESSAGE_ID;
@@ -70,6 +77,7 @@ message! {
     }
 }
 
+// сообщение о текущем состоянии
 message! {
     Status {
         const ID = STATUS_MESSAGE_ID;
@@ -81,6 +89,7 @@ message! {
     }
 }
 
+// ответ на requestblock
 message! {
     Block {
         const ID = BLOCK_MESSAGE_ID;
@@ -95,6 +104,7 @@ message! {
     }
 }
 
+// запрос на получение предложения
 message! {
     RequestPropose {
         const ID = REQUEST_PROPOSE_MESSAGE_ID;
@@ -102,12 +112,13 @@ message! {
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
-        time:           Timespec    [64 => 72]
+        time:           Timespec    [64 => 72] // текущее время, seed + ttl
         height:         u64         [72 => 80]
         propose_hash:   &Hash       [80 => 112]
     }
 }
 
+// запрос транзакций по списку hash
 message! {
     RequestTransactions {
         const ID = REQUEST_TRANSACTIONS_MESSAGE_ID;
@@ -120,6 +131,7 @@ message! {
     }
 }
 
+// запрос prevotes
 message! {
     RequestPrevotes {
         const ID = REQUEST_PREVOTES_MESSAGE_ID;
@@ -134,7 +146,7 @@ message! {
         validators:     BitVec      [116 => 124]
     }
 }
-
+// запрос прекоммитов
 message! {
     RequestPrecommits {
         const ID = REQUEST_PRECOMMITS_MESSAGE_ID;
@@ -151,6 +163,7 @@ message! {
     }
 }
 
+// запрос узлов с которыми соединён
 message! {
     RequestPeers {
         const ID = REQUEST_PEERS_MESSAGE_ID;
@@ -161,7 +174,7 @@ message! {
         time:           Timespec    [64 => 72]
     }
 }
-
+// запрос блоков
 message! {
     RequestBlock {
         const ID = REQUEST_BLOCK_MESSAGE_ID;
@@ -171,5 +184,28 @@ message! {
         to:             &PublicKey  [32 => 64]
         time:           Timespec    [64 => 72]
         height:         u64         [72 => 80]
+    }
+}
+
+message !{
+    ConfigPropose{
+        const ID = CONFIG_PROPOSE_MESSAGE_ID;
+        const SIZE = 56;
+        from:           &PublicKey  [00 => 32]
+        height:         u64         [32 => 40]
+        config:        &[u8]        [40 => 48] // serialized config bytes
+        actual_from_height: u64     [48 => 56] // с какой высоты становится актуальным
+    }
+}
+
+message !{
+    ConfigVote {
+        const ID = CONFIG_VOTE_MESSAGE_ID;
+        const SIZE = 81;
+        from:           &PublicKey  [00 => 32]
+        height:         u64         [32 => 40]
+        hash_propose:   &Hash       [40 => 72] // hash of transacion we're voting for
+        seed:           u64         [72 => 80] // incremental (1, 2, 3, 4, 5, 6, 7) проверять +1
+        revoke:         bool        [80 => 81] // голос_за=false / отозвать=true
     }
 }
