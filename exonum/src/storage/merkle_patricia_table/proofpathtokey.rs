@@ -1,14 +1,15 @@
 use ::storage::{StorageValue, Error};
 use ::storage::utils::bytes_to_hex;
-use ::storage::fields::repr_stor_val;
+use ::storage::fields::{repr_stor_val, decode_from_b64_string};
 use ::crypto::{hash, Hash};
 use std::fmt;
 use super::{BitSlice, KEY_SIZE};
 use serde::{Serialize, Serializer};
-const LEFT_HASH_DESC: &'static str = "LH";
-const RIGHT_HASH_DESC: &'static str = "RH";
-const LEFT_SLICE_DESC: &'static str = "LK";
-const RIGHT_SLICE_DESC: &'static str = "RK";
+use serde_json::Value;
+const LEFT_HASH_DESC: &'static str = "left_hash";
+const RIGHT_HASH_DESC: &'static str = "right_hash";
+const LEFT_SLICE_DESC: &'static str = "left_key";
+const RIGHT_SLICE_DESC: &'static str = "right_key";
 const VAL_DESC: &'static str = "val";
 const ROOT_KEY_DESC: &'static str = "root_key";
 const ROOT_VAL_HASH: &'static str = "hash";
@@ -103,6 +104,200 @@ pub fn verify_proof_consistency<V: StorageValue, A: AsRef<[u8]>>(proof: &ProofPa
 }
 
 impl<V: StorageValue> ProofPathToKey<V> {
+    pub fn deserialize(json: &Value) -> Result<Self, Error> {
+        if !json.is_object() {
+            return Err(Error::new(format!("Invalid json: it is expected to be json Object. \
+                                           json: {:?}",
+                                          json)));
+        }
+        let map_key_value = json.as_object().unwrap();
+        let res: Self = match map_key_value.len() {
+            1 => {
+                if map_key_value.get(VAL_DESC).is_none() {
+                    return Err(Error::new(format!("Invalid json: Key {} not found. Value: {:?}",
+                                                  VAL_DESC,
+                                                  json)));
+                }
+                let leaf_value = map_key_value.get(VAL_DESC).unwrap();
+                if !leaf_value.is_string() {
+                    return Err(Error::new(format!("Invalid json: leaf value is expected to be \
+                                                   a string. json: {:?}",
+                                                  leaf_value)));
+                }
+                let val_repr = leaf_value.as_str().unwrap();
+                let val: V = decode_from_b64_string(val_repr).map_err(|e| {
+                        Error::new(format!("Base64Error: {}. The value, that was attempted to be \
+                                            decoded: {}",
+                                           e,
+                                           val_repr))
+                    })?;
+                ProofPathToKey::Leaf(val)  // only the VAL_DESC variant
+            } 
+            2 => {
+                // either a [ROOT_KEY_DESC, VAL_DESC] or [ROOT_KEY_DESC, ROOT_VAL_HASH] variants
+                if map_key_value.get(ROOT_KEY_DESC).is_none() {
+                    return Err(Error::new(format!("Invalid json: Key {} not found. Value: {:?}",
+                                                  ROOT_KEY_DESC,
+                                                  json)));
+                }
+                if map_key_value.get(VAL_DESC).is_none() &&
+                   map_key_value.get(ROOT_VAL_HASH).is_none() {
+                    return Err(Error::new(format!("Invalid json: unknown key met. Expected: {} \
+                                                   or {}. json: {:?}",
+                                                  VAL_DESC,
+                                                  ROOT_VAL_HASH,
+                                                  json)));
+                }
+                let root_key_value = map_key_value.get(ROOT_KEY_DESC).unwrap();
+                if !root_key_value.is_string() {
+                    return Err(Error::new(format!("Invalid json: root_key is expected to \
+                                                       be a string. json: {:?}",
+                                                  root_key_value)));
+                }
+                let val_repr = root_key_value.as_str().unwrap();
+                let root_key: Vec<u8> = decode_from_b64_string(val_repr).map_err(|e| {
+                        Error::new(format!("Base64Error: {}. The value, that was attempted to be \
+                                            decoded: {}",
+                                           e,
+                                           val_repr))
+                    })?;
+
+
+                if let Some(leaf_value) = map_key_value.get(VAL_DESC) {
+                    if !leaf_value.is_string() {
+                        return Err(Error::new(format!("Invalid json: leaf value is expected to \
+                                                       be a string. json: {:?}",
+                                                      leaf_value)));
+                    }
+                    let val_repr = leaf_value.as_str().unwrap();
+                    let val: V = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    ProofPathToKey::LeafRootInclusive(root_key, val)
+                } else {
+                    // ROOT_VAL_HASH is present
+                    let hash_value = map_key_value.get(ROOT_VAL_HASH).unwrap();
+                    if !hash_value.is_string() {
+                        return Err(Error::new(format!("Invalid json: leaf value is expected to \
+                                                       be a string. json: {:?}",
+                                                      hash_value)));
+                    }
+                    let val_repr = hash_value.as_str().unwrap();
+                    let hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    ProofPathToKey::LeafRootExclusive(root_key, hash)
+                }
+            } 
+            4 => {
+                if map_key_value.get(LEFT_HASH_DESC).is_none() ||
+                   map_key_value.get(RIGHT_HASH_DESC).is_none() ||
+                   map_key_value.get(LEFT_SLICE_DESC).is_none() ||
+                   map_key_value.get(RIGHT_SLICE_DESC).is_none() {
+                    return Err(Error::new(format!("Invalid json: unknown key met. Expected: \
+                                                   {}, {}, {} and {}. json: {:?}",
+                                                  LEFT_HASH_DESC,
+                                                  RIGHT_HASH_DESC,
+                                                  LEFT_SLICE_DESC,
+                                                  RIGHT_SLICE_DESC,
+                                                  json)));
+                }
+                let (left_hash_value, right_hash_value, left_slice_value, right_slice_value) =
+                    (map_key_value.get(LEFT_HASH_DESC).unwrap(),
+                     map_key_value.get(RIGHT_HASH_DESC).unwrap(),
+                     map_key_value.get(LEFT_SLICE_DESC).unwrap(),
+                     map_key_value.get(RIGHT_SLICE_DESC).unwrap());
+                if !left_slice_value.is_string() || !right_slice_value.is_string() {
+                    return Err(Error::new(format!("Invalid json: both slice values are \
+                                                   expected to be a strings. json1: {:?}, \
+                                                   json2: {:?}",
+                                                  left_slice_value,
+                                                  right_slice_value)));
+                }
+                let val_repr = left_slice_value.as_str().unwrap();
+                let left_slice: Vec<u8> = decode_from_b64_string(val_repr).map_err(|e| {
+                        Error::new(format!("Base64Error: {}. The value, that was attempted to be \
+                                            decoded: {}",
+                                           e,
+                                           val_repr))
+                    })?;
+                let val_repr = right_slice_value.as_str().unwrap();
+                let right_slice: Vec<u8> = decode_from_b64_string(val_repr).map_err(|e| {
+                        Error::new(format!("Base64Error: {}. The value, that was attempted to be \
+                                            decoded: {}",
+                                           e,
+                                           val_repr))
+                    })?;
+                if !left_hash_value.is_string() && !right_hash_value.is_string() {
+                    return Err(Error::new(format!("Invalid json: at least 1 of hash_value is \
+                                                   expected to be a string. json1: {:?}, \
+                                                   json2: {:?}",
+                                                  left_slice_value,
+                                                  right_slice_value)));
+                }
+                if left_hash_value.is_string() && right_hash_value.is_string() {
+                    let val_repr = left_hash_value.as_str().unwrap();
+                    let left_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    let val_repr = right_hash_value.as_str().unwrap();
+                    let right_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    ProofPathToKey::BranchKeyNotFound(left_hash,
+                                                      right_hash,
+                                                      left_slice,
+                                                      right_slice)
+                } else if left_hash_value.is_string() {
+                    let val_repr = left_hash_value.as_str().unwrap();
+                    let left_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    let right_proof = Self::deserialize(right_hash_value)?;
+                    ProofPathToKey::RightBranch(left_hash,
+                                                Box::new(right_proof),
+                                                left_slice,
+                                                right_slice)
+                } else {
+                    // it's implied that right_hash_value.is_string() is true
+                    let val_repr = right_hash_value.as_str().unwrap();
+                    let right_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
+                            Error::new(format!("Base64Error: {}. The value, that was attempted \
+                                                to be decoded: {}",
+                                               e,
+                                               val_repr))
+                        })?;
+                    let left_proof = Self::deserialize(left_hash_value)?;
+                    ProofPathToKey::LeftBranch(Box::new(left_proof),
+                                               right_hash,
+                                               left_slice,
+                                               right_slice)
+                }
+            } 
+            _ => {
+                return Err(Error::new(format!("Invalid json: Number of keys should be either 1, \
+                                               2 or 4. json: {:?}",
+                                              json)))
+            }
+        };
+        Ok(res)
+    }
+
     fn verify_root_proof_consistency(&self,
                                      searched_slice: &BitSlice)
                                      -> Result<Option<&V>, Error> {

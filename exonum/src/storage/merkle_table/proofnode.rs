@@ -65,7 +65,7 @@ impl<V: StorageValue> Proofnode<V> {
     pub fn deserialize(json: &Value) -> Result<Self, Error> {
         if !json.is_object() {
             return Err(Error::new(format!("Invalid json: it is expected to be json Object. \
-                                           Value: {:?}",
+                                           json: {:?}",
                                           json)));
         }
         let map_key_value = json.as_object().unwrap();
@@ -117,13 +117,16 @@ impl<V: StorageValue> Proofnode<V> {
             } 
             1 => {
                 if map_key_value.get(VAL_DESC).is_none() && map_key_value.get(LEFT_DESC).is_none() {
-                    return Err(Error::new(format!("Invalid json: unknown key met. Value: {:?}",
+                    return Err(Error::new(format!("Invalid json: unknown key met. Expected: {} \
+                                                   or {}. json: {:?}",
+                                                  VAL_DESC,
+                                                  LEFT_DESC,
                                                   json)));
                 }
                 if let Some(leaf_value) = map_key_value.get(VAL_DESC) {
                     if !leaf_value.is_string() {
                         return Err(Error::new(format!("Invalid json: leaf value is expected to \
-                                                       be a string. Value: {:?}",
+                                                       be a string. json: {:?}",
                                                       leaf_value)));
                     }
                     let val_repr = leaf_value.as_str().unwrap();
@@ -136,6 +139,7 @@ impl<V: StorageValue> Proofnode<V> {
                     Proofnode::Leaf(val)
 
                 } else {
+                    // LEFT_DESC is present
                     let left_proof_value = map_key_value.get(LEFT_DESC).unwrap();
                     let left_proof = Self::deserialize(left_proof_value)?;
                     Proofnode::Left(Box::new(left_proof), None)
@@ -143,7 +147,7 @@ impl<V: StorageValue> Proofnode<V> {
             } 
             _ => {
                 return Err(Error::new(format!("Invalid json: Number of keys should be either 1 \
-                                               or 2. Value: {:?}",
+                                               or 2. json: {:?}",
                                               json)))
             } 
         };
