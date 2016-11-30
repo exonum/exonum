@@ -28,7 +28,7 @@ pub enum ProofPathToKey<V: StorageValue> {
     Leaf(V), // to prove inclusion of a value under searched_key below root level
 }
 
-impl<V: StorageValue> Serialize for ProofPathToKey<V> {
+impl<V: StorageValue + Clone> Serialize for ProofPathToKey<V> {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
@@ -83,10 +83,11 @@ impl<V: StorageValue> Serialize for ProofPathToKey<V> {
 ///                                 b) its structure is inconsistent with `searched_key`
 ///                                 c) its structure is inconsistent with itself (invalid enum variants are met or inconsistent parent and child bitslices)
 #[allow(dead_code)]
-pub fn verify_proof_consistency<V: StorageValue, A: AsRef<[u8]>>(proof: &ProofPathToKey<V>,
-                                                                 searched_key: A,
-                                                                 root_hash: Hash)
-                                                                 -> Result<Option<&V>, Error> {
+pub fn verify_proof_consistency<V: StorageValue + fmt::Debug, A: AsRef<[u8]>>
+    (proof: &ProofPathToKey<V>,
+     searched_key: A,
+     root_hash: Hash)
+     -> Result<Option<&V>, Error> {
     let searched_key = searched_key.as_ref();
     debug_assert_eq!(searched_key.len(), KEY_SIZE);
     let searched_slice = BitSlice::from_bytes(searched_key);
@@ -100,7 +101,6 @@ pub fn verify_proof_consistency<V: StorageValue, A: AsRef<[u8]>>(proof: &ProofPa
                                       proof_hash)));
     }
     Ok(result)
-
 }
 
 impl<V: StorageValue> ProofPathToKey<V> {
@@ -298,6 +298,57 @@ impl<V: StorageValue> ProofPathToKey<V> {
         Ok(res)
     }
 
+
+    pub fn compute_proof_root(&self) -> Hash {
+        use self::ProofPathToKey::*;
+        match *self { 
+            LeafRootInclusive(ref root_key, ref root_val) => {
+                hash(&[root_key.as_slice(), root_val.hash().as_ref()].concat())
+            } 
+            LeafRootExclusive(ref root_key, ref root_val_hash) => {
+                hash(&[root_key.as_slice(), root_val_hash.as_ref()].concat())
+            } 
+            BranchKeyNotFound(ref l_h, ref r_h, ref l_s, ref r_s) => {
+                let full_slice = &[l_h.as_ref(), r_h.as_ref(), l_s.as_slice(), r_s.as_slice()]
+                    .concat();
+                hash(full_slice)
+            }  
+            LeftBranch(ref l_proof, ref right_hash, ref l_s, ref r_s) => {
+                let full_slice = &[l_proof.compute_proof_root().as_ref(),
+                                   right_hash.as_ref(),
+                                   l_s.as_slice(),
+                                   r_s.as_slice()]
+                    .concat();
+                hash(full_slice)
+            } 
+            RightBranch(ref left_hash, ref r_proof, ref l_s, ref r_s) => {
+                let full_slice = &[left_hash.as_ref(),
+                                   r_proof.compute_proof_root().as_ref(),
+                                   l_s.as_slice(),
+                                   r_s.as_slice()]
+                    .concat();
+                hash(full_slice)
+            } 
+            Leaf(ref val) => val.hash(),            
+        }
+    }
+
+    pub fn compute_height(&self, start_height: u16) -> u16 {
+        use self::ProofPathToKey::*;
+        match *self { 
+            LeafRootInclusive(_, _) |
+            LeafRootExclusive(_, _) |
+            BranchKeyNotFound(_, _, _, _) |
+            Leaf(_) => start_height, 
+
+            LeftBranch(ref l_proof, _, _, _) => l_proof.compute_height(start_height + 1), 
+
+            RightBranch(_, ref r_proof, _, _) => r_proof.compute_height(start_height + 1),         
+        }
+    }
+}
+
+impl<V: StorageValue + fmt::Debug> ProofPathToKey<V> {
     fn verify_root_proof_consistency(&self,
                                      searched_slice: &BitSlice)
                                      -> Result<Option<&V>, Error> {
@@ -452,57 +503,9 @@ impl<V: StorageValue> ProofPathToKey<V> {
         };
         Ok(res)
     }
-
-    pub fn compute_proof_root(&self) -> Hash {
-        use self::ProofPathToKey::*;
-        match *self { 
-            LeafRootInclusive(ref root_key, ref root_val) => {
-                hash(&[root_key.as_slice(), root_val.hash().as_ref()].concat())
-            } 
-            LeafRootExclusive(ref root_key, ref root_val_hash) => {
-                hash(&[root_key.as_slice(), root_val_hash.as_ref()].concat())
-            } 
-            BranchKeyNotFound(ref l_h, ref r_h, ref l_s, ref r_s) => {
-                let full_slice = &[l_h.as_ref(), r_h.as_ref(), l_s.as_slice(), r_s.as_slice()]
-                    .concat();
-                hash(full_slice)
-            }  
-            LeftBranch(ref l_proof, ref right_hash, ref l_s, ref r_s) => {
-                let full_slice = &[l_proof.compute_proof_root().as_ref(),
-                                   right_hash.as_ref(),
-                                   l_s.as_slice(),
-                                   r_s.as_slice()]
-                    .concat();
-                hash(full_slice)
-            } 
-            RightBranch(ref left_hash, ref r_proof, ref l_s, ref r_s) => {
-                let full_slice = &[left_hash.as_ref(),
-                                   r_proof.compute_proof_root().as_ref(),
-                                   l_s.as_slice(),
-                                   r_s.as_slice()]
-                    .concat();
-                hash(full_slice)
-            } 
-            Leaf(ref val) => val.hash(),            
-        }
-    }
-
-    pub fn compute_height(&self, start_height: u16) -> u16 {
-        use self::ProofPathToKey::*;
-        match *self { 
-            LeafRootInclusive(_, _) |
-            LeafRootExclusive(_, _) |
-            BranchKeyNotFound(_, _, _, _) |
-            Leaf(_) => start_height, 
-
-            LeftBranch(ref l_proof, _, _, _) => l_proof.compute_height(start_height + 1), 
-
-            RightBranch(_, ref r_proof, _, _) => r_proof.compute_height(start_height + 1),         
-        }
-    }
 }
 
-impl<V: StorageValue> fmt::Debug for ProofPathToKey<V> {
+impl<V: StorageValue + fmt::Debug> fmt::Debug for ProofPathToKey<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::ProofPathToKey::*;
         match *self {
@@ -522,7 +525,7 @@ impl<V: StorageValue> fmt::Debug for ProofPathToKey<V> {
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             } 
-            Leaf(ref val) => write!(f, "{{ val: {:?} }}", bytes_to_hex(&val.clone().serialize())), 
+            Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
             BranchKeyNotFound(ref l_hash, ref r_hash, ref left_slice_key, ref right_slice_key) => {
                 write!(f,
                        "{{left: {:?}, right: {:?}, left_slice: {:?},  \
@@ -536,7 +539,7 @@ impl<V: StorageValue> fmt::Debug for ProofPathToKey<V> {
                 write!(f,
                        "{{ slice: {:?}, val: {:?} }}",
                        BitSlice::from_db_key(db_key),
-                       bytes_to_hex(&val.clone().serialize()))
+                       val)
             } 
             LeafRootExclusive(ref db_key, ref val_hash) => {
                 write!(f,

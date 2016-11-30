@@ -9,13 +9,13 @@ use ::messages::{MessageBuffer, Message, AnyTx};
 #[derive(Clone)]
 pub struct HeightBytes(pub [u8; 32]);
 
-pub trait StorageValue: Clone {
+pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;
     fn deserialize(v: Vec<u8>) -> Self;
     fn hash(&self) -> Hash;   
 }
 
-pub fn repr_stor_val<T: StorageValue>(value: &T) -> String {
+pub fn repr_stor_val<T: StorageValue + Clone>(value: &T) -> String {
     let vec_bytes = value.clone().serialize();
     encode(&vec_bytes)
 }

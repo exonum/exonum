@@ -22,7 +22,7 @@ pub enum Proofnode<V: StorageValue> {
     Leaf(V),
 }
 
-impl<V: StorageValue> Serialize for Proofnode<V> {
+impl<V: StorageValue + Clone> Serialize for Proofnode<V> {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
