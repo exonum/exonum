@@ -10,8 +10,10 @@ use super::crypto::{PublicKey, SecretKey, Hash, hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
                     EventsConfiguration, Channel, EventHandler, Result as EventsResult,
                     Error as EventsError};
-use super::blockchain::Blockchain;
+use super::blockchain::{Blockchain, View};
+
 use super::messages::{Connect, RawMessage};
+use storage::Map;
 
 pub mod state;//temporary solution to get access to WAIT consts
 mod basic;
@@ -21,7 +23,9 @@ mod configuration;
 mod adjusted_propose_timeout;
 pub mod config;
 
-pub use self::config::{ListenerConfig, ConsensusConfig};
+pub use self::configuration::StoredConfiguration;
+pub use self::config::ListenerConfig;
+pub use self::configuration::ConsensusCfg;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 use self::adjusted_propose_timeout::*;
 
@@ -79,9 +83,16 @@ pub struct Configuration {
     pub listener: ListenerConfig,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
-    pub consensus: ConsensusConfig,
+    pub consensus: ConsensusCfg,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
+}
+
+impl Configuration {
+    pub fn update_with_actual_config(&mut self, actual_config: StoredConfiguration){
+        self.validators = actual_config.validators;
+        self.consensus = actual_config.consensus;
+    }
 }
 
 impl<B, S> NodeHandler<B, S>
@@ -90,14 +101,6 @@ impl<B, S> NodeHandler<B, S>
 {
     pub fn new(blockchain: B, sender: S, config: Configuration) -> NodeHandler<B, S> {
         // FIXME: remove unwraps here, use FATAL log level instead
-        let id = config.validators
-            .iter()
-            .position(|pk| pk == &config.listener.public_key)
-            .unwrap();
-        let connect = Connect::new(&config.listener.public_key,
-                                   sender.address(),
-                                   sender.get_time(),
-                                   &config.listener.secret_key);
 
         let r = blockchain.last_block().unwrap();
         // TODO нужно создать api и для того, чтобы здесь подключался genesis блок
@@ -106,6 +109,16 @@ impl<B, S> NodeHandler<B, S>
         } else {
             (super::crypto::hash(&[]), 0)
         };
+
+        let id = config.validators
+            .iter()
+            .position(|pk| pk == &config.listener.public_key)
+            .unwrap();
+
+        let connect = Connect::new(&config.listener.public_key,
+                                   sender.address(),
+                                   sender.get_time(),
+                                   &config.listener.secret_key);
 
         let state = State::new(id as u32,
                                config.validators,
@@ -345,12 +358,44 @@ pub struct Node<B>
 impl<B> Node<B>
     where B: Blockchain
 {
-    pub fn new(blockchain: B, config: Configuration) -> Node<B> {
+    pub fn new(blockchain: B, mut config: Configuration) -> Node<B> {
+
+        if let Some(actual_config) = Self::actual_config(&blockchain){
+            config.update_with_actual_config(actual_config);
+        }
+
         let network = Network::with_config(config.listener.address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = MioChannel::new(config.listener.address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);
         Node { reactor: Events::with_event_loop(network, worker, event_loop) }
+    }
+
+    pub fn actual_config(blockchain: &B) -> Option<StoredConfiguration> {
+        let view = blockchain.view();
+        let configs = view.configs();
+        let r = blockchain.last_block().unwrap();
+        let (_, last_height) = if let Some(last_block) = r {
+            (last_block.hash(), last_block.height() + 1)
+        } else {
+            (super::crypto::hash(&[]), 0)
+        };
+        let mut h = last_height;
+        while h > 0 {
+            if let Some(actual_config) = configs.get(&StoredConfiguration::height_to_slice(h)).unwrap(){
+                match StoredConfiguration::deserialize(&actual_config) {
+                    Ok(configuration) => {
+                        return Some(configuration);
+                    },
+                    Err(_) => {
+                        error!("Can't parse found configuration at height: {}", h);
+                    }
+                }
+
+            }
+            h += 1;
+        }
+        None
     }
 
     pub fn run(&mut self) -> io::Result<()> {

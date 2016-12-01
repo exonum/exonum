@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use super::super::crypto::{gen_keypair, gen_keypair_from_seed, Seed, PublicKey, SecretKey};
 use super::Configuration;
 use super::super::events::{NetworkConfiguration, EventsConfiguration};
+use super::configuration::ConsensusCfg;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
@@ -11,19 +12,19 @@ pub struct ListenerConfig {
     pub address: SocketAddr,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConsensusConfig {
-    pub round_timeout: u32,
-    pub propose_timeout: u32,
-    pub status_timeout: u32,
-    pub peers_timeout: u32,
-    pub txs_block_limit: u32,
-}
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct ConsensusConfig {
+//     pub round_timeout: u32,
+//     pub propose_timeout: u32,
+//     pub status_timeout: u32,
+//     pub peers_timeout: u32,
+//     pub txs_block_limit: u32,
+// }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GenesisConfig {
     pub validators: Vec<ListenerConfig>,
-    pub consensus: ConsensusConfig,
+    pub consensus: ConsensusCfg,
     pub network: NetworkConfiguration,
 }
 
@@ -59,7 +60,7 @@ impl GenesisConfig {
 
         GenesisConfig {
             validators: pairs,
-            consensus: ConsensusConfig {
+            consensus: ConsensusCfg {
                 round_timeout: 2000,
                 status_timeout: 5000,
                 peers_timeout: 10000,

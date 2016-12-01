@@ -3,25 +3,26 @@ use events::Channel;
 use node::{ExternalMessage, NodeHandler, NodeTimeout};
 use super::super::messages::{ConfigPropose, ConfigVote};
 use super::super::blockchain::{Blockchain, View};
-use super::super::crypto::{PublicKey, Hash};
+use super::super::blockchain::HeightBytecode;
+use super::super::crypto::PublicKey;
 use super::super::storage::Map;
 use super::super::messages::Message;
 use byteorder::{ByteOrder, LittleEndian};
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Configuration {
+pub struct StoredConfiguration {
     actual_from: u64,
-    validators: Vec<PublicKey>,
-    consensus: ConsensusCfg,
+    pub validators: Vec<PublicKey>,
+    pub consensus: ConsensusCfg
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConsensusCfg {
-    round_timeout: u64, // 2000
-    status_timeout: u64, // 5000
-    peers_timeout: u64, // 10000
-    propose_timeout: u64, // 500
-    txs_block_limit: u16, // 500
+    pub round_timeout: u32,    // 2000
+    pub status_timeout: u32,   // 5000
+    pub peers_timeout: u32,    // 10000
+    pub propose_timeout: u32,  // 500
+    pub txs_block_limit: u32   // 500
 }
 
 trait ConfigurationValidator {
@@ -34,23 +35,36 @@ impl ConfigurationValidator for ConsensusCfg {
     }
 }
 
-impl Configuration {
+impl StoredConfiguration {
+
     #[allow(dead_code)]
-    fn serialize(&self) -> Vec<u8> {
+    pub fn serialize(&self) -> Vec<u8> {
         serde_json::to_vec(&self).unwrap()
     }
 
     #[allow(dead_code)]
-    fn deserialize(serialized: &[u8]) -> Result<Configuration, &str> {
-        let cfg: Configuration = serde_json::from_slice(serialized).unwrap();
+    pub fn deserialize(serialized: &[u8]) -> Result<StoredConfiguration, &str> {
+        let cfg: StoredConfiguration = serde_json::from_slice(serialized).unwrap();
         if cfg.is_valid() {
             return Ok(cfg);
         }
         Err("not valid")
     }
+
+    pub fn height_to_slice(height: u64) -> HeightBytecode {
+        let mut result = [0; 8];
+        LittleEndian::write_u64(&mut result[0..], height);
+        result
+    }
+
+    // RFU
+    // fn height_from_slice(slice: [u8; 8]) -> u64 {
+    //     LittleEndian::read_u64(&slice)
+    // }
+
 }
 
-impl ConfigurationValidator for Configuration {
+impl ConfigurationValidator for StoredConfiguration {
     fn is_valid(&self) -> bool {
         self.consensus.is_valid()
     }
@@ -140,24 +154,14 @@ impl<B, S> NodeHandler<B, S>
             }
         }
 
-        if votes_count >= 2 / 3 * self.state.validators().len() {
-            if let Some(config_propose) = view.config_proposes()
-                .get(config_vote.hash_propose())
-                .unwrap() {
-                view.configs()
-                    .put(&Hash::new(self.height_to_slice(config_propose.actual_from_height())),
-                         config_propose.config().to_vec())
-                    .unwrap();
+        if votes_count >= 2/3 * self.state.validators().len(){
+            if let Some(config_propose) = view.config_proposes().get(config_vote.hash_propose()).unwrap() {
+                view.configs().put(&StoredConfiguration::height_to_slice(config_propose.actual_from_height()), config_propose.config().to_vec()).unwrap();
                 // TODO: clear storages
             }
         }
     }
 
-    fn height_to_slice(&self, height: u64) -> [u8; 32] {
-        let mut result = [0; 32];
-        LittleEndian::write_u64(&mut result[24..], height);
-        result
-    }
 }
 
 #[cfg(test)]
