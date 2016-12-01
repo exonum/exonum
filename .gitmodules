@@ -1,0 +1,3 @@
+[submodule "exonum"]
+	path = exonum
+	url = git@gitlab.xdev.re:digital-assets/digital-assets.git
