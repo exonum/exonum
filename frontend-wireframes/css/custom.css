@@ -1,0 +1,129 @@
+/* Custom font */
+@font-face {
+    font-family: "WeblySleek UI";
+    src: url("../fonts/ws-ui.eot");
+    src: local('WeblySleek UI Regular'), url("../fonts/ws-ui.woff") format("woff");
+    font-weight: 400;
+}
+@font-face {
+    font-family: "WeblySleek UI";
+    src: url("../fonts/ws-ui-semibold.eot");
+    src: local('WeblySleek UI Bold'), url("../fonts/ws-ui-semibold.woff") format("woff");
+    font-weight: 700;
+}
+@font-face {
+    font-family: "WeblySleek UI";
+    src: url("../fonts/ws-ui-light.eot");
+    src: local('WeblySleek UI Light'), url("../fonts/ws-ui-light.woff") format("woff");
+    font-weight: 100;
+}
+
+/* Global */
+body {
+    font-family: 'WeblySleek UI', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 400;
+    color: #4c5667;
+}
+
+/* Navbar */
+.navbar {
+    margin-bottom: 0;
+}
+
+.navbar-brand {
+    font-family: 'Lato', sans-serif;
+    font-weight: 300;
+    font-size: 18px;
+    text-transform: uppercase;
+}
+
+/* Footer */
+.footer {
+    padding-top: 50px;
+    padding-bottom: 50px;
+    margin-top: 100px;
+    color: #99979c;
+    text-align: center;
+    background-color: #2a2730;
+}
+
+@media (min-width: 768px) {
+    .footer {
+        text-align: left;
+    }
+}
+
+.footer a {
+    color: #fff;
+}
+
+.footer-links {
+    padding-left: 0;
+    margin-bottom: 20px;
+}
+
+.footer-links li {
+    display: inline-block;
+}
+
+.footer-links li + li {
+    margin-left: 15px;
+}
+
+/* Common */
+.dark {
+    background-color: #2a2730;
+    color: #99979c;
+    padding: 60px 0;
+}
+
+.dark h1 {
+    color: #fff;
+}
+
+.wrapper {
+    padding: 40px 0;
+}
+
+.text-block {
+    font-size: 16px;
+}
+
+.text-block p {
+    margin-bottom: 50px;
+}
+
+.hash {
+    display: inline-block;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 100%;
+    vertical-align: bottom;
+}
+
+.inline-logo {
+    font-family: 'Lato', sans-serif;
+    font-weight: 300;
+    text-transform: uppercase;
+}
+
+.steps {
+    margin: 60px 0;
+}
+
+.steps li {
+    position: relative;
+}
+
+.steps li + li:after {
+    display: block;
+    content: '\e080';
+    font-family: 'Glyphicons Halflings';
+    position: absolute;
+    top: 5px;
+    left: -13px;
+}
+
+.steps p {
+    color: #fff;
+}
