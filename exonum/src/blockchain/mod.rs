@@ -14,6 +14,8 @@ use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
 pub use self::block::Block;
 pub use self::view::View;
+pub use self::view::ConfigurationData;
+pub use self::view::HeightBytecode;
 
 pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     where Self: Deref<Target = <Self as Blockchain>::Database>
