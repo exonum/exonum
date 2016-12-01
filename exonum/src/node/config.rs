@@ -12,15 +12,6 @@ pub struct ListenerConfig {
     pub address: SocketAddr,
 }
 
-// #[derive(Serialize, Deserialize, Debug, Clone)]
-// pub struct ConsensusConfig {
-//     pub round_timeout: u32,
-//     pub propose_timeout: u32,
-//     pub status_timeout: u32,
-//     pub peers_timeout: u32,
-//     pub txs_block_limit: u32,
-// }
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GenesisConfig {
     pub validators: Vec<ListenerConfig>,

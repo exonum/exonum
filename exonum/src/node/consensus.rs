@@ -85,6 +85,7 @@ impl<B, S> NodeHandler<B, S>
         let start_time = self.round_start_time(round) +
                          Duration::milliseconds(self.adjusted_propose_timeout());
         let end_time = start_time + Duration::milliseconds(self.round_timeout);
+
         if msg.time() < start_time || msg.time() > end_time {
             error!("Received propose with wrong time, msg={:?}", msg);
             return;
@@ -545,7 +546,7 @@ impl<B, S> NodeHandler<B, S>
         info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
         let round = self.state.round();
-        let max_count = ::std::cmp::min(self.txs_block_limit as usize,
+        let max_count = ::std::cmp::min(self.txs_block_limit() as usize,
                                         self.state.transactions().len());
         let txs: Vec<Hash> = self.state
             .transactions()

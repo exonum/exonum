@@ -18,11 +18,59 @@ pub struct StoredConfiguration {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConsensusCfg {
-    pub round_timeout: u32,    // 2000
-    pub status_timeout: u32,   // 5000
-    pub peers_timeout: u32,    // 10000
-    pub propose_timeout: u32,  // 500
+    pub round_timeout: i64,    // 2000
+    pub status_timeout: i64,   // 5000
+    pub peers_timeout: i64,    // 10000
+    pub propose_timeout: i64,  // 500
     pub txs_block_limit: u32   // 500
+}
+
+pub struct ConfigurationManager<B> where B: Blockchain
+{
+    blockchain: B
+}
+
+impl<B> ConfigurationManager<B> where B: Blockchain {
+
+    pub fn new(blockchain: B) -> ConfigurationManager<B> {
+        ConfigurationManager{
+            blockchain: blockchain
+        }
+    }
+
+    pub fn get_actual_config(&self) -> Option<StoredConfiguration> {
+
+        let r = self.blockchain.last_block().unwrap();
+        let last_height = if let Some(last_block) = r {
+            last_block.height() + 1
+        } else {
+            0
+        };
+        let mut h = last_height;
+        while h > 0 {
+            if let Some(configuration) = self.get_config_at_height(h){
+                return Some(configuration);
+            }
+            h -= 1;
+        }
+        None
+    }
+
+    pub fn get_config_at_height(&self, height: u64) -> Option<StoredConfiguration> {
+        let view = self.blockchain.view();
+        let configs = view.configs();
+        if let Ok(config) = configs.get(&StoredConfiguration::height_to_slice(height)) {
+            match StoredConfiguration::deserialize(&config.unwrap()) {
+                Ok(configuration) => {
+                    return Some(configuration);
+                },
+                Err(_) => {
+                    error!("Can't parse found configuration at height: {}", height);
+                }
+            }
+        }
+        None
+    }
 }
 
 trait ConfigurationValidator {
@@ -167,8 +215,8 @@ impl<B, S> NodeHandler<B, S>
 #[cfg(test)]
 mod tests {
 
-    use super::super::super::crypto::gen_keypair;
-    use super::{Configuration, ConsensusCfg, ConfigurationValidator};
+    use super::super::super::crypto::{gen_keypair};
+    use super::{StoredConfiguration, ConsensusCfg, ConfigurationValidator};
 
     #[test]
     fn validate_configuration() {
@@ -178,7 +226,7 @@ mod tests {
         let (p2, _) = gen_keypair();
         let (p3, _) = gen_keypair();
 
-        let cfg = Configuration {
+        let cfg = StoredConfiguration {
             actual_from: 1,
             validators: vec![p1, p2, p3],
             consensus: ConsensusCfg {

@@ -8,6 +8,9 @@ use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMess
                              BitVec, AnyTx};
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
+use super::super::blockchain::Blockchain;
+
+use super::configuration::{ConsensusCfg, StoredConfiguration, ConfigurationManager};
 
 // TODO: replace by in disk tx pool
 const TX_POOL_LIMIT: usize = 20000;
@@ -24,14 +27,22 @@ pub type Round = u32;
 pub type Height = u64;
 pub type ValidatorId = u32;
 
+pub trait Configurable {
+    fn update_config(&mut self, config: StoredConfiguration);
+}
+
 // TODO: reduce copying of Hash
 
 pub struct State<AppTx>
-    where AppTx: Message
+   where AppTx: Message
 {
     id: u32,
-    peers: HashMap<PublicKey, Connect>,
     validators: Vec<PublicKey>,
+    consensus_config: ConsensusCfg,
+    configuration_manager: ConfigurationManager<B>,
+
+
+    peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
     height: u64,
     round: Round,
@@ -68,6 +79,7 @@ pub struct State<AppTx>
     // FIXME: temp, to remove
     pub commited_txs: u64,
 }
+
 
 // Данные, которые нас интересуют,
 // специфичны для некоторой высоты
@@ -253,15 +265,31 @@ impl BlockState {
 impl<AppTx> State<AppTx>
     where AppTx: Message
 {
+
+    fn update_config(&mut self, config: StoredConfiguration){
+
+        let id = config.validators
+            .iter()
+            .position(|pk| pk == self.public_key().unwrap()).unwrap();
+
+        self.id = id as u32;
+        self.validators = config.validators;
+        self.consensus_config = config.consensus;
+    }
+}
+
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
                connect: Connect,
                last_hash: Hash,
-               last_height: u64)
-               -> State<AppTx> {
+               last_height: u64,
+               consensus_config: ConsensusCfg,
+               configuration_manager: ConfigurationManager<B>)
+                -> State<AppTx> { 
+
         let validators_len = validators.len();
 
-        State {
+        let mut state = State {
             id: id,
 
             peers: HashMap::new(),
@@ -294,12 +322,37 @@ impl<AppTx> State<AppTx>
             requests: HashMap::new(),
 
             commited_txs: 0,
+
+            consensus_config: consensus_config,
+            configuration_manager: configuration_manager
+        };
+
+        state.initial_configuration();
+
+        state
+    }
+
+    pub fn initial_configuration (&mut self){
+        if let Some(stored_config) = self.configuration_manager.get_actual_config(){
+            self.update_config(stored_config);
         }
+    }
+
+    pub fn reconfigure_at_height (&mut self){
+        if let Some(configuration) = self.configuration_manager.get_config_at_height(self.height){
+            self.update_config(configuration);
+        }
+    }
+
+    pub fn consensus_config(&self) -> &ConsensusCfg {
+        &self.consensus_config
     }
 
     pub fn id(&self) -> ValidatorId {
         self.id
     }
+
+
 
     // TODO Move to blockchain (and store therein)
     pub fn validators(&self) -> &[PublicKey] {
@@ -325,6 +378,10 @@ impl<AppTx> State<AppTx>
 
     pub fn public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
         self.validators.get(id as usize)
+    }
+
+    pub fn public_key(&self) -> Option<&PublicKey> {
+        self.public_key_of(self.id)
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {
@@ -421,6 +478,7 @@ impl<AppTx> State<AppTx>
         self.our_prevotes.clear();
         self.our_precommits.clear();
         self.requests.clear(); // FIXME: clear all timeouts
+        self.reconfigure_at_height();
     }
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {

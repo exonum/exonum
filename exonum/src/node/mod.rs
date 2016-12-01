@@ -1,3 +1,6 @@
+// To avoid clippy failure concerning unused mut in cases when it's required
+#![allow(unused_mut)]
+
 extern crate serde_json;
 
 use std::io;
@@ -10,10 +13,9 @@ use super::crypto::{PublicKey, SecretKey, Hash, hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
                     EventsConfiguration, Channel, EventHandler, Result as EventsResult,
                     Error as EventsError};
-use super::blockchain::{Blockchain, View};
+use super::blockchain::Blockchain;
 
 use super::messages::{Connect, RawMessage};
-use storage::Map;
 
 pub mod state;//temporary solution to get access to WAIT consts
 mod basic;
@@ -23,7 +25,7 @@ mod configuration;
 mod adjusted_propose_timeout;
 pub mod config;
 
-pub use self::configuration::StoredConfiguration;
+pub use self::configuration::{StoredConfiguration, ConfigurationManager};
 pub use self::config::ListenerConfig;
 pub use self::configuration::ConsensusCfg;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
@@ -65,13 +67,9 @@ pub struct NodeHandler<B, S>
 {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub state: State<B::Transaction>,
+    pub state: State<B::Transaction, B>,
     pub channel: S,
     pub blockchain: B,
-    pub round_timeout: i64,
-    pub status_timeout: i64,
-    pub peers_timeout: i64,
-    pub txs_block_limit: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
 
@@ -120,29 +118,56 @@ impl<B, S> NodeHandler<B, S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        let state = State::new(id as u32,
-                               config.validators,
-                               connect,
-                               last_hash,
-                               last_height);
+        let configuration_manager = ConfigurationManager::new(blockchain.clone());
+        let state = State::new(
+            id as u32,
+            config.validators,
+            connect,
+            last_hash,
+            last_height,
+            ConsensusCfg{
+                round_timeout: config.consensus.round_timeout as i64,
+                propose_timeout: config.consensus.propose_timeout as i64,
+                status_timeout: config.consensus.status_timeout as i64,
+                peers_timeout: config.consensus.peers_timeout as i64,
+                txs_block_limit: config.consensus.txs_block_limit,
+            },
+            configuration_manager
+        );
+
         NodeHandler {
             public_key: config.listener.public_key,
             secret_key: config.listener.secret_key,
             state: state,
             channel: sender,
             blockchain: blockchain,
-            round_timeout: config.consensus.round_timeout as i64,
-            status_timeout: config.consensus.status_timeout as i64,
-            peers_timeout: config.consensus.peers_timeout as i64,
-            peer_discovery: config.peer_discovery,
-            txs_block_limit: config.consensus.txs_block_limit,
-
 //            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster::default()),
             propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::ConstProposeTimeout{ propose_timeout: config.consensus.propose_timeout as i64, }),
+            peer_discovery: config.peer_discovery
         }
     }
 
-    pub fn state(&self) -> &State<B::Transaction> {
+    pub fn propose_timeout(&self) -> i64 {
+        self.state().consensus_config().propose_timeout
+    }
+
+    pub fn round_timeout(&self) -> i64 {
+        self.state().consensus_config().round_timeout
+    }
+
+    pub fn status_timeout(&self) -> i64 {
+        self.state().consensus_config().status_timeout
+    }
+
+    pub fn peers_timeout(&self) -> i64 {
+        self.state().consensus_config().peers_timeout
+    }
+
+    pub fn txs_block_limit(&self) -> u32 {
+        self.state().consensus_config().txs_block_limit
+    }
+
+    pub fn state(&self) -> &State<B::Transaction, B> {
         &self.state
     }
 
@@ -239,7 +264,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_status_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout);
+        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout());
         self.channel.add_timeout(NodeTimeout::Status, time);
     }
 
@@ -250,7 +275,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout);
+        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout());
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
@@ -276,7 +301,7 @@ impl<B, S> NodeHandler<B, S>
         let duration = (now - propose - Duration::milliseconds(self.adjusted_propose_timeout()))
             .num_milliseconds();
         if duration > 0 {
-            let round = (duration / self.round_timeout) as Round + 1;
+            let round = (duration / self.round_timeout()) as Round + 1;
             ::std::cmp::max(1, round)
         } else {
             1
@@ -285,7 +310,7 @@ impl<B, S> NodeHandler<B, S>
 
     // FIXME find more flexible solution
     pub fn round_start_time(&self, round: Round) -> Timespec {
-        let ms = (round - 1) as i64 * self.round_timeout;
+        let ms = (round - 1) as i64 * self.round_timeout();
         self.last_block_time() + Duration::milliseconds(ms)
     }
 }
@@ -359,43 +384,11 @@ impl<B> Node<B>
     where B: Blockchain
 {
     pub fn new(blockchain: B, mut config: Configuration) -> Node<B> {
-
-        if let Some(actual_config) = Self::actual_config(&blockchain){
-            config.update_with_actual_config(actual_config);
-        }
-
         let network = Network::with_config(config.listener.address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = MioChannel::new(config.listener.address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);
         Node { reactor: Events::with_event_loop(network, worker, event_loop) }
-    }
-
-    pub fn actual_config(blockchain: &B) -> Option<StoredConfiguration> {
-        let view = blockchain.view();
-        let configs = view.configs();
-        let r = blockchain.last_block().unwrap();
-        let (_, last_height) = if let Some(last_block) = r {
-            (last_block.hash(), last_block.height() + 1)
-        } else {
-            (super::crypto::hash(&[]), 0)
-        };
-        let mut h = last_height;
-        while h > 0 {
-            if let Some(actual_config) = configs.get(&StoredConfiguration::height_to_slice(h)).unwrap(){
-                match StoredConfiguration::deserialize(&actual_config) {
-                    Ok(configuration) => {
-                        return Some(configuration);
-                    },
-                    Err(_) => {
-                        error!("Can't parse found configuration at height: {}", h);
-                    }
-                }
-
-            }
-            h += 1;
-        }
-        None
     }
 
     pub fn run(&mut self) -> io::Result<()> {
@@ -404,7 +397,7 @@ impl<B> Node<B>
         self.reactor.run()
     }
 
-    pub fn state(&self) -> &State<B::Transaction> {
+    pub fn state(&self) -> &State<B::Transaction, B> {
         self.reactor.handler().state()
     }
 
