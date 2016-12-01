@@ -1,9 +1,5 @@
 #![feature(type_ascription)]
 
-extern crate iron;
-extern crate params;
-extern crate hyper;
-
 extern crate env_logger;
 extern crate clap;
 extern crate serde;
@@ -13,19 +9,24 @@ extern crate rand;
 extern crate log;
 extern crate colored;
 
+extern crate iron;
+extern crate params;
+extern crate hyper;
+extern crate router;
+
 extern crate exonum;
 extern crate blockchain_explorer;
 extern crate timestamping;
 
-use std::net::SocketAddr;
-use std::path::Path;
-use std::thread;
-use std::default::Default;
 use std::env;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::thread;
 
 use iron::prelude::*;
 use iron::status;
-use params::Params;
+use params::{Params, Value};
+use router::Router;
 
 use clap::{Arg, App, SubCommand};
 
@@ -34,35 +35,68 @@ use env_logger::LogBuilder;
 use colored::*;
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
-use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
+use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions, Map};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
-use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, FromHexError, hash};
+use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, FromHexError, hash, Hash};
 use exonum::messages::Message;
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 use exonum::events::Error as EventsError;
+use exonum::blockchain::Blockchain;
 
 use blockchain_explorer::ValueNotFound;
 
-use timestamping::{TimestampingBlockchain, TimestampingView, TimestampTx, TIMESTAMPING_FILE_SIZE_LIMIT};
+use timestamping::{TimestampingBlockchain, TimestampingView, TimestampTx,
+                   TIMESTAMPING_FILE_SIZE_LIMIT};
 
 pub type TimestampTxSender<B> = TxSender<B, NodeChannel<B>>;
 
+#[derive(Clone)]
 pub struct TimestampingApi<D: Database> {
     blockchain: TimestampingBlockchain<D>,
-    channel: TimestampTxSender<TimestampingBlockchain<D>>
+    channel: TimestampTxSender<TimestampingBlockchain<D>>,
 }
 
 impl<D> TimestampingApi<D>
     where D: Database
 {
     // TODO replace by error
-    fn store_file(&self, params: &Params) -> Option<String> {
-        // println!("{:?}", params);  
-        None
+    fn put_file(&self, file_name: &str, file_path: &Path) -> String {
+        use std::fs::File;
+
+        println!("put_file, {:?}", file_path);
+
+        let mut file = File::open(file_path).unwrap();
+        let mut buf = Vec::new();
+        let size = file.read_to_end(&mut buf).unwrap();
+        println!("content_size={}", size);
+        let hash = hash(buf.as_ref());
+
+        // TODO add checks for already stored files
+
+        let (_, dummy_key) = gen_keypair();
+        let tx = TimestampTx::new(file_name, buf.as_ref(), &dummy_key);
+        self.channel.send(tx).unwrap();
+
+        hash.to_hex()
+    }
+
+    fn put_files<'a, I: Iterator<Item = &'a params::File>>(&self, files: I) -> Vec<String> {
+        let mut hashes = Vec::new();
+        for file in files {
+            let hash = self.put_file(&file.filename.as_ref().unwrap(), &file.path);
+            hashes.push(hash);
+        }
+        hashes
+    }
+
+    fn get_file(&self, hash: &Hash) -> Vec<u8> {
+        let view = self.blockchain.view();
+        let file = view.files().get(&hash).unwrap().unwrap();
+
+        file.data().to_vec()
     }
 }
-
 
 fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
                          node_cfg: Configuration,
@@ -72,27 +106,50 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
         let channel = node.channel();
 
         let api_thread = thread::spawn(move || {
-            let api = TimestampingApi {
+            let timestamping_api = TimestampingApi {
                 channel: channel.clone(),
-                blockchain: blockchain.clone()
+                blockchain: blockchain.clone(),
             };
 
-            let put_file = Chain::new(|req: &mut Request| -> IronResult<Response> {
-                println!("{:?}", req.get_ref::<Params>());
-                let hash = hash(&[]).to_hex();
-                let r = Response::with((status::Ok, hash));
-                Ok(r)
+            let mut router = Router::new();
+            let api = timestamping_api.clone();
+            let get_file = move |req: &mut Request| -> IronResult<Response> {
+                let ref hash = req.extensions.get::<Router>().unwrap().find("hash").unwrap();
+                println!("get req={:?}, hash={}", req, hash);
+                let hash = Hash::from_hex(hash).unwrap();
+                let payload = api.get_file(&hash);
+                Ok(Response::with((status::Ok, payload)))
+            };
 
-                // let response = if let Some(hash) = {
-                //     Response::with(api.store_file(req.get_ref::<Params>()))
-                // } else {
-                //     Response::with(status::InternalServerError)
-                // };
-                // Ok(response)
-            });
+            // Receive a message by POST and play it back.
+            let api = timestamping_api.clone();
+            let put_file = move |req: &mut Request| -> IronResult<Response> {
+                let map = req.get_ref::<Params>().unwrap();
+                println!("{:?}", map);
+                if let &Value::Array(ref files) = map.find(&["content"]).unwrap() {
+
+                    let files = files.iter()
+                        .filter_map(|x| {
+                            if let &Value::File(ref f) = x {
+                                Some(f)
+                            } else {
+                                None
+                            }
+                        });
+                    println!("{:#?}", files);
+                    let strings = api.put_files(files);
+                    let payload = strings.join("\n");
+                    return Ok(Response::with((status::Ok, payload)));
+                } else {
+                    unimplemented!();
+                }
+            };
+
+            router.get("/timestamping/:hash", get_file, "hash");
+            router.post("/timestamping", put_file, "put");
 
             let host = format!("localhost:{}", port);
-            Iron::new(put_file).http(host.as_str()).unwrap();
+            Iron::new(router).http(host.as_str()).unwrap();
         });
 
         node.run().unwrap();
