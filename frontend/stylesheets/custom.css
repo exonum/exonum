@@ -1,0 +1,155 @@
+body {
+    background-color: #282828;
+}
+
+/* Logo */
+.pix_nav_logo,
+.pix_footer_logo {
+    font-family: 'Lato', sans-serif;
+    font-weight: 300;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.pix_nav_logo span,
+.pix_footer_logo span {
+    display: block;
+    text-align: center;
+}
+
+.pix_nav_logo,
+a.pix_nav_logo {
+    display: block;
+    color: #fff;
+    font-size: 26px;
+    line-height: 1;
+    padding-top: 16px;
+    text-decoration: none;
+}
+
+.pix_nav_logo span {
+    color: #2dc0e8;
+    font-size: 14px;
+}
+
+.pix_footer_logo {
+    font-size: 18px;
+    line-height: 1.125;
+    display: inline-block;
+}
+
+.pix_footer_logo span {
+    color: #999;
+    font-size: 11px;
+    letter-spacing: 0.015em;
+}
+
+/* Header */
+.header_nav_1.dark {
+    background-color: #444;
+}
+
+.blue_moving_bg {
+    height: 640px;
+}
+
+.blue_moving_bg,
+.dark.blue_moving_bg {
+    background-position: center -100px;
+    background-attachment: scroll;
+}
+
+/* Content */
+.medium_icon {
+    text-align: center;
+    font-size: 40px;
+    margin-bottom: 20px;
+}
+
+.columns.centered {
+    display: block;
+    float: none;
+    margin: 0 auto;
+}
+
+.pix_text_dark {
+    margin-bottom: 20px;
+}
+
+input.pix_text_readonly {
+    background-color: #2f2f2f;
+    border-color: #444;
+    border-style: dashed;
+}
+
+input.pix_text_readonly:focus,
+input.pix_text_readonly:active {
+    background-color: #2f2f2f;
+    border-color: #2dc0e8;
+    border-style: dashed;
+    color: #2dc0e8;
+}
+
+.send_btn {
+    margin-top: 30px;
+}
+
+/* Responsive image */
+.img-responsive {
+    position: relative;
+    overflow: hidden;
+    height: 96px;
+    margin-bottom: 20px;
+    border-radius: 3px;
+}
+
+.img-responsive img {
+    max-width: 100%;
+    opacity: 0.5;
+}
+
+.img-responsive:hover img,
+.img-responsive:active img {
+    opacity: 1;
+}
+
+.img-responsive-zoom {
+    color: #fff;
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 32px;
+    margin: -16px 0 0 0;
+}
+
+/* Code */
+code {
+    padding: 2px 4px;
+    font-size: 90%;
+    color: #eee;
+    background-color: #000;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+code, kbd, pre, samp {
+    font-family: Menlo,Monaco,Consolas,"Courier New",monospace;
+}
+
+/* Footer */
+.footer3 .small_text {
+    color: #666;
+}
+
+/* Paypal button */
+.paypal-button:hover {
+    background: none;
+    border: none;
+}
+
+button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag-content {
+    color: #c7c7c7;
+    text-shadow: 0 1px 0 #000;
+}

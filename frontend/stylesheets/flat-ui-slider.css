@@ -1,0 +1,762 @@
+
+.carousel {
+  position: relative;
+}
+.carousel h3{
+ font-weight: bold;
+ font-size: 26px !important;
+ line-height: 28px !important;
+}
+
+.carousel-inner {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.carousel-inner > .item {
+  position: relative;
+  display: none;
+  -webkit-transition: 0.6s ease-in-out left;
+          transition: 0.6s ease-in-out left;
+}
+
+.carousel-inner > .item > img,
+.carousel-inner > .item > a > img {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  line-height: 1;
+}
+
+.carousel-inner > .active,
+.carousel-inner > .next,
+.carousel-inner > .prev {
+  display: block;
+}
+
+.carousel-inner > .active {
+  left: 0;
+}
+
+.carousel-inner > .next,
+.carousel-inner > .prev {
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
+.carousel-inner > .next {
+  left: 100%;
+}
+
+.carousel-inner > .prev {
+  left: -100%;
+}
+
+.carousel-inner > .next.left,
+.carousel-inner > .prev.right {
+  left: 0;
+}
+
+.carousel-inner > .active.left {
+  left: -100%;
+}
+
+.carousel-inner > .active.right {
+  left: 100%;
+}
+
+.carousel-control {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 15%;
+  font-size: 20px;
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  opacity: 0.5;
+  filter: alpha(opacity=50);
+}
+
+.carousel-control.left {
+  background-image: -webkit-linear-gradient(left, color-stop(rgba(0, 0, 0, 0.5) 0), color-stop(rgba(0, 0, 0, 0.0001) 100%));
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.5) 0, rgba(0, 0, 0, 0.0001) 100%);
+  background-repeat: repeat-x;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#80000000', endColorstr='#00000000', GradientType=1);
+  text-decoration: none !important;
+  line-height: 35px;
+  color: #fff;
+}
+
+.carousel-control.right {
+  right: 0;
+  left: auto;
+  background-image: -webkit-linear-gradient(left, color-stop(rgba(0, 0, 0, 0.0001) 0), color-stop(rgba(0, 0, 0, 0.5) 100%));
+  background-image: linear-gradient(to right, rgba(0, 0, 0, 0.0001) 0, rgba(0, 0, 0, 0.5) 100%);
+  background-repeat: repeat-x;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#00000000', endColorstr='#80000000', GradientType=1);
+  text-decoration: none !important;
+  line-height: 35px;
+  color: #fff;
+}
+
+.carousel-control:hover,
+.carousel-control:focus {
+  color: #ffffff;
+  text-decoration: none;
+  outline: none;
+  opacity: 0.9;
+  filter: alpha(opacity=90);
+}
+
+.carousel-control .icon-prev,
+.carousel-control .icon-next,
+.carousel-control .glyphicon-chevron-left,
+.carousel-control .glyphicon-chevron-right {
+  position: absolute;
+  top: 50%;
+  z-index: 5;
+  display: inline-block;
+}
+
+.carousel-control .icon-prev,
+.carousel-control .glyphicon-chevron-left {
+  left: 50%;
+}
+
+.carousel-control .icon-next,
+.carousel-control .glyphicon-chevron-right {
+  right: 50%;
+}
+
+.carousel-control .icon-prev,
+.carousel-control .icon-next {
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  margin-left: -10px;
+  font-family: serif;
+}
+
+.carousel-control .icon-prev:before {
+  content: '\2039';
+}
+
+.carousel-control .icon-next:before {
+  content: '\203a';
+}
+
+.carousel-indicators {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  z-index: 15;
+  width: 60%;
+  padding-left: 0;
+  margin-left: -30%;
+  text-align: center;
+  list-style: none;
+}
+
+.carousel-indicators li {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin: 1px;
+  text-indent: -999px;
+  cursor: pointer;
+  background-color: #000 \9;
+  background-color: rgba(0, 0, 0, 0);
+  border: 1px solid #ffffff;
+  border-radius: 10px;
+}
+
+.carousel-indicators .active {
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  background-color: #ffffff;
+}
+
+.carousel-caption {
+  position: absolute;
+  right: 15%;
+  bottom: 20px;
+  left: 15%;
+  z-index: 10;
+  padding-top: 20px;
+  padding-bottom: 20px;
+  color: #ffffff;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.carousel-caption .btn {
+  text-shadow: none;
+}
+
+@media screen and (min-width: 768px) {
+  .carousel-control .glyphicons-chevron-left,
+  .carousel-control .glyphicons-chevron-right,
+  .carousel-control .icon-prev,
+  .carousel-control .icon-next {
+    width: 30px;
+    height: 30px;
+    margin-top: -15px;
+    margin-left: -15px;
+    font-size: 30px;
+  }
+  .carousel-caption {
+    right: 20%;
+    left: 20%;
+    padding-bottom: 30px;
+  }
+  .carousel-indicators {
+    bottom: 20px;
+  }
+}
+
+.clearfix:before,
+.clearfix:after {
+  display: table;
+  content: " ";
+}
+
+.clearfix:after {
+  clear: both;
+}
+
+.center-block {
+  display: block;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+
+@font-face {
+  font-family: 'Lato';
+  src: url('../fonts/lato/lato-black-webfont.eot');
+  src: url('../fonts/lato/lato-black-webfont.eot?#iefix') format('embedded-opentype'), url('../fonts/lato/lato-black-webfont.woff') format('woff'), url('../fonts/lato/lato-black-webfont.ttf') format('truetype'), url('../fonts/lato/lato-black-webfont.svg#latoblack') format('svg');
+  font-weight: 900;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Lato';
+  src: url('../fonts/lato/lato-bold-webfont.eot');
+  src: url('../fonts/lato/lato-bold-webfont.eot?#iefix') format('embedded-opentype'), url('../fonts/lato/lato-bold-webfont.woff') format('woff'), url('../fonts/lato/lato-bold-webfont.ttf') format('truetype'), url('../fonts/lato/lato-bold-webfont.svg#latobold') format('svg');
+  font-weight: bold;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Lato';
+  src: url('../fonts/lato/lato-bolditalic-webfont.eot');
+  src: url('../fonts/lato/lato-bolditalic-webfont.eot?#iefix') format('embedded-opentype'), url('../fonts/lato/lato-bolditalic-webfont.woff') format('woff'), url('../fonts/lato/lato-bolditalic-webfont.ttf') format('truetype'), url('../fonts/lato/lato-bolditalic-webfont.svg#latobold_italic') format('svg');
+  font-weight: bold;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'Lato';
+  src: url('../fonts/lato/lato-italic-webfont.eot');
+  src: url('../fonts/lato/lato-italic-webfont.eot?#iefix') format('embedded-opentype'), url('../fonts/lato/lato-italic-webfont.woff') format('woff'), url('../fonts/lato/lato-italic-webfont.ttf') format('truetype'), url('../fonts/lato/lato-italic-webfont.svg#latoitalic') format('svg');
+  font-weight: normal;
+  font-style: italic;
+}
+@font-face {
+  font-family: 'Lato';
+  src: url('../fonts/lato/lato-light-webfont.eot');
+  src: url('../fonts/lato/lato-light-webfont.eot?#iefix') format('embedded-opentype'), url('../fonts/lato/lato-light-webfont.woff') format('woff'), url('../fonts/lato/lato-light-webfont.ttf') format('truetype'), url('../fonts/lato/lato-light-webfont.svg#latolight') format('svg');
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Lato';
+  src: url('../fonts/lato/lato-regular-webfont.eot');
+  src: url('../fonts/lato/lato-regular-webfont.eot?#iefix') format('embedded-opentype'), url('../fonts/lato/lato-regular-webfont.woff') format('woff'), url('../fonts/lato/lato-regular-webfont.ttf') format('truetype'), url('../fonts/lato/lato-regular-webfont.svg#latoregular') format('svg');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Flat-UI-Icons";
+  src: url("../fonts/Flat-UI-Icons.eot");
+  src: url("../fonts/Flat-UI-Icons.eot?#iefix") format("embedded-opentype"), url("../fonts/Flat-UI-Icons.woff") format("woff"), url("../fonts/Flat-UI-Icons.ttf") format("truetype"), url("../fonts/Flat-UI-Icons.svg#Flat-UI-Icons") format("svg");
+  font-weight: normal;
+  font-style: normal;
+}
+/* Use the following CSS code if you want to use data attributes for inserting your icons */
+[data-icon]:before {
+  font-family: 'Flat-UI-Icons';
+  content: attr(data-icon);
+  speak: none;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+}
+/* Use the following CSS code if you want to have a class per icon */
+/*
+Instead of a list of all class selectors,
+you can use the generic selector below, but it's slower:
+[class*="fui-"] {
+*/
+.fui-triangle-up,
+.fui-triangle-up-small,
+.fui-triangle-right-large,
+.fui-triangle-left-large,
+.fui-triangle-down,
+.fui-info,
+.fui-alert,
+.fui-question,
+.fui-window,
+.fui-windows,
+.fui-arrow-right,
+.fui-arrow-left,
+.fui-loop,
+.fui-cmd,
+.fui-mic,
+.fui-triangle-down-small,
+.fui-check-inverted,
+.fui-heart,
+.fui-location,
+.fui-plus,
+.fui-check,
+.fui-cross,
+.fui-list,
+.fui-new,
+.fui-video,
+.fui-photo,
+.fui-volume,
+.fui-time,
+.fui-eye,
+.fui-chat,
+.fui-home,
+.fui-upload,
+.fui-search,
+.fui-user,
+.fui-mail,
+.fui-lock,
+.fui-power,
+.fui-star,
+.fui-calendar,
+.fui-gear,
+.fui-book,
+.fui-exit,
+.fui-trash,
+.fui-folder,
+.fui-bubble,
+.fui-cross-inverted,
+.fui-plus-inverted,
+.fui-export,
+.fui-radio-unchecked,
+.fui-radio-checked,
+.fui-checkbox-unchecked,
+.fui-checkbox-checked,
+.fui-flat,
+.fui-calendar-solid,
+.fui-star-2,
+.fui-credit-card,
+.fui-clip,
+.fui-link,
+.fui-pause,
+.fui-play,
+.fui-tag,
+.fui-document,
+.fui-image,
+.fui-facebook,
+.fui-youtube,
+.fui-vimeo,
+.fui-twitter,
+.fui-stumbleupon,
+.fui-spotify,
+.fui-skype,
+.fui-pinterest,
+.fui-path,
+.fui-myspace,
+.fui-linkedin,
+.fui-googleplus,
+.fui-dribbble,
+.fui-blogger,
+.fui-behance,
+.fui-list-thumbnailed,
+.fui-list-small-thumbnails,
+.fui-list-numbered,
+.fui-list-large-thumbnails,
+.fui-list-columned,
+.fui-list-bulleted {
+  display: inline-block;
+  font-family: 'Flat-UI-Icons';
+  speak: none;
+  font-style: normal;
+  font-weight: normal;
+  font-variant: normal;
+  text-transform: none;
+  -webkit-font-smoothing: antialiased;
+}
+.fui-triangle-up:before {
+  content: "\e000";
+}
+.fui-triangle-up-small:before {
+  content: "\e001";
+}
+.fui-triangle-right-large:before {
+  content: "\e002";
+}
+.fui-triangle-left-large:before {
+  content: "\e003";
+}
+.fui-triangle-down:before {
+  content: "\e004";
+}
+.fui-info:before {
+  content: "\e016";
+}
+.fui-alert:before {
+  content: "\e017";
+}
+.fui-question:before {
+  content: "\e018";
+}
+.fui-window:before {
+  content: "\e019";
+}
+.fui-windows:before {
+  content: "\e01a";
+}
+.fui-arrow-right:before {
+  content: "\e02c";
+}
+.fui-arrow-left:before {
+  content: "\e02d";
+}
+.fui-loop:before {
+  content: "\e02e";
+}
+.fui-cmd:before {
+  content: "\e02f";
+}
+.fui-mic:before {
+  content: "\e030";
+}
+.fui-triangle-down-small:before {
+  content: "\e005";
+}
+.fui-check-inverted:before {
+  content: "\e006";
+}
+.fui-heart:before {
+  content: "\e007";
+}
+.fui-location:before {
+  content: "\e008";
+}
+.fui-plus:before {
+  content: "\e009";
+}
+.fui-check:before {
+  content: "\e00a";
+}
+.fui-cross:before {
+  content: "\e00b";
+}
+.fui-list:before {
+  content: "\e00c";
+}
+.fui-new:before {
+  content: "\e00d";
+}
+.fui-video:before {
+  content: "\e00e";
+}
+.fui-photo:before {
+  content: "\e00f";
+}
+.fui-volume:before {
+  content: "\e010";
+}
+.fui-time:before {
+  content: "\e011";
+}
+.fui-eye:before {
+  content: "\e012";
+}
+.fui-chat:before {
+  content: "\e013";
+}
+.fui-home:before {
+  content: "\e015";
+}
+.fui-upload:before {
+  content: "\e01b";
+}
+.fui-search:before {
+  content: "\e01c";
+}
+.fui-user:before {
+  content: "\e01d";
+}
+.fui-mail:before {
+  content: "\e01e";
+}
+.fui-lock:before {
+  content: "\e01f";
+}
+.fui-power:before {
+  content: "\e020";
+}
+.fui-star:before {
+  content: "\e021";
+}
+.fui-calendar:before {
+  content: "\e023";
+}
+.fui-gear:before {
+  content: "\e024";
+}
+.fui-book:before {
+  content: "\e025";
+}
+.fui-exit:before {
+  content: "\e026";
+}
+.fui-trash:before {
+  content: "\e027";
+}
+.fui-folder:before {
+  content: "\e028";
+}
+.fui-bubble:before {
+  content: "\e029";
+}
+.fui-cross-inverted:before {
+  content: "\e02a";
+}
+.fui-plus-inverted:before {
+  content: "\e031";
+}
+.fui-export:before {
+  content: "\e014";
+}
+.fui-radio-unchecked:before {
+  content: "\e02b";
+}
+.fui-radio-checked:before {
+  content: "\e032";
+}
+.fui-checkbox-unchecked:before {
+  content: "\e033";
+}
+.fui-checkbox-checked:before {
+  content: "\e034";
+}
+.fui-flat:before {
+  content: "\e035";
+}
+.fui-calendar-solid:before {
+  content: "\e022";
+}
+.fui-star-2:before {
+  content: "\e036";
+}
+.fui-credit-card:before {
+  content: "\e037";
+}
+.fui-clip:before {
+  content: "\e038";
+}
+.fui-link:before {
+  content: "\e039";
+}
+.fui-pause:before {
+  content: "\e03b";
+}
+.fui-play:before {
+  content: "\e03c";
+}
+.fui-tag:before {
+  content: "\e03d";
+}
+.fui-document:before {
+  content: "\e03e";
+}
+.fui-image:before {
+  content: "\e03a";
+}
+.fui-facebook:before {
+  content: "\e03f";
+}
+.fui-youtube:before {
+  content: "\e040";
+}
+.fui-vimeo:before {
+  content: "\e041";
+}
+.fui-twitter:before {
+  content: "\e042";
+}
+.fui-stumbleupon:before {
+  content: "\e043";
+}
+.fui-spotify:before {
+  content: "\e044";
+}
+.fui-skype:before {
+  content: "\e045";
+}
+.fui-pinterest:before {
+  content: "\e046";
+}
+.fui-path:before {
+  content: "\e047";
+}
+.fui-myspace:before {
+  content: "\e048";
+}
+.fui-linkedin:before {
+  content: "\e049";
+}
+.fui-googleplus:before {
+  content: "\e04a";
+}
+.fui-dribbble:before {
+  content: "\e04c";
+}
+.fui-blogger:before {
+  content: "\e04d";
+}
+.fui-behance:before {
+  content: "\e04e";
+}
+.fui-list-thumbnailed:before {
+  content: "\e04b";
+}
+.fui-list-small-thumbnails:before {
+  content: "\e04f";
+}
+.fui-list-numbered:before {
+  content: "\e050";
+}
+.fui-list-large-thumbnails:before {
+  content: "\e051";
+}
+.fui-list-columned:before {
+  content: "\e052";
+}
+.fui-list-bulleted:before {
+  content: "\e053";
+}
+.dropdown-arrow-inverse {
+  border-bottom-color: #34495e !important;
+  border-top-color: #34495e !important;
+}
+
+.carousel-inner > .item.active > img,
+.carousel-inner > .item.active > a > img {
+  border-radius: 6px;
+}
+@media (max-width: 480px) {
+  .carousel-inner > .item.active > img {
+    border-radius: 6px 6px 0 0;
+  }
+}
+.carousel-inner > .item.active.left > img,
+.carousel-inner > .item.active.right > img,
+.carousel-inner > .item.active.left > a > img,
+.carousel-inner > .item.active.right > a > img {
+  border-radius: 0;
+}
+.carousel-control {
+  position: absolute;
+  top: 45%;
+  font-size: 20px;
+  line-height: 32px;
+  color: #ffffff;
+  text-indent: 1px;
+  border: 3px solid #ffffff;
+  height: 40px;
+  right: 15px;
+  margin-top: -20px;
+  text-align: center;
+  width: 40px;
+  outline: none !important;
+  border-radius: 23px;
+  opacity: 0.5;
+  filter: alpha(opacity=50);
+}
+.carousel-control.left,
+.carousel-control.right {
+  background: none #000;
+}
+.carousel-control.left {
+  text-indent: -1px;
+  left: 15px;
+}
+.carousel-control.right {
+  left: auto;
+  right: 15px;
+}
+.carousel-indicators {
+  bottom: auto;
+  left: auto;
+  margin: 0;
+  right: 16px;
+  top: 16px;
+  width: auto;
+  line-height: 8px;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
+}
+.carousel-indicators li {
+  vertical-align: top;
+  border: none;
+  width: 8px;
+  height: 8px;
+  margin: 0 0 0 6px;
+  background-color: #2c3e50;
+  background-color: rgba(44, 62, 80, 0.5);
+}
+.carousel-indicators li.active {
+  background-color: #fff;
+  width: 8px;
+  height: 8px;
+  margin: 0 0 0 6px;
+}
+.carousel-caption {
+  padding: 30px 19px 22px;
+  background: #243342;
+  background: rgba(36, 51, 66, 0.7);
+  background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.8) 70%);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  text-align: left;
+  border-radius: 0 0 6px 6px;
+  text-shadow: none;
+}
+.carousel-caption h3,
+.carousel-caption p {
+  color: #ffffff;
+}
+.carousel-caption h3 {
+  font-size: 18px;
+  line-height: 20px;
+  margin: 0 0 5px;
+}
+.carousel-caption p {
+  font-size: 15px;
+  line-height: 20px;
+  margin-bottom: 0;
+}
+@media (max-width: 480px) {
+  .carousel-caption {
+    position: static;
+    background: #333;
+  }
+}
+.last-col {
+  overflow: hidden;
+}

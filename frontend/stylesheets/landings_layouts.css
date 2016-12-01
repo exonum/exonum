@@ -1,0 +1,3127 @@
+/*
+* Skeleton V1.2
+* Copyright 2011, Dave Gamache
+* www.getskeleton.com
+* Free to use under the MIT license.
+* http://www.opensource.org/licenses/mit-license.php
+* 6/20/2012
+*/
+/* #Media Queries
+================================================== */
+/* Smaller than standard 960 (devices and browsers) */
+
+@media only screen and (max-width: 959px) {
+    .pixfort_normal_1 .img_style {
+        width: 100%;
+        height: auto;
+    }
+    .pixfort_app_3 .img_st img {
+        width: 100%;
+        margin: 0;
+        text-align: center;
+    }
+    .pixfort_app_3 .Designs_style {
+        padding: 0;
+    }
+    .pixfort_app_3 .Designs_text_style {
+        padding-left: 0px;
+        text-align: center;
+        padding-top: 20px;
+    }
+    .pixfort_real_estate_4 .Home_photo {
+        width: 100%;
+        height: 200px;
+    }
+    .pixfort_real_estate_4 .Home_info {
+        width: 100%;
+        height: auto;
+    }
+    .pixfort_shop_7 .box_1 {
+        margin-left: 20px;
+        padding-top: 10px;
+        margin-bottom: 20px;
+    }
+    .pixfort_shop_7 .box_2 {
+        margin-right: 20px;
+        padding-top: 10px;
+        margin-bottom: 20px;
+    }
+    .pixfort_shop_7 .b_style {
+        float: none;
+        width: 100%;
+        text-align: center;
+    }
+    .pixfort_shop_7 .txt_style {
+        max-width: 100%;
+        text-align: left;
+        padding: 10px 10px;
+    }
+}
+/* Tablet Portrait size to standard 960 (devices and browsers) */
+
+@media only screen and (min-width: 768px) and (max-width: 959px) {
+    .pixfort_normal_1 .onethird_style {
+        text-align: center;
+    }
+    .pixfort_normal_1 .circle {
+        margin-bottom: 10px;
+    }
+    .pixfort_normal_1 .img_style {
+        width: 100%;
+        height: auto;
+    }
+    .pixfort_normal_1 .rights_st {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_normal_1 .likes_st {
+        margin: 0;
+        padding-right: 0px;
+        padding-top: 25px;
+        float: none;
+        text-align: center;
+    }
+    .pixfort_normal_1 .socbuttons {
+        text-align: center;
+    }
+    .pixfort_normal_1 .soc_icons {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_corporate_2 .h_style {
+        line-height: 150%;
+        width: 100%;
+    }
+    .pixfort_corporate_2 .cc_style {
+        width: 100%;
+        text-align: center;
+    }
+    .pixfort_corporate_2 .rights_st {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_corporate_2 .likes_st {
+        margin: 0;
+        padding-right: 0px;
+        padding-top: 25px;
+        float: none;
+        text-align: center;
+    }
+    .pixfort_corporate_2 .socbuttons {
+        text-align: center;
+    }
+    .pixfort_corporate_2 .soc_icons {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_app_3 .phones {
+        vertical-align: bottom;
+        margin-top: 30px;
+    }
+    .pixfort_app_3 .amazing_img4_st {
+        width: 100%;
+        height: 400px;
+        text-align: center;
+        padding-top: 50px;
+    }
+    .pixfort_app_3 .colorful_img4_st img {
+        width: 100%;
+        height: 450px;
+        text-align: center;
+        padding-top: 50px;
+    }
+    .pixfort_app_3 .colorful {
+        text-align: center;
+        float: none;
+    }
+    .pixfort_app_3 .amazing {
+        text-align: center;
+        float: none;
+        width: 100%;
+        margin-left: auto;
+        margin-left: auto;
+    }
+    .pixfort_app_3 .amazing_style {
+        padding: 20px 0px;
+    }
+    .pixfort_app_3 .amaz_tit {
+        padding-top: 40px;
+    }
+    .pixfort_app_3 .amazing_text_style {
+        text-align: center;
+        float: none;
+    }
+    .pixfort_app_3 .suite {
+        top: 0;
+        text-align: center;
+    }
+    .pixfort_app_3 .img_st img {
+        width: 100%;
+        margin: 0;
+        text-align: center;
+    }
+    .pixfort_app_3 .Designs_style {
+        padding: 0;
+    }
+    .pixfort_app_3 .Designs_text_style {
+        padding-left: 0px;
+        text-align: center;
+        padding-top: 20px;
+    }
+    .pixfort_app_3 .rights_st {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_app_3 .likes_st {
+        margin: 0;
+        padding-right: 0px;
+        padding-top: 25px;
+        float: none;
+        text-align: center;
+    }
+    .pixfort_app_3 .socbuttons {
+        text-align: center;
+    }
+    .pixfort_app_3 .soc_icons {
+        float: right;
+        text-align: center;
+    }
+    .pixfort_real_estate_4 .Home_photo {
+        width: 100%;
+        height: 200px;
+    }
+    .pixfort_real_estate_4 .Home_info {
+        width: 100%;
+        height: auto;
+    }
+    .pixfort_real_estate_4 .box_style {
+        width: 95%;
+    }
+    .pixfort_real_estate_4 .b_style img {
+        width: 15%;
+        height: auto;
+        margin-top: 40px;
+    }
+    .pixfort_real_estate_4 .txt_style {
+        padding-left: 15px;
+        padding-right: 8px;
+    }
+    .pixfort_real_estate_4 .rights_st {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_real_estate_4 .likes_st {
+        margin: 0;
+        padding-right: 0px;
+        padding-top: 25px;
+        float: none;
+        text-align: center;
+    }
+    .pixfort_real_estate_4 .socbuttons {
+        text-align: center;
+    }
+    .pixfort_real_estate_4 .soc_icons {
+        float: right;
+        text-align: center;
+    }
+    .pixfort_hotel_5 .img_homes_st {
+        position: relative;
+        width: 100%;
+        height: auto;
+    }
+    .pixfort_hotel_5 .video_style iframe {
+        width: 100%;
+        height: 200px;
+        padding-bottom: 0px;
+    }
+    .pixfort_hotel_5 .box_Homes {
+        background: #faf5f5;
+        border-bottom: 3px solid #eadbdc;
+        position: relative;
+        text-align: center;
+        margin-left: auto;
+        margin-right: auto;
+        padding-top: 30px;
+        margin-top: 50px;
+    }
+    .pixfort_hotel_5 .Res_st {
+        position: relative;
+        display: block;
+        text-align: center;
+        top: 0px;
+        margin-left: 0px;
+    }
+    .pixfort_hotel_5 .rights_st {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_hotel_5 .likes_st {
+        margin: 0;
+        padding-right: 0px;
+        padding-top: 25px;
+        float: none;
+        text-align: center;
+    }
+    .pixfort_hotel_5 .socbuttons {
+        text-align: center;
+    }
+    .pixfort_university_6 .img_uni_st {
+        position: relative;
+        width: 100%;
+        height: auto;
+    }
+    .pixfort_university_6 .uni_st {
+        height: 40px;
+    }
+    .pixfort_university_6 .rights_st {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_university_6 .likes_st {
+        margin: 0;
+        padding-right: 0px;
+        padding-top: 25px;
+        float: none;
+        text-align: center;
+    }
+    .pixfort_university_6 .socbuttons {
+        text-align: center;
+    }
+    .pixfort_university_6 .soc_icons {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_shop_7 .left_box {
+        text-align: center;
+    }
+    .pixfort_shop_7 .segment {
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .pixfort_shop_7 .subscribe_btn a {
+        float: none;
+    }
+    .pixfort_shop_7 .note_st {
+        text-align: center;
+        padding-bottom: 80px;
+    }
+    .pixfort_shop_7 .icon-1_st,
+    .pixfort_shop_7 .icon-2_st,
+    .pixfort_shop_7 .icon-3_st {
+        margin-left: auto;
+        margin-right: auto;
+        display: block;
+    }
+    .pixfort_shop_7 .text_st {
+        max-width: 100%;
+        text-align: center;
+        float: none;
+        margin-left: 0;
+        padding-top: 20px;
+    }
+    .pixfort_shop_7 .pict_st img {
+        max-width: 100%;
+        margin-left: auto;
+        margin-right: auto;
+        margin-top: 150px;
+    }
+    .pixfort_shop_7 .box_1 {
+        margin-left: 20px;
+        padding-top: 10px;
+        margin-bottom: 20px;
+    }
+    .pixfort_shop_7 .box_2 {
+        margin-right: 20px;
+        padding-top: 10px;
+        margin-bottom: 20px;
+    }
+    .pixfort_shop_7 .b_style {
+        float: none;
+        width: 100%;
+        text-align: center;
+    }
+    .pixfort_shop_7 .txt_style {
+        max-width: 100%;
+        text-align: left;
+        padding: 10px 10px;
+    }
+    .pixfort_shop_7 .rights_st {
+        float: none;
+        text-align: center;
+    }
+    .pixfort_shop_7 .likes_st {
+        margin: 0;
+        padding-right: 0px;
+        padding-top: 25px;
+        float: none;
+        text-align: center;
+    }
+    .pixfort_shop_7 .socbuttons {
+        text-align: center;
+    }
+    .pixfort_ecourse_8 .left_zone {
+        width: 100%;
+        padding-left: 0px;
+        text-align: center;
+    }
+    .pixfort_ecourse_8 .video_style iframe {
+        width: 100%;
+        height: 240px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .pixfort_ecourse_8 .title_st,
+    .pixfort_ecourse_8 .txt_st {
+        width: 70%;
+        padding-left: 0px;
+        margin-left: auto;
+        margin-right: auto;
+        text-align: center
+    }
+    .pixfort_ecourse_8 .text_input,
+    .pixfort_ecourse_8 .subtext_style {
+        text-align: center;
+    }
+    .pixfort_ecourse_8 .segment {
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .pixfort_ecourse_8 .contact_st form {
+        //max-width: 90%;        }
+        .pixfort_ecourse_8 .note_st {
+            text-align: center;
+        }
+        .pixfort_ecourse_8 .text_zone {
+            width: 100%;
+            left: 0px;
+            margin-top: 0px;
+            float: none;
+        }
+        .pixfort_ecourse_8 .TT1,
+        .pixfort_ecourse_8 .TT2 {
+            text-align: center;
+        }
+        .pixfort_ecourse_8 .get_tut_btn a {
+            float: none;
+        }
+        .pixfort_ecourse_8 .picture_zone img {
+            width: 100%;
+            float: none;
+        }
+        .pixfort_ecourse_8 .feature_1,
+        .pixfort_ecourse_8 .feature_2,
+        .pixfort_ecourse_8 .feature_3 {
+            background-size: 80%;
+        }
+        .pixfort_ecourse_8 .box_1 {
+            margin-left: 20px;
+            padding-top: 10px;
+            margin-bottom: 20px;
+        }
+        .pixfort_ecourse_8 .box_2 {
+            margin-right: 20px;
+            padding-top: 10px;
+            margin-bottom: 20px;
+        }
+        .pixfort_ecourse_8 .b_style {
+            float: none;
+            width: 100%;
+            text-align: center;
+        }
+        .pixfort_ecourse_8 .txt_style {
+            max-width: 100%;
+            text-align: left;
+            padding: 10px 10px;
+        }
+        .pixfort_ecourse_8 .rights_st {
+            float: none;
+            text-align: center;
+        }
+        .pixfort_ecourse_8 .likes_st {
+            margin: 0;
+            padding-right: 0px;
+            padding-top: 25px;
+            float: none;
+            text-align: center;
+        }
+        .pixfort_ecourse_8 .socbuttons {
+            text-align: center;
+        }
+        .pixfort_ebook_9 .video_style iframe {
+            width: 100%;
+            height: 200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .pixfort_ebook_9 .title_st {
+            width: 70%;
+            padding-left: 0px;
+            margin-left: auto;
+            margin-right: auto;
+            text-align: center
+        }
+        .pixfort_ebook_9 .text_input,
+        .pixfort_ebook_9 .subtext_style {
+            text-align: center;
+        }
+        .pixfort_ebook_9 .segment {
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .pixfort_ebook_9 .contact_st form {
+            //max-width: 90%;        }
+            .pixfort_ebook_9 .TT1, .pixfort_ebook_9 .TT2 {
+                text-align: center;
+            }
+            .pixfort_ebook_9 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .socbuttons {
+                text-align: center;
+            }
+            /*  Part 1:   */
+            
+            .pixfort_business_10 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_business_10 .text_zone {
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_business_10 .TT1,
+            {
+                text-align: center;
+            }
+            .pixfort_business_10 .TT2 {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .check_st {
+                text-align: center;
+            }
+            .pixfort_business_10 .apply_btn {
+                text-align: center;
+            }
+            .pixfort_business_10 .picture_zone img {
+                width: 100%;
+                float: none;
+            }
+            .pixfort_business_10 .video_style iframe {
+                width: 100%;
+                height: 240px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            /*  Part 5:   */
+            
+            .pixfort_business_10 .box_1,
+            .pixfort_business_10 .box_2 {
+                margin: 0px 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_business_10 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_business_10 .txt_style {
+                max-width: 100%;
+                text-align: center;
+                padding: 10px 10px;
+            }
+            .pixfort_business_10 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_business_10 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_business_10 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .email_subscribe {
+                width: 90%;
+                height: auto;
+                padding: 0px;
+                padding-top: 15px;
+            }
+            .pixfort_subscribe_12 #contact_form input {
+                float: none;
+                width: 80%;
+                height: 40px;
+                text-align: center;
+                padding: 0px;
+            }
+            .pixfort_subscribe_12 .subscribe_btn a {
+                float: none;
+            }
+            .pixfort_subscribe_12 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .img_gym_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_gym_13 .gym_st {
+                height: 40px;
+            }
+            .pixfort_gym_13 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_gym_13 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .img_gym_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_agency_14 .gym_st {
+                height: 40px;
+            }
+            .pixfort_agency_14 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_agency_14 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .socbuttons {
+                text-align: center;
+            }
+            .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_19 .rights_st {
+                float:none;
+                text-align:center
+            }
+
+            .pixfort_subscribe_19 .soc_icons {
+                float:none;
+                text-align:center
+            }
+        }
+        /* All Mobile Sizes (devices and browser) */
+        
+        @media only screen and (max-width: 767px) {
+
+            .footer3 .area_1:after, .footer3 .area_2:after, .footer3 .area_3:after  { border-right: none;border-bottom: none; }
+            .pixfort_university_6 .link_1_btn a {
+                margin-left: auto;
+                margin-right: auto;
+                float: none;
+            }
+            .pixfort_university_6 .link_2_btn a {
+                float: none;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_university_6 .link_3_btn a {
+                float: none;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_university_6 .link_4_btn a {
+                float: none;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            img {
+                max-width: 100% !important;
+                height: auto !important;
+            }
+            .pixfort_normal_1 .img_style {
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_normal_1 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_normal_1 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_normal_1 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_normal_1 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .h_style {
+                line-height: 150%;
+            }
+            .pixfort_corporate_2 .just_st {
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_corporate_2 .cc_style {
+                top: -5px;
+            }
+            .pixfort_corporate_2 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_corporate_2 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .hbloc_style {
+                float: none;
+                text-align: center;
+                padding-bottom: 20px;
+            }
+            .pixfort_app_3 .phones_style img {
+                float: none;
+                text-align: center;
+                margin-right: 0px;
+                padding-top: 0px;
+            }
+            .pixfort_app_3 .phones {
+                width: 100%;
+                height: 250px;
+            }
+            .pixfort_app_3 .pad_top {
+                text-align: center;
+            }
+            .pixfort_app_3 .colorful {
+                text-align: center;
+            }
+            .pixfort_app_3 .amazing {
+                text-align: center;
+                float: none;
+                width: 100%;
+                margin-left: auto;
+                margin-left: auto;
+            }
+            .pixfort_app_3 .amazing_style {
+                padding: 20px 0px;
+            }
+            .pixfort_app_3 .amaz_tit {
+                padding-top: 40px;
+            }
+            .pixfort_app_3 .amazing_text_style {
+                padding: 0;
+                text-align: center;
+                float: none;
+                max-width: 100%;
+            }
+            .pixfort_app_3 .suite {
+                top: 0;
+                text-align: center;
+            }
+            .pixfort_app_3 .img_st img {
+                width: 100%;
+                margin: 0;
+                text-align: center;
+            }
+            .pixfort_app_3 .Designs_style {
+                padding: 0;
+            }
+            .pixfort_app_3 .Designs_text_style {
+                padding-left: 0px;
+                text-align: center;
+                padding-top: 20px;
+            }
+            .pixfort_app_3 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_app_3 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .Home_photo {
+                width: 100%;
+                height: 100%;
+            }
+            .pixfort_real_estate_4 .Home_info {
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_real_estate_4 .b_style img {
+                width: 15%;
+                height: auto;
+                margin-top: 40px;
+            }
+            .pixfort_real_estate_4 .txt_style {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+            .pixfort_real_estate_4 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .soc_icons {
+                float: right;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .img_homes_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_hotel_5 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_hotel_5 .video_style iframe {
+                width: 100%;
+                height: 200px;
+                padding-bottom: 0px;
+            }
+            .pixfort_university_6 .img_uni_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_university_6 .part_st {
+                text-align: center;
+            }
+            .pixfort_university_6 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_university_6 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_university_6 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_shop_7 .left_box {
+                text-align: center;
+            }
+            .pixfort_shop_7 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_shop_7 .subscribe_btn a {
+                float: none;
+            }
+            .pixfort_shop_7 .note_st {
+                text-align: center;
+                padding-bottom: 80px;
+            }
+            .pixfort_shop_7 .icon-1_st,
+            .pixfort_shop_7 .icon-2_st,
+            .pixfort_shop_7 .icon-3_st {
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+            .pixfort_shop_7 .text_st {
+                max-width: 100%;
+                text-align: center;
+                float: none;
+                margin-left: 0;
+                padding-top: 20px;
+            }
+            .pixfort_shop_7 .pict_st img {
+                max-width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                margin-top: 150px;
+            }
+            .pixfort_shop_7 .box_1,
+            .pixfort_shop_7 .box_2 {
+                margin: 0px 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_shop_7 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_shop_7 .txt_style {
+                max-width: 100%;
+                text-align: left;
+                padding: 10px 10px;
+            }
+            .pixfort_shop_7 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_shop_7 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_shop_7 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .video_style iframe {
+                width: 100%;
+                height: 240px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .text_input,
+            .pixfort_ecourse_8 .subtext_style {
+                padding-left: 0px;
+                padding-right: 0px;
+                text-align: center;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .contact_st form {
+                width: 90%;
+            }
+            .pixfort_ecourse_8 .note_st {
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .text_zone {
+                width: 100%;
+                left: 0px;
+                margin-top: 0px;
+                float: none;
+            }
+            .pixfort_ecourse_8 .TT1,
+            .pixfort_ecourse_8 .TT2 {
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .get_tut_btn a {
+                float: none;
+            }
+            .pixfort_ecourse_8 .picture_zone img {
+                width: 100%;
+                float: none;
+            }
+            .pixfort_ecourse_8 .box_1 {
+                margin-left: 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_ecourse_8 .box_2 {
+                margin-right: 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_ecourse_8 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .txt_style {
+                max-width: 100%;
+                text-align: left;
+                padding: 10px 10px;
+            }
+            .pixfort_ecourse_8 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_ebook_9 .video_style iframe {
+                width: 100%;
+                height: 240px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .text_input,
+            .pixfort_ebook_9 .subtext_style {
+                padding-left: 0px;
+                padding-right: 0px;
+                text-align: center;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .contact_st form {
+                width: 90%;
+            }
+            .pixfort_ebook_9 .chapters {
+                text-align: center
+            }
+            .pixfort_ebook_9 .text_chapter {
+                padding-bottom: 20px;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .TT1,
+            .pixfort_ebook_9 .TT2 {
+                text-align: center;
+            }
+            .pixfort_ebook_9 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_business_10 .video_style iframe {
+                width: 100%;
+                height: 240px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            /*  Part 5:   */
+            
+            .pixfort_business_10 .box_1,
+            .pixfort_business_10 .box_2 {
+                margin: 0px 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_business_10 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_business_10 .txt_style {
+                max-width: 100%;
+                text-align: center;
+                padding: 10px 10px;
+            }
+            .pixfort_business_10 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_business_10 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_business_10 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .email_subscribe {
+                width: 90%;
+                height: auto;
+                padding: 0px;
+                padding-top: 15px;
+            }
+            .pixfort_subscribe_12 #contact_form input {
+                float: none;
+                width: 80%;
+                height: 40px;
+                text-align: center;
+                padding: 0px;
+            }
+            .pixfort_subscribe_12 .subscribe_btn .subscribe_btn {
+                float: none;
+            }
+            .pixfort_subscribe_12 .context_style {
+                max-width: 100%;
+                padding: 20px;
+            }
+            .pixfort_subscribe_12 .subtitle_style {
+                max-width: 100%;
+            }
+            .pixfort_subscribe_12 .coming_st {
+                width: 100%;
+                margin-left: 0px;
+            }
+            .pixfort_subscribe_12 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .logo_width {
+                max-width: 90%;
+            }
+            .pixfort_gym_13 .img_gym_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_gym_13 .part_st {
+                text-align: center;
+            }
+            .pixfort_gym_13 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_agency_14 .logo_width {
+                max-width: 90%;
+            }
+            .pixfort_agency_14 .img_gym_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_agency_14 .part_st {
+                text-align: center;
+            }
+            .pixfort_agency_14 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .socbuttons {
+                text-align: center;
+            }
+            .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .socbuttons {
+                text-align: center;
+            }
+            .pixfort_subscribe_19 .rights_st {
+                float:none;
+                text-align:center
+            }
+
+            .pixfort_subscribe_19 .marge {
+                padding:30px 20px
+            }
+
+            .pixfort_subscribe_19 .logo_div,.pixfort_subscribe_19 .social_div {
+                width:100%;
+                display:inline-block;
+                text-align:center!important;
+                margin:10px 0;
+                float:none
+            }
+
+            .pixfort_subscribe_19 .logo_div img {
+                margin-right:auto;
+                margin-left:auto;
+                float:none
+            }
+
+            .pixfort_subscribe_19 .main_content {
+                padding-top:40px
+            }
+
+            .pixfort_subscribe_19 .soc_icons {
+                float:none;
+                text-align:center;
+                padding-bottom:30px
+            }
+        }
+        /* Mobile Landscape Size to Tablet Portrait (devices and browsers) */
+        
+        @media only screen and (min-width: 480px) and (max-width: 767px) {
+            .pixfort_normal_1 .email_subscribe {
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                height: auto;
+                padding: 0px;
+                padding: 15px 0px;
+                text-align: center;
+            }
+            .pixfort_normal_1 #contact_form input {
+                float: none;
+                width: 80%;
+                height: 40px;
+                text-align: center;
+                padding: 0px;
+            }
+            .pixfort_normal_1 .subscribe_btn {
+                padding-bottom: 10px;
+            }
+            .pixfort_normal_1 .onethird_style {
+                padding-bottom: 10px;
+            }
+            .pixfort_normal_1 .box_1 {
+                margin-bottom: 20px;
+            }
+            .pixfort_normal_1 .img_style {
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_normal_1 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_normal_1 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_normal_1 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_normal_1 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .th1_style,
+            .pixfort_corporate_2 .th2_style {
+                margin-bottom: 30px;
+            }
+            .pixfort_corporate_2 .headtext_style,
+            .pixfort_corporate_2 .subtext_style,
+            .pixfort_corporate_2 .plan {
+                text-align: center;
+            }
+            .pixfort_corporate_2 .contact_zone {
+                text-align: center;
+                margin-right: 20px;
+            }
+            .pixfort_corporate_2 .contact_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_corporate_2 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .hbloc_style {
+                float: none;
+                text-align: center;
+                padding-top: 0px;
+            }
+            .pixfort_app_3 .phones_style img {
+                float: none;
+                text-align: center;
+                margin-right: 0px;
+                padding-top: 0px;
+            }
+            .pixfort_app_3 .phones {
+                width: 100%;
+                height: 250px;
+            }
+            .pixfort_app_3 .pad_top {
+                text-align: center;
+            }
+            .th1_style,
+            .pixfort_app_3 .th2_style {
+                margin-bottom: 30px;
+            }
+            .pixfort_app_3 .amazing_img4_st {
+                width: 100%;
+                height: 400px;
+                text-align: center;
+            }
+            .pixfort_app_3 .colorful_img4_st img {
+                width: 100%;
+                height: 400px;
+                text-align: center;
+            }
+            .pixfort_app_3 .colorful {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_app_3 .amazing {
+                text-align: center;
+                float: none;
+                width: 100%;
+                margin-left: auto;
+                margin-left: auto;
+            }
+            .pixfort_app_3 .amazing_style {
+                padding: 20px 0px;
+            }
+            .pixfort_app_3 .amaz_tit {
+                padding-top: 40px;
+            }
+            .pixfort_app_3 .text2_style {
+                top: 10px;
+            }
+            .pixfort_app_3 .amazing_text_style {
+                padding: 0;
+                text-align: center;
+                float: none;
+                max-width: 100%;
+            }
+            .pixfort_app_3 .suite {
+                top: 0;
+                text-align: center;
+            }
+            .pixfort_app_3 .img_st img {
+                width: 100%;
+                margin: 0;
+                text-align: center;
+            }
+            .pixfort_app_3 .Designs_style {
+                padding: 0;
+            }
+            .pixfort_app_3 .Designs_text_style {
+                padding-left: 0px;
+                text-align: center;
+                padding-top: 20px;
+            }
+            .pixfort_app_3 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_app_3 .soc_icons {
+                float: right;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .Home_photo {
+                width: 100%;
+                height: 100%;
+            }
+            .pixfort_real_estate_4 .Home_info {
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_real_estate_4 .comp_logos {
+                width: 100%;
+            }
+            .pixfort_real_estate_4 .Designs_text_style {
+                text-align: center;
+                top: 30px;
+            }
+            .pixfort_real_estate_4 .b_style img {
+                width: 15%;
+                height: auto;
+                margin-top: 30px;
+            }
+            .pixfort_real_estate_4 .txt_style {
+                padding-left: 15px;
+                padding-right: 13px;
+            }
+            .pixfort_real_estate_4 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .soc_icons {
+                float: right;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .img_homes_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_hotel_5 .bg_Homes {
+                margin-bottom: 20px;
+            }
+            .pixfort_hotel_5 .box_Homes {
+                background: #faf5f5;
+                border-bottom: 3px solid #eadbdc;
+                text-align: center;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                padding-top: 30px;
+                margin-top: 50px;
+            }
+            .pixfort_hotel_5 .Res_st {
+                position: relative;
+                display: inline-block;
+                text-align: center;
+                top: 0px;
+                margin-left: 0px;
+            }
+            .pixfort_hotel_5 .logos_style img {
+                text-align: center;
+            }
+            .pixfort_hotel_5 .New_Latest_Off {
+                text-align: center;
+            }
+            .pixfort_hotel_5 .N1_style {
+                text-align: center;
+            }
+            .pixfort_hotel_5 .N2_style {
+                text-align: center;
+            }
+            .pixfort_hotel_5 .video_style iframe {
+                width: 100%;
+                height: 240px;
+                padding-bottom: 0px;
+            }
+            .pixfort_hotel_5 .soc_New {
+                padding-bottom: 20px;
+            }
+            .pixfort_hotel_5 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_university_6 .logos_width img {
+                max-width: 100%;
+                text-align: center;
+            }
+            .pixfort_university_6 .img_uni_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_university_6 .part_st {
+                text-align: center;
+            }
+            .pixfort_university_6 .text_st {
+                width: 69%;
+                text-align: center;
+            }
+            .pixfort_university_6 .title_st,
+            .pixfort_university_6 .subject_st {
+                width: 100%;
+            }
+            .pixfort_university_6 .substyle {
+                text-align: center;
+            }
+            .text-style {
+                max-width: 100%;
+                margin-left: 20px;
+                margin-right: 20px;
+            }
+            .pixfort_university_6 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_university_6 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_university_6 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_shop_7 .left_box {
+                text-align: center;
+            }
+            .pixfort_shop_7 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_shop_7 .subscribe_btn a {
+                float: none;
+            }
+            .pixfort_shop_7 .note_st {
+                text-align: center;
+                padding-bottom: 80px;
+            }
+            .pixfort_shop_7 .sold {
+                margin-top: -70px;
+            }
+            .pixfort_shop_7 .logos_width img {
+                max-width: 100%;
+                text-align: center;
+            }
+            .pixfort_shop_7 .icon-1_st,
+            .pixfort_shop_7 .icon-2_st,
+            .pixfort_shop_7 .icon-3_st {
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+            .pixfort_shop_7 .text_st {
+                max-width: 100%;
+                text-align: center;
+                float: none;
+                margin-left: 0;
+                padding-top: 20px;
+            }
+            .pixfort_shop_7 .pict_st img {
+                max-width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_shop_7 .disco_1 {
+                width: 300px;
+                margin-left: auto;
+                margin-right: auto;
+                bottom: 20px;
+            }
+            .pixfort_shop_7 .disco_2 {
+                width: 300px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_shop_7 .disco_3 {
+                width: 300px;
+                margin-left: auto;
+                margin-right: auto;
+                top: 20px;
+            }
+            .pixfort_shop_7 .box_1,
+            .pixfort_shop_7 .box_2 {
+                margin: 0px 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_shop_7 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_shop_7 .txt_style {
+                max-width: 100%;
+                text-align: left;
+                padding: 10px 10px;
+            }
+            .pixfort_shop_7 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_shop_7 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_shop_7 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .left_zone,
+            .pixfort_ecourse_8 .title_st,
+            .pixfort_ecourse_8 .txt_st {
+                padding-left: 0px;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .video_style iframe {
+                width: 100%;
+                height: 240px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .text_input,
+            .pixfort_ecourse_8 .subtext_style {
+                padding-left: 0px;
+                padding-right: 0px;
+                text-align: center;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .contact_st form {
+                width: 90%;
+            }
+            .pixfort_ecourse_8 .note_st {
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .logos_width img {
+                max-width: 100%;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .text_zone {
+                width: 100%;
+                left: 0px;
+                margin-top: 0px;
+                float: none;
+            }
+            .pixfort_ecourse_8 .TT1,
+            .pixfort_ecourse_8 .TT2 {
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .get_tut_btn a {
+                float: none;
+            }
+            .pixfort_ecourse_8 .picture_zone img {
+                width: 100%;
+                float: none;
+            }
+            .pixfort_ecourse_8 .feature_1,
+            .pixfort_ecourse_8 .feature_2 {
+                margin-bottom: 20px;
+            }
+            .pixfort_ecourse_8 .box_1,
+            .pixfort_ecourse_8 .box_2 {
+                margin: 0px 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_ecourse_8 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .txt_style {
+                max-width: 100%;
+                text-align: left;
+                padding: 10px 10px;
+            }
+            .pixfort_ecourse_8 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_ebook_9 .video_style iframe {
+                width: 100%;
+                height: 240px;
+                margin-left: auto;
+                margin-right: auto;
+                top: 20px;
+            }
+            .pixfort_ebook_9 .text_input,
+            .pixfort_ebook_9 .subtext_style {
+                padding-left: 0px;
+                padding-right: 0px;
+                text-align: center;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .contact_st form {
+                width: 90%;
+            }
+            .pixfort_ebook_9 .logos_width img {
+                max-width: 100%;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .trees {
+                margin-bottom: -15px;
+            }
+            .pixfort_ebook_9 .chapters {
+                text-align: center
+            }
+            .pixfort_ebook_9 .text_chapter {
+                padding-bottom: 20px;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .TT1,
+            .pixfort_ebook_9 .TT2,
+            .pixfort_ebook_9 .TT3 {
+                max-width: 90%;
+                text-align: center;
+                float: none;
+            }
+            .pixfort_ebook_9 .down_box {
+                text-align: center;
+                float: none;
+                max-width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .author_text,
+            .pixfort_ebook_9 .icons_st {
+                text-align: center;
+                margin-left: 0px;
+                max-width: 100%;
+            }
+            .pixfort_ebook_9 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .socbuttons {
+                text-align: center;
+            }
+            /*  Part 1:   */
+            
+            .pixfort_business_10 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_business_10 .text_zone {
+                max-width: 100%;
+            }
+            .pixfort_business_10 .TT1,
+            .pixfort_business_10 .TT2 {
+                text-align: center;
+            }
+            .pixfort_business_10 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .check_st {
+                text-align: center;
+            }
+            .pixfort_business_10 .apply_btn {
+                text-align: center;
+            }
+            .pixfort_business_10 .picture_zone img {
+                width: 100%;
+                float: none;
+            }
+            /*  Part 4:   */
+            
+            .pixfort_business_10 .title_st,
+            .pixfort_business_10 .txt_st {
+                padding-left: 0px;
+                text-align: center;
+            }
+            .pixfort_business_10 .video_style iframe {
+                width: 100%;
+                height: 240px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .headtext_style,
+            .pixfort_business_10 .subtext_style {
+                text-align: center;
+            }
+            .pixfort_business_10 .subtext_style {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .text_input {
+                padding-left: 0px;
+                padding-right: 0px;
+                text-align: center;
+                float: none;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .contact_st form {
+                width: 90%;
+            }
+            .pixfort_business_10 .note_st {
+                text-align: center;
+            }
+            .pixfort_business_10 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_business_10 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_business_10 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .email_subscribe {
+                width: 90%;
+                height: auto;
+                padding: 0px;
+                padding-top: 15px;
+            }
+            .pixfort_subscribe_12 #contact_form input {
+                float: none;
+                width: 80%;
+                height: 40px;
+                text-align: center;
+                padding: 0px;
+            }
+            .subscribe_btn .pixfort_subscribe_12 .subscribe_btn {
+                float: none;
+            }
+            .pixfort_subscribe_12 .video_style iframe {
+                width: 100%;
+                height: 240px
+            }
+            .pixfort_subscribe_12 .context_style {
+                max-width: 100%;
+            }
+            .pixfort_subscribe_12 .subtitle_style {
+                max-width: 100%;
+            }
+            .pixfort_subscribe_12 .coming_st {
+                width: 100%;
+                margin-left: 0px;
+            }
+            .pixfort_subscribe_12 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .logo_width {
+                max-width: 80%;
+            }
+            .pixfort_gym_13 .img_gym_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_gym_13 .part_st {
+                text-align: center;
+            }
+            .pixfort_gym_13 .text_st {
+                width: 69%;
+                text-align: center;
+            }
+            .pixfort_gym_13 .title_st,
+            .pixfort_gym_13 .subject_st {
+                width: 100%;
+            }
+            .pixfort_gym_13 .substyle {
+                text-align: center;
+            }
+            .pixfort_gym_13 .text-style {
+                max-width: 100%;
+                margin-left: 20px;
+                margin-right: 20px;
+            }
+            .pixfort_gym_13 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_gym_13 .note_contact {
+                margin-bottom: 60px;
+            }
+            .pixfort_gym_13 .text_st {
+                padding-left: 0px;
+            }
+            .pixfort_agency_14 .logo_width {
+                max-width: 80%;
+            }
+            .pixfort_agency_14 .img_gym_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_agency_14 .part_st {
+                text-align: center;
+            }
+            .pixfort_agency_14 .text_st {
+                width: 69%;
+                text-align: center;
+            }
+            .pixfort_agency_14 .title_st,
+            .pixfort_agency_14 .subject_st {
+                width: 100%;
+            }
+            .pixfort_agency_14 .substyle {
+                text-align: center;
+            }
+            .pixfort_agency_14 .text-style {
+                max-width: 100%;
+                margin-left: 20px;
+                margin-right: 20px;
+            }
+            .pixfort_agency_14 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .socbuttons {
+                text-align: center;
+            }
+            .logos_width img {
+                width: 80%;
+            }
+            .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .socbuttons {
+                text-align: center;
+            }
+            .pixfort_subscribe_19 .htext_style {
+                margin-right:0
+            }
+
+            .pixfort_subscribe_19 .contact_st form {
+                width:100%
+            }
+
+            .pixfort_subscribe_19 .rights_st {
+                margin-left:5px
+            }
+        }
+        /* Mobile Portrait Size to Mobile Landscape Size (devices and browsers) */
+        
+        @media only screen and (max-width: 479px) {
+            .pixfort_normal_1 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_normal_1 .email_subscribe {
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                height: auto;
+                padding: 0px;
+                padding: 15px 0px;
+                text-align: center;
+            }
+            .pixfort_normal_1 #contact_form input {
+                float: none;
+                width: 80%;
+                height: 40px;
+                text-align: center;
+                padding: 0px;
+            }
+            .pixfort_normal_1 .subscribe_btn {
+                padding-bottom: 10px;
+            }
+            .pixfort_normal_1 .onethird_style {
+                padding-bottom: 10px;
+            }
+            .pixfort_normal_1 .t1_style {
+                text-align: center;
+            }
+            .pixfort_normal_1 .t2_style {
+                text-align: center;
+            }
+            .pixfort_normal_1 .t3_style {
+                text-align: center;
+            }
+            .pixfort_normal_1 .box_1 {
+                margin-bottom: 20px;
+            }
+            .pixfort_normal_1 .img_style {
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_normal_1 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_normal_1 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_normal_1 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_normal_1 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_corporate_2 .h_style {
+                line-height: 200%;
+            }
+            .pixfort_corporate_2 .just_st {
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_corporate_2 .cc_style {
+                top: 8px;
+            }
+            .pixfort_corporate_2 .th1_style,
+            .pixfort_corporate_2 .th2_style {
+                margin-bottom: 30px;
+            }
+            .pixfort_corporate_2 .headtext_style,
+            .pixfort_corporate_2 .subtext_style,
+            .pixfort_corporate_2 .plan {
+                text-align: center;
+            }
+            .pixfort_corporate_2 .contact_zone {
+                text-align: center;
+                margin-right: 20px;
+            }
+            .pixfort_corporate_2 .contact_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_corporate_2 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_corporate_2 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .logo_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .soc_st {
+                float: none;
+                text-align: center;
+                margin-right: 0px;
+            }
+            .pixfort_app_3 .hbloc_style {
+                float: none;
+                text-align: center;
+                padding-top: 0px;
+            }
+            .pixfort_app_3 .phones_style img {
+                float: none;
+                text-align: center;
+                margin-right: 0px;
+                padding-top: 0px;
+            }
+            .pixfort_app_3 .phones {
+                width: 100%;
+                height: 250px;
+            }
+            .pixfort_app_3 .pad_top {
+                text-align: center;
+            }
+            .th1_style,
+            .pixfort_app_3 .th2_style {
+                margin-bottom: 30px;
+            }
+            .pixfort_app_3 .amazing_img4_st {
+                width: 100%;
+                height: 300px;
+                text-align: center;
+            }
+            .pixfort_app_3 .colorful_img4_st img {
+                width: 100%;
+                height: 300px;
+                text-align: center;
+            }
+            .pixfort_app_3 .colorful {
+                text-align: center;
+            }
+            .pixfort_app_3 .amazing {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_app_3 .amazing_style {
+                padding: 20px 0px;
+            }
+            .pixfort_app_3 .amaz_tit {
+                padding-top: 40px;
+            }
+            .pixfort_app_3 .amaz_text {
+                width: 100%;
+            }
+            .pixfort_app_3 .amazing_text_style {
+                padding: 0;
+                text-align: center;
+                float: none;
+                max-width: 100%;
+            }
+            .pixfort_app_3 .suite {
+                top: 0;
+                text-align: center;
+            }
+            .pixfort_app_3 .img_st img {
+                width: 100%;
+                margin: 0;
+                text-align: center;
+            }
+            .pixfort_app_3 .img2_st {
+                padding-bottom: 15px;
+            }
+            .pixfort_app_3 .img3_st {
+                padding-bottom: 25px;
+            }
+            .pixfort_app_3 .Designs_text_style {
+                padding-left: 0px;
+                text-align: center;
+                padding-top: 20px;
+            }
+            .pixfort_app_3 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_app_3 .socbuttoms {
+                text-align: center;
+                margin-left: 0px;
+                float: none;
+            }
+            .pixfort_app_3 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_real_estate_4 .Home_photo {
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_real_estate_4 .comp_logos {
+                width: 100%;
+            }
+            .pixfort_real_estate_4 .Designs_text_style {
+                text-align: center;
+                top: 30px;
+            }
+            .pixfort_real_estate_4 .box_style {
+                width: 100%;
+            }
+            .pixfort_real_estate_4 .b_style img {
+                width: 15%;
+                height: auto;
+                margin-top: 40px;
+            }
+            .pixfort_real_estate_4 .txt_style {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+            .pixfort_real_estate_4 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .socbuttons {
+                text-align: center;
+            }
+            .pixfort_real_estate_4 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_hotel_5 .img_homes_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_hotel_5 .bg_Homes {
+                margin-bottom: 20px;
+            }
+            .pixfort_hotel_5 .box_Homes {
+                background: #faf5f5;
+                border-bottom: 3px solid #eadbdc;
+                text-align: center;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                padding-top: 30px;
+                margin-top: 50px;
+            }
+            .pixfort_hotel_5 .Res_st {
+                position: relative;
+                display: inline-block;
+                text-align: center;
+                top: 0px;
+                margin-left: 0px;
+            }
+            .pixfort_hotel_5 .box_style {
+                width: 100%;
+            }
+            .pixfort_hotel_5 .b_style img {
+                width: 15%;
+                height: auto;
+                margin-top: 40px;
+            }
+            .pixfort_hotel_5 .txt_style {
+                width: 75%;
+                padding-left: 10px;
+                padding-right: 5px;
+            }
+            .pixfort_hotel_5 .New_Latest_Off {
+                text-align: center;
+            }
+            .pixfort_hotel_5 .N1_style {
+                text-align: center;
+            }
+            .pixfort_hotel_5 .N2_style {
+                text-align: center;
+            }
+            .pixfort_hotel_5 .video_style iframe {
+                width: 100%;
+                height: 170px;
+                padding-bottom: 0px;
+            }
+            .pixfort_hotel_5 .soc_New {
+                padding-bottom: 20px;
+            }
+            .pixfort_hotel_5 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_hotel_5 .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_hotel_5 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_university_6 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_university_6 .discover,
+            .pixfort_university_6 .discover_line,
+            .pixfort_university_6 .cosmopolitan,
+            .pixfort_university_6 .cosmopolitan_line {
+                font-size: 30px;
+            }
+            .pixfort_university_6 .college_btn a {
+                margin-right: 0px;
+                margin-bottom: 20px;
+            }
+            .pixfort_university_6 .logos_width img {
+                max-width: 100%;
+                text-align: center;
+            }
+            .pixfort_university_6 .img_uni_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            
+            .pixfort_university_6 .text_st {
+                width: 69%;
+                text-align: center;
+            }
+            .pixfort_university_6 .title_st,
+            .pixfort_university_6 .subject_st {
+                width: 100%;
+            }
+            .pixfort_university_6 .substyle {
+                text-align: center;
+            }
+            .text-style {
+                max-width: 100%;
+                margin-left: 20px;
+                margin-right: 20px;
+            }
+            .pixfort_university_6 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_university_6 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_university_6 .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_university_6 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_university_6 .head_line {
+                font-size: 25px;
+            }
+            .pixfort_shop_7 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_shop_7 .left_box {
+                text-align: center;
+            }
+            .pixfort_shop_7 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_shop_7 .subscribe_btn a {
+                float: none;
+            }
+            .pixfort_shop_7 .note_st {
+                text-align: center;
+                padding-bottom: 80px;
+            }
+            .pixfort_shop_7 .sold {
+                margin-top: -70px;
+            }
+            .pixfort_shop_7 .logos_width img {
+                max-width: 100%;
+                text-align: center;
+            }
+            .pixfort_shop_7 .icon-1_st,
+            .pixfort_shop_7 .icon-2_st,
+            .pixfort_shop_7 .icon-3_st {
+                margin-left: auto;
+                margin-right: auto;
+                display: block;
+            }
+            .pixfort_shop_7 .text_st {
+                max-width: 100%;
+                text-align: center;
+                float: none;
+                margin-left: 0;
+                padding-top: 20px;
+            }
+            .pixfort_shop_7 .pict_st img {
+                max-width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                margin-top: 30px;
+            }
+            .pixfort_shop_7 .disco_1 {
+                width: 90%;
+                margin-left: auto;
+                margin-right: auto;
+                bottom: 20px;
+            }
+            .pixfort_shop_7 .disco_2 {
+                width: 90%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_shop_7 .disco_3 {
+                width: 90%;
+                margin-left: auto;
+                margin-right: auto;
+                top: 20px;
+            }
+            .pixfort_shop_7 .box_1,
+            .pixfort_shop_7 .box_2 {
+                margin: 0px 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_shop_7 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_shop_7 .txt_style {
+                max-width: 100%;
+                text-align: left;
+                padding: 10px 10px;
+            }
+            .pixfort_shop_7 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_shop_7 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_shop_7 .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_shop_7 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_ecourse_8 .left_zone,
+            .pixfort_ecourse_8 .title_st,
+            .pixfort_ecourse_8 .txt_st {
+                padding-left: 0px;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .video_style iframe {
+                width: 100%;
+                height: 170px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .text_input {
+                padding-left: 0px;
+                padding-right: 0px;
+                text-align: center;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ecourse_8 .contact_st form {
+                width: 90%;
+            }
+            .pixfort_ecourse_8 .note_st {
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .logos_width img {
+                max-width: 100%;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .text_zone {
+                width: 100%;
+                left: 0px;
+                margin-top: 0px;
+                float: none;
+            }
+            .pixfort_ecourse_8 .TT1,
+            .pixfort_ecourse_8 .TT2 {
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .get_tut_btn a {
+                float: none;
+            }
+            .pixfort_ecourse_8 .picture_zone img {
+                width: 100%;
+                float: none;
+            }
+            .pixfort_ecourse_8 .feature_1,
+            .pixfort_ecourse_8 .feature_2 {
+                margin-bottom: 20px;
+            }
+            .pixfort_ecourse_8 .box_1,
+            .pixfort_ecourse_8 .box_2 {
+                margin: 0px 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_ecourse_8 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .txt_style {
+                max-width: 100%;
+                text-align: left;
+                padding: 10px 10px;
+            }
+            .pixfort_ecourse_8 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ecourse_8 .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_ecourse_8 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_ebook_9 .video_style iframe {
+                width: 100%;
+                height: 170px;
+                margin-left: auto;
+                margin-right: auto;
+                top: 20px;
+            }
+            .pixfort_ebook_9 .text_input {
+                padding-left: 0px;
+                padding-right: 0px;
+                text-align: center;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .contact_st form {
+                width: 90%;
+            }
+            .pixfort_ebook_9 .logos_width img {
+                max-width: 100%;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .trees {
+                margin-bottom: -15px;
+            }
+            .pixfort_ebook_9 .chapters {
+                text-align: center
+            }
+            .pixfort_ebook_9 .text_chapter {
+                padding-bottom: 20px;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_ebook_9 .TT1,
+            .pixfort_ebook_9 .TT2,
+            .pixfort_ebook_9 .TT3 {
+                max-width: 90%;
+                margin-left: auto;
+                margin-right: auto;
+                float: none;
+            }
+            .pixfort_ebook_9 .down_box {
+                max-width: 80%;
+                margin-left: auto;
+                margin-right: auto;
+                float: none;
+            }
+            .pixfort_ebook_9 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .author_text,
+            .pixfort_ebook_9 .icons_st {
+                text-align: center;
+                margin-left: 0px;
+                max-width: 100%;
+            }
+            .pixfort_ebook_9 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_ebook_9 .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_ebook_9 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            /*  Part 1:   */
+            
+            .pixfort_business_10 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_business_10 .text_zone {
+                max-width: 100%;
+            }
+            .pixfort_business_10 .TT1,
+            .pixfort_business_10 .TT2 {
+                text-align: center;
+            }
+            .pixfort_business_10 .segment {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .check_st {
+                text-align: center;
+            }
+            .pixfort_business_10 .apply_btn {
+                text-align: center;
+            }
+            .pixfort_business_10 .picture_zone img {
+                width: 100%;
+                float: none;
+            }
+            /*  Part 2:   */
+            
+            .pixfort_business_10 .logos_width img {
+                width: 100%;
+                text-align: center;
+            }
+            /*  Part 4:   */
+            
+            .pixfort_business_10 .title_st,
+            .pixfort_business_10 .txt_st {
+                padding-left: 0px;
+                text-align: center;
+            }
+            .pixfort_business_10 .video_style iframe {
+                width: 100%;
+                height: 170px;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .headtext_style,
+            .pixfort_business_10 .subtext_style {
+                text-align: center;
+            }
+            .pixfort_business_10 .text_input {
+                padding-left: 0px;
+                padding-right: 0px;
+                text-align: center;
+                float: none;
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .pixfort_business_10 .contact_st form {
+                width: 90%;
+            }
+            .pixfort_business_10 .note_st {
+                text-align: center;
+            }
+            /*  Part 5:   */
+            
+            .pixfort_business_10 .box_1,
+            .pixfort_business_10 .box_2 {
+                margin: 0px 20px;
+                padding-top: 10px;
+                margin-bottom: 20px;
+            }
+            .pixfort_business_10 .b_style {
+                float: none;
+                width: 100%;
+                text-align: center;
+            }
+            .pixfort_business_10 .txt_style {
+                max-width: 100%;
+                text-align: center;
+                padding: 10px 10px;
+            }
+            /*  Part 6:   */
+            
+            .pixfort_business_10 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_business_10 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_business_10 .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_business_10 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_subscribe_12 .email_subscribe {
+                width: 100%;
+                height: auto;
+                padding: 0px;
+                padding-top: 15px;
+            }
+            .pixfort_subscribe_12 #contact_form input {
+                float: none;
+                width: 80%;
+                height: 40px;
+                text-align: center;
+                padding: 0px;
+            }
+            .subscribe_btn .pixfort_subscribe_12 .subscribe_btn {
+                float: none;
+            }
+            .pixfort_subscribe_12 .video_style iframe {
+                width: 100%;
+                height: 170px
+            }
+            .pixfort_subscribe_12 .context_style {
+                max-width: 100%;
+            }
+            .pixfort_subscribe_12 .subtitle_style {
+                max-width: 100%;
+            }
+            .pixfort_subscribe_12 .coming_st {
+                width: 100%;
+                margin-left: 0px;
+            }
+            .pixfort_subscribe_12 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_12 .socbuttons {
+                text-align: center;
+                margin-left: 0px;
+                float: none;
+            }
+            .pixfort_subscribe_12 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_gym_13 .logo_width {
+                width: 70%;
+            }
+            .pixfort_gym_13 .img_gym_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_gym_13 .link_1_btn a {
+                float: none;
+            }
+            .pixfort_gym_13 .link_2_btn a {
+                float: none;
+            }
+            .pixfort_gym_13 .link_3_btn a {
+                float: none;
+            }
+            .pixfort_gym_13 .text_st {
+                width: 69%;
+                text-align: center;
+                padding-left: 0px;
+            }
+            .pixfort_gym_13 .title_st,
+            .pixfort_gym_13 .subject_st {
+                width: 100%;
+            }
+            .pixfort_gym_13 .zone_left {
+                text-align: center;
+            }
+            .pixfort_gym_13 .icon_st img {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .substyle {
+                text-align: center;
+            }
+            .pixfort_gym_13 .text-style {
+                max-width: 100%;
+                margin-left: 20px;
+                margin-right: 20px;
+            }
+            .pixfort_gym_13 .box_style {
+                width: 85%;
+            }
+            .pixfort_gym_13 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_gym_13 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_gym_13 .note_contact {
+                margin-bottom: 60px;
+            }
+            .pixfort_gym_13 .send_btn button {
+                width: 100%;
+            }
+            .pixfort_agency_14 .htext_style {
+                margin-right: 0px;
+            }
+            .pixfort_agency_14 .logo_width {
+                width: 90%;
+                margin: 15px 0;
+            }
+            .pixfort_agency_14 .img_gym_st {
+                position: relative;
+                width: 100%;
+                height: auto;
+            }
+            .pixfort_agency_14 .link_1_btn a {
+                float: none;
+            }
+            .pixfort_agency_14 .link_2_btn a {
+                float: none;
+            }
+            .pixfort_agency_14 .link_3_btn a {
+                float: none;
+            }
+            .pixfort_agency_14 .text_st {
+                width: 69%;
+                text-align: center;
+            }
+            .pixfort_agency_14 .title_st,
+            .pixfort_agency_14 .subject_st {
+                width: 100%;
+            }
+            .pixfort_agency_14 .text_logos {
+                width: 80%;
+                margin-left: auto;
+                margin-right: auto
+            }
+            .pixfort_agency_14 .L1_style,
+            .pixfort_agency_14 .L2_style {
+                width: 80%;
+                margin-left: auto;
+                margin-right: auto
+            }
+            .pixfort_agency_14 .box_style {
+                width: 85%;
+                margin-left: auto;
+                margin-right: auto
+            }
+            .pixfort_agency_14 .zone_left {
+                text-align: center;
+            }
+            .pixfort_agency_14 .icon_st img {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .substyle {
+                text-align: center;
+            }
+            .pixfort_agency_14 .text-style {
+                max-width: 100%;
+                margin-left: 20px;
+                margin-right: 20px;
+            }
+            .pixfort_agency_14 .f1_style {
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto
+            }
+            .pixfort_agency_14 .f2_style {
+                width: 100%
+            }
+            .pixfort_agency_14 .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .pixfort_agency_14 .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .pixfort_agency_14 .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .logos_width img {
+                max-width: 75%;
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .text_input {
+                width: 100%;
+                margin-left: auto;
+                margin-right: auto;
+                padding-left: 5px;
+                padding: 15px !important;
+                padding-right: 5px;
+            }
+            .rights_st {
+                float: none;
+                text-align: center;
+            }
+            .likes_st {
+                margin: 0;
+                padding-right: 0px;
+                padding-top: 25px;
+                float: none;
+                text-align: center;
+            }
+            .socbuttons {
+                text-align: center;
+                float: none;
+            }
+            .soc_icons {
+                float: none;
+                text-align: center;
+            }
+            .pixfort_subscribe_19 .htext_style {
+                margin-right:0
+            }
+
+            .pixfort_subscribe_19 .contact_st form {
+                width:100%
+            }
+
+            .pixfort_subscribe_19 .rights_st {
+                margin-left:5px
+            }
+        }
