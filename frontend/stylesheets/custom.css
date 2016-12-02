@@ -153,3 +153,76 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     color: #c7c7c7;
     text-shadow: 0 1px 0 #000;
 }
+
+/* Certificate */
+.certificate {
+    width: 720px;
+    height: 496px;
+    margin: 0 auto;
+    padding: 37px 37px 0;
+    background-image: url(../images/stock-vector-certificate-vector-pattern-that-is-used-in-currency-and-diplomas-370407353.png);
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    background-size: contain;
+    box-sizing: border-box;
+}
+
+.certificate-inner {
+    box-sizing: border-box;
+    height: 419px;
+    padding: 30px 65px 0;
+    background-color: #444;
+    background-image: url(../images/036-2.png);
+    background-repeat: repeat;
+    background-size: 50%;
+}
+
+.certificate_title {
+    margin: 0;
+    font-family: 'Lato', sans-serif;
+    font-weight: 300;
+}
+
+.certificate_info {
+    margin: 40px 0 10px;
+}
+
+.certificate_value {
+    overflow: hidden;
+    -ms-text-overflow: ellipsis;
+    text-overflow: ellipsis;
+    color: #fff;
+    line-height: 1;
+    margin: 0 0 5px;
+    padding: 0 0 5px;
+    border-bottom: 1px solid rgba(45, 192, 232, 0.5);
+    font-size: 0.8em;
+}
+
+.certificate_value_hash {
+    font-family: Menlo,Monaco,Consolas,"Courier New",monospace;
+}
+
+.certificate_value_icon {
+    line-height: 0;
+    font-size: 0.8em;
+}
+
+.certificate_value a {
+    color: #fff;
+    text-decoration: none;
+}
+
+.certificate_value a:hover,
+.certificate_value a:focus {
+    color: #2dc0e8;
+}
+
+.certificate_label {
+    color: #999;
+    text-transform: uppercase;
+    line-height: 1;
+    font-size: 0.65em;
+    letter-spacing: 0.05em;
+    margin: 0 0 10px;
+}

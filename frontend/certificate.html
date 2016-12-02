@@ -57,33 +57,29 @@
 <div class="dark">
     <div class="big_padding pix_builder_bg">
 
-        <div class="container">
-            <div class="sixteen columns">
-                <div class="eight columns centered alpha margin_bottom_30">
-                    <div class="center_text">
-                        <div class="title_70 light_blue margin_bottom">
-                            <span class="pi pixicon-lock2"></span>
-                        </div>
-                        <p class="big_title editContent"><strong>Certificate of proof</strong></p>
-                        <p class="normal_text light_gray editContent">This certificate proves the existence of the file with next characteristics on the Exonum blockchain:</p>
-                    </div>
-                    <div class="pix_form ">
-                        <label>File:</label>
-                        <div class="img-responsive">
-                            <a href="pics/582d15f4ca2d6.image.jpg" target="_blank">
-                                <img src="pics/582d15f4ca2d6.image.jpg" alt="">
-                                <div class="img-responsive-zoom">
-                                    <span class="pi pixicon-zoom-in"></span>
-                                </div>
-                            </a>
-                        </div>
-                        <label>File hash:</label>
-                        <input type="text" class="pix_text pix_text_dark pix_text_readonly" readonly="readonly" value="b683ac9fcc379bb32be66c8b18d4a04ec443388fc39c66fedb27dc65e5f2c2c9">
-                        <label>Title:</label>
-                        <input type="text" class="pix_text pix_text_dark pix_text_readonly" readonly="readonly" value="Meeting photo">
-                        <label>Created at:</label>
-                        <input type="text" class="pix_text pix_text_dark pix_text_readonly" readonly="readonly" value="15:21:33 November 30, 2016">
-                    </div>
+        <div class="certificate">
+            <div class="certificate-inner">
+                <div class="center_text">
+                    <p class="big_title editContent certificate_title">Certificate of proof</p>
+                    <p class="normal_text light_gray editContent">This certifies that file exists on the Exonum blockchain.</p>
+                </div>
+
+                <div class="certificate_info">
+                    <p class="certificate_value certificate_value_hash">b683ac9fcc379bb32be66c8b18d4a04ec443388fc39c66fedb27dc65e5f2c2c9</p>
+                    <p class="certificate_label">File hash</p>
+
+                    <p class="certificate_value">Photo from our party</p>
+                    <p class="certificate_label">Description</p>
+
+                    <p class="certificate_value">15:21:33 November 30, 2016</p>
+                    <p class="certificate_label">Created at</p>
+
+                    <p class="certificate_value"><a href="pics/582d15f4ca2d6.image.jpg" target="_blank"><span class="pi pixicon-image certificate_value_icon"></span> DSC_07192.jpg</a></p>
+                    <p class="certificate_label">File</p>
+                </div>
+
+                <div class="center_text">
+                    <img src="https://chart.googleapis.com/chart?cht=qr&chs=72x72&chl=http://exonum.com/timestamping/certificate.html&chld=L|0" alt="">
                 </div>
             </div>
         </div>
