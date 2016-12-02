@@ -3,6 +3,7 @@
 extern crate env_logger;
 extern crate clap;
 extern crate serde;
+extern crate serde_json;
 extern crate time;
 extern crate rand;
 #[macro_use]
@@ -27,14 +28,14 @@ use std::thread;
 
 use iron::prelude::*;
 use iron::status;
-use iron::mime::Mime;
+use iron::mime::{Mime, TopLevel, SubLevel};
 use iron::headers;
 use hyper::header::{ContentDisposition, DispositionType, DispositionParam, Charset};
 use params::{Params, Value};
 use router::Router;
 
+use serde_json::value::ToJson;
 use clap::{Arg, App, SubCommand};
-
 use log::{LogRecord, LogLevel};
 use env_logger::LogBuilder;
 use colored::*;
@@ -47,7 +48,6 @@ use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 use exonum::events::Error as EventsError;
 use exonum::blockchain::Blockchain;
-
 
 use timestamping::{TimestampingBlockchain, TimestampTx, Content, TIMESTAMPING_FILE_SIZE_LIMIT};
 
@@ -67,6 +67,7 @@ enum ApiError {
     Io(std::io::Error),
     FileNotFound,
     FileToBig,
+    FileExists,
 }
 
 impl std::fmt::Display for ApiError {
@@ -120,8 +121,7 @@ impl From<ApiError> for IronError {
 impl<D> TimestampingApi<D>
     where D: Database
 {
-    fn put_file(&self, file: &params::File) -> Result<String, ApiError> {
-        println!("put_file, {:?}", file);
+    fn put_file(&self, file: &params::File, description: &str) -> Result<TimestampTx, ApiError> {
         if file.size > TIMESTAMPING_FILE_SIZE_LIMIT {
             return Err(ApiError::FileToBig);
         }
@@ -134,26 +134,18 @@ impl<D> TimestampingApi<D>
         file.read_to_end(&mut buf)?;
         let hash = hash(buf.as_ref());
         // TODO add checks for already stored files
+        if self.blockchain.view().contents().get(&hash)?.is_some() {
+            return Err(ApiError::FileExists);
+        }
 
         // Create transaction
         let (_, dummy_key) = gen_keypair();
         let ts = time::now().to_timespec();
         // FIXME avoid reallocations
-        let tx = TimestampTx::new(&file_name, &mime, ts, &hash, buf.as_ref(), &dummy_key);
-        self.channel.send(tx)?;
+        let tx = TimestampTx::new(&file_name, &description, &mime, ts, &hash, buf.as_ref(), &dummy_key);
+        self.channel.send(tx.clone())?;
 
-        Ok(hash.to_hex())
-    }
-
-    fn put_files<'a, I: Iterator<Item = &'a params::File>>(&self,
-                                                           files: I)
-                                                           -> Result<Vec<String>, ApiError> {
-        let mut hashes = Vec::new();
-        for file in files {
-            let hash = self.put_file(&file)?;
-            hashes.push(hash);
-        }
-        Ok(hashes)
+        Ok(tx)
     }
 
     fn get_file(&self, hash_str: &str) -> Result<Content, ApiError> {
@@ -182,7 +174,6 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
             let api = timestamping_api.clone();
             let get_file = move |req: &mut Request| -> IronResult<Response> {
                 let ref hash = req.extensions.get::<Router>().unwrap().find("hash").unwrap();
-                println!("get req={:?}, hash={}", req, hash);
                 let content = api.get_file(&hash)?;
 
                 let mime: Mime = content.mime().parse().unwrap();
@@ -207,20 +198,18 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
             let api = timestamping_api.clone();
             let put_file = move |req: &mut Request| -> IronResult<Response> {
                 let map = req.get_ref::<Params>().unwrap();
-                println!("{:?}", map);
-                if let Some(&Value::Array(ref files)) = map.find(&["content"]) {
-                    let files = files.iter()
-                        .filter_map(|x| {
-                            if let &Value::File(ref f) = x {
-                                Some(f)
-                            } else {
-                                None
-                            }
-                        });
-                    println!("{:#?}", files);
-                    let strings = api.put_files(files)?;
-                    let payload = strings.join("\n");
-                    return Ok(Response::with((status::Ok, payload)));
+
+                let description = if let Some(&Value::String(ref txt)) = map.find(&["description"]) {
+                    txt
+                } else {
+                    ""
+                };
+
+                if let Some(&Value::File(ref file)) = map.find(&["content"]) {
+                    let tx = api.put_file(file, description)?;
+                    let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
+                    let response = Response::with((content_type, status::Ok, tx.to_json().to_string()));
+                    return Ok(response);
                 } else {
                     Err(ApiError::FileNotFound.into())
                 }

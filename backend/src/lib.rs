@@ -9,7 +9,7 @@ use std::ops::Deref;
 use serde::{Serialize, Serializer};
 use time::Timespec;
 
-use exonum::crypto::{Hash, hash};
+use exonum::crypto::{Hash, hash, HexValue};
 use exonum::storage::{Database, Fork, Error, MapTable, MerklePatriciaTable, Map};
 use exonum::blockchain::{View, Blockchain};
 
@@ -21,13 +21,14 @@ pub const TIMESTAMPING_FILE_SIZE_LIMIT: u64 = 20 * 1024 * 1024;
 message! {
     TimestampTx {
         const ID = TIMESTAMPING_TRANSACTION_MESSAGE_ID;
-        const SIZE = 64;
+        const SIZE = 72;
 
         file_name:      &str        [00 => 08]
-        mime:           &str        [08 => 16]
-        time:           Timespec    [16 => 24]
-        hash:           &Hash       [24 => 56]
-        data:           &[u8]       [56 => 64]
+        description:    &str        [08 => 16]
+        mime:           &str        [16 => 24]
+        time:           Timespec    [24 => 32]
+        hash:           &Hash       [32 => 64]
+        data:           &[u8]       [64 => 72]
     }
 }
 
@@ -41,12 +42,13 @@ message! {
 
 storage_value! {
     Content {
-        const SIZE = 32;
+        const SIZE = 40;
 
         file_name:          &str        [00 => 08]
-        mime:               &str        [08 => 16]
-        time:               Timespec    [16 => 24]
-        data:               &[u8]       [24 => 32]
+        description:        &str        [08 => 16]
+        mime:               &str        [16 => 24]
+        time:               Timespec    [24 => 32]
+        data:               &[u8]       [32 => 40]
     }
 }
 
@@ -56,7 +58,9 @@ impl Serialize for TimestampTx {
     {
         let mut state = ser.serialize_struct("transaction", 4)?;
         ser.serialize_struct_elt(&mut state, "file_name", self.file_name())?;
+        ser.serialize_struct_elt(&mut state, "description", self.description())?;
         ser.serialize_struct_elt(&mut state, "time", self.time().sec)?;
+        ser.serialize_struct_elt(&mut state, "hash", self.hash().to_hex())?;
         ser.serialize_struct_end(state)
     }
 }
@@ -128,7 +132,7 @@ impl<D> Blockchain for TimestampingBlockchain<D>
     }
 
     fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
-        let file = Content::new(tx.file_name(), tx.mime(), tx.time(), tx.data());
+        let file = Content::new(tx.file_name(), tx.description(), tx.mime(), tx.time(), tx.data());
         view.contents().put(tx.hash(), file)?;
         Ok(())
     }
