@@ -3,6 +3,7 @@
 extern crate env_logger;
 extern crate clap;
 extern crate serde;
+extern crate serde_json;
 extern crate time;
 extern crate rand;
 #[macro_use]
@@ -19,35 +20,36 @@ extern crate blockchain_explorer;
 extern crate timestamping;
 
 use std::env;
+use std::fs::File;
+use std::io;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::thread;
 
 use iron::prelude::*;
 use iron::status;
+use iron::mime::{Mime, TopLevel, SubLevel};
+use iron::headers;
+use hyper::header::{ContentDisposition, DispositionType, DispositionParam, Charset};
 use params::{Params, Value};
 use router::Router;
 
+use serde_json::value::ToJson;
 use clap::{Arg, App, SubCommand};
-
 use log::{LogRecord, LogLevel};
 use env_logger::LogBuilder;
 use colored::*;
 
 use exonum::node::{Node, Configuration, TxSender, NodeChannel};
 use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions, Map};
-use exonum::storage::{Result as StorageResult, Error as StorageError};
-use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, FromHexError, hash, Hash};
-use exonum::messages::Message;
+use exonum::storage::Error as StorageError;
+use exonum::crypto::{gen_keypair, HexValue, FromHexError, hash, Hash};
 use exonum::config::ConfigFile;
 use exonum::node::config::GenesisConfig;
 use exonum::events::Error as EventsError;
 use exonum::blockchain::Blockchain;
 
-use blockchain_explorer::ValueNotFound;
-
-use timestamping::{TimestampingBlockchain, TimestampingView, TimestampTx,
-                   TIMESTAMPING_FILE_SIZE_LIMIT};
+use timestamping::{TimestampingBlockchain, TimestampTx, Content, TIMESTAMPING_FILE_SIZE_LIMIT};
 
 pub type TimestampTxSender<B> = TxSender<B, NodeChannel<B>>;
 
@@ -57,44 +59,101 @@ pub struct TimestampingApi<D: Database> {
     channel: TimestampTxSender<TimestampingBlockchain<D>>,
 }
 
+#[derive(Debug)]
+enum ApiError {
+    Storage(StorageError),
+    Events(EventsError),
+    FromHex(FromHexError),
+    Io(std::io::Error),
+    FileNotFound,
+    FileToBig,
+    FileExists,
+}
+
+impl std::fmt::Display for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl std::error::Error for ApiError {
+    fn description(&self) -> &str {
+        "Api error"
+    }
+}
+
+impl From<io::Error> for ApiError {
+    fn from(e: io::Error) -> ApiError {
+        ApiError::Io(e)
+    }
+}
+
+impl From<StorageError> for ApiError {
+    fn from(e: StorageError) -> ApiError {
+        ApiError::Storage(e)
+    }
+}
+
+impl From<EventsError> for ApiError {
+    fn from(e: EventsError) -> ApiError {
+        ApiError::Events(e)
+    }
+}
+
+impl From<FromHexError> for ApiError {
+    fn from(e: FromHexError) -> ApiError {
+        ApiError::FromHex(e)
+    }
+}
+
+impl From<ApiError> for IronError {
+    fn from(e: ApiError) -> IronError {
+        let code = status::BadRequest;
+        let string = e.to_string();
+
+        IronError {
+            error: Box::new(e),
+            response: Response::with((code, string)),
+        }
+    }
+}
+
 impl<D> TimestampingApi<D>
     where D: Database
 {
-    // TODO replace by error
-    fn put_file(&self, file_name: &str, file_path: &Path) -> String {
-        use std::fs::File;
-
-        println!("put_file, {:?}", file_path);
-
-        let mut file = File::open(file_path).unwrap();
-        let mut buf = Vec::new();
-        let size = file.read_to_end(&mut buf).unwrap();
-        println!("content_size={}", size);
-        let hash = hash(buf.as_ref());
-
-        // TODO add checks for already stored files
-
-        let (_, dummy_key) = gen_keypair();
-        let tx = TimestampTx::new(file_name, buf.as_ref(), &dummy_key);
-        self.channel.send(tx).unwrap();
-
-        hash.to_hex()
-    }
-
-    fn put_files<'a, I: Iterator<Item = &'a params::File>>(&self, files: I) -> Vec<String> {
-        let mut hashes = Vec::new();
-        for file in files {
-            let hash = self.put_file(&file.filename.as_ref().unwrap(), &file.path);
-            hashes.push(hash);
+    fn put_file(&self, file: &params::File, description: &str) -> Result<TimestampTx, ApiError> {
+        if file.size > TIMESTAMPING_FILE_SIZE_LIMIT {
+            return Err(ApiError::FileToBig);
         }
-        hashes
+
+        let file_name = file.filename.clone().unwrap_or("None".into());
+        let mime = file.content_type.to_string();
+        let mut file = File::open(&file.path)?;
+
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf)?;
+        let hash = hash(buf.as_ref());
+        // TODO add checks for already stored files
+        if self.blockchain.view().contents().get(&hash)?.is_some() {
+            return Err(ApiError::FileExists);
+        }
+
+        // Create transaction
+        let (_, dummy_key) = gen_keypair();
+        let ts = time::now().to_timespec();
+        // FIXME avoid reallocations
+        let tx = TimestampTx::new(&file_name, &description, &mime, ts, &hash, buf.as_ref(), &dummy_key);
+        self.channel.send(tx.clone())?;
+
+        Ok(tx)
     }
 
-    fn get_file(&self, hash: &Hash) -> Vec<u8> {
+    fn get_file(&self, hash_str: &str) -> Result<Content, ApiError> {
+        let hash = Hash::from_hex(hash_str)?;
         let view = self.blockchain.view();
-        let file = view.files().get(&hash).unwrap().unwrap();
-
-        file.data().to_vec()
+        view.contents()
+            .get(&hash)?
+            .ok_or_else(|| ApiError::FileNotFound)
     }
 }
 
@@ -112,41 +171,64 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
             };
 
             let mut router = Router::new();
+
             let api = timestamping_api.clone();
             let get_file = move |req: &mut Request| -> IronResult<Response> {
                 let ref hash = req.extensions.get::<Router>().unwrap().find("hash").unwrap();
-                println!("get req={:?}, hash={}", req, hash);
-                let hash = Hash::from_hex(hash).unwrap();
-                let payload = api.get_file(&hash);
-                Ok(Response::with((status::Ok, payload)))
+                let content = api.get_file(&hash)?;
+
+                let mime: Mime = content.mime().parse().unwrap();
+                let data = content.data().to_vec();
+                let len = data.len() as u64;
+
+                let mut response = Response::with((status::Ok, data));
+                response.set_mut(mime);
+                response.headers.set(headers::ContentLength(len));
+                response.headers.set(ContentDisposition {
+                    disposition: DispositionType::Attachment,
+                    parameters: vec![DispositionParam::Filename(
+                    Charset::Iso_8859_1, // The character set for the bytes of the filename
+                    None, // The optional language tag (see `language-tag` crate)
+                    content.file_name().as_bytes().to_vec() // the actual bytes of the filename
+                    )]
+                });
+                Ok(response)
             };
 
             // Receive a message by POST and play it back.
             let api = timestamping_api.clone();
             let put_file = move |req: &mut Request| -> IronResult<Response> {
                 let map = req.get_ref::<Params>().unwrap();
-                println!("{:?}", map);
-                if let &Value::Array(ref files) = map.find(&["content"]).unwrap() {
 
-                    let files = files.iter()
-                        .filter_map(|x| {
-                            if let &Value::File(ref f) = x {
-                                Some(f)
-                            } else {
-                                None
-                            }
-                        });
-                    println!("{:#?}", files);
-                    let strings = api.put_files(files);
-                    let payload = strings.join("\n");
-                    return Ok(Response::with((status::Ok, payload)));
+                let description = if let Some(&Value::String(ref txt)) = map.find(&["description"]) {
+                    txt
                 } else {
-                    unimplemented!();
+                    ""
+                };
+
+                if let Some(&Value::File(ref file)) = map.find(&["content"]) {
+                    let tx = api.put_file(file, description)?;
+                    let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
+                    let response = Response::with((content_type, status::Ok, tx.to_json().to_string()));
+                    return Ok(response);
+                } else {
+                    Err(ApiError::FileNotFound.into())
                 }
             };
 
-            router.get("/timestamping/:hash", get_file, "hash");
-            router.post("/timestamping", put_file, "put");
+            let api = timestamping_api.clone();
+            let file_info = move |req: &mut Request| -> IronResult<Response> {
+                let ref hash = req.extensions.get::<Router>().unwrap().find("hash").unwrap();
+                let content = api.get_file(&hash)?;
+
+                let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
+                let response = Response::with((content_type, status::Ok, content.to_json().to_string()));
+                Ok(response)
+            };
+
+            router.get("/timestamping/content/:hash", get_file, "get");
+            router.get("/timestamping/info/:hash", file_info, "info");
+            router.post("/timestamping/content", put_file, "push");
 
             let host = format!("localhost:{}", port);
             Iron::new(router).http(host.as_str()).unwrap();

@@ -2,37 +2,53 @@
 extern crate exonum;
 extern crate blockchain_explorer;
 extern crate serde;
+extern crate time;
 
 use std::ops::Deref;
 
 use serde::{Serialize, Serializer};
+use time::Timespec;
 
-use exonum::messages::Message;
-use exonum::crypto::{PublicKey, Hash, hash, HexValue};
+use exonum::crypto::{Hash, hash, HexValue};
 use exonum::storage::{Database, Fork, Error, MapTable, MerklePatriciaTable, Map};
 use exonum::blockchain::{View, Blockchain};
 
 use blockchain_explorer::TransactionInfo;
 
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
-pub const TIMESTAMPING_FILE_SIZE_LIMIT: u32 = 10 * 1024 * 1024;
+pub const TIMESTAMPING_FILE_SIZE_LIMIT: u64 = 20 * 1024 * 1024;
 
 message! {
     TimestampTx {
         const ID = TIMESTAMPING_TRANSACTION_MESSAGE_ID;
-        const SIZE = 40;
+        const SIZE = 72;
 
         file_name:      &str        [00 => 08]
-        data:           &[u8]       [08 => 16]
+        description:    &str        [08 => 16]
+        mime:           &str        [16 => 24]
+        time:           Timespec    [24 => 32]
+        hash:           &Hash       [32 => 64]
+        data:           &[u8]       [64 => 72]
     }
 }
 
+// impl TimestampTx {
+//     pub fn from_file(file_name: &str, file: &File) -> Option<TimestampTx> {
+//         let ts = time::now_utc().to_timespec();
+
+//         let mut tx = TimestampTx::
+//     }
+// }
+
 storage_value! {
-    File {
-        const SIZE = 24;
+    Content {
+        const SIZE = 40;
 
         file_name:          &str        [00 => 08]
-        data:               &[u8]       [16 => 24]
+        description:        &str        [08 => 16]
+        mime:               &str        [16 => 24]
+        time:               Timespec    [24 => 32]
+        data:               &[u8]       [32 => 40]
     }
 }
 
@@ -42,6 +58,22 @@ impl Serialize for TimestampTx {
     {
         let mut state = ser.serialize_struct("transaction", 4)?;
         ser.serialize_struct_elt(&mut state, "file_name", self.file_name())?;
+        ser.serialize_struct_elt(&mut state, "description", self.description())?;
+        ser.serialize_struct_elt(&mut state, "time", self.time().sec)?;
+        ser.serialize_struct_elt(&mut state, "hash", self.hash().to_hex())?;
+        ser.serialize_struct_end(state)
+    }
+}
+
+impl Serialize for Content {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let mut state = ser.serialize_struct("content", 4)?;
+        ser.serialize_struct_elt(&mut state, "file_name", self.file_name())?;
+        ser.serialize_struct_elt(&mut state, "description", self.description())?;
+        ser.serialize_struct_elt(&mut state, "time", self.time().sec)?;
+        ser.serialize_struct_elt(&mut state, "hash", self.hash().to_hex())?;
         ser.serialize_struct_end(state)
     }
 }
@@ -88,7 +120,7 @@ impl<D: Database> Deref for TimestampingBlockchain<D> {
 impl<F> TimestampingView<F>
     where F: Fork 
 {
-    pub fn files(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, File> {
+    pub fn contents(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, Content> {
         MerklePatriciaTable::new(MapTable::new(vec![21], &self))
     }
 }
@@ -100,24 +132,21 @@ impl<D> Blockchain for TimestampingBlockchain<D>
     type Transaction = TimestampTx;
     type View = TimestampingView<D::Fork>;
 
-    fn verify_tx(_: &Self::Transaction) -> bool {
-        true
+    fn verify_tx(tx: &Self::Transaction) -> bool {
+        tx.data().len() < TIMESTAMPING_FILE_SIZE_LIMIT as usize
     }
 
     fn state_hash(view: &Self::View) -> Result<Hash, Error> {
-        let files = view.files();
+        let contents = view.contents();
 
         let mut hashes = Vec::new();
-        hashes.extend_from_slice(files.root_hash()?.as_ref());
+        hashes.extend_from_slice(contents.root_hash()?.as_ref());
         Ok(hash(&hashes))
     }
 
     fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
-        let content = tx.data();
-        let hash = hash(content);
-
-        let file = File::new(tx.file_name(), content);
-        view.files().put(&hash, file)?;
+        let file = Content::new(tx.file_name(), tx.description(), tx.mime(), tx.time(), tx.data());
+        view.contents().put(tx.hash(), file)?;
         Ok(())
     }
 }
