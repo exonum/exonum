@@ -1,0 +1,28 @@
+[package]
+name = "timestamping"
+version = "0.1.0"
+authors = ["Aleksei Sidorov <aleksei.sidorov@xdev.re>"]
+
+[dependencies]
+clap = "2.14"
+env_logger = "0.3"
+
+params = "0.5"
+iron = "0.4"
+hyper = "0.9"
+router = "0.4.0"
+
+time = "0.1"
+rand = "0.3"
+log = "0.3"
+byteorder = "0.5"
+
+serde = "0.8"
+serde_derive = "0.8"
+colored = "1.3"
+
+[dependencies.exonum]
+path="../exonum/exonum"
+[dependencies.blockchain_explorer]
+path="../exonum/blockchain_explorer"
+
