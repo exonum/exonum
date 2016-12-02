@@ -552,11 +552,11 @@ mod tests {
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
-        let h1 = hash(&[0]);
-        let h2 = hash(&[1]);
-        let h3 = hash(&[2]);
-        let h4 = hash(&[3]);
-        let h5 = hash(&[4]);
+        let h1 = hash(&vec![0, 1, 2]);
+        let h2 = hash(&vec![1, 2, 3]);
+        let h3 = hash(&vec![2, 3, 4]);
+        let h4 = hash(&vec![3, 4, 5]);
+        let h5 = hash(&vec![4, 5, 6]);
         let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
         let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
         let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
@@ -565,14 +565,14 @@ mod tests {
         let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
         for i in 0u8...4 {
-            table.append(vec![i]).unwrap();
+            table.append(vec![i, i+1, i+2]).unwrap();
         }
 
         assert_eq!(table.root_hash().unwrap(), h12345);
         let range_proof = table.construct_path_for_range(4u32, 5).unwrap();
         assert_eq!(range_proof.compute_proof_root(), h12345);
 
-        assert_eq!(vec![4], *(proof_indices_values(&range_proof)[0].1));
+        assert_eq!(vec![4, 5, 6], *(proof_indices_values(&range_proof)[0].1));
         if let Proofnode::Right(left_hash1, right_proof1) = range_proof {
             assert_eq!(left_hash1, h1234);
             let unboxed_proof = *right_proof1;
@@ -591,9 +591,11 @@ mod tests {
         } else {
             assert!(false);
         }
-        table.append(vec![5]).unwrap();
-        // let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
-        // println!("{:?}", range_proof);
+        table.append(vec![5, 6, 7]).unwrap();
+        let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
+        println!("{:?}", range_proof);
+        let json_repre = serde_json::to_string(&range_proof).unwrap();
+        println!("{}", json_repre );
     }
 
     #[test]
