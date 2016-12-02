@@ -171,6 +171,7 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
             };
 
             let mut router = Router::new();
+
             let api = timestamping_api.clone();
             let get_file = move |req: &mut Request| -> IronResult<Response> {
                 let ref hash = req.extensions.get::<Router>().unwrap().find("hash").unwrap();
@@ -215,8 +216,19 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
                 }
             };
 
-            router.get("/timestamping/:hash", get_file, "hash");
-            router.post("/timestamping", put_file, "put");
+            let api = timestamping_api.clone();
+            let file_info = move |req: &mut Request| -> IronResult<Response> {
+                let ref hash = req.extensions.get::<Router>().unwrap().find("hash").unwrap();
+                let content = api.get_file(&hash)?;
+
+                let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
+                let response = Response::with((content_type, status::Ok, content.to_json().to_string()));
+                Ok(response)
+            };
+
+            router.get("/timestamping/content/:hash", get_file, "get");
+            router.get("/timestamping/info/:hash", file_info, "info");
+            router.post("/timestamping/content", put_file, "push");
 
             let host = format!("localhost:{}", port);
             Iron::new(router).http(host.as_str()).unwrap();

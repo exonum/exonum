@@ -65,6 +65,19 @@ impl Serialize for TimestampTx {
     }
 }
 
+impl Serialize for Content {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let mut state = ser.serialize_struct("content", 4)?;
+        ser.serialize_struct_elt(&mut state, "file_name", self.file_name())?;
+        ser.serialize_struct_elt(&mut state, "description", self.description())?;
+        ser.serialize_struct_elt(&mut state, "time", self.time().sec)?;
+        ser.serialize_struct_elt(&mut state, "hash", self.hash().to_hex())?;
+        ser.serialize_struct_end(state)
+    }
+}
+
 impl TransactionInfo for TimestampTx {}
 
 #[derive(Clone)]
