@@ -135,7 +135,7 @@ code {
 }
 
 code, kbd, pre, samp {
-    font-family: Menlo,Monaco,Consolas,"Courier New",monospace;
+    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
 /* Footer */
@@ -198,7 +198,7 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
 }
 
 .certificate_value_hash {
-    font-family: Menlo,Monaco,Consolas,"Courier New",monospace;
+    font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
 .certificate_value_icon {
