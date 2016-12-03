@@ -175,7 +175,9 @@ input.pix_text_readonly:active {
     margin-top: 30px;
 }
 
-.btn_margin {
+.btn_margin,
+.btn_margin:hover,
+.btn_margin:focus {
     margin: 0 10px 10px;
 }
 

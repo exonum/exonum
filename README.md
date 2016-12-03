@@ -2,4 +2,10 @@
 
 ## Frontend application
 
-TODO
+First of all go to `frontend` folder.
+
+Install bower components:
+
+```
+bower install
+```
