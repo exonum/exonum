@@ -192,10 +192,8 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     -ms-text-overflow: ellipsis;
     text-overflow: ellipsis;
     color: #fff;
-    line-height: 1;
-    margin: 0 0 5px;
-    padding: 0 0 5px;
-    border-bottom: 1px solid rgba(45, 192, 232, 0.5);
+    line-height: 1.25;
+    margin: 0 0 10px;
     font-size: 0.8em;
 }
 
@@ -221,8 +219,8 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
 .certificate_label {
     color: #999;
     text-transform: uppercase;
-    line-height: 1;
+    line-height: 1.25;
     font-size: 0.65em;
     letter-spacing: 0.05em;
-    margin: 0 0 10px;
+    margin: 0;
 }
