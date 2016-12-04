@@ -9,7 +9,7 @@ mio = "0.5"
 time = "0.1"
 byteorder = "0.5"
 hex = "0.2"
-base64 = "~0.2.0"
+base64 = "0.2.0"
 num = "0.1"
 bit-vec = "0.4"
 sodiumoxide = {git = "https://github.com/dnaq/sodiumoxide.git", rev="0c9f41f"}

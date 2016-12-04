@@ -16,16 +16,20 @@ const ROOT_VAL_HASH: &'static str = "hash";
 
 
 pub enum ProofPathToKey<V: StorageValue> {
-    LeafRootInclusive(Vec<u8>, V), /* to match a leaf root with found key; (root_db_key= searched_db_key, value) */
-    LeafRootExclusive(Vec<u8>, Hash), /* to prove exclusion for a leaf root when root_db_key != searched db_key */
+    /// to match a leaf root with found key; (root_db_key= searched_db_key, value)
+    LeafRootInclusive(Vec<u8>, V),
+    /// to prove exclusion for a leaf root when root_db_key != searched db_key
+    LeafRootExclusive(Vec<u8>, Hash),
 
-    // left_hash, right_hash, left_slice_db_key, right_slice_db_key
-    BranchKeyNotFound(Hash, Hash, Vec<u8>, Vec<u8>), /* to prove exclusion for a branch with both child_key(s) != prefix(searched_key) */
-    // proof, right_slice_hash, left_slice_db_key, right_slice_db_key
+    /// format: (left_hash, right_hash, left_slice_db_key, right_slice_db_key)
+    /// to prove exclusion for a branch with both child_key(s) != prefix(searched_key)
+    BranchKeyNotFound(Hash, Hash, Vec<u8>, Vec<u8>),
+    /// format: (proof, right_slice_hash, left_slice_db_key, right_slice_db_key)
     LeftBranch(Box<ProofPathToKey<V>>, Hash, Vec<u8>, Vec<u8>),
-    // left_slice_hash, proof, left_slice_db_key, right_slice_db_key
+    /// format: (left_slice_hash, proof, left_slice_db_key, right_slice_db_key)
     RightBranch(Hash, Box<ProofPathToKey<V>>, Vec<u8>, Vec<u8>),
-    Leaf(V), // to prove inclusion of a value under searched_key below root level
+    /// to prove inclusion of a value under searched_key below root level
+    Leaf(V),
 }
 
 impl<V: StorageValue + Clone> Serialize for ProofPathToKey<V> {
@@ -336,10 +340,10 @@ impl<V: StorageValue> ProofPathToKey<V> {
     pub fn compute_height(&self, start_height: u16) -> u16 {
         use self::ProofPathToKey::*;
         match *self { 
-            LeafRootInclusive(_, _) |
-            LeafRootExclusive(_, _) |
-            BranchKeyNotFound(_, _, _, _) |
-            Leaf(_) => start_height, 
+            LeafRootInclusive(..) |
+            LeafRootExclusive(..) |
+            BranchKeyNotFound(..) |
+            Leaf(..) => start_height, 
 
             LeftBranch(ref l_proof, _, _, _) => l_proof.compute_height(start_height + 1), 
 
@@ -376,7 +380,7 @@ impl<V: StorageValue + fmt::Debug> ProofPathToKey<V> {
                 }
                 None
             } 
-            Leaf(_) => {
+            Leaf(..) => {
                 return Err(Error::new(format!("Invalid proof: Leaf enum variant found at top \
                                                level. Proof: {:?}",
                                               self)))
@@ -426,12 +430,12 @@ impl<V: StorageValue + fmt::Debug> ProofPathToKey<V> {
 
         // if we inspect sub-proofs of a proof
         let res: Option<&V> = match *self {
-            LeafRootInclusive(_, _) => {
+            LeafRootInclusive(..) => {
                 return Err(Error::new(format!("Invalid proof: LeafRootInclusive enum variant \
                                                found not at top level. Proof: {:?}",
                                               self)))
             } 
-            LeafRootExclusive(_, _) => {
+            LeafRootExclusive(..) => {
                 return Err(Error::new(format!("Invalid proof: LeafRootExclusive enum variant \
                                                found not at top level. Proof: {:?}",
                                               self)))
