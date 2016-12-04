@@ -83,6 +83,11 @@ implement_public_sodium_wrapper! {Signature, SignatureSodium, SIGNATURE_LENGTH}
 implement_private_sodium_wrapper! {SecretKey, SecretKeySodium, SECRET_KEY_LENGTH}
 implement_private_sodium_wrapper! {Seed, SeedSodium, SEED_LENGTH}
 
+const EMPTY_HASH_BASE: [u8; HASH_SIZE] = [0; HASH_SIZE];
+pub fn empty_tree_hash() -> Hash {
+    Hash::from_slice(&EMPTY_HASH_BASE).unwrap()
+}
+
 pub trait HexValue: Sized {
     fn to_hex(&self) -> String;
     fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError>;

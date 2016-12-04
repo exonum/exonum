@@ -6,7 +6,7 @@ use std::fmt;
 use std::ops::Not;
 use super::utils::bytes_to_hex;
 
-use ::crypto::{hash, Hash, HASH_SIZE};
+use ::crypto::{hash, Hash, HASH_SIZE, empty_tree_hash};
 use super::{Map, Error, StorageValue};
 use self::proofpathtokey::ProofPathToKey;
 
@@ -16,7 +16,6 @@ const LEAF_KEY_PREFIX: u8 = 01;
 const KEY_SIZE: usize = HASH_SIZE;
 const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
-const EMPTY_HASH_BASE: [u8; HASH_SIZE] = [0; HASH_SIZE];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ChildKind {
@@ -324,9 +323,6 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
-fn empty_tree_hash() -> Hash {
-    Hash::from_slice(&EMPTY_HASH_BASE).unwrap()
-}
 // TODO avoid reallocations where is possible.
 impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaTable<T, K, V> {
     pub fn new(map: T) -> Self {
@@ -825,11 +821,11 @@ mod tests {
 
     use rand::{thread_rng, Rng};
 
-    use ::crypto::{hash, Hash};
+    use ::crypto::{hash, Hash, empty_tree_hash};
     use ::storage::{Map, MemoryDB, MapTable};
     use serde_json;
 
-    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX, empty_tree_hash};
+    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX};
     use super::proofpathtokey::{ProofPathToKey, verify_proof_consistency};
     use super::ChildKind::{Left, Right};
     use super::KEY_SIZE;
