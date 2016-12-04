@@ -234,6 +234,15 @@ input.pix_text_readonly:active {
     }
 }
 
+/* Form elements */
+.pix_form input.error,
+.pix_form input.error:focus,
+.pix_form select.error,
+.pix_form textarea.error,
+.pix_form textarea.error:focus {
+    border: 2px solid #cc0000;
+}
+
 /* Responsive image */
 .img-responsive {
     position: relative;

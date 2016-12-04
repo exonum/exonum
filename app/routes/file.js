@@ -3,7 +3,7 @@ var request = require('request');
 var router = express.Router();
 
 function render(req, res, next, view) {
-    var hash = req.param('hash');
+    var hash = req.params.hash;
 
     request.get('http://exonum.com/backends/timestamping/info/' + hash, function(error, response, body) {
         if (!error) {
@@ -25,6 +25,10 @@ function render(req, res, next, view) {
         }
     });
 }
+
+router.get('/exists', function(req, res, next) {
+    res.render('file-exists', {title: 'File already exist'});
+});
 
 router.get('/:hash', function() {
     var arguments = [].slice.call(arguments, 0);

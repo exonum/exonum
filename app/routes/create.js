@@ -9,11 +9,15 @@ router.post('/', function(req, res, next) {
     form.uploadDir = 'uploads/';
     form.keepExtensions = true;
 
-    // TODO do not modify original file
+    // keep original file name
+    form.on('file', function(field, file) {
+        fs.rename(file.path, form.uploadDir + "/" + file.name);
+        file.path = form.uploadDir + "/" + file.name;
+    });
 
     form.parse(req, function(err, fields, files) {
         if (err) {
-            res.render('error');
+            res.status(500).send('Unknown error');
             return false;
         }
 
@@ -41,15 +45,16 @@ router.post('/', function(req, res, next) {
                     var data = JSON.parse(body);
                     res.send({redirect: '/f/' + data.hash + '/success'});
                 } else if (response.statusCode === 400) {
-                    // TODO redirect to 'file exists' page
+                    res.send({redirect: '/f/exists'});
                 } else {
-                    res.render('error');
+                    res.status(500).send('Unknown error');
                 }
             } else {
-                res.render('error');
+                res.status(500).send('Unknown error');
             }
 
-            // TODO remove local file
+            // remove local file
+            fs.unlink(files.content.path);
         });
     });
 });

@@ -30,15 +30,16 @@ $(function() {
     });
 
     $('#verify').on('submit', function(event) {
-        var hash = $('#hash').val();
+        var hash = $('#hash');
 
         event.preventDefault();
 
-        if (hash.length === 0) {
+        if (hash.val().length === 0) {
+            hash.addClass('error');
             return false;
         }
 
-        window.location.replace('/f/' + hash);
+        window.location.replace('/f/' + hash.val());
     });
 
     $('#create').on('submit', function(event) {
@@ -48,6 +49,7 @@ $(function() {
         event.preventDefault();
 
         if (content.val().length === 0) {
+            content.addClass('error');
             return false;
         }
 
@@ -63,9 +65,29 @@ $(function() {
             contentType: false,
             processData: false,
             success: function(data) {
-                window.location.replace(data.redirect);
+                if (data.redirect) {
+                    window.location.replace(data.redirect);
+                } else {
+                    console.error(data);
+                }
             }
         });
+    });
+
+    $('#content').on('change', function() {
+        var content = $(this);
+
+        if (content.val().length !== 0) {
+            content.removeClass('error');
+        }
+    });
+
+    $('#hash').on('input', function() {
+        var hash = $(this);
+
+        if (hash.val().length !== 0) {
+            hash.removeClass('error');
+        }
     });
 
 });
