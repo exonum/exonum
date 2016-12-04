@@ -5,7 +5,7 @@ use std::cell::Cell;
 
 use super::{Map, List, Error, StorageValue};
 
-use ::crypto::{hash, Hash};
+use ::crypto::{hash, Hash, empty_tree_hash};
 use self::proofnode::Proofnode;
 
 mod proofnode;
@@ -71,7 +71,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
         self.get_hash(self.height()?, K::zero())
-            .map(|h| h.unwrap_or_else(|| hash(&[])))
+            .map(|h| h.unwrap_or_else(empty_tree_hash))
     }
 
     fn construct_proof_subtree(&self,
@@ -305,7 +305,7 @@ mod tests {
     use rand::{thread_rng, Rng};
     use std::collections::HashSet;
 
-    use ::crypto::{Hash, hash};
+    use ::crypto::{Hash, hash, empty_tree_hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
@@ -425,7 +425,7 @@ mod tests {
     fn test_table_and_proof_roots() {
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        assert_eq!(table.root_hash().unwrap(), hash(&[]));
+        assert_eq!(table.root_hash().unwrap(), empty_tree_hash());
 
         let h1 = hash(&[1, 2]);
         let h2 = hash(&[2, 3]);
@@ -550,7 +550,7 @@ mod tests {
     fn test_proof_structure() {
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        assert_eq!(table.root_hash().unwrap(), hash(&[]));
+        assert_eq!(table.root_hash().unwrap(), empty_tree_hash());
 
         let h1 = hash(&vec![0, 1, 2]);
         let h2 = hash(&vec![1, 2, 3]);
@@ -565,7 +565,7 @@ mod tests {
         let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
         for i in 0u8...4 {
-            table.append(vec![i, i+1, i+2]).unwrap();
+            table.append(vec![i, i + 1, i + 2]).unwrap();
         }
 
         assert_eq!(table.root_hash().unwrap(), h12345);
@@ -595,7 +595,7 @@ mod tests {
         let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
         println!("{:?}", range_proof);
         let json_repre = serde_json::to_string(&range_proof).unwrap();
-        println!("{}", json_repre );
+        println!("{}", json_repre);
     }
 
     #[test]
