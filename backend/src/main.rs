@@ -25,6 +25,7 @@ use std::io;
 use std::io::Read;
 use std::path::Path;
 use std::thread;
+use std::collections::BTreeMap;
 
 use iron::prelude::*;
 use iron::status;
@@ -65,9 +66,10 @@ enum ApiError {
     Events(EventsError),
     FromHex(FromHexError),
     Io(std::io::Error),
-    FileNotFound,
+    FileNotFound(Hash),
     FileToBig,
-    FileExists,
+    FileExists(Hash),
+    IncorrectRequest,
 }
 
 impl std::fmt::Display for ApiError {
@@ -78,7 +80,16 @@ impl std::fmt::Display for ApiError {
 
 impl std::error::Error for ApiError {
     fn description(&self) -> &str {
-        "Api error"
+        match *self {
+            ApiError::Storage(_) => "Storage",
+            ApiError::Events(_) => "Events",
+            ApiError::FromHex(_) => "FromHex",
+            ApiError::Io(_) => "Io",
+            ApiError::FileNotFound(_) => "FileNotFound",
+            ApiError::FileToBig => "FileToBig",
+            ApiError::FileExists(_) => "FileExists",
+            ApiError::IncorrectRequest => "IncorrectRequest",
+        }
     }
 }
 
@@ -108,12 +119,26 @@ impl From<FromHexError> for ApiError {
 
 impl From<ApiError> for IronError {
     fn from(e: ApiError) -> IronError {
-        let code = status::BadRequest;
-        let string = e.to_string();
+        use std::error::Error;
 
+        let mut body = BTreeMap::new();
+        body.insert("type", e.description().into());                
+        let code = match e {
+            ApiError::FileExists(hash) => {
+                body.insert("hash", hash.to_hex());
+                status::Conflict
+            }
+            ApiError::FileNotFound(hash) => {
+                body.insert("hash", hash.to_hex());
+                status::Conflict
+            }
+            _ => {
+                status::Conflict
+            }
+        };
         IronError {
             error: Box::new(e),
-            response: Response::with((code, string)),
+            response: Response::with((code, body.to_json().to_string())),
         }
     }
 }
@@ -135,7 +160,7 @@ impl<D> TimestampingApi<D>
         let hash = hash(buf.as_ref());
         // TODO add checks for already stored files
         if self.blockchain.view().contents().get(&hash)?.is_some() {
-            return Err(ApiError::FileExists);
+            return Err(ApiError::FileExists(hash));
         }
 
         // Create transaction
@@ -153,7 +178,7 @@ impl<D> TimestampingApi<D>
         let view = self.blockchain.view();
         view.contents()
             .get(&hash)?
-            .ok_or_else(|| ApiError::FileNotFound)
+            .ok_or_else(|| ApiError::FileNotFound(hash))
     }
 }
 
@@ -212,7 +237,7 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
                     let response = Response::with((content_type, status::Ok, tx.to_json().to_string()));
                     return Ok(response);
                 } else {
-                    Err(ApiError::FileNotFound.into())
+                    Err(ApiError::IncorrectRequest.into())
                 }
             };
 
