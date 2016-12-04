@@ -11,7 +11,7 @@ function render(req, res, next, view) {
 
             if (response.statusCode === 200) {
                 data['title'] = 'Certificate of proof';
-                data['url'] = encodeURIComponent('http://' + req.headers.host + '/f/' + hash);
+                data['url'] = encodeURIComponent('http://ts.exonum.com/f/' + hash);
                 data['file_path'] = 'http://exonum.com/backends/timestamping/content/' + hash;
 
                 res.render(view, data);
