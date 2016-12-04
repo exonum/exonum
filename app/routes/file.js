@@ -7,15 +7,15 @@ function render(req, res, next, view) {
 
     request.get('http://exonum.com/backends/timestamping/info/' + hash, function(error, response, body) {
         if (!error) {
-            if (response.statusCode === 200) {
-                var data = JSON.parse(body);
+            var data = JSON.parse(body);
 
+            if (response.statusCode === 200) {
                 data['title'] = 'Certificate of proof';
                 data['url'] = encodeURIComponent('http://' + req.headers.host + '/f/' + hash);
                 data['file_path'] = 'http://exonum.com/backends/timestamping/content/' + hash;
 
                 res.render(view, data);
-            } else if (response.statusCode === 400) {
+            } else if (response.statusCode === 409) {
                 res.render('file-not-found', {title: 'File not found'});
             } else {
                 res.render('error');
