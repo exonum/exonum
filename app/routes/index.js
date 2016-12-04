@@ -63,8 +63,12 @@ router.post('/create', function(req, res, next) {
             if (!error) {
                 if (response.statusCode === 200) {
                     var data = JSON.parse(body);
-                    res.send({redirect: '/f/' + data.hash + '/success'});
-                } else if (response.statusCode === 400) {
+
+                    // hack
+                    setTimeout(function() {
+                        res.send({redirect: '/f/' + data.hash + '/success'});
+                    }, 1000);
+                } else if (response.statusCode === 409) {
                     res.send({redirect: '/f/exists'});
                 } else {
                     res.status(500).send('Unknown error');

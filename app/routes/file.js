@@ -15,7 +15,7 @@ function render(req, res, next, view) {
                 data['file_path'] = 'http://exonum.com/backends/timestamping/content/' + hash;
 
                 res.render(view, data);
-            } else if (response.statusCode === 409) {
+            } else if (response.statusCode === 400) {
                 res.render('file-not-found', {title: 'File not found'});
             } else {
                 res.render('error');
