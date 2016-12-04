@@ -22,4 +22,4 @@ Run application:
 DEBUG=timestamping:* npm start
 ```
 
-Reach application on [localhost:3000/](http://localhost:3000/).
+Reach application on [localhost:2268](http://localhost:2268/).
