@@ -148,10 +148,7 @@ impl<D> TimestampingApi<D>
         // Create transaction
         let (_, dummy_key) = gen_keypair();
         let ts = time::now().to_timespec();
-        let tx = TimestampTx::new(&description,
-                                  ts,
-                                  &hash,
-                                  &dummy_key);
+        let tx = TimestampTx::new(&description, ts, &hash, &dummy_key);
         self.channel.send(tx.clone())?;
         Ok(tx)
     }
@@ -185,23 +182,21 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
             let put_content = move |req: &mut Request| -> IronResult<Response> {
                 let map = req.get_ref::<Params>().unwrap();
 
-                let find_str = |path: &[&str]| -> Result<String, ApiError> {
+                fn find_str<'a>(map: &'a params::Map, path: &[&str]) -> Result<&'a str, ApiError> {
                     let value = map.find(path);
                     if let Some(&Value::String(ref s)) = value {
-                        Ok(s.to_string())
+                        Ok(s)
                     } else {
                         Err(ApiError::IncorrectRequest)
                     }
                 };
 
-                let hash = find_str(&["hash"])?;
-                let description = find_str(&["description"])
-                    .unwrap_or("".to_string());
+                let hash = find_str(map, &["hash"])?;
+                let description = find_str(map, &["description"]).unwrap_or("");
 
-                let tx = api.put_content(&hash, &description)?;
+                let tx = api.put_content(hash, description)?;
                 let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-                let response =
-                    Response::with((content_type, status::Ok, tx.to_json().to_string()));
+                let response = Response::with((content_type, status::Ok, tx.to_json().to_string()));
                 return Ok(response);
             };
 
