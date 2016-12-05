@@ -122,7 +122,7 @@ impl From<ApiError> for IronError {
         use std::error::Error;
 
         let mut body = BTreeMap::new();
-        body.insert("type", e.description().into());                
+        body.insert("type", e.description().into());
         let code = match e {
             ApiError::FileExists(hash) => {
                 body.insert("hash", hash.to_hex());
@@ -132,9 +132,7 @@ impl From<ApiError> for IronError {
                 body.insert("hash", hash.to_hex());
                 status::Conflict
             }
-            _ => {
-                status::Conflict
-            }
+            _ => status::Conflict,
         };
         IronError {
             error: Box::new(e),
@@ -167,7 +165,13 @@ impl<D> TimestampingApi<D>
         let (_, dummy_key) = gen_keypair();
         let ts = time::now().to_timespec();
         // FIXME avoid reallocations
-        let tx = TimestampTx::new(&file_name, &description, &mime, ts, &hash, buf.as_ref(), &dummy_key);
+        let tx = TimestampTx::new(&file_name,
+                                  &description,
+                                  &mime,
+                                  ts,
+                                  &hash,
+                                  buf.as_ref(),
+                                  &dummy_key);
         self.channel.send(tx.clone())?;
 
         Ok(tx)
@@ -225,7 +229,8 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
             let put_file = move |req: &mut Request| -> IronResult<Response> {
                 let map = req.get_ref::<Params>().unwrap();
 
-                let description = if let Some(&Value::String(ref txt)) = map.find(&["description"]) {
+                let description = if let Some(&Value::String(ref txt)) =
+                                         map.find(&["description"]) {
                     txt
                 } else {
                     ""
@@ -234,7 +239,8 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
                 if let Some(&Value::File(ref file)) = map.find(&["content"]) {
                     let tx = api.put_file(file, description)?;
                     let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-                    let response = Response::with((content_type, status::Ok, tx.to_json().to_string()));
+                    let response =
+                        Response::with((content_type, status::Ok, tx.to_json().to_string()));
                     return Ok(response);
                 } else {
                     Err(ApiError::IncorrectRequest.into())
@@ -247,7 +253,8 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
                 let content = api.get_file(&hash)?;
 
                 let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-                let response = Response::with((content_type, status::Ok, content.to_json().to_string()));
+                let response =
+                    Response::with((content_type, status::Ok, content.to_json().to_string()));
                 Ok(response)
             };
 
