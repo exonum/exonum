@@ -74,15 +74,20 @@ router.get('/:hash', function(req, res, next) {
     var hash = req.params.hash;
 
     request.get(backendsUrl + '/' + hash, function(error, response, body) {
+        console.log('>>>>>');
+        console.log(error);
         if (!error) {
             var data = JSON.parse(body);
+
+            console.log(response.statusCode);
+            console.log(data);
 
             if (response.statusCode === 200) {
                 data['title'] = 'Certificate of proof';
                 data['url'] = encodeURIComponent('http://ts.exonum.com/f/' + hash);
 
                 res.render('file', data);
-            } else if (response.statusCode === 400) {
+            } else if (response.statusCode === 409) {
                 res.render('file-not-found', {title: 'File not found', hash: hash});
             } else {
                 res.render('error', {error: error});

@@ -291,6 +291,15 @@ code, kbd, pre, samp {
     font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
+.inline-code {
+    display: inline-block;
+    vertical-align: middle;
+    max-width: 48px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    line-height: 1.25;
+}
+
 /* Footer */
 .footer3 .small_text {
     color: #666;
