@@ -57,7 +57,7 @@ router.get('/:hash/redirect', function(req, res) {
                 } else {
                     setTimeout(function() {
                         pooling(res, hash);
-                    }, 1024);
+                    }, 512);
                 }
             } else {
                 res.status(response.statusCode).send(error);

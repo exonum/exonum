@@ -400,10 +400,15 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
 }
 
 /* Custom file upload */
+.pix_form .filestyle {
+    margin: 0;
+}
+
 .pix_form .input-group {
     position: relative;
     display: table;
     border-collapse: separate;
+    margin-bottom: 15px;
 }
 
 .pix_form .input-group-btn {
@@ -449,6 +454,13 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     z-index: 2;
     float: left;
     margin: 0;
+}
+
+.pix_form input.error + .input-group .form-control {
+    border-color: #cc0000;
+    background-image: url(../images/error-pattern.png);
+    background-repeat: repeat;
+    background-size: 5px;
 }
 
 .pix_form .form-control[disabled],

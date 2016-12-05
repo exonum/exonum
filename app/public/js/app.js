@@ -1,5 +1,7 @@
 $(function() {
 
+    var fileSizeLimit = 20971520; // 20 MB in bytes
+
     function getReader(t) {
         var reader = new FileReader;
         reader.readAsBinaryString(t);
@@ -62,7 +64,7 @@ $(function() {
 
         event.preventDefault();
 
-        if (file === null) {
+        if (file === null || file.size > fileSizeLimit) {
             content.addClass('error');
             return false;
         }
@@ -90,8 +92,9 @@ $(function() {
 
     $('#content').on('change', function() {
         var content = $(this);
+        var file = content.get(0).files.item(0);
 
-        if (content.val().length !== 0) {
+        if (file !== null && file.size <= fileSizeLimit) {
             content.removeClass('error');
         }
     });

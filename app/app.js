@@ -18,7 +18,7 @@ app.set('view engine', 'hbs');
 
 hbs.registerPartials(__dirname + '/views/partials');
 hbs.registerHelper('formatDate', function(date, format) {
-    var mmnt = moment(date, 'X');
+    var mmnt = moment.utc(date, 'X');
     return mmnt.format(format);
 });
 
