@@ -4,6 +4,26 @@ var router = express.Router();
 
 var backendsUrl = 'http://exonum.com/backends/timestamping/content';
 
+router.post('/proceed', function(req, res) {
+    var hash = req.body.label;
+    var description = '';
+
+    // create file
+    request.post({
+        url: backendsUrl,
+        headers: [{
+            name: 'content-type',
+            value: 'multipart/form-data'
+        }],
+        formData: {
+            hash: hash,
+            description: description
+        }
+    });
+
+    res.status(200).send();
+});
+
 router.get('/:hash/exists', function(req, res, next) {
     var hash = req.params.hash;
 
@@ -46,41 +66,12 @@ router.get('/:hash/redirect', function(req, res) {
     })();
 });
 
-router.post('/proceed', function(req, res) {
-
-    /**
-     * req.body
-     *
-     */
-
-    var hash = 'aaa'; // TODO
-    var description = ''; // TODO
-
-    // create file
-    request.post({
-        url: backendsUrl,
-        headers: [{
-            name: 'content-type',
-            value: 'multipart/form-data'
-        }],
-        formData: {
-            hash: hash,
-            description: description
-        }
-    });
-});
-
 router.get('/:hash', function(req, res, next) {
     var hash = req.params.hash;
 
     request.get(backendsUrl + '/' + hash, function(error, response, body) {
-        console.log('>>>>>');
-        console.log(error);
         if (!error) {
             var data = JSON.parse(body);
-
-            console.log(response.statusCode);
-            console.log(data);
 
             if (response.statusCode === 200) {
                 data['title'] = 'Certificate of proof';
