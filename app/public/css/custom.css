@@ -52,7 +52,7 @@ a.pix_nav_logo {
 
 .blue_moving_bg,
 .dark.blue_moving_bg {
-    padding-bottom: 100px!important;
+    padding-bottom: 100px !important;
     background-position: center bottom;
     background-attachment: scroll;
     background-repeat: repeat-x;
@@ -72,7 +72,7 @@ a.pix_nav_logo {
 @media (min-width: 768px) {
     .blue_moving_bg,
     .dark.blue_moving_bg {
-        padding-bottom: 180px!important;
+        padding-bottom: 180px !important;
         -webkit-background-size: 75%;
         -moz-background-size: 75%;
         -o-background-size: 75%;
@@ -90,7 +90,7 @@ a.pix_nav_logo {
 @media (min-width: 1200px) {
     .blue_moving_bg,
     .dark.blue_moving_bg {
-        padding-bottom: 240px!important;
+        padding-bottom: 240px !important;
         -webkit-background-size: 50%;
         -moz-background-size: 50%;
         -o-background-size: 50%;
@@ -391,6 +391,74 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     font-size: 0.65em;
     letter-spacing: 0.05em;
     margin: 0;
+}
+
+.certificate_qr {
+    margin-top: 5px;
+    width: 80px;
+    height: 80px;
+}
+
+/* Custom file upload */
+.pix_form .input-group {
+    position: relative;
+    display: table;
+    border-collapse: separate;
+}
+
+.pix_form .input-group-btn {
+    display: table-cell;
+    position: relative;
+    font-size: 0;
+    white-space: nowrap;
+    width: 1%;
+    vertical-align: top;
+}
+
+.pix_form .btn {
+    display: inline-block;
+    margin-bottom: 0;
+    font-weight: 400;
+    text-align: center;
+    vertical-align: top;
+    cursor: pointer;
+    background: #2dc0e8;
+    border: 1px solid #2dc0e8;
+    white-space: nowrap;
+    padding: 6px 12px;
+    height: 51px;
+    line-height: 37px;
+    border-radius: 0 3px 3px 0;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    color: #fff;
+    position: relative;
+    margin-left: -1px;
+    box-sizing: border-box;
+}
+
+.pix_form .btn-default .buttonText {
+    color: #fff;
+}
+
+.pix_form .form-control {
+    border-radius: 3px 0 0 3px;
+    position: relative;
+    z-index: 2;
+    float: left;
+    margin: 0;
+}
+
+.pix_form .form-control[disabled],
+.pix_form .form-control[readonly] {
+    cursor: not-allowed;
+    opacity: 1;
+}
+
+.pix_form input {
+    height: 51px;
 }
 
 /* Payment form */
