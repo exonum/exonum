@@ -1,5 +1,17 @@
 $(function() {
 
+    function getReader(t) {
+        var reader = new FileReader;
+        reader.readAsBinaryString(t);
+        return reader;
+    }
+
+    function getSHA256(t) {
+        var e = CryptoJS.algo.SHA256.create();
+        e.update(CryptoJS.enc.Latin1.parse(t));
+        return e.finalize();
+    }
+
     $('.navbar-nav a, .pseudo-link').bind('click', function(event) {
         var $link = $(this);
         var ahcnor = $link.attr('href').match(/#(.*)$/g);
@@ -42,36 +54,38 @@ $(function() {
         window.location.replace('/f/' + hash.val());
     });
 
-    $('#create').on('submit', function(event) {
+    $('#create-form').on('submit', function(event) {
         var content = $('#content');
+        var file = content.get(0).files.item(0);
         var description = $('#description');
+        var location = window.location;
 
         event.preventDefault();
 
-        if (content.val().length === 0) {
+        if (file === null) {
             content.addClass('error');
             return false;
         }
 
-        var data = new FormData();
-        data.append('content', content[0].files[0]);
-        data.append('description', description.val());
+        getReader(file).onload = function(n) {
+            var hash = '' + getSHA256(n.target.result);
 
-        $.ajax({
-            type: 'POST',
-            data: data,
-            url: '/create',
-            cache: false,
-            contentType: false,
-            processData: false,
-            success: function(data) {
-                if (data.redirect) {
-                    window.location.replace(data.redirect);
-                } else {
-                    console.error(data);
+            $.ajax({
+                type: 'GET',
+                url: '/f/' + hash + '/exists',
+                success: function(data) {
+                    if (data.exists) {
+                        window.location.replace(data.redirect);
+                    } else {
+                        $('#label').val(hash);
+                        $('#targets').val(hash.substring(0, 10) + '...');
+                        $('#success-url').val(location.protocol + '//' + location.hostname + '/f/' + hash + '/redirect');
+                        $('#create').addClass('hidden');
+                        $('#pay').removeClass('hidden');
+                    }
                 }
-            }
-        });
+            });
+        };
     });
 
     $('#content').on('change', function() {

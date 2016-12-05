@@ -141,6 +141,10 @@ a.pix_nav_logo {
 }
 
 /* Content */
+.hidden {
+    display: none;
+}
+
 .medium_icon {
     text-align: center;
     font-size: 40px;
@@ -378,4 +382,87 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     font-size: 0.65em;
     letter-spacing: 0.05em;
     margin: 0;
+}
+
+/* Payment form */
+.radio-button {
+    display: table;
+    width: 100%;
+    height: 51px;
+    background: #fff;
+    border: 2px solid #eee;
+    border-radius: 3px;
+    padding: 0;
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.radio-button__radio {
+    display: table-cell;
+    vertical-align: top;
+    width: 50%;
+    height: 47px;
+    line-height: 47px;
+}
+
+input.radio-button__control {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    width: 0;
+    padding: 0;
+}
+
+.radio-button__text {
+    display: block;
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+    height: 47px;
+    -webkit-transition: all .2s linear;
+    -moz-transition: all .2s linear;
+    -ms-transition: all .2s linear;
+    -o-transition: all .2s linear;
+    cursor: pointer;
+}
+
+.radio-button__control:checked + .radio-button__text {
+    background-color: #ffdf62;
+}
+
+.radio-button__radio_side_left .radio-button__text {
+    border-radius: 1px 0 0 1px;
+}
+
+.radio-button__radio_side_right .radio-button__text {
+    border-radius: 0 1px 1px 0;
+}
+
+.widget-shop__icon {
+    display: inline-block;
+    background-repeat: no-repeat;
+    background-position: 50%;
+    background-size: 100%;
+    vertical-align: middle;
+    position: relative;
+    top: -1px;
+}
+
+.widget-shop__icon_name_PC {
+    width: 81px;
+    height: 26px;
+    background-image: url(../images/yandex.money.svg);
+}
+
+.widget-shop__icon_name_AC {
+    width: 93px;
+    height: 24px;
+    background-image: url(../images/credit-cards.svg);
+}
+
+.widget-shop__icon:after {
+    visibility: hidden;
+    content: '\00A0';
 }
