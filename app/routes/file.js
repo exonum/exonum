@@ -18,10 +18,10 @@ function render(req, res, next, view) {
             } else if (response.statusCode === 400) {
                 res.render('file-not-found', {title: 'File not found'});
             } else {
-                res.render('error');
+                res.render('error', {error: error});
             }
         } else {
-            res.render('error');
+            res.render('error', {error: error});
         }
     });
 }

@@ -43,12 +43,10 @@ router.post('/create', function(req, res, next) {
 
         request.post({
             url: 'http://exonum.com/backends/timestamping/content',
-            headers: [
-                {
-                    name: 'content-type',
-                    value: 'multipart/form-data'
-                }
-            ],
+            headers: [{
+                name: 'content-type',
+                value: 'multipart/form-data'
+            }],
             formData: {
                 description: fields.description,
                 content: {
@@ -64,17 +62,15 @@ router.post('/create', function(req, res, next) {
                 if (response.statusCode === 200) {
                     var data = JSON.parse(body);
 
-                    // hack
-                    setTimeout(function() {
-                        res.send({redirect: '/f/' + data.hash + '/success'});
-                    }, 1000);
-                } else if (response.statusCode === 409) {
+                    // start pooling until it will be able to get files info with GET request which means file is in a block
+                    pooling(res, data.hash);
+                } else if (response.statusCode === 409) { // file exists
                     res.send({redirect: '/f/exists'});
                 } else {
-                    res.status(500).send('Unknown error');
+                    res.status(response.statusCode).send(error);
                 }
             } else {
-                res.status(500).send('Unknown error');
+                res.status(response.statusCode).send(error);
             }
 
             // remove local file
@@ -82,5 +78,23 @@ router.post('/create', function(req, res, next) {
         });
     });
 });
+
+function pooling(res, hash) {
+    request.get('http://exonum.com/backends/timestamping/info/' + hash, function(error, response, body) {
+        if (!error) {
+            if (response.statusCode === 200) {
+                res.send({redirect: '/f/' + hash + '/success'});
+            } else if (response.statusCode === 409) { // file not found
+                setTimeout(function() {
+                    pooling(res, hash);
+                }, 100);
+            } else {
+                res.status(response.statusCode).send(error);
+            }
+        } else {
+            res.status(response.statusCode).send(error);
+        }
+    })
+}
 
 module.exports = router;
