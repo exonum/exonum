@@ -9,7 +9,10 @@
                     <p class="big_text normal_gray editContent">
                         Creating secure and anonymous proof of file existence become as&nbsp;simple as&nbsp;<span class="nowrap">one-two-three</span> with <span class="inline-logo">Exonum</span>.
                     </p>
-                    <a href="#create-a-stamp" class="pix_button btn_normal pix_button_flat blue_bg bold_text btn_big btn_margin pseudo-link">
+                    <a href="#create-a-stamp" class="pix_button btn_normal pix_button_flat blue_bg bold_text btn_big btn_margin pseudo-link hidden-xs">
+                        <span>CREATE A STAMP</span>
+                    </a>
+                    <a href="#create" class="pix_button btn_normal pix_button_flat blue_bg bold_text btn_big btn_margin pseudo-link visible-xs">
                         <span>CREATE A STAMP</span>
                     </a>
                     <a href="/faq" class="pix_button pix_button_line white_border_button bold_text btn_big">
@@ -60,14 +63,11 @@
             </div>
         </div>
 
-        <br>
-        <br>
-
         <div id="create" class="container">
             <div class="sixteen columns">
                 <div class="eight columns centered">
                     <div class="center_text">
-                        <span class="bold_text big_text blue_text editContent">CREATE A STAMP</span>
+                        <span class="bold_text big_text blue_text spaced_title editContent">CREATE A STAMP</span>
                     </div>
                     <form id="create-form" class="pix_form">
                         <label for="content">Upload file:</label>
@@ -88,7 +88,7 @@
             <div class="sixteen columns">
                 <div class="eight columns centered">
                     <div class="center_text">
-                        <span class="bold_text big_text blue_text editContent">PAY A FEE</span>
+                        <span class="bold_text big_text blue_text spaced_title editContent">PAY A FEE</span>
                     </div>
 
                     <form class="pix_form" method="POST" action="/f/pay">

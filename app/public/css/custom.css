@@ -145,6 +145,18 @@ a.pix_nav_logo {
     display: none;
 }
 
+@media (max-width: 767px) {
+    .hidden-xs {
+        display: none!important;
+    }
+}
+
+@media (min-width: 768px) {
+    .visible-xs {
+        display: none!important;
+    }
+}
+
 .medium_icon {
     text-align: center;
     font-size: 40px;
@@ -187,6 +199,10 @@ input.pix_text_readonly:active {
 
 .nowrap {
     white-space: nowrap;
+}
+
+.spaced_title {
+    margin-top: 30px;
 }
 
 .big_title {
@@ -330,73 +346,62 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
 /* Certificate */
 .certificate {
     width: 720px;
-    height: 496px;
+    height: 484px;
     margin: 0 auto;
-    padding: 37px 37px 0;
-    background-image: url(../images/stock-vector-certificate-vector-pattern-that-is-used-in-currency-and-diplomas-370407353.png);
+    padding: 40px 45px 0;
+    background-image: url(../images/certificate.jpg);
     background-repeat: no-repeat;
     background-position: 0 0;
     background-size: contain;
     box-sizing: border-box;
+    color: #333;
 }
 
 .certificate-inner {
     box-sizing: border-box;
-    height: 419px;
-    padding: 30px 65px 0;
-    background-color: #444;
-    background-image: url(../images/036-2.png);
-    background-repeat: repeat;
-    background-size: 50%;
+    height: 403px;
+    position: relative;
 }
 
-.certificate_title {
-    margin: 0;
-    font-family: 'Lato', sans-serif;
-    font-weight: 300;
-}
-
-.certificate_info {
-    margin: 40px 0 10px;
-}
-
-.certificate_value {
-    overflow: hidden;
-    -ms-text-overflow: ellipsis;
-    text-overflow: ellipsis;
-    color: #fff;
-    line-height: 1.25;
-    margin: 0 0 10px;
-    font-size: 0.8em;
-}
-
-.certificate_value_hash {
+.certificate_hash,
+.certificate_description,
+.certificate_date {
     font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+    font-weight: bold;
+    line-height: 1;
+    text-shadow: 0 0 1px #fff;
+    position: absolute;
 }
 
-.certificate_value a {
-    color: #fff;
-    text-decoration: none;
+.certificate_hash {
+    font-size: 0.8em;
+    text-align: center;
+    width: 100%;
+    top: 180px;
+    left: 0;
 }
 
-.certificate_value a:hover,
-.certificate_value a:focus {
-    color: #2dc0e8;
+.certificate_description {
+    font-size: 0.8em;
+    text-align: center;
+    width: 100%;
+    top: 208px;
+    left: 0;
 }
 
-.certificate_label {
-    color: #999;
-    text-transform: uppercase;
-    line-height: 1.25;
+.certificate_date {
     font-size: 0.65em;
-    letter-spacing: 0.05em;
-    margin: 0;
+    bottom: 45px;
+    left: 160px;
 }
 
 .certificate_qr {
     margin-top: 5px;
     width: 80px;
     height: 80px;
+    position: absolute;
+    bottom: 10px;
+    right: 170px;
 }
 
 /* Custom file upload */
