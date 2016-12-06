@@ -2,23 +2,47 @@ var express = require('express');
 var request = require('request');
 var router = express.Router();
 
+var baseUrl = 'http://ts.exonum.com/f/';
 var backendsUrl = 'http://exonum.com/backends/timestamping/content';
 
-router.post('/proceed', function(req, res) {
+router.post('/pay', function(req, res) {
+    var db = req.db;
     var hash = req.body.label;
-    var description = '';
+    var description = req.body.description;
 
-    // create file
-    request.post({
-        url: backendsUrl,
-        headers: [{
-            name: 'content-type',
-            value: 'multipart/form-data'
-        }],
-        formData: {
-            hash: hash,
-            description: description
-        }
+    db.serialize(function() {
+        db.get('SELECT 1 FROM pairs WHERE hash = "' + hash + '"', function(err, row) {
+            if (typeof row === 'undefined') {
+                db.prepare('INSERT INTO pairs (hash, description) VALUES (?, ?)').run(hash, description).finalize();
+            } else {
+                db.run('UPDATE pairs SET description = "' + description + '" WHERE hash = "' + hash + '"');
+            }
+        });
+    });
+
+    res.redirect(307, 'https://money.yandex.ru/quickpay/confirm.xml');
+});
+
+router.post('/proceed', function(req, res) {
+    var db = req.db;
+    var hash = req.body.label;
+
+    db.serialize(function() {
+        db.each('SELECT 1 rowid, * FROM pairs WHERE hash = "' + hash + '" LIMIT 1', function(err, row) {
+            if (typeof row !== 'undefined') {
+                request.post({
+                    url: backendsUrl,
+                    headers: [{
+                        name: 'content-type',
+                        value: 'multipart/form-data'
+                    }],
+                    formData: {
+                        hash: hash,
+                        description: row.description
+                    }
+                });
+            }
+        });
     });
 
     res.status(200).send();
@@ -75,7 +99,7 @@ router.get('/:hash', function(req, res, next) {
 
             if (response.statusCode === 200) {
                 data['title'] = 'Certificate of proof';
-                data['url'] = encodeURIComponent('http://ts.exonum.com/f/' + hash);
+                data['url'] = encodeURIComponent(baseUrl + hash);
 
                 res.render('file', data);
             } else if (response.statusCode === 409) {

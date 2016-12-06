@@ -6,6 +6,7 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var hbs = require('hbs');
 var moment = require('moment');
+var sqlite3 = require('sqlite3').verbose();
 
 var index = require('./routes/index');
 var file = require('./routes/file');
@@ -28,6 +29,16 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+
+// make db accessible to routers
+var db = new sqlite3.Database(':memory:');
+db.serialize(function() {
+    db.run('CREATE TABLE IF NOT EXISTS pairs (hash CHAR (64), description CHAR (50))');
+});
+app.use(function(req, res, next) {
+    req.db = db;
+    next();
+});
 
 app.use('/', index);
 app.use('/f', file);

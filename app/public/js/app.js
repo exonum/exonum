@@ -1,7 +1,5 @@
 $(function() {
 
-    var fileSizeLimit = 20971520; // 20 MB in bytes
-
     function getReader(t) {
         var reader = new FileReader;
         reader.readAsBinaryString(t);
@@ -64,7 +62,7 @@ $(function() {
 
         event.preventDefault();
 
-        if (file === null || file.size > fileSizeLimit) {
+        if (file === null) {
             content.addClass('error');
             return false;
         }
@@ -80,8 +78,8 @@ $(function() {
                         window.location.replace(data.redirect);
                     } else {
                         $('#label').val(hash);
-                        $('#targets').val(hash.substring(0, 10) + '...');
                         $('#success-url').val(location.protocol + '//' + location.hostname + '/f/' + hash + '/redirect');
+                        $('#pay-description').val(description.val());
                         $('#create').addClass('hidden');
                         $('#pay').removeClass('hidden');
                     }
@@ -94,7 +92,7 @@ $(function() {
         var content = $(this);
         var file = content.get(0).files.item(0);
 
-        if (file !== null && file.size <= fileSizeLimit) {
+        if (file !== null) {
             content.removeClass('error');
         }
     });
