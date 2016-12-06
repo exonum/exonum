@@ -377,7 +377,7 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     font-size: 0.8em;
     text-align: center;
     width: 100%;
-    top: 170px;
+    top: 150px;
     left: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -387,13 +387,13 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     font-size: 0.8em;
     text-align: center;
     width: 100%;
-    top: 198px;
+    top: 178px;
     left: 0;
 }
 
 .certificate_date {
     font-size: 0.65em;
-    bottom: 45px;
+    bottom: 65px;
     left: 160px;
 }
 
@@ -402,7 +402,7 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     width: 80px;
     height: 80px;
     position: absolute;
-    bottom: 10px;
+    bottom: 30px;
     right: 170px;
 }
 

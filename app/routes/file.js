@@ -98,7 +98,7 @@ router.get('/:hash', function(req, res, next) {
             var data = JSON.parse(body);
 
             if (response.statusCode === 200) {
-                data['title'] = 'Certificate of proof';
+                data['title'] = 'Certificate of proof ' + hash;
                 data['url'] = encodeURIComponent(baseUrl + hash);
 
                 res.render('file', data);
