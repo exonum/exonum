@@ -25,7 +25,7 @@ mod configuration;
 mod adjusted_propose_timeout;
 pub mod config;
 
-pub use self::configuration::{StoredConfiguration, ConfigurationManager};
+pub use self::configuration::StoredConfiguration;
 pub use self::config::ListenerConfig;
 pub use self::configuration::ConsensusCfg;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
@@ -67,12 +67,11 @@ pub struct NodeHandler<B, S>
 {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub state: State<B::Transaction, B>,
+    pub state: State<B::Transaction>,
     pub channel: S,
     pub blockchain: B,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-
     propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster<B>>,
 }
 
@@ -97,7 +96,7 @@ impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
-    pub fn new(blockchain: B, sender: S, config: Configuration) -> NodeHandler<B, S> {
+    pub fn new(blockchain: B, sender: S, mut config: Configuration) -> NodeHandler<B, S> {
         // FIXME: remove unwraps here, use FATAL log level instead
 
         let r = blockchain.last_block().unwrap();
@@ -118,7 +117,10 @@ impl<B, S> NodeHandler<B, S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        let configuration_manager = ConfigurationManager::new(blockchain.clone());
+        if let Some(stored_config) = blockchain.get_initial_configuration() {
+            config.update_with_actual_config(stored_config);
+        }
+
         let state = State::new(
             id as u32,
             config.validators,
@@ -131,8 +133,7 @@ impl<B, S> NodeHandler<B, S>
                 status_timeout: config.consensus.status_timeout as i64,
                 peers_timeout: config.consensus.peers_timeout as i64,
                 txs_block_limit: config.consensus.txs_block_limit,
-            },
-            configuration_manager
+            }
         );
 
         NodeHandler {
@@ -167,7 +168,7 @@ impl<B, S> NodeHandler<B, S>
         self.state().consensus_config().txs_block_limit
     }
 
-    pub fn state(&self) -> &State<B::Transaction, B> {
+    pub fn state(&self) -> &State<B::Transaction> {
         &self.state
     }
 
@@ -397,7 +398,7 @@ impl<B> Node<B>
         self.reactor.run()
     }
 
-    pub fn state(&self) -> &State<B::Transaction, B> {
+    pub fn state(&self) -> &State<B::Transaction> {
         self.reactor.handler().state()
     }
 

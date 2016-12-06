@@ -8,9 +8,8 @@ use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMess
                              BitVec, AnyTx};
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
-use super::super::blockchain::Blockchain;
 
-use super::configuration::{ConsensusCfg, StoredConfiguration, ConfigurationManager};
+use super::configuration::{ConsensusCfg, StoredConfiguration};
 
 // TODO: replace by in disk tx pool
 const TX_POOL_LIMIT: usize = 20000;
@@ -27,20 +26,16 @@ pub type Round = u32;
 pub type Height = u64;
 pub type ValidatorId = u32;
 
-pub trait Configurable {
-    fn update_config(&mut self, config: StoredConfiguration);
-}
-
 // TODO: reduce copying of Hash
+
 
 pub struct State<AppTx>
    where AppTx: Message
 {
+
     id: u32,
     validators: Vec<PublicKey>,
     consensus_config: ConsensusCfg,
-    configuration_manager: ConfigurationManager<B>,
-
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -289,7 +284,7 @@ impl<AppTx> State<AppTx>
 
         let validators_len = validators.len();
 
-        let mut state = State {
+        State {
             id: id,
 
             peers: HashMap::new(),
@@ -323,24 +318,7 @@ impl<AppTx> State<AppTx>
 
             commited_txs: 0,
 
-            consensus_config: consensus_config,
-            configuration_manager: configuration_manager
-        };
-
-        state.initial_configuration();
-
-        state
-    }
-
-    pub fn initial_configuration (&mut self){
-        if let Some(stored_config) = self.configuration_manager.get_actual_config(){
-            self.update_config(stored_config);
-        }
-    }
-
-    pub fn reconfigure_at_height (&mut self){
-        if let Some(configuration) = self.configuration_manager.get_config_at_height(self.height){
-            self.update_config(configuration);
+            consensus_config: consensus_config
         }
     }
 
@@ -351,8 +329,6 @@ impl<AppTx> State<AppTx>
     pub fn id(&self) -> ValidatorId {
         self.id
     }
-
-
 
     // TODO Move to blockchain (and store therein)
     pub fn validators(&self) -> &[PublicKey] {
@@ -455,7 +431,7 @@ impl<AppTx> State<AppTx>
     }
 
     // FIXME use block_hash
-    pub fn new_height(&mut self, block_hash: &Hash, round: Round) {
+    pub fn new_height(&mut self, block_hash: &Hash, round: Round, new_config: Option<StoredConfiguration>) {
         self.height += 1;
         self.round = round;
         self.locked_round = 0;
@@ -478,7 +454,22 @@ impl<AppTx> State<AppTx>
         self.our_prevotes.clear();
         self.our_precommits.clear();
         self.requests.clear(); // FIXME: clear all timeouts
-        self.reconfigure_at_height();
+
+        if let Some(config) = new_config {
+            self.update_config(config);
+        }
+
+    }
+
+    fn update_config(&mut self, config: StoredConfiguration){
+
+        let id = config.validators
+            .iter()
+            .position(|pk| pk == self.public_key().unwrap()).unwrap();
+
+        self.id = id as u32;
+        self.validators = config.validators;
+        self.consensus_config = config.consensus;
     }
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {

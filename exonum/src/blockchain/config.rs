@@ -1,12 +1,8 @@
-use node::serde_json;
-use events::Channel;
-use node::{ExternalMessage, NodeHandler, NodeTimeout};
-use super::super::messages::{ConfigPropose, ConfigVote};
-use super::super::blockchain::{Blockchain, View};
-use super::super::blockchain::HeightBytecode;
-use super::super::crypto::PublicKey;
-use super::super::storage::Map;
-use super::super::messages::Message;
+use super::serde_json;
+use ::messages::{ConfigPropose, ConfigVote};
+use ::crypto::PublicKey;
+use ::storage::Map;
+use blockchain::view::HeightBytecode;
 use byteorder::{ByteOrder, LittleEndian};
 
 #[derive(Debug, Serialize, Deserialize)]

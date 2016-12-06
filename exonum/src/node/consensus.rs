@@ -421,7 +421,8 @@ impl<B, S> NodeHandler<B, S>
 
         // Update state to new height
         let round = self.actual_round();
-        self.state.new_height(&block_hash, round);
+        let config = self.blockchain.get_configuration_at_height(height);
+        self.state.new_height(&block_hash, round, config);
 
         info!("{:?} ====== height={}, round={}, proposer={}, commited={}, pool={}",
               self.channel.get_time(),
