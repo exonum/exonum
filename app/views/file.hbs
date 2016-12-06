@@ -11,7 +11,8 @@
                     {{#if description}}
                         <div class="certificate_description">{{description}}</div>
                     {{/if}}
-                    <div class="certificate_date">{{formatDate time 'YYYY-MM-DD HH:mm:ss'}} +0000</div>
+                    <div class="certificate_description">Agreement between employee and employer</div>
+                    <div class="certificate_date">{{formatDate time 'YYYY-MM-DD HH:mm:ss'}}</div>
                     <img class="certificate_qr" src="https://chart.googleapis.com/chart?cht=qr&chs=320x320&chld=L|0&chl={{url}}" alt="">
                 </div>
 
@@ -20,8 +21,8 @@
 
         <br>
 
-        <div class="center_text">
-            <a href="#" class="pix_button btn_normal pix_button_flat blue_bg bold_text btn_big">
+        <div class="center_text print-btn">
+            <a href="javascript:window.print()" class="pix_button btn_normal pix_button_flat blue_bg bold_text btn_big">
                 <span>Print certificate</span>
             </a>
         </div>

@@ -377,7 +377,7 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     font-size: 0.8em;
     text-align: center;
     width: 100%;
-    top: 180px;
+    top: 170px;
     left: 0;
 }
 
@@ -385,7 +385,7 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     font-size: 0.8em;
     text-align: center;
     width: 100%;
-    top: 208px;
+    top: 198px;
     left: 0;
 }
 
@@ -559,4 +559,18 @@ input.radio-button__control {
 .widget-shop__icon:after {
     visibility: hidden;
     content: '\00A0';
+}
+
+/* Print styles */
+@media print {
+    html,
+    body,
+    .dark {
+        background-color: #fff;
+    }
+    .header_style,
+    .footer3,
+    .print-btn {
+        display: none;
+    }
 }
