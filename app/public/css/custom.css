@@ -147,13 +147,13 @@ a.pix_nav_logo {
 
 @media (max-width: 767px) {
     .hidden-xs {
-        display: none!important;
+        display: none !important;
     }
 }
 
 @media (min-width: 768px) {
     .visible-xs {
-        display: none!important;
+        display: none !important;
     }
 }
 
@@ -226,6 +226,10 @@ input.pix_text_readonly:active {
     color: #2dc0e8;
 }
 
+.normal_text.light_gray a {
+    color: #ccc;
+}
+
 @media (min-width: 768px) {
     .big_title {
         font-size: 48px;
@@ -254,13 +258,35 @@ input.pix_text_readonly:active {
     }
 }
 
-/* Form elements */
-.pix_form input.error,
-.pix_form input.error:focus,
-.pix_form select.error,
-.pix_form textarea.error,
-.pix_form textarea.error:focus {
-    border: 2px solid #cc0000;
+/* Panels */
+.panel-group .panel {
+    padding: 15px 0;
+}
+
+.panel-group .panel-heading a {
+    text-decoration: none;
+}
+
+.panel-group .panel-heading a:before {
+    display: inline-block;
+    vertical-align: middle;
+    content: '';
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid #2dc0e8;
+    width: 0;
+    height: 0;
+}
+
+.panel-group .panel-heading a.collapsed:before {
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 5px solid #2dc0e8;
+    border-right: none;
+}
+
+.panel-group .panel-heading a span {
+    border-bottom: 1px dashed rgba(45, 192, 232, 0.5);
 }
 
 /* Responsive image */
@@ -322,6 +348,10 @@ code, kbd, pre, samp {
     clear: both;
 }
 
+.footer3 .small_text a {
+    color: #666;
+}
+
 @media (max-width: 767px) {
     .pixfort_text_4 .footer_left {
         padding-bottom: 0;
@@ -330,17 +360,6 @@ code, kbd, pre, samp {
     .pixfort_text_4 .footer_right {
         padding-top: 0;
     }
-}
-
-/* Paypal button */
-.paypal-button:hover {
-    background: none;
-    border: none;
-}
-
-button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag-content {
-    color: #c7c7c7;
-    text-shadow: 0 1px 0 #000;
 }
 
 /* Certificate */
@@ -441,7 +460,15 @@ button.paypal-button.paypal-style-checkout.paypal-size-medium .paypal-button-tag
     }
 }
 
-/* Custom file upload */
+/* Form customization */
+.pix_form input.error,
+.pix_form input.error:focus,
+.pix_form select.error,
+.pix_form textarea.error,
+.pix_form textarea.error:focus {
+    border: 2px solid #cc0000;
+}
+
 .pix_form .filestyle {
     margin: 0;
 }
