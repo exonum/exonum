@@ -32,6 +32,12 @@ impl<B, S> NodeHandler<B, S>
             Any::Transaction(msg) => self.handle_tx(msg),
         }
     }
+    // pub fn handle_config(&mut self, config_message: ConfigMessage) {
+    //     match config_message{
+    //         ConfigMessage::ConfigPropose(msg) => self.handle_config_propose(msg),
+    //         ConfigMessage::ConfigVote(msg) => self.handle_config_vote(msg)
+    //     }
+    // }
 
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
         info!("Connected to: {}", addr);
