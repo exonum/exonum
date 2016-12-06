@@ -6,14 +6,12 @@
         <div class="certificate">
             <div class="certificate-inner">
 
-                <div class="certificate_info">
-                    <div class="certificate_hash">{{hash}}</div>
-                    {{#if description}}
-                        <div class="certificate_description">{{description}}</div>
-                    {{/if}}
-                    <div class="certificate_date">{{formatDate time 'YYYY-MM-DD HH:mm:ss'}}</div>
-                    <img class="certificate_qr" src="https://chart.googleapis.com/chart?cht=qr&chs=320x320&chld=L|0&chl={{url}}" alt="">
-                </div>
+                <div class="certificate_hash">{{hash}}</div>
+                {{#if description}}
+                    <div class="certificate_description">{{description}}</div>
+                {{/if}}
+                <div class="certificate_date">{{formatDate time 'YYYY-MM-DD HH:mm:ss'}}</div>
+                <img class="certificate_qr" src="https://chart.googleapis.com/chart?cht=qr&chs=320x320&chld=L|0&chl={{url}}" alt="">
 
             </div>
         </div>
