@@ -147,7 +147,7 @@ impl<D> TimestampingApi<D>
         }
         // Create transaction
         let (_, dummy_key) = gen_keypair();
-        let ts = time::now().to_timespec();
+        let ts = time::now_utc().to_timespec();
         let tx = TimestampTx::new(&description, ts, &hash, &dummy_key);
         self.channel.send(tx.clone())?;
         Ok(tx)

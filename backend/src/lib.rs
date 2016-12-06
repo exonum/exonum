@@ -28,14 +28,6 @@ message! {
     }
 }
 
-// impl TimestampTx {
-//     pub fn from_file(file_name: &str, file: &File) -> Option<TimestampTx> {
-//         let ts = time::now_utc().to_timespec();
-
-//         let mut tx = TimestampTx::
-//     }
-// }
-
 storage_value! {
     Content {
         const SIZE = 48;
@@ -156,7 +148,7 @@ mod tests {
     #[test]
     fn test_timestamp_tx() {
         let description = "Test Description";
-        let time = time::now().to_timespec();
+        let time = time::now_utc().to_timespec();
         let hash = hash(b"js9sdhcsdh32or830ru8043ru-wf9-12u8u3280y8hfwoefnsdljs");
         let (_, sec_key) = gen_keypair();
 
@@ -169,7 +161,7 @@ mod tests {
     #[test]
     fn test_file_content() {
         let description = "Test Description";
-        let time = time::now().to_timespec();
+        let time = time::now_utc().to_timespec();
         let hash = hash(b"js9sdhcsdh32or830ru8043ru-wf9-12u8u3280y8hfwoefnsdljs");
 
         let content = Content::new(description, time, &hash);
