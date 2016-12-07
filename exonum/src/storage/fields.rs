@@ -1,6 +1,6 @@
 use std::mem;
 use std::sync::Arc;
-use base64::{encode, decode, Base64Error};
+use base64::{encode_mode, decode_mode, Base64Error, Base64Mode};
 use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{Hash, hash};
@@ -17,11 +17,11 @@ pub trait StorageValue {
 
 pub fn repr_stor_val<T: StorageValue + Clone>(value: &T) -> String {
     let vec_bytes = value.clone().serialize();
-    encode(&vec_bytes)
+    encode_mode(&vec_bytes, Base64Mode::UrlSafe)
 }
 
 pub fn decode_from_b64_string<T: StorageValue>(b64: &str) -> Result<T, Base64Error> {
-    let vec_bytes = decode(b64)?; 
+    let vec_bytes = decode_mode(b64, Base64Mode::UrlSafe)?; 
     Ok(StorageValue::deserialize(vec_bytes))
 }
 

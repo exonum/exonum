@@ -15,7 +15,7 @@ const ROOT_KEY_DESC: &'static str = "root_key";
 const ROOT_VAL_HASH: &'static str = "hash";
 
 
-pub enum ProofPathToKey<V: StorageValue> {
+pub enum ProofPathToKey<V> {
     /// to match a leaf root with found key; (root_db_key= searched_db_key, value)
     LeafRootInclusive(Vec<u8>, V),
     /// to prove exclusion for a leaf root when root_db_key != searched db_key
