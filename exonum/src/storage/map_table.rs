@@ -33,7 +33,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
     }
 
     fn put(&self, key: &K, value: V) -> Result<(), Error> {
-        self.storage.put(&[&self.prefix, key.as_ref()].concat(), value.serialize())
+        self.storage.put(&[&self.prefix, key.as_ref()].concat(), value.serialize(Vec::new()))
     }
 
     fn delete(&self, key: &K) -> Result<(), Error> {
