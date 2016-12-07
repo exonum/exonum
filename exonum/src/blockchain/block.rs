@@ -33,7 +33,7 @@ impl<'a> Field<'a> for Block {
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-        <&[u8] as Field>::write(&self.clone().serialize().as_slice(), buffer, from, to);
+        <&[u8] as Field>::write(&self.serialize(Vec::new()).as_slice(), buffer, from, to);
     }
 }
 

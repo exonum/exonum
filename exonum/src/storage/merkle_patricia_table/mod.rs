@@ -296,14 +296,25 @@ impl BranchNode {
 }
 
 impl StorageValue for BranchNode {
-    fn serialize(self) -> Vec<u8> {
-        self.raw
+    fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
+        let old_len = buf.len(); 
+        let new_len = old_len + self.raw.len(); 
+        buf.resize(new_len, 0);
+        {
+            let part = &mut buf[old_len..new_len]; 
+            part.copy_from_slice(&self.raw); 
+        }
+        buf
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
         BranchNode::from_bytes(v)
     }
 
+    fn len_hint(&self) -> usize {
+            self.raw.len()
+    }
+    
     fn hash(&self) -> Hash {
         self.hash()
     }
@@ -701,14 +712,14 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
         let hash = value.hash();
         let db_key = key.to_db_key();
-        let bytes = value.serialize();
+        let bytes = value.serialize(Vec::new());
         self.map.put(&db_key, bytes)?;
         Ok(hash)
     }
 
     fn insert_branch(&self, key: &BitSlice, branch: BranchNode) -> Result<(), Error> {
         let db_key = key.to_db_key();
-        self.map.put(&db_key, branch.serialize())
+        self.map.put(&db_key, branch.serialize(Vec::new()))
     }
 
     // TODO replace by debug trait impl

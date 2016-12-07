@@ -1,10 +1,11 @@
 use ::storage::{StorageValue, Error};
 use ::storage::utils::bytes_to_hex;
 use ::storage::fields::{repr_stor_val, decode_from_b64_string};
-use ::crypto::{hash, Hash};
+use ::crypto::{Hash};
 use std::fmt;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
+use super::hash_rules;
 const LEFT_DESC: &'static str = "left";
 const RIGHT_DESC: &'static str = "rigth";
 const VAL_DESC: &'static str = "val";
@@ -15,14 +16,14 @@ pub fn proof_indices_values<V: StorageValue>(proof: &Proofnode<V>) -> Vec<(usize
     res
 }
 
-pub enum Proofnode<V: StorageValue> {
+pub enum Proofnode<V> {
     Full(Box<Proofnode<V>>, Box<Proofnode<V>>),
     Left(Box<Proofnode<V>>, Option<Hash>),
     Right(Hash, Box<Proofnode<V>>),
     Leaf(V),
 }
 
-impl<V: StorageValue + Clone> Serialize for Proofnode<V> {
+impl<V: StorageValue> Serialize for Proofnode<V> {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
@@ -157,20 +158,20 @@ impl<V: StorageValue> Proofnode<V> {
     pub fn compute_proof_root(&self) -> Hash {
         match *self {
             Proofnode::Full(ref left, ref right) => {
-                hash(&[left.compute_proof_root().as_ref(), right.compute_proof_root().as_ref()]
-                    .concat())
+               hash_rules::hash_branch(left.compute_proof_root(), right.compute_proof_root())
             }
             Proofnode::Left(ref left_proof, ref right_hash) => {
                 if let Some(ref hash_val) = *right_hash {
-                    hash(&[left_proof.compute_proof_root().as_ref(), hash_val.as_ref()].concat())
+                hash_rules::hash_branch(left_proof.compute_proof_root(), *hash_val)
                 } else {
-                    hash(left_proof.compute_proof_root().as_ref())
+                    left_proof.compute_proof_root()
                 }
             } 
             Proofnode::Right(ref left_hash, ref right_proof) => {
-                hash(&[left_hash.as_ref(), right_proof.compute_proof_root().as_ref()].concat())
+                hash_rules::hash_branch(*left_hash, right_proof.compute_proof_root())
+
             }
-            Proofnode::Leaf(ref val) => val.hash(), 
+            Proofnode::Leaf(ref val) => hash_rules::hash_leaf(val) 
         }
     }
 
