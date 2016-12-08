@@ -99,6 +99,20 @@ impl StorageValue for Hash {
     }
 }
 
+impl StorageValue for RawMessage {
+    fn serialize(self) -> Vec<u8> {
+        self.as_ref().as_ref().to_vec()
+    }
+
+    fn deserialize(v: Vec<u8>) -> Self {
+        Arc::new(MessageBuffer::from_vec(v))
+    }
+
+    fn hash(&self) -> Hash {
+        self.hash()
+    }
+}
+
 impl<T> StorageValue for T
     where T: Message
 {

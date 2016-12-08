@@ -61,7 +61,7 @@ pub struct NodeHandler<B, S>
 {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub state: State<B::Transaction>,
+    pub state: State,
     pub channel: S,
     pub blockchain: B,
     // TODO: move this into peer exchange service
@@ -162,7 +162,7 @@ impl<B, S> NodeHandler<B, S>
         self.state().consensus_config().txs_block_limit
     }
 
-    pub fn state(&self) -> &State<B::Transaction> {
+    pub fn state(&self) -> &State {
         &self.state
     }
 
@@ -392,7 +392,7 @@ impl<B> Node<B>
         self.reactor.run()
     }
 
-    pub fn state(&self) -> &State<B::Transaction> {
+    pub fn state(&self) -> &State {
         self.reactor.handler().state()
     }
 

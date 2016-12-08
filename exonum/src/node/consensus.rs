@@ -212,7 +212,7 @@ impl<B, S> NodeHandler<B, S>
                             error!("Incorrect transaction in block detected, block={:?}", msg);
                             return;
                         }
-                        txs.push((hash, tx));
+                        txs.push((hash, tx.raw().clone()));
                     }
                     Err(e) => {
                         error!("Unknown transaction in block detected, error={:?}, block={:?}",
@@ -462,7 +462,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-        let full_proposes = self.state.add_transaction(hash, msg);
+        let full_proposes = self.state.add_transaction(hash, msg.raw().clone());
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));

@@ -6,6 +6,7 @@ use time::Duration;
 
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
                              BitVec, AnyTx};
+
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
 
@@ -27,7 +28,6 @@ pub type Height = u64;
 pub type ValidatorId = u32;
 
 // TODO: reduce copying of Hash
-
 
 pub struct State<AppTx>
    where AppTx: Message
@@ -271,7 +271,6 @@ impl<AppTx> State<AppTx>
         self.validators = config.validators;
         self.consensus_config = config.consensus;
     }
-}
 
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
