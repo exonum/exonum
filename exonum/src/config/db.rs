@@ -113,14 +113,14 @@ impl<D> Blockchain for ConfigsBlockchain<D> where D: Database
     fn execute(&self, tx: &Self::Transaction) -> Result<(), Error> {
         match *tx {
             ConfigTx::ConfigPropose(ref tx) => {
-                self.handle_config_propose(tx);
-                return Ok(());
+                self.handle_config_propose(tx);                              
             }
             ConfigTx::ConfigVote(ref tx) => {
                 self.handle_config_vote(tx);
-                return Ok(());
+                                
             }
         }
+        Ok(())
     }    
     
     fn get_initial_configuration (&mut self) -> Option<StoredConfiguration> {
