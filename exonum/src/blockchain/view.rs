@@ -7,9 +7,6 @@ use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatr
 
 use super::Block;
 
-pub type ConfigurationData = Vec<u8>;
-pub type HeightBytecode = [u8; 8];
-
 pub trait View<F: Fork>: Deref<Target = F> {
     type Transaction: Message + StorageValue;
 

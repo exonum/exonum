@@ -1,8 +1,3 @@
-// To avoid clippy failure concerning unused mut in cases when it's required
-#![allow(unused_mut)]
-
-extern crate serde_json;
-
 use std::io;
 use std::net::SocketAddr;
 use std::marker::PhantomData;
@@ -25,9 +20,8 @@ mod configuration;
 mod adjusted_propose_timeout;
 pub mod config;
 
-pub use self::configuration::StoredConfiguration;
+use super::config::view::{StoredConfiguration, ConsensusCfg};
 pub use self::config::ListenerConfig;
-pub use self::configuration::ConsensusCfg;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 use self::adjusted_propose_timeout::*;
 
@@ -96,7 +90,7 @@ impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
-    pub fn new(blockchain: B, sender: S, mut config: Configuration) -> NodeHandler<B, S> {
+    pub fn new(mut blockchain: B, sender: S, mut config: Configuration) -> NodeHandler<B, S> {
         // FIXME: remove unwraps here, use FATAL log level instead
 
         let r = blockchain.last_block().unwrap();
@@ -384,7 +378,7 @@ pub struct Node<B>
 impl<B> Node<B>
     where B: Blockchain
 {
-    pub fn new(blockchain: B, mut config: Configuration) -> Node<B> {
+    pub fn new(blockchain: B, config: Configuration) -> Node<B> {
         let network = Network::with_config(config.listener.address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = MioChannel::new(config.listener.address, event_loop.channel());

@@ -19,9 +19,6 @@ pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 11;
 
-pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 12;
-pub const CONFIG_VOTE_MESSAGE_ID: u16 = 13;
-
 // когда присоединяются узлы
 message! {
     Connect {
@@ -211,3 +208,4 @@ message! {
         revoke:         bool        [80 => 81] // голос_за=false / отозвать=true
     }
 }
+

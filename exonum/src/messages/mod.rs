@@ -333,7 +333,7 @@ impl<AppTx: Message> AnyTx<AppTx> {
                         )
                     )
             }
-            _ => AnyTx::Application(AppTx::from_raw(raw)?),
+            _ => AnyTx::Application(AppTx::from_raw(raw)?)
         })
     }
 
