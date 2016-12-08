@@ -59,7 +59,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Save & execute transactions
         let mut tx_hashes = Vec::new();
         for &(hash, ref tx) in txs {
-
+            
             match *tx {
                 AnyTx::Application(ref tx) => Self::execute(&fork, tx)?,
                 AnyTx::Service(ref tx) => Self::execute_service_tx(&fork, tx)?,
@@ -71,9 +71,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             fork.block_txs(height)
                 .append(hash)
                 .unwrap();
-            tx_hashes.push(hash);
-
-            
+            tx_hashes.push(hash);            
         }
         // Get tx hash
         let tx_hash = fork.block_txs(height).root_hash()?;
