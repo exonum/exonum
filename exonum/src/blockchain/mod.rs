@@ -75,9 +75,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             fork.block_txs(height)
                 .append(hash)
                 .unwrap();
-            tx_hashes.push(hash);
-
-            
+            tx_hashes.push(hash);            
         }
         // Get tx hash
         let tx_hash = fork.block_txs(height).root_hash()?;
