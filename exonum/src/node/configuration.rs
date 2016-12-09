@@ -134,7 +134,7 @@ impl<B, S> NodeHandler<B, S>
 
         if votes_count >= 2/3 * self.state.validators().len(){
             if let Some(config_propose) = view.config_proposes().get(config_vote.hash_propose()).unwrap() {
-                view.configs().put(&Hash::from_slice(&self.height_to_slice(config_propose.actual_from_height())).unwrap(), config_propose.config().to_vec()).unwrap();
+                view.configs().put(&Hash::new(self.height_to_slice(config_propose.actual_from_height())), config_propose.config().to_vec()).unwrap();
                 // TODO: clear storages
             }
         }
