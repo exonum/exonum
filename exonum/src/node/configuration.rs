@@ -1,8 +1,12 @@
-use super::serde_json;
-use ::messages::{ConfigPropose, ConfigVote};
-use ::crypto::PublicKey;
-use ::storage::Map;
-use blockchain::view::HeightBytecode;
+use node::serde_json;
+use events::Channel;
+use node::{ExternalMessage, NodeHandler, NodeTimeout};
+use super::super::messages::{ConfigPropose, ConfigVote};
+use super::super::blockchain::{Blockchain, View};
+use super::super::blockchain::HeightBytecode;
+use super::super::crypto::PublicKey;
+use super::super::storage::Map;
+use super::super::messages::Message;
 use byteorder::{ByteOrder, LittleEndian};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,6 +40,17 @@ impl StoredConfiguration {
         }
         Err("not valid")
     }
+
+    pub fn height_to_slice(height: u64) -> HeightBytecode {
+        let mut result = [0; 8];
+        LittleEndian::write_u64(&mut result[0..], height);
+        result
+    }
+
+    // RFU
+    // fn height_from_slice(slice: [u8; 8]) -> u64 {
+    //     LittleEndian::read_u64(&slice)
+    // }
 
     fn is_valid(&self) -> bool {
         self.consensus.round_timeout < 10000

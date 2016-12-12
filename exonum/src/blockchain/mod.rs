@@ -4,6 +4,7 @@ extern crate serde_json;
 mod spec;
 mod block;
 mod view;
+mod config;
 
 use std::borrow::Borrow;
 use std::ops::Deref;
@@ -14,13 +15,12 @@ use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{PublicKey, Hash, hash};
 use ::messages::{Any, Precommit, Message, ConfigMessage, ServiceTransaction, ConfigPropose, ConfigVote, TransactionMessage, RawMessage, AnyTx};
+
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
-use config::view::{StoredConfiguration};
 
 pub use self::block::Block;
-pub use self::view::View;
+pub use self::view::{View, ConfigurationData, HeightBytecode};
 pub use self::view::ConfigurationData;
-
 pub use self::config::{StoredConfiguration, ConsensusCfg};
 
 pub trait Blockchain: Sized + Clone + Send + Sync + 'static
@@ -221,6 +221,40 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 }
             }
         }
+    }    
+
+    fn get_initial_configuration (&self) -> Option<StoredConfiguration> {
+        let r = self.last_block().unwrap();
+        let last_height = if let Some(last_block) = r {
+            last_block.height() + 1
+        } else {
+            0
+        };
+        let mut h = last_height;
+
+        while h > 0 {
+            if let Some(configuration) = self.get_configuration_at_height(h){
+                return Some(configuration);
+            }
+            h -= 1;
+        }
+        None
+    }
+
+    fn get_configuration_at_height (&self, height: u64) -> Option<StoredConfiguration> {
+        let view = self.view();
+        let configs = view.configs();
+        if let Ok(config) = configs.get(&StoredConfiguration::height_to_slice(height)) {
+            match StoredConfiguration::deserialize(&config.unwrap()) {
+                Ok(configuration) => {
+                    return Some(configuration);
+                },
+                Err(_) => {
+                    error!("Can't parse found configuration at height: {}", height);
+                }
+            }
+        }
+        None
     }
 
     fn commit<'a, I: Iterator<Item = &'a Precommit>>(&self,
