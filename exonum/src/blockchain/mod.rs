@@ -216,10 +216,8 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 }
             }
 
-            if votes_count >= 2 / 3 * config.validators.len() {
-                if let Some(config_propose) = view.config_proposes()
-                    .get(config_vote.hash_propose())
-                    .unwrap() {
+            if votes_count >= 2/3 * config.validators.len(){
+                if let Some(config_propose) = view.config_proposes().get(config_vote.hash_propose()).unwrap() {
                     let height_bytecode = config_propose.actual_from_height().into();
                     view.configs().put(&height_bytecode, config_propose.config().to_vec()).unwrap();
                     view.configs_heights().append(height_bytecode).unwrap();
