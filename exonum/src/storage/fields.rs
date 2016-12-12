@@ -10,7 +10,7 @@ use ::messages::{MessageBuffer, Message, AnyTx};
 pub struct HeightBytes(pub [u8; 32]);
 
 pub trait StorageValue {
-    fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8>;
+    fn serialize(&self, buf: Vec<u8>) -> Vec<u8>;
     ///to inform caller what capacity is needed for serialize beforehand
     fn len_hint(&self) -> usize {
         0
