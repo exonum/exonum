@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use ::crypto::{Hash, PublicKey};
 use ::messages::{Precommit, Message, ConfigPropose, ConfigVote, AnyTx};
-use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatriciaTable};
+use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatriciaTable}, HeightBytes;
 
 use super::Block;
 
@@ -32,7 +32,7 @@ pub trait View<F: Fork>: Deref<Target = F> {
 
     fn precommits(&self, hash: &Hash) -> ListTable<MapTable<F, [u8], Vec<u8>>, u32, Precommit> {
         ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self))
-    }
+    }    
 
     fn config_proposes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, ConfigPropose> {
         //config_propose paricia merkletree <hash_tx> транзакция пропоз

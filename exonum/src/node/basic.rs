@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use rand::Rng;
 
 use super::super::blockchain::Blockchain;
-use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
+use super::super::messages::{Any, TransactionMessage, ServiceTransaction, RawMessage, Connect, Status, Message, RequestPeers};
 use super::{NodeHandler, RequestData};
 
 use super::super::events::Channel;
@@ -29,7 +29,8 @@ impl<B, S> NodeHandler<B, S>
             Any::Consensus(msg) => self.handle_consensus(msg),
             Any::Request(msg) => self.handle_request(msg),
             Any::Block(msg) => self.handle_block(msg),
-            Any::Transaction(msg) => self.handle_tx(msg),
+            Any::Transaction(TransactionMessage::Service(msg)) => self.handle_service_tx(msg),
+            Any::Transaction(TransactionMessage::Application(msg)) => self.handle_tx(msg),
         }
     }
 

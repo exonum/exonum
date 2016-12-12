@@ -2,8 +2,7 @@ use std::net::SocketAddr;
 
 use super::super::crypto::{gen_keypair, gen_keypair_from_seed, Seed, PublicKey, SecretKey};
 use super::super::events::{NetworkConfiguration, EventsConfiguration};
-use blockchain::ConsensusCfg;
-use node::Configuration;
+use super::configuration::ConsensusCfg;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {

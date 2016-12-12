@@ -19,6 +19,9 @@ pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 11;
 
+pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 12;
+pub const CONFIG_VOTE_MESSAGE_ID: u16 = 13;
+
 // когда присоединяются узлы
 message! {
     Connect {
@@ -184,11 +187,10 @@ message! {
     }
 }
 
-message! {
-    ConfigPropose {
+message !{
+    ConfigPropose{
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
         const SIZE = 56;
-
         from:           &PublicKey  [00 => 32]
         height:         u64         [32 => 40]
         config:        &[u8]        [40 => 48] // serialized config bytes
@@ -196,7 +198,7 @@ message! {
     }
 }
 
-message! {
+message !{
     ConfigVote {
         const ID = CONFIG_VOTE_MESSAGE_ID;
         const SIZE = 81;
@@ -207,4 +209,3 @@ message! {
         revoke:         bool        [80 => 81] // голос_за=false / отозвать=true
     }
 }
-
