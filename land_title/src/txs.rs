@@ -158,6 +158,21 @@ impl ObjectTx {
     }
 }
 
+impl From<RawMessage> for ObjectTx {
+    fn from(raw: RawMessage) -> Self {
+        match raw.message_type() {
+            TX_REGISTER => ObjectTx::Register(TxRegister::from_raw(raw).unwrap()),
+            TX_CREATE_OWNER_ID => ObjectTx::CreateOwner(TxCreateOwner::from_raw(raw).unwrap()),
+            TX_CREATE_OBJECT_ID => ObjectTx::CreateObject(TxCreateObject::from_raw(raw).unwrap()),
+            TX_MODIFY_OBJECT_ID => ObjectTx::ModifyObject(TxModifyObject::from_raw(raw).unwrap()),
+            TX_TRANSFER_OBJECT_ID => ObjectTx::TransferObject(TxTransferObject::from_raw(raw).unwrap()),
+            TX_REMOVE_OBJECT_ID => ObjectTx::RemoveObject(TxRemoveObject::from_raw(raw).unwrap()),
+            TX_RESTORE_OBJECT_ID => ObjectTx::RestoreObject(TxRestoreObject::from_raw(raw).unwrap()),
+            _ => panic!("Undefined message type"),
+        }
+    }
+}
+
 impl Message for ObjectTx {
     fn raw(&self) -> &RawMessage {
         match *self {
