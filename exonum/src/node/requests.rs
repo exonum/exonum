@@ -149,8 +149,8 @@ impl<B, S> NodeHandler<B, S>
             .values()
             .unwrap()
             .iter()
-            .map(|tx_hash| view.transactions().get(tx_hash).unwrap().unwrap())
-            .map(|p| p.clone())
+            .map(|tx_hash| view.transactions().get(tx_hash).unwrap().unwrap())                            
+            .map(|p| p.clone())               
             .collect::<Vec<_>>();
 
         let block_msg = Block::new(&self.public_key,

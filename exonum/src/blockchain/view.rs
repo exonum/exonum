@@ -7,6 +7,8 @@ use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatr
 
 use super::Block;
 
+pub type ConfigurationData = Vec<u8>;
+
 pub trait View<F: Fork>: Deref<Target = F> {
     type Transaction: Message + StorageValue;
 
@@ -32,20 +34,24 @@ pub trait View<F: Fork>: Deref<Target = F> {
         ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self))
     }
 
-    fn config_proposes(&self)
-                       -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, ConfigPropose> {
-        // config_propose paricia merkletree <hash_tx> транзакция пропоз
+    fn config_proposes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, ConfigPropose> {
+        //config_propose paricia merkletree <hash_tx> транзакция пропоз
         MerklePatriciaTable::new(MapTable::new(vec![04], self))
     }
 
-    fn config_votes(&self)
-                    -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, ConfigVote> {
-        // config_votes patricia merkletree <pub_key> последний голос
+    fn config_votes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, ConfigVote> {
+        //config_votes patricia merkletree <pub_key> последний голос
         MerklePatriciaTable::new(MapTable::new(vec![05], self))
     }
 
-    fn configs(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, HeightBytecode, ConfigurationData> {
+    fn configs(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, HeightBytes, ConfigurationData> {
         //configs patricia merkletree <высота блока> json
         MerklePatriciaTable::new(MapTable::new(vec![06], self))
+    } 
+
+    // TODO: consider List index to reduce storage volume
+    fn configs_heights(&self) -> ListTable<MapTable<F, [u8], Vec<u8>>, u64, HeightBytes> {
+        ListTable::new(MapTable::new(vec![07], self))        
     }
+    
 }
