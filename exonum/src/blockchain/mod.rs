@@ -27,7 +27,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 {
     type View: View<<<Self as Blockchain>::Database as Database>::Fork, Transaction=Self::Transaction>;
     type Database: Database;
-    type Transaction: Message + StorageValue;
+    type Transaction: Message + StorageValue;    
 
     fn last_hash(&self) -> Result<Option<Hash>, Error> {
         self.view().heights().last()
@@ -138,7 +138,6 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 }
             }
         }
-
         None
     }
 
@@ -147,7 +146,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         let configs = view.configs();
         if let Ok(config) = configs.get(&height.into()) {
             match StoredConfiguration::deserialize(&config.unwrap()) {
-                Ok(configuration) => {
+                Ok(configuration) => {                    
                     return Some(configuration);
                 }
                 Err(_) => {

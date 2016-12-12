@@ -1,9 +1,5 @@
 use super::serde_json;
-use ::messages::{ConfigPropose, ConfigVote};
 use ::crypto::PublicKey;
-use ::storage::Map;
-use blockchain::view::HeightBytecode;
-use byteorder::{ByteOrder, LittleEndian};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StoredConfiguration {
