@@ -9,8 +9,8 @@ use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMess
 
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
-
 use super::super::config::view::{ConsensusCfg, StoredConfiguration};
+use blockchain::{ConsensusCfg, StoredConfiguration};
 
 // TODO: replace by in disk tx pool
 const TX_POOL_LIMIT: usize = 20000;

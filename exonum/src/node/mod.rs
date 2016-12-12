@@ -13,6 +13,8 @@ use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
 
 pub mod state;//temporary solution to get access to WAIT consts
+use blockchain::{ConsensusCfg,StoredConfiguration};
+
 mod basic;
 mod consensus;
 mod requests;
@@ -111,7 +113,7 @@ impl<B, S> NodeHandler<B, S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        if let Some(stored_config) = blockchain.get_initial_configuration() {
+        if let Some(stored_config) = blockchain.get_actual_configuration() {
             config.update_with_actual_config(stored_config);
         }
 
