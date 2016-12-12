@@ -95,17 +95,21 @@ router.get('/:hash', function(req, res, next) {
 
     request.get(backendsUrl + '/' + hash, function(error, response, body) {
         if (!error) {
-            var data = JSON.parse(body);
+            try {
+                var data = JSON.parse(body);
 
-            if (response.statusCode === 200) {
-                data['title'] = 'Certificate of proof ' + hash;
-                data['url'] = encodeURIComponent(baseUrl + hash);
+                if (response.statusCode === 200) {
+                    data['title'] = 'Certificate of proof ' + hash;
+                    data['url'] = encodeURIComponent(baseUrl + hash);
 
-                res.render('file', data);
-            } else if (response.statusCode === 409) {
-                res.render('file-not-found', {title: 'File not found', hash: hash});
-            } else {
-                res.render('error', {error: error});
+                    res.render('file', data);
+                } else if (response.statusCode === 409) {
+                    res.render('file-not-found', {title: 'File not found', hash: hash});
+                } else {
+                    res.render('error', {error: error});
+                }
+            } catch(e) {
+                res.render('error');
             }
         } else {
             res.render('error', {error: error});
