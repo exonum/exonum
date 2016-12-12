@@ -50,7 +50,7 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     }
 
     pub fn tx_info<T>(&self, tx_hash: &Hash) -> StorageResult<Option<T>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawMessage>
     {
         let tx = self.view.transactions().get(tx_hash)?;
         Ok(tx.and_then(|tx| {
@@ -65,7 +65,7 @@ impl<B: Blockchain> BlockchainExplorer<B> {
                          block_hash: &Hash,
                          full_info: bool)
                          -> StorageResult<Option<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawMessage>
     {
         let block = self.view.blocks().get(block_hash)?;
         if let Some(block) = block {
@@ -105,7 +105,7 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     }
 
     pub fn block_info_with_height<T>(&self, height: u64) -> StorageResult<Option<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawMessage>
     {
         if let Some(block_hash) = self.view.heights().get(height)? {
             // TODO avoid double unwrap
@@ -116,7 +116,7 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     }
 
     pub fn blocks_range<T>(&self, count: u64, from: Option<u64>) -> StorageResult<Vec<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawMessage>
     {
         let heights = self.view.heights();
 
@@ -136,7 +136,7 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     }
 
     fn block_txs<T>(&self, height: u64) -> StorageResult<Vec<T>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawMessage>
     {
         let txs = self.view.block_txs(height);
         let tx_count = txs.len()?;
