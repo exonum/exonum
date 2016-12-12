@@ -10,10 +10,10 @@ use std::ops::Deref;
 
 use time::Timespec;
 
-use ::messages::{Precommit, Message, AnyTx, ServiceTx};
 use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{PublicKey, Hash, hash};
+use ::messages::{Any, Precommit, Message, ConfigMessage, ServiceTransaction, ConfigPropose, ConfigVote, TransactionMessage, RawMessage, AnyTx};
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 use config::view::{StoredConfiguration};
 
@@ -204,7 +204,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             let _ = view.config_votes().put(msg.from(), config_vote.clone());
 
             let mut votes_count = 0;
-            for pub_key in config.validators {
+            for pub_key in config.validators.clone() {
                 if let Some(vote) = view.config_votes().get(&pub_key).unwrap() {
                     if !vote.revoke() {
                         votes_count += 1;
@@ -212,7 +212,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 }
             }
 
-            if votes_count >= 2/3 * self.validators().len(){
+            if votes_count >= 2/3 * config.validators.len(){
                 if let Some(config_propose) = view.config_proposes().get(config_vote.hash_propose()).unwrap() {
                     let height_bytecode = config_propose.actual_from_height().into();
                     view.configs().put(&height_bytecode, config_propose.config().to_vec()).unwrap();
