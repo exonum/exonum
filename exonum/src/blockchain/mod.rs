@@ -68,7 +68,6 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 AnyTx::Application(ref tx) => Self::execute(&fork, tx)?,
                 AnyTx::Service(ref tx) => Self::execute_service_tx(&fork, tx)?,
             }
-
             fork.transactions()
                 .put(&hash, tx.clone())
                 .unwrap();
