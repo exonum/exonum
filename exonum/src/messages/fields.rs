@@ -582,7 +582,7 @@ impl<'a> Field<'a> for BitVec {
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-        // TODO avoid reallocation 
+        // TODO avoid reallocation
         let vec = self.to_bytes();
         let slice = vec.as_slice();
         <&[u8] as Field>::write(&slice, buffer, from, to);

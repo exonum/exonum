@@ -6,7 +6,7 @@ use super::super::crypto::{Hash, PublicKey, HexValue};
 use super::super::blockchain::{Blockchain, View};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
-                             RequestPrecommits, RequestBlock, Block};
+                             RequestPrecommits, RequestBlock, Block, AnyTx};
 use super::super::storage::{Map, Patch};
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
@@ -103,7 +103,7 @@ impl<B, S> NodeHandler<B, S>
         if self.state.propose(&msg.hash()).is_some() {
             return;
         }
-        
+
         trace!("Handle propose");
         // Add propose
         let (hash, has_unknown_txs) = match self.state.add_propose(msg.clone()) {
@@ -199,7 +199,7 @@ impl<B, S> NodeHandler<B, S>
             let view = self.blockchain.view();
             let mut txs = Vec::new();
             for raw in msg.transactions() {
-                match B::Transaction::from_raw(raw) {
+                match AnyTx::from_raw(raw) {
                     Ok(tx) => {
                         let hash = tx.hash();
                         if view.transactions().get(&hash).unwrap().is_some() {
@@ -207,7 +207,7 @@ impl<B, S> NodeHandler<B, S>
                                    msg);
                             return;
                         }
-                        if !B::verify_tx(&tx) {
+                        if !tx.verify::<B>() {
                             error!("Incorrect transaction in block detected, block={:?}", msg);
                             return;
                         }
@@ -281,7 +281,8 @@ impl<B, S> NodeHandler<B, S>
         let has_consensus = self.state.add_prevote(&prevote);
 
         // Request propose or transactions
-        let has_propose_with_txs = self.request_propose_or_txs(prevote.propose_hash(), prevote.validator());
+        let has_propose_with_txs =
+            self.request_propose_or_txs(prevote.propose_hash(), prevote.validator());
 
         // Request prevotes
         if prevote.locked_round() > self.state.locked_round() {
@@ -325,7 +326,7 @@ impl<B, S> NodeHandler<B, S>
             if let Some(validator) = has_unknown_txs {
                 let data = RequestData::Transactions(*propose_hash);
                 let key = self.public_key_of(validator);
-                self.request(data, key);   
+                self.request(data, key);
                 return;
             }
 
@@ -441,9 +442,9 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn handle_tx(&mut self, msg: B::Transaction) {
+    pub fn handle_tx(&mut self, msg: AnyTx<B::Transaction>) {
         trace!("Handle transaction");
-        let hash = Message::hash(&msg);
+        let hash = msg.hash();
 
         // Make sure that it is new transaction
         if self.state.transactions().contains_key(&hash) {
@@ -455,7 +456,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-        if !B::verify_tx(&msg) {
+        if !msg.verify::<B>() {
             return;
         }
 
@@ -481,7 +482,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-        let full_proposes = self.state.add_transaction(hash, msg.clone());
+        let full_proposes = self.state.add_transaction(hash, AnyTx::Application(msg.clone()));
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));
@@ -656,7 +657,7 @@ impl<B, S> NodeHandler<B, S>
                         height: Height,
                         round: Round,
                         time: Timespec,
-                        txs: &[(Hash, B::Transaction)])
+                        txs: &[(Hash, AnyTx<B::Transaction>)])
                         -> (Hash, Vec<Hash>, Patch) {
         self.blockchain
             .create_patch(height, round, time, txs)

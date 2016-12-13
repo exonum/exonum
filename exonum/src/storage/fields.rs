@@ -4,7 +4,7 @@ use std::sync::Arc;
 use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{Hash, hash};
-use ::messages::{MessageBuffer, Message};
+use ::messages::{MessageBuffer, Message, AnyTx};
 
 pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;
@@ -111,23 +111,26 @@ impl<T> StorageValue for T
     }
 
     fn hash(&self) -> Hash {
-        self.hash()
+        <Self as Message>::hash(self)
     }
 }
 
-// impl StorageValue for TxMessage {
-//     fn serialize(self) -> Vec<u8> {
-//         self.raw().as_ref().as_ref().to_vec()
-//     }
+impl<AppTx> StorageValue for AnyTx<AppTx>
+    where AppTx: Message
+{
+    fn serialize(self) -> Vec<u8> {
+        self.raw().as_ref().as_ref().to_vec()
+    }
 
-//     fn deserialize(v: Vec<u8>) -> Self {
-//         TxMessage::from_raw(Arc::new(MessageBuffer::from_vec(v))).unwrap()
-//     }
+    fn deserialize(v: Vec<u8>) -> Self {
+        let raw = Arc::new(MessageBuffer::from_vec(v));
+        Self::from_raw(raw).unwrap()
+    }
 
-//     fn hash(&self) -> Hash {
-//         self.hash()
-//     }
-// }
+    fn hash(&self) -> Hash {
+        self.hash()
+    }
+}
 
 impl StorageValue for Vec<u8> {
     fn serialize(self) -> Vec<u8> {

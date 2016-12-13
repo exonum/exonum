@@ -7,6 +7,7 @@ use exonum::storage::Result as StorageResult;
 use exonum::crypto::{Hash, PublicKey};
 use exonum::blockchain::{Blockchain, View};
 use exonum::node::Configuration;
+use exonum::messages::AnyTx;
 
 use super::HexField;
 
@@ -52,7 +53,12 @@ impl<B: Blockchain> BlockchainExplorer<B> {
         where T: TransactionInfo + From<B::Transaction>
     {
         let tx = self.view.transactions().get(tx_hash)?;
-        Ok(tx.map(|tx| T::from(tx)))
+        Ok(tx.and_then(|tx| {
+            match tx {
+                AnyTx::Application(msg) => Some(T::from(msg)),
+                AnyTx::Service(_) => None,
+            }
+        }))
     }
 
     pub fn block_info<T>(&self,

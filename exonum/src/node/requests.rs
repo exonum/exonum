@@ -111,7 +111,7 @@ impl<B, S> NodeHandler<B, S>
             .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 
-        // FIXME what about msg.height < state.height ? 
+        // FIXME what about msg.height < state.height ?
         // self.blockchain
         //     .view()
         //     .precommits(msg.block_hash())

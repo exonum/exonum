@@ -11,23 +11,23 @@ use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
 use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
-use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull}; 
+use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
 
 pub use hex::{ToHex, FromHex, FromHexError};
 
 pub fn sign(m: &[u8], secret_key: &SecretKey) -> Signature {
     let sodium_signature = sign_detached(m, &secret_key.0);
-    Signature(sodium_signature) 
+    Signature(sodium_signature)
 }
 
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (sod_pub_key, sod_secr_key) = keypair_from_seed(&seed.0);
-    (PublicKey (sod_pub_key), SecretKey(sod_secr_key))
+    (PublicKey(sod_pub_key), SecretKey(sod_secr_key))
 }
 
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
     let (pubkey, secrkey) = gen_keypair_sodium();
-    (PublicKey (pubkey), SecretKey(secrkey))
+    (PublicKey(pubkey), SecretKey(secrkey))
 }
 
 pub fn verify(sig: &Signature, m: &[u8], pubkey: &PublicKey) -> bool {
@@ -36,7 +36,7 @@ pub fn verify(sig: &Signature, m: &[u8], pubkey: &PublicKey) -> bool {
 
 pub fn hash(m: &[u8]) -> Hash {
     let dig = hash_sodium(m);
-    Hash(dig) 
+    Hash(dig)
 }
 macro_rules! implement_public_sodium_wrapper {
     ($name:ident, $name_from:ident, $size:expr) => (
@@ -137,7 +137,7 @@ macro_rules! implement_serde {
     )
 }
 
-implement_serde! {Hash} 
+implement_serde! {Hash}
 implement_serde! {PublicKey}
 implement_serde! {SecretKey}
 implement_serde! {Seed}
@@ -192,7 +192,7 @@ implement_index_traits! {Signature}
 mod tests {
     use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature};
     use super::HexValue;
-    use serde_json; 
+    use serde_json;
     #[test]
     fn test_hash() {
         let h = hash(&[]);
@@ -211,43 +211,44 @@ mod tests {
 
     #[test]
     fn test_ser_deser() {
-        let h = Hash::new([207; 32]); 
-        let json_h = serde_json::to_string(&h).unwrap(); 
-        println!("{}", json_h );
-        let h1 = serde_json::from_str(&json_h).unwrap(); 
-        assert_eq!(h,h1);
+        let h = Hash::new([207; 32]);
+        let json_h = serde_json::to_string(&h).unwrap();
+        println!("{}", json_h);
+        let h1 = serde_json::from_str(&json_h).unwrap();
+        assert_eq!(h, h1);
 
-        let h = PublicKey::new([208; 32]); 
-        let json_h = serde_json::to_string(&h).unwrap(); 
-        println!("{}", json_h );
-        let h1 = serde_json::from_str(&json_h).unwrap(); 
-        assert_eq!(h,h1);
+        let h = PublicKey::new([208; 32]);
+        let json_h = serde_json::to_string(&h).unwrap();
+        println!("{}", json_h);
+        let h1 = serde_json::from_str(&json_h).unwrap();
+        assert_eq!(h, h1);
 
-        let h = Signature::new([209; 64]); 
-        let json_h = serde_json::to_string(&h).unwrap(); 
-        println!("{}", json_h );
-        let h1 = serde_json::from_str(&json_h).unwrap(); 
-        assert_eq!(h,h1);
+        let h = Signature::new([209; 64]);
+        let json_h = serde_json::to_string(&h).unwrap();
+        println!("{}", json_h);
+        let h1 = serde_json::from_str(&json_h).unwrap();
+        assert_eq!(h, h1);
 
-        let h = Seed::new([210; 32]); 
-        let json_h = serde_json::to_string(&h).unwrap(); 
-        println!("{}", json_h );
-        let h1 = serde_json::from_str(&json_h).unwrap(); 
-        assert_eq!(h,h1);
+        let h = Seed::new([210; 32]);
+        let json_h = serde_json::to_string(&h).unwrap();
+        println!("{}", json_h);
+        let h1 = serde_json::from_str(&json_h).unwrap();
+        assert_eq!(h, h1);
 
-        let h = SecretKey::new([211; 64]); 
-        let json_h = serde_json::to_string(&h).unwrap(); 
-        println!("{}", json_h );
-        let h1 = serde_json::from_str(&json_h).unwrap(); 
-        assert_eq!(h,h1);
+        let h = SecretKey::new([211; 64]);
+        let json_h = serde_json::to_string(&h).unwrap();
+        println!("{}", json_h);
+        let h1 = serde_json::from_str(&json_h).unwrap();
+        assert_eq!(h, h1);
     }
 
     #[test]
     fn test_range_sodium() {
-        let h = hash(&[]) ; 
-        println!(" {:?}", h );
-        let sub_range = &h[10..20]; 
+        let h = hash(&[]);
+        println!(" {:?}", h);
+        let sub_range = &h[10..20];
         println!("{:?}", sub_range);
-        assert_eq!(&[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228], sub_range );
+        assert_eq!(&[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228],
+                   sub_range);
     }
 }
