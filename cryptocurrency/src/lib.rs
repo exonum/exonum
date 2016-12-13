@@ -74,12 +74,7 @@ pub enum CurrencyTx {
 
 impl From<RawMessage> for CurrencyTx {
     fn from(raw: RawMessage) -> Self {
-        match raw.message_type() {
-            TX_TRANSFER_ID => CurrencyTx::Transfer(TxTransfer::from_raw(raw).unwrap()),
-            TX_ISSUE_ID => CurrencyTx::Issue(TxIssue::from_raw(raw).unwrap()),
-            TX_WALLET_ID => CurrencyTx::CreateWallet(TxCreateWallet::from_raw(raw).unwrap()),
-            _ => panic!("Undefined message type"),
-        }
+        CurrencyTx::from_raw(raw).unwrap()
     }
 }
 

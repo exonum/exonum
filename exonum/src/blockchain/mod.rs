@@ -15,7 +15,6 @@ use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{PublicKey, Hash, hash};
 use ::messages::{Any, Precommit, Message, ConfigMessage, ServiceTransaction, ConfigPropose, ConfigVote, TransactionMessage, RawMessage, AnyTx};
-
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
 pub use self::block::Block;
@@ -28,7 +27,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 {
     type View: View<<<Self as Blockchain>::Database as Database>::Fork, Transaction=Self::Transaction>;
     type Database: Database;
-    type Transaction: Message + StorageValue;    
+    type Transaction: Message + StorageValue;
 
     fn last_hash(&self) -> Result<Option<Hash>, Error> {
         self.view().heights().last()
@@ -64,7 +63,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Save & execute transactions
         let mut tx_hashes = Vec::new();
         for &(hash, ref tx) in txs {
-
+            
             match *tx {
                 AnyTx::Application(ref tx) => Self::execute(&fork, tx)?,
                 AnyTx::Service(ref tx) => Self::execute_service_tx(&fork, tx)?,
@@ -76,7 +75,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             fork.block_txs(height)
                 .append(hash)
                 .unwrap();
-            tx_hashes.push(hash);            
+            tx_hashes.push(hash);
         }
         // Get tx hash
         let tx_hash = fork.block_txs(height).root_hash()?;
@@ -94,18 +93,18 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         Ok((block_hash, tx_hashes, fork.changes()))
     }
 
-    fn execute_service_tx(&self, tx: ServiceTransaction){
+    fn execute_service_tx(&self, tx: ServiceTransaction) {
         match tx {
-             ServiceTransaction::ConfigChange(config_message) => {
-                 self.execute_config_change(config_message);
+            ServiceTransaction::ConfigChange(config_message) => {
+                self.execute_config_change(config_message);
             }            
         }
     }
 
-    fn execute_config_change(&self, config_message: ConfigMessage){
+    fn execute_config_change(&self, config_message: ConfigMessage) {
         match config_message {
             ConfigMessage::ConfigPropose(config_propose_tx) => {
-                self.handle_config_propose(config_propose_tx);                
+                self.handle_config_propose(config_propose_tx);
             }
             ConfigMessage::ConfigVote(config_vote_tx) => {
                 self.handle_config_vote(config_vote_tx);
@@ -122,34 +121,35 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         }
     }
 
-    fn get_actual_configuration (&self) -> Option<StoredConfiguration> {
+    fn get_actual_configuration(&self) -> Option<StoredConfiguration> {
 
         let h = self.get_height();
 
         let view = self.view();
-        
+
         let heights = view.configs_heights();
 
         if let Ok(height_values) = heights.values() {
 
-            if let Some(idx) = height_values.iter().rposition(|ref r| BigEndian::read_u64(r.as_ref()) <= h ){
+            if let Some(idx) = height_values.into_iter()
+                .rposition(|r| u64::from(r) <= h) {
                 if let Ok(Some(height)) = heights.get(idx as u64) {
                     return self.get_configuration_at_height(height.into());
                 }
-            }            
-        }                     
-            
-        None                        
+            }
+        }
+
+        None
     }
 
-    fn get_configuration_at_height (&self, height: u64) -> Option<StoredConfiguration> {
+    fn get_configuration_at_height(&self, height: u64) -> Option<StoredConfiguration> {
         let view = self.view();
         let configs = view.configs();
         if let Ok(config) = configs.get(&height.into()) {
             match StoredConfiguration::deserialize(&config.unwrap()) {
-                Ok(configuration) => {                    
+                Ok(configuration) => {
                     return Some(configuration);
-                },
+                }
                 Err(_) => {
                     error!("Can't parse found configuration at height: {}", height);
                 }
@@ -161,15 +161,17 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     fn handle_config_propose(&self, config_propose: ConfigPropose) {
 
         if let Some(config) = self.get_actual_configuration() {
-            if !config.validators.contains(config_propose.from()){
-                error!("ConfigPropose from unknown validator: {:?}", config_propose.from());
+            if !config.validators.contains(config_propose.from()) {
+                error!("ConfigPropose from unknown validator: {:?}",
+                       config_propose.from());
                 return;
             }
 
             let view = self.view();
             let hash = <ConfigPropose as Message>::hash(&config_propose);
             if view.config_proposes().get(&hash).unwrap().is_some() {
-                error!("Received config_propose has already been handled, msg={:?}", config_propose);
+                error!("Received config_propose has already been handled, msg={:?}",
+                       config_propose);
                 return;
             }
 
@@ -178,24 +180,27 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         }
     }
 
-    fn handle_config_vote(&self, config_vote: ConfigVote){
-    
+    fn handle_config_vote(&self, config_vote: ConfigVote) {
+
         if let Some(config) = self.get_actual_configuration() {
 
-            if !config.validators.contains(config_vote.from()){
-                error!("ConfigVote from unknown validator: {:?}", config_vote.from());
+            if !config.validators.contains(config_vote.from()) {
+                error!("ConfigVote from unknown validator: {:?}",
+                       config_vote.from());
                 return;
             }
 
             let view = self.view();
             if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_some() {
-                error!("Received config_vote for unknown transaciton, msg={:?}", config_vote);
+                error!("Received config_vote for unknown transaciton, msg={:?}",
+                       config_vote);
                 return;
             }
 
             if let Some(vote) = view.config_votes().get(config_vote.from()).unwrap() {
-                if vote.seed() != config_vote.seed() -1 {
-                    error!("Received config_vote with wrong seed, msg={:?}", config_vote);
+                if vote.seed() != config_vote.seed() - 1 {
+                    error!("Received config_vote with wrong seed, msg={:?}",
+                           config_vote);
                     return;
                 }
             }
@@ -212,8 +217,10 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 }
             }
 
-            if votes_count >= 2/3 * config.validators.len(){
-                if let Some(config_propose) = view.config_proposes().get(config_vote.hash_propose()).unwrap() {
+            if votes_count >= 2 / 3 * config.validators.len() {
+                if let Some(config_propose) = view.config_proposes()
+                    .get(config_vote.hash_propose())
+                    .unwrap() {
                     let height_bytecode = config_propose.actual_from_height().into();
                     view.configs().put(&height_bytecode, config_propose.config().to_vec()).unwrap();
                     view.configs_heights().append(height_bytecode).unwrap();
