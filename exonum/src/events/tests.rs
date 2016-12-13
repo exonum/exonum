@@ -305,7 +305,7 @@ fn reconnect() {
                 debug!("t2: received m1 from t1");
                 debug!("t2: wait for m3");
                 assert_eq!(e.wait_for_message(Duration::milliseconds(5000)),
-                               Some(m3.clone()));
+                           Some(m3.clone()));
                 debug!("t2: received m3 from t1");
             }
             debug!("t2: connection closed");

@@ -9,7 +9,7 @@ use std::ops::Deref;
 use time::Timespec;
 
 use ::crypto::{Hash, hash};
-use ::messages::{Precommit, Message};
+use ::messages::{Precommit, Message, AnyTx, ServiceTx};
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
 pub use self::block::Block;
@@ -37,13 +37,17 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     fn verify_tx(tx: &Self::Transaction) -> bool;
     fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
     fn execute(fork: &Self::View, tx: &Self::Transaction) -> Result<(), Error>;
+    // FIXME make private
+    fn execute_service_tx(_: &Self::View, _: &ServiceTx) -> Result<(), Error> {
+        unimplemented!();
+    }
 
     // TODO use Iterator to avoid memory allocations?
     fn create_patch(&self,
                     height: u64,
                     round: u32,
                     time: Timespec,
-                    txs: &[(Hash, Self::Transaction)])
+                    txs: &[(Hash, AnyTx<Self::Transaction>)])
                     -> Result<(Hash, Vec<Hash>, Patch), Error> {
         // Get last hash
         let last_hash = self.last_hash()?.unwrap_or_else(|| hash(&[]));
@@ -52,7 +56,11 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Save & execute transactions
         let mut tx_hashes = Vec::new();
         for &(hash, ref tx) in txs {
-            Self::execute(&fork, tx)?;
+            match *tx {
+                AnyTx::Application(ref tx) => Self::execute(&fork, tx)?,
+                AnyTx::Service(ref tx) => Self::execute_service_tx(&fork, tx)?,
+            }
+
             fork.transactions()
                 .put(&hash, tx.clone())
                 .unwrap();
