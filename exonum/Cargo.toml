@@ -19,7 +19,7 @@ serde_derive = "0.8"
 valico = "1"
 serde_json = "0.8"
 toml = {version="0.2", default-features=false, features=["serde"]}
-clippy = {version = "0.0.98", optional = true}
+clippy = {version = "0.0.103", optional = true}
 
 [dev-dependencies]
 tempdir = "0.3"
