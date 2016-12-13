@@ -7,9 +7,8 @@ use std::ops::Drop;
 
 use time::{Timespec, Duration};
 
-use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig,
-                   ConsensusCfg, GENESIS_TIME};
-use exonum::blockchain::Blockchain;
+use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig, GENESIS_TIME};
+use exonum::blockchain::{Blockchain, ConsensusCfg};
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
