@@ -22,3 +22,5 @@ serde = "0.8"
 serde_derive = "0.8"
 serde_json = "0.8"
 jsonway = "1.0"
+
+clippy = {version = "0.0.103", optional = true}

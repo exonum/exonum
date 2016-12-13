@@ -1,9 +1,5 @@
 use super::serde_json;
-use ::messages::{ConfigPropose, ConfigVote};
 use ::crypto::PublicKey;
-use ::storage::Map;
-use blockchain::view::HeightBytecode;
-use byteorder::{ByteOrder, LittleEndian};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StoredConfiguration {
@@ -36,17 +32,6 @@ impl StoredConfiguration {
         }
         Err("not valid")
     }
-
-    pub fn height_to_slice(height: u64) -> HeightBytecode {
-        let mut result = [0; 8];
-        LittleEndian::write_u64(&mut result[0..], height);
-        result
-    }
-
-    // RFU
-    // fn height_from_slice(slice: [u8; 8]) -> u64 {
-    //     LittleEndian::read_u64(&slice)
-    // }
 
     fn is_valid(&self) -> bool {
         self.consensus.round_timeout < 10000

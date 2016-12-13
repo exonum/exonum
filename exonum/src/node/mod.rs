@@ -27,7 +27,6 @@ mod adjusted_propose_timeout;
 pub mod config;
 
 pub use self::config::ListenerConfig;
-pub use self::configuration::ConsensusCfg;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 use self::adjusted_propose_timeout::*;
 
