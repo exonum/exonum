@@ -34,7 +34,7 @@ impl Wallet {
 
 #[test]
 fn test_wallet() {
-    let hash = Hash([2; 32]);
+    let hash = Hash::new([2; 32]); 
     let name = "foobar abacaba Юникод всяуи";
     let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
     let wallet = Wallet::new(&pub_key, name, -100500, &hash);
@@ -48,7 +48,7 @@ fn test_wallet() {
 
 #[test]
 fn test_amount_transfer() {
-    let hash = Hash([5; 32]);
+    let hash = Hash::new([5; 32]);
     let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
     let mut a = Wallet::new(&pub_key, "a", 100, &hash);
     let mut b = Wallet::new(&pub_key, "b", 0, &hash);
