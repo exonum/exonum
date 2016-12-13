@@ -537,6 +537,9 @@ impl<B, S> NodeHandler<B, S>
         if self.state.locked_propose().is_some() {
             return;
         }
+        if self.state.have_prevote(round) {
+            return;
+        }
 
         info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
