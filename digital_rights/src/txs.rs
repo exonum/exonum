@@ -94,6 +94,12 @@ pub enum DigitalRightsTx {
     Report(TxReport),
 }
 
+impl From<RawMessage> for DigitalRightsTx {
+    fn from(raw: RawMessage) -> Self {
+        DigitalRightsTx::from_raw(raw).unwrap()
+    }
+}
+
 impl Message for DigitalRightsTx {
     fn raw(&self) -> &RawMessage {
         match *self {
