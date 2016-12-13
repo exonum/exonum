@@ -15,6 +15,7 @@ use byteorder::{ByteOrder, BigEndian};
 
 use ::crypto::{PublicKey, Hash, hash};
 use ::messages::{Any, Precommit, Message, ConfigMessage, ServiceTransaction, ConfigPropose, ConfigVote, TransactionMessage, RawMessage, AnyTx};
+
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
 pub use self::block::Block;
@@ -27,7 +28,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 {
     type View: View<<<Self as Blockchain>::Database as Database>::Fork, Transaction=Self::Transaction>;
     type Database: Database;
-    type Transaction: Message + StorageValue;    
+    type Transaction: Message + StorageValue;
 
     fn last_hash(&self) -> Result<Option<Hash>, Error> {
         self.view().heights().last()
@@ -74,7 +75,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             fork.block_txs(height)
                 .append(hash)
                 .unwrap();
-            tx_hashes.push(hash);            
+            tx_hashes.push(hash);
         }
         // Get tx hash
         let tx_hash = fork.block_txs(height).root_hash()?;
@@ -145,7 +146,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         let configs = view.configs();
         if let Ok(config) = configs.get(&height.into()) {
             match StoredConfiguration::deserialize(&config.unwrap()) {
-                Ok(configuration) => {                    
+                Ok(configuration) => {
                     return Some(configuration);
                 }
                 Err(_) => {
@@ -215,8 +216,10 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 }
             }
 
-            if votes_count >= 2/3 * config.validators.len(){
-                if let Some(config_propose) = view.config_proposes().get(config_vote.hash_propose()).unwrap() {
+            if votes_count >= 2 / 3 * config.validators.len() {
+                if let Some(config_propose) = view.config_proposes()
+                    .get(config_vote.hash_propose())
+                    .unwrap() {
                     let height_bytecode = config_propose.actual_from_height().into();
                     view.configs().put(&height_bytecode, config_propose.config().to_vec()).unwrap();
                     view.configs_heights().append(height_bytecode).unwrap();
