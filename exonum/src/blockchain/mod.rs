@@ -19,9 +19,11 @@ use ::messages::{Any, Precommit, Message, ConfigMessage, ServiceTransaction, Con
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
 pub use self::block::Block;
-pub use self::view::{View, ConfigurationData, HeightBytecode};
-pub use self::view::ConfigurationData;
+pub use self::view::View;
+
 pub use self::config::{StoredConfiguration, ConsensusCfg};
+
+pub use self::view::ConfigurationData;
 
 pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     where Self: Deref<Target = <Self as Blockchain>::Database>

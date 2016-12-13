@@ -34,6 +34,10 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
+    pub fn handle_service_tx(& self, _: ServiceTransaction)
+    {
+    }
+
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
         info!("Connected to: {}", addr);
         let message = self.state.our_connect_message().clone();
