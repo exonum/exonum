@@ -13,15 +13,19 @@ use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConf
 use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
 
-mod state;
+pub mod state;//temporary solution to get access to WAIT consts
 mod basic;
 mod consensus;
 mod requests;
 mod configuration;
+mod adjusted_propose_timeout;
 pub mod config;
 
 pub use self::config::{ListenerConfig, ConsensusConfig};
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
+use self::adjusted_propose_timeout::*;
+
+type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
 
 pub const GENESIS_TIME: Timespec = Timespec {
     sec: 1451649600,
@@ -61,12 +65,13 @@ pub struct NodeHandler<B, S>
     pub channel: S,
     pub blockchain: B,
     pub round_timeout: i64,
-    pub propose_timeout: i64,
     pub status_timeout: i64,
     pub peers_timeout: i64,
     pub txs_block_limit: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
+
+    propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster<B>>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,11 +119,13 @@ impl<B, S> NodeHandler<B, S>
             channel: sender,
             blockchain: blockchain,
             round_timeout: config.consensus.round_timeout as i64,
-            propose_timeout: config.consensus.propose_timeout as i64,
             status_timeout: config.consensus.status_timeout as i64,
             peers_timeout: config.consensus.peers_timeout as i64,
             peer_discovery: config.peer_discovery,
             txs_block_limit: config.consensus.txs_block_limit,
+
+//            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster::default()),
+            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::ConstProposeTimeout{ propose_timeout: config.consensus.propose_timeout as i64, }),
         }
     }
 
@@ -196,9 +203,19 @@ impl<B, S> NodeHandler<B, S>
         self.channel.add_timeout(timeout, time);
     }
 
+    ///getter for adjusted_propose_timeout
+    pub fn adjusted_propose_timeout(&self) -> i64 {
+        self.propose_timeout_adjuster.adjusted_propose_timeout(&self.blockchain.view())
+    }
+
     pub fn add_propose_timeout(&mut self) {
+//        let time = self.round_start_time(self.state.round()) +
+//                   Duration::milliseconds(self.propose_timeout);
+        let adjusted_propose_timeout = self.adjusted_propose_timeout();//cache adjusted_propose_timeout because this value will be used 2 times
         let time = self.round_start_time(self.state.round()) +
-                   Duration::milliseconds(self.propose_timeout);
+                   Duration::milliseconds(adjusted_propose_timeout);
+        self.propose_timeout_adjuster.update_last_propose_timeout(adjusted_propose_timeout);
+
         trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
                self.state.height(),
@@ -243,7 +260,7 @@ impl<B, S> NodeHandler<B, S>
         let propose = self.last_block_time();
         debug_assert!(now >= propose);
 
-        let duration = (now - propose - Duration::milliseconds(self.propose_timeout))
+        let duration = (now - propose - Duration::milliseconds(self.adjusted_propose_timeout()))
             .num_milliseconds();
         if duration > 0 {
             let round = (duration / self.round_timeout) as Round + 1;

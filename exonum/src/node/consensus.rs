@@ -83,7 +83,7 @@ impl<B, S> NodeHandler<B, S>
         // check time of the propose
         let round = msg.round();
         let start_time = self.round_start_time(round) +
-                         Duration::milliseconds(self.propose_timeout);
+                         Duration::milliseconds(self.adjusted_propose_timeout());
         let end_time = start_time + Duration::milliseconds(self.round_timeout);
         if msg.time() < start_time || msg.time() > end_time {
             error!("Received propose with wrong time, msg={:?}", msg);
@@ -171,7 +171,7 @@ impl<B, S> NodeHandler<B, S>
         // Verify propose time
         let propose_round = block.propose_round();
         let start_time = self.round_start_time(propose_round) +
-                         Duration::milliseconds(self.propose_timeout);
+                         Duration::milliseconds(self.adjusted_propose_timeout());
         let end_time = start_time + Duration::milliseconds(self.round_timeout);
         if msg.time() < start_time || block.time() > end_time {
             error!("Received block with wrong propose time, block={:?}", msg);
@@ -297,12 +297,12 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn has_majority_prevotes(&mut self, round: Round, propose_hash: &Hash) {
+    pub fn has_majority_prevotes(&mut self, prevote_round: Round, propose_hash: &Hash) {
         // Remove request info
-        self.remove_request(RequestData::Prevotes(round, *propose_hash));
+        self.remove_request(RequestData::Prevotes(prevote_round, *propose_hash));
         // Lock to propose
-        if self.state.locked_round() < round && self.state.propose(propose_hash).is_some() {
-            self.lock(round, *propose_hash);
+        if self.state.locked_round() < prevote_round && self.state.propose(propose_hash).is_some() {
+            self.lock(prevote_round, *propose_hash);
         }
     }
 
@@ -348,9 +348,9 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn lock(&mut self, round: Round, propose_hash: Hash) {
-        trace!("MAKE LOCK {:?} {:?}", round, propose_hash);
-        for round in round...self.state.round() {
+    pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
+        trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
+        for round in prevote_round...self.state.round() {
             // Send prevotes
             if !self.state.have_prevote(round) {
                 self.broadcast_prevote(round, &propose_hash);
