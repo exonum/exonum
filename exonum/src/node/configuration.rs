@@ -12,16 +12,16 @@ use byteorder::{ByteOrder, LittleEndian};
 pub struct Configuration {
     actual_from: u64,
     validators: Vec<PublicKey>,
-    consensus: ConsensusCfg
+    consensus: ConsensusCfg,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConsensusCfg {
-    round_timeout: u64,    // 2000
-    status_timeout: u64,   // 5000
-    peers_timeout: u64,    // 10000
-    propose_timeout: u64,  // 500
-    txs_block_limit: u16   // 500
+    round_timeout: u64, // 2000
+    status_timeout: u64, // 5000
+    peers_timeout: u64, // 10000
+    propose_timeout: u64, // 500
+    txs_block_limit: u16, // 500
 }
 
 trait ConfigurationValidator {
@@ -35,7 +35,6 @@ impl ConfigurationValidator for ConsensusCfg {
 }
 
 impl Configuration {
-
     #[allow(dead_code)]
     fn serialize(&self) -> Vec<u8> {
         serde_json::to_vec(&self).unwrap()
@@ -64,8 +63,10 @@ impl<B, S> NodeHandler<B, S>
 {
     pub fn handle_config_propose(&self, config_propose: ConfigPropose) {
 
-        if config_propose.height() < self.state.height() || config_propose.height() > self.state.height() + 1 {
-            warn!("Received ConfigPropose message from other height: msg.height={}, self.height={}",
+        if config_propose.height() < self.state.height() ||
+           config_propose.height() > self.state.height() + 1 {
+            warn!("Received ConfigPropose message from other height: msg.height={}, \
+                   self.height={}",
                   config_propose.height(),
                   self.state.height());
             return;
@@ -73,18 +74,21 @@ impl<B, S> NodeHandler<B, S>
 
         if config_propose.actual_from_height() < self.state.height() {
             error!("Received config for past height: msg.actual_from_height={}, self.height={}",
-                config_propose.actual_from_height(), self.state.height());
+                   config_propose.actual_from_height(),
+                   self.state.height());
             return;
         }
 
-        if !self.state.validators().contains(config_propose.from()){
-            error!("ConfigPropose from unknown validator: {:?}", config_propose.from());
+        if !self.state.validators().contains(config_propose.from()) {
+            error!("ConfigPropose from unknown validator: {:?}",
+                   config_propose.from());
             return;
         }
 
         let view = self.blockchain.view();
         if view.config_proposes().get(&config_propose.hash()).unwrap().is_some() {
-            error!("Received config_propose has already been handled, msg={:?}", config_propose);
+            error!("Received config_propose has already been handled, msg={:?}",
+                   config_propose);
             return;
         }
 
@@ -93,29 +97,33 @@ impl<B, S> NodeHandler<B, S>
 
     }
 
-    pub fn handle_config_vote(&self, config_vote: ConfigVote){
+    pub fn handle_config_vote(&self, config_vote: ConfigVote) {
 
-        if config_vote.height() < self.state.height() || config_vote.height() > self.state.height() + 1 {
+        if config_vote.height() < self.state.height() ||
+           config_vote.height() > self.state.height() + 1 {
             warn!("Received ConfigVote message from other height: msg.height={}, self.height={}",
                   config_vote.height(),
                   self.state.height());
             return;
         }
 
-        if !self.state.validators().contains(config_vote.from()){
-            error!("ConfigVote from unknown validator: {:?}", config_vote.from());
+        if !self.state.validators().contains(config_vote.from()) {
+            error!("ConfigVote from unknown validator: {:?}",
+                   config_vote.from());
             return;
         }
 
         let view = self.blockchain.view();
         if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_some() {
-            error!("Received config_vote for unknown transaciton, msg={:?}", config_vote);
+            error!("Received config_vote for unknown transaciton, msg={:?}",
+                   config_vote);
             return;
         }
 
         if let Some(vote) = view.config_votes().get(config_vote.from()).unwrap() {
-            if vote.seed() != config_vote.seed() -1 {
-                error!("Received config_vote with wrong seed, msg={:?}", config_vote);
+            if vote.seed() != config_vote.seed() - 1 {
+                error!("Received config_vote with wrong seed, msg={:?}",
+                       config_vote);
                 return;
             }
         }
@@ -124,7 +132,7 @@ impl<B, S> NodeHandler<B, S>
         let _ = view.config_votes().put(msg.from(), config_vote.clone());
 
         let mut votes_count = 0;
-        for pub_key in self.state.validators(){
+        for pub_key in self.state.validators() {
             if let Some(vote) = view.config_votes().get(pub_key).unwrap() {
                 if !vote.revoke() {
                     votes_count += 1;
@@ -132,15 +140,20 @@ impl<B, S> NodeHandler<B, S>
             }
         }
 
-        if votes_count >= 2/3 * self.state.validators().len(){
-            if let Some(config_propose) = view.config_proposes().get(config_vote.hash_propose()).unwrap() {
-                view.configs().put(&Hash::new(self.height_to_slice(config_propose.actual_from_height())), config_propose.config().to_vec()).unwrap();
+        if votes_count >= 2 / 3 * self.state.validators().len() {
+            if let Some(config_propose) = view.config_proposes()
+                .get(config_vote.hash_propose())
+                .unwrap() {
+                view.configs()
+                    .put(&Hash::new(self.height_to_slice(config_propose.actual_from_height())),
+                         config_propose.config().to_vec())
+                    .unwrap();
                 // TODO: clear storages
             }
         }
     }
 
-    fn height_to_slice(&self, height: u64) -> [u8;32] {
+    fn height_to_slice(&self, height: u64) -> [u8; 32] {
         let mut result = [0; 32];
         LittleEndian::write_u64(&mut result[24..], height);
         result
@@ -150,11 +163,11 @@ impl<B, S> NodeHandler<B, S>
 #[cfg(test)]
 mod tests {
 
-    use super::super::super::crypto::{gen_keypair};
+    use super::super::super::crypto::gen_keypair;
     use super::{Configuration, ConsensusCfg, ConfigurationValidator};
 
     #[test]
-    fn validate_configuration(){
+    fn validate_configuration() {
         // Arrange
 
         let (p1, _) = gen_keypair();
@@ -169,8 +182,8 @@ mod tests {
                 status_timeout: 5000,
                 peers_timeout: 10000,
                 propose_timeout: 500,
-                txs_block_limit: 500
-            }
+                txs_block_limit: 500,
+            },
         };
 
         // Assert

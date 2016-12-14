@@ -13,7 +13,8 @@ mod protocol;
 use time::Timespec;
 use bit_vec;
 
-use super::crypto::{PublicKey, Hash};
+use ::crypto::{PublicKey, Hash};
+use ::blockchain::Blockchain;
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::Error;
@@ -26,28 +27,28 @@ pub type BitVec = bit_vec::BitVec;
 // TODO: use macro for implementing enums
 
 #[derive(Clone, PartialEq)]
-pub enum Any<Tx: Message> {
+pub enum Any<AppTx: Message> {
     Connect(Connect),
     Status(Status),
     Block(Block),
     Consensus(ConsensusMessage),
     Request(RequestMessage),
-    Transaction(TransactionMessage<Tx>)
+    Transaction(AnyTx<AppTx>),
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum TransactionMessage<Tx: Message> {
-   Service(ServiceTransaction),
-   Application(Tx),
+pub enum AnyTx<AppTx: Message> {
+    Service(ServiceTx),
+    Application(AppTx),
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum ServiceTransaction{
-    ConfigChange(ConfigMessage)
+pub enum ServiceTx {
+    ConfigChange(ConfigMessage),
 }
 
 #[derive(Clone, PartialEq)]
-pub enum ConfigMessage{
+pub enum ConfigMessage {
     ConfigPropose(ConfigPropose),
     ConfigVote(ConfigVote),
 }
@@ -68,59 +69,6 @@ pub enum RequestMessage {
     Peers(RequestPeers),
     Block(RequestBlock),
 }
-
-// #[derive(Clone, PartialEq)]
-// pub enum TxMessage {
-//     Issue(TxIssue),
-//     Transfer(TxTransfer),
-//     VoteValidator(TxVoteValidator),
-//     VoteConfig(TxVoteConfig),
-// }
-
-// impl TxMessage {
-//     pub fn hash(&self) -> Hash {
-//         match *self {
-//             TxMessage::Issue(ref msg) => msg.hash(),
-//             TxMessage::Transfer(ref msg) => msg.hash(),
-//             TxMessage::VoteValidator(ref msg) => msg.hash(),
-//             TxMessage::VoteConfig(ref msg) => msg.hash()
-//         }
-//     }
-
-//     pub fn raw(&self) -> &RawMessage {
-//         match *self {
-//             TxMessage::Issue(ref msg) => msg.raw(),
-//             TxMessage::Transfer(ref msg) => msg.raw(),
-//             TxMessage::VoteValidator(ref msg) => msg.raw(),
-//             TxMessage::VoteConfig(ref msg) => msg.raw()
-//         }
-//     }
-
-//     pub fn from_raw(raw: RawMessage) -> Result<TxMessage, Error> {
-//         // TODO: check input message size
-//         Ok(match raw.message_type() {
-//             TxIssue::MESSAGE_TYPE => TxMessage::Issue(TxIssue::from_raw(raw)?),
-//             TxTransfer::MESSAGE_TYPE => TxMessage::Transfer(TxTransfer::from_raw(raw)?),
-//             TxVoteValidator::MESSAGE_TYPE => TxMessage::VoteValidator(TxVoteValidator::from_raw(raw)?),
-//             TxVoteConfig::MESSAGE_TYPE => TxMessage::VoteConfig(TxVoteConfig::from_raw(raw)?),
-//             _ => {
-//                 // TODO: use result here
-//                 panic!("unrecognized message type");
-//             }
-//         })
-//     }
-// }
-
-// impl fmt::Debug for TxMessage {
-//     fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-//         match *self {
-//             TxMessage::Issue(ref msg) => write!(fmt, "{:?}", msg),
-//             TxMessage::Transfer(ref msg) => write!(fmt, "{:?}", msg),
-//             TxMessage::VoteValidator(ref msg) => write!(fmt, "{:?}", msg),
-//             TxMessage::VoteConfig(ref msg) => write!(fmt, "{:?}", msg)
-//         }
-//     }
-// }
 
 impl RequestMessage {
     pub fn from(&self) -> &PublicKey {
@@ -192,12 +140,11 @@ impl fmt::Debug for RequestMessage {
     }
 }
 
-impl ConfigMessage{
-
+impl ConfigMessage {
     pub fn from(&self) -> &PublicKey {
         match *self {
             ConfigMessage::ConfigPropose(ref msg) => msg.from(),
-            ConfigMessage::ConfigVote(ref msg) => msg.from()
+            ConfigMessage::ConfigVote(ref msg) => msg.from(),
         }
     }
 
@@ -211,12 +158,11 @@ impl ConfigMessage{
     pub fn raw(&self) -> &RawMessage {
         match *self {
             ConfigMessage::ConfigPropose(ref msg) => msg.raw(),
-            ConfigMessage::ConfigVote(ref msg) => msg.raw()
+            ConfigMessage::ConfigVote(ref msg) => msg.raw(),
         }
-
     }
 
-    pub fn veify(&self, public_key: &PublicKey) -> bool {
+    pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
             ConfigMessage::ConfigPropose(ref msg) => msg.verify(public_key),
             ConfigMessage::ConfigVote(ref msg) => msg.verify(public_key),
@@ -229,8 +175,6 @@ impl ConfigMessage{
             ConfigMessage::ConfigVote(ref msg) => msg.hash(),
         }
     }
-
-
 }
 
 impl fmt::Debug for ConfigMessage {
@@ -330,26 +274,71 @@ impl<Tx: Message> Any<Tx> {
             REQUEST_BLOCK_MESSAGE_ID => {
                 Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
             }
+            _ => Any::Transaction(AnyTx::from_raw(raw)?),
+        })
+    }
+}
+
+impl ServiceTx {
+    pub fn from(&self) -> &PublicKey {
+        match *self {
+            ServiceTx::ConfigChange(ref msg) => msg.from(),
+        }
+    }
+
+    pub fn verify(&self) -> bool {
+        match *self {
+            ServiceTx::ConfigChange(ref msg) => msg.verify(msg.from()),
+        }
+    }
+
+    pub fn raw(&self) -> &RawMessage {
+        match *self {
+            ServiceTx::ConfigChange(ref msg) => msg.raw(),
+        }
+    }
+}
+
+impl<AppTx: Message> AnyTx<AppTx> {
+    pub fn verify<B>(&self) -> bool
+        where B: Blockchain<Transaction = AppTx>
+    {
+        match *self {
+            AnyTx::Application(ref msg) => B::verify_tx(msg),
+            AnyTx::Service(ref msg) => msg.verify(),
+        }
+    }
+
+    pub fn raw(&self) -> &RawMessage {
+        match *self {
+            AnyTx::Application(ref msg) => msg.raw(),
+            AnyTx::Service(ref msg) => msg.raw(),
+        }
+    }
+
+    pub fn from_raw(raw: RawMessage) -> Result<AnyTx<AppTx>, Error> {
+        // TODO: check input message size
+        Ok(match raw.message_type() {
             CONFIG_PROPOSE_MESSAGE_ID => {
-                Any::Transaction(
-                    TransactionMessage::Service(
-                        ServiceTransaction::ConfigChange(
+                    AnyTx::Service(
+                        ServiceTx::ConfigChange(
                             ConfigMessage::ConfigPropose(ConfigPropose::from_raw(raw)?)
                         )
                     )
-                )
             }
             CONFIG_VOTE_MESSAGE_ID => {
-                Any::Transaction(
-                    TransactionMessage::Service(
-                        ServiceTransaction::ConfigChange(
+                    AnyTx::Service(
+                        ServiceTx::ConfigChange(
                             ConfigMessage::ConfigVote(ConfigVote::from_raw(raw)?)
                         )
                     )
-                )
             }
-            _ => Any::Transaction(TransactionMessage::Application(Tx::from_raw(raw)?)),
+            _ => AnyTx::Application(AppTx::from_raw(raw)?),
         })
+    }
+
+    pub fn hash(&self) -> Hash {
+        self.raw().hash()
     }
 }
 

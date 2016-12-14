@@ -86,7 +86,8 @@ impl MessageWriter {
         while let Some(message) = self.queue.front().cloned() {
             let buf = message.as_ref().as_ref();
             if buf.len() > MAX_MESSAGE_LEN {
-                error!("Attempted to send too long message. len={}kb", buf.len() / 1024);
+                error!("Attempted to send too long message. len={}kb",
+                       buf.len() / 1024);
             }
             match socket.try_write(&buf[self.position..])? {
                 None | Some(0) => {

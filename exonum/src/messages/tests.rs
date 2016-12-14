@@ -10,7 +10,7 @@ use super::{Field, RawMessage, Message, Connect, Propose, Prevote, Precommit, St
 #[test]
 fn test_bitvec() {
     // TODO Think about BitVec len
-    // now if the size of the BitVec is not a multiple of eight 
+    // now if the size of the BitVec is not a multiple of eight
     // then trailing bits will be filled-in with false.
 
     let mut b = BitVec::from_elem(14, false);
@@ -18,7 +18,7 @@ fn test_bitvec() {
     b.set(4, true);
     b.push(true);
     b.push(true);
-    
+
     let mut buf = vec![0; 8];
     Field::write(&b, &mut buf, 0, 8);
     <BitVec as Field>::check(&buf, 0, 8).unwrap();

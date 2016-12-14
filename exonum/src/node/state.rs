@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use time::Duration;
 
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
-                             BitVec};
+                             BitVec, AnyTx};
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
 
@@ -26,7 +26,9 @@ pub type ValidatorId = u32;
 
 // TODO: reduce copying of Hash
 
-pub struct State<Tx> {
+pub struct State<AppTx>
+    where AppTx: Message
+{
     id: u32,
     peers: HashMap<PublicKey, Connect>,
     validators: Vec<PublicKey>,
@@ -44,7 +46,7 @@ pub struct State<Tx> {
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
     // TODO replace by TxPool
-    transactions: HashMap<Hash, Tx>,
+    transactions: HashMap<Hash, AnyTx<AppTx>>,
 
     queued: Vec<ConsensusMessage>,
 
@@ -248,13 +250,15 @@ impl BlockState {
     }
 }
 
-impl<Tx> State<Tx> {
+impl<AppTx> State<AppTx>
+    where AppTx: Message
+{
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
                connect: Connect,
                last_hash: Hash,
                last_height: u64)
-               -> State<Tx> {
+               -> State<AppTx> {
         let validators_len = validators.len();
 
         State {
@@ -429,11 +433,11 @@ impl<Tx> State<Tx> {
         self.queued.push(msg);
     }
 
-    pub fn transactions(&self) -> &HashMap<Hash, Tx> {
+    pub fn transactions(&self) -> &HashMap<Hash, AnyTx<AppTx>> {
         &self.transactions
     }
 
-    pub fn add_transaction(&mut self, tx_hash: Hash, msg: Tx) -> Vec<(Hash, Round)> {
+    pub fn add_transaction(&mut self, tx_hash: Hash, msg: AnyTx<AppTx>) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
             propose_state.unknown_txs.remove(&tx_hash);
@@ -443,7 +447,8 @@ impl<Tx> State<Tx> {
         }
         self.transactions.insert(tx_hash, msg);
         if self.transactions.len() >= TX_POOL_LIMIT {
-            panic!("Too many transactions in pool, txs={}", self.transactions.len());
+            panic!("Too many transactions in pool, txs={}",
+                   self.transactions.len());
         }
         full_proposes
     }
@@ -548,14 +553,16 @@ impl<Tx> State<Tx> {
 
     pub fn known_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
         let len = self.validators.len();
-        self.prevotes.get(&(round, *propose_hash))
+        self.prevotes
+            .get(&(round, *propose_hash))
             .map(|x| x.validators().clone())
             .unwrap_or_else(|| BitVec::from_elem(len, false))
     }
 
     pub fn known_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
         let len = self.validators.len();
-        self.precommits.get(&(round, *propose_hash))
+        self.precommits
+            .get(&(round, *propose_hash))
             .map(|x| x.validators().clone())
             .unwrap_or_else(|| BitVec::from_elem(len, false))
     }
