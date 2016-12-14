@@ -13,20 +13,17 @@ use super::crypto::{PublicKey, SecretKey, Hash, hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
                     EventsConfiguration, Channel, EventHandler, Result as EventsResult,
                     Error as EventsError};
-use super::blockchain::Blockchain;
-
+use super::blockchain::{Blockchain, GenesisConfig};
 use super::messages::{Connect, RawMessage};
 
 pub mod state;//temporary solution to get access to WAIT consts
-use blockchain::{ConsensusCfg, StoredConfiguration};
+use blockchain::{ConsensusConfig, StoredConfiguration};
 
 mod basic;
 mod consensus;
 mod requests;
 mod adjusted_propose_timeout;
-pub mod config;
 
-pub use self::config::ListenerConfig;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 use self::adjusted_propose_timeout::*;
 
@@ -74,12 +71,19 @@ pub struct NodeHandler<B, S>
     propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster<B>>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ListenerConfig {
+    pub public_key: PublicKey,
+    pub secret_key: SecretKey,
+    pub address: SocketAddr,
+}
+
 #[derive(Debug, Clone)]
 pub struct Configuration {
     pub listener: ListenerConfig,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
-    pub consensus: ConsensusCfg,
+    pub consensus: ConsensusConfig,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
 }
@@ -89,6 +93,16 @@ impl Configuration {
         self.validators = actual_config.validators;
         self.consensus = actual_config.consensus;
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NodeConfig {
+    pub genesis: GenesisConfig,
+    pub listen_address: SocketAddr,
+    pub network: NetworkConfiguration,
+    pub peers: Vec<SocketAddr>,
+    pub public_key: PublicKey,
+    pub secret_key: SecretKey,
 }
 
 impl<B, S> NodeHandler<B, S>
@@ -125,7 +139,7 @@ impl<B, S> NodeHandler<B, S>
                                connect,
                                last_hash,
                                last_height,
-                               ConsensusCfg {
+                               ConsensusConfig {
                                    round_timeout: config.consensus.round_timeout as i64,
                                    propose_timeout: config.consensus.propose_timeout as i64,
                                    status_timeout: config.consensus.status_timeout as i64,
@@ -383,10 +397,25 @@ pub struct Node<B>
 impl<B> Node<B>
     where B: Blockchain
 {
-    pub fn new(blockchain: B, mut config: Configuration) -> Node<B> {
-        let network = Network::with_config(config.listener.address, config.network);
+    pub fn new(blockchain: B, node_cfg: NodeConfig) -> Node<B> {
+        // FIXME temporary solution
+        let config = Configuration {
+            listener: ListenerConfig {
+                public_key: node_cfg.public_key,
+                secret_key: node_cfg.secret_key,
+                address: node_cfg.listen_address,
+            },
+            network: node_cfg.network,
+            events: EventsConfiguration::default(),
+            consensus: node_cfg.genesis.consensus.clone(),
+            peer_discovery: node_cfg.peers,
+            validators: node_cfg.genesis.validators.clone(),
+        };
+        blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
+
+        let network = Network::with_config(node_cfg.listen_address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
-        let channel = MioChannel::new(config.listener.address, event_loop.channel());
+        let channel = MioChannel::new(node_cfg.listen_address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);
         Node { reactor: Events::with_event_loop(network, worker, event_loop) }
     }

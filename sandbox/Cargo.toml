@@ -7,6 +7,7 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re>"]
 exonum = {version="0.1", path="../exonum"}
 timestamping = {version="0.1", path="../timestamping"}
 cryptocurrency = {version="0.1", path="../cryptocurrency"}
+blockchain_explorer = {version="0.1", path="../blockchain_explorer"}
 
 log = "0.3"
 env_logger = "0.3"

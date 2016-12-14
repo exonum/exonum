@@ -12,3 +12,6 @@ serde = "0.8"
 serde_derive = "0.8"
 rustless = "0.9"
 valico = "1.0"
+
+clap = "2.14"
+env_logger = "0.3"
