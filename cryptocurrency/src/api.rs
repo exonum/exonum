@@ -2,8 +2,7 @@ use serde::{Serialize, Serializer};
 
 use exonum::crypto::{HexValue, PublicKey};
 use exonum::storage::{Database, Result as StorageResult};
-use exonum::blockchain::Blockchain;
-use exonum::node::Configuration;
+use exonum::blockchain::{Blockchain, GenesisConfig};
 use blockchain_explorer::{BlockchainExplorer, TransactionInfo};
 
 use super::{CurrencyTx, CurrencyBlockchain};
@@ -67,11 +66,11 @@ impl Serialize for WalletInfo {
 
 pub struct CurrencyApi<D: Database> {
     blockchain: CurrencyBlockchain<D>,
-    cfg: Configuration,
+    cfg: GenesisConfig,
 }
 
 impl<D: Database> CurrencyApi<D> {
-    pub fn new(b: CurrencyBlockchain<D>, cfg: Configuration) -> CurrencyApi<D> {
+    pub fn new(b: CurrencyBlockchain<D>, cfg: GenesisConfig) -> CurrencyApi<D> {
         CurrencyApi {
             blockchain: b,
             cfg: cfg,

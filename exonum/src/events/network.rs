@@ -3,6 +3,7 @@ use std::io;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::cmp::min;
+use std::default::Default;
 
 pub use mio::{EventSet, PollOpt, Token};
 use mio::Timeout as MioTimeout;
@@ -28,6 +29,19 @@ pub struct NetworkConfiguration {
     pub tcp_keep_alive: Option<u32>,
     pub tcp_reconnect_timeout: u64,
     pub tcp_reconnect_timeout_max: u64,
+}
+
+impl Default for NetworkConfiguration {
+    fn default() -> NetworkConfiguration {
+        NetworkConfiguration {
+            max_incoming_connections: 128,
+            max_outgoing_connections: 128,
+            tcp_keep_alive: None,
+            tcp_nodelay: false,
+            tcp_reconnect_timeout: 500,
+            tcp_reconnect_timeout_max: 600000,
+        }
+    }
 }
 
 // TODO Implement generic ConnectionPool struct to avoid copy paste.

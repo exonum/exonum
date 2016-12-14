@@ -7,9 +7,10 @@ use std::ops::Drop;
 
 use time::{Timespec, Duration};
 
-use exonum::storage::{MemoryDB, Error};
-use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig, GENESIS_TIME};
-use exonum::blockchain::{Blockchain, Block, ConsensusCfg};
+use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig,
+                   GENESIS_TIME};
+use exonum::blockchain::{Blockchain, ConsensusConfig};
+use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      Channel, EventHandler, Result as EventsResult};
@@ -78,7 +79,7 @@ impl<B> Channel for SandboxChannel<B>
         self.inner.lock().unwrap().time
     }
 
-    fn post_event(&self, event: Self::ApplicationEvent) -> EventsResult<()>  {
+    fn post_event(&self, event: Self::ApplicationEvent) -> EventsResult<()> {
         let msg = InternalEvent::Application(event);
         self.send_event(msg);
         Ok(())
@@ -418,21 +419,12 @@ pub fn timestamping_sandbox
     ()
     -> Sandbox<TimestampingBlockchain<MemoryDB>, TimestampingTxGenerator>
 {
-    extern crate env_logger;
-    let _ = env_logger::init().unwrap_or(());
-    let validators = vec![
-        gen_keypair(),
-        gen_keypair(),
-        gen_keypair(),
-        gen_keypair(),
-    ];
+    let validators = vec![gen_keypair(), gen_keypair(), gen_keypair(), gen_keypair()];
 
-    let addresses = vec![
-        "1.1.1.1:1".parse().unwrap(),
-        "2.2.2.2:2".parse().unwrap(),
-        "3.3.3.3:3".parse().unwrap(),
-        "4.4.4.4:4".parse().unwrap(),
-    ]: Vec<SocketAddr>;
+    let addresses = vec!["1.1.1.1:1".parse().unwrap(),
+                         "2.2.2.2:2".parse().unwrap(),
+                         "3.3.3.3:3".parse().unwrap(),
+                         "4.4.4.4:4".parse().unwrap()]: Vec<SocketAddr>;
 
     let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
 
@@ -442,7 +434,7 @@ pub fn timestamping_sandbox
             public_key: validators[0].0.clone(),
             secret_key: validators[0].1.clone(),
         },
-        consensus: ConsensusCfg {
+        consensus: ConsensusConfig {
             round_timeout: 1000,
             status_timeout: 50000,
             peers_timeout: 50000,

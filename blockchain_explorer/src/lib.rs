@@ -2,6 +2,7 @@
 #![feature(proc_macro)]
 
 mod explorer;
+pub mod helpers;
 
 extern crate time;
 extern crate serde;
@@ -10,6 +11,7 @@ extern crate serde_derive;
 extern crate exonum;
 extern crate rustless;
 extern crate valico;
+extern crate clap;
 
 use std::ops::Deref;
 use std::marker::PhantomData;
@@ -25,8 +27,7 @@ use valico::json_dsl;
 
 use exonum::crypto::{Hash, HexValue, ToHex};
 use exonum::storage::Error as StorageError;
-use exonum::blockchain::Blockchain;
-use exonum::node::Configuration;
+use exonum::blockchain::{Blockchain, GenesisConfig};
 
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
 
@@ -103,7 +104,7 @@ impl<T> Deserialize for HexField<T>
     }
 }
 
-pub fn make_api<B, T>(api: &mut Api, b: B, cfg: Configuration)
+pub fn make_api<B, T>(api: &mut Api, b: B, cfg: GenesisConfig)
     where B: Blockchain,
           T: TransactionInfo + From<B::Transaction>
 {

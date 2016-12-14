@@ -20,12 +20,11 @@ extern crate blockchain_explorer;
 extern crate cryptocurrency;
 
 use std::net::SocketAddr;
-use std::path::Path;
 use std::thread;
 use std::default::Default;
 use std::env;
 
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App};
 use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning, Response};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
@@ -38,16 +37,16 @@ use log::{LogRecord, LogLevel};
 use env_logger::LogBuilder;
 use colored::*;
 
-use exonum::node::{Node, Configuration, TxSender, NodeChannel};
-use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
+use exonum::blockchain::GenesisConfig;
+use exonum::node::{Node, NodeConfig, TxSender, NodeChannel};
+use exonum::storage::Database;
 use exonum::storage::{Result as StorageResult, Error as StorageError};
 use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, FromHexError};
 use exonum::messages::Message;
-use exonum::config::ConfigFile;
-use exonum::node::config::GenesisConfig;
 use exonum::events::Error as EventsError;
 
 use blockchain_explorer::ValueNotFound;
+use blockchain_explorer::helpers::{GenerateCommand, RunCommand, DatabaseType};
 
 use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer, TxCreateWallet};
 use cryptocurrency::api::CurrencyApi;
@@ -86,14 +85,14 @@ fn load_keypair_from_cookies(storage: &CookieJar) -> StorageResult<(PublicKey, S
 
 fn blockchain_explorer_api<D: Database>(api: &mut Api,
                                         b: CurrencyBlockchain<D>,
-                                        cfg: Configuration) {
+                                        cfg: GenesisConfig) {
     blockchain_explorer::make_api::<CurrencyBlockchain<D>, CurrencyTx>(api, b, cfg);
 }
 
 fn cryptocurrency_api<D: Database>(api: &mut Api,
                                    blockchain: CurrencyBlockchain<D>,
                                    channel: CurrencyTxSender<CurrencyBlockchain<D>>,
-                                   cfg: Configuration) {
+                                   cfg: GenesisConfig) {
     api.namespace("wallets", move |api| {
         let ch = channel.clone();
         api.post("create", move |endpoint| {
@@ -118,7 +117,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
                         client.json(json)
                     }
-                    Err(e) => client.error(e)
+                    Err(e) => client.error(e),
                 }
             })
         });
@@ -151,7 +150,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
                         client.json(json)
                     }
-                    Err(e) => client.error(e)
+                    Err(e) => client.error(e),
                 }
             })
         });
@@ -185,10 +184,11 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         let tx_hash = tx.hash().to_hex();
                         match ch.send(CurrencyTx::Transfer(tx)) {
                             Ok(_) => {
-                                let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
+                                let json = &jsonway::object(|json| json.set("tx_hash", tx_hash))
+                                    .unwrap();
                                 client.json(json)
                             }
-                            Err(e) => client.error(e)
+                            Err(e) => client.error(e),
                         }
                     }
                     Err(e) => return client.error(e),
@@ -221,7 +221,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
 }
 
 fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
-                         node_cfg: Configuration,
+                         node_cfg: NodeConfig,
                          port: Option<u16>) {
     if let Some(port) = port {
         let mut node = Node::new(blockchain.clone(), node_cfg.clone());
@@ -235,7 +235,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                 // Specify API version
                 api.version("v1", Versioning::Path);
                 api.prefix("api");
-                
+
                 api.error_formatter(|err, _media| {
                     let body;
                     let code;
@@ -267,8 +267,8 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
                     Some(Response::from_json(code, &json))
                 });
 
-                blockchain_explorer_api(api, blockchain.clone(), node_cfg.clone());
-                cryptocurrency_api(api, blockchain.clone(), channel.clone(), node_cfg);
+                blockchain_explorer_api(api, blockchain.clone(), node_cfg.genesis.clone());
+                cryptocurrency_api(api, blockchain.clone(), channel.clone(), node_cfg.genesis);
                 api.mount(swagger::create_api("docs"));
             });
 
@@ -339,100 +339,28 @@ fn main() {
         .version(env!("CARGO_PKG_VERSION"))
         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
         .about("Demo cryptocurrency validator node")
-        .arg(Arg::with_name("CONFIG")
-            .short("c")
-            .long("config")
-            .value_name("CONFIG_PATH")
-            .help("Sets a node config file")
-            .required(true)
-            .takes_value(true))
-        .subcommand(SubCommand::with_name("generate")
-            .about("Generates default configuration file")
-            .version(env!("CARGO_PKG_VERSION"))
-            .author("Aleksey S. <aleksei.sidorov@xdev.re>")
-            .arg(Arg::with_name("START_PORT")
-                .short("p")
-                .long("port")
-                .value_name("START_PORT")
-                .help("Port for first validator")
-                .takes_value(true))
-            .arg(Arg::with_name("COUNT")
-                .help("Validators count")
-                .required(true)
-                .index(1)))
-        .subcommand(SubCommand::with_name("run")
-            .about("Run demo node with the given validator id")
-            .version(env!("CARGO_PKG_VERSION"))
-            .author("Aleksey S. <aleksei.sidorov@xdev.re>")
-            .arg(Arg::with_name("LEVELDB_PATH")
-                .short("d")
-                .long("leveldb-path")
-                .value_name("LEVELDB_PATH")
-                .help("Use leveldb database with the given path")
-                .takes_value(true))
-            .arg(Arg::with_name("HTTP_PORT")
-                .short("p")
-                .long("port")
-                .value_name("HTTP_PORT")
-                .help("Run http server on given port")
-                .takes_value(true))
-            .arg(Arg::with_name("PEERS")
-                .long("known-peers")
-                .value_name("PEERS")
-                .help("Comma separated list of known validator ids")
-                .takes_value(true))
-            .arg(Arg::with_name("VALIDATOR")
-                .help("Sets a validator id")
-                .required(true)
-                .index(1)));
-
+        .subcommand(GenerateCommand::new())
+        .subcommand(RunCommand::new().arg(Arg::with_name("HTTP_PORT")
+            .short("p")
+            .long("port")
+            .value_name("HTTP_PORT")
+            .help("Run http server on given port")
+            .takes_value(true)));
     let matches = app.get_matches();
-    let path = Path::new(matches.value_of("CONFIG").unwrap());
+
     match matches.subcommand() {
-        ("generate", Some(matches)) => {
-            let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let port: Option<u16> = matches.value_of("START_PORT").map(|x| x.parse().unwrap());
-            let cfg = GenesisConfig::gen(count, port);
-            ConfigFile::save(&cfg, &path).unwrap();
-            println!("The configuration was successfully written to file {:?}",
-                     path);
-        }
+        ("generate", Some(matches)) => GenerateCommand::execute(matches),
         ("run", Some(matches)) => {
-            let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
-            let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let port: Option<u16> = matches.value_of("HTTP_PORT").map(|x| x.parse().unwrap());
-            let peers = match matches.value_of("PEERS") {
-                Some(string) => {
-                    string.split(" ")
-                        .map(|x| -> usize { x.parse().unwrap() })
-                        .map(|x| cfg.validators[x].address)
-                        .collect()
+            let node_cfg = RunCommand::node_config(matches);
+            match RunCommand::db(matches) {
+                DatabaseType::LevelDB(db) => {
+                    run_node(CurrencyBlockchain { db: db }, node_cfg, port)
                 }
-                None => {
-                    cfg.validators
-                        .iter()
-                        .map(|v| v.address)
-                        .collect()
+                DatabaseType::MemoryDB(db) => {
+                    run_node(CurrencyBlockchain { db: db }, node_cfg, port)
                 }
-            };
-            let node_cfg = cfg.gen_node_configuration(idx, peers);
-            match matches.value_of("LEVELDB_PATH") {
-                Some(ref db_path) => {
-                    println!("Using levedb storage with path: {}", db_path);
-                    let mut options = LevelDBOptions::new();
-                    options.create_if_missing = true;
-                    let leveldb = LevelDB::new(&Path::new(db_path), options).unwrap();
-
-                    let blockchain = CurrencyBlockchain { db: leveldb };
-                    run_node(blockchain, node_cfg, port);
-                }
-                None => {
-                    println!("Using memorydb storage");
-
-                    let blockchain = CurrencyBlockchain { db: MemoryDB::new() };
-                    run_node(blockchain, node_cfg, port);
-                }
-            };
+            }
         }
         _ => {
             unreachable!("Wrong subcommand");

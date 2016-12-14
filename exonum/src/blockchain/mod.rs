@@ -1,10 +1,9 @@
-extern crate serde_json;
-
 #[macro_use]
 mod spec;
 mod block;
 mod view;
-mod config;
+pub mod config;
+mod genesis;
 
 use std::borrow::Borrow;
 use std::ops::Deref;
@@ -15,13 +14,12 @@ use ::crypto::{Hash, hash};
 use ::messages::{Precommit, Message, ConfigMessage, ServiceTx, ConfigPropose, ConfigVote, AnyTx};
 
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
+use self::genesis::GenesisBlock;
 
 pub use self::block::Block;
-pub use self::view::View;
-
-pub use self::config::{StoredConfiguration, ConsensusCfg};
-
-pub use self::view::ConfigurationData;
+pub use self::view::{View, ConfigurationData};
+pub use self::genesis::GenesisConfig;
+pub use self::config::{StoredConfiguration, ConsensusConfig};
 
 pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     where Self: Deref<Target = <Self as Blockchain>::Database>
@@ -129,6 +127,17 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         None
     }
 
+    fn commit_actual_configuration(view: &Self::View,
+                                   config_propose: ConfigPropose)
+                                   -> Result<(), Error> {
+        let height_bytecode = config_propose.actual_from_height().into();
+        view.configs().put(&height_bytecode, config_propose.config().to_vec())?;
+        view.configs_heights().append(height_bytecode)?;
+        // TODO: clear storages
+
+        Ok(())
+    }
+
     fn get_configuration_at_height(view: &Self::View, height: u64) -> Option<StoredConfiguration> {
         let configs = view.configs();
         if let Ok(Some(config)) = configs.get(&height.into()) {
@@ -145,6 +154,15 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     }
 
     fn handle_config_propose(view: &Self::View, config_propose: &ConfigPropose) {
+        // Special case for genesis block with zero height
+        if view.heights().len().unwrap() == 0 {
+            // FIXME add is_empty method
+            let hash = <ConfigPropose as Message>::hash(config_propose);
+            trace!("Create initial config");
+            view.config_proposes().put(&hash, config_propose.clone()).unwrap();
+            Self::commit_actual_configuration(view, config_propose.clone()).unwrap();
+        }
+
         if let Some(config) = Self::get_actual_configuration(view) {
             if !config.validators.contains(config_propose.from()) {
                 error!("ConfigPropose from unknown validator: {:?}",
@@ -160,7 +178,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             }
 
             trace!("Handle ConfigPropose");
-            let _ = view.config_proposes().put(&hash, config_propose.clone());
+            view.config_proposes().put(&hash, config_propose.clone()).unwrap();
         }
     }
 
@@ -205,10 +223,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                     view.config_proposes()
                         .get(config_vote.hash_propose())
                         .unwrap() {
-                    let height_bytecode = config_propose.actual_from_height().into();
-                    view.configs().put(&height_bytecode, config_propose.config().to_vec()).unwrap();
-                    view.configs_heights().append(height_bytecode).unwrap();
-                    // TODO: clear storages
+                    Self::commit_actual_configuration(view, config_propose).unwrap();
                 }
             }
         }
@@ -231,6 +246,20 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         };
 
         self.merge(&patch)
+    }
+
+    // FIXME make it private
+    fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
+        let genesis_block: GenesisBlock<Self> = cfg.into();
+        let patch = self.create_patch(0, 0, genesis_block.time, &genesis_block.txs)?;
+        if let Some(block_hash) = self.view().heights().get(0)? {
+            if block_hash != patch.0 {
+                panic!("Genesis config is corrupted!");
+            }
+        } else {
+            self.merge(&patch.2)?;
+        }
+        Ok(())
     }
 
     fn view(&self) -> Self::View {

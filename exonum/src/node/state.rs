@@ -9,7 +9,7 @@ use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMess
 
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
-use blockchain::{ConsensusCfg, StoredConfiguration};
+use blockchain::{ConsensusConfig, StoredConfiguration};
 
 // TODO: replace by in disk tx pool
 const TX_POOL_LIMIT: usize = 20000;
@@ -33,7 +33,7 @@ pub struct State<AppTx>
 {
     id: u32,
     validators: Vec<PublicKey>,
-    consensus_config: ConsensusCfg,
+    consensus_config: ConsensusConfig,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -275,7 +275,7 @@ impl<AppTx> State<AppTx>
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
-               consensus_config: ConsensusCfg)
+               consensus_config: ConsensusConfig)
                -> State<AppTx> {
 
         let validators_len = validators.len();
@@ -318,7 +318,7 @@ impl<AppTx> State<AppTx>
         }
     }
 
-    pub fn consensus_config(&self) -> &ConsensusCfg {
+    pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.consensus_config
     }
 

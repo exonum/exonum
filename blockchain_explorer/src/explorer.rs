@@ -5,8 +5,7 @@ use serde::Serialize;
 use exonum::storage::{Map, List};
 use exonum::storage::Result as StorageResult;
 use exonum::crypto::{Hash, PublicKey};
-use exonum::blockchain::{Blockchain, View};
-use exonum::node::Configuration;
+use exonum::blockchain::{Blockchain, View, GenesisConfig};
 use exonum::messages::AnyTx;
 
 use super::HexField;
@@ -35,14 +34,14 @@ pub struct BlockInfo<T>
 }
 
 impl<B: Blockchain> BlockchainExplorer<B> {
-    pub fn new(b: B, cfg: Configuration) -> BlockchainExplorer<B> {
+    pub fn new(b: B, cfg: GenesisConfig) -> BlockchainExplorer<B> {
         BlockchainExplorer {
             view: b.view(),
             validators: cfg.validators,
         }
     }
 
-    pub fn from_view(view: B::View, cfg: Configuration) -> BlockchainExplorer<B> {
+    pub fn from_view(view: B::View, cfg: GenesisConfig) -> BlockchainExplorer<B> {
         BlockchainExplorer {
             view: view,
             validators: cfg.validators,
