@@ -181,7 +181,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
             if !config.validators.contains(config_vote.from()) {
                 error!("ConfigVote from unknown validator: {:?}",
-                       config_vote.from());
+                    config_vote.from());
                 return;
             }
             
