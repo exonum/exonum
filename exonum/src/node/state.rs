@@ -270,14 +270,13 @@ impl<AppTx> State<AppTx>
         self.validators = config.validators;
         self.consensus_config = config.consensus;
     }
-
+    
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
-               consensus_config: ConsensusCfg,
-               configuration_manager: ConfigurationManager<B>)
+               consensus_config: ConsensusCfg)
                 -> State<AppTx> { 
 
         let validators_len = validators.len();
@@ -457,18 +456,7 @@ impl<AppTx> State<AppTx>
             self.update_config(config);
         }
 
-    }
-
-    fn update_config(&mut self, config: StoredConfiguration){
-
-        let id = config.validators
-            .iter()
-            .position(|pk| pk == self.public_key().unwrap()).unwrap();
-
-        self.id = id as u32;
-        self.validators = config.validators;
-        self.consensus_config = config.consensus;
-    }
+    }    
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
         let mut queued = Vec::new();

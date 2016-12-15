@@ -11,10 +11,8 @@ use std::ops::Deref;
 
 use time::Timespec;
 
-use byteorder::{ByteOrder, BigEndian};
-
-use ::crypto::{PublicKey, Hash, hash};
-use ::messages::{Any, Precommit, Message, ConfigMessage, ServiceTransaction, ConfigPropose, ConfigVote, TransactionMessage, RawMessage, AnyTx};
+use ::crypto::{Hash, hash};
+use ::messages::{Precommit, Message, ConfigMessage, ServiceTx, ConfigPropose, ConfigVote, AnyTx};
 
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
@@ -48,8 +46,12 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
     fn execute(fork: &Self::View, tx: &Self::Transaction) -> Result<(), Error>;
     // FIXME make private
-    fn execute_service_tx(_: &Self::View, _: &ServiceTx) -> Result<(), Error> {
-        unimplemented!();
+    fn execute_service_tx(view: &Self::View, tx: &ServiceTx) -> Result<(), Error> {
+        match *tx {
+            ServiceTx::ConfigChange(ref config_message) => {
+                Ok(Self::execute_config_change(view, config_message))
+            }            
+        }        
     }
 
     // TODO use Iterator to avoid memory allocations?
@@ -95,39 +97,33 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         Ok((block_hash, tx_hashes, fork.changes()))
     }
 
-    fn execute_service_tx(&self, tx: ServiceTransaction) {
-        match tx {
-            ServiceTransaction::ConfigChange(config_message) => {
-                self.execute_config_change(config_message);
-            }            
-        }
-    }
-
-    fn execute_config_change(&self, config_message: ConfigMessage) {
-        match config_message {
-            ConfigMessage::ConfigPropose(config_propose_tx) => {
-                self.handle_config_propose(config_propose_tx);
+    fn execute_config_change(view: &Self::View, config_message: &ConfigMessage) {
+        match *config_message {
+            ConfigMessage::ConfigPropose(ref config_propose_tx) => {
+                Self::handle_config_propose(view, config_propose_tx);
             }
-            ConfigMessage::ConfigVote(config_vote_tx) => {
-                self.handle_config_vote(config_vote_tx);
+            ConfigMessage::ConfigVote(ref config_vote_tx) => {
+                Self::handle_config_vote(view, config_vote_tx);
             }
         }
     }
 
-    fn get_height(&self) -> u64 {
-        let r = self.last_block().unwrap();
-        if let Some(last_block) = r {
-            last_block.height() + 1
-        } else {
-            0
-        }
+    fn last_block_(view: &Self::View) -> Result<Option<Block>, Error> {        
+        Ok(match view.heights().last()? {
+            Some(hash) => Some(view.blocks().get(&hash)?.unwrap()),
+            None => None,
+        })
+    }
+    fn get_height(view: &Self::View) -> u64 {  
+        if let Ok(Some(last_block)) = Self::last_block_(&view){
+            return last_block.height() + 1;
+        }                        
+        0    
     }
 
-    fn get_actual_configuration(&self) -> Option<StoredConfiguration> {
+    fn get_actual_configuration(view: &Self::View) -> Option<StoredConfiguration> {
 
-        let h = self.get_height();
-
-        let view = self.view();
+        let h = Self::get_height(&view);        
 
         let heights = view.configs_heights();
 
@@ -136,15 +132,14 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             if let Some(idx) = height_values.into_iter()
                 .rposition(|r| u64::from(r) <= h) {
                 if let Ok(Some(height)) = heights.get(idx as u64) {
-                    return self.get_configuration_at_height(height.into());
+                    return Self::get_configuration_at_height(view, height.into());
                 }
             }
         }
         None
     }
 
-    fn get_configuration_at_height(&self, height: u64) -> Option<StoredConfiguration> {
-        let view = self.view();
+    fn get_configuration_at_height(view: &Self::View, height: u64) -> Option<StoredConfiguration> {        
         let configs = view.configs();
         if let Ok(config) = configs.get(&height.into()) {
             match StoredConfiguration::deserialize(&config.unwrap()) {
@@ -159,16 +154,15 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         None
     }
 
-    fn handle_config_propose(&self, config_propose: ConfigPropose) {
+    fn handle_config_propose(view: &Self::View, config_propose: &ConfigPropose) {
 
-        if let Some(config) = self.get_actual_configuration() {
+        if let Some(config) = Self::get_actual_configuration(&view) {
             if !config.validators.contains(config_propose.from()) {
                 error!("ConfigPropose from unknown validator: {:?}",
                        config_propose.from());
                 return;
             }
-
-            let view = self.view();
+            
             let hash = <ConfigPropose as Message>::hash(&config_propose);
             if view.config_proposes().get(&hash).unwrap().is_some() {
                 error!("Received config_propose has already been handled, msg={:?}",
@@ -177,21 +171,20 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             }
 
             trace!("Handle ConfigPropose");
-            let _ = view.config_proposes().put(&hash, config_propose);
+            let _ = view.config_proposes().put(&hash, config_propose.clone());
         }
     }
 
-    fn handle_config_vote(&self, config_vote: ConfigVote) {
+    fn handle_config_vote(view: &Self::View, config_vote: &ConfigVote) {
 
-        if let Some(config) = self.get_actual_configuration() {
+        if let Some(config) = Self::get_actual_configuration(&view) {
 
             if !config.validators.contains(config_vote.from()) {
                 error!("ConfigVote from unknown validator: {:?}",
                        config_vote.from());
                 return;
             }
-
-            let view = self.view();
+            
             if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_some() {
                 error!("Received config_vote for unknown transaciton, msg={:?}",
                        config_vote);

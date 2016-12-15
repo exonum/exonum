@@ -78,7 +78,7 @@ impl<B, S> NodeHandler<B, S>
                 .or_else(|| view.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {
-                self.send_to_peer(*msg.from(), &tx);
+                self.send_to_peer(*msg.from(), &tx.raw());
             }
         }
     }
@@ -153,7 +153,7 @@ impl<B, S> NodeHandler<B, S>
             .unwrap()
             .iter()
             .map(|tx_hash| view.transactions().get(tx_hash).unwrap().unwrap())                            
-            .map(|p| p.clone())               
+            .map(|p| p.raw().clone())               
             .collect::<Vec<_>>();
 
         let block_msg = Block::new(&self.public_key,

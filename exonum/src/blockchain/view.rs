@@ -3,7 +3,7 @@ use std::ops::Deref;
 
 use ::crypto::{Hash, PublicKey};
 use ::messages::{Precommit, Message, ConfigPropose, ConfigVote, AnyTx};
-use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatriciaTable}, HeightBytes;
+use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatriciaTable, HeightBytes};
 
 use super::Block;
 

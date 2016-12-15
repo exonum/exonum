@@ -66,7 +66,7 @@ pub struct NodeHandler<B, S>
 {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub state: State,
+    pub state: State<B::Transaction>,
     pub channel: S,
     pub blockchain: B,
     // TODO: move this into peer exchange service
@@ -116,7 +116,7 @@ impl<B, S> NodeHandler<B, S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        if let Some(stored_config) = blockchain.get_actual_configuration() {
+        if let Some(stored_config) = B::get_actual_configuration(&blockchain.view()) {
             config.update_with_actual_config(stored_config);
         }
 
@@ -167,7 +167,7 @@ impl<B, S> NodeHandler<B, S>
         self.state().consensus_config().txs_block_limit
     }
 
-    pub fn state(&self) -> &State {
+    pub fn state(&self) -> &State<B::Transaction> {
         &self.state
     }
 
@@ -397,7 +397,7 @@ impl<B> Node<B>
         self.reactor.run()
     }
 
-    pub fn state(&self) -> &State {
+    pub fn state(&self) -> &State<B::Transaction> {
         self.reactor.handler().state()
     }
 
