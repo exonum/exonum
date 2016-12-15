@@ -141,8 +141,8 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
     fn get_configuration_at_height(view: &Self::View, height: u64) -> Option<StoredConfiguration> {        
         let configs = view.configs();
-        if let Ok(config) = configs.get(&height.into()) {
-            match StoredConfiguration::deserialize(&config.unwrap()) {
+        if let Ok(Some(config)) = configs.get(&height.into()) {
+            match StoredConfiguration::deserialize(&config) {
                 Ok(configuration) => {
                     return Some(configuration);
                 }
