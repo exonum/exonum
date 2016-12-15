@@ -27,7 +27,6 @@ use exonum::crypto::{Hash, HexValue, ToHex};
 use exonum::storage::Error as StorageError;
 use exonum::blockchain::Blockchain;
 use exonum::node::Configuration;
-use exonum::messages::RawMessage;
 
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
 
@@ -106,7 +105,7 @@ impl<T> Deserialize for HexField<T>
 
 pub fn make_api<B, T>(api: &mut Api, b: B, cfg: Configuration)
     where B: Blockchain,
-          T: TransactionInfo + From<RawMessage>
+          T: TransactionInfo + From<B::Transaction>
 {
     api.namespace("blockchain", move |api| {
         api.get("blocks", |endpoint| {
