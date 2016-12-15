@@ -3,7 +3,8 @@ use std::ops::Deref;
 
 use ::crypto::{Hash, PublicKey};
 use ::messages::{Precommit, Message, ConfigPropose, ConfigVote, AnyTx};
-use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatriciaTable, HeightBytes};
+use ::storage::{StorageValue, Fork, ListTable, MapTable, MerkleTable, MerklePatriciaTable,
+                HeightBytes, Error, Map, List};
 
 use super::Block;
 
@@ -11,6 +12,13 @@ pub type ConfigurationData = Vec<u8>;
 
 pub trait View<F: Fork>: Deref<Target = F> {
     type Transaction: Message + StorageValue;
+
+    fn last_block(&self) -> Result<Option<Block>, Error> {
+        Ok(match self.heights().last()? {
+            Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
+            None => None,
+        })
+    }
 
     fn from_fork(fork: F) -> Self;
 
@@ -32,26 +40,29 @@ pub trait View<F: Fork>: Deref<Target = F> {
 
     fn precommits(&self, hash: &Hash) -> ListTable<MapTable<F, [u8], Vec<u8>>, u32, Precommit> {
         ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self))
-    }    
+    }
 
-    fn config_proposes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, ConfigPropose> {
-        //config_propose paricia merkletree <hash_tx> транзакция пропоз
+    fn config_proposes(&self)
+                       -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, ConfigPropose> {
+        // config_propose paricia merkletree <hash_tx> транзакция пропоз
         MerklePatriciaTable::new(MapTable::new(vec![04], self))
     }
 
-    fn config_votes(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, ConfigVote> {
-        //config_votes patricia merkletree <pub_key> последний голос
+    fn config_votes(&self)
+                    -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, PublicKey, ConfigVote> {
+        // config_votes patricia merkletree <pub_key> последний голос
         MerklePatriciaTable::new(MapTable::new(vec![05], self))
     }
 
-    fn configs(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, HeightBytes, ConfigurationData> {
-        //configs patricia merkletree <высота блока> json
+    fn configs
+        (&self)
+         -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, HeightBytes, ConfigurationData> {
+        // configs patricia merkletree <высота блока> json
         MerklePatriciaTable::new(MapTable::new(vec![06], self))
-    } 
+    }
 
     // TODO: consider List index to reduce storage volume
     fn configs_heights(&self) -> ListTable<MapTable<F, [u8], Vec<u8>>, u64, HeightBytes> {
-        ListTable::new(MapTable::new(vec![07], self))        
+        ListTable::new(MapTable::new(vec![07], self))
     }
-    
 }

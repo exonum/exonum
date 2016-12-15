@@ -29,9 +29,8 @@ pub type ValidatorId = u32;
 // TODO: reduce copying of Hash
 
 pub struct State<AppTx>
-   where AppTx: Message
+    where AppTx: Message
 {
-
     id: u32,
     validators: Vec<PublicKey>,
     consensus_config: ConsensusCfg,
@@ -259,25 +258,25 @@ impl BlockState {
 impl<AppTx> State<AppTx>
     where AppTx: Message
 {
-
-    fn update_config(&mut self, config: StoredConfiguration){
+    fn update_config(&mut self, config: StoredConfiguration) {
 
         let id = config.validators
             .iter()
-            .position(|pk| pk == self.public_key().unwrap()).unwrap();
+            .position(|pk| pk == self.public_key().unwrap())
+            .unwrap();
 
         self.id = id as u32;
         self.validators = config.validators;
         self.consensus_config = config.consensus;
     }
-    
+
     pub fn new(id: u32,
                validators: Vec<PublicKey>,
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
                consensus_config: ConsensusCfg)
-                -> State<AppTx> { 
+               -> State<AppTx> {
 
         let validators_len = validators.len();
 
@@ -315,7 +314,7 @@ impl<AppTx> State<AppTx>
 
             commited_txs: 0,
 
-            consensus_config: consensus_config
+            consensus_config: consensus_config,
         }
     }
 
@@ -428,7 +427,10 @@ impl<AppTx> State<AppTx>
     }
 
     // FIXME use block_hash
-    pub fn new_height(&mut self, block_hash: &Hash, round: Round, new_config: Option<StoredConfiguration>) {
+    pub fn new_height(&mut self,
+                      block_hash: &Hash,
+                      round: Round,
+                      new_config: Option<StoredConfiguration>) {
         self.height += 1;
         self.round = round;
         self.locked_round = 0;
@@ -456,7 +458,7 @@ impl<AppTx> State<AppTx>
             self.update_config(config);
         }
 
-    }    
+    }
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
         let mut queued = Vec::new();
