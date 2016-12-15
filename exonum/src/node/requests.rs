@@ -78,7 +78,7 @@ impl<B, S> NodeHandler<B, S>
                 .or_else(|| view.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {
-                self.send_to_peer(*msg.from(), &tx.raw());
+                self.send_to_peer(*msg.from(), tx.raw());
             }
         }
     }

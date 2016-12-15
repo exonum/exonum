@@ -115,7 +115,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         })
     }
     fn get_height(view: &Self::View) -> u64 {  
-        if let Ok(Some(last_block)) = Self::last_block_(&view){
+        if let Ok(Some(last_block)) = Self::last_block_(view){
             return last_block.height() + 1;
         }                        
         0    
@@ -123,7 +123,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
     fn get_actual_configuration(view: &Self::View) -> Option<StoredConfiguration> {
 
-        let h = Self::get_height(&view);        
+        let h = Self::get_height(view);        
 
         let heights = view.configs_heights();
 
@@ -156,14 +156,14 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
     fn handle_config_propose(view: &Self::View, config_propose: &ConfigPropose) {
 
-        if let Some(config) = Self::get_actual_configuration(&view) {
+        if let Some(config) = Self::get_actual_configuration(view) {
             if !config.validators.contains(config_propose.from()) {
                 error!("ConfigPropose from unknown validator: {:?}",
                        config_propose.from());
                 return;
             }
             
-            let hash = <ConfigPropose as Message>::hash(&config_propose);
+            let hash = <ConfigPropose as Message>::hash(config_propose);
             if view.config_proposes().get(&hash).unwrap().is_some() {
                 error!("Received config_propose has already been handled, msg={:?}",
                        config_propose);
@@ -177,7 +177,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
     fn handle_config_vote(view: &Self::View, config_vote: &ConfigVote) {
 
-        if let Some(config) = Self::get_actual_configuration(&view) {
+        if let Some(config) = Self::get_actual_configuration(view) {
 
             if !config.validators.contains(config_vote.from()) {
                 error!("ConfigVote from unknown validator: {:?}",
