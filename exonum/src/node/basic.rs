@@ -29,9 +29,9 @@ impl<B, S> NodeHandler<B, S>
             Any::Consensus(msg) => self.handle_consensus(msg),
             Any::Request(msg) => self.handle_request(msg),
             Any::Block(msg) => self.handle_block(msg),
-            Any::Transaction(msg) => self.handle_tx(msg)
+            Any::Transaction(msg) => self.handle_tx(msg),
         }
-    }    
+    }
 
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
         info!("Connected to: {}", addr);

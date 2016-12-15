@@ -35,12 +35,15 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     }
 
     fn last_block(&self) -> Result<Option<Block>, Error> {
-        let view = self.view();
-        Ok(match view.heights().last()? {
-            Some(hash) => Some(view.blocks().get(&hash)?.unwrap()),
-            None => None,
-        })
+        self.view().last_block()
     }
+    // fn last_block(&self) -> Result<Option<Block>, Error> {
+    //     let view = self.view();
+    //     Ok(match view.heights().last()? {
+    //         Some(hash) => Some(view.blocks().get(&hash)?.unwrap()),
+    //         None => None,
+    //     })
+    // }
 
     fn verify_tx(tx: &Self::Transaction) -> bool;
     fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
@@ -51,7 +54,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             ServiceTx::ConfigChange(ref config_message) => {
                 Ok(Self::execute_config_change(view, config_message))
             }            
-        }        
+        }
     }
 
     // TODO use Iterator to avoid memory allocations?
@@ -68,7 +71,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Save & execute transactions
         let mut tx_hashes = Vec::new();
         for &(hash, ref tx) in txs {
-            
+
             match *tx {
                 AnyTx::Application(ref tx) => Self::execute(&fork, tx)?,
                 AnyTx::Service(ref tx) => Self::execute_service_tx(&fork, tx)?,
@@ -108,22 +111,16 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         }
     }
 
-    fn last_block_(view: &Self::View) -> Result<Option<Block>, Error> {        
-        Ok(match view.heights().last()? {
-            Some(hash) => Some(view.blocks().get(&hash)?.unwrap()),
-            None => None,
-        })
-    }
-    fn get_height(view: &Self::View) -> u64 {  
-        if let Ok(Some(last_block)) = Self::last_block_(view){
+    fn get_height(view: &Self::View) -> u64 {
+        if let Ok(Some(last_block)) = view.last_block() {
             return last_block.height() + 1;
-        }                        
-        0    
+        }
+        0
     }
 
     fn get_actual_configuration(view: &Self::View) -> Option<StoredConfiguration> {
 
-        let h = Self::get_height(view);        
+        let h = Self::get_height(view);
 
         let heights = view.configs_heights();
 
@@ -139,7 +136,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         None
     }
 
-    fn get_configuration_at_height(view: &Self::View, height: u64) -> Option<StoredConfiguration> {        
+    fn get_configuration_at_height(view: &Self::View, height: u64) -> Option<StoredConfiguration> {
         let configs = view.configs();
         if let Ok(Some(config)) = configs.get(&height.into()) {
             match StoredConfiguration::deserialize(&config) {
@@ -155,14 +152,13 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     }
 
     fn handle_config_propose(view: &Self::View, config_propose: &ConfigPropose) {
-
         if let Some(config) = Self::get_actual_configuration(view) {
             if !config.validators.contains(config_propose.from()) {
                 error!("ConfigPropose from unknown validator: {:?}",
                        config_propose.from());
                 return;
             }
-            
+
             let hash = <ConfigPropose as Message>::hash(config_propose);
             if view.config_proposes().get(&hash).unwrap().is_some() {
                 error!("Received config_propose has already been handled, msg={:?}",
@@ -181,10 +177,10 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
             if !config.validators.contains(config_vote.from()) {
                 error!("ConfigVote from unknown validator: {:?}",
-                    config_vote.from());
+                       config_vote.from());
                 return;
             }
-            
+
             if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_some() {
                 error!("Received config_vote for unknown transaciton, msg={:?}",
                        config_vote);
@@ -211,10 +207,11 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 }
             }
 
-            if votes_count >= 2 / 3 * config.validators.len() {
-                if let Some(config_propose) = view.config_proposes()
-                    .get(config_vote.hash_propose())
-                    .unwrap() {
+            if votes_count > 2 / 3 * config.validators.len() {
+                if let Some(config_propose) =
+                    view.config_proposes()
+                        .get(config_vote.hash_propose())
+                        .unwrap() {
                     let height_bytecode = config_propose.actual_from_height().into();
                     view.configs().put(&height_bytecode, config_propose.config().to_vec()).unwrap();
                     view.configs_heights().append(height_bytecode).unwrap();

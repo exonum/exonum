@@ -1,5 +1,5 @@
-// FIXME avoiding a bug in clippy. 
-#![cfg_attr(feature="clippy", allow(map_clone))] 
+// FIXME avoiding a bug in clippy.
+#![cfg_attr(feature="clippy", allow(map_clone))]
 
 use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
                              RequestPrevotes, RequestPrecommits, RequestBlock, Block};
@@ -152,8 +152,8 @@ impl<B, S> NodeHandler<B, S>
             .values()
             .unwrap()
             .iter()
-            .map(|tx_hash| view.transactions().get(tx_hash).unwrap().unwrap())                            
-            .map(|p| p.raw().clone())               
+            .map(|tx_hash| view.transactions().get(tx_hash).unwrap().unwrap())
+            .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 
         let block_msg = Block::new(&self.public_key,

@@ -18,7 +18,7 @@ use super::blockchain::Blockchain;
 use super::messages::{Connect, RawMessage};
 
 pub mod state;//temporary solution to get access to WAIT consts
-use blockchain::{ConsensusCfg,StoredConfiguration};
+use blockchain::{ConsensusCfg, StoredConfiguration};
 
 mod basic;
 mod consensus;
@@ -85,7 +85,7 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    pub fn update_with_actual_config(&mut self, actual_config: StoredConfiguration){
+    pub fn update_with_actual_config(&mut self, actual_config: StoredConfiguration) {
         self.validators = actual_config.validators;
         self.consensus = actual_config.consensus;
     }
@@ -120,20 +120,18 @@ impl<B, S> NodeHandler<B, S>
             config.update_with_actual_config(stored_config);
         }
 
-        let state = State::new(
-            id as u32,
-            config.validators,
-            connect,
-            last_hash,
-            last_height,
-            ConsensusCfg{
-                round_timeout: config.consensus.round_timeout as i64,
-                propose_timeout: config.consensus.propose_timeout as i64,
-                status_timeout: config.consensus.status_timeout as i64,
-                peers_timeout: config.consensus.peers_timeout as i64,
-                txs_block_limit: config.consensus.txs_block_limit,
-            }
-        );
+        let state = State::new(id as u32,
+                               config.validators,
+                               connect,
+                               last_hash,
+                               last_height,
+                               ConsensusCfg {
+                                   round_timeout: config.consensus.round_timeout as i64,
+                                   propose_timeout: config.consensus.propose_timeout as i64,
+                                   status_timeout: config.consensus.status_timeout as i64,
+                                   peers_timeout: config.consensus.peers_timeout as i64,
+                                   txs_block_limit: config.consensus.txs_block_limit,
+                               });
 
         NodeHandler {
             public_key: config.listener.public_key,
@@ -141,9 +139,11 @@ impl<B, S> NodeHandler<B, S>
             state: state,
             channel: sender,
             blockchain: blockchain,
-//            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster::default()),
-            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::ConstProposeTimeout{ propose_timeout: config.consensus.propose_timeout as i64, }),
-            peer_discovery: config.peer_discovery
+            //            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster::default()),
+            propose_timeout_adjuster: Box::new(adjusted_propose_timeout::ConstProposeTimeout {
+                propose_timeout: config.consensus.propose_timeout as i64,
+            }),
+            peer_discovery: config.peer_discovery,
         }
     }
 
@@ -241,14 +241,14 @@ impl<B, S> NodeHandler<B, S>
         self.channel.add_timeout(timeout, time);
     }
 
-    ///getter for adjusted_propose_timeout
+    /// getter for adjusted_propose_timeout
     pub fn adjusted_propose_timeout(&self) -> i64 {
         self.propose_timeout_adjuster.adjusted_propose_timeout(&self.blockchain.view())
     }
 
     pub fn add_propose_timeout(&mut self) {
-//        let time = self.round_start_time(self.state.round()) +
-//                   Duration::milliseconds(self.propose_timeout);
+        //        let time = self.round_start_time(self.state.round()) +
+        //                   Duration::milliseconds(self.propose_timeout);
         let adjusted_propose_timeout = self.adjusted_propose_timeout();//cache adjusted_propose_timeout because this value will be used 2 times
         let time = self.round_start_time(self.state.round()) +
                    Duration::milliseconds(adjusted_propose_timeout);

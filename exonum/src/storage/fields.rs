@@ -111,12 +111,13 @@ impl StorageValue for Hash {
 //         Arc::new(MessageBuffer::from_vec(v))
 //     }
 
-//     fn hash(&self) -> Hash {        
+//     fn hash(&self) -> Hash {
 //         self.as_ref().hash()
 //     }
 // }
 
-impl<T> StorageValue for T where T: Message
+impl<T> StorageValue for T
+    where T: Message
 {
     fn serialize(self) -> Vec<u8> {
         self.raw().as_ref().as_ref().to_vec()
@@ -187,9 +188,9 @@ impl StorageValue for HeightBytes {
         self.as_ref().to_vec()
     }
 
-    fn deserialize(v: Vec<u8>) -> Self { 
+    fn deserialize(v: Vec<u8>) -> Self {
         let mut b = [0u8; 32];
-        b.clone_from_slice(v.as_slice());               
+        b.clone_from_slice(v.as_slice());
         HeightBytes(b)
     }
 
