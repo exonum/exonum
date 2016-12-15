@@ -37,13 +37,6 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     fn last_block(&self) -> Result<Option<Block>, Error> {
         self.view().last_block()
     }
-    // fn last_block(&self) -> Result<Option<Block>, Error> {
-    //     let view = self.view();
-    //     Ok(match view.heights().last()? {
-    //         Some(hash) => Some(view.blocks().get(&hash)?.unwrap()),
-    //         None => None,
-    //     })
-    // }
 
     fn verify_tx(tx: &Self::Transaction) -> bool;
     fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
