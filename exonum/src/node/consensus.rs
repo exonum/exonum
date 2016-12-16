@@ -84,7 +84,8 @@ impl<B, S> NodeHandler<B, S>
         let round = msg.round();
         let start_time = self.round_start_time(round) +
                          Duration::milliseconds(self.adjusted_propose_timeout());
-        let end_time = start_time + Duration::milliseconds(self.round_timeout);
+        let end_time = start_time + Duration::milliseconds(self.round_timeout());
+
         if msg.time() < start_time || msg.time() > end_time {
             error!("Received propose with wrong time, msg={:?}", msg);
             return;
@@ -172,7 +173,7 @@ impl<B, S> NodeHandler<B, S>
         let propose_round = block.propose_round();
         let start_time = self.round_start_time(propose_round) +
                          Duration::milliseconds(self.adjusted_propose_timeout());
-        let end_time = start_time + Duration::milliseconds(self.round_timeout);
+        let end_time = start_time + Duration::milliseconds(self.round_timeout());
         if msg.time() < start_time || block.time() > end_time {
             error!("Received block with wrong propose time, block={:?}", msg);
             return;
@@ -211,7 +212,7 @@ impl<B, S> NodeHandler<B, S>
                             error!("Incorrect transaction in block detected, block={:?}", msg);
                             return;
                         }
-                        txs.push((hash, tx));
+                        txs.push((hash, tx.clone()));
                     }
                     Err(e) => {
                         error!("Unknown transaction in block detected, error={:?}, block={:?}",
@@ -420,7 +421,8 @@ impl<B, S> NodeHandler<B, S>
 
         // Update state to new height
         let round = self.actual_round();
-        self.state.new_height(&block_hash, round);
+        let config = B::get_configuration_at_height(&self.blockchain.view(), height);
+        self.state.new_height(&block_hash, round, config);
 
         info!("{:?} ====== height={}, round={}, proposer={}, commited={}, pool={}",
               self.channel.get_time(),
@@ -460,7 +462,7 @@ impl<B, S> NodeHandler<B, S>
             return;
         }
 
-        let full_proposes = self.state.add_transaction(hash, msg);
+        let full_proposes = self.state.add_transaction(hash, msg.clone());
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));
@@ -545,7 +547,7 @@ impl<B, S> NodeHandler<B, S>
         info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
         let round = self.state.round();
-        let max_count = ::std::cmp::min(self.txs_block_limit as usize,
+        let max_count = ::std::cmp::min(self.txs_block_limit() as usize,
                                         self.state.transactions().len());
         let txs: Vec<Hash> = self.state
             .transactions()

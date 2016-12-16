@@ -72,6 +72,12 @@ pub enum CurrencyTx {
     CreateWallet(TxCreateWallet),
 }
 
+impl From<RawMessage> for CurrencyTx {
+    fn from(raw: RawMessage) -> Self {
+        CurrencyTx::from_raw(raw).unwrap()
+    }
+}
+
 impl Message for CurrencyTx {
     fn raw(&self) -> &RawMessage {
         match *self {

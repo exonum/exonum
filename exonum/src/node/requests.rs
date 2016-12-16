@@ -1,3 +1,6 @@
+// FIXME avoiding a bug in clippy.
+#![cfg_attr(feature="clippy", allow(map_clone))]
+
 use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
                              RequestPrevotes, RequestPrecommits, RequestBlock, Block};
 use super::super::blockchain::{Blockchain, View};
