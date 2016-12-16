@@ -1,3 +1,6 @@
+// To avoid clippy failure concerning unused mut in cases when it's required
+#![allow(unused_mut)]
+
 extern crate serde_json;
 
 use std::io;
@@ -11,17 +14,19 @@ use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConf
                     EventsConfiguration, Channel, EventHandler, Result as EventsResult,
                     Error as EventsError};
 use super::blockchain::Blockchain;
+
 use super::messages::{Connect, RawMessage};
 
 pub mod state;//temporary solution to get access to WAIT consts
+use blockchain::{ConsensusCfg, StoredConfiguration};
+
 mod basic;
 mod consensus;
 mod requests;
-mod configuration;
 mod adjusted_propose_timeout;
 pub mod config;
 
-pub use self::config::{ListenerConfig, ConsensusConfig};
+pub use self::config::ListenerConfig;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 use self::adjusted_propose_timeout::*;
 
@@ -64,13 +69,8 @@ pub struct NodeHandler<B, S>
     pub state: State<B::Transaction>,
     pub channel: S,
     pub blockchain: B,
-    pub round_timeout: i64,
-    pub status_timeout: i64,
-    pub peers_timeout: i64,
-    pub txs_block_limit: u32,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-
     propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster<B>>,
 }
 
@@ -79,25 +79,24 @@ pub struct Configuration {
     pub listener: ListenerConfig,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
-    pub consensus: ConsensusConfig,
+    pub consensus: ConsensusCfg,
     pub peer_discovery: Vec<SocketAddr>,
     pub validators: Vec<PublicKey>,
+}
+
+impl Configuration {
+    pub fn update_with_actual_config(&mut self, actual_config: StoredConfiguration) {
+        self.validators = actual_config.validators;
+        self.consensus = actual_config.consensus;
+    }
 }
 
 impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
-    pub fn new(blockchain: B, sender: S, config: Configuration) -> NodeHandler<B, S> {
+    pub fn new(blockchain: B, sender: S, mut config: Configuration) -> NodeHandler<B, S> {
         // FIXME: remove unwraps here, use FATAL log level instead
-        let id = config.validators
-            .iter()
-            .position(|pk| pk == &config.listener.public_key)
-            .unwrap();
-        let connect = Connect::new(&config.listener.public_key,
-                                   sender.address(),
-                                   sender.get_time(),
-                                   &config.listener.secret_key);
 
         let r = blockchain.last_block().unwrap();
         // TODO нужно создать api и для того, чтобы здесь подключался genesis блок
@@ -107,26 +106,65 @@ impl<B, S> NodeHandler<B, S>
             (super::crypto::hash(&[]), 0)
         };
 
+        let id = config.validators
+            .iter()
+            .position(|pk| pk == &config.listener.public_key)
+            .unwrap();
+
+        let connect = Connect::new(&config.listener.public_key,
+                                   sender.address(),
+                                   sender.get_time(),
+                                   &config.listener.secret_key);
+
+        if let Some(stored_config) = B::get_actual_configuration(&blockchain.view()) {
+            config.update_with_actual_config(stored_config);
+        }
+
         let state = State::new(id as u32,
                                config.validators,
                                connect,
                                last_hash,
-                               last_height);
+                               last_height,
+                               ConsensusCfg {
+                                   round_timeout: config.consensus.round_timeout as i64,
+                                   propose_timeout: config.consensus.propose_timeout as i64,
+                                   status_timeout: config.consensus.status_timeout as i64,
+                                   peers_timeout: config.consensus.peers_timeout as i64,
+                                   txs_block_limit: config.consensus.txs_block_limit,
+                               });
+
         NodeHandler {
             public_key: config.listener.public_key,
             secret_key: config.listener.secret_key,
             state: state,
             channel: sender,
             blockchain: blockchain,
-            round_timeout: config.consensus.round_timeout as i64,
-            status_timeout: config.consensus.status_timeout as i64,
-            peers_timeout: config.consensus.peers_timeout as i64,
+            //            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster::default()),
+            propose_timeout_adjuster: Box::new(adjusted_propose_timeout::ConstProposeTimeout {
+                propose_timeout: config.consensus.propose_timeout as i64,
+            }),
             peer_discovery: config.peer_discovery,
-            txs_block_limit: config.consensus.txs_block_limit,
-
-//            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster::default()),
-            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::ConstProposeTimeout{ propose_timeout: config.consensus.propose_timeout as i64, }),
         }
+    }
+
+    pub fn propose_timeout(&self) -> i64 {
+        self.state().consensus_config().propose_timeout
+    }
+
+    pub fn round_timeout(&self) -> i64 {
+        self.state().consensus_config().round_timeout
+    }
+
+    pub fn status_timeout(&self) -> i64 {
+        self.state().consensus_config().status_timeout
+    }
+
+    pub fn peers_timeout(&self) -> i64 {
+        self.state().consensus_config().peers_timeout
+    }
+
+    pub fn txs_block_limit(&self) -> u32 {
+        self.state().consensus_config().txs_block_limit
     }
 
     pub fn state(&self) -> &State<B::Transaction> {
@@ -203,14 +241,14 @@ impl<B, S> NodeHandler<B, S>
         self.channel.add_timeout(timeout, time);
     }
 
-    ///getter for adjusted_propose_timeout
+    /// getter for adjusted_propose_timeout
     pub fn adjusted_propose_timeout(&self) -> i64 {
         self.propose_timeout_adjuster.adjusted_propose_timeout(&self.blockchain.view())
     }
 
     pub fn add_propose_timeout(&mut self) {
-//        let time = self.round_start_time(self.state.round()) +
-//                   Duration::milliseconds(self.propose_timeout);
+        //        let time = self.round_start_time(self.state.round()) +
+        //                   Duration::milliseconds(self.propose_timeout);
         let adjusted_propose_timeout = self.adjusted_propose_timeout();//cache adjusted_propose_timeout because this value will be used 2 times
         let time = self.round_start_time(self.state.round()) +
                    Duration::milliseconds(adjusted_propose_timeout);
@@ -226,7 +264,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_status_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout);
+        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout());
         self.channel.add_timeout(NodeTimeout::Status, time);
     }
 
@@ -237,7 +275,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout);
+        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout());
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
@@ -263,7 +301,7 @@ impl<B, S> NodeHandler<B, S>
         let duration = (now - propose - Duration::milliseconds(self.adjusted_propose_timeout()))
             .num_milliseconds();
         if duration > 0 {
-            let round = (duration / self.round_timeout) as Round + 1;
+            let round = (duration / self.round_timeout()) as Round + 1;
             ::std::cmp::max(1, round)
         } else {
             1
@@ -272,7 +310,7 @@ impl<B, S> NodeHandler<B, S>
 
     // FIXME find more flexible solution
     pub fn round_start_time(&self, round: Round) -> Timespec {
-        let ms = (round - 1) as i64 * self.round_timeout;
+        let ms = (round - 1) as i64 * self.round_timeout();
         self.last_block_time() + Duration::milliseconds(ms)
     }
 }
@@ -345,7 +383,7 @@ pub struct Node<B>
 impl<B> Node<B>
     where B: Blockchain
 {
-    pub fn new(blockchain: B, config: Configuration) -> Node<B> {
+    pub fn new(blockchain: B, mut config: Configuration) -> Node<B> {
         let network = Network::with_config(config.listener.address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = MioChannel::new(config.listener.address, event_loop.channel());

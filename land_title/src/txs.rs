@@ -14,16 +14,12 @@ pub const TX_RESTORE_OBJECT_ID: u16 = 134;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GeoPoint {
     pub x: f64,
-    pub y: f64
+    pub y: f64,
 }
 
 impl GeoPoint {
-
     pub fn new(x: f64, y: f64) -> GeoPoint {
-        GeoPoint {
-            x: x,
-            y: y
-        }
+        GeoPoint { x: x, y: y }
     }
     pub fn from_vec(v: Vec<f64>) -> Vec<GeoPoint> {
         assert!(v.len() % 2 == 0);
@@ -44,12 +40,15 @@ impl GeoPoint {
         let start_point = points[0].clone();
         points.push(start_point);
         let v = Vec::new();
-        Polygon::new(LineString(points.iter().map(|item| Point::new(item.x, item.y)).collect::<Vec<Point<f64>>>()), v)
+        Polygon::new(LineString(points.iter()
+                         .map(|item| Point::new(item.x, item.y))
+                         .collect::<Vec<Point<f64>>>()),
+                     v)
     }
 }
 
 
-impl PartialEq for GeoPoint{
+impl PartialEq for GeoPoint {
     fn eq(&self, other: &GeoPoint) -> bool {
         self.x == other.x && self.y == other.y
     }
@@ -128,7 +127,7 @@ message! {
     }
 }
 
-pub fn timestamp () -> u64 {
+pub fn timestamp() -> u64 {
     let timespec = time::get_time();
     timespec.sec as u64
 }
@@ -212,11 +211,12 @@ impl Message for ObjectTx {
 mod tests {
 
     use exonum::crypto::gen_keypair;
-    use super::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject, TxRegister, GeoPoint, timestamp};
+    use super::{TxCreateOwner, TxCreateObject, TxModifyObject, TxTransferObject, TxRemoveObject,
+                TxRegister, GeoPoint, timestamp};
     use exonum::messages::Message;
 
     #[test]
-    fn test_register(){
+    fn test_register() {
         // Arrange
         let (p, s) = gen_keypair();
 
@@ -261,7 +261,8 @@ mod tests {
         // Act
         let points = GeoPoint::from_vec(u);
         // Assert
-        assert_eq!(points, [GeoPoint::new(1.0, 2.0) , GeoPoint::new(3.0, 4.0), GeoPoint::new(5.0, 6.0)]);
+        assert_eq!(points,
+                   [GeoPoint::new(1.0, 2.0), GeoPoint::new(3.0, 4.0), GeoPoint::new(5.0, 6.0)]);
 
         // Act
         let v = GeoPoint::to_vec(&points);

@@ -7,9 +7,8 @@ use std::ops::Drop;
 
 use time::{Timespec, Duration};
 
-use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig,
-                   ConsensusConfig, GENESIS_TIME};
-use exonum::blockchain::Blockchain;
+use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig, GENESIS_TIME};
+use exonum::blockchain::{Blockchain, ConsensusCfg};
 use exonum::storage::MemoryDB;
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
@@ -390,7 +389,7 @@ pub fn timestamping_sandbox
             public_key: validators[0].0.clone(),
             secret_key: validators[0].1.clone(),
         },
-        consensus: ConsensusConfig {
+        consensus: ConsensusCfg {
             round_timeout: 1000,
             status_timeout: 5000,
             peers_timeout: 10000,
