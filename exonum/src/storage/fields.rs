@@ -177,8 +177,20 @@ impl<T> StorageValue for T
 impl<AppTx> StorageValue for AnyTx<AppTx>
     where AppTx: Message
 {
-    fn serialize(self) -> Vec<u8> {
-        self.raw().as_ref().as_ref().to_vec()
+    fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
+        let byteslice = self.raw().as_ref().as_ref();
+        let old_len = buf.len(); 
+        let new_len = old_len + byteslice.len(); 
+        buf.resize(new_len, 0);
+        {
+            let part = &mut buf[old_len..new_len]; 
+            part.copy_from_slice(byteslice); 
+        }
+        buf
+    }
+
+    fn len_hint(&self) -> usize {
+        self.raw().as_ref().as_ref().len() 
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
@@ -237,10 +249,23 @@ impl From<HeightBytes> for u64 {
 }
 
 impl StorageValue for HeightBytes {
-    fn serialize(self) -> Vec<u8> {
-        self.as_ref().to_vec()
+    fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
+
+        let byteslice = self.as_ref();   
+        let old_len = buf.len(); 
+        let new_len = old_len + byteslice.len(); 
+        buf.resize(new_len, 0);
+        {
+            let part = &mut buf[old_len..new_len]; 
+            part.copy_from_slice(byteslice); 
+        }
+        buf
     }
 
+    fn len_hint(&self) -> usize {
+        32
+    }
+    
     fn deserialize(v: Vec<u8>) -> Self {
         let mut b = [0u8; 32];
         b.clone_from_slice(v.as_slice());
