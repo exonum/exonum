@@ -35,30 +35,30 @@ fn index_of_first_element_in_subtree<K>(subtree_root_height: K, subtree_root_ind
 }
 mod hash_rules {
     use ::crypto::{hash, Hash};
-    use ::storage::fields::StorageValue; 
-    pub const LEAF_DOMAIN : u8 = 00;
-    pub const BRANCH_DOMAIN: u8 = 01;  
-    pub const SINGLE_BRANCH_DOMAIN: u8 = 02; 
+    use ::storage::fields::StorageValue;
+    pub const LEAF_DOMAIN: u8 = 00;
+    pub const BRANCH_DOMAIN: u8 = 01;
+    pub const SINGLE_BRANCH_DOMAIN: u8 = 02;
 
-    pub fn hash_leaf<V: StorageValue>(value: &V) -> Hash{
-        let mut vecb = Vec::with_capacity(1 + value.len_hint()); 
-        vecb.push(LEAF_DOMAIN); 
-        vecb = value.serialize(vecb); 
+    pub fn hash_leaf<V: StorageValue>(value: &V) -> Hash {
+        let mut vecb = Vec::with_capacity(1 + value.len_hint());
+        vecb.push(LEAF_DOMAIN);
+        vecb = value.serialize(vecb);
         hash(&vecb)
-    } 
+    }
 
     pub fn hash_branch(left: Hash, right: Hash) -> Hash {
-        let mut vecb = Vec::with_capacity(1 + 2* left.len_hint()); 
+        let mut vecb = Vec::with_capacity(1 + 2 * left.len_hint());
         vecb.push(BRANCH_DOMAIN);
-        vecb = left.serialize(vecb); 
-        vecb = right.serialize(vecb); 
+        vecb = left.serialize(vecb);
+        vecb = right.serialize(vecb);
         hash(&vecb)
     }
 
     pub fn hash_single_branch(left: Hash) -> Hash {
-        let mut vecb = Vec::with_capacity(1 + left.len_hint()); 
-        vecb.push(SINGLE_BRANCH_DOMAIN); 
-        vecb = left.serialize(vecb); 
+        let mut vecb = Vec::with_capacity(1 + left.len_hint());
+        vecb.push(SINGLE_BRANCH_DOMAIN);
+        vecb = left.serialize(vecb);
         hash(&vecb)
     }
 }
@@ -190,8 +190,8 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
     // TODO reduce reallocations. We can create a key by one allocation.
     fn db_key(h: K, i: K) -> Vec<u8> {
-        let mut vec = Vec::with_capacity(h.len_hint() * 2); 
-        vec = h.serialize(vec); 
+        let mut vec = Vec::with_capacity(h.len_hint() * 2);
+        vec = h.serialize(vec);
         i.serialize(vec)
     }
 
@@ -219,7 +219,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         while index != K::zero() {
             // Left leaf, Right leaf is empty
             let new_hash = if index.is_even() {
-                let h1 = self.get_hash(current_height, index)?.unwrap(); 
+                let h1 = self.get_hash(current_height, index)?.unwrap();
                 hash_rules::hash_single_branch(h1)
                 // TODO replace by error
 
@@ -251,7 +251,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
             let h1 = self.get_hash(current_height, i)?.unwrap();
             let h2 = self.get_hash(current_height, i + K::one())?;
             let new_hash = if let Some(h2) = h2 {
-                hash_rules::hash_branch(h1,h2)
+                hash_rules::hash_branch(h1, h2)
             } else {
                 hash_rules::hash_single_branch(h1)
             };
@@ -337,10 +337,11 @@ mod tests {
 
     use ::crypto::{Hash, hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
+    use ::storage::fields::DeserializeFromJson;
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
-    use super::hash_rules::{LEAF_DOMAIN, BRANCH_DOMAIN, SINGLE_BRANCH_DOMAIN}; 
+    use super::hash_rules::{LEAF_DOMAIN, BRANCH_DOMAIN, SINGLE_BRANCH_DOMAIN};
     const KEY_SIZE: usize = 10;
 
     fn generate_fully_random_data_keys(len: usize) -> Vec<(Vec<u8>)> {
@@ -449,6 +450,7 @@ mod tests {
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (end_range - start_range) as usize);
             assert_eq!(deser_proof.compute_proof_root(), table_root_hash);
+            // println!("{:?}", deser_proof);
         }
     }
 
@@ -459,36 +461,36 @@ mod tests {
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
         let h1 = hash(&[LEAF_DOMAIN, 1, 2]);
-        let h2 = hash(&[LEAF_DOMAIN,2, 3]);
-        let h3 = hash(&[LEAF_DOMAIN,3, 4]);
-        let h4 = hash(&[LEAF_DOMAIN,4, 5]);
-        let h5 = hash(&[LEAF_DOMAIN,5, 6]);
-        let h6 = hash(&[LEAF_DOMAIN,6, 7]);
-        let h7 = hash(&[LEAF_DOMAIN,7, 8]);
-        let h8 = hash(&[LEAF_DOMAIN,8, 9]);
+        let h2 = hash(&[LEAF_DOMAIN, 2, 3]);
+        let h3 = hash(&[LEAF_DOMAIN, 3, 4]);
+        let h4 = hash(&[LEAF_DOMAIN, 4, 5]);
+        let h5 = hash(&[LEAF_DOMAIN, 5, 6]);
+        let h6 = hash(&[LEAF_DOMAIN, 6, 7]);
+        let h7 = hash(&[LEAF_DOMAIN, 7, 8]);
+        let h8 = hash(&[LEAF_DOMAIN, 8, 9]);
 
         let h12 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1.as_ref(), h2.as_ref()].concat());
         let h3up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h3.as_ref()].concat());
-        let h123 = hash(&[&[BRANCH_DOMAIN] as &[u8],h12.as_ref(), h3up.as_ref()].concat());
+        let h123 = hash(&[&[BRANCH_DOMAIN] as &[u8], h12.as_ref(), h3up.as_ref()].concat());
 
-        let h34 = hash(&[&[BRANCH_DOMAIN] as &[u8],h3.as_ref(), h4.as_ref()].concat());
-        let h1234 = hash(&[&[BRANCH_DOMAIN] as &[u8],h12.as_ref(), h34.as_ref()].concat());
+        let h34 = hash(&[&[BRANCH_DOMAIN] as &[u8], h3.as_ref(), h4.as_ref()].concat());
+        let h1234 = hash(&[&[BRANCH_DOMAIN] as &[u8], h12.as_ref(), h34.as_ref()].concat());
 
         let h5up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5.as_ref()].concat());
         let h5upup = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5up.as_ref()].concat());
-        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h5upup.as_ref()].concat());
+        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h5upup.as_ref()].concat());
 
-        let h56 = hash(&[&[BRANCH_DOMAIN] as &[u8],h5.as_ref(), h6.as_ref()].concat());
+        let h56 = hash(&[&[BRANCH_DOMAIN] as &[u8], h5.as_ref(), h6.as_ref()].concat());
         let h56up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h56.as_ref()].concat());
-        let h123456 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h56up.as_ref()].concat());
+        let h123456 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h56up.as_ref()].concat());
 
         let h7up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h7.as_ref()].concat());
-        let h567 = hash(&[&[BRANCH_DOMAIN] as &[u8],h56.as_ref(), h7up.as_ref()].concat());
-        let h1234567 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h567.as_ref()].concat());
+        let h567 = hash(&[&[BRANCH_DOMAIN] as &[u8], h56.as_ref(), h7up.as_ref()].concat());
+        let h1234567 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h567.as_ref()].concat());
 
-        let h78 = hash(&[&[BRANCH_DOMAIN] as &[u8],h7.as_ref(), h8.as_ref()].concat());
-        let h5678 = hash(&[&[BRANCH_DOMAIN] as &[u8],h56.as_ref(), h78.as_ref()].concat());
-        let h12345678 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h5678.as_ref()].concat());
+        let h78 = hash(&[&[BRANCH_DOMAIN] as &[u8], h7.as_ref(), h8.as_ref()].concat());
+        let h5678 = hash(&[&[BRANCH_DOMAIN] as &[u8], h56.as_ref(), h78.as_ref()].concat());
+        let h12345678 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h5678.as_ref()].concat());
 
         let expected_hash_comb: Vec<(Vec<u8>, Hash, u32)> = vec![(vec![1, 2], h1, 0),
                                                                  (vec![2, 3], h12, 1),
@@ -512,6 +514,7 @@ mod tests {
             let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(), 1);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
+            // println!("{:?}", deser_proof);
 
             let range_proof = table.construct_path_for_range(0, proof_ind + 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
@@ -525,6 +528,7 @@ mod tests {
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (proof_ind + 1) as usize);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
+            // println!("{:?}", deser_proof);
         }
 
         let range_proof = table.construct_path_for_range(0, 8).unwrap();
@@ -585,19 +589,19 @@ mod tests {
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
         let h1 = hash(&vec![LEAF_DOMAIN, 0, 1, 2]);
-        let h2 = hash(&vec![LEAF_DOMAIN,1, 2, 3]);
-        let h3 = hash(&vec![LEAF_DOMAIN,2, 3, 4]);
-        let h4 = hash(&vec![LEAF_DOMAIN,3, 4, 5]);
-        let h5 = hash(&vec![LEAF_DOMAIN,4, 5, 6]);
-        let h12 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1.as_ref(), h2.as_ref()].concat());
-        let h34 = hash(&[&[BRANCH_DOMAIN] as &[u8],h3.as_ref(), h4.as_ref()].concat());
-        let h1234 = hash(&[&[BRANCH_DOMAIN] as &[u8],h12.as_ref(), h34.as_ref()].concat());
+        let h2 = hash(&vec![LEAF_DOMAIN, 1, 2, 3]);
+        let h3 = hash(&vec![LEAF_DOMAIN, 2, 3, 4]);
+        let h4 = hash(&vec![LEAF_DOMAIN, 3, 4, 5]);
+        let h5 = hash(&vec![LEAF_DOMAIN, 4, 5, 6]);
+        let h12 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1.as_ref(), h2.as_ref()].concat());
+        let h34 = hash(&[&[BRANCH_DOMAIN] as &[u8], h3.as_ref(), h4.as_ref()].concat());
+        let h1234 = hash(&[&[BRANCH_DOMAIN] as &[u8], h12.as_ref(), h34.as_ref()].concat());
         let h5up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5.as_ref()].concat());
         let h5upup = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5up.as_ref()].concat());
-        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h5upup.as_ref()].concat());
+        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h5upup.as_ref()].concat());
 
         for i in 0u8...4 {
-            table.append(vec![i, i+1, i+2]).unwrap();
+            table.append(vec![i, i + 1, i + 2]).unwrap();
         }
 
         assert_eq!(table.root_hash().unwrap(), h12345);
@@ -624,10 +628,10 @@ mod tests {
             assert!(false);
         }
         table.append(vec![5, 6, 7]).unwrap();
-        let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
-        println!("{:?}", range_proof);
-        let json_repre = serde_json::to_string(&range_proof).unwrap();
-        println!("{}", json_repre );
+        // let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
+        // println!("{:?}", range_proof);
+        // let json_repre = serde_json::to_string(&range_proof).unwrap();
+        // println!("{}", json_repre );
     }
 
     #[test]

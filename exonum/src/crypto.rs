@@ -67,7 +67,7 @@ macro_rules! implement_public_sodium_wrapper {
             let slice = &inner.0; 
             let hex_bytes = bytes_to_hex(&slice[0..BYTES_IN_DEBUG]); 
             let type_str = stringify!($name); 
-            write!(f, "{}({}...)",type_str, hex_bytes)
+            write!(f, "\"{}({}...)\"",type_str, hex_bytes)
         }
     }
     )
@@ -93,7 +93,7 @@ macro_rules! implement_private_sodium_wrapper {
             let slice = &inner.0; 
             let hex_bytes = bytes_to_hex(&slice[0..BYTES_IN_DEBUG]); 
             let type_str = stringify!($name); 
-            write!(f, "{}({}...)",type_str, hex_bytes)
+            write!(f, "\"{}({}...)\"",type_str, hex_bytes)
         }
     }
     )
