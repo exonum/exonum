@@ -164,12 +164,11 @@ impl<V: StorageValue> Proofnode<V> {
                 if let Some(ref hash_val) = *right_hash {
                 hash_rules::hash_branch(left_proof.compute_proof_root(), *hash_val)
                 } else {
-                    left_proof.compute_proof_root()
+                    hash_rules::hash_single_branch(left_proof.compute_proof_root())             
                 }
             } 
             Proofnode::Right(ref left_hash, ref right_proof) => {
                 hash_rules::hash_branch(*left_hash, right_proof.compute_proof_root())
-
             }
             Proofnode::Leaf(ref val) => hash_rules::hash_leaf(val) 
         }

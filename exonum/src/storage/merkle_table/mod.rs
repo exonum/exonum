@@ -38,6 +38,7 @@ mod hash_rules {
     use ::storage::fields::StorageValue; 
     pub const LEAF_DOMAIN : u8 = 00;
     pub const BRANCH_DOMAIN: u8 = 01;  
+    pub const SINGLE_BRANCH_DOMAIN: u8 = 02; 
 
     pub fn hash_leaf<V: StorageValue>(value: &V) -> Hash{
         let mut vecb = Vec::with_capacity(1 + value.len_hint()); 
@@ -51,6 +52,13 @@ mod hash_rules {
         vecb.push(BRANCH_DOMAIN);
         vecb = left.serialize(vecb); 
         vecb = right.serialize(vecb); 
+        hash(&vecb)
+    }
+
+    pub fn hash_single_branch(left: Hash) -> Hash {
+        let mut vecb = Vec::with_capacity(1 + left.len_hint()); 
+        vecb.push(SINGLE_BRANCH_DOMAIN); 
+        vecb = left.serialize(vecb); 
         hash(&vecb)
     }
 }
@@ -211,7 +219,8 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         while index != K::zero() {
             // Left leaf, Right leaf is empty
             let new_hash = if index.is_even() {
-                self.get_hash(current_height, index)?.unwrap()
+                let h1 = self.get_hash(current_height, index)?.unwrap(); 
+                hash_rules::hash_single_branch(h1)
                 // TODO replace by error
 
             } else {
@@ -244,7 +253,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
             let new_hash = if let Some(h2) = h2 {
                 hash_rules::hash_branch(h1,h2)
             } else {
-                h1
+                hash_rules::hash_single_branch(h1)
             };
 
             current_height = current_height + K::one();
@@ -331,7 +340,7 @@ mod tests {
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
-    use super::hash_rules::{LEAF_DOMAIN, BRANCH_DOMAIN}; 
+    use super::hash_rules::{LEAF_DOMAIN, BRANCH_DOMAIN, SINGLE_BRANCH_DOMAIN}; 
     const KEY_SIZE: usize = 10;
 
     fn generate_fully_random_data_keys(len: usize) -> Vec<(Vec<u8>)> {
@@ -457,21 +466,27 @@ mod tests {
         let h6 = hash(&[LEAF_DOMAIN,6, 7]);
         let h7 = hash(&[LEAF_DOMAIN,7, 8]);
         let h8 = hash(&[LEAF_DOMAIN,8, 9]);
+
         let h12 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1.as_ref(), h2.as_ref()].concat());
-        let h123 = hash(&[&[BRANCH_DOMAIN] as &[u8],h12.as_ref(), h3.as_ref()].concat());
+        let h3up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h3.as_ref()].concat());
+        let h123 = hash(&[&[BRANCH_DOMAIN] as &[u8],h12.as_ref(), h3up.as_ref()].concat());
 
         let h34 = hash(&[&[BRANCH_DOMAIN] as &[u8],h3.as_ref(), h4.as_ref()].concat());
         let h1234 = hash(&[&[BRANCH_DOMAIN] as &[u8],h12.as_ref(), h34.as_ref()].concat());
 
-        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h5.as_ref()].concat());
+        let h5up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5.as_ref()].concat());
+        let h5upup = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5up.as_ref()].concat());
+        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h5upup.as_ref()].concat());
 
         let h56 = hash(&[&[BRANCH_DOMAIN] as &[u8],h5.as_ref(), h6.as_ref()].concat());
-        let h123456 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h56.as_ref()].concat());
+        let h56up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h56.as_ref()].concat());
+        let h123456 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h56up.as_ref()].concat());
 
-        let h78 = hash(&[&[BRANCH_DOMAIN] as &[u8],h7.as_ref(), h8.as_ref()].concat());
-        let h567 = hash(&[&[BRANCH_DOMAIN] as &[u8],h56.as_ref(), h7.as_ref()].concat());
+        let h7up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h7.as_ref()].concat());
+        let h567 = hash(&[&[BRANCH_DOMAIN] as &[u8],h56.as_ref(), h7up.as_ref()].concat());
         let h1234567 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h567.as_ref()].concat());
 
+        let h78 = hash(&[&[BRANCH_DOMAIN] as &[u8],h7.as_ref(), h8.as_ref()].concat());
         let h5678 = hash(&[&[BRANCH_DOMAIN] as &[u8],h56.as_ref(), h78.as_ref()].concat());
         let h12345678 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h5678.as_ref()].concat());
 
@@ -577,7 +592,9 @@ mod tests {
         let h12 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1.as_ref(), h2.as_ref()].concat());
         let h34 = hash(&[&[BRANCH_DOMAIN] as &[u8],h3.as_ref(), h4.as_ref()].concat());
         let h1234 = hash(&[&[BRANCH_DOMAIN] as &[u8],h12.as_ref(), h34.as_ref()].concat());
-        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h5.as_ref()].concat());
+        let h5up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5.as_ref()].concat());
+        let h5upup = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5up.as_ref()].concat());
+        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8],h1234.as_ref(), h5upup.as_ref()].concat());
 
         for i in 0u8...4 {
             table.append(vec![i, i+1, i+2]).unwrap();
