@@ -1,43 +1,48 @@
 use std::mem;
 use std::sync::Arc;
 use byteorder::{ByteOrder, BigEndian};
+use super::Error;
 
-use ::crypto::{Hash, hash, HASH_SIZE, HexValue, FromHexError};
+use ::crypto::{Hash, hash, HASH_SIZE};
 use ::messages::{MessageBuffer, Message, AnyTx};
+use serde::Deserialize;
+use serde_json::Value;
+use serde_json::value::from_value;
+
+pub trait DeserializeFromJson: Sized {
+    fn deserialize(json: &Value) -> Result<Self, Error>;
+}
+
+impl<T: Deserialize> DeserializeFromJson for T {
+    fn deserialize(json: &Value) -> Result<Self, Error> {
+        from_value(json.clone())
+            .map_err(|e| Error::new(format!("Error deserializing from json: {}", e)))
+    }
+}
 
 #[derive(Clone)]
 pub struct HeightBytes(pub [u8; 32]);
 
 pub trait StorageValue {
     fn serialize(&self, buf: Vec<u8>) -> Vec<u8>;
-    ///to inform caller what capacity is needed for serialize beforehand
+    /// to inform caller what capacity is needed for serialize beforehand
     fn len_hint(&self) -> usize {
         0
-    } 
+    }
     fn deserialize(v: Vec<u8>) -> Self;
     fn hash(&self) -> Hash {
         hash(&self.serialize(Vec::new()))
-    }  
-}
-
-pub fn repr_stor_val<T: StorageValue>(value: &T) -> String {
-    let vec_bytes = value.serialize(Vec::new());
-    vec_bytes.to_hex()
-}
-
-pub fn decode_from_b64_string<T: StorageValue>(hex: &str) -> Result<T, FromHexError> {
-    let vec_bytes: Vec<u8> = Vec::<u8>::from_hex(hex)?; 
-    Ok(StorageValue::deserialize(vec_bytes))
+    }
 }
 
 impl StorageValue for u16 {
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
-        let old_len = buf.len(); 
-        let new_len = old_len + mem::size_of::<u16>(); 
-        buf.resize(new_len, 0); 
+        let old_len = buf.len();
+        let new_len = old_len + mem::size_of::<u16>();
+        buf.resize(new_len, 0);
 
-        BigEndian::write_u16(&mut buf[old_len..new_len], *self);  
-        buf 
+        BigEndian::write_u16(&mut buf[old_len..new_len], *self);
+        buf
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
@@ -45,17 +50,17 @@ impl StorageValue for u16 {
     }
 
     fn len_hint(&self) -> usize {
-        mem::size_of::<u16>() 
+        mem::size_of::<u16>()
     }
 }
 
 impl StorageValue for u32 {
     // TODO: return Cow<[u8]>
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
-        let old_len = buf.len(); 
-        let new_len = old_len + mem::size_of::<u32>(); 
+        let old_len = buf.len();
+        let new_len = old_len + mem::size_of::<u32>();
         buf.resize(new_len, 0);
-        BigEndian::write_u32(&mut buf[old_len..new_len], *self); 
+        BigEndian::write_u32(&mut buf[old_len..new_len], *self);
         buf
     }
 
@@ -64,14 +69,14 @@ impl StorageValue for u32 {
     }
 
     fn len_hint(&self) -> usize {
-        mem::size_of::<u32>() 
+        mem::size_of::<u32>()
     }
 }
 
 impl StorageValue for u64 {
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
-        let old_len = buf.len(); 
-        let new_len = old_len + mem::size_of::<u64>(); 
+        let old_len = buf.len();
+        let new_len = old_len + mem::size_of::<u64>();
         buf.resize(new_len, 0);
         BigEndian::write_u64(&mut buf[old_len..new_len], *self);
         buf
@@ -82,14 +87,14 @@ impl StorageValue for u64 {
     }
 
     fn len_hint(&self) -> usize {
-        mem::size_of::<u64>() 
+        mem::size_of::<u64>()
     }
 }
 
 impl StorageValue for i64 {
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
-        let old_len = buf.len(); 
-        let new_len = old_len + mem::size_of::<i64>(); 
+        let old_len = buf.len();
+        let new_len = old_len + mem::size_of::<i64>();
         buf.resize(new_len, 0);
         BigEndian::write_i64(&mut buf[old_len..new_len], *self);
         buf
@@ -100,20 +105,20 @@ impl StorageValue for i64 {
     }
 
     fn len_hint(&self) -> usize {
-        mem::size_of::<i64>() 
+        mem::size_of::<i64>()
     }
 }
 
 impl StorageValue for Hash {
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
 
-        let byteslice = self.as_ref();   
-        let old_len = buf.len(); 
-        let new_len = old_len + byteslice.len(); 
+        let byteslice = self.as_ref();
+        let old_len = buf.len();
+        let new_len = old_len + byteslice.len();
         buf.resize(new_len, 0);
         {
-            let part = &mut buf[old_len..new_len]; 
-            part.copy_from_slice(byteslice); 
+            let part = &mut buf[old_len..new_len];
+            part.copy_from_slice(byteslice);
         }
         buf
     }
@@ -150,12 +155,12 @@ impl<T> StorageValue for T
 {
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
         let byteslice = self.raw().as_ref().as_ref();
-        let old_len = buf.len(); 
-        let new_len = old_len + byteslice.len(); 
+        let old_len = buf.len();
+        let new_len = old_len + byteslice.len();
         buf.resize(new_len, 0);
         {
-            let part = &mut buf[old_len..new_len]; 
-            part.copy_from_slice(byteslice); 
+            let part = &mut buf[old_len..new_len];
+            part.copy_from_slice(byteslice);
         }
         buf
     }
@@ -165,7 +170,7 @@ impl<T> StorageValue for T
     }
 
     fn len_hint(&self) -> usize {
-        self.raw().as_ref().as_ref().len() 
+        self.raw().as_ref().as_ref().len()
     }
 
     fn hash(&self) -> Hash {
@@ -178,18 +183,18 @@ impl<AppTx> StorageValue for AnyTx<AppTx>
 {
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
         let byteslice = self.raw().as_ref().as_ref();
-        let old_len = buf.len(); 
-        let new_len = old_len + byteslice.len(); 
+        let old_len = buf.len();
+        let new_len = old_len + byteslice.len();
         buf.resize(new_len, 0);
         {
-            let part = &mut buf[old_len..new_len]; 
-            part.copy_from_slice(byteslice); 
+            let part = &mut buf[old_len..new_len];
+            part.copy_from_slice(byteslice);
         }
         buf
     }
 
     fn len_hint(&self) -> usize {
-        self.raw().as_ref().as_ref().len() 
+        self.raw().as_ref().as_ref().len()
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
@@ -203,14 +208,13 @@ impl<AppTx> StorageValue for AnyTx<AppTx>
 }
 
 impl StorageValue for Vec<u8> {
-    
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
-        let old_len = buf.len(); 
-        let new_len = old_len + self.len(); 
+        let old_len = buf.len();
+        let new_len = old_len + self.len();
         buf.resize(new_len, 0);
         {
-            let part = &mut buf[old_len..new_len]; 
-            part.copy_from_slice(self); 
+            let part = &mut buf[old_len..new_len];
+            part.copy_from_slice(self);
         }
         buf
     }
@@ -250,13 +254,13 @@ impl From<HeightBytes> for u64 {
 impl StorageValue for HeightBytes {
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
 
-        let byteslice = self.as_ref();   
-        let old_len = buf.len(); 
-        let new_len = old_len + byteslice.len(); 
+        let byteslice = self.as_ref();
+        let old_len = buf.len();
+        let new_len = old_len + byteslice.len();
         buf.resize(new_len, 0);
         {
-            let part = &mut buf[old_len..new_len]; 
-            part.copy_from_slice(byteslice); 
+            let part = &mut buf[old_len..new_len];
+            part.copy_from_slice(byteslice);
         }
         buf
     }
@@ -264,7 +268,7 @@ impl StorageValue for HeightBytes {
     fn len_hint(&self) -> usize {
         32
     }
-    
+
     fn deserialize(v: Vec<u8>) -> Self {
         let mut b = [0u8; 32];
         b.clone_from_slice(v.as_slice());

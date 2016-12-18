@@ -296,12 +296,12 @@ impl BranchNode {
 
 impl StorageValue for BranchNode {
     fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
-        let old_len = buf.len(); 
-        let new_len = old_len + self.raw.len(); 
+        let old_len = buf.len();
+        let new_len = old_len + self.raw.len();
         buf.resize(new_len, 0);
         {
-            let part = &mut buf[old_len..new_len]; 
-            part.copy_from_slice(&self.raw); 
+            let part = &mut buf[old_len..new_len];
+            part.copy_from_slice(&self.raw);
         }
         buf
     }
@@ -311,9 +311,9 @@ impl StorageValue for BranchNode {
     }
 
     fn len_hint(&self) -> usize {
-            self.raw.len()
+        self.raw.len()
     }
-    
+
     fn hash(&self) -> Hash {
         self.hash()
     }
@@ -791,7 +791,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
 impl<'a> fmt::Debug for BitSlice<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let bytes_hex = bytes_to_hex(&self.data);
-        let repr_string = format!("0x{}_{}_{}", bytes_hex, self.from, self.to);
+        let repr_string = format!("0x{}_from:{}_to:{}", bytes_hex, self.from, self.to);
         write!(f, "{:?}", repr_string)
     }
 }
@@ -833,6 +833,7 @@ mod tests {
     use rand::{thread_rng, Rng};
 
     use ::crypto::{hash, Hash};
+    use ::storage::fields::DeserializeFromJson;
     use ::storage::{Map, MemoryDB, MapTable};
     use serde_json;
 
@@ -1361,6 +1362,7 @@ mod tests {
             assert!(check_res.is_none());
         }
         let json_repre = serde_json::to_string(&proof_path).unwrap();
+        // println!("{}", json_repre);
         let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
         let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
         {
@@ -1392,6 +1394,7 @@ mod tests {
             assert_eq!(*check_res.unwrap(), root_val);
         }
         let json_repre = serde_json::to_string(&proof_path).unwrap();
+        // println!("{}", json_repre);
         let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
         let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
         {
@@ -1443,7 +1446,7 @@ mod tests {
             let check_res = verify_proof_consistency(&deser_proof, &item.0, table_root_hash);
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert_eq!(*proved_value.unwrap(), item.1);
-            // println!("Proofpath {:?}", deser_proof);
+            // println!("{:?}", deser_proof);
         }
     }
 
@@ -1485,7 +1488,7 @@ mod tests {
             let check_res = verify_proof_consistency(&deser_proof, key, table_root_hash);
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert!(proved_value.is_none());
-            // println!("Proofpath {:?}", proof_path_to_key);
+            // println!("{:?}", deser_proof);
         }
     }
 

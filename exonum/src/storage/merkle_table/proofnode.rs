@@ -1,7 +1,6 @@
 use ::storage::{StorageValue, Error};
-use ::storage::utils::bytes_to_hex;
-use ::storage::fields::{repr_stor_val, decode_from_b64_string};
-use ::crypto::{Hash};
+use ::storage::fields::DeserializeFromJson;
+use ::crypto::Hash;
 use std::fmt;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
@@ -23,7 +22,7 @@ pub enum Proofnode<V> {
     Leaf(V),
 }
 
-impl<V: StorageValue> Serialize for Proofnode<V> {
+impl<V: Serialize> Serialize for Proofnode<V> {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
@@ -38,9 +37,8 @@ impl<V: StorageValue> Serialize for Proofnode<V> {
             Left(ref left_proof, ref option_hash) => {
                 if let Some(ref hash) = *option_hash {
                     state = ser.serialize_struct("Left", 2)?;
-                    let hash_repr = repr_stor_val(hash);
                     ser.serialize_struct_elt(&mut state, LEFT_DESC, left_proof)?;
-                    ser.serialize_struct_elt(&mut state, RIGHT_DESC, hash_repr)?;
+                    ser.serialize_struct_elt(&mut state, RIGHT_DESC, hash)?;
                 } else {
                     state = ser.serialize_struct("Left", 1)?;
                     ser.serialize_struct_elt(&mut state, LEFT_DESC, left_proof)?;
@@ -48,22 +46,19 @@ impl<V: StorageValue> Serialize for Proofnode<V> {
             } 
             Right(ref hash, ref right_proof) => {
                 state = ser.serialize_struct("Right", 2)?;
-                let hash_repr = repr_stor_val(hash);
-                ser.serialize_struct_elt(&mut state, LEFT_DESC, hash_repr)?;
+                ser.serialize_struct_elt(&mut state, LEFT_DESC, hash)?;
                 ser.serialize_struct_elt(&mut state, RIGHT_DESC, right_proof)?;
             } 
             Leaf(ref val) => {
                 state = ser.serialize_struct("Leaf", 1)?;
-                let val_repr = repr_stor_val(val);
-                ser.serialize_struct_elt(&mut state, VAL_DESC, val_repr)?;
+                ser.serialize_struct_elt(&mut state, VAL_DESC, val)?;
             }
         }
         ser.serialize_struct_end(state)
     }
 }
-
-impl<V: StorageValue> Proofnode<V> {
-    pub fn deserialize(json: &Value) -> Result<Self, Error> {
+impl<V: DeserializeFromJson> DeserializeFromJson for Proofnode<V> {
+    fn deserialize(json: &Value) -> Result<Self, Error> {
         if !json.is_object() {
             return Err(Error::new(format!("Invalid json: it is expected to be json Object. \
                                            json: {:?}",
@@ -92,23 +87,11 @@ impl<V: StorageValue> Proofnode<V> {
                 };
                 if right_value.is_string() {
                     let left_proof = Self::deserialize(left_value)?;
-                    let val_repr = right_value.as_str().unwrap();
-                    let right_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
+                    let right_hash: Hash = DeserializeFromJson::deserialize(right_value)?;
                     Proofnode::Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
                     let right_proof = Self::deserialize(right_value)?;
-                    let val_repr = left_value.as_str().unwrap();
-                    let left_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
+                    let left_hash: Hash = DeserializeFromJson::deserialize(left_value)?;
                     Proofnode::Right(left_hash, Box::new(right_proof))
                 } else {
                     let left_proof = Self::deserialize(left_value)?;
@@ -125,20 +108,8 @@ impl<V: StorageValue> Proofnode<V> {
                                                   json)));
                 }
                 if let Some(leaf_value) = map_key_value.get(VAL_DESC) {
-                    if !leaf_value.is_string() {
-                        return Err(Error::new(format!("Invalid json: leaf value is expected to \
-                                                       be a string. json: {:?}",
-                                                      leaf_value)));
-                    }
-                    let val_repr = leaf_value.as_str().unwrap();
-                    let val: V = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
+                    let val: V = V::deserialize(leaf_value)?;
                     Proofnode::Leaf(val)
-
                 } else {
                     // LEFT_DESC is present
                     let left_proof_value = map_key_value.get(LEFT_DESC).unwrap();
@@ -154,23 +125,24 @@ impl<V: StorageValue> Proofnode<V> {
         };
         Ok(res)
     }
-
+}
+impl<V: StorageValue> Proofnode<V> {
     pub fn compute_proof_root(&self) -> Hash {
         match *self {
             Proofnode::Full(ref left, ref right) => {
-               hash_rules::hash_branch(left.compute_proof_root(), right.compute_proof_root())
+                hash_rules::hash_branch(left.compute_proof_root(), right.compute_proof_root())
             }
             Proofnode::Left(ref left_proof, ref right_hash) => {
                 if let Some(ref hash_val) = *right_hash {
-                hash_rules::hash_branch(left_proof.compute_proof_root(), *hash_val)
+                    hash_rules::hash_branch(left_proof.compute_proof_root(), *hash_val)
                 } else {
-                    hash_rules::hash_single_branch(left_proof.compute_proof_root())             
+                    hash_rules::hash_single_branch(left_proof.compute_proof_root())
                 }
             } 
             Proofnode::Right(ref left_hash, ref right_proof) => {
                 hash_rules::hash_branch(*left_hash, right_proof.compute_proof_root())
             }
-            Proofnode::Leaf(ref val) => hash_rules::hash_leaf(val) 
+            Proofnode::Leaf(ref val) => hash_rules::hash_leaf(val), 
         }
     }
 
@@ -193,29 +165,22 @@ impl<V: StorageValue> Proofnode<V> {
     }
 }
 
-impl<V: StorageValue + fmt::Debug> fmt::Debug for Proofnode<V> {
+impl<V: fmt::Debug> fmt::Debug for Proofnode<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::Proofnode::*;
         match *self {
-            Full(ref left, ref right) => write!(f, "{{ left: {:?}, right: {:?} }}", left, right),
+            Full(ref left, ref right) => write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left, right),
             Left(ref left_proof, ref right_hash) => {
-                let hash_repr: String;
                 if let Some(ref digest) = *right_hash {
-                    hash_repr = bytes_to_hex(digest);
+                    write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_proof, digest)
                 } else {
-                    hash_repr = "None".to_string();
+                    write!(f, "{{\"left\":{:?}}}", left_proof)
                 }
-                write!(f,
-                       "{{ left: {:?}, right_hash: {:?} }}",
-                       left_proof,
-                       hash_repr)
             } 
             Right(ref left_hash, ref right) => {
-                let hash_repr: String;
-                hash_repr = bytes_to_hex(left_hash);
-                write!(f, "{{ left_hash: {:?}, right: {:?} }}", hash_repr, right)
+                write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_hash, right)
             }
-            Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
+            Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val), 
         }
     }
 }

@@ -1,7 +1,6 @@
 use ::storage::{StorageValue, Error};
-use ::storage::utils::bytes_to_hex;
-use ::storage::fields::{repr_stor_val, decode_from_b64_string};
-use ::crypto::{hash, Hash};
+use ::storage::fields::DeserializeFromJson;
+use ::crypto::{hash, Hash, HexValue};
 use std::fmt;
 use super::{BitSlice, KEY_SIZE};
 use serde::{Serialize, Serializer};
@@ -32,7 +31,7 @@ pub enum ProofPathToKey<V> {
     Leaf(V),
 }
 
-impl<V: StorageValue + Clone> Serialize for ProofPathToKey<V> {
+impl<V: Serialize> Serialize for ProofPathToKey<V> {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
@@ -41,38 +40,38 @@ impl<V: StorageValue + Clone> Serialize for ProofPathToKey<V> {
         match *self {
             LeafRootInclusive(ref key, ref value) => {
                 state = ser.serialize_struct("LeafRootInclusive", 2)?;
-                ser.serialize_struct_elt(&mut state, ROOT_KEY_DESC, repr_stor_val(key))?;
-                ser.serialize_struct_elt(&mut state, VAL_DESC, repr_stor_val(value))?;
+                ser.serialize_struct_elt(&mut state, ROOT_KEY_DESC, key.to_hex())?;
+                ser.serialize_struct_elt(&mut state, VAL_DESC, value)?;
             } 
             LeafRootExclusive(ref key, ref hash) => {
                 state = ser.serialize_struct("LeafRootExclusive", 2)?;
-                ser.serialize_struct_elt(&mut state, ROOT_KEY_DESC, repr_stor_val(key))?;
-                ser.serialize_struct_elt(&mut state, ROOT_VAL_HASH, repr_stor_val(hash))?;
+                ser.serialize_struct_elt(&mut state, ROOT_KEY_DESC, key.to_hex())?;
+                ser.serialize_struct_elt(&mut state, ROOT_VAL_HASH, hash)?;
             } 
             BranchKeyNotFound(ref lhash, ref rhash, ref lkey, ref rkey) => {
                 state = ser.serialize_struct("BranchKeyNotFound", 4)?;
-                ser.serialize_struct_elt(&mut state, LEFT_HASH_DESC, repr_stor_val(lhash))?;
-                ser.serialize_struct_elt(&mut state, RIGHT_HASH_DESC, repr_stor_val(rhash))?;
-                ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, repr_stor_val(lkey))?;
-                ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, repr_stor_val(rkey))?;
+                ser.serialize_struct_elt(&mut state, LEFT_HASH_DESC, lhash)?;
+                ser.serialize_struct_elt(&mut state, RIGHT_HASH_DESC, rhash)?;
+                ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, lkey.to_hex())?;
+                ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, rkey.to_hex())?;
             } 
             LeftBranch(ref proof, ref rhash, ref lkey, ref rkey) => {
                 state = ser.serialize_struct("LeftBranch", 4)?;
                 ser.serialize_struct_elt(&mut state, LEFT_HASH_DESC, proof)?;
-                ser.serialize_struct_elt(&mut state, RIGHT_HASH_DESC, repr_stor_val(rhash))?;
-                ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, repr_stor_val(lkey))?;
-                ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, repr_stor_val(rkey))?;
+                ser.serialize_struct_elt(&mut state, RIGHT_HASH_DESC, rhash)?;
+                ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, lkey.to_hex())?;
+                ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, rkey.to_hex())?;
             }
             RightBranch(ref lhash, ref proof, ref lkey, ref rkey) => {
                 state = ser.serialize_struct("RightBranch", 4)?;
-                ser.serialize_struct_elt(&mut state, LEFT_HASH_DESC, repr_stor_val(lhash))?;
+                ser.serialize_struct_elt(&mut state, LEFT_HASH_DESC, lhash)?;
                 ser.serialize_struct_elt(&mut state, RIGHT_HASH_DESC, proof)?;
-                ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, repr_stor_val(lkey))?;
-                ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, repr_stor_val(rkey))?;
+                ser.serialize_struct_elt(&mut state, LEFT_SLICE_DESC, lkey.to_hex())?;
+                ser.serialize_struct_elt(&mut state, RIGHT_SLICE_DESC, rkey.to_hex())?;
             } 
             Leaf(ref value) => {
                 state = ser.serialize_struct("Leaf", 1)?;
-                ser.serialize_struct_elt(&mut state, VAL_DESC, repr_stor_val(value))?;
+                ser.serialize_struct_elt(&mut state, VAL_DESC, value)?;
             }
         }
         ser.serialize_struct_end(state)
@@ -107,8 +106,8 @@ pub fn verify_proof_consistency<V: StorageValue + fmt::Debug, A: AsRef<[u8]>>
     Ok(result)
 }
 
-impl<V: StorageValue> ProofPathToKey<V> {
-    pub fn deserialize(json: &Value) -> Result<Self, Error> {
+impl<V: DeserializeFromJson> DeserializeFromJson for ProofPathToKey<V> {
+    fn deserialize(json: &Value) -> Result<Self, Error> {
         if !json.is_object() {
             return Err(Error::new(format!("Invalid json: it is expected to be json Object. \
                                            json: {:?}",
@@ -123,18 +122,7 @@ impl<V: StorageValue> ProofPathToKey<V> {
                                                   json)));
                 }
                 let leaf_value = map_key_value.get(VAL_DESC).unwrap();
-                if !leaf_value.is_string() {
-                    return Err(Error::new(format!("Invalid json: leaf value is expected to be \
-                                                   a string. json: {:?}",
-                                                  leaf_value)));
-                }
-                let val_repr = leaf_value.as_str().unwrap();
-                let val: V = decode_from_b64_string(val_repr).map_err(|e| {
-                        Error::new(format!("Base64Error: {}. The value, that was attempted to be \
-                                            decoded: {}",
-                                           e,
-                                           val_repr))
-                    })?;
+                let val: V = V::deserialize(leaf_value)?;
                 ProofPathToKey::Leaf(val)  // only the VAL_DESC variant
             } 
             2 => {
@@ -159,43 +147,21 @@ impl<V: StorageValue> ProofPathToKey<V> {
                                                   root_key_value)));
                 }
                 let val_repr = root_key_value.as_str().unwrap();
-                let root_key: Vec<u8> = decode_from_b64_string(val_repr).map_err(|e| {
-                        Error::new(format!("Base64Error: {}. The value, that was attempted to be \
-                                            decoded: {}",
+                let root_key: Vec<u8> = Vec::<u8>::from_hex(val_repr).map_err(|e| {
+                        Error::new(format!("FromHexError: {}. The value, that was attempted to \
+                                            be decoded: {}",
                                            e,
                                            val_repr))
                     })?;
 
 
                 if let Some(leaf_value) = map_key_value.get(VAL_DESC) {
-                    if !leaf_value.is_string() {
-                        return Err(Error::new(format!("Invalid json: leaf value is expected to \
-                                                       be a string. json: {:?}",
-                                                      leaf_value)));
-                    }
-                    let val_repr = leaf_value.as_str().unwrap();
-                    let val: V = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
+                    let val: V = V::deserialize(leaf_value)?;
                     ProofPathToKey::LeafRootInclusive(root_key, val)
                 } else {
                     // ROOT_VAL_HASH is present
                     let hash_value = map_key_value.get(ROOT_VAL_HASH).unwrap();
-                    if !hash_value.is_string() {
-                        return Err(Error::new(format!("Invalid json: leaf value is expected to \
-                                                       be a string. json: {:?}",
-                                                      hash_value)));
-                    }
-                    let val_repr = hash_value.as_str().unwrap();
-                    let hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
+                    let hash: Hash = DeserializeFromJson::deserialize(hash_value)?;
                     ProofPathToKey::LeafRootExclusive(root_key, hash)
                 }
             } 
@@ -225,16 +191,16 @@ impl<V: StorageValue> ProofPathToKey<V> {
                                                   right_slice_value)));
                 }
                 let val_repr = left_slice_value.as_str().unwrap();
-                let left_slice: Vec<u8> = decode_from_b64_string(val_repr).map_err(|e| {
-                        Error::new(format!("Base64Error: {}. The value, that was attempted to be \
-                                            decoded: {}",
+                let left_slice: Vec<u8> = Vec::<u8>::from_hex(val_repr).map_err(|e| {
+                        Error::new(format!("FromHexError: {}. The value, that was attempted to \
+                                            be decoded: {}",
                                            e,
                                            val_repr))
                     })?;
                 let val_repr = right_slice_value.as_str().unwrap();
-                let right_slice: Vec<u8> = decode_from_b64_string(val_repr).map_err(|e| {
-                        Error::new(format!("Base64Error: {}. The value, that was attempted to be \
-                                            decoded: {}",
+                let right_slice: Vec<u8> = Vec::<u8>::from_hex(val_repr).map_err(|e| {
+                        Error::new(format!("FromHexError: {}. The value, that was attempted to \
+                                            be decoded: {}",
                                            e,
                                            val_repr))
                     })?;
@@ -246,32 +212,14 @@ impl<V: StorageValue> ProofPathToKey<V> {
                                                   right_slice_value)));
                 }
                 if left_hash_value.is_string() && right_hash_value.is_string() {
-                    let val_repr = left_hash_value.as_str().unwrap();
-                    let left_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
-                    let val_repr = right_hash_value.as_str().unwrap();
-                    let right_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
+                    let left_hash: Hash = DeserializeFromJson::deserialize(left_hash_value)?;
+                    let right_hash: Hash = DeserializeFromJson::deserialize(right_hash_value)?;
                     ProofPathToKey::BranchKeyNotFound(left_hash,
                                                       right_hash,
                                                       left_slice,
                                                       right_slice)
                 } else if left_hash_value.is_string() {
-                    let val_repr = left_hash_value.as_str().unwrap();
-                    let left_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
+                    let left_hash: Hash = DeserializeFromJson::deserialize(left_hash_value)?;
                     let right_proof = Self::deserialize(right_hash_value)?;
                     ProofPathToKey::RightBranch(left_hash,
                                                 Box::new(right_proof),
@@ -279,13 +227,7 @@ impl<V: StorageValue> ProofPathToKey<V> {
                                                 right_slice)
                 } else {
                     // it's implied that right_hash_value.is_string() is true
-                    let val_repr = right_hash_value.as_str().unwrap();
-                    let right_hash: Hash = decode_from_b64_string(val_repr).map_err(|e| {
-                            Error::new(format!("Base64Error: {}. The value, that was attempted \
-                                                to be decoded: {}",
-                                               e,
-                                               val_repr))
-                        })?;
+                    let right_hash: Hash = DeserializeFromJson::deserialize(right_hash_value)?;
                     let left_proof = Self::deserialize(left_hash_value)?;
                     ProofPathToKey::LeftBranch(Box::new(left_proof),
                                                right_hash,
@@ -301,8 +243,9 @@ impl<V: StorageValue> ProofPathToKey<V> {
         };
         Ok(res)
     }
+}
 
-
+impl<V: StorageValue> ProofPathToKey<V> {
     pub fn compute_proof_root(&self) -> Hash {
         use self::ProofPathToKey::*;
         match *self { 
@@ -336,7 +279,9 @@ impl<V: StorageValue> ProofPathToKey<V> {
             Leaf(ref val) => val.hash(),            
         }
     }
+}
 
+impl<V> ProofPathToKey<V> {
     pub fn compute_height(&self, start_height: u16) -> u16 {
         use self::ProofPathToKey::*;
         match *self { 
@@ -352,7 +297,7 @@ impl<V: StorageValue> ProofPathToKey<V> {
     }
 }
 
-impl<V: StorageValue + fmt::Debug> ProofPathToKey<V> {
+impl<V: fmt::Debug> ProofPathToKey<V> {
     fn verify_root_proof_consistency(&self,
                                      searched_slice: &BitSlice)
                                      -> Result<Option<&V>, Error> {
@@ -509,47 +454,46 @@ impl<V: StorageValue + fmt::Debug> ProofPathToKey<V> {
     }
 }
 
-impl<V: StorageValue + fmt::Debug> fmt::Debug for ProofPathToKey<V> {
+impl<V: fmt::Debug> fmt::Debug for ProofPathToKey<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::ProofPathToKey::*;
         match *self {
             LeftBranch(ref proof, ref hash, ref left_slice_key, ref right_slice_key) => {
                 write!(f,
-                       "{{ left: {:?}, right: {:?}, left_slice: {:?},  right_slice: {:?} }}",
+                       "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
                        proof,
-                       bytes_to_hex(hash),
+                       hash,
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             } 
             RightBranch(ref hash, ref proof, ref left_slice_key, ref right_slice_key) => {
                 write!(f,
-                       "{{ left: {:?}, right: {:?}, left_slice: {:?},  right_slice: {:?} }}",
-                       bytes_to_hex(hash),
+                       "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
+                       hash,
                        proof,
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             } 
-            Leaf(ref val) => write!(f, "{{ val: {:?} }}", val), 
+            Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val), 
             BranchKeyNotFound(ref l_hash, ref r_hash, ref left_slice_key, ref right_slice_key) => {
                 write!(f,
-                       "{{left: {:?}, right: {:?}, left_slice: {:?},  \
-                        right_slice: {:?} }}",
-                       bytes_to_hex(l_hash),
-                       bytes_to_hex(r_hash),
+                       "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
+                       l_hash,
+                       r_hash,
                        BitSlice::from_db_key(left_slice_key),
                        BitSlice::from_db_key(right_slice_key))
             }
             LeafRootInclusive(ref db_key, ref val) => {
                 write!(f,
-                       "{{ slice: {:?}, val: {:?} }}",
+                       "{{\"slice\":{:?},\"val\":{:?}}}",
                        BitSlice::from_db_key(db_key),
                        val)
             } 
             LeafRootExclusive(ref db_key, ref val_hash) => {
                 write!(f,
-                       "{{ slice: {:?}, val_hash: {:?} }}",
+                       "{{\"slice\":{:?},\"val_hash\":{:?}}}",
                        BitSlice::from_db_key(db_key),
-                       bytes_to_hex(val_hash))
+                       val_hash)
             }
         }
     }
