@@ -1,9 +1,8 @@
 use std::mem;
 use std::sync::Arc;
-use base64::{encode_mode, decode_mode, Base64Error, Base64Mode};
 use byteorder::{ByteOrder, BigEndian};
 
-use ::crypto::{Hash, hash, HASH_SIZE};
+use ::crypto::{Hash, hash, HASH_SIZE, HexValue, FromHexError};
 use ::messages::{MessageBuffer, Message, AnyTx};
 
 #[derive(Clone)]
@@ -23,11 +22,11 @@ pub trait StorageValue {
 
 pub fn repr_stor_val<T: StorageValue>(value: &T) -> String {
     let vec_bytes = value.serialize(Vec::new());
-    encode_mode(&vec_bytes, Base64Mode::UrlSafe)
+    vec_bytes.to_hex()
 }
 
-pub fn decode_from_b64_string<T: StorageValue>(b64: &str) -> Result<T, Base64Error> {
-    let vec_bytes = decode_mode(b64, Base64Mode::UrlSafe)?; 
+pub fn decode_from_b64_string<T: StorageValue>(hex: &str) -> Result<T, FromHexError> {
+    let vec_bytes: Vec<u8> = Vec::<u8>::from_hex(hex)?; 
     Ok(StorageValue::deserialize(vec_bytes))
 }
 
