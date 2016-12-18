@@ -16,7 +16,6 @@ const LEAF_KEY_PREFIX: u8 = 01;
 const KEY_SIZE: usize = HASH_SIZE;
 const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
-const EMPTY_HASH_BASE: [u8; HASH_SIZE] = [0; HASH_SIZE];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum ChildKind {
@@ -335,9 +334,6 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
-fn empty_tree_hash() -> Hash {
-    Hash::from_slice(&EMPTY_HASH_BASE).unwrap()
-}
 // TODO avoid reallocations where is possible.
 impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaTable<T, K, V> {
     pub fn new(map: T) -> Self {
@@ -354,7 +350,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                 Ok(hash(&[root_db_key.as_slice(), value.hash().as_ref()].concat()))
             }
             Some((_, Node::Branch(branch))) => Ok(branch.hash()),
-            None => Ok(empty_tree_hash()),
+            None => Ok(Hash::zero()),
         }
     }
 
@@ -840,7 +836,7 @@ mod tests {
     use ::storage::{Map, MemoryDB, MapTable};
     use serde_json;
 
-    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX, empty_tree_hash};
+    use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX};
     use super::proofpathtokey::{ProofPathToKey, verify_proof_consistency};
     use super::ChildKind::{Left, Right};
     use super::KEY_SIZE;
@@ -1125,7 +1121,7 @@ mod tests {
         assert_eq!(table1.find_key(&vec![255; 32]).unwrap(),
                    Some(vec![255; 32]));
 
-        assert!(table1.root_hash().unwrap() != empty_tree_hash());
+        assert!(table1.root_hash().unwrap() != Hash::zero());
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
 
@@ -1134,7 +1130,7 @@ mod tests {
         let storage = MemoryDB::new();
         let map = MapTable::new(vec![255], &storage);
         let table = MerklePatriciaTable::new(map);
-        assert_eq!(table.root_hash().unwrap(), empty_tree_hash());
+        assert_eq!(table.root_hash().unwrap(), Hash::zero());
         let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0u8]].concat();
         let hash = hash(&[root_prefix, hash(&[2]).as_ref()].concat());
 
@@ -1163,7 +1159,7 @@ mod tests {
         table2.put(&vec![255; 32], vec![3]).unwrap();
         table2.put(&vec![254; 32], vec![5]).unwrap();
 
-        assert!(table1.root_hash().unwrap() != empty_tree_hash());
+        assert!(table1.root_hash().unwrap() != Hash::zero());
         assert_eq!(table1.root_hash().unwrap(), table2.root_hash().unwrap());
     }
 
@@ -1190,7 +1186,7 @@ mod tests {
         table2.put(&vec![42; 32], vec![1]).unwrap();
 
 
-        assert!(table2.root_hash().unwrap() != empty_tree_hash());
+        assert!(table2.root_hash().unwrap() != Hash::zero());
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
     }
 
@@ -1208,8 +1204,8 @@ mod tests {
         table2.put(&vec![255; 32], vec![6]).unwrap();
         table2.delete(&vec![255; 32]).unwrap();
 
-        assert_eq!(table1.root_hash().unwrap(), empty_tree_hash());
-        assert_eq!(table2.root_hash().unwrap(), empty_tree_hash());
+        assert_eq!(table1.root_hash().unwrap(), Hash::zero());
+        assert_eq!(table2.root_hash().unwrap(), Hash::zero());
     }
 
     #[test]
@@ -1310,7 +1306,7 @@ mod tests {
             assert_eq!(v2.as_ref(), Some(&item.1));
         }
 
-        assert!(table2.root_hash().unwrap() != empty_tree_hash());
+        assert!(table2.root_hash().unwrap() != Hash::zero());
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
 
         // Test same keys
@@ -1534,7 +1530,7 @@ mod tests {
             assert!(table2.get(key).unwrap().is_none());
         }
 
-        assert!(table2.root_hash().unwrap() != empty_tree_hash());
+        assert!(table2.root_hash().unwrap() != Hash::zero());
         assert_eq!(table2.root_hash().unwrap(), table1.root_hash().unwrap());
 
         for item in &data {
