@@ -113,15 +113,15 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_status_timeout(&mut self) {
-        if let Some(hash) = self.blockchain.last_hash().unwrap() {
-            // Send status
-            let status = Status::new(self.state.id(),
-                                     self.state.height(),
-                                     &hash,
-                                     &self.secret_key);
-            trace!("Broadcast status: {:?}", status);
-            self.broadcast(status.raw());
-        }
+        let hash = self.blockchain.last_hash().unwrap();
+        // Send status
+        let status = Status::new(self.state.id(),
+                                 self.state.height(),
+                                 &hash,
+                                 &self.secret_key);
+        trace!("Broadcast status: {:?}", status);
+        self.broadcast(status.raw());
+
         self.add_status_timeout();
     }
 
