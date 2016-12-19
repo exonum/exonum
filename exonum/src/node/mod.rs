@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 
 use time::{Duration, Timespec};
 
-use super::crypto::{PublicKey, SecretKey, Hash, hash};
+use super::crypto::{PublicKey, SecretKey, Hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
                     EventsConfiguration, Channel, EventHandler, Result as EventsResult,
                     Error as EventsError};
@@ -111,14 +111,15 @@ impl<B, S> NodeHandler<B, S>
 {
     pub fn new(blockchain: B, sender: S, mut config: Configuration) -> NodeHandler<B, S> {
         // FIXME: remove unwraps here, use FATAL log level instead
-
-        let r = blockchain.last_block().unwrap();
-        // TODO нужно создать api и для того, чтобы здесь подключался genesis блок
-        let (last_hash, last_height) = if let Some(last_block) = r {
-            (last_block.hash(), last_block.height() + 1)
-        } else {
-            (super::crypto::hash(&[]), 0)
+        let (last_hash, last_height) = {
+            let block = blockchain.last_block().unwrap();
+            (block.hash(), block.height() + 1)
         };
+
+        let stored = B::get_actual_configuration(&blockchain.view());
+        config.update_with_actual_config(stored);
+
+        info!("Create node with config={:#?}", config);
 
         let id = config.validators
             .iter()
@@ -129,10 +130,6 @@ impl<B, S> NodeHandler<B, S>
                                    sender.address(),
                                    sender.get_time(),
                                    &config.listener.secret_key);
-
-        if let Some(stored_config) = B::get_actual_configuration(&blockchain.view()) {
-            config.update_with_actual_config(stored_config);
-        }
 
         let state = State::new(id as u32,
                                config.validators,
@@ -297,14 +294,14 @@ impl<B, S> NodeHandler<B, S>
         self.blockchain
             .last_block()
             .unwrap()
-            .map_or_else(|| GENESIS_TIME, |p| p.time())
+            .time()
     }
 
     pub fn last_block_hash(&self) -> Hash {
         self.blockchain
             .last_block()
             .unwrap()
-            .map_or_else(|| hash(&[]), |p| p.hash())
+            .hash()
     }
 
     pub fn actual_round(&self) -> Round {
