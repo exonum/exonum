@@ -32,7 +32,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         Ok(self.view()
             .heights()
             .last()?
-            .unwrap_or_else(|| Hash::default()))
+            .unwrap_or_else(Hash::default))
     }
 
     fn last_block(&self) -> Result<Block, Error> {
@@ -250,9 +250,10 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
     // FIXME make it private and find more clear name
     fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
-        if let Some(_) = self.view().heights().get(0)? {
+        if let Some(block_hash) = self.view().heights().get(0)? {
             // TODO create genesis block for MemoryDB and compare in hash with zero block
             // panic!("Genesis block is already created");
+            let _ = block_hash;
             return Ok(());
         }
 
