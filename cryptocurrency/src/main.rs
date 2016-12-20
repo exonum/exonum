@@ -13,7 +13,6 @@ extern crate time;
 extern crate rand;
 #[macro_use]
 extern crate log;
-extern crate colored;
 
 extern crate exonum;
 extern crate blockchain_explorer;
@@ -22,7 +21,6 @@ extern crate cryptocurrency;
 use std::net::SocketAddr;
 use std::thread;
 use std::default::Default;
-use std::env;
 
 use clap::{Arg, App};
 use rustless::json::ToJson;
@@ -33,9 +31,6 @@ use rustless::errors;
 use valico::json_dsl;
 use hyper::status::StatusCode;
 use rand::{Rng, thread_rng};
-use log::{LogRecord, LogLevel};
-use env_logger::LogBuilder;
-use colored::*;
 
 use exonum::blockchain::GenesisConfig;
 use exonum::node::{Node, NodeConfig, TxSender, NodeChannel};
