@@ -409,11 +409,11 @@ impl<B, S> NodeHandler<B, S>
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let propose_round = {
+        let (propose_round, commited_txs) = {
             let block_state = self.state.block(&block_hash).unwrap();
             let patch = block_state.patch();
             self.blockchain.commit(block_hash, patch, precommits).unwrap();
-            block_state.propose_round()
+            (block_state.propose_round(), block_state.txs().len())
         };
 
         let height = self.state.height();
@@ -424,12 +424,11 @@ impl<B, S> NodeHandler<B, S>
         let config = B::get_configuration_at_height(&self.blockchain.view(), height);
         self.state.new_height(&block_hash, round, config);
 
-        info!("{:?} ====== height={}, round={}, proposer={}, commited={}, pool={}",
-              self.channel.get_time(),
+        info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}",
               height,
               propose_round,
               proposer,
-              self.state.commited_txs,
+              commited_txs,
               self.state.transactions().len());
 
         // Add timeout for first round

@@ -68,9 +68,6 @@ pub struct State<AppTx>
     // Максимальная высота, на которой
     // "засветились" другие валидаторы
     validator_heights: Vec<Height>,
-
-    // FIXME: temp, to remove
-    pub commited_txs: u64,
 }
 
 
@@ -312,8 +309,6 @@ impl<AppTx> State<AppTx>
 
             requests: HashMap::new(),
 
-            commited_txs: 0,
-
             consensus_config: consensus_config,
         }
     }
@@ -440,9 +435,7 @@ impl<AppTx> State<AppTx>
             // Commit transactions if needed
             let txs = self.block(block_hash).unwrap().txs.clone();
             for hash in txs {
-                if self.transactions.remove(&hash).is_some() {
-                    self.commited_txs += 1;
-                }
+                self.transactions.remove(&hash);
             }
         }
         // TODO: destruct/construct structure HeightState instead of call clear
