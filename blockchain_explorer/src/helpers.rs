@@ -1,8 +1,13 @@
 use std::path::Path;
 use std::marker::PhantomData;
 use std::fs;
+use std::env;
 
+use time;
 use clap::{SubCommand, App, Arg, ArgMatches};
+use log::{LogRecord, LogLevel, SetLoggerError};
+use env_logger::LogBuilder;
+use colored::*;
 
 use exonum::config::ConfigFile;
 use exonum::blockchain::GenesisConfig;
@@ -140,4 +145,53 @@ impl<'a, 'b> RunCommand<'a, 'b>
             DatabaseType::MemoryDB(MemoryDB::new())
         }
     }
+}
+
+fn has_colors() -> bool {
+    use term::terminfo::TerminfoTerminal;
+    use term::Terminal;
+    use std::io;
+
+    let out = io::stderr();
+    if let Some(term) = TerminfoTerminal::new(out) {
+        term.supports_color()
+    } else {
+        false
+    }
+}
+
+pub fn init_logger() -> Result<(), SetLoggerError> {
+    let format = |record: &LogRecord| {
+        let ts = time::now_utc().to_timespec();
+        let now = (ts.sec * 1000 + ts.nsec as i64 / 1000000).to_string();
+
+        if has_colors() {
+            let level = match record.level() {
+                LogLevel::Error => "ERROR".red(),
+                LogLevel::Warn => "WARN".yellow(),
+                LogLevel::Info => "INFO".green(),
+                LogLevel::Debug => "DEBUG".cyan(),
+                LogLevel::Trace => "TRACE".white(),
+            };
+            format!("{} - [ {} ] - {}", now.bold(), level, record.args())
+        } else {
+            let level = match record.level() {
+                LogLevel::Error => "ERROR",
+                LogLevel::Warn => "WARN",
+                LogLevel::Info => "INFO",
+                LogLevel::Debug => "DEBUG",
+                LogLevel::Trace => "TRACE",
+            };
+            format!("{} - [ {} ] - {}", now, level, record.args())
+        }
+    };
+
+    let mut builder = LogBuilder::new();
+    builder.format(format);
+
+    if env::var("RUST_LOG").is_ok() {
+        builder.parse(&env::var("RUST_LOG").unwrap());
+    }
+
+    builder.init()
 }
