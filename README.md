@@ -106,7 +106,7 @@ $ test_node run --help
 ```
 $ cargo build --release --manifest-path sandbox/Cargo.toml --example test_node
     Finished release [optimized] target(s) in 0.0 secs
-$ export PATH=./sandbox/target/release/examples:$PATH
+$ export PATH=./target/release/examples:$PATH
 $ test_node --version
 Testnet node 0.1
 ```
