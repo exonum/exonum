@@ -659,6 +659,7 @@ fn run_node<D: Database>(blockchain: DigitalRightsBlockchain<D>,
 }
 
 fn main() {
+    exonum::crypto::init();
     blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Digital rights manager api")

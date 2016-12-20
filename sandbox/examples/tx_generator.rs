@@ -58,6 +58,7 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
 }
 
 fn main() {
+    exonum::crypto::init();
     blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Testnet transaction generator")
