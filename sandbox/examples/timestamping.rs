@@ -1,11 +1,10 @@
 extern crate exonum;
 extern crate timestamping;
 extern crate sandbox;
-extern crate env_logger;
 extern crate clap;
 extern crate blockchain_explorer;
 
-use clap::{App, SubCommand};
+use clap::App;
 
 use exonum::node::{Node, NodeConfig};
 use exonum::blockchain::Blockchain;
@@ -19,7 +18,7 @@ fn run_node<B: Blockchain>(blockchain: B, node_cfg: NodeConfig) {
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Simple exonum demo program")
         .version(env!("CARGO_PKG_VERSION"))

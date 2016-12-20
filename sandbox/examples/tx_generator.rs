@@ -5,7 +5,6 @@ extern crate exonum;
 extern crate blockchain_explorer;
 extern crate timestamping;
 extern crate sandbox;
-extern crate env_logger;
 extern crate clap;
 
 use std::{thread, time};
@@ -41,7 +40,9 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
         while tx_remaining > 0 {
             let count = min(tx_remaining, tx_gen_cfg.tx_package_size);
             for tx in gen.take(count) {
-                chan.send(tx);
+                if let Err(e) = chan.send(tx) {
+                    trace!("Unable to add tx to node channel error={:?}", e);
+                }
             }
             tx_remaining -= count;
 
@@ -57,7 +58,7 @@ fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Testnet transaction generator")
         .version(env!("CARGO_PKG_VERSION"))

@@ -1,5 +1,5 @@
 extern crate exonum;
-extern crate env_logger;
+extern crate blockchain_explorer;
 extern crate rand;
 #[macro_use]
 extern crate clap;
@@ -18,6 +18,8 @@ use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Fork};
 /// seed - seed for rng
 
 fn main() {
+    blockchain_explorer::helpers::init_logger().unwrap();
+
     let matches = clap_app!(merkle_map =>
         (version: "0.1")
         (author: "Aleksey S. <aleksei.sidorov@xdev.re>")
