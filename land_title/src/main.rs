@@ -504,7 +504,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Land titles manager api")
         .version(env!("CARGO_PKG_VERSION"))

@@ -11,7 +11,12 @@ extern crate serde_derive;
 extern crate exonum;
 extern crate rustless;
 extern crate valico;
+
 extern crate clap;
+extern crate env_logger;
+extern crate log;
+extern crate term;
+extern crate colored;
 
 use std::ops::Deref;
 use std::marker::PhantomData;

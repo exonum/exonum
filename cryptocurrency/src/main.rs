@@ -311,29 +311,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 }
 
 fn main() {
-    let format = |record: &LogRecord| {
-        let now = time::now_utc();
-        let level = match record.level() {
-            LogLevel::Error => "ERROR".red(),
-            LogLevel::Warn => "WARN".yellow(),
-            LogLevel::Info => "INFO".green(),
-            LogLevel::Debug => "DEBUG".cyan(),
-            LogLevel::Trace => "TRACE".white(),
-        };
-        format!("{} - [ {} ] - {}",
-                now.asctime().to_string().bold(),
-                level,
-                record.args())
-    };
-
-    let mut builder = LogBuilder::new();
-    builder.format(format);
-
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
-
-    builder.init().unwrap();
+    blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Simple cryptocurrency demo program")
         .version(env!("CARGO_PKG_VERSION"))
