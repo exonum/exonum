@@ -1,8 +1,3 @@
-// To avoid clippy failure concerning unused mut in cases when it's required
-#![allow(unused_mut)]
-
-extern crate serde_json;
-
 use std::io;
 use std::net::SocketAddr;
 use std::marker::PhantomData;
@@ -27,7 +22,7 @@ mod adjusted_propose_timeout;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 use self::adjusted_propose_timeout::*;
 
-type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
+pub type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
 
 pub const GENESIS_TIME: Timespec = Timespec {
     sec: 1451649600,
