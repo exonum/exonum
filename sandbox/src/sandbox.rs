@@ -7,13 +7,14 @@ use std::ops::Drop;
 
 use time::{Timespec, Duration};
 
+use exonum::storage::{MemoryDB, Error};
 use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig, GENESIS_TIME};
-use exonum::blockchain::{Blockchain, ConsensusCfg};
-use exonum::storage::MemoryDB;
+use exonum::blockchain::{Blockchain, Block, ConsensusCfg};
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      Channel, EventHandler, Result as EventsResult};
 use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
+use exonum::node::state::{Round, Height};
 
 use timestamping::TimestampingBlockchain;
 
@@ -141,6 +142,19 @@ impl<B> Reactor<NodeHandler<B, SandboxChannel<B>>> for SandboxReactor<B>
 impl<B> SandboxReactor<B>
     where B: Blockchain
 {
+
+    pub fn is_leader(&self) -> bool {
+        self.handler.is_leader()
+    }
+
+    pub fn last_block(&self) -> Result<Option<Block>, Error> {
+        self.handler.blockchain.last_block()
+    }
+
+    pub fn last_hash(&self) -> Result<Option<Hash>, Error> {
+        self.handler.blockchain.last_hash()
+    }
+
     pub fn handle_message(&mut self, msg: RawMessage) {
         let event = Event::Incoming(msg);
         self.handler.handle_event(event);
@@ -167,6 +181,17 @@ impl<B, G> Sandbox<B, G>
     where B: Blockchain,
           G: Iterator<Item = B::Transaction>
 {
+
+    pub fn is_leader(&self) -> bool {
+        let reactor = self.reactor.borrow();
+        reactor.is_leader()
+    }
+
+    pub fn last_block(&self) -> Result<Option<Block>, Error> {
+        let mut reactor = self.reactor.borrow();
+        reactor.last_block()
+    }
+
     fn initialize(&self) {
         let connect = Connect::new(self.p(0), self.a(0), self.time(), self.s(0));
 
@@ -216,13 +241,23 @@ impl<B, G> Sandbox<B, G>
         self.addresses[id].clone()
     }
 
+    pub fn n_validators(&self) -> usize {
+        self.validators.len()
+    }
+
     pub fn time(&self) -> Timespec {
         self.inner.lock().unwrap().time.clone()
     }
 
     pub fn last_hash(&self) -> Hash {
         // FIXME: temporary hack
-        hash(&[])
+//        hash(&[])
+        let mut reactor = self.reactor.borrow_mut();
+        reactor.last_hash().unwrap().unwrap_or(hash(&[]))
+    }
+
+    pub fn cfg(&self) -> &Configuration {
+        &self.cfg
     }
 
     pub fn propose_timeout(&self) -> i64 {
@@ -319,7 +354,23 @@ impl<B, G> Sandbox<B, G>
         }
     }
 
-    pub fn assert_state(&self, height: u64, round: u32) {
+    pub fn transactions_hashes(&self) -> Vec<Hash> {
+        self.reactor.borrow().handler.state().transactions().keys().cloned().collect()
+    }
+
+    pub fn current_round(&self) -> Round {
+        self.reactor.borrow().handler.state().round()
+    }
+
+    pub fn current_height(&self) -> Height {
+        self.reactor.borrow().handler.state().height()
+    }
+
+    pub fn current_leader(&self) -> Round {
+        self.reactor.borrow().handler.state().leader(self.current_round())
+    }
+
+    pub fn assert_state(&self, height: Height, round: Round) {
         let reactor = self.reactor.borrow();
         let ref state = reactor.handler.state();
 
@@ -335,18 +386,18 @@ impl<B, G> Sandbox<B, G>
                 round);
     }
 
-    pub fn assert_lock(&self, round: u32, hash: Option<Hash>) {
+    pub fn assert_lock(&self, round: Round, hash: Option<Hash>) {
         let reactor = self.reactor.borrow();
         let state = reactor.handler.state();
 
         let actual_round = state.locked_round();
         let actual_hash = state.locked_propose();
         assert!(actual_round == round,
-                "Incorrect height, actual={}, expected={}",
+                "Incorrect round, actual={}, expected={}",
                 actual_round,
                 round);
         assert!(actual_hash == hash,
-                "Incorrect round, actual={:?}, expected={:?}",
+                "Incorrect hash, actual={:?}, expected={:?}",
                 actual_hash,
                 hash);
     }
@@ -367,6 +418,8 @@ pub fn timestamping_sandbox
     ()
     -> Sandbox<TimestampingBlockchain<MemoryDB>, TimestampingTxGenerator>
 {
+    extern crate env_logger;
+    let _ = env_logger::init().unwrap_or(());
     let validators = vec![
         gen_keypair(),
         gen_keypair(),
@@ -391,8 +444,8 @@ pub fn timestamping_sandbox
         },
         consensus: ConsensusCfg {
             round_timeout: 1000,
-            status_timeout: 5000,
-            peers_timeout: 10000,
+            status_timeout: 50000,
+            peers_timeout: 50000,
             propose_timeout: 200,
             txs_block_limit: 1000,
         },
@@ -439,6 +492,7 @@ pub fn timestamping_sandbox
     };
 
     sandbox.initialize();
+    assert!(sandbox.propose_timeout() < sandbox.round_timeout());//general assumption; necessary for correct work of consensus algorithm
     sandbox
 }
 
