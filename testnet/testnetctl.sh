@@ -37,7 +37,7 @@ update() {
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc/ || exit 1
     cd ${destdir}
     supervisorctl reread || exit 1
-    supervisorctl update || exit 1
+    #supervisorctl update || exit 1
 }
 
 clear() {
