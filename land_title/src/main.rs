@@ -504,6 +504,7 @@ fn land_titles_api<D: Database>(api: &mut Api,
 }
 
 fn main() {
+    exonum::crypto::init();
     blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Land titles manager api")

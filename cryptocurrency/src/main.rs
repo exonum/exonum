@@ -306,6 +306,7 @@ fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
 }
 
 fn main() {
+    exonum::crypto::init();
     blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Simple cryptocurrency demo program")

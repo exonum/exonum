@@ -8,6 +8,7 @@ use clap::App;
 use blockchain_explorer::helpers::GenerateCommand;
 
 fn main() {
+    exonum::crypto::init();
     blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Blockchain control utility")

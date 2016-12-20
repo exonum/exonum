@@ -1,5 +1,6 @@
 use std::default::Default;
 
+pub use sodiumoxide::init;
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
                                              SIGNATUREBYTES as SIGNATURE_LENGTH,

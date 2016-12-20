@@ -18,6 +18,7 @@ fn run_node<B: Blockchain>(blockchain: B, node_cfg: NodeConfig) {
 }
 
 fn main() {
+    exonum::crypto::init();
     blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Simple exonum demo program")
