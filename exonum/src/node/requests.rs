@@ -52,6 +52,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_request_propose(&mut self, msg: RequestPropose) {
+        trace!("HANDLE PROPOSE REQUEST!!!");
         if msg.height() != self.state.height() {
             return;
         }
@@ -84,6 +85,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_request_prevotes(&mut self, msg: RequestPrevotes) {
+        trace!("HANDLE PREVOTES REQUEST!!!");
         if msg.height() != self.state.height() {
             return;
         }
@@ -102,6 +104,7 @@ impl<B, S> NodeHandler<B, S>
     }
 
     pub fn handle_request_precommits(&mut self, msg: RequestPrecommits) {
+        trace!("HANDLE PRECOMMITS REQUEST!!!");
         if msg.height() > self.state.height() {
             return;
         }
