@@ -7,10 +7,9 @@ use std::ops::Drop;
 
 use time::{Timespec, Duration};
 
-use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig,
-                   GENESIS_TIME};
-use exonum::blockchain::{Blockchain, ConsensusConfig};
-use exonum::storage::MemoryDB;
+use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig};
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration};
+use exonum::storage::{MemoryDB, Error as StorageError};
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      Channel, EventHandler, Result as EventsResult};
@@ -143,17 +142,20 @@ impl<B> Reactor<NodeHandler<B, SandboxChannel<B>>> for SandboxReactor<B>
 impl<B> SandboxReactor<B>
     where B: Blockchain
 {
-
     pub fn is_leader(&self) -> bool {
         self.handler.is_leader()
     }
 
-    pub fn last_block(&self) -> Result<Option<Block>, Error> {
+    pub fn last_block(&self) -> Result<Block, StorageError> {
         self.handler.blockchain.last_block()
     }
 
-    pub fn last_hash(&self) -> Result<Option<Hash>, Error> {
+    pub fn last_hash(&self) -> Result<Hash, StorageError> {
         self.handler.blockchain.last_hash()
+    }
+
+    pub fn actual_config(&self) -> Result<StoredConfiguration, StorageError> {
+        B::get_actual_configuration(&self.handler.blockchain.view())
     }
 
     pub fn handle_message(&mut self, msg: RawMessage) {
@@ -175,24 +177,12 @@ pub struct Sandbox<B, G>
     tx_generator: RefCell<G>,
     validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
-    blockchain: B,
 }
 
 impl<B, G> Sandbox<B, G>
     where B: Blockchain,
           G: Iterator<Item = B::Transaction>
 {
-
-    pub fn is_leader(&self) -> bool {
-        let reactor = self.reactor.borrow();
-        reactor.is_leader()
-    }
-
-    pub fn last_block(&self) -> Result<Option<Block>, Error> {
-        let mut reactor = self.reactor.borrow();
-        reactor.last_block()
-    }
-
     fn initialize(&self) {
         let connect = Connect::new(self.p(0), self.a(0), self.time(), self.s(0));
 
@@ -248,21 +238,6 @@ impl<B, G> Sandbox<B, G>
 
     pub fn time(&self) -> Timespec {
         self.inner.lock().unwrap().time.clone()
-    }
-
-    pub fn last_hash(&self) -> Hash {
-        self.blockchain.last_hash().unwrap()
-    }
-
-    pub fn cfg(&self) -> StoredConfiguration {
-        B::get_actual_configuration(&self.blockchain.view()).unwrap()
-    }
-
-    pub fn propose_timeout(&self) -> i64 {
-        self.cfg().consensus.propose_timeout
-    }
-    pub fn round_timeout(&self) -> i64 {
-        self.cfg().consensus.round_timeout
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -352,6 +327,34 @@ impl<B, G> Sandbox<B, G>
         }
     }
 
+    pub fn is_leader(&self) -> bool {
+        let reactor = self.reactor.borrow();
+        reactor.is_leader()
+    }
+
+    pub fn last_block(&self) -> Block {
+        let reactor = self.reactor.borrow();
+        reactor.last_block().unwrap()
+    }
+
+    pub fn last_hash(&self) -> Hash {
+        let reactor = self.reactor.borrow();
+        reactor.last_hash().unwrap()
+    }
+
+    pub fn cfg(&self) -> StoredConfiguration {
+        let reactor = self.reactor.borrow();
+        reactor.actual_config().unwrap()
+    }
+
+    pub fn propose_timeout(&self) -> i64 {
+        self.cfg().consensus.propose_timeout
+    }
+
+    pub fn round_timeout(&self) -> i64 {
+        self.cfg().consensus.round_timeout
+    }
+
     pub fn transactions_hashes(&self) -> Vec<Hash> {
         self.reactor.borrow().handler.state().transactions().keys().cloned().collect()
     }
@@ -417,14 +420,20 @@ pub fn timestamping_sandbox
     -> Sandbox<TimestampingBlockchain<MemoryDB>, TimestampingTxGenerator>
 {
     let validators = vec![gen_keypair(), gen_keypair(), gen_keypair(), gen_keypair()];
-
     let addresses = vec!["1.1.1.1:1".parse().unwrap(),
                          "2.2.2.2:2".parse().unwrap(),
                          "3.3.3.3:3".parse().unwrap(),
                          "4.4.4.4:4".parse().unwrap()]: Vec<SocketAddr>;
 
     let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
-    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
+    let consensus = ConsensusConfig {
+        round_timeout: 1000,
+        status_timeout: 50000,
+        peers_timeout: 50000,
+        propose_timeout: 200,
+        txs_block_limit: 1000,
+    };
+    let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
@@ -464,11 +473,10 @@ pub fn timestamping_sandbox
         tx_generator: RefCell::new(tx_gen),
         validators: validators,
         addresses: addresses,
-        blockchain: blockchain.clone(),
     };
 
     sandbox.initialize();
-    assert!(sandbox.propose_timeout() < sandbox.round_timeout());//general assumption; necessary for correct work of consensus algorithm
+    assert!(sandbox.propose_timeout() < sandbox.round_timeout()); //general assumption; necessary for correct work of consensus algorithm
     sandbox
 }
 
@@ -489,11 +497,11 @@ fn test_sandbox_recv_and_send() {
 fn test_sandbox_assert_status() {
     // TODO: remove this?
     let s = timestamping_sandbox();
-    s.assert_state(0, 1);
+    s.assert_state(1, 1);
     s.add_time(Duration::milliseconds(999));
-    s.assert_state(0, 1);
+    s.assert_state(1, 1);
     s.add_time(Duration::milliseconds(1));
-    s.assert_state(0, 2);
+    s.assert_state(1, 2);
 }
 
 #[test]
