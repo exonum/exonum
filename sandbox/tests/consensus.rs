@@ -32,7 +32,7 @@ fn test_queue_message_from_future_round() {
                                        sandbox.propose_timeout()),
                                &sandbox.last_hash(),
                                &[],
-                               sandbox.s(VALIDATOR_2 as usize));
+                               sandbox.s(3));
 
     sandbox.recv(propose.clone());
     sandbox.add_time(Duration::milliseconds(sandbox.round_timeout() - 1));

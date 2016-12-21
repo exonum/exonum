@@ -175,7 +175,7 @@ pub struct Sandbox<B, G>
     tx_generator: RefCell<G>,
     validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
-    cfg: Configuration,
+    blockchain: B,
 }
 
 impl<B, G> Sandbox<B, G>
@@ -251,21 +251,18 @@ impl<B, G> Sandbox<B, G>
     }
 
     pub fn last_hash(&self) -> Hash {
-        // FIXME: temporary hack
-//        hash(&[])
-        let mut reactor = self.reactor.borrow_mut();
-        reactor.last_hash().unwrap().unwrap_or(hash(&[]))
+        self.blockchain.last_hash().unwrap()
     }
 
-    pub fn cfg(&self) -> &Configuration {
-        &self.cfg
+    pub fn cfg(&self) -> StoredConfiguration {
+        B::get_actual_configuration(&self.blockchain.view()).unwrap()
     }
 
     pub fn propose_timeout(&self) -> i64 {
-        self.cfg.consensus.propose_timeout as i64
+        self.cfg().consensus.propose_timeout
     }
     pub fn round_timeout(&self) -> i64 {
-        self.cfg.consensus.round_timeout as i64
+        self.cfg().consensus.round_timeout
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -427,6 +424,8 @@ pub fn timestamping_sandbox
                          "4.4.4.4:4".parse().unwrap()]: Vec<SocketAddr>;
 
     let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
+    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
+    blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
         listener: ListenerConfig {
@@ -434,23 +433,8 @@ pub fn timestamping_sandbox
             public_key: validators[0].0.clone(),
             secret_key: validators[0].1.clone(),
         },
-        consensus: ConsensusConfig {
-            round_timeout: 1000,
-            status_timeout: 50000,
-            peers_timeout: 50000,
-            propose_timeout: 200,
-            txs_block_limit: 1000,
-        },
-        network: NetworkConfiguration {
-            max_incoming_connections: 8,
-            max_outgoing_connections: 8,
-            tcp_nodelay: false,
-            tcp_keep_alive: None,
-            tcp_reconnect_timeout: 5000,
-            tcp_reconnect_timeout_max: 600000,
-        },
+        network: NetworkConfiguration::default(),
         events: EventsConfiguration::new(),
-        validators: validators.iter().map(|&(p, _)| p.clone()).collect(),
         peer_discovery: Vec::new(),
     };
 
@@ -458,7 +442,7 @@ pub fn timestamping_sandbox
 
     let inner = Arc::new(Mutex::new(SandboxInner {
         address: addresses[0].clone(),
-        time: GENESIS_TIME,
+        time: blockchain.last_block().unwrap().time(),
         sended: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
@@ -480,7 +464,7 @@ pub fn timestamping_sandbox
         tx_generator: RefCell::new(tx_gen),
         validators: validators,
         addresses: addresses,
-        cfg: config,
+        blockchain: blockchain.clone(),
     };
 
     sandbox.initialize();
