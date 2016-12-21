@@ -11,11 +11,11 @@ pub struct StoredConfiguration {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConsensusConfig {
-    pub round_timeout: i64, // 2000
-    pub status_timeout: i64, // 5000
-    pub peers_timeout: i64, // 10000
-    pub propose_timeout: i64, // 500
-    pub txs_block_limit: u32, // 500
+    pub round_timeout: i64,
+    pub status_timeout: i64,
+    pub peers_timeout: i64,
+    pub propose_timeout: i64,
+    pub txs_block_limit: u32,
 }
 
 impl Default for ConsensusConfig {

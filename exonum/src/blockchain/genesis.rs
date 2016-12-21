@@ -27,11 +27,17 @@ pub struct GenesisConfig {
 
 impl GenesisConfig {
     pub fn new<I: Iterator<Item = PublicKey>>(validators: I) -> GenesisConfig {
+        Self::new_with_consensus(ConsensusConfig::default(), validators)
+    }
+
+    pub fn new_with_consensus<I: Iterator<Item = PublicKey>>(consensus: ConsensusConfig,
+                                                             validators: I)
+                                                             -> GenesisConfig {
         let (pub_key, sec_key) = gen_keypair();
         GenesisConfig {
             time: time::now_utc().to_timespec().sec as u64,
             validators: validators.collect::<Vec<_>>(),
-            consensus: ConsensusConfig::default(),
+            consensus: consensus,
             public_key: pub_key,
             secret_key: sec_key,
         }
