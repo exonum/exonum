@@ -112,19 +112,18 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         0
     }
 
-    fn get_actual_configuration(view: &Self::View) -> StoredConfiguration {
+    fn get_actual_configuration(view: &Self::View) -> Result<StoredConfiguration, Error> {
         let h = Self::get_height(view);
         let heights = view.configs_heights();
         let height_values = heights.values().unwrap();
 
         // TODO improve perfomance
-        if let Some(idx) = height_values.into_iter()
-            .rposition(|r| u64::from(r) <= h) {
-            if let Ok(Some(height)) = heights.get(idx as u64) {
-                return Self::get_configuration_at_height(view, height.into()).unwrap();
-            }
-        }
-        unreachable!("An attempt to use exonum without genesis block");
+        let idx = height_values.into_iter()
+            .rposition(|r| u64::from(r) <= h)
+            .unwrap();
+
+        let height = heights.get(idx as u64)?.unwrap();
+        Self::get_configuration_at_height(view, height.into()).map(|x| x.unwrap())
     }
 
     fn commit_actual_configuration(view: &Self::View,
@@ -138,19 +137,22 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         Ok(())
     }
 
-    fn get_configuration_at_height(view: &Self::View, height: u64) -> Option<StoredConfiguration> {
+    // FIXME Replace by result?
+    fn get_configuration_at_height(view: &Self::View,
+                                   height: u64)
+                                   -> Result<Option<StoredConfiguration>, Error> {
         let configs = view.configs();
-        if let Ok(Some(config)) = configs.get(&height.into()) {
+        if let Some(config) = configs.get(&height.into())? {
             match StoredConfiguration::deserialize(&config) {
                 Ok(configuration) => {
-                    return Some(configuration);
+                    return Ok(Some(configuration));
                 }
                 Err(_) => {
                     error!("Can't parse found configuration at height: {}", height);
                 }
             }
         }
-        None
+        Ok(None)
     }
 
     fn handle_config_propose(view: &Self::View, config_propose: &ConfigPropose) {
@@ -165,7 +167,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         }
 
         {
-            let config = Self::get_actual_configuration(view);
+            let config = Self::get_actual_configuration(view).unwrap();
             if !config.validators.contains(config_propose.from()) {
                 error!("ConfigPropose from unknown validator: {:?}",
                        config_propose.from());
@@ -185,7 +187,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     }
 
     fn handle_config_vote(view: &Self::View, config_vote: &ConfigVote) {
-        let config = Self::get_actual_configuration(view);
+        let config = Self::get_actual_configuration(view).unwrap();
 
         if !config.validators.contains(config_vote.from()) {
             error!("ConfigVote from unknown validator: {:?}",

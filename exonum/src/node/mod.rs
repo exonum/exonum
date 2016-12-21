@@ -96,7 +96,7 @@ impl<B, S> NodeHandler<B, S>
             (block.hash(), block.height() + 1)
         };
 
-        let stored = B::get_actual_configuration(&blockchain.view());
+        let stored = B::get_actual_configuration(&blockchain.view()).unwrap();
 
         info!("Create node with config={:#?}", stored);
 
