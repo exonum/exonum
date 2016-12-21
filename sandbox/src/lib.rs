@@ -12,7 +12,8 @@ extern crate exonum;
 extern crate timestamping;
 extern crate cryptocurrency;
 
-mod sandbox;
+pub mod sandbox;
+pub mod sandbox_tests_helper;
 mod tx_generator;
 
 pub use tx_generator::TimestampingTxGenerator;

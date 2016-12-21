@@ -16,11 +16,11 @@ const TX_POOL_LIMIT: usize = 20000;
 
 // TODO: move request timeouts into node configuration
 
-const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
-const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
-const REQUEST_PREVOTES_WAIT: u64 = 100;
-const REQUEST_PRECOMMITS_WAIT: u64 = 100;
-const REQUEST_BLOCK_WAIT: u64 = 100;
+pub const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
+pub const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
+pub const REQUEST_PREVOTES_WAIT: u64 = 100;
+pub const REQUEST_PRECOMMITS_WAIT: u64 = 100;
+pub const REQUEST_BLOCK_WAIT: u64 = 100;
 
 pub type Round = u32;
 pub type Height = u64;
