@@ -432,15 +432,16 @@ impl<B, S> NodeHandler<B, S>
               self.state.commited_txs,
               self.state.transactions().len());
 
-        // Handle queued messages
-        for msg in self.state.queued() {
-            self.handle_consensus(msg);
-        }
         // Add timeout for first round
         self.add_round_timeout();
         // Send propose we is leader
         if self.is_leader() {
             self.add_propose_timeout();
+        }
+
+        // Handle queued messages
+        for msg in self.state.queued() {
+            self.handle_consensus(msg);
         }
     }
 
