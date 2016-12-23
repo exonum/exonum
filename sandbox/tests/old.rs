@@ -72,7 +72,7 @@ fn test_get_lock_and_send_precommit() {
                            propose_time,
                            &sandbox.last_hash(),
                            &hash(&[]),
-                           &hash(&[]));
+                           &sandbox.last_state_hash());
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
@@ -101,7 +101,7 @@ fn test_commit() {
                            propose_time,
                            &sandbox.last_hash(),
                            &hash(&[]),
-                           &hash(&[]));
+                           &sandbox.last_state_hash());
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));

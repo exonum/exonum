@@ -10,11 +10,10 @@ use std::ops::Deref;
 
 use time::Timespec;
 
-use ::crypto::Hash;
+use ::crypto::{Hash, hash};
 use ::messages::{Precommit, Message, ConfigMessage, ServiceTx, ConfigPropose, ConfigVote, AnyTx};
 
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
-use self::genesis::GenesisBlock;
 
 pub use self::block::Block;
 pub use self::view::{View, ConfigurationData};
@@ -81,7 +80,17 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Get tx hash
         let tx_hash = fork.block_txs(height).root_hash()?;
         // Get state hash
-        let state_hash = Self::state_hash(&fork)?;
+        let state_hash = {
+            let app_state_hash = Self::state_hash(&fork)?;
+            let mut buf = Vec::new();
+            buf.extend_from_slice(app_state_hash.as_ref());
+            // Add service state to state_hash
+            buf.extend_from_slice(fork.config_proposes().root_hash()?.as_ref());
+            buf.extend_from_slice(fork.config_votes().root_hash()?.as_ref());
+            buf.extend_from_slice(fork.configs().root_hash()?.as_ref());
+            hash(&buf)
+        };
+
         // Create block
         let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
         // Eval block hash
@@ -127,10 +136,11 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     }
 
     fn commit_actual_configuration(view: &Self::View,
-                                   config_propose: ConfigPropose)
+                                   actual_from: u64,
+                                   config_data: &[u8])
                                    -> Result<(), Error> {
-        let height_bytecode = config_propose.actual_from_height().into();
-        view.configs().put(&height_bytecode, config_propose.config().to_vec())?;
+        let height_bytecode = actual_from.into();
+        view.configs().put(&height_bytecode, config_data.to_vec())?;
         view.configs_heights().append(height_bytecode)?;
         // TODO: clear storages
 
@@ -156,16 +166,6 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     }
 
     fn handle_config_propose(view: &Self::View, config_propose: &ConfigPropose) {
-        // Special case for genesis block with zero height
-        if view.heights().len().unwrap() == 0 {
-            // FIXME add is_empty method
-            let hash = <ConfigPropose as Message>::hash(config_propose);
-            trace!("Create initial config");
-            view.config_proposes().put(&hash, config_propose.clone()).unwrap();
-            Self::commit_actual_configuration(view, config_propose.clone()).unwrap();
-            return;
-        }
-
         {
             let config = Self::get_actual_configuration(view).unwrap();
             if !config.validators.contains(config_propose.from()) {
@@ -226,7 +226,10 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                 view.config_proposes()
                     .get(config_vote.hash_propose())
                     .unwrap() {
-                Self::commit_actual_configuration(view, config_propose).unwrap();
+                Self::commit_actual_configuration(view,
+                                                  config_propose.actual_from_height(),
+                                                  config_propose.config())
+                    .unwrap();
             }
         }
     }
@@ -252,6 +255,16 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
 
     // FIXME make it private and find more clear name
     fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
+        let config_propose = StoredConfiguration {
+            actual_from: 0,
+            validators: cfg.validators,
+            consensus: cfg.consensus,
+        };
+        let time = Timespec {
+            sec: cfg.time as i64,
+            nsec: 0,
+        };
+
         if let Some(block_hash) = self.view().heights().get(0)? {
             // TODO create genesis block for MemoryDB and compare in hash with zero block
             // panic!("Genesis block is already created");
@@ -259,9 +272,14 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             return Ok(());
         }
 
-        let genesis_block: GenesisBlock<Self> = cfg.into();
-        let patch = self.create_patch(0, 0, genesis_block.time, &genesis_block.txs)?;
-        self.merge(&patch.2)?;
+        let patch = {
+            let view = self.view();
+            Self::commit_actual_configuration(&view, 0, config_propose.serialize().as_ref())?;
+            self.merge(&view.changes())?;
+
+            self.create_patch(0, 0, time, &[])?.2
+        };
+        self.merge(&patch)?;
         Ok(())
     }
 

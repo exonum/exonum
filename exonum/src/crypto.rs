@@ -194,7 +194,7 @@ implement_index_traits! {Signature}
 
 impl Default for Hash {
     fn default() -> Hash {
-        hash(&[])
+        Hash::new([0; 32])
     }
 }
 
