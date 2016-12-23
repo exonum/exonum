@@ -1,7 +1,6 @@
 /// purpose of this module is to keep functions with reusable code used for sandbox tests
 
 use time::{Timespec, Duration};
-use std::ops::Add;
 use std::cell::RefCell;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestPrevotes};
@@ -114,7 +113,7 @@ impl<'a> BlockBuilder<'a> {
                    //   &[tx.hash()],
                    //   &[],
                    self.tx_hash.unwrap_or(&hash(&[])),
-                   self.state_hash.unwrap_or(&hash(&[])))
+                   self.state_hash.unwrap_or(&self.sandbox.last_state_hash()))
     }
 }
 

@@ -13,7 +13,7 @@ use exonum::storage::{MemoryDB, Error as StorageError};
 use exonum::messages::{Any, Message, RawMessage, Connect};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      Channel, EventHandler, Result as EventsResult};
-use exonum::crypto::{hash, Hash, PublicKey, SecretKey, gen_keypair};
+use exonum::crypto::{Hash, PublicKey, SecretKey, gen_keypair};
 use exonum::node::state::{Round, Height};
 
 use timestamping::TimestampingBlockchain;
@@ -340,6 +340,11 @@ impl<B, G> Sandbox<B, G>
     pub fn last_hash(&self) -> Hash {
         let reactor = self.reactor.borrow();
         reactor.last_hash().unwrap()
+    }
+
+    pub fn last_state_hash(&self) -> Hash {
+        let reactor = self.reactor.borrow();
+        *reactor.last_block().unwrap().state_hash()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
