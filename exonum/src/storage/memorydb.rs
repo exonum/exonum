@@ -2,8 +2,8 @@ use std::clone::Clone;
 use std::sync::RwLock;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::collections::btree_map;
 use std::collections::Bound::{Included, Unbounded};
+// use std::collections::btree_map;
 // use std::iter::Iterator;
 
 use super::{Map, Database, Error, Patch, Change, Fork};
@@ -13,7 +13,7 @@ use super::{Map, Database, Error, Patch, Change, Fork};
 pub struct MemoryDB {
     map: RwLock<BTreeMap<Vec<u8>, Vec<u8>>>,
 }
-pub type MemoryDBIterator<'a> = btree_map::Iter<'a, Vec<u8>, Vec<u8>>;
+// pub type MemoryDBIterator<'a> = btree_map::Iter<'a, Vec<u8>, Vec<u8>>;
 
 pub struct MemoryDBView {
     map: MemoryDB,

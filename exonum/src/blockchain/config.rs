@@ -1,20 +1,33 @@
-use super::serde_json;
+use serde_json;
+
 use ::crypto::PublicKey;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StoredConfiguration {
-    actual_from: u64,
+    pub actual_from: u64,
     pub validators: Vec<PublicKey>,
-    pub consensus: ConsensusCfg,
+    pub consensus: ConsensusConfig,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConsensusCfg {
-    pub round_timeout: i64, // 2000
-    pub status_timeout: i64, // 5000
-    pub peers_timeout: i64, // 10000
-    pub propose_timeout: i64, // 500
-    pub txs_block_limit: u32, // 500
+pub struct ConsensusConfig {
+    pub round_timeout: i64,
+    pub status_timeout: i64,
+    pub peers_timeout: i64,
+    pub propose_timeout: i64,
+    pub txs_block_limit: u32,
+}
+
+impl Default for ConsensusConfig {
+    fn default() -> ConsensusConfig {
+        ConsensusConfig {
+            round_timeout: 3000,
+            propose_timeout: 500,
+            status_timeout: 5000,
+            peers_timeout: 10000,
+            txs_block_limit: 1000,
+        }
+    }
 }
 
 impl StoredConfiguration {

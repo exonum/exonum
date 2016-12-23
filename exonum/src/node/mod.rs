@@ -1,41 +1,27 @@
-// To avoid clippy failure concerning unused mut in cases when it's required
-#![allow(unused_mut)]
-
-extern crate serde_json;
-
 use std::io;
 use std::net::SocketAddr;
 use std::marker::PhantomData;
 
 use time::{Duration, Timespec};
 
-use super::crypto::{PublicKey, SecretKey, Hash, hash};
+use super::crypto::{PublicKey, SecretKey, Hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
                     EventsConfiguration, Channel, EventHandler, Result as EventsResult,
                     Error as EventsError};
-use super::blockchain::Blockchain;
-
+use super::blockchain::{Blockchain, GenesisConfig};
 use super::messages::{Connect, RawMessage};
 
 pub mod state;//temporary solution to get access to WAIT consts
-use blockchain::{ConsensusCfg, StoredConfiguration};
 
 mod basic;
 mod consensus;
 mod requests;
 mod adjusted_propose_timeout;
-pub mod config;
 
-pub use self::config::ListenerConfig;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 use self::adjusted_propose_timeout::*;
 
-type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
-
-pub const GENESIS_TIME: Timespec = Timespec {
-    sec: 1451649600,
-    nsec: 0,
-};
+pub type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
 
 #[derive(Clone, Debug)]
 pub enum ExternalMessage<B: Blockchain> {
@@ -74,39 +60,47 @@ pub struct NodeHandler<B, S>
     propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster<B>>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ListenerConfig {
+    pub public_key: PublicKey,
+    pub secret_key: SecretKey,
+    pub address: SocketAddr,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NodeConfig {
+    pub genesis: GenesisConfig,
+    pub listen_address: SocketAddr,
+    pub network: NetworkConfiguration,
+    pub peers: Vec<SocketAddr>,
+    pub public_key: PublicKey,
+    pub secret_key: SecretKey,
+}
+
 #[derive(Debug, Clone)]
 pub struct Configuration {
     pub listener: ListenerConfig,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
-    pub consensus: ConsensusCfg,
     pub peer_discovery: Vec<SocketAddr>,
-    pub validators: Vec<PublicKey>,
-}
-
-impl Configuration {
-    pub fn update_with_actual_config(&mut self, actual_config: StoredConfiguration) {
-        self.validators = actual_config.validators;
-        self.consensus = actual_config.consensus;
-    }
 }
 
 impl<B, S> NodeHandler<B, S>
     where B: Blockchain,
           S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
 {
-    pub fn new(blockchain: B, sender: S, mut config: Configuration) -> NodeHandler<B, S> {
+    pub fn new(blockchain: B, sender: S, config: Configuration) -> NodeHandler<B, S> {
         // FIXME: remove unwraps here, use FATAL log level instead
-
-        let r = blockchain.last_block().unwrap();
-        // TODO нужно создать api и для того, чтобы здесь подключался genesis блок
-        let (last_hash, last_height) = if let Some(last_block) = r {
-            (last_block.hash(), last_block.height() + 1)
-        } else {
-            (super::crypto::hash(&[]), 0)
+        let (last_hash, last_height) = {
+            let block = blockchain.last_block().unwrap();
+            (block.hash(), block.height() + 1)
         };
 
-        let id = config.validators
+        let stored = B::get_actual_configuration(&blockchain.view()).unwrap();
+
+        info!("Create node with config={:#?}", stored);
+
+        let id = stored.validators
             .iter()
             .position(|pk| pk == &config.listener.public_key)
             .unwrap();
@@ -116,22 +110,16 @@ impl<B, S> NodeHandler<B, S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        if let Some(stored_config) = B::get_actual_configuration(&blockchain.view()) {
-            config.update_with_actual_config(stored_config);
-        }
+        let propose_timeout_adjuster = Box::new(adjusted_propose_timeout::ConstProposeTimeout {
+            propose_timeout: stored.consensus.propose_timeout as i64,
+        });
 
         let state = State::new(id as u32,
-                               config.validators,
+                               stored.validators,
                                connect,
                                last_hash,
                                last_height,
-                               ConsensusCfg {
-                                   round_timeout: config.consensus.round_timeout as i64,
-                                   propose_timeout: config.consensus.propose_timeout as i64,
-                                   status_timeout: config.consensus.status_timeout as i64,
-                                   peers_timeout: config.consensus.peers_timeout as i64,
-                                   txs_block_limit: config.consensus.txs_block_limit,
-                               });
+                               stored.consensus);
 
         NodeHandler {
             public_key: config.listener.public_key,
@@ -139,10 +127,7 @@ impl<B, S> NodeHandler<B, S>
             state: state,
             channel: sender,
             blockchain: blockchain,
-            //            propose_timeout_adjuster:   Box::new(adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster::default()),
-            propose_timeout_adjuster: Box::new(adjusted_propose_timeout::ConstProposeTimeout {
-                propose_timeout: config.consensus.propose_timeout as i64,
-            }),
+            propose_timeout_adjuster: propose_timeout_adjuster,
             peer_discovery: config.peer_discovery,
         }
     }
@@ -283,14 +268,14 @@ impl<B, S> NodeHandler<B, S>
         self.blockchain
             .last_block()
             .unwrap()
-            .map_or_else(|| GENESIS_TIME, |p| p.time())
+            .time()
     }
 
     pub fn last_block_hash(&self) -> Hash {
         self.blockchain
             .last_block()
             .unwrap()
-            .map_or_else(|| hash(&[]), |p| p.hash())
+            .hash()
     }
 
     pub fn actual_round(&self) -> Round {
@@ -383,10 +368,22 @@ pub struct Node<B>
 impl<B> Node<B>
     where B: Blockchain
 {
-    pub fn new(blockchain: B, mut config: Configuration) -> Node<B> {
-        let network = Network::with_config(config.listener.address, config.network);
+    pub fn new(blockchain: B, node_cfg: NodeConfig) -> Node<B> {
+        blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
+
+        let config = Configuration {
+            listener: ListenerConfig {
+                public_key: node_cfg.public_key,
+                secret_key: node_cfg.secret_key,
+                address: node_cfg.listen_address,
+            },
+            network: node_cfg.network,
+            events: EventsConfiguration::default(),
+            peer_discovery: node_cfg.peers,
+        };
+        let network = Network::with_config(node_cfg.listen_address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
-        let channel = MioChannel::new(config.listener.address, event_loop.channel());
+        let channel = MioChannel::new(node_cfg.listen_address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);
         Node { reactor: Events::with_event_loop(network, worker, event_loop) }
     }

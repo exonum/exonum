@@ -21,15 +21,14 @@ extern crate exonum;
 extern crate blockchain_explorer;
 extern crate land_title;
 
-//use land_title::cors::CORS;
-//use iron::method::Method;
+// use land_title::cors::CORS;
+// use iron::method::Method;
 
 use std::net::SocketAddr;
-use std::path::Path;
 use std::thread;
 use std::default::Default;
 
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App};
 use rustless::json::ToJson;
 use rustless::{Application, Api, Nesting, Versioning, Response, Client, ErrorResponse};
 use rustless::batteries::cookie::{Cookie, CookieExt, CookieJar};
@@ -39,17 +38,16 @@ use valico::json_dsl;
 use hyper::status::StatusCode;
 use serde_json::value::from_value;
 
-use exonum::node::{Node, Configuration, TxSender, NodeChannel};
-use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions};
+use exonum::blockchain::GenesisConfig;
+use exonum::node::{Node, NodeConfig, TxSender, NodeChannel};
+use exonum::storage::Database;
 use exonum::storage::{Result as StorageResult, Error as StorageError};
 use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, Hash, FromHexError};
 use exonum::messages::Message;
-use exonum::config::ConfigFile;
-use exonum::node::config::GenesisConfig;
 use blockchain_explorer::ValueNotFound;
+use blockchain_explorer::helpers::{GenerateCommand, RunCommand, DatabaseType};
+
 use land_title::GeoPoint;
-
-
 use land_title::{ObjectsBlockchain, ObjectTx, TxCreateOwner, TxCreateObject, TxTransferObject,
                  TxRemoveObject, TxRestoreObject, TxRegister};
 use land_title::api::{ObjectsApi, NewObject};
@@ -109,7 +107,7 @@ fn send_tx<'a, D: Database>(tx: ObjectTx,
 }
 
 fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
-                         node_cfg: Configuration,
+                         node_cfg: NodeConfig,
                          port: Option<u16>,
                          origin: Option<String>) {
     if let Some(port) = port {
@@ -154,7 +152,7 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                     Some(Response::from_json(code, &json))
                 });
 
-                blockchain_explorer_api(api, blockchain.clone(), node_cfg);
+                blockchain_explorer_api(api, blockchain.clone(), node_cfg.genesis.clone());
                 land_titles_api(api, blockchain.clone(), channel.clone());
                 api.mount(swagger::create_api("docs"));
             });
@@ -198,10 +196,10 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
                      listen_address,
                      origin_url);
 
-            //let cors = CORS::new(origin_url, vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
+            // let cors = CORS::new(origin_url, vec![(vec![Method::Get, Method::Post], "owners".to_owned())]);
 
             chain.link(cookie);
-            //chain.link_after(cors);
+            // chain.link_after(cors);
             iron::Iron::new(chain).http(listen_address).unwrap();
         });
 
@@ -214,7 +212,7 @@ fn run_node<D: Database>(blockchain: ObjectsBlockchain<D>,
 
 fn blockchain_explorer_api<D: Database>(api: &mut Api,
                                         b1: ObjectsBlockchain<D>,
-                                        cfg: Configuration) {
+                                        cfg: GenesisConfig) {
     blockchain_explorer::make_api::<ObjectsBlockchain<D>, ObjectTx>(api, b1, cfg);
 }
 
@@ -506,43 +504,15 @@ fn land_titles_api<D: Database>(api: &mut Api,
 }
 
 fn main() {
-    env_logger::init().unwrap();
+    exonum::crypto::init();
+    blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Land titles manager api")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Aleksandr M. <aleksandr.marinenko@xdev.re>")
         .about("Demo lt validator node")
-        .arg(Arg::with_name("CONFIG")
-            .short("c")
-            .long("config")
-            .value_name("CONFIG_PATH")
-            .help("Sets a node config file")
-            .required(true)
-            .takes_value(true))
-        .subcommand(SubCommand::with_name("generate")
-            .about("Generates default configuration file")
-            .version(env!("CARGO_PKG_VERSION"))
-            .author("Aleksandr M. <aleksandr.marinenko@xdev.re>")
-            .arg(Arg::with_name("START_PORT")
-                .short("p")
-                .long("port")
-                .value_name("START_PORT")
-                .help("Port for first validator")
-                .takes_value(true))
-            .arg(Arg::with_name("COUNT")
-                .help("Validators count")
-                .required(true)
-                .index(1)))
-        .subcommand(SubCommand::with_name("run")
-            .about("Run demo node with the given validator id")
-            .version(env!("CARGO_PKG_VERSION"))
-            .author("Aleksandr M. <aleksandr.marinenko@xdev.re>")
-            .arg(Arg::with_name("LEVELDB_PATH")
-                .short("d")
-                .long("leveldb-path")
-                .value_name("LEVELDB_PATH")
-                .help("Use leveldb database with the given path")
-                .takes_value(true))
+        .subcommand(GenerateCommand::new())
+        .subcommand(RunCommand::new()
             .arg(Arg::with_name("HTTP_PORT")
                 .short("p")
                 .long("port")
@@ -554,65 +524,23 @@ fn main() {
                 .long("origin")
                 .value_name("ORIGIN")
                 .help("Set origin for CORS")
-                .takes_value(true))
-            .arg(Arg::with_name("PEERS")
-                .long("known-peers")
-                .value_name("PEERS")
-                .help("Comma separated list of known validator ids")
-                .takes_value(true))
-            .arg(Arg::with_name("VALIDATOR")
-                .help("Sets a validator id")
-                .required(true)
-                .index(1)));
+                .takes_value(true)));
 
     let matches = app.get_matches();
-    let path = Path::new(matches.value_of("CONFIG").unwrap());
     match matches.subcommand() {
-        ("generate", Some(matches)) => {
-            let count: u8 = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let port: Option<u16> = matches.value_of("START_PORT").map(|x| x.parse().unwrap());
-            let cfg = GenesisConfig::gen(count, port);
-            ConfigFile::save(&cfg, &path).unwrap();
-            println!("The configuration was successfully written to file {:?}",
-                     path);
-        }
+        ("generate", Some(matches)) => GenerateCommand::execute(matches),
         ("run", Some(matches)) => {
-            let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
-            let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
             let port: Option<u16> = matches.value_of("HTTP_PORT").map(|x| x.parse().unwrap());
             let origin: Option<String> = matches.value_of("ORIGIN").map(|x| x.parse().unwrap());
-            let peers = match matches.value_of("PEERS") {
-                Some(string) => {
-                    string.split(" ")
-                        .map(|x| -> usize { x.parse().unwrap() })
-                        .map(|x| cfg.validators[x].address)
-                        .collect()
+            let node_cfg = RunCommand::node_config(matches);
+            match RunCommand::db(matches) {
+                DatabaseType::LevelDB(db) => {
+                    run_node(ObjectsBlockchain { db: db }, node_cfg, port, origin)
                 }
-                None => {
-                    cfg.validators
-                        .iter()
-                        .map(|v| v.address)
-                        .collect()
+                DatabaseType::MemoryDB(db) => {
+                    run_node(ObjectsBlockchain { db: db }, node_cfg, port, origin)
                 }
-            };
-            let node_cfg = cfg.gen_node_configuration(idx, peers);
-            match matches.value_of("LEVELDB_PATH") {
-                Some(ref db_path) => {
-                    println!("Using levedb storage with path: {}", db_path);
-                    let mut options = LevelDBOptions::new();
-                    options.create_if_missing = true;
-                    let leveldb = LevelDB::new(&Path::new(db_path), options).unwrap();
-
-                    let blockchain = ObjectsBlockchain { db: leveldb };
-                    run_node(blockchain, node_cfg, port, origin);
-                }
-                None => {
-                    println!("Using memorydb storage");
-
-                    let blockchain = ObjectsBlockchain { db: MemoryDB::new() };
-                    run_node(blockchain, node_cfg, port, origin);
-                }
-            };
+            }
         }
         _ => {
             unreachable!("Wrong subcommand");

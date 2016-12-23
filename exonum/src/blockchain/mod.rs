@@ -1,10 +1,9 @@
-extern crate serde_json;
-
 #[macro_use]
 mod spec;
 mod block;
 mod view;
-mod config;
+pub mod config;
+mod genesis;
 
 use std::borrow::Borrow;
 use std::ops::Deref;
@@ -17,11 +16,9 @@ use ::messages::{Precommit, Message, ConfigMessage, ServiceTx, ConfigPropose, Co
 use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
 
 pub use self::block::Block;
-pub use self::view::View;
-
-pub use self::config::{StoredConfiguration, ConsensusCfg};
-
-pub use self::view::ConfigurationData;
+pub use self::view::{View, ConfigurationData};
+pub use self::genesis::GenesisConfig;
+pub use self::config::{StoredConfiguration, ConsensusConfig};
 
 pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     where Self: Deref<Target = <Self as Blockchain>::Database>
@@ -30,12 +27,15 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
     type Database: Database;
     type Transaction: Message + StorageValue;
 
-    fn last_hash(&self) -> Result<Option<Hash>, Error> {
-        self.view().heights().last()
+    fn last_hash(&self) -> Result<Hash, Error> {
+        Ok(self.view()
+            .heights()
+            .last()?
+            .unwrap_or_else(Hash::default))
     }
 
-    fn last_block(&self) -> Result<Option<Block>, Error> {
-        self.view().last_block()
+    fn last_block(&self) -> Result<Block, Error> {
+        Ok(self.view().last_block()?.unwrap())
     }
 
     fn verify_tx(tx: &Self::Transaction) -> bool;
@@ -58,7 +58,7 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
                     txs: &[(Hash, AnyTx<Self::Transaction>)])
                     -> Result<(Hash, Vec<Hash>, Patch), Error> {
         // Get last hash
-        let last_hash = self.last_hash()?.unwrap_or_else(|| hash(&[]));
+        let last_hash = self.last_hash()?;
         // Create fork
         let fork = self.view();
         // Save & execute transactions
@@ -80,7 +80,17 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         // Get tx hash
         let tx_hash = fork.block_txs(height).root_hash()?;
         // Get state hash
-        let state_hash = Self::state_hash(&fork)?;
+        let state_hash = {
+            let app_state_hash = Self::state_hash(&fork)?;
+            let mut buf = Vec::new();
+            buf.extend_from_slice(app_state_hash.as_ref());
+            // Add service state to state_hash
+            buf.extend_from_slice(fork.config_proposes().root_hash()?.as_ref());
+            buf.extend_from_slice(fork.config_votes().root_hash()?.as_ref());
+            buf.extend_from_slice(fork.configs().root_hash()?.as_ref());
+            hash(&buf)
+        };
+
         // Create block
         let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
         // Eval block hash
@@ -111,41 +121,53 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         0
     }
 
-    fn get_actual_configuration(view: &Self::View) -> Option<StoredConfiguration> {
-
+    fn get_actual_configuration(view: &Self::View) -> Result<StoredConfiguration, Error> {
         let h = Self::get_height(view);
-
         let heights = view.configs_heights();
+        let height_values = heights.values().unwrap();
 
-        if let Ok(height_values) = heights.values() {
+        // TODO improve perfomance
+        let idx = height_values.into_iter()
+            .rposition(|r| u64::from(r) <= h)
+            .unwrap();
 
-            if let Some(idx) = height_values.into_iter()
-                .rposition(|r| u64::from(r) <= h) {
-                if let Ok(Some(height)) = heights.get(idx as u64) {
-                    return Self::get_configuration_at_height(view, height.into());
-                }
-            }
-        }
-        None
+        let height = heights.get(idx as u64)?.unwrap();
+        Self::get_configuration_at_height(view, height.into()).map(|x| x.unwrap())
     }
 
-    fn get_configuration_at_height(view: &Self::View, height: u64) -> Option<StoredConfiguration> {
+    fn commit_actual_configuration(view: &Self::View,
+                                   actual_from: u64,
+                                   config_data: &[u8])
+                                   -> Result<(), Error> {
+        let height_bytecode = actual_from.into();
+        view.configs().put(&height_bytecode, config_data.to_vec())?;
+        view.configs_heights().append(height_bytecode)?;
+        // TODO: clear storages
+
+        Ok(())
+    }
+
+    // FIXME Replace by result?
+    fn get_configuration_at_height(view: &Self::View,
+                                   height: u64)
+                                   -> Result<Option<StoredConfiguration>, Error> {
         let configs = view.configs();
-        if let Ok(Some(config)) = configs.get(&height.into()) {
+        if let Some(config) = configs.get(&height.into())? {
             match StoredConfiguration::deserialize(&config) {
                 Ok(configuration) => {
-                    return Some(configuration);
+                    return Ok(Some(configuration));
                 }
                 Err(_) => {
                     error!("Can't parse found configuration at height: {}", height);
                 }
             }
         }
-        None
+        Ok(None)
     }
 
     fn handle_config_propose(view: &Self::View, config_propose: &ConfigPropose) {
-        if let Some(config) = Self::get_actual_configuration(view) {
+        {
+            let config = Self::get_actual_configuration(view).unwrap();
             if !config.validators.contains(config_propose.from()) {
                 error!("ConfigPropose from unknown validator: {:?}",
                        config_propose.from());
@@ -160,56 +182,54 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             }
 
             trace!("Handle ConfigPropose");
-            let _ = view.config_proposes().put(&hash, config_propose.clone());
+            view.config_proposes().put(&hash, config_propose.clone()).unwrap();
         }
     }
 
     fn handle_config_vote(view: &Self::View, config_vote: &ConfigVote) {
+        let config = Self::get_actual_configuration(view).unwrap();
 
-        if let Some(config) = Self::get_actual_configuration(view) {
+        if !config.validators.contains(config_vote.from()) {
+            error!("ConfigVote from unknown validator: {:?}",
+                   config_vote.from());
+            return;
+        }
 
-            if !config.validators.contains(config_vote.from()) {
-                error!("ConfigVote from unknown validator: {:?}",
-                       config_vote.from());
-                return;
-            }
+        if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_some() {
+            error!("Received config_vote for unknown transaciton, msg={:?}",
+                   config_vote);
+            return;
+        }
 
-            if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_some() {
-                error!("Received config_vote for unknown transaciton, msg={:?}",
+        if let Some(vote) = view.config_votes().get(config_vote.from()).unwrap() {
+            if vote.seed() != config_vote.seed() - 1 {
+                error!("Received config_vote with wrong seed, msg={:?}",
                        config_vote);
                 return;
             }
+        }
 
-            if let Some(vote) = view.config_votes().get(config_vote.from()).unwrap() {
-                if vote.seed() != config_vote.seed() - 1 {
-                    error!("Received config_vote with wrong seed, msg={:?}",
-                           config_vote);
-                    return;
+        let msg = config_vote.clone();
+        let _ = view.config_votes().put(msg.from(), config_vote.clone());
+
+        let mut votes_count = 0;
+        for pub_key in config.validators.clone() {
+            if let Some(vote) = view.config_votes().get(&pub_key).unwrap() {
+                if !vote.revoke() {
+                    votes_count += 1;
                 }
             }
+        }
 
-            let msg = config_vote.clone();
-            let _ = view.config_votes().put(msg.from(), config_vote.clone());
-
-            let mut votes_count = 0;
-            for pub_key in config.validators.clone() {
-                if let Some(vote) = view.config_votes().get(&pub_key).unwrap() {
-                    if !vote.revoke() {
-                        votes_count += 1;
-                    }
-                }
-            }
-
-            if votes_count > 2 / 3 * config.validators.len() {
-                if let Some(config_propose) =
-                    view.config_proposes()
-                        .get(config_vote.hash_propose())
-                        .unwrap() {
-                    let height_bytecode = config_propose.actual_from_height().into();
-                    view.configs().put(&height_bytecode, config_propose.config().to_vec()).unwrap();
-                    view.configs_heights().append(height_bytecode).unwrap();
-                    // TODO: clear storages
-                }
+        if votes_count > 2 / 3 * config.validators.len() {
+            if let Some(config_propose) =
+                view.config_proposes()
+                    .get(config_vote.hash_propose())
+                    .unwrap() {
+                Self::commit_actual_configuration(view,
+                                                  config_propose.actual_from_height(),
+                                                  config_propose.config())
+                    .unwrap();
             }
         }
     }
@@ -231,6 +251,36 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
         };
 
         self.merge(&patch)
+    }
+
+    // FIXME make it private and find more clear name
+    fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
+        let config_propose = StoredConfiguration {
+            actual_from: 0,
+            validators: cfg.validators,
+            consensus: cfg.consensus,
+        };
+        let time = Timespec {
+            sec: cfg.time as i64,
+            nsec: 0,
+        };
+
+        if let Some(block_hash) = self.view().heights().get(0)? {
+            // TODO create genesis block for MemoryDB and compare in hash with zero block
+            // panic!("Genesis block is already created");
+            let _ = block_hash;
+            return Ok(());
+        }
+
+        let patch = {
+            let view = self.view();
+            Self::commit_actual_configuration(&view, 0, config_propose.serialize().as_ref())?;
+            self.merge(&view.changes())?;
+
+            self.create_patch(0, 0, time, &[])?.2
+        };
+        self.merge(&patch)?;
+        Ok(())
     }
 
     fn view(&self) -> Self::View {

@@ -1,3 +1,5 @@
+use std::fs;
+use std::io;
 use std::mem;
 use std::path::Path;
 use std::error;
@@ -45,16 +47,19 @@ impl From<LevelError> for Error {
     }
 }
 
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Self {
+        Error::new(error::Error::description(&err))
+    }
+}
+
 impl LevelDB {
     pub fn new(path: &Path, options: Options) -> Result<LevelDB, Error> {
-        match LevelDatabase::open(path, options) {
-            Ok(database) => Ok(LevelDB { db: Arc::new(database) }),
-            Err(e) => Err(Self::to_storage_error(e)),
+        if options.create_if_missing {
+            fs::create_dir_all(path)?;
         }
-    }
-
-    fn to_storage_error(err: LevelError) -> Error {
-        Error::from(err)
+        let database = LevelDatabase::open(path, options)?;
+        Ok(LevelDB { db: Arc::new(database) })
     }
 }
 
@@ -62,17 +67,17 @@ impl Map<[u8], Vec<u8>> for LevelDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         self.db
             .get(LEVELDB_READ_OPTIONS, key)
-            .map_err(LevelDB::to_storage_error)
+            .map_err(Into::into)
     }
 
     fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
         let result = self.db.put(LEVELDB_WRITE_OPTIONS, key, &value);
-        result.map_err(LevelDB::to_storage_error)
+        result.map_err(Into::into)
     }
 
     fn delete(&self, key: &[u8]) -> Result<(), Error> {
         let result = self.db.delete(LEVELDB_WRITE_OPTIONS, key);
-        result.map_err(LevelDB::to_storage_error)
+        result.map_err(Into::into)
     }
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let it = self.db.keys_iter(LEVELDB_READ_OPTIONS);
@@ -108,7 +113,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
             None => {
                 self.snap
                     .get(LEVELDB_READ_OPTIONS, key)
-                    .map_err(LevelDB::to_storage_error)
+                    .map_err(Into::into)
             }
         }
     }
@@ -175,7 +180,7 @@ impl Database for LevelDB {
         }
         let write_opts = WriteOptions::new();
         let result = self.db.write(write_opts, &batch);
-        result.map_err(LevelDB::to_storage_error)
+        result.map_err(Into::into)
     }
 }
 

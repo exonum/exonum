@@ -1,3 +1,6 @@
+use std::default::Default;
+
+pub use sodiumoxide::init;
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
                                              SIGNATUREBYTES as SIGNATURE_LENGTH,
@@ -38,6 +41,7 @@ pub fn hash(m: &[u8]) -> Hash {
     let dig = hash_sodium(m);
     Hash(dig)
 }
+
 macro_rules! implement_public_sodium_wrapper {
     ($name:ident, $name_from:ident, $size:expr) => (
         #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash, Debug)]
@@ -187,6 +191,12 @@ implement_index_traits! {PublicKey}
 implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
+
+impl Default for Hash {
+    fn default() -> Hash {
+        Hash::new([0; 32])
+    }
+}
 
 #[cfg(test)]
 mod tests {

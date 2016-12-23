@@ -9,7 +9,7 @@ use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMess
 
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
-use blockchain::{ConsensusCfg, StoredConfiguration};
+use blockchain::{ConsensusConfig, StoredConfiguration};
 
 // TODO: replace by in disk tx pool
 const TX_POOL_LIMIT: usize = 20000;
@@ -33,7 +33,7 @@ pub struct State<AppTx>
 {
     id: u32,
     validators: Vec<PublicKey>,
-    consensus_config: ConsensusCfg,
+    consensus_config: ConsensusConfig,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -68,9 +68,6 @@ pub struct State<AppTx>
     // Максимальная высота, на которой
     // "засветились" другие валидаторы
     validator_heights: Vec<Height>,
-
-    // FIXME: temp, to remove
-    pub commited_txs: u64,
 }
 
 
@@ -275,7 +272,7 @@ impl<AppTx> State<AppTx>
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
-               consensus_config: ConsensusCfg)
+               consensus_config: ConsensusConfig)
                -> State<AppTx> {
 
         let validators_len = validators.len();
@@ -312,13 +309,11 @@ impl<AppTx> State<AppTx>
 
             requests: HashMap::new(),
 
-            commited_txs: 0,
-
             consensus_config: consensus_config,
         }
     }
 
-    pub fn consensus_config(&self) -> &ConsensusCfg {
+    pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.consensus_config
     }
 
@@ -440,9 +435,7 @@ impl<AppTx> State<AppTx>
             // Commit transactions if needed
             let txs = self.block(block_hash).unwrap().txs.clone();
             for hash in txs {
-                if self.transactions.remove(&hash).is_some() {
-                    self.commited_txs += 1;
-                }
+                self.transactions.remove(&hash);
             }
         }
         // TODO: destruct/construct structure HeightState instead of call clear

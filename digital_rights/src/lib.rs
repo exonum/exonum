@@ -310,7 +310,6 @@ impl<D> Blockchain for DigitalRightsBlockchain<D>
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use time;
