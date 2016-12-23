@@ -12,7 +12,6 @@ supervisor_conf=${destdir}/etc/supervisord.conf
 enable() {
     mkdir -p ${destdir}/log/supervisor
     mkdir ${destdir}/run
-    mkdir ${destdir}/db
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc || exit 1
 
     cd ${destdir}
@@ -38,16 +37,10 @@ update() {
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc/ || exit 1
     cd ${destdir}
     supervisorctl reread || exit 1
-    supervisorctl update || exit 1
 }
 
 clear() {
-    cd ${destdir}
-    if [ -e /tmp/supervisord.sock ]
-    then
-        supervisorctl shutdown || exit 1
-    fi 
-    rm -rf ${destdir}
+    rm -rf ${destdir}/${1}
 }
 
 start() {
@@ -55,6 +48,7 @@ start() {
 
     template=$1
     cd ${destdir}
+    supervisorctl update ${template}
     supervisorctl start ${template}:* || exit 1
 }
 
@@ -72,6 +66,15 @@ stop() {
     template=$1
     cd ${destdir}
     supervisorctl stop ${template}:* || exit 1
+}
+
+generate() {
+    template=$1
+    count=$2
+    port=$3
+
+    test -e ${destdir}/${template} && exit 1
+    exonumctl generate -o ${destdir}/${template} $count -p $port
 }
 
 case "$1" in
@@ -95,5 +98,8 @@ case "$1" in
         ;;
     clear) 
         clear $2
+        ;;
+    generate) 
+        generate $2 $3 $4
         ;;
 esac

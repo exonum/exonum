@@ -2,49 +2,70 @@
 extern crate log;
 
 extern crate exonum;
+extern crate blockchain_explorer;
 extern crate timestamping;
 extern crate sandbox;
-extern crate env_logger;
 extern crate clap;
 
-use std::path::Path;
 use std::{thread, time};
 use std::cmp::min;
 
-use clap::{Arg, App, SubCommand};
+use clap::{Arg, App};
 
-use exonum::node::{Node};
-use exonum::config::ConfigFile;
-use exonum::node::config::GenesisConfig;
-use exonum::storage::{MemoryDB};
-use timestamping::TimestampingBlockchain; 
+use exonum::node::{Node, NodeConfig};
+use exonum::storage::Database;
+
+use timestamping::TimestampingBlockchain;
+use blockchain_explorer::helpers::{RunCommand, DatabaseType};
 
 use sandbox::TimestampingTxGenerator;
 
+struct TxGeneratorConfig {
+    tx_size: usize,
+    tx_count: usize,
+    tx_package_size: usize,
+    tx_timeout: u64,
+}
+
+fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
+                         node_cfg: NodeConfig,
+                         tx_gen_cfg: TxGeneratorConfig) {
+    let mut node = Node::new(blockchain.clone(), node_cfg);
+    let chan = node.channel();
+    let mut tx_gen = TimestampingTxGenerator::new(tx_gen_cfg.tx_size);
+
+    let handle = thread::spawn(move || {
+        let gen = &mut tx_gen;
+        let mut tx_remaining = tx_gen_cfg.tx_count;
+        while tx_remaining > 0 {
+            let count = min(tx_remaining, tx_gen_cfg.tx_package_size);
+            for tx in gen.take(count) {
+                if let Err(e) = chan.send(tx) {
+                    trace!("Unable to add tx to node channel error={:?}", e);
+                }
+            }
+            tx_remaining -= count;
+
+            println!("There are {} transactions in the pool", tx_remaining);
+
+            let timeout = time::Duration::from_millis(tx_gen_cfg.tx_timeout);
+            thread::sleep(timeout);
+        }
+    });
+
+    node.run().unwrap();
+    handle.join().unwrap();
+}
+
 fn main() {
-    env_logger::init().unwrap();
+    exonum::crypto::init();
+    blockchain_explorer::helpers::init_logger().unwrap();
 
     let app = App::new("Testnet transaction generator")
-        .version("0.1")
+        .version(env!("CARGO_PKG_VERSION"))
         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
         .about("Test network node")
-        .arg(Arg::with_name("CONFIG")
-            .short("c")
-            .long("config")
-            .value_name("CONFIG_PATH")
-            .help("Sets a testnet config file")
-            .required(true)
-            .takes_value(true))
-        .subcommand(SubCommand::with_name("run")
-            .about("Run transaction generator")
-            .version("0.1")
-            .author("Aleksey S. <aleksei.sidorov@xdev.re>")
-            .arg(Arg::with_name("PEERS")
-                .short("p")
-                .long("known-peers")
-                .value_name("PEERS")
-                .help("Comma separated list of known validator ids")
-                .takes_value(true))
+        .subcommand(RunCommand::new()
             .arg(Arg::with_name("TX_PACKAGE")
                 .short("x")
                 .long("tx-package-size")
@@ -60,68 +81,29 @@ fn main() {
                 .long("tx-data-size")
                 .value_name("TX_SIZE")
                 .help("A transaction data size"))
-            .arg(Arg::with_name("VALIDATOR")
-                .help("Sets a validator id")
-                .required(true)
-                .index(1))
             .arg(Arg::with_name("COUNT")
                 .help("transactions count")
                 .required(true)
-                .index(2)));
+                .index(1)));
 
     let matches = app.get_matches();
-    let path = Path::new(matches.value_of("CONFIG").unwrap());
     match matches.subcommand() {
         ("run", Some(matches)) => {
-            let cfg: GenesisConfig = ConfigFile::load(path).unwrap();
-            let idx: usize = matches.value_of("VALIDATOR").unwrap().parse().unwrap();
-            let count: usize = matches.value_of("COUNT").unwrap().parse().unwrap();
-            let peers = match matches.value_of("PEERS") {
-                Some(string) => {
-                    string.split(" ")
-                        .map(|x| -> usize { x.parse().unwrap() })
-                        .map(|x| cfg.validators[x].address)
-                        .collect::<Vec<_>>()
-                }
-                None => {
-                    cfg.validators
-                        .iter()
-                        .map(|v| v.address)
-                        .collect::<Vec<_>>()
-                }
+            let tx_gen_cfg = TxGeneratorConfig {
+                tx_size: matches.value_of("TX_SIZE").unwrap_or("64").parse().unwrap(),
+                tx_count: matches.value_of("COUNT").unwrap().parse().unwrap(),
+                tx_package_size: matches.value_of("TX_PACKAGE").unwrap_or("1000").parse().unwrap(),
+                tx_timeout: matches.value_of("TX_TIMEOUT").unwrap_or("1000").parse().unwrap(),
             };
-
-            let node_cfg = cfg.gen_node_configuration(idx, peers);
-
-            let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
-            let mut node = Node::new(blockchain.clone(), node_cfg);
-            let chan = node.channel();
-
-            let tx_package_size: usize = matches.value_of("TX_PACKAGE").unwrap_or("1000").parse().unwrap();
-            let tx_timeout: u64 = matches.value_of("TX_TIMEOUT").unwrap_or("1000").parse().unwrap();
-            let tx_size = matches.value_of("TX_SIZE").unwrap_or("64").parse().unwrap();
-            let mut tx_gen = TimestampingTxGenerator::new(tx_size);
-
-            let handle = thread::spawn(move || {
-                let gen = &mut tx_gen;
-                let mut tx_remaining = count;
-                while tx_remaining > 0 {                    
-                    let count = min(tx_remaining, tx_package_size);
-                    for tx in gen.take(count) {
-                        chan.send(tx);
-                    }
-                    tx_remaining -= count;
-                    
-                    println!("There are {} transactions in the pool",
-                        tx_remaining);
-
-                    let timeout = time::Duration::from_millis(tx_timeout);
-                    thread::sleep(timeout);   
-                }                 
-            });
-
-            node.run().unwrap();
-            handle.join().unwrap();
+            let node_cfg = RunCommand::node_config(matches);
+            match RunCommand::db(matches) {
+                DatabaseType::LevelDB(db) => {
+                    run_node(TimestampingBlockchain { db: db }, node_cfg, tx_gen_cfg)
+                }
+                DatabaseType::MemoryDB(db) => {
+                    run_node(TimestampingBlockchain { db: db }, node_cfg, tx_gen_cfg)
+                }
+            }
         }
         _ => {
             unreachable!("Wrong subcommand");
