@@ -31,6 +31,8 @@ def node_proc_runner(node_index, node_args, stdout, stderr, env):
 
 
 parser = argparse.ArgumentParser(description='Exonum benchmark util.')
+parser.add_argument('--binaries-dir', dest='binaries_dir',
+                    action="store", default="", help="path(empty or ends with '/') to the directory where tx_generator, timestamping and blockchain_utils are located")
 parser.add_argument('--exonum-dir', dest='exonum_dir',
                     action="store", default="/tmp/exonum")
 parser.add_argument('--output-file', dest='output_file',
@@ -48,6 +50,7 @@ args = parser.parse_args()
 # Config section
 
 print("Config section:")
+binaries_dir = args.binaries_dir
 dest_dir = args.exonum_dir
 output_file = args.output_file
 node_type = args.node_type
@@ -67,7 +70,7 @@ os.makedirs(dest_dir + "/logs")
 # Helper functions
 
 def is_tx_hash_found_in_node(tx_hash, node_number):
-    r = run(["blockchain_utils",
+    r = run([binaries_dir + "blockchain_utils",
              "-d", dest_dir + "/db/" + str(node_number),
              "find_tx", tx_hash],
             stderr=DEVNULL, stdout=DEVNULL)
@@ -162,7 +165,7 @@ def print_output_to_bench_file(node_number, node_log, tx_gen_log):
 # ide aof the function is to produce args to run node with index i
 def node_args(i):
     return [
-        node_type,
+        binaries_dir + node_type, # todo should node_type be replaced directly with 'timestamping'?
         "run",
         "--node-config",        dest_dir + "/validators/%s.toml" % str(i),
         "--leveldb-path",       dest_dir + "/db/%s" % str(i),
@@ -183,13 +186,8 @@ print("Running nodes:")
 node_env = os.environ.copy()
 node_env["RUST_BACKTRACE"] = "1"
 
-node_args_ = [
-    node_type,
-    "run"
-]
-
 tx_gen_args = [
-    "tx_generator",
+    binaries_dir + "tx_generator",
     "run",
     "--node-config",        dest_dir + "/validators/3.toml",
     "--leveldb-path",       dest_dir + "/db/3",
