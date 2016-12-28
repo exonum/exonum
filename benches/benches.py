@@ -20,7 +20,7 @@ parser.add_argument('--tx-package-size-min', dest='tx_package_size_min', type=in
 parser.add_argument('--tx-package-size-max', dest='tx_package_size_max', type=int,
                     action="store", default=900)
 parser.add_argument('--tx-package-size-step', dest='tx_package_size_step', type=int,
-                    action="store", default=600)
+                    action="store", default=100)
 parser.add_argument('--tx-timeout', dest='tx_timeout', type=int,
                     action="store", default=100)
 args = parser.parse_args()
@@ -53,6 +53,8 @@ def create_name_of_bench_dir_2(**kwargs):
 def run_bench(exonum_dir, tx_count, tx_package_size, tx_timeout):
     bench_args = [
         "python3",  "./benches/transactions.py",
+        "--binaries-dir", "./target/release/examples/",
+        # "--binaries-dir", "",
         "--exonum-dir", str(exonum_dir),
         "--tx-count", str(tx_count),
         "--tx-package-size", str(tx_package_size),
