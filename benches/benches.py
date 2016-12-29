@@ -6,6 +6,8 @@ import os
 import shutil
 import re
 import argparse
+import fileinput
+import sys
 from time import sleep
 
 # constants
@@ -27,9 +29,11 @@ parser.add_argument('--tx-package-size-min', dest='tx_package_size_min', type=in
 parser.add_argument('--tx-package-size-max', dest='tx_package_size_max', type=int,
                     action="store", default=900)
 parser.add_argument('--tx-package-size-step', dest='tx_package_size_step', type=int,
-                    action="store", default=100)
+                    action="store", default=1000)
 parser.add_argument('--tx-timeout', dest='tx_timeout', type=int,
                     action="store", default=100)
+parser.add_argument('--propose-timeout', dest='propose_timeout', type=int,
+                    action="store")
 # todo do not hardcode 4 as node number and parametrize it
 # parser.add_argument('--nodes-number', dest='nodes_number', type=int,
 #                     action="store", default=4, help="number of nodes which will be started and processed. last node - is tx_generator")
@@ -45,6 +49,7 @@ def print_args():
     print("tx_package_size_max: " + str(args.tx_package_size_max))
     print("tx_package_size_step: " + str(args.tx_package_size_step))
     print("tx_timeout: " + str(args.tx_timeout))
+    print("propose_timeout: " + str(args.propose_timeout))
     # print("nodes_number: " + str(args.nodes_number))
 
 def prepare_exonum_tmp_dir(exonum_tmp_dir_path):
@@ -69,6 +74,17 @@ def generate_exonum_config(exonum_tmp_dir_path):
                    stdout=DEVNULL, stderr=DEVNULL,
                    )
     generate_config_proc.communicate()
+
+def update_exonum_config_with_propose_timeout(propose_timeout):
+#     print config pathes
+    for validator in range(0, 4):
+        validator_config_file_path = args.exonum_dir + "/validators/{}.toml".format(validator)
+        print(validator_config_file_path)
+        for line in fileinput.input([validator_config_file_path], inplace=True):
+            if line.strip().startswith('propose_timeout_ = '):
+                line = 'propose_timeout = {}\n'.format(propose_timeout)
+                sys.stdout.write(line)
+#     todo
 
 #     idea of the function is to
 #  - create name of directory for current bench (using arguments)
@@ -166,6 +182,9 @@ prepare_exonum_tmp_dir(args.exonum_dir)
 
 # generate exonum config
 generate_exonum_config(args.exonum_dir)
+
+if args.propose_timeout is not None:
+    update_exonum_config_with_propose_timeout(args.propose_timeout)
 
 # clean benches dir
 shutil.rmtree(args.benches_dir, ignore_errors=True)
