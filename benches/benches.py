@@ -29,7 +29,7 @@ parser.add_argument('--tx-package-size-min', dest='tx_package_size_min', type=in
 parser.add_argument('--tx-package-size-max', dest='tx_package_size_max', type=int,
                     action="store", default=900)
 parser.add_argument('--tx-package-size-step', dest='tx_package_size_step', type=int,
-                    action="store", default=1000)
+                    action="store", default=100)
 parser.add_argument('--tx-timeout', dest='tx_timeout', type=int,
                     action="store", default=100)
 parser.add_argument('--propose-timeout', dest='propose_timeout', type=int,
@@ -81,10 +81,9 @@ def update_exonum_config_with_propose_timeout(propose_timeout):
         validator_config_file_path = args.exonum_dir + "/validators/{}.toml".format(validator)
         print(validator_config_file_path)
         for line in fileinput.input([validator_config_file_path], inplace=True):
-            if line.strip().startswith('propose_timeout_ = '):
-                line = 'propose_timeout = {}\n'.format(propose_timeout)
-                sys.stdout.write(line)
-#     todo
+            if line.strip().startswith("propose_timeout = "):
+                line = "propose_timeout = {}\n".format(propose_timeout)
+            sys.stdout.write(line)
 
 #     idea of the function is to
 #  - create name of directory for current bench (using arguments)
@@ -212,5 +211,8 @@ while package_size_current <= args.tx_package_size_max:
     sleep(10)
 
 # keep file with results in eorking directory
-shutil.copy(bench_output_file_path, "./" + count_of_unfound_txs_file_name)
+file_prefix_with_propose_timeout = ""
+if args.propose_timeout is not None:
+    file_prefix_with_propose_timeout = "propose_timeout-{}__".format(args.propose_timeout)
+shutil.copy(bench_output_file_path, "./" + file_prefix_with_propose_timeout + count_of_unfound_txs_file_name)
 
