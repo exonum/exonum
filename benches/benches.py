@@ -14,6 +14,8 @@ count_of_unfound_txs_file_name = "benches_results.csv"
 
 # parse arguments
 parser = argparse.ArgumentParser(description='Exonum benchmarks util.')
+parser.add_argument('--binaries-dir', dest='binaries_dir',
+                    action="store", default="", help="path(empty or ends with '/') to the directory where tx_generator, timestamping and blockchain_utils are located")
 parser.add_argument('--exonum-dir', dest='exonum_dir',
                     action="store", default="/tmp/exonum")
 parser.add_argument('--benches-dir', dest='benches_dir',
@@ -35,6 +37,7 @@ args = parser.parse_args()
 
 def print_args():
     # print arguments:
+    print("binaries_dir: " + str(args.binaries_dir))
     print("exonum_dir: " + str(args.exonum_dir))
     print("benches_dir: " + str(args.benches_dir))
     print("tx_package_count: " + str(args.tx_package_count))
@@ -43,6 +46,29 @@ def print_args():
     print("tx_package_size_step: " + str(args.tx_package_size_step))
     print("tx_timeout: " + str(args.tx_timeout))
     # print("nodes_number: " + str(args.nodes_number))
+
+def prepare_exonum_tmp_dir(exonum_tmp_dir_path):
+    # clean tmp_dir
+    shutil.rmtree(exonum_tmp_dir_path, ignore_errors=True)
+    os.makedirs(exonum_tmp_dir_path)
+    os.makedirs(exonum_tmp_dir_path + "/logs")
+    os.makedirs(exonum_tmp_dir_path + "/db")
+    os.makedirs(exonum_tmp_dir_path + "/benches")
+
+def generate_exonum_config(exonum_tmp_dir_path):
+    generate_args = [
+        args.binaries_dir + "/timestamping",
+        "generate",
+        "4",
+        "--output-dir", exonum_tmp_dir_path,
+        "--start-port", "1900", #todo get rid of hardcode
+    ]
+
+    print("run generate_config with args: " + str(generate_args))
+    generate_config_proc = Popen(generate_args,
+                   stdout=DEVNULL, stderr=DEVNULL,
+                   )
+    generate_config_proc.communicate()
 
 #     idea of the function is to
 #  - create name of directory for current bench (using arguments)
@@ -134,6 +160,12 @@ def process_bench(exonum_dir, benches_dir_path, tx_count, tx_package_size, tx_ti
 
 
 print_args()
+
+# clean tmp_dir
+prepare_exonum_tmp_dir(args.exonum_dir)
+
+# generate exonum config
+generate_exonum_config(args.exonum_dir)
 
 # clean benches dir
 shutil.rmtree(args.benches_dir, ignore_errors=True)
