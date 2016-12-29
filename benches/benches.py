@@ -34,6 +34,8 @@ parser.add_argument('--tx-timeout', dest='tx_timeout', type=int,
                     action="store", default=100)
 parser.add_argument('--propose-timeout', dest='propose_timeout', type=int,
                     action="store")
+parser.add_argument('--start-port', dest='start_port', type=int,
+                    action="store", help="is used when generating exonum config. same param as in 'timestamping generate'")
 # todo do not hardcode 4 as node number and parametrize it
 # parser.add_argument('--nodes-number', dest='nodes_number', type=int,
 #                     action="store", default=4, help="number of nodes which will be started and processed. last node - is tx_generator")
@@ -50,6 +52,7 @@ def print_args():
     print("tx_package_size_step: " + str(args.tx_package_size_step))
     print("tx_timeout: " + str(args.tx_timeout))
     print("propose_timeout: " + str(args.propose_timeout))
+    print("start_port: " + str(args.start_port))
     # print("nodes_number: " + str(args.nodes_number))
 
 def prepare_exonum_tmp_dir(exonum_tmp_dir_path):
@@ -66,8 +69,10 @@ def generate_exonum_config(exonum_tmp_dir_path):
         "generate",
         "4",
         "--output-dir", exonum_tmp_dir_path,
-        "--start-port", "1900", #todo get rid of hardcode
     ]
+    if args.start_port is not None:
+        generate_args.append("--start-port")
+        generate_args.append(str(args.start_port))
 
     print("run generate_config with args: " + str(generate_args))
     generate_config_proc = Popen(generate_args,
