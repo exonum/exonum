@@ -4,8 +4,13 @@
 from subprocess import Popen, DEVNULL, PIPE, run
 import os
 import shutil
+import re
 import argparse
 from time import sleep
+
+# constants
+csv_delimiter = ","
+count_of_unfound_txs_file_name = "benches_results.csv"
 
 # parse arguments
 parser = argparse.ArgumentParser(description='Exonum benchmarks util.')
@@ -23,6 +28,9 @@ parser.add_argument('--tx-package-size-step', dest='tx_package_size_step', type=
                     action="store", default=100)
 parser.add_argument('--tx-timeout', dest='tx_timeout', type=int,
                     action="store", default=100)
+# todo do not hardcode 4 as node number and parametrize it
+# parser.add_argument('--nodes-number', dest='nodes_number', type=int,
+#                     action="store", default=4, help="number of nodes which will be started and processed. last node - is tx_generator")
 args = parser.parse_args()
 
 def print_args():
@@ -34,6 +42,7 @@ def print_args():
     print("tx_package_size_max: " + str(args.tx_package_size_max))
     print("tx_package_size_step: " + str(args.tx_package_size_step))
     print("tx_timeout: " + str(args.tx_timeout))
+    # print("nodes_number: " + str(args.nodes_number))
 
 #     idea of the function is to
 #  - create name of directory for current bench (using arguments)
@@ -86,6 +95,18 @@ def keep_results(logs_dir_path, bench_dir_path):
     shutil.rmtree(bench_dir_path, ignore_errors=True)
     shutil.copytree(logs_dir_path, bench_dir_path)
 
+#       as an input param expected smth like this: "array('l', [0, 0, 0, 2])"
+#       !! exactly 4 elements in array are expected
+def get_numbers_of_unfound_txs_per_node(array_printed_as_string):
+    result = []
+    m = re.search(r"^.*[[\s](\d+).*[[\s](\d+).*[[\s](\d+).*[[\s](\d+)", array_printed_as_string)
+    result.append(int(m.group(1)))
+    result.append(int(m.group(2)))
+    result.append(int(m.group(3)))
+    result.append(int(m.group(4)))
+    return result
+
+
 # idea of the function is
 #  - to run bench with certain arguments (tx_number, tx_package_size and tx_timeout)
 #  - copy log files and according csv's to user dir (in folder with name which reflects params)
@@ -96,9 +117,20 @@ def process_bench(exonum_dir, benches_dir_path, tx_count, tx_package_size, tx_ti
     keep_results(exonum_dir + "/logs", bench_dir_path)
 #     print count_of_unfound_txs
     print(bench_dir_name + " - " + get_count_of_unfound_txs(bench_dir_path))
-    bench_output_file_path = benches_dir_path + "/count_of_unfound_txs"
+    bench_output_file_path = benches_dir_path + "/" + count_of_unfound_txs_file_name
     with open(bench_output_file_path, "a") as myfile:
-        myfile.write(bench_dir_name + " - " + get_count_of_unfound_txs(bench_dir_path))
+        print("current count_of_unfound_txs: " + str(get_count_of_unfound_txs(bench_dir_path)))
+        numbers_of_unfound_txs_per_node = get_numbers_of_unfound_txs_per_node(str(get_count_of_unfound_txs(bench_dir_path)))
+        print("current numbers_of_unfound_txs_per_node: " + str(numbers_of_unfound_txs_per_node))
+        # myfile.write(bench_dir_name + " - " + get_count_of_unfound_txs(bench_dir_path))
+        myfile.write(str(tx_count) + csv_delimiter)
+        myfile.write(str(tx_package_size) + csv_delimiter)
+        myfile.write(str(tx_timeout) + csv_delimiter)
+        myfile.write(str(tx_count/tx_package_size) + csv_delimiter)
+        for count_of_unfound_txs in numbers_of_unfound_txs_per_node:
+            myfile.write(str(count_of_unfound_txs) + csv_delimiter)
+        myfile.write("\n")
+        myfile.close()
 
 
 print_args()
@@ -107,10 +139,27 @@ print_args()
 shutil.rmtree(args.benches_dir, ignore_errors=True)
 os.makedirs(args.benches_dir)
 
+# prepare output csv file columns headers
+bench_output_file_path = args.benches_dir + "/" + count_of_unfound_txs_file_name
+with open(bench_output_file_path, "a") as myfile:
+    myfile.write("tx_count" + csv_delimiter)
+    myfile.write("tx_package_size" + csv_delimiter)
+    myfile.write("tx_timeout" + csv_delimiter)
+    myfile.write("number_of_expected_txs" + csv_delimiter)
+    myfile.write("number_of_unfound_txs_in_node_0" + csv_delimiter)
+    myfile.write("number_of_unfound_txs_in_node_1" + csv_delimiter)
+    myfile.write("number_of_unfound_txs_in_node_2" + csv_delimiter)
+    myfile.write("number_of_unfound_txs_in_node_3" + csv_delimiter)
+    myfile.write("\n")
+    myfile.close()
+
 # loop through the range of flows
 package_size_current = args.tx_package_size_min
 while package_size_current <= args.tx_package_size_max:
     process_bench(args.exonum_dir, args.benches_dir, package_size_current * args.tx_package_count, package_size_current, args.tx_timeout)
     package_size_current += args.tx_package_size_step
     sleep(10)
+
+# keep file with results in eorking directory
+shutil.copy(bench_output_file_path, "./" + count_of_unfound_txs_file_name)
 
