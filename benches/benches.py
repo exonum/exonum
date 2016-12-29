@@ -20,8 +20,6 @@ parser.add_argument('--binaries-dir', dest='binaries_dir',
                     action="store", default="", help="path(empty or ends with '/') to the directory where tx_generator, timestamping and blockchain_utils are located")
 parser.add_argument('--exonum-dir', dest='exonum_dir',
                     action="store", default="/tmp/exonum")
-parser.add_argument('--benches-dir', dest='benches_dir',
-                    action="store", default="/tmp/exonum/benches")
 parser.add_argument('--tx-package-count', dest='tx_package_count', type=int,
                     action="store", default=20)
 parser.add_argument('--tx-package-size-min', dest='tx_package_size_min', type=int,
@@ -45,7 +43,6 @@ def print_args():
     # print arguments:
     print("binaries_dir: " + str(args.binaries_dir))
     print("exonum_dir: " + str(args.exonum_dir))
-    print("benches_dir: " + str(args.benches_dir))
     print("tx_package_count: " + str(args.tx_package_count))
     print("tx_package_size_min: " + str(args.tx_package_size_min))
     print("tx_package_size_max: " + str(args.tx_package_size_max))
@@ -181,6 +178,8 @@ def process_bench(exonum_dir, benches_dir_path, tx_count, tx_package_size, tx_ti
 
 print_args()
 
+benches_dir_path = args.exonum_dir + "/benches"
+
 # clean tmp_dir
 prepare_exonum_tmp_dir(args.exonum_dir)
 
@@ -191,11 +190,11 @@ if args.propose_timeout is not None:
     update_exonum_config_with_propose_timeout(args.propose_timeout)
 
 # clean benches dir
-shutil.rmtree(args.benches_dir, ignore_errors=True)
-os.makedirs(args.benches_dir)
+shutil.rmtree(benches_dir_path, ignore_errors=True)
+os.makedirs(benches_dir_path)
 
 # prepare output csv file columns headers
-bench_output_file_path = args.benches_dir + "/" + count_of_unfound_txs_file_name
+bench_output_file_path = benches_dir_path + "/" + count_of_unfound_txs_file_name
 with open(bench_output_file_path, "a") as myfile:
     myfile.write("tx_count" + csv_delimiter)
     myfile.write("tx_package_size" + csv_delimiter)
@@ -211,7 +210,7 @@ with open(bench_output_file_path, "a") as myfile:
 # loop through the range of flows
 package_size_current = args.tx_package_size_min
 while package_size_current <= args.tx_package_size_max:
-    process_bench(args.exonum_dir, args.benches_dir, package_size_current * args.tx_package_count, package_size_current, args.tx_timeout)
+    process_bench(args.exonum_dir, benches_dir_path, package_size_current * args.tx_package_count, package_size_current, args.tx_timeout)
     package_size_current += args.tx_package_size_step
     sleep(10)
 
