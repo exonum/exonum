@@ -70,7 +70,8 @@ os.makedirs(dest_dir + "/logs")
 # Helper functions
 
 def is_tx_hash_found_in_node(tx_hash, node_number):
-    r = run([binaries_dir + "blockchain_utils",
+    r = run([binaries_dir + "exonumctl",
+             "blockchain"
              "-d", dest_dir + "/db/" + str(node_number),
              "find_tx", tx_hash],
             stderr=DEVNULL, stdout=DEVNULL)
@@ -189,11 +190,12 @@ node_env["RUST_BACKTRACE"] = "1"
 tx_gen_args = [
     binaries_dir + "tx_generator",
     "run",
+    node_type,
     "--node-config",        dest_dir + "/validators/3.toml",
     "--leveldb-path",       dest_dir + "/db/3",
     "--tx-package-size",    str(tx_package_size),
     "--tx-timeout",         str(tx_timeout),
-                         str(tx_count),  # COUNT - number of all txs
+                            str(tx_count),  # COUNT - number of all txs
           ]
 
 # procs = [
