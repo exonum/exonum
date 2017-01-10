@@ -207,12 +207,6 @@ impl<D> Blockchain for CurrencyBlockchain<D>
         hashes.extend_from_slice(wallets.root_hash()?.as_ref());
         hashes.extend_from_slice(wallet_ids.root_hash()?.as_ref());
 
-        for item in wallets.values()? {
-            if let Some((id, _)) = view.wallet(item.pub_key())? {
-                let history = view.wallet_history(id);
-                hashes.extend_from_slice(history.root_hash()?.as_ref());
-            }
-        }
         Ok(hash(&hashes))
     }
 
