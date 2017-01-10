@@ -9,6 +9,7 @@ import argparse
 import fileinput
 import sys
 from time import sleep
+from find_file_in_folder import call_find_file_in_binaries_folder
 
 # constants
 csv_delimiter = ","
@@ -17,9 +18,11 @@ count_of_unfound_txs_file_name = "benches_results.csv"
 # parse arguments
 parser = argparse.ArgumentParser(description='Exonum benchmarks util.')
 parser.add_argument('--binaries-dir', dest='binaries_dir',
-                    action="store", default="", help="path(empty or ends with '/') to the directory where tx_generator, timestamping and blockchain_utils are located")
+                    action="store", default="./target/release/", help="path(empty or ends with '/') to the directory where tx_generator, timestamping and blockchain_utils are located")
 parser.add_argument('--exonum-dir', dest='exonum_dir',
                     action="store", default="/tmp/exonum")
+parser.add_argument('--node-type', dest='node_type',
+                    action="store", default="timestamping")
 parser.add_argument('--tx-package-count', dest='tx_package_count', type=int,
                     action="store", default=20)
 parser.add_argument('--tx-package-size-min', dest='tx_package_size_min', type=int,
@@ -43,6 +46,7 @@ def print_args():
     # print arguments:
     print("binaries_dir: " + str(args.binaries_dir))
     print("exonum_dir: " + str(args.exonum_dir))
+    print("node_type: " + str(args.node_type))
     print("tx_package_count: " + str(args.tx_package_count))
     print("tx_package_size_min: " + str(args.tx_package_size_min))
     print("tx_package_size_max: " + str(args.tx_package_size_max))
@@ -62,7 +66,7 @@ def prepare_exonum_tmp_dir(exonum_tmp_dir_path):
 
 def generate_exonum_config(exonum_tmp_dir_path):
     generate_args = [
-        args.binaries_dir + "/timestamping",
+        call_find_file_in_binaries_folder(args.binaries_dir, args.node_type),
         "generate",
         "4",
         "--output-dir", exonum_tmp_dir_path,
@@ -105,8 +109,7 @@ def create_name_of_bench_dir_2(**kwargs):
 def run_bench(exonum_dir, tx_count, tx_package_size, tx_timeout):
     bench_args = [
         "python3",  "./benches/transactions.py",
-        "--binaries-dir", "./target/release/examples/",
-        # "--binaries-dir", "",
+        "--binaries-dir", str(args.binaries_dir),
         "--exonum-dir", str(exonum_dir),
         "--tx-count", str(tx_count),
         "--tx-package-size", str(tx_package_size),
