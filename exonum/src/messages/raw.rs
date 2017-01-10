@@ -8,7 +8,7 @@ use super::super::crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, 
 
 use super::{Field, Error};
 
-pub const HEADER_SIZE: usize = 8; // TODO: rename to HEADER_LENGTH?
+pub const HEADER_SIZE: usize = 10; // TODO: rename to HEADER_LENGTH?
 
 pub const TEST_NETWORK_ID: u8 = 0;
 pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
@@ -45,6 +45,10 @@ impl MessageBuffer {
 
     pub fn version(&self) -> u8 {
         self.raw[1]
+    }
+
+    pub fn extension_id(&self) -> u16 {
+        LittleEndian::read_u16(&self.raw[4..6])
     }
 
     pub fn message_type(&self) -> u16 {
@@ -89,10 +93,11 @@ pub struct MessageWriter {
 }
 
 impl MessageWriter {
-    pub fn new(message_type: u16, payload_length: usize) -> MessageWriter {
+    pub fn new(extension_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
         let mut raw = MessageWriter { raw: vec![0; HEADER_SIZE + payload_length] };
         raw.set_network_id(TEST_NETWORK_ID);
         raw.set_version(PROTOCOL_MAJOR_VERSION);
+        raw.set_extension_id(extension_id);
         raw.set_message_type(message_type);
         raw
     }
@@ -105,12 +110,16 @@ impl MessageWriter {
         self.raw[1] = version
     }
 
+    fn set_extension_id(&mut self, message_type: u16) {
+        LittleEndian::write_u16(&mut self.raw[4..6], message_type)
+    }
+
     fn set_message_type(&mut self, message_type: u16) {
         LittleEndian::write_u16(&mut self.raw[2..4], message_type)
     }
 
     fn set_payload_length(&mut self, length: usize) {
-        LittleEndian::write_u32(&mut self.raw[4..8], length as u32)
+        LittleEndian::write_u32(&mut self.raw[6..10], length as u32)
     }
 
     pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: usize, to: usize) {
