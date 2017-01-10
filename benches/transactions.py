@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from subprocess import Popen, DEVNULL, PIPE, run
+from subprocess import Popen, DEVNULL, PIPE, run, check_output
 import os
 import shutil
 import re
@@ -7,6 +7,7 @@ import argparse
 import threading
 from time import sleep
 from array import *
+from find_file_in_folder import call_find_file_in_binaries_folder
 
 # there was a problem, described in 127 issue: code like proc.kill() followed by proc.stderr.readlines() trunk captured logs by few dozens of kilobytes.
 # in order to deal with this issue, following crutch with separate thread for every popen process and global vars is created
@@ -32,7 +33,7 @@ def node_proc_runner(node_index, node_args, stdout, stderr, env):
 
 parser = argparse.ArgumentParser(description='Exonum benchmark util.')
 parser.add_argument('--binaries-dir', dest='binaries_dir',
-                    action="store", default="", help="path(empty or ends with '/') to the directory where tx_generator, timestamping and blockchain_utils are located")
+                    action="store", default="", help="path(empty or ends with '/') to the root directory where binaries are located")
 parser.add_argument('--exonum-dir', dest='exonum_dir',
                     action="store", default="/tmp/exonum")
 parser.add_argument('--output-file', dest='output_file',
@@ -70,8 +71,8 @@ os.makedirs(dest_dir + "/logs")
 # Helper functions
 
 def is_tx_hash_found_in_node(tx_hash, node_number):
-    r = run([binaries_dir + "exonumctl",
-             "blockchain"
+    r = run([call_find_file_in_binaries_folder(args.binaries_dir, "exonumctl"),
+             "blockchain",
              "-d", dest_dir + "/db/" + str(node_number),
              "find_tx", tx_hash],
             stderr=DEVNULL, stdout=DEVNULL)
@@ -93,7 +94,12 @@ def is_tx_hash_found_in_dbs(tx_hash, array_of_unfound_txs):
 def update_data_with_node_log(data, node_log):
     # Analyze node log
     for entry in node_log.splitlines():
-        # entry = str(entry.decode("utf8"))
+        # if entry is bytes-like (tx_generator_log case), than encode, otherwise(ordinar node log case) leave it as it is
+        # use code from http://stackoverflow.com/a/34870210
+        try:
+            entry = str(entry.decode("utf8"))
+        except AttributeError:
+            pass
         m = re.search(r"^(\d+).*commited=(\d+).*", entry)
         # print(entry, end='')
         if m is not None:
@@ -111,7 +117,6 @@ def get_txs_from_tx_gen_log_and_update_data(tx_gen_log, data):
     print("get_txs_from_tx_gen_log_and_update_data")
     txs = []
     for entry in str(tx_gen_log.decode("utf8")).splitlines():
-        print("entry: " + entry)
         m = re.search(r"^.*(\d+).*count=(\d+).*last_tx_hash=(\w+).*", entry)
         if m is not None:
             print(entry)
@@ -142,10 +147,7 @@ def print_output_to_bench_file(node_number, node_log, tx_gen_log):
         for value in data:
             if value["sended"] is not None:
                 sended = value["sended"]
-            # print("!!!:" + str(value))
-            # print("!!!:" + str(value["tx_hash"]))
             if "tx_hash" in value.keys() and value["tx_hash"] is not None:
-                # print("!!!:" + str(value["tx_hash"]))
                 tx_hash = value["tx_hash"]
                 is_tx_hash_found_in_node_var = is_tx_hash_found_in_node(tx_hash, node_number)
             else:
@@ -166,7 +168,7 @@ def print_output_to_bench_file(node_number, node_log, tx_gen_log):
 # ide aof the function is to produce args to run node with index i
 def node_args(i):
     return [
-        binaries_dir + node_type, # todo should node_type be replaced directly with 'timestamping'?
+        call_find_file_in_binaries_folder(args.binaries_dir, node_type),
         "run",
         "--node-config",        dest_dir + "/validators/%s.toml" % str(i),
         "--leveldb-path",       dest_dir + "/db/%s" % str(i),
@@ -188,7 +190,8 @@ node_env = os.environ.copy()
 node_env["RUST_BACKTRACE"] = "1"
 
 tx_gen_args = [
-    binaries_dir + "tx_generator",
+    # binaries_dir + "tx_generator",
+    call_find_file_in_binaries_folder(args.binaries_dir, "tx_generator"),
     "run",
     node_type,
     "--node-config",        dest_dir + "/validators/3.toml",
@@ -245,7 +248,7 @@ print("Running tx_gen_proc with params: " + str(tx_gen_args))
 #     (_, tx_gen_log) = tx_gen_proc.communicate()
 
 print("waiting for nodes to catch each other")
-sleep(10)
+sleep(1)
 
 print("killing nodes:")
 flag = False
@@ -259,7 +262,6 @@ node_1_log = node_logs[1]
 node_2_log = node_logs[2]
 
 data = []
-
 # validate transactions
 print("validate transactions")
 txs = get_txs_from_tx_gen_log_and_update_data(tx_gen_log, data)
@@ -277,6 +279,7 @@ print("array_of_unfound_txs: " + str(array_of_unfound_txs))
 print_output_to_bench_file(0, node_0_log, tx_gen_log)
 print_output_to_bench_file(1, node_1_log, tx_gen_log)
 print_output_to_bench_file(2, node_2_log, tx_gen_log)
+print_output_to_bench_file(3, tx_gen_log, tx_gen_log)
 # print_output_to_file(3, tx_gen_node_log, tx_gen_log)
 # with open(output_file, 'w+') as out:
 #     current_block_size = 0
