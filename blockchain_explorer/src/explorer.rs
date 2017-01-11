@@ -5,14 +5,17 @@ use serde::Serialize;
 use exonum::storage::{Map, List, View};
 use exonum::storage::Result as StorageResult;
 use exonum::crypto::{Hash, PublicKey};
-use exonum::blockchain::{Schema, GenesisConfig};
+use exonum::blockchain::{Schema, GenesisConfig, Blockchain, View};
 use exonum::messages::RawTransaction;
+use exonum::node::NodeConfig;
 
 use super::HexField;
 
-pub struct BlockchainExplorer<'a> {
-    view: &'a View,
-    validators: Vec<PublicKey>,
+use super::HexField;
+
+pub struct BlockchainExplorer<B: Blockchain> {
+    view: B::View,
+    cfg: NodeConfig,
 }
 
 pub trait TransactionInfo: Serialize {}
@@ -33,11 +36,18 @@ pub struct BlockInfo<T>
     txs: Option<Vec<T>>,
 }
 
-impl<'a> BlockchainExplorer<'a> {
-    pub fn new(view: &'a View, cfg: GenesisConfig) -> BlockchainExplorer {
+impl<B: Blockchain> BlockchainExplorer<B> {
+    pub fn new(b: B, cfg: NodeConfig) -> BlockchainExplorer<B> {
+        BlockchainExplorer {
+            view: b.view(),
+            cfg: cfg,
+        }
+    }
+
+    pub fn from_view(view: B::View, cfg: NodeConfig) -> BlockchainExplorer<B> {
         BlockchainExplorer {
             view: view,
-            validators: cfg.validators,
+            cfg: cfg,
         }
     }
 
@@ -71,8 +81,9 @@ impl<'a> BlockchainExplorer<'a> {
 
             // TODO Find more common solution
             // FIXME this code was copied from state.rs
-            let proposer = ((height + block.propose_round() as u64) %
-                            (self.validators.len() as u64)) as u32;
+            let proposer =
+                ((height + block.propose_round() as u64) %
+                 (self.cfg.genesis.validators.len() as u64)) as u32;
 
             let precommits_count = schema.precommits(block_hash).len()? as u64;
             let info = BlockInfo {

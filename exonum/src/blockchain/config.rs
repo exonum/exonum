@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use ::crypto::PublicKey;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StoredConfiguration {
     pub actual_from: u64,
     pub validators: Vec<PublicKey>,
