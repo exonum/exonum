@@ -164,6 +164,141 @@ impl Blockchain {
         Ok((block_hash, fork.changes()))
     }
 
+    fn execute_config_change(view: &Self::View, config_message: &ConfigMessage) {
+        match *config_message {
+            ConfigMessage::ConfigPropose(ref config_propose_tx) => {
+                if !Self::handle_config_propose(view, config_propose_tx).is_ok() {
+                    error!("ConfigPropose failed !");
+                }
+            }
+            ConfigMessage::ConfigVote(ref config_vote_tx) => {
+                if !Self::handle_config_vote(view, config_vote_tx).is_ok() {
+                    error!("ConfigVote failed !");
+                }
+            }
+        }
+    }
+
+    fn get_height(view: &Self::View) -> u64 {
+        if let Ok(Some(last_block)) = view.last_block() {
+            return last_block.height() + 1;
+        }
+        0
+    }
+
+    fn get_actual_configuration(view: &Self::View) -> Result<StoredConfiguration, Error> {
+        let h = Self::get_height(view);
+        let heights = view.configs_heights();
+        let height_values = heights.values().unwrap();
+
+        // TODO improve perfomance
+        let idx = height_values.into_iter()
+            .rposition(|r| u64::from(r) <= h)
+            .unwrap();
+
+        let height = heights.get(idx as u64)?.unwrap();
+        Self::get_configuration_at_height(view, height.into()).map(|x| x.unwrap())
+    }
+
+    fn commit_actual_configuration(view: &Self::View,
+                                   actual_from: u64,
+                                   config_data: &[u8])
+                                   -> Result<(), Error> {
+        let height_bytecode = actual_from.into();
+        view.configs().put(&height_bytecode, config_data.to_vec())?;
+        view.configs_heights().append(height_bytecode)?;
+        Ok(())
+    }
+
+    // FIXME Replace by result?
+    fn get_configuration_at_height(view: &Self::View,
+                                   height: u64)
+                                   -> Result<Option<StoredConfiguration>, Error> {
+        let configs = view.configs();
+        if let Some(config) = configs.get(&height.into())? {
+            match StoredConfiguration::deserialize(&config) {
+                Ok(configuration) => {
+                    return Ok(Some(configuration));
+                }
+                Err(_) => {
+                    error!("Can't parse found configuration at height: {}", height);
+                }
+            }
+        }
+        Ok(None)
+    }
+
+    fn handle_config_propose(view: &Self::View,
+                             config_propose: &ConfigPropose)
+                             -> Result<Hash, Error> {
+        let config = Self::get_actual_configuration(view).unwrap();
+        if !config.validators.contains(config_propose.from()) {
+            error!("ConfigPropose from unknown validator: {:?}",
+                   config_propose.from());
+            return Err(Error::new("ConfigPropose from unknown validator"));
+        }
+
+        let hash = <ConfigPropose as Message>::hash(config_propose);
+        if view.config_proposes().get(&hash).unwrap().is_some() {
+            error!("Received config_propose has already been handled, msg={:?}",
+                   config_propose);
+            return Err(Error::new("Received config_propose has already been handled"));
+        }
+
+        trace!("Handle ConfigPropose");
+        view.config_proposes().put(&hash, config_propose.clone()).unwrap();
+        Ok(hash)
+    }
+
+    fn handle_config_vote(view: &Self::View, config_vote: &ConfigVote) -> Result<(), Error> {
+        let config = Self::get_actual_configuration(view).unwrap();
+
+        if !config.validators.contains(config_vote.from()) {
+            error!("ConfigVote from unknown validator: {:?}",
+                   config_vote.from());
+            return Err(Error::new("ConfigVote from unknown validator"));
+        }
+
+        if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_none() {
+            error!("Received ConfigVote for unknown transaciton, msg={:?}",
+                   config_vote);
+            return Err(Error::new("Received ConfigVote for unknown transaciton"));
+        }
+
+        if let Some(vote) = view.config_votes().get(config_vote.from()).unwrap() {
+            if vote.seed() != config_vote.seed() - 1 {
+                error!("Received config_vote with wrong seed, msg={:?}",
+                       config_vote);
+                return Err(Error::new("Received config_vote with wrong seed"));
+            }
+        }
+
+        let msg = config_vote.clone();
+        let _ = view.config_votes().put(msg.from(), config_vote.clone());
+
+        let mut votes_count = 0;
+        for pub_key in config.validators.clone() {
+            if let Some(vote) = view.config_votes().get(&pub_key).unwrap() {
+                if config_vote.hash_propose() == vote.hash_propose() && !vote.revoke() {
+                    votes_count += 1;
+                }
+            }
+        }
+
+        if votes_count > 2 / 3 * config.validators.len() {
+            if let Some(config_propose) =
+                view.config_proposes()
+                    .get(config_vote.hash_propose())
+                    .unwrap() {
+                Self::commit_actual_configuration(view,
+                                                  config_propose.actual_from_height(),
+                                                  config_propose.config())
+                    .unwrap();
+            }
+        }
+        Ok(())
+    }
+
     pub fn commit<'a, I>(&self,
                          state: &mut State,
                          block_hash: Hash,

@@ -10,6 +10,8 @@ exonum = {version="0.1", path="../exonum"}
 time = "0.1"
 serde = "0.8"
 serde_derive = "0.8"
+serde_json = "0.8"
+jsonway = "1.0"
 rustless = "0.9"
 valico = "1.0"
 
