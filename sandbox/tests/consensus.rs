@@ -104,7 +104,7 @@ fn test_reach_thirteen_height() {
 /// - handle queued Prevote
 /// - and observe RequestPropose for queued Prevote
 #[test]
-#[should_panic(expected = "Send unexpected message RequestPropose")]
+#[should_panic(expected = "Send unexpected message Request(RequestPropose")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -131,7 +131,7 @@ fn test_queue_prevote_message_from_next_height() {
 /// check line from NodeHandler.handle_consensus()
 /// case msg.height() == self.state.height() + 1
 #[test]
-#[should_panic(expected = "Send unexpected message Prevote")]
+#[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -627,7 +627,7 @@ fn not_request_txs_when_get_tx_and_propose() {
 /// - verify signature
 /// - should panic because tx has wrong signature and is not considered
 #[test]
-#[should_panic(expected = "Send unexpected message RequestTransactions")]
+#[should_panic(expected = "Send unexpected message Request(RequestTransactions")]
 fn handle_tx_verify_signature() {
     let sandbox = timestamping_sandbox();
 
@@ -2184,7 +2184,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - trigger round_timeout
 ///  - observe broadcasted prevote
 #[test]
-#[should_panic(expected = "Send unexpected message RequestPropose")]
+#[should_panic(expected = "Send unexpected message Request(RequestPropose")]
 fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 

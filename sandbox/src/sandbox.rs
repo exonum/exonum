@@ -193,7 +193,7 @@ impl Sandbox {
     fn check_unexpected_message(&self) {
         let sended = self.inner.lock().unwrap().sended.pop_front();
         if let Some((addr, msg)) = sended {
-            let any_msg = TimestampTx::from_raw(msg.clone()).expect("Send incorrect message");
+            let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
     }
