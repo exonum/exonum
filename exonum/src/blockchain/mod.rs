@@ -14,7 +14,7 @@ use vec_map::VecMap;
 use ::crypto::{Hash, hash};
 use ::messages::{RawMessage, Precommit};
 
-use ::storage::{Patch, Database, Fork, Error, Map, List, Backend, View as StorageView};
+use ::storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
 
 pub use self::block::Block;
 pub use self::schema::{ConfigurationData, Schema};
@@ -24,17 +24,17 @@ pub use self::service::{Service, Transaction};
 
 #[derive(Clone)]
 pub struct Blockchain {
-    db: Backend,
+    db: Storage,
     service_map: Arc<VecMap<Box<Service>>>,
 }
 
 impl Blockchain {
-    pub fn new(db: Backend, services: Vec<Box<Service>>) -> Blockchain {
+    pub fn new(db: Storage, services: Vec<Box<Service>>) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
             let id = service.service_id() as usize;
             if service_map.contains_key(id) {
-                panic!("Services has already contains service with id={}, please change it",
+                panic!("Services have already contain service with id={}, please change it.",
                        id);
             }
             service_map.insert(id, service);
@@ -83,12 +83,11 @@ impl Blockchain {
 
         let patch = {
             let view = self.view();
-
             // Update service tables
             for service in self.service_map.values() {
                 service.handle_genesis_block(&view)?;
             }
-
+            // Commit actual configuration
             {
                 let schema = Schema::new(&view);
                 if let Some(block_hash) = schema.heights().get(0)? {

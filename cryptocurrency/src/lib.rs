@@ -23,7 +23,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::{RawMessage, RawTransaction, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, hash};
-use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, Backend,
+use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List,
                       View as StorageView};
 use exonum::blockchain::{Service, Transaction};
 
