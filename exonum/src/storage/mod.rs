@@ -18,7 +18,7 @@ mod merkle_patricia_table;
 pub use leveldb::options::Options as LevelDBOptions;
 pub use leveldb::database::cache::Cache as LevelDBCache;
 
-pub use self::leveldb::LevelDB;
+pub use self::leveldb::{LevelDB, LevelDBView};
 pub use self::db::{Database, Patch, Fork, Change};
 pub use self::memorydb::MemoryDB;
 pub use self::map_table::MapTable;
@@ -82,3 +82,6 @@ impl error::Error for Error {
         &self.message
     }
 }
+
+pub type Backend = LevelDB;
+pub type View = LevelDBView;

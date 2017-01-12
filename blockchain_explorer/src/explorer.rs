@@ -2,16 +2,16 @@ use std::cmp;
 
 use serde::Serialize;
 
-use exonum::storage::{Map, List};
+use exonum::storage::{Map, List, View};
 use exonum::storage::Result as StorageResult;
 use exonum::crypto::{Hash, PublicKey};
-use exonum::blockchain::{Blockchain, View, GenesisConfig};
-use exonum::messages::AnyTx;
+use exonum::blockchain::{Schema, GenesisConfig};
+use exonum::messages::RawTransaction;
 
 use super::HexField;
 
-pub struct BlockchainExplorer<B: Blockchain> {
-    view: B::View,
+pub struct BlockchainExplorer<'a> {
+    view: &'a View,
     validators: Vec<PublicKey>,
 }
 
@@ -33,15 +33,8 @@ pub struct BlockInfo<T>
     txs: Option<Vec<T>>,
 }
 
-impl<B: Blockchain> BlockchainExplorer<B> {
-    pub fn new(b: B, cfg: GenesisConfig) -> BlockchainExplorer<B> {
-        BlockchainExplorer {
-            view: b.view(),
-            validators: cfg.validators,
-        }
-    }
-
-    pub fn from_view(view: B::View, cfg: GenesisConfig) -> BlockchainExplorer<B> {
+impl<'a> BlockchainExplorer<'a> {
+    pub fn new(view: &'a View, cfg: GenesisConfig) -> BlockchainExplorer {
         BlockchainExplorer {
             view: view,
             validators: cfg.validators,
@@ -49,24 +42,21 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     }
 
     pub fn tx_info<T>(&self, tx_hash: &Hash) -> StorageResult<Option<T>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawTransaction>
     {
-        let tx = self.view.transactions().get(tx_hash)?;
-        Ok(tx.and_then(|tx| {
-            match tx {
-                AnyTx::Application(msg) => Some(T::from(msg)),
-                AnyTx::Service(_) => None,
-            }
-        }))
+        let tx = Schema::new(self.view).transactions().get(tx_hash)?;
+        Ok(tx.and_then(|raw| Some(T::from(raw))))
     }
 
     pub fn block_info<T>(&self,
                          block_hash: &Hash,
                          full_info: bool)
                          -> StorageResult<Option<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawTransaction>
     {
-        let block = self.view.blocks().get(block_hash)?;
+        let schema = Schema::new(self.view);
+
+        let block = schema.blocks().get(block_hash)?;
         if let Some(block) = block {
             let height = block.height();
             let (txs, txs_count) = {
@@ -75,7 +65,7 @@ impl<B: Blockchain> BlockchainExplorer<B> {
                     let txs_count = txs.len() as u64;
                     (Some(txs), txs_count)
                 } else {
-                    (None, self.view.block_txs(height).len()? as u64)
+                    (None, schema.block_txs(height).len()? as u64)
                 }
             };
 
@@ -84,7 +74,7 @@ impl<B: Blockchain> BlockchainExplorer<B> {
             let proposer = ((height + block.propose_round() as u64) %
                             (self.validators.len() as u64)) as u32;
 
-            let precommits_count = self.view.precommits(block_hash).len()? as u64;
+            let precommits_count = schema.precommits(block_hash).len()? as u64;
             let info = BlockInfo {
                 height: height,
                 proposer: proposer,
@@ -104,9 +94,9 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     }
 
     pub fn block_info_with_height<T>(&self, height: u64) -> StorageResult<Option<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawTransaction>
     {
-        if let Some(block_hash) = self.view.heights().get(height)? {
+        if let Some(block_hash) = Schema::new(self.view).heights().get(height)? {
             // TODO avoid double unwrap
             self.block_info(&block_hash, true)
         } else {
@@ -115,9 +105,10 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     }
 
     pub fn blocks_range<T>(&self, count: u64, from: Option<u64>) -> StorageResult<Vec<BlockInfo<T>>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawTransaction>
     {
-        let heights = self.view.heights();
+        let schema = Schema::new(self.view);
+        let heights = schema.heights();
 
         let max_len = heights.len()?;
         let to = from.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
@@ -135,9 +126,10 @@ impl<B: Blockchain> BlockchainExplorer<B> {
     }
 
     fn block_txs<T>(&self, height: u64) -> StorageResult<Vec<T>>
-        where T: TransactionInfo + From<B::Transaction>
+        where T: TransactionInfo + From<RawTransaction>
     {
-        let txs = self.view.block_txs(height);
+        let schema = Schema::new(self.view);
+        let txs = schema.block_txs(height);
         let tx_count = txs.len()?;
 
         let mut v = Vec::new();

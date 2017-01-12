@@ -13,7 +13,7 @@ use exonum::config::ConfigFile;
 use exonum::blockchain::GenesisConfig;
 use exonum::node::NodeConfig;
 use exonum::crypto::gen_keypair;
-use exonum::storage::{LevelDB, LevelDBOptions, MemoryDB};
+use exonum::storage::{LevelDB, LevelDBOptions, Backend};
 
 pub struct GenerateCommand<'a, 'b>
     where 'a: 'b
@@ -99,11 +99,6 @@ pub struct RunCommand<'a, 'b>
     _p: PhantomData<App<'a, 'b>>,
 }
 
-pub enum DatabaseType {
-    LevelDB(LevelDB),
-    MemoryDB(MemoryDB),
-}
-
 impl<'a, 'b> RunCommand<'a, 'b>
     where 'a: 'b
 {
@@ -134,16 +129,11 @@ impl<'a, 'b> RunCommand<'a, 'b>
         matches.value_of("LEVELDB_PATH").map(Path::new)
     }
 
-    pub fn db(matches: &'a ArgMatches<'a>) -> DatabaseType {
-        if let Some(path) = Self::leveldb_path(matches) {
-            let mut options = LevelDBOptions::new();
-            options.create_if_missing = true;
-            let db = LevelDB::new(path, options).unwrap();
-
-            DatabaseType::LevelDB(db)
-        } else {
-            DatabaseType::MemoryDB(MemoryDB::new())
-        }
+    pub fn db(matches: &'a ArgMatches<'a>) -> Backend {
+        let path = Self::leveldb_path(matches).unwrap();
+        let mut options = LevelDBOptions::new();
+        options.create_if_missing = true;
+        LevelDB::new(path, options).unwrap()
     }
 }
 

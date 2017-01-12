@@ -5,7 +5,8 @@
 
 use std::ops::{Deref, DerefMut};
 
-use super::super::blockchain::{Blockchain, View};
+use ::blockchain::Schema;
+use ::storage::View as StorageView;
 use ::storage::{List, Map};
 
 pub type Timeout = i64;//todo wait until sandbox-tests are merged and use type from config.rs
@@ -13,19 +14,19 @@ pub type BlockSize = usize;
 pub type Float = f64;
 
 
-pub trait ProposeTimeoutAdjuster<B: Blockchain> {
+pub trait ProposeTimeoutAdjuster {
     fn update_last_propose_timeout(&mut self, new_last_propose_timeout: Timeout);
 
-    fn adjusted_propose_timeout(&self, view: &B::View) -> Timeout;
+    fn adjusted_propose_timeout(&self, view: &StorageView) -> Timeout;
 }
 
-impl<F: ?Sized, B: Blockchain> ProposeTimeoutAdjuster<B> for Box<F>
-    where F: ProposeTimeoutAdjuster<B>
+impl<F: ?Sized> ProposeTimeoutAdjuster for Box<F>
+    where F: ProposeTimeoutAdjuster
 {
     fn update_last_propose_timeout(&mut self, new_last_propose_timeout: Timeout) {
         self.deref_mut().update_last_propose_timeout(new_last_propose_timeout)
     }
-    fn adjusted_propose_timeout(&self, view: &B::View) -> Timeout {
+    fn adjusted_propose_timeout(&self, view: &StorageView) -> Timeout {
         self.deref().adjusted_propose_timeout(view)
     }
 }
@@ -40,14 +41,10 @@ impl Default for ConstProposeTimeout {
     }
 }
 
-impl<B> ProposeTimeoutAdjuster<B> for ConstProposeTimeout
-    where B: Blockchain
-{
+impl ProposeTimeoutAdjuster for ConstProposeTimeout {
     fn update_last_propose_timeout(&mut self, _new_last_propose_timeout: Timeout) {}
 
-    fn adjusted_propose_timeout(&self, _view: &B::View) -> Timeout
-        where B: Blockchain
-    {
+    fn adjusted_propose_timeout(&self, _view: &StorageView) -> Timeout {
         self.propose_timeout
     }
 }
@@ -76,18 +73,16 @@ impl Default for MovingAverageProposeTimeoutAdjuster {
     }
 }
 
-impl<B> ProposeTimeoutAdjuster<B> for MovingAverageProposeTimeoutAdjuster
-    where B: Blockchain
-{
-    fn adjusted_propose_timeout(&self, view: &B::View) -> Timeout
-        where B: Blockchain
-    {
-        let last_block_hash = view.heights().last().unwrap_or(None);
+impl ProposeTimeoutAdjuster for MovingAverageProposeTimeoutAdjuster {
+    fn adjusted_propose_timeout(&self, view: &StorageView) -> Timeout {
+        let schema = Schema::new(view);
+
+        let last_block_hash = schema.heights().last().unwrap_or(None);
         let last_height = match last_block_hash {
-            Some(hash) => view.blocks().get(&hash).unwrap_or(None).map_or(0, |b| b.height()),
+            Some(hash) => schema.blocks().get(&hash).unwrap_or(None).map_or(0, |b| b.height()),
             None => 0,
         };
-        let last_block_size = view.block_txs(last_height).len().unwrap_or(0);
+        let last_block_size = schema.block_txs(last_height).len().unwrap_or(0);
 
         {
             // calculate adjusted_propose_time using last_block_size and stored last_propose_timeout

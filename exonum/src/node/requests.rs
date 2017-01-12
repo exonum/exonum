@@ -3,7 +3,7 @@
 
 use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
                              RequestPrevotes, RequestPrecommits, RequestBlock, Block};
-use super::super::blockchain::{Blockchain, View};
+use super::super::blockchain::Schema;
 use super::super::storage::{Map, List};
 use super::super::events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
@@ -13,9 +13,8 @@ use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
 const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
-impl<B, S> NodeHandler<B, S>
-    where B: Blockchain,
-          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+impl<S> NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
 {
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
@@ -71,15 +70,16 @@ impl<B, S> NodeHandler<B, S>
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
         trace!("HANDLE TRANSACTIONS REQUEST!!!");
         let view = self.blockchain.view();
+        let schema = Schema::new(&view);
         for hash in msg.txs() {
             let tx = self.state
                 .transactions()
                 .get(hash)
-                .cloned()
-                .or_else(|| view.transactions().get(hash).unwrap());
+                .map(|tx| tx.raw())
+                .or_else(|| schema.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {
-                self.send_to_peer(*msg.from(), tx.raw());
+                self.send_to_peer(*msg.from(), &tx);
             }
         }
     }
@@ -141,22 +141,23 @@ impl<B, S> NodeHandler<B, S>
         }
 
         let view = self.blockchain.view();
-        let height = msg.height();
-        let block_hash = view.heights().get(height).unwrap().unwrap();
+        let schema = Schema::new(&view);
 
-        let block = view.blocks().get(&block_hash).unwrap().unwrap();
-        let precommits = view.precommits(&block_hash)
+        let height = msg.height();
+        let block_hash = schema.heights().get(height).unwrap().unwrap();
+
+        let block = schema.blocks().get(&block_hash).unwrap().unwrap();
+        let precommits = schema.precommits(&block_hash)
             .values()
             .unwrap()
             .iter()
             .cloned()
             .collect::<Vec<_>>();
-        let transactions = view.block_txs(height)
+        let transactions = schema.block_txs(height)
             .values()
             .unwrap()
             .iter()
-            .map(|tx_hash| view.transactions().get(tx_hash).unwrap().unwrap())
-            .map(|p| p.raw().clone())
+            .map(|tx_hash| schema.transactions().get(tx_hash).unwrap().unwrap())
             .collect::<Vec<_>>();
 
         let block_msg = Block::new(&self.public_key,

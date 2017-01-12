@@ -3,10 +3,10 @@ use std::collections::HashSet;
 use time::{Duration, Timespec};
 
 use super::super::crypto::{Hash, PublicKey, HexValue};
-use super::super::blockchain::{Blockchain, View};
+use super::super::blockchain::{Schema, Transaction};
 use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
                              RequestPropose, RequestTransactions, RequestPrevotes,
-                             RequestPrecommits, RequestBlock, Block, AnyTx};
+                             RequestPrecommits, RequestBlock, Block, RawTransaction};
 use super::super::storage::{Map, Patch};
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
@@ -16,9 +16,8 @@ use super::{ExternalMessage, NodeTimeout};
 const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 // TODO reduce view invokations
-impl<B, S> NodeHandler<B, S>
-    where B: Blockchain,
-          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+impl<S> NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
 {
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
@@ -94,7 +93,7 @@ impl<B, S> NodeHandler<B, S>
         let view = self.blockchain.view();
         // Check that transactions are not commited yet
         for hash in msg.transactions() {
-            if view.transactions().get(hash).unwrap().is_some() {
+            if Schema::new(&view).transactions().get(hash).unwrap().is_some() {
                 error!("Received propose with already commited transaction, msg={:?}",
                        msg);
                 return;
@@ -196,30 +195,26 @@ impl<B, S> NodeHandler<B, S>
         }
 
         if self.state.block(&block_hash).is_none() {
+            let view = &self.blockchain.view();
+            let schema = Schema::new(view);
             // Verify transactions
-            let view = self.blockchain.view();
             let mut txs = Vec::new();
             for raw in msg.transactions() {
-                match AnyTx::from_raw(raw) {
-                    Ok(tx) => {
-                        let hash = tx.hash();
-                        if view.transactions().get(&hash).unwrap().is_some() {
-                            error!("Received block with already commited transaction, block={:?}",
-                                   msg);
-                            return;
-                        }
-                        if !tx.verify::<B>() {
-                            error!("Incorrect transaction in block detected, block={:?}", msg);
-                            return;
-                        }
-                        txs.push((hash, tx.clone()));
-                    }
-                    Err(e) => {
-                        error!("Unknown transaction in block detected, error={:?}, block={:?}",
-                               e,
+                if let Some(tx) = self.blockchain.tx_from_raw(raw) {
+                    let hash = tx.hash();
+                    if schema.transactions().get(&hash).unwrap().is_some() {
+                        error!("Received block with already commited transaction, block={:?}",
                                msg);
                         return;
                     }
+                    if !tx.verify() {
+                        error!("Incorrect transaction in block detected, block={:?}", msg);
+                        return;
+                    }
+                    txs.push((hash, tx));
+                } else {
+                    error!("Unknown transaction in block detected, block={:?}", msg);
+                    return;
                 }
             }
 
@@ -409,19 +404,28 @@ impl<B, S> NodeHandler<B, S>
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (propose_round, commited_txs) = {
+        let (propose_round, commited_txs, new_txs) = {
             let block_state = self.state.block(&block_hash).unwrap();
             let patch = block_state.patch();
-            self.blockchain.commit(block_hash, patch, precommits).unwrap();
-            (block_state.propose_round(), block_state.txs().len())
+            let txs = self.blockchain.commit(block_hash, patch, precommits).unwrap();
+
+            (block_state.propose_round(), block_state.txs().len(), txs)
         };
+
+        for tx in new_txs {
+            assert!(tx.verify());
+            self.handle_incoming_tx(tx.clone());
+        }
 
         let height = self.state.height();
         let proposer = self.state.leader(propose_round);
 
         // Update state to new height
         let round = self.actual_round();
-        let config = B::get_configuration_at_height(&self.blockchain.view(), height).unwrap();
+
+        let view = self.blockchain.view();
+        let schema = Schema::new(&view);
+        let config = schema.get_configuration_at_height(height).unwrap();
         self.state.new_height(&block_hash, round, config);
 
         info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}",
@@ -444,8 +448,44 @@ impl<B, S> NodeHandler<B, S>
         }
     }
 
-    pub fn handle_tx(&mut self, msg: AnyTx<B::Transaction>) {
+    pub fn handle_tx(&mut self, msg: RawTransaction) {
         trace!("Handle transaction");
+        let hash = msg.hash();
+        let tx = {
+            let service_id = msg.service_id();
+            if let Some(tx) = self.blockchain.tx_from_raw(msg) {
+                tx
+            } else {
+                error!("Received transaction with unknown service_id={}",
+                       service_id);
+                return;
+            }
+        };
+
+        // Make sure that it is new transaction
+        if self.state.transactions().contains_key(&hash) {
+            return;
+        }
+
+        let view = self.blockchain.view();
+        if Schema::new(&view).transactions().get(&hash).unwrap().is_some() {
+            return;
+        }
+
+        if !tx.verify() {
+            return;
+        }
+
+        let full_proposes = self.state.add_transaction(hash, tx);
+        // Go to has full propose if we get last transaction
+        for (hash, round) in full_proposes {
+            self.remove_request(RequestData::Transactions(hash));
+            self.has_full_propose(hash, round);
+        }
+    }
+
+    pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
+        trace!("Handle incoming transaction");
         let hash = msg.hash();
 
         // Make sure that it is new transaction
@@ -454,45 +494,20 @@ impl<B, S> NodeHandler<B, S>
         }
 
         let view = self.blockchain.view();
-        if view.transactions().get(&hash).unwrap().is_some() {
+        if Schema::new(&view).transactions().get(&hash).unwrap().is_some() {
             return;
         }
 
-        if !msg.verify::<B>() {
-            return;
-        }
-
-        let full_proposes = self.state.add_transaction(hash, msg.clone());
-        // Go to has full propose if we get last transaction
-        for (hash, round) in full_proposes {
-            self.remove_request(RequestData::Transactions(hash));
-            self.has_full_propose(hash, round);
-        }
-    }
-
-    pub fn handle_incoming_tx(&mut self, msg: B::Transaction) {
-        trace!("Handle incoming transaction");
-        let hash = Message::hash(&msg);
-
-        // Make sure that it is new transaction
-        if self.state.transactions().contains_key(&hash) {
-            return;
-        }
-
-        let view = self.blockchain.view();
-        if view.transactions().get(&hash).unwrap().is_some() {
-            return;
-        }
-
-        let full_proposes = self.state.add_transaction(hash, AnyTx::Application(msg.clone()));
-        // Go to has full propose if we get last transaction
-        for (hash, round) in full_proposes {
-            self.remove_request(RequestData::Transactions(hash));
-            self.has_full_propose(hash, round);
-        }
         // Broadcast transaction to validators
-        trace!("Broadcast transactions: {:?}", msg);
-        self.broadcast(msg.raw());
+        trace!("Broadcast transactions: {:?}", msg.raw());
+        self.broadcast(&msg.raw());
+
+        let full_proposes = self.state.add_transaction(hash, msg);
+        // Go to has full propose if we get last transaction
+        for (hash, round) in full_proposes {
+            self.remove_request(RequestData::Transactions(hash));
+            self.has_full_propose(hash, round);
+        }
     }
 
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
@@ -659,7 +674,7 @@ impl<B, S> NodeHandler<B, S>
                         height: Height,
                         round: Round,
                         time: Timespec,
-                        txs: &[(Hash, AnyTx<B::Transaction>)])
+                        txs: &[(Hash, Box<Transaction>)])
                         -> (Hash, Vec<Hash>, Patch) {
         self.blockchain
             .create_patch(height, round, time, txs)

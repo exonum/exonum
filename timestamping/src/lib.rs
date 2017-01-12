@@ -1,17 +1,17 @@
 #[macro_use(message)]
 extern crate exonum;
 
-use std::ops::Deref;
-
-use exonum::messages::Message;
+use exonum::messages::{Message, RawTransaction};
 use exonum::crypto::{PublicKey, Hash, hash};
-use exonum::storage::{Database, Fork, Error};
-use exonum::blockchain::{View, Blockchain};
+use exonum::storage::{Error, View as StorageView};
+use exonum::blockchain::{Service, Transaction};
 
+pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
 
 message! {
     TimestampTx {
+        const TYPE = TIMESTAMPING_SERVICE;
         const ID = TIMESTAMPING_TRANSACTION_MESSAGE_ID;
         const SIZE = 40;
 
@@ -20,59 +20,54 @@ message! {
     }
 }
 
-#[derive(Clone)]
-pub struct TimestampingBlockchain<D: Database> {
-    pub db: D,
-}
+pub struct TimestampingService {}
 
-pub struct TimestampingView<F: Fork> {
-    pub fork: F,
-}
-
-impl<F> View<F> for TimestampingView<F>
-    where F: Fork
-{
-    type Transaction = TimestampTx;
-
-    fn from_fork(fork: F) -> Self {
-        TimestampingView { fork: fork }
+impl TimestampingService {
+    pub fn new() -> TimestampingService {
+        TimestampingService {}
     }
 }
 
-impl<F> Deref for TimestampingView<F>
-    where F: Fork
-{
-    type Target = F;
+impl Transaction for TimestampTx {
+    fn verify(&self) -> bool {
+        Message::verify(self, self.pub_key())
+    }
 
-    fn deref(&self) -> &Self::Target {
-        &self.fork
+    fn execute(&self, _: &StorageView) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn raw(&self) -> RawTransaction {
+        Message::raw(self).clone()
+    }
+
+    fn clone_box(&self) -> Box<Transaction> {
+        Box::new(self.clone())
+    }
+
+    fn hash(&self) -> Hash {
+        Message::hash(self)
     }
 }
 
-impl<D: Database> Deref for TimestampingBlockchain<D> {
-    type Target = D;
-
-    fn deref(&self) -> &D {
-        &self.db
-    }
-}
-
-impl<D> Blockchain for TimestampingBlockchain<D>
-    where D: Database
-{
-    type Database = D;
-    type Transaction = TimestampTx;
-    type View = TimestampingView<D::Fork>;
-
-    fn verify_tx(tx: &Self::Transaction) -> bool {
-        tx.verify(tx.pub_key())
+impl Service for TimestampingService {
+    fn service_id(&self) -> u16 {
+        TIMESTAMPING_SERVICE
     }
 
-    fn state_hash(_: &Self::View) -> Result<Hash, Error> {
+    fn handle_genesis_block(&self, _: &StorageView) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn state_hash(&self, _: &StorageView) -> Result<Hash, Error> {
         Ok(hash(&[]))
     }
 
-    fn execute(_: &Self::View, _: &Self::Transaction) -> Result<(), Error> {
-        Ok(())
+    fn tx_from_raw(&self, raw: RawTransaction) -> Box<Transaction> {
+        Box::new(TimestampTx::from_raw(raw).unwrap())
+    }
+
+    fn handle_commit(&self, _: &StorageView) -> Result<Vec<Box<Transaction>>, Error> {
+        Ok(Vec::new())
     }
 }

@@ -14,7 +14,6 @@ use time::Timespec;
 use bit_vec;
 
 use ::crypto::{PublicKey, Hash};
-use ::blockchain::Blockchain;
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::Error;
@@ -26,20 +25,16 @@ pub type BitVec = bit_vec::BitVec;
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify)
 // TODO: use macro for implementing enums
 
-#[derive(Clone, PartialEq)]
-pub enum Any<AppTx: Message> {
+pub type RawTransaction = RawMessage;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Any {
     Connect(Connect),
     Status(Status),
     Block(Block),
     Consensus(ConsensusMessage),
     Request(RequestMessage),
-    Transaction(AnyTx<AppTx>),
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum AnyTx<AppTx: Message> {
-    Service(ServiceTx),
-    Application(AppTx),
+    Transaction(RawTransaction),
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -238,8 +233,8 @@ impl fmt::Debug for ConsensusMessage {
     }
 }
 
-impl<Tx: Message> Any<Tx> {
-    pub fn from_raw(raw: RawMessage) -> Result<Any<Tx>, Error> {
+impl Any {
+    pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
         // TODO: check input message size
         Ok(match raw.message_type() {
             CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
@@ -274,7 +269,7 @@ impl<Tx: Message> Any<Tx> {
             REQUEST_BLOCK_MESSAGE_ID => {
                 Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
             }
-            _ => Any::Transaction(AnyTx::from_raw(raw)?),
+            _ => Any::Transaction(raw),
         })
     }
 }
@@ -295,62 +290,6 @@ impl ServiceTx {
     pub fn raw(&self) -> &RawMessage {
         match *self {
             ServiceTx::ConfigChange(ref msg) => msg.raw(),
-        }
-    }
-}
-
-impl<AppTx: Message> AnyTx<AppTx> {
-    pub fn verify<B>(&self) -> bool
-        where B: Blockchain<Transaction = AppTx>
-    {
-        match *self {
-            AnyTx::Application(ref msg) => B::verify_tx(msg),
-            AnyTx::Service(ref msg) => msg.verify(),
-        }
-    }
-
-    pub fn raw(&self) -> &RawMessage {
-        match *self {
-            AnyTx::Application(ref msg) => msg.raw(),
-            AnyTx::Service(ref msg) => msg.raw(),
-        }
-    }
-
-    pub fn from_raw(raw: RawMessage) -> Result<AnyTx<AppTx>, Error> {
-        // TODO: check input message size
-        Ok(match raw.message_type() {
-            CONFIG_PROPOSE_MESSAGE_ID => {
-                    AnyTx::Service(
-                        ServiceTx::ConfigChange(
-                            ConfigMessage::ConfigPropose(ConfigPropose::from_raw(raw)?)
-                        )
-                    )
-            }
-            CONFIG_VOTE_MESSAGE_ID => {
-                    AnyTx::Service(
-                        ServiceTx::ConfigChange(
-                            ConfigMessage::ConfigVote(ConfigVote::from_raw(raw)?)
-                        )
-                    )
-            }
-            _ => AnyTx::Application(AppTx::from_raw(raw)?),
-        })
-    }
-
-    pub fn hash(&self) -> Hash {
-        self.raw().hash()
-    }
-}
-
-impl<Tx: Message> fmt::Debug for Any<Tx> {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            Any::Connect(ref msg) => write!(fmt, "{:?}", msg),
-            Any::Status(ref msg) => write!(fmt, "{:?}", msg),
-            Any::Consensus(ref msg) => write!(fmt, "{:?}", msg),
-            Any::Request(ref msg) => write!(fmt, "{:?}", msg),
-            Any::Transaction(ref msg) => write!(fmt, "{:?}", msg),
-            Any::Block(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }

@@ -14,3 +14,4 @@ clap = {version="2.14", features=["unstable"]}
 rand = "0.3"
 time = "0.1"
 serde = "0.8"
+tempdir = "0.3.5"
