@@ -7,9 +7,9 @@ mod genesis;
 mod service;
 
 use std::sync::Arc;
-use std::collections::HashMap;
 
 use time::Timespec;
+use vec_map::VecMap;
 
 use ::crypto::{Hash, hash};
 use ::messages::{RawMessage, Precommit};
@@ -25,30 +25,24 @@ pub use self::service::{Service, Transaction};
 #[derive(Clone)]
 pub struct Blockchain {
     db: Backend,
-    service_map: Arc<HashMap<u16, Box<Service>>>,
-    // to preverse order
-    service_order: Vec<u16>,
+    service_map: Arc<VecMap<Box<Service>>>,
 }
 
 impl Blockchain {
     pub fn new(db: Backend, services: Vec<Box<Service>>) -> Blockchain {
-        let mut service_map = HashMap::new();
-        let mut service_order = Vec::new();
+        let mut service_map = VecMap::new();
         for service in services {
-            let id = service.service_id();
-            if service_map.contains_key(&id) {
+            let id = service.service_id() as usize;
+            if service_map.contains_key(id) {
                 panic!("Services has already contains service with id={}, please change it",
                        id);
             }
             service_map.insert(id, service);
-            service_order.push(id);
         }
-        service_order.sort();
 
         Blockchain {
             db: db,
             service_map: Arc::new(service_map),
-            service_order: service_order,
         }
     }
 
@@ -57,8 +51,8 @@ impl Blockchain {
     }
 
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
-        let id = raw.service_id();
-        self.service_map.get(&id).map(|service| service.tx_from_raw(raw))
+        let id = raw.service_id() as usize;
+        self.service_map.get(id).map(|service| service.tx_from_raw(raw))
     }
 
     pub fn merge(&self, patch: &Patch) -> Result<(), Error> {
@@ -146,8 +140,8 @@ impl Blockchain {
             // Add core configs hashes
             buf.extend_from_slice(schema.configs().root_hash()?.as_ref());
             // Add state hashes from extensions
-            for id in &self.service_order {
-                let hash = self.service_map[id].state_hash(&fork)?;
+            for service in self.service_map.values() {
+                let hash = service.state_hash(&fork)?;
                 buf.extend_from_slice(hash.as_ref());
             }
             hash(&buf)
