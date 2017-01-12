@@ -5,6 +5,7 @@ extern crate time;
 extern crate serde;
 #[macro_use]
 extern crate log;
+extern crate tempdir;
 
 extern crate clap;
 

@@ -47,7 +47,7 @@ impl MessageBuffer {
         self.raw[1]
     }
 
-    pub fn extension_id(&self) -> u16 {
+    pub fn service_id(&self) -> u16 {
         LittleEndian::read_u16(&self.raw[4..6])
     }
 
@@ -93,11 +93,11 @@ pub struct MessageWriter {
 }
 
 impl MessageWriter {
-    pub fn new(extension_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
+    pub fn new(service_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
         let mut raw = MessageWriter { raw: vec![0; HEADER_SIZE + payload_length] };
         raw.set_network_id(TEST_NETWORK_ID);
         raw.set_version(PROTOCOL_MAJOR_VERSION);
-        raw.set_extension_id(extension_id);
+        raw.set_service_id(service_id);
         raw.set_message_type(message_type);
         raw
     }
@@ -110,7 +110,7 @@ impl MessageWriter {
         self.raw[1] = version
     }
 
-    fn set_extension_id(&mut self, message_type: u16) {
+    fn set_service_id(&mut self, message_type: u16) {
         LittleEndian::write_u16(&mut self.raw[4..6], message_type)
     }
 

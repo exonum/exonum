@@ -1,6 +1,5 @@
 use std::io;
 use std::net::SocketAddr;
-use std::marker::PhantomData;
 
 use time::{Duration, Timespec};
 
@@ -8,7 +7,7 @@ use super::crypto::{PublicKey, SecretKey, Hash};
 use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
                     EventsConfiguration, Channel, EventHandler, Result as EventsResult,
                     Error as EventsError};
-use super::blockchain::{Blockchain, GenesisConfig};
+use super::blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use super::messages::{Connect, RawMessage};
 
 pub mod state;//temporary solution to get access to WAIT consts
@@ -24,8 +23,8 @@ use self::adjusted_propose_timeout::*;
 pub type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
 
 #[derive(Clone, Debug)]
-pub enum ExternalMessage<B: Blockchain> {
-    Transaction(B::Transaction),
+pub enum ExternalMessage {
+    Transaction(Box<Transaction>),
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -38,26 +37,23 @@ pub enum NodeTimeout {
 }
 
 #[derive(Clone)]
-pub struct TxSender<B, S>
-    where B: Blockchain,
-          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
+pub struct TxSender<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     inner: S,
-    _b: PhantomData<B>,
 }
 
-pub struct NodeHandler<B, S>
-    where B: Blockchain,
-          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
+pub struct NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub state: State<B::Transaction>,
+    pub state: State,
     pub channel: S,
-    pub blockchain: B,
+    pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster<B>>,
+    propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -85,19 +81,17 @@ pub struct Configuration {
     pub peer_discovery: Vec<SocketAddr>,
 }
 
-impl<B, S> NodeHandler<B, S>
-    where B: Blockchain,
-          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+impl<S> NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
 {
-    pub fn new(blockchain: B, sender: S, config: Configuration) -> NodeHandler<B, S> {
+    pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> NodeHandler<S> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block().unwrap();
             (block.hash(), block.height() + 1)
         };
 
-        let stored = B::get_actual_configuration(&blockchain.view()).unwrap();
-
+        let stored = Schema::new(&blockchain.view()).get_actual_configuration().unwrap();
         info!("Create node with config={:#?}", stored);
 
         let id = stored.validators
@@ -152,7 +146,7 @@ impl<B, S> NodeHandler<B, S>
         self.state().consensus_config().txs_block_limit
     }
 
-    pub fn state(&self) -> &State<B::Transaction> {
+    pub fn state(&self) -> &State {
         &self.state
     }
 
@@ -300,12 +294,11 @@ impl<B, S> NodeHandler<B, S>
     }
 }
 
-impl<B, S> EventHandler for NodeHandler<B, S>
-    where B: Blockchain,
-          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+impl<S> EventHandler for NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
 {
     type Timeout = NodeTimeout;
-    type ApplicationEvent = ExternalMessage<B>;
+    type ApplicationEvent = ExternalMessage;
 
     fn handle_event(&mut self, event: Event) {
         match event {
@@ -335,40 +328,31 @@ impl<B, S> EventHandler for NodeHandler<B, S>
     }
 }
 
-impl<B, S> TxSender<B, S>
-    where B: Blockchain,
-          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout>
+impl<S> TxSender<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    pub fn new(inner: S) -> TxSender<B, S> {
-        TxSender {
-            inner: inner,
-            _b: PhantomData,
-        }
+    pub fn new(inner: S) -> TxSender<S> {
+        TxSender { inner: inner }
     }
 
-    pub fn send(&self, tx: B::Transaction) -> EventsResult<()> {
-        if B::verify_tx(&tx) {
-            let msg = ExternalMessage::Transaction(tx);
-            self.inner.post_event(msg)?;
-            Ok(())
-        } else {
-            Err(EventsError::new("Unable to verify transacion"))
+    pub fn send<T: Transaction>(&self, tx: T) -> EventsResult<()> {
+        // TODO remove double data convertation
+        if !tx.verify() {
+            return Err(EventsError::new("Unable to verify transaction"));
         }
+        let msg = ExternalMessage::Transaction(Box::new(tx));
+        self.inner.post_event(msg)
     }
 }
 
-pub type NodeChannel<B> = MioChannel<ExternalMessage<B>, NodeTimeout>;
+pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
 
-pub struct Node<B>
-    where B: Blockchain
-{
-    reactor: Events<NodeHandler<B, NodeChannel<B>>>,
+pub struct Node {
+    reactor: Events<NodeHandler<NodeChannel>>,
 }
 
-impl<B> Node<B>
-    where B: Blockchain
-{
-    pub fn new(blockchain: B, node_cfg: NodeConfig) -> Node<B> {
+impl Node {
+    pub fn new(blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
         blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
 
         let config = Configuration {
@@ -394,11 +378,11 @@ impl<B> Node<B>
         self.reactor.run()
     }
 
-    pub fn state(&self) -> &State<B::Transaction> {
+    pub fn state(&self) -> &State {
         self.reactor.handler().state()
     }
 
-    pub fn channel(&self) -> TxSender<B, NodeChannel<B>> {
+    pub fn channel(&self) -> TxSender<NodeChannel> {
         TxSender::new(self.reactor.handler().channel.clone())
     }
 }

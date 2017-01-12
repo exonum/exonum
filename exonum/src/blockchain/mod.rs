@@ -1,260 +1,82 @@
 #[macro_use]
 mod spec;
 mod block;
-mod view;
+mod schema;
 pub mod config;
 mod genesis;
+mod service;
 
-use std::borrow::Borrow;
-use std::ops::Deref;
+use std::sync::Arc;
+use std::collections::HashMap;
 
 use time::Timespec;
 
 use ::crypto::{Hash, hash};
-use ::messages::{Precommit, Message, ConfigMessage, ServiceTx, ConfigPropose, ConfigVote, AnyTx};
+use ::messages::{RawMessage, Precommit};
 
-use ::storage::{StorageValue, Patch, Database, Fork, Error, Map, List};
+use ::storage::{Patch, Database, Fork, Error, Map, List, Backend, View as StorageView};
 
 pub use self::block::Block;
-pub use self::view::{View, ConfigurationData};
+pub use self::schema::{ConfigurationData, Schema};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
+pub use self::service::{Service, Transaction};
 
-pub trait Blockchain: Sized + Clone + Send + Sync + 'static
-    where Self: Deref<Target = <Self as Blockchain>::Database>
-{
-    type View: View<<<Self as Blockchain>::Database as Database>::Fork, Transaction=Self::Transaction>;
-    type Database: Database;
-    type Transaction: Message + StorageValue;
+#[derive(Clone)]
+pub struct Blockchain {
+    db: Backend,
+    service_map: Arc<HashMap<u16, Box<Service>>>,
+    // to preverse order
+    service_order: Vec<u16>,
+}
 
-    fn last_hash(&self) -> Result<Hash, Error> {
-        Ok(self.view()
+impl Blockchain {
+    pub fn new(db: Backend, services: Vec<Box<Service>>) -> Blockchain {
+        let mut service_map = HashMap::new();
+        let mut service_order = Vec::new();
+        for service in services {
+            let id = service.service_id();
+            if service_map.contains_key(&id) {
+                panic!("Services has already contains service with id={}, please change it",
+                       id);
+            }
+            service_map.insert(id, service);
+            service_order.push(id);
+        }
+        service_order.sort();
+
+        Blockchain {
+            db: db,
+            service_map: Arc::new(service_map),
+            service_order: service_order,
+        }
+    }
+
+    pub fn view(&self) -> StorageView {
+        self.db.fork()
+    }
+
+    pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
+        let id = raw.service_id();
+        self.service_map.get(&id).map(|service| service.tx_from_raw(raw))
+    }
+
+    pub fn merge(&self, patch: &Patch) -> Result<(), Error> {
+        self.db.merge(patch)
+    }
+
+    pub fn last_hash(&self) -> Result<Hash, Error> {
+        Ok(Schema::new(&self.view())
             .heights()
             .last()?
             .unwrap_or_else(Hash::default))
     }
 
-    fn last_block(&self) -> Result<Block, Error> {
-        Ok(self.view().last_block()?.unwrap())
+    pub fn last_block(&self) -> Result<Block, Error> {
+        Ok(Schema::new(&self.view()).last_block()?.unwrap())
     }
 
-    fn verify_tx(tx: &Self::Transaction) -> bool;
-    fn state_hash(fork: &Self::View) -> Result<Hash, Error>;
-    fn execute(fork: &Self::View, tx: &Self::Transaction) -> Result<(), Error>;
-    // FIXME make private
-    fn execute_service_tx(view: &Self::View, tx: &ServiceTx) -> Result<(), Error> {
-        match *tx {
-            ServiceTx::ConfigChange(ref config_message) => {
-                Ok(Self::execute_config_change(view, config_message))
-            }            
-        }
-    }
-
-    // TODO use Iterator to avoid memory allocations?
-    fn create_patch(&self,
-                    height: u64,
-                    round: u32,
-                    time: Timespec,
-                    txs: &[(Hash, AnyTx<Self::Transaction>)])
-                    -> Result<(Hash, Vec<Hash>, Patch), Error> {
-        // Get last hash
-        let last_hash = self.last_hash()?;
-        // Create fork
-        let fork = self.view();
-        // Save & execute transactions
-        let mut tx_hashes = Vec::new();
-        for &(hash, ref tx) in txs {
-
-            match *tx {
-                AnyTx::Application(ref tx) => Self::execute(&fork, tx)?,
-                AnyTx::Service(ref tx) => Self::execute_service_tx(&fork, tx)?,
-            }
-            fork.transactions()
-                .put(&hash, tx.clone())
-                .unwrap();
-            fork.block_txs(height)
-                .append(hash)
-                .unwrap();
-            tx_hashes.push(hash);
-        }
-        // Get tx hash
-        let tx_hash = fork.block_txs(height).root_hash()?;
-        // Get state hash
-        let state_hash = {
-            let app_state_hash = Self::state_hash(&fork)?;
-            let mut buf = Vec::new();
-            buf.extend_from_slice(app_state_hash.as_ref());
-            // Add service state to state_hash
-            buf.extend_from_slice(fork.config_proposes().root_hash()?.as_ref());
-            buf.extend_from_slice(fork.config_votes().root_hash()?.as_ref());
-            buf.extend_from_slice(fork.configs().root_hash()?.as_ref());
-            hash(&buf)
-        };
-
-        // Create block
-        let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
-        // Eval block hash
-        let block_hash = block.hash();
-        // Update height
-        // TODO: check that height == propose.height
-        fork.heights().append(block_hash).is_ok();
-        // Save block
-        fork.blocks().put(&block_hash, block).is_ok();
-        Ok((block_hash, tx_hashes, fork.changes()))
-    }
-
-    fn execute_config_change(view: &Self::View, config_message: &ConfigMessage) {
-        match *config_message {
-            ConfigMessage::ConfigPropose(ref config_propose_tx) => {
-                Self::handle_config_propose(view, config_propose_tx);
-            }
-            ConfigMessage::ConfigVote(ref config_vote_tx) => {
-                Self::handle_config_vote(view, config_vote_tx);
-            }
-        }
-    }
-
-    fn get_height(view: &Self::View) -> u64 {
-        if let Ok(Some(last_block)) = view.last_block() {
-            return last_block.height() + 1;
-        }
-        0
-    }
-
-    fn get_actual_configuration(view: &Self::View) -> Result<StoredConfiguration, Error> {
-        let h = Self::get_height(view);
-        let heights = view.configs_heights();
-        let height_values = heights.values().unwrap();
-
-        // TODO improve perfomance
-        let idx = height_values.into_iter()
-            .rposition(|r| u64::from(r) <= h)
-            .unwrap();
-
-        let height = heights.get(idx as u64)?.unwrap();
-        Self::get_configuration_at_height(view, height.into()).map(|x| x.unwrap())
-    }
-
-    fn commit_actual_configuration(view: &Self::View,
-                                   actual_from: u64,
-                                   config_data: &[u8])
-                                   -> Result<(), Error> {
-        let height_bytecode = actual_from.into();
-        view.configs().put(&height_bytecode, config_data.to_vec())?;
-        view.configs_heights().append(height_bytecode)?;
-        // TODO: clear storages
-
-        Ok(())
-    }
-
-    // FIXME Replace by result?
-    fn get_configuration_at_height(view: &Self::View,
-                                   height: u64)
-                                   -> Result<Option<StoredConfiguration>, Error> {
-        let configs = view.configs();
-        if let Some(config) = configs.get(&height.into())? {
-            match StoredConfiguration::deserialize(&config) {
-                Ok(configuration) => {
-                    return Ok(Some(configuration));
-                }
-                Err(_) => {
-                    error!("Can't parse found configuration at height: {}", height);
-                }
-            }
-        }
-        Ok(None)
-    }
-
-    fn handle_config_propose(view: &Self::View, config_propose: &ConfigPropose) {
-        {
-            let config = Self::get_actual_configuration(view).unwrap();
-            if !config.validators.contains(config_propose.from()) {
-                error!("ConfigPropose from unknown validator: {:?}",
-                       config_propose.from());
-                return;
-            }
-
-            let hash = <ConfigPropose as Message>::hash(config_propose);
-            if view.config_proposes().get(&hash).unwrap().is_some() {
-                error!("Received config_propose has already been handled, msg={:?}",
-                       config_propose);
-                return;
-            }
-
-            trace!("Handle ConfigPropose");
-            view.config_proposes().put(&hash, config_propose.clone()).unwrap();
-        }
-    }
-
-    fn handle_config_vote(view: &Self::View, config_vote: &ConfigVote) {
-        let config = Self::get_actual_configuration(view).unwrap();
-
-        if !config.validators.contains(config_vote.from()) {
-            error!("ConfigVote from unknown validator: {:?}",
-                   config_vote.from());
-            return;
-        }
-
-        if view.config_proposes().get(config_vote.hash_propose()).unwrap().is_some() {
-            error!("Received config_vote for unknown transaciton, msg={:?}",
-                   config_vote);
-            return;
-        }
-
-        if let Some(vote) = view.config_votes().get(config_vote.from()).unwrap() {
-            if vote.seed() != config_vote.seed() - 1 {
-                error!("Received config_vote with wrong seed, msg={:?}",
-                       config_vote);
-                return;
-            }
-        }
-
-        let msg = config_vote.clone();
-        let _ = view.config_votes().put(msg.from(), config_vote.clone());
-
-        let mut votes_count = 0;
-        for pub_key in config.validators.clone() {
-            if let Some(vote) = view.config_votes().get(&pub_key).unwrap() {
-                if !vote.revoke() {
-                    votes_count += 1;
-                }
-            }
-        }
-
-        if votes_count > 2 / 3 * config.validators.len() {
-            if let Some(config_propose) =
-                view.config_proposes()
-                    .get(config_vote.hash_propose())
-                    .unwrap() {
-                Self::commit_actual_configuration(view,
-                                                  config_propose.actual_from_height(),
-                                                  config_propose.config())
-                    .unwrap();
-            }
-        }
-    }
-
-    fn commit<'a, I: Iterator<Item = &'a Precommit>>(&self,
-                                                     block_hash: Hash,
-                                                     patch: &Patch,
-                                                     precommits: I)
-                                                     -> Result<(), Error> {
-        let patch = {
-            let view = self.view();
-            view.merge(patch);
-
-            for precommit in precommits {
-                view.precommits(&block_hash).append(precommit.clone())?;
-            }
-
-            view.changes()
-        };
-
-        self.merge(&patch)
-    }
-
-    // FIXME make it private and find more clear name
-    fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
+    pub fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
         let config_propose = StoredConfiguration {
             actual_from: 0,
             validators: cfg.validators,
@@ -265,29 +87,110 @@ pub trait Blockchain: Sized + Clone + Send + Sync + 'static
             nsec: 0,
         };
 
-        if let Some(block_hash) = self.view().heights().get(0)? {
-            // TODO create genesis block for MemoryDB and compare in hash with zero block
-            // panic!("Genesis block is already created");
-            let _ = block_hash;
-            return Ok(());
-        }
-
         let patch = {
             let view = self.view();
-            Self::commit_actual_configuration(&view, 0, config_propose.serialize().as_ref())?;
-            self.merge(&view.changes())?;
 
+            // Update service tables
+            for service in self.service_map.values() {
+                service.handle_genesis_block(&view)?;
+            }
+
+            {
+                let schema = Schema::new(&view);
+                if let Some(block_hash) = schema.heights().get(0)? {
+                    // TODO create genesis block for MemoryDB and compare in hash with zero block
+                    // panic!("Genesis block is already created");
+                    let _ = block_hash;
+                    return Ok(());
+                }
+                schema.commit_actual_configuration(0, config_propose.serialize().as_ref())?;
+            };
+            self.merge(&view.changes())?;
             self.create_patch(0, 0, time, &[])?.2
         };
         self.merge(&patch)?;
         Ok(())
     }
 
-    fn view(&self) -> Self::View {
-        Self::View::from_fork(self.borrow().fork())
+    // TODO use Iterator to avoid memory allocations?
+    pub fn create_patch(&self,
+                        height: u64,
+                        round: u32,
+                        time: Timespec,
+                        txs: &[(Hash, Box<Transaction>)])
+                        -> Result<(Hash, Vec<Hash>, Patch), Error> {
+        // Create fork
+        let fork = self.view();
+        // Create databa schema
+        let schema = Schema::new(&fork);
+        // Get last hash
+        let last_hash = self.last_hash()?;
+        // Save & execute transactions
+        let mut tx_hashes = Vec::new();
+        for &(hash, ref tx) in txs {
+            tx.execute(&fork)?;
+            schema.transactions()
+                .put(&hash, tx.raw())
+                .unwrap();
+            schema.block_txs(height)
+                .append(hash)
+                .unwrap();
+            tx_hashes.push(hash);
+        }
+        // Get tx hash
+        let tx_hash = schema.block_txs(height).root_hash()?;
+        // Get state hash
+        let state_hash = {
+            // TODO Implement me with merkle table
+            let mut buf = Vec::new();
+            // Add core configs hashes
+            buf.extend_from_slice(schema.configs().root_hash()?.as_ref());
+            // Add state hashes from extensions
+            for id in &self.service_order {
+                let hash = self.service_map[id].state_hash(&fork)?;
+                buf.extend_from_slice(hash.as_ref());
+            }
+            hash(&buf)
+        };
+
+        // Create block
+        let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
+        // Eval block hash
+        let block_hash = block.hash();
+        // Update height
+        // TODO: check that height == propose.height
+        schema.heights().append(block_hash).is_ok();
+        // Save block
+        schema.blocks().put(&block_hash, block).is_ok();
+        Ok((block_hash, tx_hashes, fork.changes()))
     }
 
-    fn merge(&self, patch: &Patch) -> Result<(), Error> {
-        self.deref().merge(patch)
+    pub fn commit<'a, I>(&self,
+                         block_hash: Hash,
+                         patch: &Patch,
+                         precommits: I)
+                         -> Result<Vec<Box<Transaction>>, Error>
+        where I: Iterator<Item = &'a Precommit>
+    {
+        let (patch, txs) = {
+            let view = self.db.fork();
+            view.merge(patch);
+
+            let schema = Schema::new(&view);
+            for precommit in precommits {
+                schema.precommits(&block_hash).append(precommit.clone())?;
+            }
+
+            // create special txs like anchoring or fee
+            let mut txs = Vec::new();
+            for service in self.service_map.values() {
+                let t = service.handle_commit(&view)?;
+                txs.extend_from_slice(&t);
+            }
+
+            (view.changes(), txs)
+        };
+        self.merge(&patch)?;
+        Ok(txs)
     }
 }
