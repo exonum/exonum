@@ -6,12 +6,11 @@ use std::net::SocketAddr;
 use std::ops::Drop;
 
 use time::{Timespec, Duration};
-use tempdir::TempDir;
 
 use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction};
-use exonum::storage::{LevelDB, LevelDBOptions, Error as StorageError};
+use exonum::storage::{MemoryDB, Error as StorageError};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      Channel, EventHandler, Result as EventsResult};
@@ -420,10 +419,7 @@ pub fn timestamping_sandbox() -> Sandbox {
                          "3.3.3.3:3".parse().unwrap(),
                          "4.4.4.4:4".parse().unwrap()]: Vec<SocketAddr>;
 
-    let mut options = LevelDBOptions::new();
-    options.create_if_missing = true;
-    let dir = TempDir::new("cryptocurrency").unwrap();
-    let db = LevelDB::new(dir.path(), options).unwrap();
+    let db = MemoryDB::new();
     let blockchain = Blockchain::new(db, vec![Box::new(TimestampingService::new())]);
 
     let consensus = ConsensusConfig {

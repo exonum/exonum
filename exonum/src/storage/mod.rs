@@ -20,7 +20,7 @@ pub use leveldb::database::cache::Cache as LevelDBCache;
 
 pub use self::leveldb::{LevelDB, LevelDBView};
 pub use self::db::{Database, Patch, Fork, Change};
-pub use self::memorydb::MemoryDB;
+pub use self::memorydb::{MemoryDB, MemoryDBView};
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::merkle_table::MerkleTable;
@@ -83,5 +83,21 @@ impl error::Error for Error {
     }
 }
 
-pub type Backend = LevelDB;
-pub type View = LevelDBView;
+#[cfg(not(feature="memorydb"))]
+mod details {
+    use super::{LevelDB, LevelDBView};
+
+    pub type Storage = LevelDB;
+    pub type View = LevelDBView;
+}
+
+#[cfg(feature="memorydb")]
+mod details {
+    use super::{MemoryDB, MemoryDBView};
+
+    pub type Storage = MemoryDB;
+    pub type View = MemoryDBView;
+}
+
+pub type Storage = details::Storage;
+pub type View = details::View;

@@ -13,7 +13,7 @@ use exonum::config::ConfigFile;
 use exonum::blockchain::GenesisConfig;
 use exonum::node::NodeConfig;
 use exonum::crypto::gen_keypair;
-use exonum::storage::{LevelDB, LevelDBOptions, Backend};
+use exonum::storage::Storage;
 
 pub struct GenerateCommand<'a, 'b>
     where 'a: 'b
@@ -129,11 +129,20 @@ impl<'a, 'b> RunCommand<'a, 'b>
         matches.value_of("LEVELDB_PATH").map(Path::new)
     }
 
-    pub fn db(matches: &'a ArgMatches<'a>) -> Backend {
+    #[cfg(not(feature="memorydb"))]
+    pub fn db(matches: &'a ArgMatches<'a>) -> Storage {
+        use exonum::storage::{LevelDB, LevelDBOptions};
+
         let path = Self::leveldb_path(matches).unwrap();
         let mut options = LevelDBOptions::new();
         options.create_if_missing = true;
         LevelDB::new(path, options).unwrap()
+    }
+
+    #[cfg(feature="memorydb")]
+    pub fn db(_: &'a ArgMatches<'a>) -> Storage {
+        use exonum::storage::MemoryDB;
+        MemoryDB::new()
     }
 }
 
