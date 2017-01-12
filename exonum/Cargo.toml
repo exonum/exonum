@@ -11,6 +11,7 @@ byteorder = "0.5"
 hex = "0.2"
 num = "0.1"
 bit-vec = "0.4"
+vec_map = "0.6.0"
 sodiumoxide = {git = "https://github.com/dnaq/sodiumoxide.git", rev="0c9f41f"}
 rand = "0.3"
 leveldb = {version="0.9", path="../3rdparty/leveldb"}

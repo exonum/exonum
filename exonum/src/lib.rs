@@ -26,6 +26,7 @@ extern crate serde_json;
 extern crate toml;
 extern crate hex;
 extern crate bit_vec;
+extern crate vec_map;
 
 #[cfg(test)]
 extern crate tempdir;
