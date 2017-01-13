@@ -1,5 +1,4 @@
 #![feature(type_ascription)]
-#![feature(proc_macro)]
 
 mod explorer;
 pub mod helpers;

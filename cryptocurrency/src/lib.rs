@@ -1,5 +1,4 @@
 #![feature(type_ascription)]
-#![feature(proc_macro)]
 
 extern crate rand;
 extern crate time;
@@ -112,12 +111,12 @@ impl Message for CurrencyTx {
     }
 
     fn from_raw(raw: RawMessage) -> Result<Self, MessageError> {
-        Ok(match raw.message_type() {
-            TX_TRANSFER_ID => CurrencyTx::Transfer(TxTransfer::from_raw(raw)?),
-            TX_ISSUE_ID => CurrencyTx::Issue(TxIssue::from_raw(raw)?),
-            TX_WALLET_ID => CurrencyTx::CreateWallet(TxCreateWallet::from_raw(raw)?),
-            _ => panic!("Undefined message type"),
-        })
+        match raw.message_type() {
+            TX_TRANSFER_ID => Ok(CurrencyTx::Transfer(TxTransfer::from_raw(raw)?)),
+            TX_ISSUE_ID => Ok(CurrencyTx::Issue(TxIssue::from_raw(raw)?)),
+            TX_WALLET_ID => Ok(CurrencyTx::CreateWallet(TxCreateWallet::from_raw(raw)?)),
+            _ => Err(MessageError::IncorrectMessageType { message_type: raw.message_type() }),
+        }
     }
 
     fn hash(&self) -> Hash {
@@ -285,8 +284,8 @@ impl Service for CurrencyService {
         Ok(hash(&hashes))
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Box<Transaction> {
-        Box::new(CurrencyTx::from_raw(raw).unwrap())
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+        CurrencyTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
     fn handle_commit(&self, _: &StorageView) -> Result<Vec<Box<Transaction>>, Error> {

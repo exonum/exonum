@@ -4,6 +4,7 @@ pub enum Error {
     IncorrectBoolean { position: u32, value: u8 },
     IncorrectSegmentReference { position: u32, value: u32 },
     IncorrectSegmentSize { position: u32, value: u32 },
+    IncorrectMessageType { message_type: u16 },
     Utf8 {
         position: u32,
         error: ::std::str::Utf8Error,
