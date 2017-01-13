@@ -6,7 +6,7 @@ use serde::{Serialize, Serializer};
 use serde_json::Value;
 use super::hash_rules;
 const LEFT_DESC: &'static str = "left";
-const RIGHT_DESC: &'static str = "rigth";
+const RIGHT_DESC: &'static str = "right";
 const VAL_DESC: &'static str = "val";
 #[allow(dead_code)]
 pub fn proof_indices_values<V: StorageValue>(proof: &Proofnode<V>) -> Vec<(usize, &V)> {
