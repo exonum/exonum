@@ -76,9 +76,9 @@ fn test_table_list<T: Database>(prefix: Vec<u8>, db: &T) -> Result<(), Error> {
 
     let bound: u64 = 500;
     for i in 0..bound {
-        list.append(StorageValue::serialize(&(i as u64), Vec::new()))?;
+        list.append(StorageValue::serialize(i as u64))?;
     }
-    assert_eq!(list.last()?, Some(StorageValue::serialize(&(bound - 1), Vec::new())));
+    assert_eq!(list.last()?, Some(StorageValue::serialize(bound - 1)));
     assert_eq!(list.len()?, 2 + bound);
     Ok(())
 }
@@ -119,9 +119,9 @@ fn serializer() {
     let b: u64 = 15;
     let c: Vec<u8> = vec![10, 15, 24, 2, 1];
 
-    let a_s = a.serialize(Vec::new());
-    let b_s = b.serialize(Vec::new());
-    let c_s = c.clone().serialize(Vec::new());
+    let a_s = a.serialize();
+    let b_s = b.serialize();
+    let c_s = c.clone().serialize();
     let c_d: Vec<u8> = StorageValue::deserialize(c_s);
     assert_eq!(a, StorageValue::deserialize(a_s));
     assert_eq!(b, StorageValue::deserialize(b_s));

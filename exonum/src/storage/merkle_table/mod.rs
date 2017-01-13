@@ -36,30 +36,20 @@ fn index_of_first_element_in_subtree<K>(subtree_root_height: K, subtree_root_ind
 mod hash_rules {
     use ::crypto::{hash, Hash};
     use ::storage::fields::StorageValue;
-    pub const LEAF_DOMAIN: u8 = 00;
-    pub const BRANCH_DOMAIN: u8 = 01;
-    pub const SINGLE_BRANCH_DOMAIN: u8 = 02;
+    // pub const LEAF_DOMAIN: u8 = 00;
+    // pub const BRANCH_DOMAIN: u8 = 01;
+    // pub const SINGLE_BRANCH_DOMAIN: u8 = 02;
 
     pub fn hash_leaf<V: StorageValue>(value: &V) -> Hash {
-        let mut vecb = Vec::with_capacity(1 + value.len_hint());
-        vecb.push(LEAF_DOMAIN);
-        vecb = value.serialize(vecb);
-        hash(&vecb)
+        value.hash()
     }
 
     pub fn hash_branch(left: Hash, right: Hash) -> Hash {
-        let mut vecb = Vec::with_capacity(1 + 2 * left.len_hint());
-        vecb.push(BRANCH_DOMAIN);
-        vecb = left.serialize(vecb);
-        vecb = right.serialize(vecb);
-        hash(&vecb)
+        hash(&[left.as_ref(), right.as_ref()].concat())
     }
 
     pub fn hash_single_branch(left: Hash) -> Hash {
-        let mut vecb = Vec::with_capacity(1 + left.len_hint());
-        vecb.push(SINGLE_BRANCH_DOMAIN);
-        vecb = left.serialize(vecb);
-        hash(&vecb)
+        hash(left.as_ref())
     }
 }
 /// Merkle tree over list.
@@ -185,14 +175,12 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
     fn set_len(&self, len: K) -> Result<(), Error> {
         self.count.set(Some(len));
-        self.map.put(&[], len.serialize(Vec::new()))
+        self.map.put(&[], len.serialize())
     }
 
     // TODO reduce reallocations. We can create a key by one allocation.
     fn db_key(h: K, i: K) -> Vec<u8> {
-        let mut vec = Vec::with_capacity(h.len_hint() * 2);
-        vec = h.serialize(vec);
-        i.serialize(vec)
+        [h.serialize(), i.serialize()].concat()
     }
 
     fn get_hash(&self, height: K, index: K) -> Result<Option<Hash>, Error> {
@@ -273,7 +261,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
         let len = self.len()?;
         self.append_hash(len, hash_rules::hash_leaf(&value))?;
 
-        self.map.put(&Self::db_key(K::zero(), len), value.serialize(Vec::new()))?;
+        self.map.put(&Self::db_key(K::zero(), len), value.serialize())?;
         self.set_len(len + K::one())?;
         Ok(())
     }
@@ -298,7 +286,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
         }
 
         self.update_hash_subtree(index, hash_rules::hash_leaf(&value))?;
-        self.map.put(&Self::db_key(K::zero(), index), value.serialize(Vec::new()))
+        self.map.put(&Self::db_key(K::zero(), index), value.serialize())
     }
 
 
@@ -341,7 +329,6 @@ mod tests {
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
-    use super::hash_rules::{LEAF_DOMAIN, BRANCH_DOMAIN, SINGLE_BRANCH_DOMAIN};
     const KEY_SIZE: usize = 10;
 
     fn generate_fully_random_data_keys(len: usize) -> Vec<(Vec<u8>)> {
@@ -460,37 +447,37 @@ mod tests {
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
-        let h1 = hash(&[LEAF_DOMAIN, 1, 2]);
-        let h2 = hash(&[LEAF_DOMAIN, 2, 3]);
-        let h3 = hash(&[LEAF_DOMAIN, 3, 4]);
-        let h4 = hash(&[LEAF_DOMAIN, 4, 5]);
-        let h5 = hash(&[LEAF_DOMAIN, 5, 6]);
-        let h6 = hash(&[LEAF_DOMAIN, 6, 7]);
-        let h7 = hash(&[LEAF_DOMAIN, 7, 8]);
-        let h8 = hash(&[LEAF_DOMAIN, 8, 9]);
+        let h1 = hash(&[1, 2]);
+        let h2 = hash(&[2, 3]);
+        let h3 = hash(&[3, 4]);
+        let h4 = hash(&[4, 5]);
+        let h5 = hash(&[5, 6]);
+        let h6 = hash(&[6, 7]);
+        let h7 = hash(&[7, 8]);
+        let h8 = hash(&[8, 9]);
 
-        let h12 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1.as_ref(), h2.as_ref()].concat());
-        let h3up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h3.as_ref()].concat());
-        let h123 = hash(&[&[BRANCH_DOMAIN] as &[u8], h12.as_ref(), h3up.as_ref()].concat());
+        let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
+        let h3up = hash(h3.as_ref());
+        let h123 = hash(&[h12.as_ref(), h3up.as_ref()].concat());
 
-        let h34 = hash(&[&[BRANCH_DOMAIN] as &[u8], h3.as_ref(), h4.as_ref()].concat());
-        let h1234 = hash(&[&[BRANCH_DOMAIN] as &[u8], h12.as_ref(), h34.as_ref()].concat());
+        let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
+        let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
 
-        let h5up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5.as_ref()].concat());
-        let h5upup = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5up.as_ref()].concat());
-        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h5upup.as_ref()].concat());
+        let h5up = hash(h5.as_ref());
+        let h5upup = hash(h5up.as_ref());
+        let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
-        let h56 = hash(&[&[BRANCH_DOMAIN] as &[u8], h5.as_ref(), h6.as_ref()].concat());
-        let h56up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h56.as_ref()].concat());
-        let h123456 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h56up.as_ref()].concat());
+        let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());
+        let h56up = hash(h56.as_ref());
+        let h123456 = hash(&[h1234.as_ref(), h56up.as_ref()].concat());
 
-        let h7up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h7.as_ref()].concat());
-        let h567 = hash(&[&[BRANCH_DOMAIN] as &[u8], h56.as_ref(), h7up.as_ref()].concat());
-        let h1234567 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h567.as_ref()].concat());
+        let h7up = hash(h7.as_ref());
+        let h567 = hash(&[h56.as_ref(), h7up.as_ref()].concat());
+        let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());
 
-        let h78 = hash(&[&[BRANCH_DOMAIN] as &[u8], h7.as_ref(), h8.as_ref()].concat());
-        let h5678 = hash(&[&[BRANCH_DOMAIN] as &[u8], h56.as_ref(), h78.as_ref()].concat());
-        let h12345678 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h5678.as_ref()].concat());
+        let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());
+        let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
+        let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
         let expected_hash_comb: Vec<(Vec<u8>, Hash, u32)> = vec![(vec![1, 2], h1, 0),
                                                                  (vec![2, 3], h12, 1),
@@ -588,17 +575,17 @@ mod tests {
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
-        let h1 = hash(&vec![LEAF_DOMAIN, 0, 1, 2]);
-        let h2 = hash(&vec![LEAF_DOMAIN, 1, 2, 3]);
-        let h3 = hash(&vec![LEAF_DOMAIN, 2, 3, 4]);
-        let h4 = hash(&vec![LEAF_DOMAIN, 3, 4, 5]);
-        let h5 = hash(&vec![LEAF_DOMAIN, 4, 5, 6]);
-        let h12 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1.as_ref(), h2.as_ref()].concat());
-        let h34 = hash(&[&[BRANCH_DOMAIN] as &[u8], h3.as_ref(), h4.as_ref()].concat());
-        let h1234 = hash(&[&[BRANCH_DOMAIN] as &[u8], h12.as_ref(), h34.as_ref()].concat());
-        let h5up = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5.as_ref()].concat());
-        let h5upup = hash(&[&[SINGLE_BRANCH_DOMAIN] as &[u8], h5up.as_ref()].concat());
-        let h12345 = hash(&[&[BRANCH_DOMAIN] as &[u8], h1234.as_ref(), h5upup.as_ref()].concat());
+        let h1 = hash(&vec![0, 1, 2]);
+        let h2 = hash(&vec![1, 2, 3]);
+        let h3 = hash(&vec![2, 3, 4]);
+        let h4 = hash(&vec![3, 4, 5]);
+        let h5 = hash(&vec![4, 5, 6]);
+        let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
+        let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
+        let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
+        let h5up = hash(h5.as_ref());
+        let h5upup = hash(h5up.as_ref());
+        let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
         for i in 0u8...4 {
             table.append(vec![i, i + 1, i + 2]).unwrap();
@@ -646,8 +633,8 @@ mod tests {
 
     #[test]
     fn test_hash_set_value_simple() {
-        let h1 = hash(&[LEAF_DOMAIN, 1]);
-        let h2 = hash(&[LEAF_DOMAIN, 2]);
+        let h1 = hash(&[1]);
+        let h2 = hash(&[2]);
 
         let s = MemoryDB::new();
         let t = MerkleTable::new(MapTable::new(vec![255], &s));
