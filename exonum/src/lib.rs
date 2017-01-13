@@ -8,7 +8,6 @@
 #![feature(type_ascription)]
 #![feature(slice_concat_ext)]
 #![feature(btree_range, collections_bound)]
-#![feature(proc_macro)]
 
 #[macro_use]
 extern crate log;
