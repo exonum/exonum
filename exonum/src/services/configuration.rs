@@ -42,9 +42,8 @@ pub enum ConfigTx {
     ConfigVote(TxConfigVote),
 }
 
-pub struct ConfigurationService {
-    
-}
+#[derive(Default)]
+pub struct ConfigurationService {}
 
 pub struct ConfigurationSchema<'a> {
     view: &'a View,

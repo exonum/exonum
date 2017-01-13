@@ -500,7 +500,7 @@ impl<S> NodeHandler<S>
 
         // Broadcast transaction to validators
         trace!("Broadcast transactions: {:?}", msg.raw());
-        self.broadcast(&msg.raw());
+        self.broadcast(msg.raw());
 
         let full_proposes = self.state.add_transaction(hash, msg);
         // Go to has full propose if we get last transaction
