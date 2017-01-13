@@ -5,7 +5,6 @@ use super::{RawMessage, BitVec};
 use super::super::blockchain;
 
 pub const CONSENSUS: u16 = 0;
-pub const CONFIG_EXTENSION: u16 = 1;
 
 pub const CONNECT_MESSAGE_ID: u16 = 0;
 pub const STATUS_MESSAGE_ID: u16 = 1;
@@ -21,9 +20,6 @@ pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
 pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 11;
-
-pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 12;
-pub const CONFIG_VOTE_MESSAGE_ID: u16 = 13;
 
 // когда присоединяются узлы
 message! {
@@ -199,32 +195,5 @@ message! {
         to:             &PublicKey  [32 => 64]
         time:           Timespec    [64 => 72]
         height:         u64         [72 => 80]
-    }
-}
-
-message! {
-    ConfigPropose {
-        const TYPE = CONFIG_EXTENSION;        
-        const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 56; 
-
-        from:           &PublicKey  [00 => 32]
-        height:         u64         [32 => 40]
-        config:        &[u8]        [40 => 48] // serialized config bytes
-        actual_from_height: u64     [48 => 56] // с какой высоты становится актуальным
-    }
-}
-
-message! {
-    ConfigVote {
-        const TYPE = CONFIG_EXTENSION;   
-        const ID = CONFIG_VOTE_MESSAGE_ID;
-        const SIZE = 81; 
-        
-        from:           &PublicKey  [00 => 32]
-        height:         u64         [32 => 40]
-        hash_propose:   &Hash       [40 => 72] // hash of transacion we're voting for
-        seed:           u64         [72 => 80] // incremental (1, 2, 3, 4, 5, 6, 7) проверять +1
-        revoke:         bool        [80 => 81] // голос_за=false / отозвать=true
     }
 }

@@ -14,7 +14,7 @@ pub trait Transaction: Send + 'static + Debug {
     fn verify(&self) -> bool;
     fn execute(&self, view: &View) -> Result<()>;
 
-    fn raw(&self) -> RawTransaction;
+    fn raw(&self) -> &RawTransaction;
     fn clone_box(&self) -> Box<Transaction>;
 
     fn info(&self) -> Value {
