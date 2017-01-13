@@ -123,7 +123,7 @@ impl Blockchain {
         for &(hash, ref tx) in txs {
             tx.execute(&fork)?;
             schema.transactions()
-                .put(&hash, tx.raw())
+                .put(&hash, tx.raw().clone())
                 .unwrap();
             schema.block_txs(height)
                 .append(hash)

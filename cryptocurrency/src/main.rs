@@ -32,12 +32,13 @@ use valico::json_dsl;
 use hyper::status::StatusCode;
 use rand::{Rng, thread_rng};
 
-use exonum::blockchain::{GenesisConfig, Blockchain};
+use exonum::blockchain::{GenesisConfig, Blockchain, Service};
 use exonum::node::{Node, NodeConfig, TxSender, NodeChannel};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
 use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, FromHexError};
 use exonum::messages::Message;
 use exonum::events::Error as EventsError;
+use exonum::services::configuration::ConfigurationService;
 
 use blockchain_explorer::ValueNotFound;
 use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
@@ -324,7 +325,9 @@ fn main() {
             let node_cfg = RunCommand::node_config(matches);
             let db = RunCommand::db(matches);
 
-            let blockchain = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
+            let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new()),
+                                                   Box::new(ConfigurationService::new())];
+            let blockchain = Blockchain::new(db, services);
             run_node(blockchain, node_cfg, port)
         }
         _ => {

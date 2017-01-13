@@ -76,6 +76,7 @@ impl<S> NodeHandler<S>
                 .transactions()
                 .get(hash)
                 .map(|tx| tx.raw())
+                .cloned()
                 .or_else(|| schema.transactions().get(hash).unwrap());
 
             if let Some(tx) = tx {

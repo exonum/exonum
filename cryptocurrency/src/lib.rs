@@ -251,8 +251,8 @@ impl Transaction for CurrencyTx {
         Ok(())
     }
 
-    fn raw(&self) -> RawTransaction {
-        Message::raw(self).clone()
+    fn raw(&self) -> &RawTransaction {
+        Message::raw(self)
     }
 
     fn clone_box(&self) -> Box<Transaction> {

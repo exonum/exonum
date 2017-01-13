@@ -13,7 +13,7 @@ mod protocol;
 use time::Timespec;
 use bit_vec;
 
-use ::crypto::{PublicKey, Hash};
+use ::crypto::PublicKey;
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SIZE};
 pub use self::error::Error;
@@ -35,17 +35,6 @@ pub enum Any {
     Consensus(ConsensusMessage),
     Request(RequestMessage),
     Transaction(RawTransaction),
-}
-
-#[derive(Clone, PartialEq, Debug)]
-pub enum ServiceTx {
-    ConfigChange(ConfigMessage),
-}
-
-#[derive(Clone, PartialEq)]
-pub enum ConfigMessage {
-    ConfigPropose(ConfigPropose),
-    ConfigVote(ConfigVote),
 }
 
 #[derive(Clone, PartialEq)]
@@ -131,52 +120,6 @@ impl fmt::Debug for RequestMessage {
             RequestMessage::Precommits(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Peers(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Block(ref msg) => write!(fmt, "{:?}", msg),
-        }
-    }
-}
-
-impl ConfigMessage {
-    pub fn from(&self) -> &PublicKey {
-        match *self {
-            ConfigMessage::ConfigPropose(ref msg) => msg.from(),
-            ConfigMessage::ConfigVote(ref msg) => msg.from(),
-        }
-    }
-
-    pub fn height(&self) -> u64 {
-        match *self {
-            ConfigMessage::ConfigPropose(ref msg) => msg.height(),
-            ConfigMessage::ConfigVote(ref msg) => msg.height(),
-        }
-    }
-
-    pub fn raw(&self) -> &RawMessage {
-        match *self {
-            ConfigMessage::ConfigPropose(ref msg) => msg.raw(),
-            ConfigMessage::ConfigVote(ref msg) => msg.raw(),
-        }
-    }
-
-    pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            ConfigMessage::ConfigPropose(ref msg) => msg.verify(public_key),
-            ConfigMessage::ConfigVote(ref msg) => msg.verify(public_key),
-        }
-    }
-
-    pub fn hash(&self) -> Hash {
-        match *self {
-            ConfigMessage::ConfigPropose(ref msg) => msg.hash(),
-            ConfigMessage::ConfigVote(ref msg) => msg.hash(),
-        }
-    }
-}
-
-impl fmt::Debug for ConfigMessage {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            ConfigMessage::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
-            ConfigMessage::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
 }
@@ -271,25 +214,5 @@ impl Any {
             }
             _ => Any::Transaction(raw),
         })
-    }
-}
-
-impl ServiceTx {
-    pub fn from(&self) -> &PublicKey {
-        match *self {
-            ServiceTx::ConfigChange(ref msg) => msg.from(),
-        }
-    }
-
-    pub fn verify(&self) -> bool {
-        match *self {
-            ServiceTx::ConfigChange(ref msg) => msg.verify(msg.from()),
-        }
-    }
-
-    pub fn raw(&self) -> &RawMessage {
-        match *self {
-            ServiceTx::ConfigChange(ref msg) => msg.raw(),
-        }
     }
 }
