@@ -3,16 +3,13 @@ use std::fmt::Debug;
 use serde_json::Value;
 
 use ::crypto::Hash;
-use ::storage::View;
-use ::messages::RawTransaction;
-
-pub type Error = ::storage::Error;
-pub type Result<T> = ::std::result::Result<T, Error>;
+use ::storage::{View, Error as StorageError};
+use ::messages::{RawTransaction, Error as MessageError};
 
 pub trait Transaction: Send + 'static + Debug {
     fn hash(&self) -> Hash;
     fn verify(&self) -> bool;
-    fn execute(&self, view: &View) -> Result<()>;
+    fn execute(&self, view: &View) -> Result<(), StorageError>;
 
     fn raw(&self) -> &RawTransaction;
     fn clone_box(&self) -> Box<Transaction>;
@@ -31,9 +28,9 @@ impl Clone for Box<Transaction> {
 pub trait Service: Send + Sync + 'static {
     fn service_id(&self) -> u16;
 
-    fn state_hash(&self, view: &View) -> Result<Hash>;
-    fn tx_from_raw(&self, raw: RawTransaction) -> Box<Transaction>;
+    fn state_hash(&self, view: &View) -> Result<Hash, StorageError>;
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    fn handle_genesis_block(&self, view: &View) -> Result<()>;
-    fn handle_commit(&self, view: &View) -> Result<Vec<Box<Transaction>>>;
+    fn handle_genesis_block(&self, view: &View) -> Result<(), StorageError>;
+    fn handle_commit(&self, view: &View) -> Result<Vec<Box<Transaction>>, StorageError>;
 }

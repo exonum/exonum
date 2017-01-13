@@ -52,7 +52,7 @@ impl Blockchain {
 
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
         let id = raw.service_id() as usize;
-        self.service_map.get(id).map(|service| service.tx_from_raw(raw))
+        self.service_map.get(id).and_then(|service| service.tx_from_raw(raw).ok())
     }
 
     pub fn merge(&self, patch: &Patch) -> Result<(), Error> {

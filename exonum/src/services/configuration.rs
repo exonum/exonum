@@ -86,11 +86,13 @@ impl ConfigTx {
     }
 
     pub fn from_raw(raw: RawMessage) -> Result<ConfigTx, MessageError> {
-        Ok(match raw.message_type() {
-            CONFIG_PROPOSE_MESSAGE_ID => ConfigTx::ConfigPropose(TxConfigPropose::from_raw(raw)?),
-            CONFIG_VOTE_MESSAGE_ID => ConfigTx::ConfigVote(TxConfigVote::from_raw(raw)?),
-            _ => unreachable!("Undefined tx type"),
-        })
+        match raw.message_type() {
+            CONFIG_PROPOSE_MESSAGE_ID => {
+                Ok(ConfigTx::ConfigPropose(TxConfigPropose::from_raw(raw)?))
+            }
+            CONFIG_VOTE_MESSAGE_ID => Ok(ConfigTx::ConfigVote(TxConfigVote::from_raw(raw)?)),
+            _ => Err(MessageError::IncorrectMessageType { message_type: raw.message_type() }),
+        }
     }
 }
 
@@ -237,8 +239,8 @@ impl Service for ConfigurationService {
         buf.extend_from_slice(schema.config_votes().root_hash()?.as_ref());
         Ok(hash(buf.as_ref()))
     }
-    fn tx_from_raw(&self, raw: RawTransaction) -> Box<Transaction> {
-        Box::new(ConfigTx::from_raw(raw).unwrap())
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+        ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
     fn handle_genesis_block(&self, _: &View) -> StorageResult<()> {

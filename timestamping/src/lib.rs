@@ -1,7 +1,7 @@
 #[macro_use(message)]
 extern crate exonum;
 
-use exonum::messages::{Message, RawTransaction};
+use exonum::messages::{Message, RawTransaction, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::{Error, View as StorageView};
 use exonum::blockchain::{Service, Transaction};
@@ -37,8 +37,8 @@ impl Transaction for TimestampTx {
         Ok(())
     }
 
-    fn raw(&self) -> RawTransaction {
-        Message::raw(self).clone()
+    fn raw(&self) -> &RawTransaction {
+        Message::raw(self)
     }
 
     fn clone_box(&self) -> Box<Transaction> {
@@ -63,8 +63,12 @@ impl Service for TimestampingService {
         Ok(hash(&[]))
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Box<Transaction> {
-        Box::new(TimestampTx::from_raw(raw).unwrap())
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+        if raw.message_type() != TIMESTAMPING_TRANSACTION_MESSAGE_ID {
+            return Err(MessageError::IncorrectMessageType { message_type: raw.message_type() });
+        }
+
+        TimestampTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
     fn handle_commit(&self, _: &StorageView) -> Result<Vec<Box<Transaction>>, Error> {
