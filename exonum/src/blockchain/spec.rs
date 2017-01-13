@@ -11,26 +11,14 @@ macro_rules! storage_value {
         }
 
         impl $crate::storage::StorageValue for $name {
-            fn serialize(&self, mut buf: Vec<u8>) -> Vec<u8> {
-
-                let old_len = buf.len(); 
-                let new_len = old_len + self.raw.len(); 
-                buf.resize(new_len, 0);
-                {
-                    let part = &mut buf[old_len..new_len]; 
-                part.copy_from_slice(&self.raw); 
-                }
-                buf
+            fn serialize(self) -> Vec<u8> {
+                self.raw
             }
 
             fn deserialize(v: Vec<u8>) -> Self {
                 $name {
                     raw: v
                 }
-            }
-
-            fn len_hint(&self) -> usize {
-                self.raw.len()
             }
 
             fn hash(&self) -> Hash {

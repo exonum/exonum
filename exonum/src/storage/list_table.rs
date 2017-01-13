@@ -41,8 +41,8 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
 {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
-        self.map.put(&len.serialize(Vec::new()), value.serialize(Vec::new()))?;
-        self.map.put(&[], (len + K::one()).serialize(Vec::new()))?;
+        self.map.put(&len.serialize(), value.serialize())?;
+        self.map.put(&[], (len + K::one()).serialize())?;
         self.count.set(Some(len + K::one()));
         Ok(())
     }
@@ -52,16 +52,16 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
     {
         let mut len = self.len()?;
         for value in iter {
-            self.map.put(&len.serialize(Vec::new()), value.serialize(Vec::new()))?;
+            self.map.put(&len.serialize(), value.serialize())?;
             len = len + K::one();
         }
-        self.map.put(&[], len.serialize(Vec::new()))?;
+        self.map.put(&[], len.serialize())?;
         self.count.set(Some(len));
         Ok(())
     }
 
     fn get(&self, index: K) -> Result<Option<V>, Error> {
-        let value = self.map.get(&index.serialize(Vec::new()))?;
+        let value = self.map.get(&index.serialize())?;
         Ok(value.map(StorageValue::deserialize))
     }
 
@@ -69,7 +69,7 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
         if index >= self.len()? {
             return Err(Error::new("Wrong index!"));
         }
-        self.map.put(&index.serialize(Vec::new()), value.serialize(Vec::new()))
+        self.map.put(&index.serialize(), value.serialize())
     }
 
     fn last(&self) -> Result<Option<V>, Error> {

@@ -35,10 +35,7 @@ pub trait View<F: Fork>: Deref<Target = F> {
     }
 
     fn block_txs(&self, height: u64) -> MerkleTable<MapTable<F, [u8], Vec<u8>>, u32, Hash> {
-        let mut vecb = Vec::with_capacity(1 + height.len_hint()); 
-        vecb.push(03u8); 
-        vecb = height.serialize(vecb); 
-        MerkleTable::new(MapTable::new(vecb, self))
+        MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self))
     }
 
     fn precommits(&self, hash: &Hash) -> ListTable<MapTable<F, [u8], Vec<u8>>, u32, Precommit> {
