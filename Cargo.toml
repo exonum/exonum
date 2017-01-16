@@ -5,9 +5,7 @@ members = [
     "3rdparty/leveldb",
     "blockchain_explorer",
     "cryptocurrency",
-    "digital_rights",
     "exonum",
     "sandbox",
     "timestamping",
-    "land_title"
 ]
