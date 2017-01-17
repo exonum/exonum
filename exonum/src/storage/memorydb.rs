@@ -55,7 +55,7 @@ impl Map<[u8], Vec<u8>> for MemoryDB {
 }
 
 impl MemoryDBView {
-    fn new(from: &MemoryDB) -> MemoryDBView {
+    pub fn new(from: &MemoryDB) -> MemoryDBView {
         MemoryDBView {
             map: from.clone(),
             changes: RefCell::default(),
