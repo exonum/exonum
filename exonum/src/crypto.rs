@@ -15,8 +15,11 @@ use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
+use ::storage::bytes_to_hex;
+use std::fmt;
 
 pub use hex::{ToHex, FromHex, FromHexError};
+const BYTES_IN_DEBUG: usize = 4;
 
 pub fn sign(m: &[u8], secret_key: &SecretKey) -> Signature {
     let sodium_signature = sign_detached(m, &secret_key.0);
@@ -44,41 +47,60 @@ pub fn hash(m: &[u8]) -> Hash {
 
 macro_rules! implement_public_sodium_wrapper {
     ($name:ident, $name_from:ident, $size:expr) => (
-        #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash, Debug)]
-        pub struct $name($name_from); 
+    #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
+    pub struct $name($name_from); 
 
-        impl $name {
-            pub fn new(ba: [u8; $size]) -> $name {
-                $name($name_from(ba))
-            }
+    impl $name {
+        pub fn new(ba: [u8; $size]) -> $name {
+            $name($name_from(ba))
+        }
 
-            pub fn from_slice(bs: &[u8]) -> Option<$name> {
-                $name_from::from_slice(bs).map($name)
-            }
+        pub fn from_slice(bs: &[u8]) -> Option<$name> {
+            $name_from::from_slice(bs).map($name)
         }
-        impl AsRef<[u8]> for $name {
-            fn as_ref(&self) -> &[u8] {
-                self.0.as_ref()
-            }
+    }
+    impl AsRef<[u8]> for $name {
+        fn as_ref(&self) -> &[u8] {
+            self.0.as_ref()
         }
-        )
+    }
+
+    impl fmt::Debug for $name {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let inner = &self.0; 
+            let slice = &inner.0; 
+            let hex_bytes = bytes_to_hex(&slice[0..BYTES_IN_DEBUG]); 
+            let type_str = stringify!($name); 
+            write!(f, "\"{}({}...)\"",type_str, hex_bytes)
+        }
+    }
+    )
 }
 
 macro_rules! implement_private_sodium_wrapper {
     ($name:ident, $name_from:ident, $size:expr) => (
-        #[derive(Clone, PartialEq, Eq, Debug)]
-        pub struct $name($name_from); 
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct $name($name_from); 
 
-        impl $name {
-            pub fn new(ba: [u8; $size]) -> $name {
-                $name($name_from(ba))
-            }
-
-            pub fn from_slice(bs: &[u8]) -> Option<$name> {
-                $name_from::from_slice(bs).map($name)
-            }
+    impl $name {
+        pub fn new(ba: [u8; $size]) -> $name {
+            $name($name_from(ba))
         }
-        )
+
+        pub fn from_slice(bs: &[u8]) -> Option<$name> {
+            $name_from::from_slice(bs).map($name)
+        }
+    }
+    impl fmt::Debug for $name {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let inner = &self.0; 
+            let slice = &inner.0; 
+            let hex_bytes = bytes_to_hex(&slice[0..BYTES_IN_DEBUG]); 
+            let type_str = stringify!($name); 
+            write!(f, "\"{}({}...)\"",type_str, hex_bytes)
+        }
+    }
+    )
 }
 
 implement_public_sodium_wrapper! {PublicKey, PublicKeySodium, PUBLIC_KEY_LENGTH}
@@ -86,6 +108,12 @@ implement_public_sodium_wrapper! {Hash, Digest, HASH_SIZE}
 implement_public_sodium_wrapper! {Signature, SignatureSodium, SIGNATURE_LENGTH}
 implement_private_sodium_wrapper! {SecretKey, SecretKeySodium, SECRET_KEY_LENGTH}
 implement_private_sodium_wrapper! {Seed, SeedSodium, SEED_LENGTH}
+
+impl Hash {
+    pub fn zero() -> Self {
+        Hash::new([0; HASH_SIZE])
+    }
+}
 
 pub trait HexValue: Sized {
     fn to_hex(&self) -> String;
@@ -208,6 +236,8 @@ mod tests {
         let h = hash(&[]);
         let h1 = Hash::from_hex(h.to_hex()).unwrap();
         assert_eq!(h1, h);
+        let h = Hash::zero();
+        assert_eq!(*h.as_ref(), [0; 32]);
     }
 
     #[test]
@@ -224,30 +254,35 @@ mod tests {
         let h = Hash::new([207; 32]);
         let json_h = serde_json::to_string(&h).unwrap();
         println!("{}", json_h);
+        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
 
         let h = PublicKey::new([208; 32]);
         let json_h = serde_json::to_string(&h).unwrap();
         println!("{}", json_h);
+        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
 
         let h = Signature::new([209; 64]);
         let json_h = serde_json::to_string(&h).unwrap();
         println!("{}", json_h);
+        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
 
         let h = Seed::new([210; 32]);
         let json_h = serde_json::to_string(&h).unwrap();
         println!("{}", json_h);
+        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
 
         let h = SecretKey::new([211; 64]);
         let json_h = serde_json::to_string(&h).unwrap();
         println!("{}", json_h);
+        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
     }
