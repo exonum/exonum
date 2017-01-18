@@ -405,11 +405,16 @@ impl<S> NodeHandler<S>
 
         // Merge changes into storage
         let (propose_round, commited_txs, new_txs) = {
-            let block_state = self.state.block(&block_hash).unwrap();
-            let patch = block_state.patch();
-            let txs = self.blockchain.commit(block_hash, patch, precommits).unwrap();
+            let (txs_count, propose_round) = {
+                let block_state = self.state.block(&block_hash).unwrap();
+                (block_state.txs().len(), block_state.propose_round())
+            };
 
-            (block_state.propose_round(), block_state.txs().len(), txs)
+            let txs = self.blockchain
+                .commit(&mut self.state, block_hash, precommits)
+                .unwrap();
+
+            (propose_round, txs_count, txs)
         };
 
         for tx in new_txs {

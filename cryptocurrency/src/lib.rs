@@ -25,6 +25,7 @@ use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List,
                       View as StorageView};
 use exonum::blockchain::{Service, Transaction};
+use exonum::node::State;
 
 use wallet::{Wallet, WalletId};
 
@@ -288,7 +289,10 @@ impl Service for CurrencyService {
         CurrencyTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
-    fn handle_commit(&self, _: &StorageView) -> Result<Vec<Box<Transaction>>, Error> {
+    fn handle_commit(&self,
+                     _: &StorageView,
+                     _: &mut State)
+                     -> Result<Vec<Box<Transaction>>, Error> {
         Ok(Vec::new())
     }
 }
@@ -299,11 +303,28 @@ mod tests {
     use tempdir::TempDir;
 
     use exonum::crypto::gen_keypair;
-    use exonum::storage::{LevelDB, LevelDBOptions};
+    use exonum::storage::Storage;
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::messages::Message;
 
     use super::{CurrencyTx, CurrencyService, CurrencySchema, TxCreateWallet, TxIssue, TxTransfer};
+
+    #[cfg(feature="memorydb")]
+    fn create_db() -> Storage {
+        use exonum::storage::MemoryDB;
+
+        MemoryDB::new()
+    }
+
+    #[cfg(not(feature="memorydb"))]
+    fn create_db() -> Storage {
+        use exonum::storage::{LevelDB, LevelDBOptions};
+
+        let mut options = LevelDBOptions::new();
+        options.create_if_missing = true;
+        let dir = TempDir::new("cryptocurrency").unwrap();
+        LevelDB::new(dir.path(), options).unwrap()
+    }
 
     #[test]
     fn test_tx_create_wallet() {
@@ -329,10 +350,7 @@ mod tests {
 
     #[test]
     fn test_wallet_history() {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let dir = TempDir::new("cryptocurrency").unwrap();
-        let db = LevelDB::new(dir.path(), options).unwrap();
+        let db = create_db();
         let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
 
         let v = b.view();

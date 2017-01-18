@@ -4,6 +4,7 @@ use ::blockchain::{Service, Transaction, Schema};
 use ::crypto::{PublicKey, Hash, hash};
 use ::messages::{RawMessage, Message, RawTransaction, Error as MessageError};
 use ::storage::{View, Map, MerklePatriciaTable, MapTable, Result as StorageResult};
+use ::node::State;
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
@@ -246,7 +247,7 @@ impl Service for ConfigurationService {
     fn handle_genesis_block(&self, _: &View) -> StorageResult<()> {
         Ok(())
     }
-    fn handle_commit(&self, _: &View) -> StorageResult<Vec<Box<Transaction>>> {
+    fn handle_commit(&self, _: &View, _: &mut State) -> StorageResult<Vec<Box<Transaction>>> {
         Ok(Vec::new())
     }
 }

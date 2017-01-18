@@ -13,6 +13,7 @@ use vec_map::VecMap;
 
 use ::crypto::{Hash, hash};
 use ::messages::{RawMessage, Precommit};
+use ::node::State;
 
 use ::storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
 
@@ -159,15 +160,19 @@ impl Blockchain {
     }
 
     pub fn commit<'a, I>(&self,
+                         state: &mut State,
                          block_hash: Hash,
-                         patch: &Patch,
                          precommits: I)
                          -> Result<Vec<Box<Transaction>>, Error>
         where I: Iterator<Item = &'a Precommit>
     {
         let (patch, txs) = {
-            let view = self.db.fork();
-            view.merge(patch);
+            let view = {
+                let patch = state.block(&block_hash).unwrap().patch();
+                let view = self.db.fork();
+                view.merge(patch);
+                view
+            };
 
             let schema = Schema::new(&view);
             for precommit in precommits {
@@ -177,7 +182,7 @@ impl Blockchain {
             // create special txs like anchoring or fee
             let mut txs = Vec::new();
             for service in self.service_map.values() {
-                let t = service.handle_commit(&view)?;
+                let t = service.handle_commit(&view, state)?;
                 txs.extend_from_slice(&t);
             }
 
