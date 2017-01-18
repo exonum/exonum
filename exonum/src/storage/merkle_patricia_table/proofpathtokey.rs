@@ -227,7 +227,7 @@ impl<V: fmt::Debug> ProofPathToKey<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                let ref unboxed = **leaf_proof;
+                let unboxed = &(**leaf_proof);
                 match *unboxed {
                     Leaf(ref root_val) => Some(root_val), 
                     _ => {
