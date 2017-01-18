@@ -4,7 +4,7 @@ use byteorder::{ByteOrder, BigEndian};
 use super::Error;
 
 use ::crypto::{Hash, hash};
-use ::messages::{RawMessage, MessageBuffer, Message, AnyTx};
+use ::messages::{RawMessage, MessageBuffer, Message};
 use serde::Deserialize;
 use serde_json::Value;
 use serde_json::value::from_value;
