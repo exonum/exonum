@@ -4,7 +4,7 @@ use byteorder::{ByteOrder, BigEndian};
 use super::Error;
 
 use ::crypto::{Hash, hash};
-use ::messages::{MessageBuffer, Message, AnyTx};
+use ::messages::{RawMessage, MessageBuffer, Message, AnyTx};
 use serde::Deserialize;
 use serde_json::Value;
 use serde_json::value::from_value;
@@ -116,19 +116,19 @@ impl StorageValue for Hash {
     }
 }
 
-// impl StorageValue for RawMessage {
-//     fn serialize(self) -> Vec<u8> {
-//         self.as_ref().as_ref().to_vec()
-//     }
+impl StorageValue for RawMessage {
+    fn serialize(self) -> Vec<u8> {
+        self.as_ref().as_ref().to_vec()
+    }
 
-//     fn deserialize(v: Vec<u8>) -> Self {
-//         Arc::new(MessageBuffer::from_vec(v))
-//     }
+    fn deserialize(v: Vec<u8>) -> Self {
+        Arc::new(MessageBuffer::from_vec(v))
+    }
 
-//     fn hash(&self) -> Hash {
-//         self.as_ref().hash()
-//     }
-// }
+    fn hash(&self) -> Hash {
+        self.as_ref().hash()
+    }
+}
 
 impl<T> StorageValue for T
     where T: Message
@@ -143,23 +143,6 @@ impl<T> StorageValue for T
 
     fn hash(&self) -> Hash {
         <Self as Message>::hash(self)
-    }
-}
-
-impl<AppTx> StorageValue for AnyTx<AppTx>
-    where AppTx: Message
-{
-    fn serialize(self) -> Vec<u8> {
-        self.raw().as_ref().as_ref().to_vec()
-    }
-
-    fn deserialize(v: Vec<u8>) -> Self {
-        let raw = Arc::new(MessageBuffer::from_vec(v));
-        Self::from_raw(raw).unwrap()
-    }
-
-    fn hash(&self) -> Hash {
-        self.hash()
     }
 }
 

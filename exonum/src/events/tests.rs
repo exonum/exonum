@@ -178,7 +178,7 @@ impl TestEvents {
 }
 
 pub fn gen_message(id: u16, len: usize) -> RawMessage {
-    let writer = MessageWriter::new(id, len);
+    let writer = MessageWriter::new(0, id, len);
     RawMessage::new(writer.sign(&gen_keypair().1))
 }
 

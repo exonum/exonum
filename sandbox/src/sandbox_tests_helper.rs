@@ -12,11 +12,10 @@ use super::timestamping_sandbox;
 use super::sandbox::Sandbox;
 use super::TimestampingTxGenerator;
 use exonum::storage::MemoryDB;
-use timestamping::TimestampingBlockchain;
 use timestamping::TimestampTx;
 
 type Transaction = TimestampTx;
-pub type TimestampingSandbox = Sandbox<TimestampingBlockchain<MemoryDB>, TimestampingTxGenerator>;
+pub type TimestampingSandbox = Sandbox;
 
 pub const HEIGHT_ZERO: u64 = 0;
 pub const HEIGHT_ONE: u64 = 1;

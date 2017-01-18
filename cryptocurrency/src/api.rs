@@ -1,11 +1,11 @@
 use serde::{Serialize, Serializer};
 
 use exonum::crypto::{HexValue, PublicKey};
-use exonum::storage::{Database, Result as StorageResult};
-use exonum::blockchain::{Blockchain, GenesisConfig};
+use exonum::storage::{Result as StorageResult, View as StorageView};
+use exonum::blockchain::GenesisConfig;
 use blockchain_explorer::{BlockchainExplorer, TransactionInfo};
 
-use super::{CurrencyTx, CurrencyBlockchain};
+use super::{CurrencyTx, CurrencySchema};
 use super::wallet::{Wallet, WalletId};
 
 impl Serialize for CurrencyTx {
@@ -64,28 +64,27 @@ impl Serialize for WalletInfo {
     }
 }
 
-pub struct CurrencyApi<D: Database> {
-    blockchain: CurrencyBlockchain<D>,
+pub struct CurrencyApi<'a> {
+    view: &'a StorageView,
     cfg: GenesisConfig,
 }
 
-impl<D: Database> CurrencyApi<D> {
-    pub fn new(b: CurrencyBlockchain<D>, cfg: GenesisConfig) -> CurrencyApi<D> {
+impl<'a> CurrencyApi<'a> {
+    pub fn new(v: &'a StorageView, cfg: GenesisConfig) -> CurrencyApi {
         CurrencyApi {
-            blockchain: b,
+            view: v,
             cfg: cfg,
         }
     }
 
     pub fn wallet_info(&self, pub_key: &PublicKey) -> StorageResult<Option<WalletInfo>> {
-        let view = self.blockchain.view();
-        if let Some((id, wallet)) = view.wallet(pub_key)? {
-            let history = view.wallet_history(id).values()?;
+        let schema = CurrencySchema::new(self.view);
+        if let Some((id, wallet)) = schema.wallet(pub_key)? {
+            let history = schema.wallet_history(id).values()?;
             let txs = {
                 let mut v = Vec::new();
 
-                let explorer =
-                    BlockchainExplorer::<CurrencyBlockchain<D>>::from_view(view, self.cfg.clone());
+                let explorer = BlockchainExplorer::new(self.view, self.cfg.clone());
                 for hash in history {
                     if let Some(tx_info) = explorer.tx_info::<CurrencyTx>(&hash)? {
                         v.push(tx_info)

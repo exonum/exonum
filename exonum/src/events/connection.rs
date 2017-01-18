@@ -35,7 +35,7 @@ impl MessageReader {
     }
 
     pub fn total_len(&self) -> usize {
-        LittleEndian::read_u32(&self.raw[4..8]) as usize
+        LittleEndian::read_u32(&self.raw[6..10]) as usize
     }
 
     pub fn allocate(&mut self) -> io::Result<()> {

@@ -6,16 +6,11 @@ extern crate blockchain_explorer;
 
 use clap::App;
 
-use exonum::node::{Node, NodeConfig};
+use exonum::node::Node;
 use exonum::blockchain::Blockchain;
 
-use timestamping::TimestampingBlockchain;
-use blockchain_explorer::helpers::{GenerateCommand, RunCommand, DatabaseType};
-
-fn run_node<B: Blockchain>(blockchain: B, node_cfg: NodeConfig) {
-    let mut node = Node::new(blockchain, node_cfg);
-    node.run().unwrap();
-}
+use timestamping::TimestampingService;
+use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
 
 fn main() {
     exonum::crypto::init();
@@ -33,10 +28,11 @@ fn main() {
         ("generate", Some(matches)) => GenerateCommand::execute(matches),
         ("run", Some(matches)) => {
             let node_cfg = RunCommand::node_config(matches);
-            match RunCommand::db(matches) {
-                DatabaseType::LevelDB(db) => run_node(TimestampingBlockchain { db: db }, node_cfg),
-                DatabaseType::MemoryDB(db) => run_node(TimestampingBlockchain { db: db }, node_cfg),
-            }
+            let db = RunCommand::db(matches);
+
+            let blockchain = Blockchain::new(db, vec![Box::new(TimestampingService::new())]);
+            let mut node = Node::new(blockchain, node_cfg);
+            node.run().unwrap();
         }
         _ => {
             unreachable!("Wrong subcommand");

@@ -5,11 +5,11 @@ use std::net::SocketAddr;
 use time::Duration;
 
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
-                             BitVec, AnyTx};
+                             BitVec};
 
 use super::super::crypto::{PublicKey, Hash};
 use super::super::storage::Patch;
-use blockchain::{ConsensusConfig, StoredConfiguration};
+use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
 
 // TODO: replace by in disk tx pool
 const TX_POOL_LIMIT: usize = 20000;
@@ -28,9 +28,7 @@ pub type ValidatorId = u32;
 
 // TODO: reduce copying of Hash
 
-pub struct State<AppTx>
-    where AppTx: Message
-{
+pub struct State {
     id: u32,
     validators: Vec<PublicKey>,
     consensus_config: ConsensusConfig,
@@ -50,7 +48,7 @@ pub struct State<AppTx>
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
     // TODO replace by TxPool
-    transactions: HashMap<Hash, AnyTx<AppTx>>,
+    transactions: HashMap<Hash, Box<Transaction>>,
 
     queued: Vec<ConsensusMessage>,
 
@@ -252,9 +250,7 @@ impl BlockState {
     }
 }
 
-impl<AppTx> State<AppTx>
-    where AppTx: Message
-{
+impl State {
     fn update_config(&mut self, config: StoredConfiguration) {
 
         let id = config.validators
@@ -273,7 +269,7 @@ impl<AppTx> State<AppTx>
                last_hash: Hash,
                last_height: u64,
                consensus_config: ConsensusConfig)
-               -> State<AppTx> {
+               -> State {
 
         let validators_len = validators.len();
 
@@ -463,11 +459,11 @@ impl<AppTx> State<AppTx>
         self.queued.push(msg);
     }
 
-    pub fn transactions(&self) -> &HashMap<Hash, AnyTx<AppTx>> {
+    pub fn transactions(&self) -> &HashMap<Hash, Box<Transaction>> {
         &self.transactions
     }
 
-    pub fn add_transaction(&mut self, tx_hash: Hash, msg: AnyTx<AppTx>) -> Vec<(Hash, Round)> {
+    pub fn add_transaction(&mut self, tx_hash: Hash, msg: Box<Transaction>) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
             propose_state.unknown_txs.remove(&tx_hash);
