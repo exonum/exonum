@@ -8,21 +8,22 @@ use std::ops::Drop;
 use time::{Timespec, Duration};
 
 use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig};
-use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration};
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
+                         Schema, Transaction};
 use exonum::storage::{MemoryDB, Error as StorageError};
-use exonum::messages::{Any, Message, RawMessage, Connect};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      Channel, EventHandler, Result as EventsResult};
 use exonum::crypto::{Hash, PublicKey, SecretKey, gen_keypair};
 use exonum::node::state::{Round, Height};
 
-use timestamping::TimestampingBlockchain;
+use timestamping::{TimestampingService, TimestampTx};
 
 use super::TimestampingTxGenerator;
 
 #[derive(PartialEq, Eq)]
 struct TimerPair(Timespec, NodeTimeout);
-type SandboxEvent<B> = InternalEvent<ExternalMessage<B>, NodeTimeout>;
+type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
 
 impl PartialOrd for TimerPair {
     fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
@@ -36,26 +37,26 @@ impl Ord for TimerPair {
     }
 }
 
-struct SandboxInner<B: Blockchain> {
+struct SandboxInner {
     address: SocketAddr,
     time: Timespec,
     sended: VecDeque<(SocketAddr, RawMessage)>,
-    events: VecDeque<SandboxEvent<B>>,
+    events: VecDeque<SandboxEvent>,
     timers: BinaryHeap<TimerPair>,
 }
 
-pub struct SandboxReactor<B: Blockchain> {
-    inner: Arc<Mutex<SandboxInner<B>>>,
-    handler: NodeHandler<B, SandboxChannel<B>>,
+pub struct SandboxReactor {
+    inner: Arc<Mutex<SandboxInner>>,
+    handler: NodeHandler<SandboxChannel>,
 }
 
 #[derive(Clone)]
-pub struct SandboxChannel<B: Blockchain> {
-    inner: Arc<Mutex<SandboxInner<B>>>,
+pub struct SandboxChannel {
+    inner: Arc<Mutex<SandboxInner>>,
 }
 
-impl<B: Blockchain> SandboxChannel<B> {
-    fn send_event(&self, event: SandboxEvent<B>) {
+impl SandboxChannel {
+    fn send_event(&self, event: SandboxEvent) {
         self.inner.lock().unwrap().events.push_back(event);
     }
 
@@ -64,10 +65,8 @@ impl<B: Blockchain> SandboxChannel<B> {
     }
 }
 
-impl<B> Channel for SandboxChannel<B>
-    where B: Blockchain
-{
-    type ApplicationEvent = ExternalMessage<B>;
+impl Channel for SandboxChannel {
+    type ApplicationEvent = ExternalMessage;
     type Timeout = NodeTimeout;
 
     fn address(&self) -> SocketAddr {
@@ -101,10 +100,8 @@ impl<B> Channel for SandboxChannel<B>
     }
 }
 
-impl<B> Reactor<NodeHandler<B, SandboxChannel<B>>> for SandboxReactor<B>
-    where B: Blockchain
-{
-    type Channel = SandboxChannel<B>;
+impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
+    type Channel = SandboxChannel;
 
     fn bind(&mut self) -> ::std::io::Result<()> {
         Ok(())
@@ -134,14 +131,12 @@ impl<B> Reactor<NodeHandler<B, SandboxChannel<B>>> for SandboxReactor<B>
     fn get_time(&self) -> Timespec {
         self.inner.lock().unwrap().time
     }
-    fn channel(&self) -> SandboxChannel<B> {
+    fn channel(&self) -> SandboxChannel {
         SandboxChannel { inner: self.inner.clone() }
     }
 }
 
-impl<B> SandboxReactor<B>
-    where B: Blockchain
-{
+impl SandboxReactor {
     pub fn is_leader(&self) -> bool {
         self.handler.is_leader()
     }
@@ -155,7 +150,9 @@ impl<B> SandboxReactor<B>
     }
 
     pub fn actual_config(&self) -> Result<StoredConfiguration, StorageError> {
-        B::get_actual_configuration(&self.handler.blockchain.view())
+        let view = self.handler.blockchain.view();
+        let schema = Schema::new(&view);
+        schema.get_actual_configuration()
     }
 
     pub fn handle_message(&mut self, msg: RawMessage) {
@@ -168,21 +165,15 @@ impl<B> SandboxReactor<B>
     }
 }
 
-pub struct Sandbox<B, G>
-    where B: Blockchain,
-          G: Iterator<Item = B::Transaction>
-{
-    inner: Arc<Mutex<SandboxInner<B>>>,
-    reactor: RefCell<SandboxReactor<B>>,
-    tx_generator: RefCell<G>,
+pub struct Sandbox {
+    inner: Arc<Mutex<SandboxInner>>,
+    reactor: RefCell<SandboxReactor>,
+    tx_generator: RefCell<TimestampingTxGenerator>,
     validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
 }
 
-impl<B, G> Sandbox<B, G>
-    where B: Blockchain,
-          G: Iterator<Item = B::Transaction>
-{
+impl Sandbox {
     fn initialize(&self) {
         let connect = Connect::new(self.p(0), self.a(0), self.time(), self.s(0));
 
@@ -201,23 +192,27 @@ impl<B, G> Sandbox<B, G>
     fn check_unexpected_message(&self) {
         let sended = self.inner.lock().unwrap().sended.pop_front();
         if let Some((addr, msg)) = sended {
-            let any_msg = Any::<B::Transaction>::from_raw(msg.clone())
-                .expect("Send incorrect message");
+            let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
     }
 
-    pub fn gen_tx(&self) -> B::Transaction {
+    pub fn gen_tx(&self) -> TimestampTx {
         self.tx_generator.borrow_mut().next().unwrap()
     }
 
-    pub fn gen_txs(&self, count: usize) -> Vec<B::Transaction> {
+    pub fn gen_txs(&self, count: usize) -> Vec<TimestampTx> {
         let mut v = Vec::new();
         let mut tx_generator = self.tx_generator.borrow_mut();
         for _ in 0..count {
             v.push(tx_generator.next().unwrap())
         }
         v
+    }
+
+    pub fn tx_from_raw(&self, raw: RawTransaction) -> Option<Box<Transaction>> {
+        let reactor = self.reactor.borrow_mut();
+        reactor.handler.blockchain.tx_from_raw(raw)
     }
 
     pub fn p(&self, id: usize) -> &PublicKey {
@@ -248,7 +243,7 @@ impl<B, G> Sandbox<B, G>
     }
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
-        let any_expected_msg = Any::<B::Transaction>::from_raw(msg.raw().clone()).unwrap();
+        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
         let sended = self.inner.lock().unwrap().sended.pop_front();
         if let Some((real_addr, real_msg)) = sended {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
@@ -268,7 +263,7 @@ impl<B, G> Sandbox<B, G>
 
     // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
-        let any_expected_msg = Any::<B::Transaction>::from_raw(msg.raw().clone()).unwrap();
+        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
         let mut set = HashSet::from_iter(self.addresses
             .iter()
             .skip(1)
@@ -409,10 +404,7 @@ impl<B, G> Sandbox<B, G>
     }
 }
 
-impl<B, G> Drop for Sandbox<B, G>
-    where B: Blockchain,
-          G: Iterator<Item = B::Transaction>
-{
+impl Drop for Sandbox {
     fn drop(&mut self) {
         if !::std::thread::panicking() {
             self.check_unexpected_message();
@@ -420,17 +412,16 @@ impl<B, G> Drop for Sandbox<B, G>
     }
 }
 
-pub fn timestamping_sandbox
-    ()
-    -> Sandbox<TimestampingBlockchain<MemoryDB>, TimestampingTxGenerator>
-{
+pub fn timestamping_sandbox() -> Sandbox {
     let validators = vec![gen_keypair(), gen_keypair(), gen_keypair(), gen_keypair()];
     let addresses = vec!["1.1.1.1:1".parse().unwrap(),
                          "2.2.2.2:2".parse().unwrap(),
                          "3.3.3.3:3".parse().unwrap(),
                          "4.4.4.4:4".parse().unwrap()]: Vec<SocketAddr>;
 
-    let blockchain = TimestampingBlockchain { db: MemoryDB::new() };
+    let db = MemoryDB::new();
+    let blockchain = Blockchain::new(db, vec![Box::new(TimestampingService::new())]);
+
     let consensus = ConsensusConfig {
         round_timeout: 1000,
         status_timeout: 50000,

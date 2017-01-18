@@ -19,9 +19,9 @@ mod utils;
 pub use leveldb::options::Options as LevelDBOptions;
 pub use leveldb::database::cache::Cache as LevelDBCache;
 
-pub use self::leveldb::LevelDB;
+pub use self::leveldb::{LevelDB, LevelDBView};
 pub use self::db::{Database, Patch, Fork, Change};
-pub use self::memorydb::MemoryDB;
+pub use self::memorydb::{MemoryDB, MemoryDBView};
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::fields::{StorageValue, HeightBytes};
@@ -84,3 +84,22 @@ impl error::Error for Error {
         &self.message
     }
 }
+
+#[cfg(not(feature="memorydb"))]
+mod details {
+    use super::{LevelDB, LevelDBView};
+
+    pub type Storage = LevelDB;
+    pub type View = LevelDBView;
+}
+
+#[cfg(feature="memorydb")]
+mod details {
+    use super::{MemoryDB, MemoryDBView};
+
+    pub type Storage = MemoryDB;
+    pub type View = MemoryDBView;
+}
+
+pub type Storage = details::Storage;
+pub type View = details::View;

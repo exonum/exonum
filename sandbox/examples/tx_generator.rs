@@ -14,9 +14,10 @@ use clap::{Arg, App};
 
 use exonum::node::{Node, NodeConfig};
 use exonum::storage::Database;
+use exonum::blockchain::Blockchain;
 
-use timestamping::TimestampingBlockchain;
-use blockchain_explorer::helpers::{RunCommand, DatabaseType};
+use timestamping::TimestampingService;
+use blockchain_explorer::helpers::RunCommand;
 
 use sandbox::TimestampingTxGenerator;
 
@@ -27,9 +28,7 @@ struct TxGeneratorConfig {
     tx_timeout: u64,
 }
 
-fn run_node<D: Database>(blockchain: TimestampingBlockchain<D>,
-                         node_cfg: NodeConfig,
-                         tx_gen_cfg: TxGeneratorConfig) {
+fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, tx_gen_cfg: TxGeneratorConfig) {
     let mut node = Node::new(blockchain.clone(), node_cfg);
     let chan = node.channel();
     let mut tx_gen = TimestampingTxGenerator::new(tx_gen_cfg.tx_size);
@@ -96,14 +95,10 @@ fn main() {
                 tx_timeout: matches.value_of("TX_TIMEOUT").unwrap_or("1000").parse().unwrap(),
             };
             let node_cfg = RunCommand::node_config(matches);
-            match RunCommand::db(matches) {
-                DatabaseType::LevelDB(db) => {
-                    run_node(TimestampingBlockchain { db: db }, node_cfg, tx_gen_cfg)
-                }
-                DatabaseType::MemoryDB(db) => {
-                    run_node(TimestampingBlockchain { db: db }, node_cfg, tx_gen_cfg)
-                }
-            }
+            let db = RunCommand::db(matches);
+
+            let blockchain = Blockchain::new(db, vec![Box::new(TimestampingService::new())]);
+            run_node(blockchain, node_cfg, tx_gen_cfg);
         }
         _ => {
             unreachable!("Wrong subcommand");

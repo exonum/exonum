@@ -4,6 +4,8 @@ use super::super::crypto::{Hash, PublicKey};
 use super::{RawMessage, BitVec};
 use super::super::blockchain;
 
+pub const CONSENSUS: u16 = 0;
+
 pub const CONNECT_MESSAGE_ID: u16 = 0;
 pub const STATUS_MESSAGE_ID: u16 = 1;
 
@@ -19,12 +21,10 @@ pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 11;
 
-pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 12;
-pub const CONFIG_VOTE_MESSAGE_ID: u16 = 13;
-
 // когда присоединяются узлы
 message! {
     Connect {
+        const TYPE = CONSENSUS;
         const ID = CONNECT_MESSAGE_ID;
         const SIZE = 46;
 
@@ -37,6 +37,7 @@ message! {
 // консенсус
 message! {
     Propose {
+        const TYPE = CONSENSUS;
         const ID = PROPOSE_MESSAGE_ID;
         const SIZE = 64;
 
@@ -52,6 +53,7 @@ message! {
 // консенсус
 message! {
     Prevote {
+        const TYPE = CONSENSUS;
         const ID = PREVOTE_MESSAGE_ID;
         const SIZE = 52;
 
@@ -66,6 +68,7 @@ message! {
 // консенсус
 message! {
     Precommit {
+        const TYPE = CONSENSUS;
         const ID = PRECOMMIT_MESSAGE_ID;
         const SIZE = 84;
 
@@ -80,6 +83,7 @@ message! {
 // сообщение о текущем состоянии
 message! {
     Status {
+        const TYPE = CONSENSUS;
         const ID = STATUS_MESSAGE_ID;
         const SIZE = 44;
 
@@ -92,6 +96,7 @@ message! {
 // ответ на requestblock
 message! {
     Block {
+        const TYPE = CONSENSUS;
         const ID = BLOCK_MESSAGE_ID;
         const SIZE = 96;
 
@@ -107,6 +112,7 @@ message! {
 // запрос на получение предложения
 message! {
     RequestPropose {
+        const TYPE = CONSENSUS;
         const ID = REQUEST_PROPOSE_MESSAGE_ID;
         const SIZE = 112;
 
@@ -121,6 +127,7 @@ message! {
 // запрос транзакций по списку hash
 message! {
     RequestTransactions {
+        const TYPE = CONSENSUS;
         const ID = REQUEST_TRANSACTIONS_MESSAGE_ID;
         const SIZE = 80;
 
@@ -134,6 +141,7 @@ message! {
 // запрос prevotes
 message! {
     RequestPrevotes {
+        const TYPE = CONSENSUS;
         const ID = REQUEST_PREVOTES_MESSAGE_ID;
         const SIZE = 124;
 
@@ -149,6 +157,7 @@ message! {
 // запрос прекоммитов
 message! {
     RequestPrecommits {
+        const TYPE = CONSENSUS;
         const ID = REQUEST_PRECOMMITS_MESSAGE_ID;
         const SIZE = 156;
 
@@ -166,6 +175,7 @@ message! {
 // запрос узлов с которыми соединён
 message! {
     RequestPeers {
+        const TYPE = CONSENSUS;
         const ID = REQUEST_PEERS_MESSAGE_ID;
         const SIZE = 72;
 
@@ -177,6 +187,7 @@ message! {
 // запрос блоков
 message! {
     RequestBlock {
+        const TYPE = CONSENSUS;
         const ID = REQUEST_BLOCK_MESSAGE_ID;
         const SIZE = 80;
 
@@ -184,30 +195,5 @@ message! {
         to:             &PublicKey  [32 => 64]
         time:           Timespec    [64 => 72]
         height:         u64         [72 => 80]
-    }
-}
-
-message! {
-    ConfigPropose {
-        const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 56; 
-
-        from:           &PublicKey  [00 => 32]
-        height:         u64         [32 => 40]
-        config:        &[u8]        [40 => 48] // serialized config bytes
-        actual_from_height: u64     [48 => 56] // с какой высоты становится актуальным
-    }
-}
-
-message! {
-    ConfigVote {
-        const ID = CONFIG_VOTE_MESSAGE_ID;
-        const SIZE = 81; 
-        
-        from:           &PublicKey  [00 => 32]
-        height:         u64         [32 => 40]
-        hash_propose:   &Hash       [40 => 72] // hash of transacion we're voting for
-        seed:           u64         [72 => 80] // incremental (1, 2, 3, 4, 5, 6, 7) проверять +1
-        revoke:         bool        [80 => 81] // голос_за=false / отозвать=true
     }
 }

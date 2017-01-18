@@ -1,6 +1,7 @@
 #[macro_export]
 macro_rules! message {
     ($name:ident {
+        const TYPE = $extension:expr;
         const ID = $id:expr;
         const SIZE = $body:expr;
 
@@ -28,7 +29,7 @@ macro_rules! message {
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                let mut writer = MessageWriter::new($id, $body);
+                let mut writer = MessageWriter::new($extension, $id, $body);
                 $(writer.write($field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }

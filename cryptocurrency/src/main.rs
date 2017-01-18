@@ -32,22 +32,21 @@ use valico::json_dsl;
 use hyper::status::StatusCode;
 use rand::{Rng, thread_rng};
 
-use exonum::blockchain::GenesisConfig;
+use exonum::blockchain::{GenesisConfig, Blockchain, Service};
 use exonum::node::{Node, NodeConfig, TxSender, NodeChannel};
-use exonum::storage::Database;
 use exonum::storage::{Result as StorageResult, Error as StorageError};
 use exonum::crypto::{gen_keypair, PublicKey, SecretKey, HexValue, FromHexError};
 use exonum::messages::Message;
 use exonum::events::Error as EventsError;
+use exonum::services::configuration::ConfigurationService;
 
 use blockchain_explorer::ValueNotFound;
-use blockchain_explorer::helpers::{GenerateCommand, RunCommand, DatabaseType};
+use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
 
-use cryptocurrency::{CurrencyBlockchain, CurrencyTx, TxIssue, TxTransfer, TxCreateWallet};
+use cryptocurrency::{CurrencyService, CurrencyTx, TxIssue, TxTransfer, TxCreateWallet};
 use cryptocurrency::api::CurrencyApi;
 
-pub type CurrencyTxSender<B> = TxSender<B, NodeChannel<B>>;
-
+pub type CurrencyTxSender = TxSender<NodeChannel>;
 
 fn save_keypair_in_cookies(storage: &mut CookieJar,
                            public_key: &PublicKey,
@@ -78,16 +77,14 @@ fn load_keypair_from_cookies(storage: &CookieJar) -> StorageResult<(PublicKey, S
     Ok((public_key, secret_key))
 }
 
-fn blockchain_explorer_api<D: Database>(api: &mut Api,
-                                        b: CurrencyBlockchain<D>,
-                                        cfg: GenesisConfig) {
-    blockchain_explorer::make_api::<CurrencyBlockchain<D>, CurrencyTx>(api, b, cfg);
+fn blockchain_explorer_api(api: &mut Api, b: Blockchain, cfg: GenesisConfig) {
+    blockchain_explorer::make_api::<CurrencyTx>(api, b, cfg);
 }
 
-fn cryptocurrency_api<D: Database>(api: &mut Api,
-                                   blockchain: CurrencyBlockchain<D>,
-                                   channel: CurrencyTxSender<CurrencyBlockchain<D>>,
-                                   cfg: GenesisConfig) {
+fn cryptocurrency_api(api: &mut Api,
+                      blockchain: Blockchain,
+                      channel: CurrencyTxSender,
+                      cfg: GenesisConfig) {
     api.namespace("wallets", move |api| {
         let ch = channel.clone();
         api.post("create", move |endpoint| {
@@ -107,7 +104,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                 let tx = TxCreateWallet::new(&public_key, &name, &secret_key);
 
                 let tx_hash = tx.hash().to_hex();
-                match ch.send(CurrencyTx::CreateWallet(tx)) {
+                match ch.send(CurrencyTx::from(tx)) {
                     Ok(_) => {
                         let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
                         client.json(json)
@@ -140,7 +137,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                 let tx = TxIssue::new(&public_key, amount, seed, &secret_key);
 
                 let tx_hash = tx.hash().to_hex();
-                match ch.send(CurrencyTx::Issue(tx)) {
+                match ch.send(CurrencyTx::from(tx)) {
                     Ok(_) => {
                         let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
                         client.json(json)
@@ -177,7 +174,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         let tx = TxTransfer::new(&from_key, &to_key, amount, seed, &secret_key);
 
                         let tx_hash = tx.hash().to_hex();
-                        match ch.send(CurrencyTx::Transfer(tx)) {
+                        match ch.send(CurrencyTx::from(tx)) {
                             Ok(_) => {
                                 let json = &jsonway::object(|json| json.set("tx_hash", tx_hash))
                                     .unwrap();
@@ -205,7 +202,8 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
                         Err(e) => return client.error(e),
                     }
                 };
-                let currency_api = CurrencyApi::<D>::new(b.clone(), c.clone());
+                let view = b.view();
+                let currency_api = CurrencyApi::new(&view, c.clone());
                 match currency_api.wallet_info(&public_key) {
                     Ok(Some(info)) => client.json(&info.to_json()),
                     _ => client.error(StorageError::new("Unable to get wallet info")),
@@ -215,9 +213,7 @@ fn cryptocurrency_api<D: Database>(api: &mut Api,
     });
 }
 
-fn run_node<D: Database>(blockchain: CurrencyBlockchain<D>,
-                         node_cfg: NodeConfig,
-                         port: Option<u16>) {
+fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
     if let Some(port) = port {
         let mut node = Node::new(blockchain.clone(), node_cfg.clone());
         let channel = node.channel();
@@ -327,14 +323,12 @@ fn main() {
         ("run", Some(matches)) => {
             let port: Option<u16> = matches.value_of("HTTP_PORT").map(|x| x.parse().unwrap());
             let node_cfg = RunCommand::node_config(matches);
-            match RunCommand::db(matches) {
-                DatabaseType::LevelDB(db) => {
-                    run_node(CurrencyBlockchain { db: db }, node_cfg, port)
-                }
-                DatabaseType::MemoryDB(db) => {
-                    run_node(CurrencyBlockchain { db: db }, node_cfg, port)
-                }
-            }
+            let db = RunCommand::db(matches);
+
+            let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new()),
+                                                   Box::new(ConfigurationService::new())];
+            let blockchain = Blockchain::new(db, services);
+            run_node(blockchain, node_cfg, port)
         }
         _ => {
             unreachable!("Wrong subcommand");

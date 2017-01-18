@@ -8,7 +8,6 @@
 #![feature(type_ascription)]
 #![feature(slice_concat_ext)]
 #![feature(btree_range, collections_bound)]
-#![feature(proc_macro)]
 
 #[macro_use]
 extern crate log;
@@ -26,6 +25,7 @@ extern crate serde_json;
 extern crate toml;
 extern crate hex;
 extern crate bit_vec;
+extern crate vec_map;
 
 #[cfg(test)]
 extern crate tempdir;
@@ -42,3 +42,4 @@ pub mod node;
 pub mod storage;
 pub mod blockchain;
 pub mod config;
+pub mod services;

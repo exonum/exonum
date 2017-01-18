@@ -4,16 +4,14 @@ use std::net::SocketAddr;
 
 use rand::Rng;
 
-use super::super::blockchain::Blockchain;
 use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
 use super::{NodeHandler, RequestData};
 
 use super::super::events::Channel;
 use super::{ExternalMessage, NodeTimeout};
 
-impl<B, S> NodeHandler<B, S>
-    where B: Blockchain,
-          S: Channel<ApplicationEvent = ExternalMessage<B>, Timeout = NodeTimeout> + Clone
+impl<S> NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
 {
     pub fn handle_message(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
@@ -22,7 +20,7 @@ impl<B, S> NodeHandler<B, S>
         //         return;
         //     }
 
-        let msg = Any::<B::Transaction>::from_raw(raw).unwrap();
+        let msg = Any::from_raw(raw).unwrap();
         match msg {
             Any::Connect(msg) => self.handle_connect(msg),
             Any::Status(msg) => self.handle_status(msg),
