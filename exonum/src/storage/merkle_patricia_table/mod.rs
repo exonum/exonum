@@ -8,7 +8,7 @@ use super::utils::bytes_to_hex;
 
 use ::crypto::{hash, Hash, HASH_SIZE};
 use super::{Map, Error, StorageValue};
-use self::proofpathtokey::ProofPathToKey;
+use self::proofpathtokey::{ProofPathToKey, BitVec};
 
 const BRANCH_KEY_PREFIX: u8 = 00;
 const LEAF_KEY_PREFIX: u8 = 01;
@@ -563,23 +563,33 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
 
     pub fn construct_path_to_key<A: AsRef<[u8]>>(&self,
                                                  searched_key: A)
-                                                 -> Result<Option<ProofPathToKey<V>>, Error> {
+                                                 -> Result<ProofPathToKey<V>, Error> {
         let searched_key = searched_key.as_ref();
         debug_assert_eq!(searched_key.len(), KEY_SIZE);
         let searched_slice = BitSlice::from_bytes(searched_key);
+        let suff_from = 0;
 
         let res: ProofPathToKey<V> = match self.root_node()? {
             Some((root_db_key, Node::Leaf(root_value))) => {
                 if searched_slice.to_db_key() == root_db_key {
-                    ProofPathToKey::LeafRootInclusive(root_db_key, root_value)
+                    let val_proof = ProofPathToKey::Leaf(root_value);
+                    ProofPathToKey::LeafRootInclusive(BitVec::new(root_db_key,
+                                                                  suff_from,
+                                                                  KEY_SIZE * 8),
+                                                      Box::new(val_proof))
                 } else {
-                    ProofPathToKey::LeafRootExclusive(root_db_key, root_value.hash())
+                    ProofPathToKey::LeafRootExclusive(BitVec::new(root_db_key,
+                                                                  suff_from,
+                                                                  KEY_SIZE * 8),
+                                                      root_value.hash())
                 }
             } 
             Some((root_db_key, Node::Branch(branch))) => {
                 let root_slice = BitSlice::from_db_key(&root_db_key);
-                let l_s_db_key = branch.child_slice(ChildKind::Left).to_db_key();
-                let r_s_db_key = branch.child_slice(ChildKind::Right).to_db_key();
+                let l_s = branch.child_slice(ChildKind::Left);
+                let r_s = branch.child_slice(ChildKind::Right);
+                let l_s_db_key = l_s.to_db_key();
+                let r_s_db_key = r_s.to_db_key();
 
                 let c_pr_l = root_slice.common_prefix(&searched_slice);
                 if c_pr_l == root_slice.len() {
@@ -594,20 +604,35 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                             ChildKind::Left => {
                                 ProofPathToKey::LeftBranch(Box::new(child_proof),
                                                            neighbour_child_hash,
-                                                           l_s_db_key,
-                                                           r_s_db_key)
+                                                           BitVec::new(l_s_db_key,
+                                                                       suff_from,
+                                                                       l_s.to as usize),
+                                                           BitVec::new(r_s_db_key,
+                                                                       suff_from,
+                                                                       r_s.to as usize))
                             } 
                             ChildKind::Right => {
                                 ProofPathToKey::RightBranch(neighbour_child_hash,
                                                             Box::new(child_proof),
-                                                            l_s_db_key,
-                                                            r_s_db_key)
+                                                            BitVec::new(l_s_db_key,
+                                                                        suff_from,
+                                                                        l_s.to as usize),
+                                                            BitVec::new(r_s_db_key,
+                                                                        suff_from,
+                                                                        r_s.to as usize))
                             }
                         }
                     } else {
                         let l_h = *branch.child_hash(ChildKind::Left); //copy
                         let r_h = *branch.child_hash(ChildKind::Right);//copy
-                        ProofPathToKey::BranchKeyNotFound(l_h, r_h, l_s_db_key, r_s_db_key)
+                        ProofPathToKey::BranchKeyNotFound(l_h,
+                                                          r_h,
+                                                          BitVec::new(l_s_db_key,
+                                                                      suff_from,
+                                                                      l_s.to as usize),
+                                                          BitVec::new(r_s_db_key,
+                                                                      suff_from,
+                                                                      r_s.to as usize))
                         // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                     }
                 } else {
@@ -615,13 +640,20 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                     let l_h = *branch.child_hash(ChildKind::Left); //copy
                     let r_h = *branch.child_hash(ChildKind::Right);//copy
 
-                    ProofPathToKey::BranchKeyNotFound(l_h, r_h, l_s_db_key, r_s_db_key)
+                    ProofPathToKey::BranchKeyNotFound(l_h,
+                                                      r_h,
+                                                      BitVec::new(l_s_db_key,
+                                                                  suff_from,
+                                                                  l_s.to as usize),
+                                                      BitVec::new(r_s_db_key,
+                                                                  suff_from,
+                                                                  r_s.to as usize))
                     // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
             } 
-            None => return Ok(None),
+            None => return Ok(ProofPathToKey::Empty),
         };
-        Ok(Some(res))
+        Ok(res)
     }
 
     fn construct_path_to_key_in_branch(&self,
@@ -632,6 +664,7 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         let mut child_slice = current_branch.child_slice(searched_slice.at(0));
         child_slice.from = searched_slice.from;
         let c_pr_l = child_slice.common_prefix(searched_slice);
+        let suff_from = (searched_slice.from as usize) + c_pr_l;
         debug_assert!(c_pr_l > 0);
         if c_pr_l < child_slice.len() {
             return Ok(None);
@@ -640,8 +673,10 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
         let res: ProofPathToKey<V> = match self.read_node(child_slice.to_db_key())? {
             Node::Leaf(child_value) => ProofPathToKey::Leaf(child_value), 
             Node::Branch(child_branch) => {
-                let l_s_db_key = child_branch.child_slice(ChildKind::Left).to_db_key();
-                let r_s_db_key = child_branch.child_slice(ChildKind::Right).to_db_key();
+                let l_s = child_branch.child_slice(ChildKind::Left);
+                let r_s = child_branch.child_slice(ChildKind::Right);
+                let l_s_db_key = l_s.to_db_key();
+                let r_s_db_key = r_s.to_db_key();
                 let suf_searched_slice = searched_slice.mid(c_pr_l);
                 let proof_from_level_below: Option<ProofPathToKey<V>> =
                     self.construct_path_to_key_in_branch(&child_branch, &suf_searched_slice)?;
@@ -653,20 +688,35 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
                         ChildKind::Left => {
                             ProofPathToKey::LeftBranch(Box::new(child_proof),
                                                        neighbour_child_hash,
-                                                       l_s_db_key,
-                                                       r_s_db_key)
+                                                       BitVec::new(l_s_db_key,
+                                                                   suff_from,
+                                                                   l_s.to as usize),
+                                                       BitVec::new(r_s_db_key,
+                                                                   suff_from,
+                                                                   r_s.to as usize))
                         }
                         ChildKind::Right => {
                             ProofPathToKey::RightBranch(neighbour_child_hash,
                                                         Box::new(child_proof),
-                                                        l_s_db_key,
-                                                        r_s_db_key)
+                                                        BitVec::new(l_s_db_key,
+                                                                    suff_from,
+                                                                    l_s.to as usize),
+                                                        BitVec::new(r_s_db_key,
+                                                                    suff_from,
+                                                                    r_s.to as usize))
                         } 
                     }
                 } else {
                     let l_h = *child_branch.child_hash(ChildKind::Left); //copy
                     let r_h = *child_branch.child_hash(ChildKind::Right);//copy
-                    ProofPathToKey::BranchKeyNotFound(l_h, r_h, l_s_db_key, r_s_db_key)
+                    ProofPathToKey::BranchKeyNotFound(l_h,
+                                                      r_h,
+                                                      BitVec::new(l_s_db_key,
+                                                                  suff_from,
+                                                                  l_s.to as usize),
+                                                      BitVec::new(r_s_db_key,
+                                                                  suff_from,
+                                                                  r_s.to as usize))
                     // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                 }
             }
@@ -822,8 +872,8 @@ mod tests {
     use rand::{thread_rng, Rng};
 
     use ::crypto::{hash, Hash};
-    use ::storage::fields::DeserializeFromJson;
     use ::storage::{Map, MemoryDB, MapTable};
+    use ::storage::utils::bytes_to_hex;
     use serde_json;
 
     use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX};
@@ -1328,7 +1378,14 @@ mod tests {
         table.delete(&vec![230;32]).unwrap();
 
         let search_res = table.construct_path_to_key(&vec![244; 32]).unwrap();
-        assert!(search_res.is_none());
+        match search_res {
+            ProofPathToKey::Empty => {} 
+            _ => assert!(false),
+        }
+        let json_repre = serde_json::to_string(&search_res).unwrap();
+        println!("thall: {:?}", json_repre);
+
+        assert_eq!(table.root_hash().unwrap(), search_res.compute_proof_root());
     }
 
     #[test]
@@ -1337,73 +1394,48 @@ mod tests {
         let map = MapTable::new(vec![255], &storage);
         let table = MerklePatriciaTable::new(map);
         let root_key = vec![230;32];
-        let root_val = vec![1];
+        let root_val = vec![2];
         let searched_key = vec![244; 32];
 
         table.put(&root_key, root_val.clone()).unwrap();
         let table_root = table.root_hash().unwrap();
-
-        let search_option = table.construct_path_to_key(&searched_key).unwrap();
-        let proof_path = search_option.unwrap();
+        let proof_path = table.construct_path_to_key(&searched_key).unwrap();
         {
             let check_res = verify_proof_consistency(&proof_path, &searched_key, table_root)
                 .unwrap();
             assert!(check_res.is_none());
         }
         let json_repre = serde_json::to_string(&proof_path).unwrap();
-        // println!("{}", json_repre);
-        let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-        let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
-        {
-            let check_res = verify_proof_consistency(&deser_proof, &searched_key, table_root)
-                .unwrap();
-            assert!(check_res.is_none());
-        }
+        println!("{}", json_repre);
 
         match proof_path {
             ProofPathToKey::LeafRootExclusive(key, hash_val) => {
-                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
+                assert_eq!(key.db_key_data, BitSlice::from_bytes(&root_key).to_db_key());
                 assert_eq!(hash_val, hash(&root_val));
             }
             _ => assert!(false),
         }
 
-        match deser_proof {
-            ProofPathToKey::LeafRootExclusive(key, hash_val) => {
-                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
-                assert_eq!(hash_val, hash(&root_val));
-            }
-            _ => assert!(false),
-        }
-
-        let search_option = table.construct_path_to_key(&root_key).unwrap();
-        let proof_path = search_option.unwrap();
+        let proof_path = table.construct_path_to_key(&root_key).unwrap();
+        println!("{:?}", bytes_to_hex(&root_key));
         {
             let check_res = verify_proof_consistency(&proof_path, &root_key, table_root).unwrap();
             assert_eq!(*check_res.unwrap(), root_val);
         }
         let json_repre = serde_json::to_string(&proof_path).unwrap();
-        // println!("{}", json_repre);
-        let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-        let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
-        {
-            let check_res = verify_proof_consistency(&deser_proof, &root_key, table_root).unwrap();
-            assert_eq!(*check_res.unwrap(), root_val);
-        }
+        println!("{}", json_repre);
 
         match proof_path {
-            ProofPathToKey::LeafRootInclusive(key, val) => {
-                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
-                assert_eq!(val, root_val);
-            }
-            _ => assert!(false),
-        }
-
-        match deser_proof {
-            ProofPathToKey::LeafRootInclusive(key, val) => {
-                assert_eq!(key, BitSlice::from_bytes(&root_key).to_db_key());
-                assert_eq!(val, root_val);
-            }
+            ProofPathToKey::LeafRootInclusive(key, val_proof) => {
+                assert_eq!(key.db_key_data, BitSlice::from_bytes(&root_key).to_db_key());
+                let unboxed_pr = *val_proof;
+                match unboxed_pr {
+                    ProofPathToKey::Leaf(val) => {
+                        assert_eq!(val, root_val);
+                    } 
+                    _ => assert!(false), 
+                }
+            } 
             _ => assert!(false),
         }
     }
@@ -1422,20 +1454,15 @@ mod tests {
         let table_root_hash = table.root_hash().unwrap();
 
         for item in &data {
-            let search_res = table.construct_path_to_key(&item.0).unwrap();
-            let proof_path_to_key = search_res.unwrap();
+            let proof_path_to_key = table.construct_path_to_key(&item.0).unwrap();
+            println!("{:?}", bytes_to_hex(&item.0));
+            assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
             let check_res = verify_proof_consistency(&proof_path_to_key, &item.0, table_root_hash);
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert_eq!(*proved_value.unwrap(), item.1);
 
             let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
-            // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
-            let check_res = verify_proof_consistency(&deser_proof, &item.0, table_root_hash);
-            let proved_value: Option<&Vec<u8>> = check_res.unwrap();
-            assert_eq!(*proved_value.unwrap(), item.1);
-            // println!("{:?}", deser_proof);
+            println!("{}", json_repre);
         }
     }
 
@@ -1462,8 +1489,8 @@ mod tests {
         }
         let table_root_hash = table1.root_hash().unwrap();
         for key in &keys_to_remove {
-            let search_res = table1.construct_path_to_key(key).unwrap();
-            let proof_path_to_key = search_res.unwrap();
+            let proof_path_to_key = table1.construct_path_to_key(key).unwrap();
+            println!("{:?}", bytes_to_hex(key));
             assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
             let check_res = verify_proof_consistency(&proof_path_to_key, key, table_root_hash);
             assert!(check_res.is_ok());
@@ -1471,13 +1498,7 @@ mod tests {
             assert!(proved_value.is_none());
 
             let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
-            // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = ProofPathToKey::<Vec<u8>>::deserialize(&data).unwrap();
-            let check_res = verify_proof_consistency(&deser_proof, key, table_root_hash);
-            let proved_value: Option<&Vec<u8>> = check_res.unwrap();
-            assert!(proved_value.is_none());
-            // println!("{:?}", deser_proof);
+            println!("{}", json_repre);
         }
     }
 
