@@ -29,16 +29,18 @@ use serde::de::{Visitor, Deserialize, Deserializer};
 use rustless::json::ToJson;
 use rustless::{Api, Nesting};
 use valico::json_dsl;
-use exonum::messages::{ConfigPropose, ConfigVote};
 
 use exonum::crypto::{Hash, PublicKey, SecretKey, HexValue, ToHex};
 use exonum::storage::Error as StorageError;
 use exonum::messages::RawTransaction;
-use exonum::blockchain::{View, Blockchain};
-use exonum::storage::Map;
-use exonum::node::NodeConfig;
+use exonum::blockchain::{Blockchain, Schema};
+use exonum::services::configuration::ConfigurationSchema;
+use exonum::node::{Node, NodeConfig, NodeChannel, TxSender};
+use exonum::services::configuration::{ConfigTx, TxConfigPropose, TxConfigVote};
 
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
+
+pub type Channel = TxSender<NodeChannel>;
 
 #[derive(Debug)]
 pub struct ValueNotFound(String);
@@ -142,28 +144,28 @@ struct ConfigVoteRequest {
 }
 
 impl ConfigProposeRequest {
-    fn into_tx(&self, pub_key: &PublicKey, sec_key: &SecretKey) -> ConfigPropose {
-        ConfigPropose::new(pub_key,
-                           self.height,
-                           self.config.as_ref(),
-                           self.actual_from_height,
-                           &sec_key)
+    fn into_tx(&self, pub_key: &PublicKey, sec_key: &SecretKey) -> TxConfigPropose {
+        TxConfigPropose::new(pub_key,
+                             self.height,
+                             self.config.as_ref(),
+                             self.actual_from_height,
+                             &sec_key)
     }
 }
 
 impl ConfigVoteRequest {
-    fn into_tx(&self, pub_key: &PublicKey, sec_key: &SecretKey) -> ConfigVote {
-        ConfigVote::new(pub_key,
-                        self.height,
-                        &self.hash_propose,
-                        self.seed,
-                        self.revoke,
-                        &sec_key)
+    fn into_tx(&self, pub_key: &PublicKey, sec_key: &SecretKey) -> TxConfigVote {
+        TxConfigVote::new(pub_key,
+                          self.height,
+                          &self.hash_propose,
+                          self.seed,
+                          self.revoke,
+                          &sec_key)
     }
 }
 
-impl From<ConfigPropose> for ConfigProposeInfo {
-    fn from(src: ConfigPropose) -> ConfigProposeInfo {
+impl From<TxConfigPropose> for ConfigProposeInfo {
+    fn from(src: TxConfigPropose) -> ConfigProposeInfo {
         ConfigProposeInfo {
             from: *src.from(),
             height: src.height(),
@@ -173,24 +175,28 @@ impl From<ConfigPropose> for ConfigProposeInfo {
     }
 }
 
-pub fn make_api<B, T>(api: &mut Api, b: B, cfg: NodeConfig)
-    where B: Blockchain,
-          T: TransactionInfo + From<B::Transaction>
+pub fn make_api<T>(api: &mut Api, b: Blockchain, cfg: NodeConfig)
+    where T: TransactionInfo + From<RawTransaction>
 {
+
+    let node = Node::new(b.clone(), cfg.clone());
+    let channel = node.channel();
+
     api.namespace("blockchain", move |api| {
         api.get("config/actual", |endpoint| {
             let b = b.clone();
             endpoint.summary("Returns actual configuration");
             endpoint.handle(move |client, _| {
-                match B::get_actual_configuration(&b.view()) {
+                match Schema::new(&b.view()).get_actual_configuration() {
                     Ok(config) => client.json(&config.to_json()),
                     Err(e) => client.error(e),
                 }
             })
         });
         api.put("config/propose", |endpoint| {
-            let b = b.clone();
+
             let c = cfg.clone();
+            let ch = channel.clone();
             endpoint.summary("Puts new ConfigPropose");
             endpoint.params(|params| {
                 params.opt_typed("config", json_dsl::string());
@@ -203,8 +209,10 @@ pub fn make_api<B, T>(api: &mut Api, b: B, cfg: NodeConfig)
                         let config_propose =
                             config_propose_request.into_tx(&c.public_key, &c.secret_key);
 
-                        match B::handle_config_propose(&b.view(), &config_propose) {
-                            Ok(tx_hash) => {
+                        let tx = ConfigTx::ConfigPropose(config_propose);
+                        let tx_hash = HexValue::to_hex(&tx.hash());
+                        match ch.send(tx) {
+                            Ok(_) => {
                                 let json = &jsonway::object(|json| json.set("tx_hash", tx_hash))
                                     .unwrap();
                                 client.json(json)
@@ -217,8 +225,9 @@ pub fn make_api<B, T>(api: &mut Api, b: B, cfg: NodeConfig)
             })
         });
         api.put("config/vote", |endpoint| {
-            let b = b.clone();
+
             let c = cfg.clone();
+            let ch = channel.clone();
             endpoint.summary("Puts new ConfigVote");
             endpoint.params(|params| {
                 params.opt_typed("height", json_dsl::u64());
@@ -231,8 +240,11 @@ pub fn make_api<B, T>(api: &mut Api, b: B, cfg: NodeConfig)
                 match from_value::<ConfigVoteRequest>(params.clone()) {
                     Ok(config_vote_request) => {
                         let config_vote = config_vote_request.into_tx(&c.public_key, &c.secret_key);
-                        match B::handle_config_vote(&b.view(), &config_vote) {
-                            Ok(tx_hash) => {
+
+                        let tx = ConfigTx::ConfigVote(config_vote);
+                        let tx_hash = HexValue::to_hex(&tx.hash());
+                        match ch.send(tx) {
+                            Ok(_) => {
                                 let json = &jsonway::object(|json| json.set("tx_hash", tx_hash))
                                     .unwrap();
                                 client.json(json)
@@ -245,43 +257,43 @@ pub fn make_api<B, T>(api: &mut Api, b: B, cfg: NodeConfig)
             })
         });
         api.get("config/propose/:hash", |endpoint| {
-            let b = b.clone();
+            let b = b.clone();            
             endpoint.summary("Returns config propose by hash");
             endpoint.params(|params| {
                 params.opt_typed("hash", json_dsl::string());
             });
             endpoint.handle(move |client, params| {
                 let hash_propose = Hash::from_hex(params.find("hash").unwrap().as_str().unwrap())
-                    .unwrap();
-                let view = b.view();
-                match view.config_proposes().get(&hash_propose).unwrap() {
+                    .unwrap();                                    
+                match ConfigurationSchema::new(&b.view()).get_config_propose(&hash_propose).unwrap() {
                     Some(config_propose) => {
                         let info = ConfigProposeInfo::from(config_propose);
-                        client.json(&info.to_json())
+                        return client.json(&info.to_json());
                     }
                     None => {
-                        client.error(ValueNotFound::new("Unable to find ConfigPropose for hash"))
+                        return client.error(ValueNotFound::new("Unable to find ConfigPropose for hash"))
                     }
-                }
+                }                          
             })
         });
         api.get("config/vote/:from", |endpoint| {
-            let b = b.clone();
+            let b = b.clone(); 
             endpoint.summary("Returns config votes array");
             endpoint.params(|params| {
                 params.opt_typed("from", json_dsl::string());
             });
             endpoint.handle(move |client, params| {
                 let from = PublicKey::from_hex(params.find("from").unwrap().as_str().unwrap())
-                    .unwrap();
-                let view = b.view();
-                match view.config_votes().get(&from).unwrap() {
+                    .unwrap();                
+                match ConfigurationSchema::new(&b.view()).get_vote(&from).unwrap() {
                     Some(vote) => {
                         let vote_value = VoteValue { revoke: vote.revoke() };
                         client.json(&vote_value.to_json())
                     }
-                    None => client.error(ValueNotFound::new("Unable to find vote for public key")),
-                }
+                    None => {
+                        return client.error(ValueNotFound::new("Unable to find vote for public key"));
+                    }
+                }                
             })
         });
         api.get("blocks", |endpoint| {
