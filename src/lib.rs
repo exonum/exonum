@@ -134,6 +134,7 @@ impl<'a> ConfigurationSchema<'a> {
         MerklePatriciaTable::new(MapTable::new(vec![05], self.view))
     }
 
+
     pub fn state_hash(&self) -> StorageResult<Hash> {
         let db = MemoryDB::new();
         let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
@@ -141,6 +142,15 @@ impl<'a> ConfigurationSchema<'a> {
         hashes.append(self.config_proposes().root_hash()?)?;
         hashes.append(self.config_votes().root_hash()?)?;
         hashes.root_hash()
+    }
+    pub fn get_config_propose(&self,
+                              hash: &Hash)
+                              -> Result<Option<TxConfigPropose>, ::storage::Error> {
+        self.config_proposes().get(hash)
+    }
+
+    pub fn get_vote(&self, pub_key: &PublicKey) -> Result<Option<TxConfigVote>, ::storage::Error> {
+        self.config_votes().get(pub_key)
     }
 }
 
