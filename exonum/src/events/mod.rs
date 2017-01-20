@@ -93,7 +93,6 @@ pub struct Events<H: EventHandler> {
     event_loop: EventLoop<H>,
 }
 
-#[derive(Clone)]
 pub struct MioChannel<E: Send, T: Send> {
     address: SocketAddr,
     inner: mio::Sender<InternalEvent<E, T>>,
@@ -103,12 +102,21 @@ impl<E: Send, T: Send> MioChannel<E, T> {
     pub fn new(addr: SocketAddr, inner: mio::Sender<InternalEvent<E, T>>) -> MioChannel<E, T> {
         MioChannel {
             address: addr,
-            inner: inner,
+            inner: inner.clone(),
         }
     }
 }
 
-impl<E: Send + Clone, T: Send + Clone> Channel for MioChannel<E, T> {
+impl<E: Send, T: Send> Clone for MioChannel<E, T> {
+    fn clone(&self) -> MioChannel<E, T> {
+        MioChannel {
+            address: self.address,
+            inner: self.inner.clone(),
+        }
+    }
+}
+
+impl<E: Send, T: Send> Channel for MioChannel<E, T> {
     type ApplicationEvent = E;
     type Timeout = T;
 
@@ -272,10 +280,7 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
     }
 }
 
-impl<H: EventHandler> Reactor<H> for Events<H>
-    where <H as EventHandler>::Timeout: Clone,
-          <H as EventHandler>::ApplicationEvent: Clone
-{
+impl<H: EventHandler> Reactor<H> for Events<H> {
     type Channel = MioChannel<H::ApplicationEvent, H::Timeout>;
 
     fn bind(&mut self) -> ::std::io::Result<()> {

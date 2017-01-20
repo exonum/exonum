@@ -8,15 +8,8 @@ use ::node::State;
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
     fn execute(&self, view: &View) -> Result<(), StorageError>;
-    fn clone_box(&self) -> Box<Transaction>;
     fn info(&self) -> Value {
         Value::Null
-    }
-}
-
-impl Clone for Box<Transaction> {
-    fn clone(&self) -> Box<Transaction> {
-        self.clone_box()
     }
 }
 

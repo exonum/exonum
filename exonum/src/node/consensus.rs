@@ -198,7 +198,7 @@ impl<S> NodeHandler<S>
             let view = &self.blockchain.view();
             let schema = Schema::new(view);
             // Verify transactions
-            let mut txs = Vec::new();
+            let mut tx_hashes = Vec::new();
             for raw in msg.transactions() {
                 if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                     let hash = tx.hash();
@@ -211,24 +211,25 @@ impl<S> NodeHandler<S>
                         error!("Incorrect transaction in block detected, block={:?}", msg);
                         return;
                     }
-                    txs.push((hash, tx));
+                    self.state.add_transaction(hash, tx);
+                    tx_hashes.push(hash);
                 } else {
                     error!("Unknown transaction in block detected, block={:?}", msg);
                     return;
                 }
             }
 
-            let (block_hash, txs, patch) = self.create_block(block.height(),
-                                                             block.propose_round(),
-                                                             block.time(),
-                                                             txs.as_slice());
+            let (block_hash, patch) = self.create_block(block.height(),
+                                                        block.propose_round(),
+                                                        block.time(),
+                                                        tx_hashes.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
                 panic!("Block_hash incorrect in received block={:?}", msg);
             }
 
             // Commit block
-            self.state.add_block(block_hash, patch, txs, propose_round);
+            self.state.add_block(block_hash, patch, tx_hashes, propose_round);
         }
         self.commit(block_hash, precommits.iter());
         self.request_next_block();
@@ -419,7 +420,7 @@ impl<S> NodeHandler<S>
 
         for tx in new_txs {
             assert!(tx.verify());
-            self.handle_incoming_tx(tx.clone());
+            self.handle_incoming_tx(tx);
         }
 
         let height = self.state.height();
@@ -679,29 +680,28 @@ impl<S> NodeHandler<S>
                         height: Height,
                         round: Round,
                         time: Timespec,
-                        txs: &[(Hash, Box<Transaction>)])
-                        -> (Hash, Vec<Hash>, Patch) {
+                        tx_hashes: &[Hash])
+                        -> (Hash, Patch) {
         self.blockchain
-            .create_patch(height, round, time, txs)
+            .create_patch(height, round, time, tx_hashes, self.state.transactions())
             .unwrap()
     }
 
     // FIXME: remove this bull shit
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
-        let propose = self.state.propose(propose_hash).unwrap().message().clone();
-        let txs = propose.transactions()
-            .iter()
-            .map(|tx_hash| {
-                let tx = self.state.transactions().get(tx_hash).unwrap();
-                (*tx_hash, tx.clone())
-            })
-            .collect::<Vec<_>>();
-        let (block_hash, txs, patch) = self.create_block(propose.height(),
-                                                         propose.round(),
-                                                         propose.time(),
-                                                         txs.as_slice());
+        let propose = self.state
+            .propose(propose_hash)
+            .unwrap()
+            .message()
+            .clone();
+
+        let tx_hashes = propose.transactions().to_vec();
+        let (block_hash, patch) = self.create_block(propose.height(),
+                                                    propose.round(),
+                                                    propose.time(),
+                                                    tx_hashes.as_slice());
         // Save patch
-        self.state.add_block(block_hash, patch, txs, propose.round());
+        self.state.add_block(block_hash, patch, tx_hashes, propose.round());
         block_hash
     }
 
