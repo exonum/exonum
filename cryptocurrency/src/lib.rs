@@ -20,7 +20,7 @@ pub mod wallet;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use exonum::messages::{RawMessage, RawTransaction, Message, Error as MessageError};
+use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List,
                       View as StorageView};
@@ -78,27 +78,13 @@ pub enum CurrencyTx {
     CreateWallet(TxCreateWallet),
 }
 
-impl From<TxTransfer> for CurrencyTx {
-    fn from(tx: TxTransfer) -> CurrencyTx {
-        CurrencyTx::Transfer(tx)
-    }
-}
-
-impl From<TxCreateWallet> for CurrencyTx {
-    fn from(tx: TxCreateWallet) -> CurrencyTx {
-        CurrencyTx::CreateWallet(tx)
-    }
-}
-
-impl From<TxIssue> for CurrencyTx {
-    fn from(tx: TxIssue) -> CurrencyTx {
-        CurrencyTx::Issue(tx)
-    }
-}
-
-impl From<RawMessage> for CurrencyTx {
-    fn from(raw: RawMessage) -> Self {
-        CurrencyTx::from_raw(raw).unwrap()
+impl CurrencyTx {
+    pub fn pub_key(&self) -> &PublicKey {
+        match *self {
+            CurrencyTx::Transfer(ref msg) => msg.from(),
+            CurrencyTx::Issue(ref msg) => msg.wallet(),
+            CurrencyTx::CreateWallet(ref msg) => msg.pub_key(),
+        }
     }
 }
 
@@ -111,15 +97,6 @@ impl Message for CurrencyTx {
         }
     }
 
-    fn from_raw(raw: RawMessage) -> Result<Self, MessageError> {
-        match raw.message_type() {
-            TX_TRANSFER_ID => Ok(CurrencyTx::Transfer(TxTransfer::from_raw(raw)?)),
-            TX_ISSUE_ID => Ok(CurrencyTx::Issue(TxIssue::from_raw(raw)?)),
-            TX_WALLET_ID => Ok(CurrencyTx::CreateWallet(TxCreateWallet::from_raw(raw)?)),
-            _ => Err(MessageError::IncorrectMessageType { message_type: raw.message_type() }),
-        }
-    }
-
     fn hash(&self) -> Hash {
         match *self {
             CurrencyTx::Transfer(ref msg) => msg.hash(),
@@ -128,22 +105,44 @@ impl Message for CurrencyTx {
         }
     }
 
-    fn verify(&self, pub_key: &PublicKey) -> bool {
+    fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         match *self {
-            CurrencyTx::Transfer(ref msg) => msg.verify(pub_key),
-            CurrencyTx::Issue(ref msg) => msg.verify(pub_key),
-            CurrencyTx::CreateWallet(ref msg) => msg.verify(pub_key),
+            CurrencyTx::Transfer(ref msg) => msg.verify_signature(pub_key),
+            CurrencyTx::Issue(ref msg) => msg.verify_signature(pub_key),
+            CurrencyTx::CreateWallet(ref msg) => msg.verify_signature(pub_key),
         }
     }
 }
 
-impl CurrencyTx {
-    pub fn pub_key(&self) -> &PublicKey {
-        match *self {
-            CurrencyTx::Transfer(ref msg) => msg.from(),
-            CurrencyTx::Issue(ref msg) => msg.wallet(),
-            CurrencyTx::CreateWallet(ref msg) => msg.pub_key(),
+impl FromRaw for CurrencyTx {
+    fn from_raw(raw: RawMessage) -> Result<Self, MessageError> {
+        match raw.message_type() {
+            TX_TRANSFER_ID => Ok(CurrencyTx::Transfer(TxTransfer::from_raw(raw)?)),
+            TX_ISSUE_ID => Ok(CurrencyTx::Issue(TxIssue::from_raw(raw)?)),
+            TX_WALLET_ID => Ok(CurrencyTx::CreateWallet(TxCreateWallet::from_raw(raw)?)),
+            _ => Err(MessageError::IncorrectMessageType { message_type: raw.message_type() }),
         }
+    }
+}
+
+impl From<TxTransfer> for CurrencyTx {
+    fn from(tx: TxTransfer) -> CurrencyTx {
+        CurrencyTx::Transfer(tx)
+    }
+}
+impl From<TxCreateWallet> for CurrencyTx {
+    fn from(tx: TxCreateWallet) -> CurrencyTx {
+        CurrencyTx::CreateWallet(tx)
+    }
+}
+impl From<TxIssue> for CurrencyTx {
+    fn from(tx: TxIssue) -> CurrencyTx {
+        CurrencyTx::Issue(tx)
+    }
+}
+impl From<RawMessage> for CurrencyTx {
+    fn from(raw: RawMessage) -> Self {
+        CurrencyTx::from_raw(raw).unwrap()
     }
 }
 
@@ -193,7 +192,7 @@ impl CurrencyService {
 
 impl Transaction for CurrencyTx {
     fn verify(&self) -> bool {
-        Message::verify(self, self.pub_key())
+        self.verify_signature(self.pub_key())
     }
 
     fn execute(&self, view: &StorageView) -> Result<(), Error> {
@@ -251,16 +250,8 @@ impl Transaction for CurrencyTx {
         Ok(())
     }
 
-    fn raw(&self) -> &RawTransaction {
-        Message::raw(self)
-    }
-
     fn clone_box(&self) -> Box<Transaction> {
         Box::new(self.clone())
-    }
-
-    fn hash(&self) -> Hash {
-        Message::hash(self)
     }
 }
 
@@ -300,12 +291,11 @@ impl Service for CurrencyService {
 #[cfg(test)]
 mod tests {
     use byteorder::{ByteOrder, LittleEndian};
-    use tempdir::TempDir;
 
     use exonum::crypto::gen_keypair;
     use exonum::storage::Storage;
     use exonum::blockchain::{Blockchain, Transaction};
-    use exonum::messages::Message;
+    use exonum::messages::{FromRaw, Message};
 
     use super::{CurrencyTx, CurrencyService, CurrencySchema, TxCreateWallet, TxIssue, TxTransfer};
 
@@ -319,6 +309,7 @@ mod tests {
     #[cfg(not(feature="memorydb"))]
     fn create_db() -> Storage {
         use exonum::storage::{LevelDB, LevelDBOptions};
+        use tempdir::TempDir;
 
         let mut options = LevelDBOptions::new();
         options.create_if_missing = true;

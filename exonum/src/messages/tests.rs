@@ -4,8 +4,8 @@ use time;
 
 use super::super::crypto::{hash, gen_keypair};
 use super::super::blockchain;
-use super::{Field, RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, Block,
-            RequestBlock, BitVec};
+use super::{Field, RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
+            Block, RequestBlock, BitVec};
 
 #[test]
 fn test_bitvec() {
@@ -166,7 +166,7 @@ fn test_connect() {
     assert_eq!(connect.pub_key(), &public_key);
     assert_eq!(connect.addr(), socket_address);
     assert_eq!(connect.time(), time);
-    assert!(connect.verify(&public_key));
+    assert!(connect.verify_signature(&public_key));
 }
 
 #[test]
@@ -197,7 +197,7 @@ fn test_propose() {
     assert_eq!(propose.transactions()[0], txs[0]);
     assert_eq!(propose.transactions()[1], txs[1]);
     assert_eq!(propose.transactions()[2], txs[2]);
-    assert!(propose.verify(&public_key));
+    assert!(propose.verify_signature(&public_key));
 }
 
 #[test]
@@ -222,7 +222,7 @@ fn test_prevote() {
     assert_eq!(prevote.round(), round);
     assert_eq!(prevote.propose_hash(), &propose_hash);
     assert_eq!(prevote.locked_round(), locked_round);
-    assert!(prevote.verify(&public_key));
+    assert!(prevote.verify_signature(&public_key));
 }
 
 #[test]
@@ -247,7 +247,7 @@ fn test_precommit() {
     assert_eq!(precommit.round(), round);
     assert_eq!(precommit.propose_hash(), &propose_hash);
     assert_eq!(precommit.block_hash(), &block_hash);
-    assert!(precommit.verify(&public_key));
+    assert!(precommit.verify_signature(&public_key));
 }
 
 #[test]
@@ -263,7 +263,7 @@ fn test_status() {
     assert_eq!(commit.validator(), validator);
     assert_eq!(commit.height(), height);
     assert_eq!(commit.last_hash(), &last_hash);
-    assert!(commit.verify(&public_key));
+    assert!(commit.verify_signature(&public_key));
 }
 
 #[test]
@@ -296,11 +296,9 @@ fn test_block() {
                                          &hash(&[1, 1, 3]),
                                          &hash(&[5, 2, 1]),
                                          &secret_key)];
-    let transactions = vec![
-        Status::new(1, 2, &hash(&[]), &secret_key).raw().clone(),
-        Status::new(2, 4, &hash(&[2]), &secret_key).raw().clone(),
-        Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone(),
-    ];
+    let transactions = vec![Status::new(1, 2, &hash(&[]), &secret_key).raw().clone(),
+                            Status::new(2, 4, &hash(&[2]), &secret_key).raw().clone(),
+                            Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone()];
     let block = Block::new(&pub_key,
                            &pub_key,
                            ts,
@@ -370,5 +368,5 @@ fn test_request_block() {
     assert_eq!(request.height(), 1);
     assert_eq!(request.to(), &public_key);
     assert_eq!(request.time(), time);
-    assert!(request.verify(&public_key));
+    assert!(request.verify_signature(&public_key));
 }

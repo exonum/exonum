@@ -15,7 +15,7 @@ use bit_vec;
 
 use ::crypto::PublicKey;
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SIZE};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_SIZE};
 pub use self::error::Error;
 pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;
@@ -90,12 +90,12 @@ impl RequestMessage {
 
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
-            RequestMessage::Propose(ref msg) => msg.verify(public_key),
-            RequestMessage::Transactions(ref msg) => msg.verify(public_key),
-            RequestMessage::Prevotes(ref msg) => msg.verify(public_key),
-            RequestMessage::Precommits(ref msg) => msg.verify(public_key),
-            RequestMessage::Peers(ref msg) => msg.verify(public_key),
-            RequestMessage::Block(ref msg) => msg.verify(public_key),
+            RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Transactions(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Prevotes(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Precommits(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Peers(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Block(ref msg) => msg.verify_signature(public_key),
         }
     }
 
@@ -159,9 +159,9 @@ impl ConsensusMessage {
 
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
-            ConsensusMessage::Propose(ref msg) => msg.verify(public_key),
-            ConsensusMessage::Prevote(ref msg) => msg.verify(public_key),
-            ConsensusMessage::Precommit(ref msg) => msg.verify(public_key),
+            ConsensusMessage::Propose(ref msg) => msg.verify_signature(public_key),
+            ConsensusMessage::Prevote(ref msg) => msg.verify_signature(public_key),
+            ConsensusMessage::Precommit(ref msg) => msg.verify_signature(public_key),
         }
     }
 }

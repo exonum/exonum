@@ -90,7 +90,7 @@ impl<S> NodeHandler<S>
             let peer = match self.state.public_key_of(msg.validator()) {
                 // Incorrect signature of message
                 Some(public_key) => {
-                    if !msg.verify(public_key) {
+                    if !msg.verify_signature(public_key) {
                         return;
                     }
                     *public_key

@@ -1,7 +1,7 @@
 #[macro_use(message)]
 extern crate exonum;
 
-use exonum::messages::{Message, RawTransaction, Error as MessageError};
+use exonum::messages::{FromRaw, Message, RawTransaction, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::{Error, View as StorageView};
 use exonum::blockchain::{Service, Transaction};
@@ -31,23 +31,15 @@ impl TimestampingService {
 
 impl Transaction for TimestampTx {
     fn verify(&self) -> bool {
-        Message::verify(self, self.pub_key())
+        self.verify_signature(self.pub_key())
     }
 
     fn execute(&self, _: &StorageView) -> Result<(), Error> {
         Ok(())
     }
 
-    fn raw(&self) -> &RawTransaction {
-        Message::raw(self)
-    }
-
     fn clone_box(&self) -> Box<Transaction> {
         Box::new(self.clone())
-    }
-
-    fn hash(&self) -> Hash {
-        Message::hash(self)
     }
 }
 

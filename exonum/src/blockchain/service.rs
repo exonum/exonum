@@ -1,20 +1,14 @@
-use std::fmt::Debug;
-
 use serde_json::Value;
 
 use ::crypto::Hash;
 use ::storage::{View, Error as StorageError};
-use ::messages::{RawTransaction, Error as MessageError};
+use ::messages::{Message, RawTransaction, Error as MessageError};
 use ::node::State;
 
-pub trait Transaction: Send + 'static + Debug {
-    fn hash(&self) -> Hash;
+pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
     fn execute(&self, view: &View) -> Result<(), StorageError>;
-
-    fn raw(&self) -> &RawTransaction;
     fn clone_box(&self) -> Box<Transaction>;
-
     fn info(&self) -> Value {
         Value::Null
     }

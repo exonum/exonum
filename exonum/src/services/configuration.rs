@@ -2,7 +2,7 @@ use std::fmt;
 
 use ::blockchain::{Service, Transaction, Schema};
 use ::crypto::{PublicKey, Hash, hash};
-use ::messages::{RawMessage, Message, RawTransaction, Error as MessageError};
+use ::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use ::storage::{View, Map, MerklePatriciaTable, MapTable, Result as StorageResult};
 use ::node::State;
 
@@ -64,29 +64,19 @@ impl ConfigTx {
             ConfigTx::ConfigVote(ref msg) => msg.height(),
         }
     }
+}
 
-    pub fn raw(&self) -> &RawMessage {
+impl fmt::Debug for ConfigTx {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.raw(),
-            ConfigTx::ConfigVote(ref msg) => msg.raw(),
+            ConfigTx::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
+            ConfigTx::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
+}
 
-    pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.verify(public_key),
-            ConfigTx::ConfigVote(ref msg) => msg.verify(public_key),
-        }
-    }
-
-    pub fn hash(&self) -> Hash {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.hash(),
-            ConfigTx::ConfigVote(ref msg) => msg.hash(),
-        }
-    }
-
-    pub fn from_raw(raw: RawMessage) -> Result<ConfigTx, MessageError> {
+impl FromRaw for ConfigTx {
+    fn from_raw(raw: RawMessage) -> Result<ConfigTx, MessageError> {
         match raw.message_type() {
             CONFIG_PROPOSE_MESSAGE_ID => {
                 Ok(ConfigTx::ConfigPropose(TxConfigPropose::from_raw(raw)?))
@@ -97,11 +87,25 @@ impl ConfigTx {
     }
 }
 
-impl fmt::Debug for ConfigTx {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+impl Message for ConfigTx {
+    fn raw(&self) -> &RawMessage {
         match *self {
-            ConfigTx::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
-            ConfigTx::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
+            ConfigTx::ConfigPropose(ref msg) => msg.raw(),
+            ConfigTx::ConfigVote(ref msg) => msg.raw(),
+        }
+    }
+
+    fn verify_signature(&self, public_key: &PublicKey) -> bool {
+        match *self {
+            ConfigTx::ConfigPropose(ref msg) => msg.verify_signature(public_key),
+            ConfigTx::ConfigVote(ref msg) => msg.verify_signature(public_key),
+        }
+    }
+
+    fn hash(&self) -> Hash {
+        match *self {
+            ConfigTx::ConfigPropose(ref msg) => msg.hash(),
+            ConfigTx::ConfigVote(ref msg) => msg.hash(),
         }
     }
 }
@@ -200,12 +204,10 @@ impl TxConfigVote {
 }
 
 impl Transaction for ConfigTx {
-    fn hash(&self) -> Hash {
-        ConfigTx::hash(self)
-    }
     fn verify(&self) -> bool {
-        self.verify(self.from())
+        self.verify_signature(self.from())
     }
+
     fn execute(&self, view: &View) -> StorageResult<()> {
         match *self {
             ConfigTx::ConfigPropose(ref tx) => tx.execute(view),
@@ -213,9 +215,6 @@ impl Transaction for ConfigTx {
         }
     }
 
-    fn raw(&self) -> &RawTransaction {
-        ConfigTx::raw(self)
-    }
     fn clone_box(&self) -> Box<Transaction> {
         Box::new(self.clone())
     }

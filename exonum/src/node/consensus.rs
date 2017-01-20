@@ -784,7 +784,7 @@ impl<S> NodeHandler<S>
                             precommit: &Precommit)
                             -> Result<(), String> {
         if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
-            if !precommit.verify(pub_key) {
+            if !precommit.verify_signature(pub_key) {
                 let e = format!("Received wrong signed precommit, precommit={:?}", precommit);
                 return Err(e);
             }
