@@ -11,7 +11,9 @@ export SCRIPTS_PATH=${scriptdir}/sandbox/supervisord
 
 
 start_generator() {
-    tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000 $1 $2 2> /dev/null
+
+    until tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000 $1 $2 2> /dev/null;
+    do done;
 
 }
 
