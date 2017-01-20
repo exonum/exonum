@@ -9,25 +9,31 @@ export PATH=${scriptdir}/target/release:$PATH
 export PATH=${scriptdir}/target/release/examples:$PATH
 export SCRIPTS_PATH=${scriptdir}/sandbox/supervisord
 
+
+start_generator() {
+    tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000 $1 $2 2> /dev/null
+
+}
+
 run() {
 
     test -e ${testnet_dir}/supervisord.sock && exit 1
-
-
     export TESTNET_DESTDIR="${testnet_dir}/run"
-    export PROFILE_STOP_AT_HEIGHT=$2
-    #stub generator wallet count
-    export TESTNET_COUNT=0
-
     load $1 &&
-
     supervisord -c ${supervisor_conf}  &&
     #start validators && tx_Generator
-    supervisorctl -c ${supervisor_conf} start cryptocurrency_profiler:* &&
+    supervisorctl -c ${supervisor_conf} start cryptocurrency_profiler:* 
 
+    # for now im just using big enought count
+    tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000  cryptocurrency 50000000 2> /dev/null &
+    pid=$!;
+    
     #wait for report
-    while [ ! -e $TESTNET_DESTDIR/profile/flame-00.html ]; do sleep 1; done
-    sleep 30 # give a chance to write full report
+    echo "Wait $2 sec"
+    sleep $2
+    kill -9 $pid
+    start_generator profiler
+    sleep 5 # give a chance to write full report
     mkdir ${scriptdir}/report
     cp -f $TESTNET_DESTDIR/profile/flame-00.html ${scriptdir}/report/
     supervisorctl -c ${supervisor_conf} stop cryptocurrency_profiler:*
@@ -36,11 +42,10 @@ run() {
 
 generate() {
     [[ -z  $1 ]] && echo 'Write wallets count' && exit 1
-    export TESTNET_COUNT=$1
     export TESTNET_DESTDIR="${testnet_dir}/generate"
     echo "Generating database in folder $TESTNET_DESTDIR"
 
-    #cargo build --manifest-path sandbox/Cargo.toml --example=tx_generator --release 
+    cargo build --manifest-path sandbox/Cargo.toml --example=tx_generator --release &&
     cargo build --manifest-path cryptocurrency/Cargo.toml --features="flame_profile" --release &&    
     #generate config
     mkdir -p $TESTNET_DESTDIR &&
@@ -51,9 +56,12 @@ generate() {
     supervisord -c ${supervisor_conf}  &&
     mkdir -p $TESTNET_DESTDIR/profile &&
     #start validators && tx_Generator
-    supervisorctl -c ${supervisor_conf} start cryptocurrency_profiler_generate:* &&
-    #wait for supervisord death
-    while [ -e $TESTNET_DESTDIR/supervisor.sock ]; do sleep 1; done || echo "Run clean first"
+    supervisorctl -c ${supervisor_conf} start cryptocurrency_profiler:* &&
+    start_generator cryptocurrencywallet $1 &&
+    supervisorctl -c ${supervisor_conf} stop cryptocurrency_profiler:* &&
+    supervisorctl -c ${supervisor_conf} shutdown || 
+    echo "Run clean first"
+
 }
 
 save() {
