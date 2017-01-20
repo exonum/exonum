@@ -214,10 +214,6 @@ impl Transaction for ConfigTx {
             ConfigTx::ConfigVote(ref tx) => tx.execute(view),
         }
     }
-
-    fn clone_box(&self) -> Box<Transaction> {
-        Box::new(self.clone())
-    }
 }
 
 impl ConfigurationService {

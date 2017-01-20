@@ -37,10 +37,6 @@ impl Transaction for TimestampTx {
     fn execute(&self, _: &StorageView) -> Result<(), Error> {
         Ok(())
     }
-
-    fn clone_box(&self) -> Box<Transaction> {
-        Box::new(self.clone())
-    }
 }
 
 impl Service for TimestampingService {

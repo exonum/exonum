@@ -249,10 +249,6 @@ impl Transaction for CurrencyTx {
         };
         Ok(())
     }
-
-    fn clone_box(&self) -> Box<Transaction> {
-        Box::new(self.clone())
-    }
 }
 
 impl Service for CurrencyService {

@@ -22,12 +22,12 @@ use self::adjusted_propose_timeout::*;
 
 pub type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum ExternalMessage {
     Transaction(Box<Transaction>),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NodeTimeout {
     Status,
     Round(u64, u32),
