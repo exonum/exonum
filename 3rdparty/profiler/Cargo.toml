@@ -1,0 +1,11 @@
+[package]
+name = "profiler"
+version = "0.1.0"
+authors = ["Vladimir Motilenko <vladimir.motylenko@xdev.re>"]
+
+[dependencies]
+lazy_static = "0.2.1"
+thread-id = "2.0.0"
+
+[features]
+nomock = []
