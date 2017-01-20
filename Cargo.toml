@@ -3,7 +3,10 @@
 members = [
     "3rdparty/leveldb-sys",
     "3rdparty/leveldb",
-    "blockchain_explorer",    
+    "3rdparty/flamer",
+    "3rdparty/profiler",
+    "blockchain_explorer",
+    "cryptocurrency",
     "exonum",
     "sandbox",
     "services/configuration",
