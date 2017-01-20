@@ -4,7 +4,6 @@ use ::crypto::{hash, Hash};
 use std::fmt;
 use super::{BitSlice, ChildKind, KEY_SIZE, DB_KEY_SIZE};
 use serde::{Serialize, Serializer};
-const VAL_DESC: &'static str = "val";
 
 pub struct BitVec {
     pub db_key_data: Vec<u8>,
@@ -153,56 +152,98 @@ impl<V: StorageValue> BranchProofNode<V> {
 }
 
 
-// impl<V: Serialize> Serialize for ProofPathToKey<V> {
-//     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
-//         where S: Serializer
-//     {
-//         use self::ProofPathToKey::*;
-//         let mut state;
-//         match *self {
-//             Empty => {
-//                 state = serializer.serialize_map(Some(0))?;
-//             }
-//             LeafRootInclusive(ref key, ref value) => {
-//                 state = serializer.serialize_map(Some(1))?;
-//                 serializer.serialize_map_key(&mut state, key)?;
-//                 serializer.serialize_map_value(&mut state, value)?;
-//             }
-//             LeafRootExclusive(ref key, ref hash) => {
-//                 state = serializer.serialize_map(Some(1))?;
-//                 serializer.serialize_map_key(&mut state, key)?;
-//                 serializer.serialize_map_value(&mut state, hash)?;
-//             }
-//             BranchKeyNotFound(ref lhash, ref rhash, ref lkey, ref rkey) => {
-//                 state = serializer.serialize_map(Some(2))?;
-//                 serializer.serialize_map_key(&mut state, lkey)?;
-//                 serializer.serialize_map_value(&mut state, lhash)?;
-//                 serializer.serialize_map_key(&mut state, rkey)?;
-//                 serializer.serialize_map_value(&mut state, rhash)?;
-//             }
-//             LeftBranch(ref proof, ref rhash, ref lkey, ref rkey) => {
-//                 state = serializer.serialize_map(Some(2))?;
-//                 serializer.serialize_map_key(&mut state, lkey)?;
-//                 serializer.serialize_map_value(&mut state, proof)?;
-//                 serializer.serialize_map_key(&mut state, rkey)?;
-//                 serializer.serialize_map_value(&mut state, rhash)?;
-//             }
-//             RightBranch(ref lhash, ref proof, ref lkey, ref rkey) => {
-//                 state = serializer.serialize_map(Some(2))?;
-//                 serializer.serialize_map_key(&mut state, lkey)?;
-//                 serializer.serialize_map_value(&mut state, lhash)?;
-//                 serializer.serialize_map_key(&mut state, rkey)?;
-//                 serializer.serialize_map_value(&mut state, proof)?;
-//             }
-//             Leaf(ref value) => {
-//                 state = serializer.serialize_map(Some(1))?;
-//                 serializer.serialize_map_key(&mut state, VAL_DESC)?;
-//                 serializer.serialize_map_value(&mut state, value)?;
-//             }
-//         }
-//         serializer.serialize_map_end(state)
-//     }
-// }
+impl<V: Serialize> Serialize for RootProofNode<V> {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        use self::RootProofNode::*;
+        let mut state;
+        match *self {
+            Empty => {
+                state = serializer.serialize_map(Some(0))?;
+                serializer.serialize_map_end(state)
+            }
+            LeafRootInclusive(ref key, ref value) => {
+                #[derive(Serialize)]
+                struct SerializeHelper<'a, V: Serialize + 'a> {
+                    val: &'a V,
+                }
+                let helper = SerializeHelper { val: value };
+                state = serializer.serialize_map(Some(1))?;
+                serializer.serialize_map_key(&mut state, key)?;
+                serializer.serialize_map_value(&mut state, &helper)?;
+                serializer.serialize_map_end(state)
+            }
+            LeafRootExclusive(ref key, ref hash) => {
+                state = serializer.serialize_map(Some(1))?;
+                serializer.serialize_map_key(&mut state, key)?;
+                serializer.serialize_map_value(&mut state, hash)?;
+                serializer.serialize_map_end(state)
+            }
+            Branch(ref branch) => branch.serialize(serializer),
+        }
+    }
+}
+impl<V: Serialize> Serialize for BranchProofNode<V> {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        use self::BranchProofNode::*;
+        let mut state;
+        match *self {
+            BranchKeyNotFound { left_hash: ref lhash,
+                                right_hash: ref rhash,
+                                left_key: ref lkey,
+                                right_key: ref rkey } => {
+                state = serializer.serialize_map(Some(2))?;
+                serializer.serialize_map_key(&mut state, lkey)?;
+                serializer.serialize_map_value(&mut state, lhash)?;
+                serializer.serialize_map_key(&mut state, rkey)?;
+                serializer.serialize_map_value(&mut state, rhash)?;
+            }
+            LeftBranch { left_hash: ref proof,
+                         right_hash: ref rhash,
+                         left_key: ref lkey,
+                         right_key: ref rkey } => {
+                state = serializer.serialize_map(Some(2))?;
+                serializer.serialize_map_key(&mut state, lkey)?;
+                serializer.serialize_map_value(&mut state, proof)?;
+                serializer.serialize_map_key(&mut state, rkey)?;
+                serializer.serialize_map_value(&mut state, rhash)?;
+            }
+            RightBranch { left_hash: ref lhash,
+                          right_hash: ref proof,
+                          left_key: ref lkey,
+                          right_key: ref rkey } => {
+                state = serializer.serialize_map(Some(2))?;
+                serializer.serialize_map_key(&mut state, lkey)?;
+                serializer.serialize_map_value(&mut state, lhash)?;
+                serializer.serialize_map_key(&mut state, rkey)?;
+                serializer.serialize_map_value(&mut state, proof)?;
+            }
+        }
+        serializer.serialize_map_end(state)
+    }
+}
+impl<V: Serialize> Serialize for ProofNode<V> {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        use self::ProofNode::*;
+        match *self {
+            Leaf(ref value) => {
+
+                #[derive(Serialize)]
+                struct SerializeHelper<'a, V: Serialize + 'a> {
+                    val: &'a V,
+                }
+                let helper = SerializeHelper { val: value };
+                helper.serialize(serializer)
+            }
+            Branch(ref branch) => branch.serialize(serializer),
+        }
+    }
+}
 
 // impl<V> ProofPathToKey<V> {
 //     pub fn compute_height(&self, start_height: u16) -> u16 {
@@ -223,9 +264,9 @@ impl<V: StorageValue> BranchProofNode<V> {
 
 impl<V: fmt::Debug + StorageValue> RootProofNode<V> {
     pub fn verify_root_proof_consistency<A: AsRef<[u8]>>(&self,
-                                                     searched_key: A,
-                                                     root_hash: Hash)
-                                                     -> Result<Option<&V>, Error> {
+                                                         searched_key: A,
+                                                         root_hash: Hash)
+                                                         -> Result<Option<&V>, Error> {
         let searched_key = searched_key.as_ref();
         debug_assert_eq!(searched_key.len(), KEY_SIZE);
         let searched_slice = &BitSlice::from_bytes(searched_key);
