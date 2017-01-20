@@ -1,8 +1,8 @@
-# Timestamping service on Exonum blockchain
+# Timestamping service on Exonum blockchain platform
 
-## Frontend application
+### Install
 
-First of all go to `frontend` folder.
+Switch to `app` folder.
 
 Install npm dependencies:
 
@@ -15,6 +15,8 @@ Install bower components:
 ```
 bower install
 ```
+
+### Run
 
 Run application:
 

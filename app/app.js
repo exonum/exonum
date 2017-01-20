@@ -31,7 +31,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // make db accessible to routers
-var db = new sqlite3.Database(':memory:');
+var db = new sqlite3.Database('db/ts.db');
 db.serialize(function() {
     db.run('CREATE TABLE IF NOT EXISTS pairs (hash CHAR (64), description CHAR (50))');
 });

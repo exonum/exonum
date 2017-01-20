@@ -78,10 +78,8 @@ $(function() {
                         window.location.replace(data.redirect);
                     } else {
                         $('#label').val(hash);
-                        $('#success-url').val(location.protocol + '//' + location.hostname + '/f/' + hash + '/redirect');
                         $('#pay-description').val(description.val());
-                        $('#create').addClass('hidden');
-                        $('#pay').removeClass('hidden');
+                        $('#upload-form').submit();
                     }
                 }
             });

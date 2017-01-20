@@ -28,7 +28,7 @@
     <div class="big_padding pix_builder_bg">
 
         <div class="container">
-            <div class="one-third column">
+            <div class="four offset-by-four columns">
                 <div class="f1_box">
                     <div class="medium_icon light_blue">
                         <span class="pi pixicon-upload2"></span>
@@ -39,7 +39,7 @@
                     </div>
                 </div>
             </div>
-            <div class="one-third column">
+            {{!--<div class="one-third column">
                 <div class="f1_box">
                     <div class="medium_icon light_blue">
                         <span class="pi pixicon-wallet"></span>
@@ -49,14 +49,14 @@
                         <div class="small_title bold_text"><span class="editContent"><span class="pix_text">Pay a $1.00 fee</span></span></div><br>
                     </div>
                 </div>
-            </div>
-            <div class="one-third column omega">
+            </div>--}}
+            <div class="four columns omega">
                 <div class="f1_box">
                     <div class="medium_icon light_blue">
                         <span class="pi pixicon-check"></span>
                     </div>
                     <div class="center_text">
-                        <div class="editContent light_gray"><span class="pix_text">STEP 3</span></div>
+                        <div class="editContent light_gray"><span class="pix_text">STEP 2</span></div>
                         <div class="small_title bold_text"><span class="editContent"><span class="pix_text">Get certificate of&nbsp;proof</span></span></div><br>
                     </div>
                 </div>
@@ -80,11 +80,15 @@
                             </button>
                         </div>
                     </form>
+                    <form id="upload-form" class="hidden" method="POST" action="/f/upload">
+                        <input id="label" type="hidden" name="label">
+                        <input id="upload-description" type="hidden" name="description">
+                    </form>
                 </div>
             </div>
         </div>
 
-        <div id="pay" class="container hidden">
+        {{!--<div id="pay" class="container hidden">
             <div class="sixteen columns">
                 <div class="eight columns centered">
                     <div class="center_text">
@@ -125,7 +129,7 @@
                     </form>
                 </div>
             </div>
-        </div>
+        </div>--}}
 
     </div>
 </div>
