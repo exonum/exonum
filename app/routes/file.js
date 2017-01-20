@@ -28,21 +28,33 @@ router.post('/upload', function(req, res) {
     var hash = req.body.label;
     var description = req.body.description;
 
-    db.serialize(function() {
-        db.get('SELECT 1 FROM pairs WHERE hash = "' + hash + '"', function(err, row) {
-            if (typeof row === 'undefined') {
-                db.prepare('INSERT INTO pairs (hash, description) VALUES (?, ?)').run(hash, description).finalize(function() {
-                    res.redirect(baseUrl + hash);
-                });
-            } else {
-                db.run('UPDATE pairs SET description = "' + description + '" WHERE hash = "' + hash + '"', function(err) {
-                    if (err !== null) {
-                        res.render('error', {error: error});
-                    } else {
-                        res.redirect(baseUrl + hash);
-                    }
-                });
-            }
+    request.post({
+        url: backendsUrl,
+        headers: [{
+            name: 'content-type',
+            value: 'multipart/form-data'
+        }],
+        formData: {
+            hash: hash,
+            description: description
+        }
+    }, function() {
+        db.serialize(function() {
+            db.get('SELECT 1 FROM pairs WHERE hash = "' + hash + '"', function(err, row) {
+                if (typeof row === 'undefined') {
+                    db.prepare('INSERT INTO pairs (hash, description) VALUES (?, ?)').run(hash, description).finalize(function() {
+                        res.redirect(baseUrl + hash + '/redirect');
+                    });
+                } else {
+                    db.run('UPDATE pairs SET description = "' + description + '" WHERE hash = "' + hash + '"', function(error) {
+                        if (!error) {
+                            res.redirect(baseUrl + hash + '/redirect');
+                        } else {
+                            res.render('error', {error: error});
+                        }
+                    });
+                }
+            });
         });
     });
 });

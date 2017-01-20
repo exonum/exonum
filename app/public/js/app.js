@@ -78,7 +78,7 @@ $(function() {
                         window.location.replace(data.redirect);
                     } else {
                         $('#label').val(hash);
-                        $('#pay-description').val(description.val());
+                        $('#upload-description').val(description.val());
                         $('#upload-form').submit();
                     }
                 }
