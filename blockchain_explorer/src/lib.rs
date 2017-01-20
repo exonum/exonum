@@ -130,7 +130,6 @@ struct ConfigProposeInfo {
 
 #[derive(Deserialize)]
 struct ConfigProposeRequest {
-    pub height: u64,
     pub config: Vec<u8>,
     pub actual_from_height: u64,
 }
@@ -144,9 +143,9 @@ struct ConfigVoteRequest {
 }
 
 impl ConfigProposeRequest {
-    fn into_tx(&self, pub_key: &PublicKey, sec_key: &SecretKey) -> TxConfigPropose {
+    fn into_tx(&self, height: u64, pub_key: &PublicKey, sec_key: &SecretKey) -> TxConfigPropose {
         TxConfigPropose::new(pub_key,
-                             self.height,
+                             height,
                              self.config.as_ref(),
                              self.actual_from_height,
                              &sec_key)
@@ -154,9 +153,9 @@ impl ConfigProposeRequest {
 }
 
 impl ConfigVoteRequest {
-    fn into_tx(&self, pub_key: &PublicKey, sec_key: &SecretKey) -> TxConfigVote {
+    fn into_tx(&self, height: u64, pub_key: &PublicKey, sec_key: &SecretKey) -> TxConfigVote {
         TxConfigVote::new(pub_key,
-                          self.height,
+                          height,
                           &self.hash_propose,
                           self.seed,
                           self.revoke,
@@ -175,12 +174,12 @@ impl From<TxConfigPropose> for ConfigProposeInfo {
     }
 }
 
-pub fn make_api<T>(api: &mut Api, b: Blockchain, cfg: NodeConfig)
+pub fn make_api<T>(api: &mut Api, b: Blockchain, channel: TxSender<NodeChannel>, cfg: NodeConfig)
     where T: TransactionInfo + From<RawTransaction>
 {
 
-    let node = Node::new(b.clone(), cfg.clone());
-    let channel = node.channel();
+    // let node = Node::new(b.clone(), cfg.clone());
+    // let channel = node.channel();
 
     api.namespace("blockchain", move |api| {
         api.get("config/actual", |endpoint| {
@@ -194,20 +193,19 @@ pub fn make_api<T>(api: &mut Api, b: Blockchain, cfg: NodeConfig)
             })
         });
         api.put("config/propose", |endpoint| {
-
+            let b = b.clone();
             let c = cfg.clone();
             let ch = channel.clone();
-            endpoint.summary("Puts new ConfigPropose");
+            endpoint.summary("Puts new ConfigPropose");            
             endpoint.params(|params| {
-                params.opt_typed("config", json_dsl::string());
-                params.opt_typed("height", json_dsl::u64());
+                params.opt_typed("config", json_dsl::array_of(json_dsl::u64()));                
                 params.opt_typed("actual_from_height", json_dsl::u64());
             });
             endpoint.handle(move |client, params| {
                 match from_value::<ConfigProposeRequest>(params.clone()) {
                     Ok(config_propose_request) => {
                         let config_propose =
-                            config_propose_request.into_tx(&c.public_key, &c.secret_key);
+                            config_propose_request.into_tx(Schema::new(&b.view()).last_height().unwrap(), &c.public_key, &c.secret_key);
 
                         let tx = ConfigTx::ConfigPropose(config_propose);
                         let tx_hash = HexValue::to_hex(&tx.hash());
@@ -217,7 +215,9 @@ pub fn make_api<T>(api: &mut Api, b: Blockchain, cfg: NodeConfig)
                                     .unwrap();
                                 client.json(json)
                             }
-                            Err(e) => client.error(e),
+                            Err(e) => {
+                                client.error(e)
+                            }
                         }
                     }
                     Err(_) => client.error(ValueNotFound::new("Can't parse ConfigPropose request")),
@@ -225,7 +225,7 @@ pub fn make_api<T>(api: &mut Api, b: Blockchain, cfg: NodeConfig)
             })
         });
         api.put("config/vote", |endpoint| {
-
+            let b = b.clone();
             let c = cfg.clone();
             let ch = channel.clone();
             endpoint.summary("Puts new ConfigVote");
@@ -239,7 +239,7 @@ pub fn make_api<T>(api: &mut Api, b: Blockchain, cfg: NodeConfig)
             endpoint.handle(move |client, params| {
                 match from_value::<ConfigVoteRequest>(params.clone()) {
                     Ok(config_vote_request) => {
-                        let config_vote = config_vote_request.into_tx(&c.public_key, &c.secret_key);
+                        let config_vote = config_vote_request.into_tx(Schema::new(&b.view()).last_height().unwrap(), &c.public_key, &c.secret_key);
 
                         let tx = ConfigTx::ConfigVote(config_vote);
                         let tx_hash = HexValue::to_hex(&tx.hash());
