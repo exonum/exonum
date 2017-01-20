@@ -8,12 +8,14 @@ supervisor_conf=${scriptdir}/sandbox/supervisord/etc/supervisord.conf
 export PATH=${scriptdir}/target/release:$PATH
 export PATH=${scriptdir}/target/release/examples:$PATH
 export SCRIPTS_PATH=${scriptdir}/sandbox/supervisord
-
+export RUST_LOG="exonum=debug,sandbox=debug"
 
 start_generator() {
 
-    until tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000 $1 $2 2> /dev/null;
-    do done;
+    until tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000 $1 $2 2>> $TESTNET_DESTDIR/log/supervisor/tx_generator-stderr.log;
+    do
+        echo "#"
+    done;
 
 }
 
@@ -27,7 +29,10 @@ run() {
     supervisorctl -c ${supervisor_conf} start cryptocurrency_profiler:* 
 
     # for now im just using big enought count
-    tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000  cryptocurrency 50000000 2> /dev/null &
+    until tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000  cryptocurrency 50000000 2> /dev/null; 
+    do 
+    echo "#"
+    done &
     pid=$!;
     
     #wait for report
