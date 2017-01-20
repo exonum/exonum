@@ -21,6 +21,7 @@ use leveldb::snapshots::Snapshots;
 use leveldb::iterator::LevelDBIterator;
 
 use super::{Map, Database, Error, Patch, Change, Fork};
+use profiler;
 // use super::{Iterable, Seekable}
 
 #[derive(Clone)]
@@ -65,12 +66,14 @@ impl LevelDB {
 
 impl Map<[u8], Vec<u8>> for LevelDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        let mut _p = profiler::ProfilerSpan::new("LevelDB::get");
         self.db
             .get(LEVELDB_READ_OPTIONS, key)
             .map_err(Into::into)
     }
 
     fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        let mut _p = profiler::ProfilerSpan::new("LevelDB::put");
         let result = self.db.put(LEVELDB_WRITE_OPTIONS, key, &value);
         result.map_err(Into::into)
     }
@@ -102,6 +105,7 @@ impl LevelDBView {
 
 impl Map<[u8], Vec<u8>> for LevelDBView {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        let mut _p = profiler::ProfilerSpan::new("LevelDBView::get");
         match self.changes.borrow().get(key) {
             Some(change) => {
                 let v = match *change {
@@ -119,6 +123,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
     }
 
     fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        let mut _p = profiler::ProfilerSpan::new("LevelDBView::put");
         self.changes.borrow_mut().insert(key.to_vec(), Change::Put(value));
         Ok(())
     }
@@ -154,6 +159,7 @@ impl Fork for LevelDBView {
         self.changes.borrow().clone()
     }
     fn merge(&self, patch: &Patch) {
+        let mut _p = profiler::ProfilerSpan::new("LevelDBView::merge");
         let iter = patch.into_iter().map(|(k, v)| (k.clone(), v.clone()));
         self.changes.borrow_mut().extend(iter);
     }
@@ -167,6 +173,7 @@ impl Database for LevelDB {
     }
 
     fn merge(&self, patch: &Patch) -> Result<(), Error> {
+        let mut _p = profiler::ProfilerSpan::new("LevelDB::merge");
         let mut batch = Writebatch::new();
         for (key, change) in patch {
             match *change {

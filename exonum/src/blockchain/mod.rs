@@ -20,6 +20,8 @@ use ::node::{State, TxPool};
 
 use ::storage::{Patch, Database, Fork, Error, Map, List, Storage,
                 View as StorageView};
+use profiler;
+
 
 pub use self::block::Block;
 pub use self::schema::{ConfigurationData, Schema};
@@ -121,6 +123,7 @@ impl Blockchain {
         hash(&vec)
     }
 
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn create_patch(&self,
                         height: u64,
                         round: u32,
@@ -128,13 +131,17 @@ impl Blockchain {
                         tx_hashes: &[Hash],
                         pool: &TxPool)
                         -> Result<(Hash, Patch), Error> {
+        let mut profiler = profiler::ProfilerSpan::new("Create fork");                            
         // Create fork
         let fork = self.view();
         // Create database schema
+        profiler.next_span("Create database schema");
         let schema = Schema::new(&fork);
         // Get last hash
+        profiler.next_span("Get last hash");
         let last_hash = self.last_hash()?;
         // Save & execute transactions
+        profiler.next_span("Save & execute transactions");
         for hash in tx_hashes {
             let tx = &pool[hash];
             tx.execute(&fork)?;
@@ -146,8 +153,10 @@ impl Blockchain {
                 .unwrap();
         }
         // Get tx hash
+        profiler.next_span("Get tx hash");
         let tx_hash = schema.block_txs(height).root_hash()?;
         // Get state hash
+        profiler.next_span("Get state hash");
         let state_hash = {
             let sum_table = schema.state_hash_aggregator(); 
             let vec_core_state = schema.core_state_hash()?;
@@ -167,17 +176,22 @@ impl Blockchain {
         };
 
         // Create block
+        profiler.next_span("Create block");
         let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
         // Eval block hash
+        profiler.next_span("Eval block hash");
         let block_hash = block.hash();
         // Update height
         // TODO: check that height == propose.height
+        profiler.next_span("Update height");
         schema.heights().append(block_hash).is_ok();
         // Save block
+        profiler.next_span("Save block");
         schema.blocks().put(&block_hash, block).is_ok();
         Ok((block_hash, fork.changes()))
     }
 
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I>(&self,
                          state: &mut State,
                          block_hash: Hash,
@@ -186,6 +200,7 @@ impl Blockchain {
         where I: Iterator<Item = &'a Precommit>
     {
         let (patch, txs) = {
+            let mut profiler = profiler::ProfilerSpan::new("get view");
             let view = {
                 let patch = state.block(&block_hash).unwrap().patch();
                 let view = self.db.fork();
@@ -193,12 +208,13 @@ impl Blockchain {
                 view
             };
 
+            profiler.next_span("Create schema");
             let schema = Schema::new(&view);
             for precommit in precommits {
                 schema.precommits(&block_hash).append(precommit.clone())?;
             }
 
-            let mut node_state = NodeState::new(state, &view);
+            profiler.next_span("create special txs like anchoring or fee");
             for service in self.service_map.values() {
                 service.handle_commit(&mut node_state)?;
             }
