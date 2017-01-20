@@ -16,7 +16,9 @@ macro_rules! message {
             fn raw(&self) -> &$crate::messages::RawMessage {
                 &self.raw
             }
+        }
 
+        impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::messages::Error> {
                 $(raw.check::<$field_type>($from, $to)?;)*

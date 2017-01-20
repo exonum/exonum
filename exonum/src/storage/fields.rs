@@ -4,7 +4,7 @@ use byteorder::{ByteOrder, BigEndian};
 use super::Error;
 
 use ::crypto::{Hash, hash};
-use ::messages::{RawMessage, MessageBuffer, Message};
+use ::messages::{RawMessage, MessageBuffer, Message, FromRaw};
 use serde::Deserialize;
 use serde_json::Value;
 use serde_json::value::from_value;
@@ -131,14 +131,14 @@ impl StorageValue for RawMessage {
 }
 
 impl<T> StorageValue for T
-    where T: Message
+    where T: FromRaw
 {
     fn serialize(self) -> Vec<u8> {
         self.raw().as_ref().as_ref().to_vec()
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
-        Message::from_raw(Arc::new(MessageBuffer::from_vec(v))).unwrap()
+        FromRaw::from_raw(Arc::new(MessageBuffer::from_vec(v))).unwrap()
     }
 
     fn hash(&self) -> Hash {

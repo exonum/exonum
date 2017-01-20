@@ -7,7 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::{Hash, PublicKey};
 
-use super::{Error, RawMessage, MessageBuffer, Message, BitVec};
+use super::{Error, RawMessage, MessageBuffer, BitVec, FromRaw};
 
 pub trait Field<'a> {
     // TODO: use Read and Cursor
@@ -530,7 +530,7 @@ impl<'a> Field<'a> for Vec<RawMessage> {
 }
 
 impl<'a, T> Field<'a> for Vec<T>
-    where T: Message
+    where T: FromRaw
 {
     fn field_size() -> usize {
         1

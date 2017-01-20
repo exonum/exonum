@@ -110,7 +110,7 @@ pub struct BlockState {
     propose_round: Round,
 }
 
-pub trait VoteMessage: Message {
+pub trait VoteMessage: Message + Clone {
     fn validator(&self) -> ValidatorId;
 }
 
