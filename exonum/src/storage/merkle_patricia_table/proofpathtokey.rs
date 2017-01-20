@@ -316,10 +316,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
 
         // if we inspect the topmost level of a proof
         let res: Option<&V> = match *self {
-            LeftBranch { left_hash: ref proof,
-                         right_hash: _,
-                         left_key: ref left_slice_key,
-                         right_key: _ } => {
+            LeftBranch { left_hash: ref proof, left_key: ref left_slice_key, .. } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 if !searched_slice.starts_with(&left_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with searched_key: \
@@ -329,10 +326,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 }
                 proof.verify_proof_consistency(left_slice, searched_slice)?
             } 
-            RightBranch { left_hash: _,
-                          right_hash: ref proof,
-                          left_key: _,
-                          right_key: ref right_slice_key } => {
+            RightBranch { right_hash: ref proof, right_key: ref right_slice_key, .. } => {
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if !searched_slice.starts_with(&right_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with searched_key: \
@@ -342,10 +336,9 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 }
                 proof.verify_proof_consistency(right_slice, searched_slice)?
             } 
-            BranchKeyNotFound { left_hash: _,
-                                right_hash: _,
-                                left_key: ref left_slice_key,
-                                right_key: ref right_slice_key } => {
+            BranchKeyNotFound { left_key: ref left_slice_key,
+                                right_key: ref right_slice_key,
+                                .. } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if searched_slice.starts_with(&left_slice) ||
@@ -370,9 +363,9 @@ impl<V: fmt::Debug> BranchProofNode<V> {
         // if we inspect sub-proofs of a proof
         let res: Option<&V> = match *self {
             LeftBranch { left_hash: ref proof,
-                         right_hash: _,
                          left_key: ref left_slice_key,
-                         right_key: ref right_slice_key } => {
+                         right_key: ref right_slice_key,
+                         .. } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if !left_slice.starts_with(&parent_slice) ||
@@ -390,10 +383,10 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 }
                 proof.verify_proof_consistency(left_slice, searched_slice)?
             } 
-            RightBranch { left_hash: _,
-                          right_hash: ref proof,
+            RightBranch { right_hash: ref proof,
                           left_key: ref left_slice_key,
-                          right_key: ref right_slice_key } => {
+                          right_key: ref right_slice_key,
+                          .. } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if !left_slice.starts_with(&parent_slice) ||
@@ -411,10 +404,9 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 }
                 proof.verify_proof_consistency(right_slice, searched_slice)?
             } 
-            BranchKeyNotFound { left_hash: _,
-                                right_hash: _,
-                                left_key: ref left_slice_key,
-                                right_key: ref right_slice_key } => {
+            BranchKeyNotFound { left_key: ref left_slice_key,
+                                right_key: ref right_slice_key,
+                                .. } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if !left_slice.starts_with(&parent_slice) ||
