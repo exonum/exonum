@@ -15,25 +15,21 @@ use exonum::blockchain::{Service, Transaction};
 use exonum::node::State;
 
 pub const PROFILER_SERVICE: u16 = 7001;
-pub const PROFILER_TRANSACTION_MESSAGE_ID: u16 = 7001;
+pub const PROFILER_TRANSACTION_MESSAGE_ID: u16 = 7002;
 
 
 const PROFILE_ENV_VARIABLE_NAME: &'static str = "PROFILE_FILENAME";
 
 fn flame_dump() {
-    use std::sync::{Once, ONCE_INIT};
     use profiler;
     use std::fs::File;
 
-    static PROFILE_ONCE: Once = ONCE_INIT;
+    if File::create(env::var(PROFILE_ENV_VARIABLE_NAME)
+                          .unwrap_or("exonum-flame-graph.html".to_string()))
+             .and_then(|ref mut  file| profiler::dump_html(file) ).is_err() {
+        warn!("FLAME_GRAPH, cant dump html!");
+    }
 
-    PROFILE_ONCE.call_once(|| {
-        if File::create(env::var(PROFILE_ENV_VARIABLE_NAME)
-                              .unwrap_or("exonum-flame-graph.html".to_string()))
-                 .and_then(|ref mut  file| profiler::dump_html(file) ).is_err() {
-            warn!("FLAME_GRAPH, cant dump html!");
-        }
-    });
    
 }
 
