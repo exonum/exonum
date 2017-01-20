@@ -60,7 +60,7 @@ pub trait EventHandler {
     fn handle_application_event(&mut self, event: Self::ApplicationEvent);
 }
 
-pub trait Channel: Send {
+pub trait Channel: Send + Clone {
     type ApplicationEvent: Send;
     type Timeout: Send;
 
@@ -108,7 +108,7 @@ impl<E: Send, T: Send> MioChannel<E, T> {
     }
 }
 
-impl<E: Send, T: Send> Channel for MioChannel<E, T> {
+impl<E: Send + Clone, T: Send + Clone> Channel for MioChannel<E, T> {
     type ApplicationEvent = E;
     type Timeout = T;
 
@@ -272,7 +272,10 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
     }
 }
 
-impl<H: EventHandler> Reactor<H> for Events<H> {
+impl<H: EventHandler> Reactor<H> for Events<H>
+    where <H as EventHandler>::Timeout: Clone,
+          <H as EventHandler>::ApplicationEvent: Clone
+{
     type Channel = MioChannel<H::ApplicationEvent, H::Timeout>;
 
     fn bind(&mut self) -> ::std::io::Result<()> {

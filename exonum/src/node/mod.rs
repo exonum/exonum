@@ -27,7 +27,7 @@ pub enum ExternalMessage {
     Transaction(Box<Transaction>),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NodeTimeout {
     Status,
     Round(u64, u32),
@@ -82,7 +82,7 @@ pub struct Configuration {
 }
 
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> NodeHandler<S> {
         // FIXME: remove unwraps here, use FATAL log level instead
@@ -295,7 +295,7 @@ impl<S> NodeHandler<S>
 }
 
 impl<S> EventHandler for NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     type Timeout = NodeTimeout;
     type ApplicationEvent = ExternalMessage;

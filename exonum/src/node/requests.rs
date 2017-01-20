@@ -14,7 +14,7 @@ use super::{NodeHandler, ExternalMessage, NodeTimeout};
 const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
