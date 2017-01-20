@@ -6,6 +6,7 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re>"]
 [dependencies]
 exonum = {version="0.1", path="../exonum", features=["memorydb"]}
 blockchain_explorer = {version="0.1", path="../blockchain_explorer", features=["memorydb"]}
+profiler_service = {version = "0.1.0", path="../profiler_service/"}
 
 log = "0.3"
 env_logger = "0.3"
@@ -13,3 +14,4 @@ clap = {version="2.14", features=["unstable"]}
 rand = "0.3"
 time = "0.1"
 serde = "0.8"
+
