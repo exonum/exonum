@@ -190,7 +190,7 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        if config_schema.config_proposes().get(self.hash_propose())?.is_some() {
+        if config_schema.config_proposes().get(self.hash_propose())?.is_none() {
             error!("Received config_vote for unknown transaciton, msg={:?}",
                    self);
             return Ok(());

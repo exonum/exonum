@@ -5,80 +5,102 @@ import datetime
 
 from exonum import ExonumApi, random_hex
 
-class ConfigsApi(ExonumApi):
+class ConfigsApiTest(ExonumApi):
     
-    def new_config_propose(self, config, height, actual_from_height):
-        tx, c = self.send_transaction("config/propose", {"config": config, "height": height, "actual_from_height": actual_from_height})
-        return (self.get_config_propose(tx))
-
-    def new_config_vote(self):
-        tx, _ = self.send_transaction(
-            "config/vote", {"config_propose_hash": hash})
-
-    def get_config_propose(self, hash):
-        r = self.get("config/propose/" + hash)
-        return r.json()
-
-    def get_config_vote(self, pubkey):
-        r = self.get("config/vote/" + hash)
-        return r.json()
-
-class ConfigsApiTest(ConfigsApi):
+    config_propose_hash = ''
     
     def setUp(self):
         super().setUp()
-        self.host = "http://127.0.0.1:8400/api/v1"
+        self.host = "http://127.0.0.1:8900/api/v1"
         self.times = 120
 
-    def create_many_proposes(self, txs):        
-        final_tx = None
-
+    def step1_test_create_propose(self):        
         print()
-        print(" - Create {} config_proposes".format(txs))
+        print (" - Create config_propose")
         start = datetime.datetime.now()
-        for i in range(txs):
-            r, c = self.post_transaction(
-                "wallets/create", {"name": "name_" + str(i)})            
-            final_tx = r["tx_hash"]
+        r, _ = self.put_transaction("configs/propose", 
+        { "actual_from": 1,
+          "validators":[],
+          "consensus": {
+            "round_timeout":2,
+            "status_timeout": 3,
+            "peers_timeout": 4,
+            "propose_timeout": 5,
+            "txs_block_limit": 6
+            } 
+        })
+        print(r)
+        self.config_propose_hash = r["tx_hash"]
+        trx = self.wait_for_transaction(self.config_propose_hash, "configs/propose/")
+        self.assertNotEqual(trx, None)
+        self.assertEqual(trx['config']['actual_from'], 1)
+        self.assertEqual(trx['config']['consensus']['round_timeout'], 2)
+        self.assertEqual(trx['config']['consensus']['status_timeout'], 3)
+        self.assertEqual(trx['config']['consensus']['peers_timeout'], 4)
+        self.assertEqual(trx['config']['consensus']['propose_timeout'], 5)
+        self.assertEqual(trx['config']['consensus']['txs_block_limit'], 6)
 
-        tx = self.wait_for_transaction(final_tx)
-        self.assertNotEqual(tx, None)
-        finish = datetime.datetime.now()
+    # def step2_test_vote_for_unknown_propose(self):        
+    #     print()
+    #     print (" - Create config_vote for unknown")
+    #     start = datetime.datetime.now()
+    #     r, _ = self.put_transaction("configs/vote", 
+    #     { 
+    #         "height": 1,
+    #         "hash_propose": "3222222222222222222222222222222222222222222222222222222222222222",
+    #         "seed": 2,
+    #         "revoke": False
+    #     })        
+    #     tx_hash = r.get('tx_hash')
+    #     self.assertNotEqual(tx_hash, None)
+    #     trx = self.wait_for_transaction(tx_hash, 5)
+    #     self.assertEqual(trx, None)
 
-        delta = finish - start
-        ms = delta.seconds * 1000 + delta.microseconds / 1000
-        print(" - Commited, txs={}, total time: {}s".format(txs, ms / 1000))
-
+    def step4_test_vote_for_known_propose(self):        
+        print()
+        print (" - Create config_vote for known")
         start = datetime.datetime.now()
-        for i in range(txs):
-            info = self.find_user(cookies[i])
-            self.assertEqual(info["name"], "name_" + str(i))
-        finish = datetime.datetime.now()
+        r, _ = self.put_transaction("configs/vote", 
+        { 
+            "height": 1,
+            "hash_propose": self.config_propose_hash,
+            "seed": 4,
+            "revoke": False
+        })        
 
-        delta = finish - start
-        ms = delta.seconds * 1000 + delta.microseconds / 1000
-        print(" - All users found, total time: {}s".format(ms / 1000))
+        tx_hash = r["tx_hash"]
+        trx = self.wait_for_transaction("393db95d6f03db824460752e93bee50c231d5b39cfeb08acf0f1a058bf21eba1", "configs/vote/", 5)
+        self.assertNotEqual(trx, None) 
+        self.assertFalse(trx['revoke'])
 
-    def test_create_config_propose(self):
-        r, c = self.create_user("My First User")
-        self.assertEqual(r["name"], "My First User")
-        self.assertEqual(r["balance"], 0)
+    def step5_test_revoke_for_known_propose(self):        
+        print()
+        print (" - Create config_vote revoke for known")
+        start = datetime.datetime.now()
+        r, _ = self.put_transaction("configs/vote", 
+        { 
+            "height": 1,
+            "hash_propose": self.config_propose_hash,
+            "seed": 5,
+            "revoke": True
+        })        
 
-    def test_create_proposes_1_10(self):
-        self.create_many_proposes(10)
+        tx_hash = r["tx_hash"]
+        trx = self.wait_for_transaction("393db95d6f03db824460752e93bee50c231d5b39cfeb08acf0f1a058bf21eba1", "configs/vote/", 5)
+        self.assertNotEqual(trx, None) 
+        self.assertTrue(trx['revoke'])
 
-    def test_create_proposes_2_100(self):
-        self.create_many_proposes(100)
+    def _steps(self):
+        for name in sorted(dir(self)):
+            if name.startswith("step"):
+                yield name, getattr(self, name) 
 
-    def test_create_proposes_3_1000(self):
-        self.create_many_proposes(1000)
-
-    def test_create_proposes_4_5000(self):
-        self.create_many_proposes(5000)
-
-    def test_create_proposes_5_10000(self):
-        self.create_many_proposes(10000)
-
+    def test_steps(self):
+        for name, step in self._steps():
+            # try:
+                step()
+            # except Exception as e:
+                # self.fail("{} failed ({}: {})".format(step, type(e), e))    
 
 if __name__ == '__main__':
     unittest.main(verbosity=2, buffer=None)
