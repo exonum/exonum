@@ -107,7 +107,6 @@ impl Blockchain {
         Ok(())
     }
 
-    // TODO use Iterator to avoid memory allocations?
     pub fn create_patch(&self,
                         height: u64,
                         round: u32,
