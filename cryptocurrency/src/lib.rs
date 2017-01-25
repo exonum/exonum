@@ -1,5 +1,3 @@
-#![feature(type_ascription)]
-
 extern crate rand;
 extern crate time;
 extern crate serde;

@@ -1,5 +1,3 @@
-use std::slice::SliceConcatExt;
-
 use ::crypto::Hash;
 use ::messages::{RawMessage, Precommit};
 use ::storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, HeightBytes,

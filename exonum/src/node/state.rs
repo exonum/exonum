@@ -516,7 +516,7 @@ impl State {
                     .iter()
                     .filter(|tx| !txs.contains_key(tx))
                     .cloned()
-                    .collect(): BTreeSet<Hash>;
+                    .collect::<BTreeSet<Hash>>();
                 for tx in &unknown_txs {
                     self.unknown_txs
                         .entry(*tx)
