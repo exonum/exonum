@@ -12,11 +12,12 @@ use std::collections::HashMap;
 use time::Timespec;
 use vec_map::VecMap;
 
-use ::crypto::{Hash, hash};
+use ::crypto::Hash;
 use ::messages::{RawMessage, Precommit};
 use ::node::State;
 
-use ::storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
+use ::storage::{MerkleTable, MemoryDB, Patch, Database, Fork, Error, Map, List, Storage,
+                View as StorageView};
 
 pub use self::block::Block;
 pub use self::schema::{ConfigurationData, Schema};
@@ -135,16 +136,18 @@ impl Blockchain {
         let tx_hash = schema.block_txs(height).root_hash()?;
         // Get state hash
         let state_hash = {
-            // TODO Implement me with merkle table
-            let mut buf = Vec::new();
-            // Add core configs hashes
-            buf.extend_from_slice(schema.configs().root_hash()?.as_ref());
+            let db = MemoryDB::new();
+            let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+
+            // Add core state hashes
+            hashes.append(schema.state_hash()?)?;
             // Add state hashes from extensions
             for service in self.service_map.values() {
-                let hash = service.state_hash(&fork)?;
-                buf.extend_from_slice(hash.as_ref());
+                if let Some(hash) = service.state_hash(&fork) {
+                    hashes.append(hash?)?;
+                }
             }
-            hash(&buf)
+            hashes.root_hash()?
         };
 
         // Create block
