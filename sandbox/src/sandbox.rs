@@ -264,10 +264,10 @@ impl Sandbox {
     // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let mut set = HashSet::from_iter(self.addresses
+        let mut set: HashSet<SocketAddr> = HashSet::from_iter(self.addresses
             .iter()
             .skip(1)
-            .map(Clone::clone)): HashSet<SocketAddr>;
+            .map(Clone::clone));
         for _ in 0..self.validators.len() - 1 {
             let sended = self.inner.lock().unwrap().sended.pop_front();
             if let Some((real_addr, real_msg)) = sended {
@@ -414,10 +414,10 @@ impl Drop for Sandbox {
 
 pub fn timestamping_sandbox() -> Sandbox {
     let validators = vec![gen_keypair(), gen_keypair(), gen_keypair(), gen_keypair()];
-    let addresses = vec!["1.1.1.1:1".parse().unwrap(),
-                         "2.2.2.2:2".parse().unwrap(),
-                         "3.3.3.3:3".parse().unwrap(),
-                         "4.4.4.4:4".parse().unwrap()]: Vec<SocketAddr>;
+    let addresses: Vec<SocketAddr> = vec!["1.1.1.1:1".parse().unwrap(),
+                                          "2.2.2.2:2".parse().unwrap(),
+                                          "3.3.3.3:3".parse().unwrap(),
+                                          "4.4.4.4:4".parse().unwrap()];
 
     let db = MemoryDB::new();
     let blockchain = Blockchain::new(db, vec![Box::new(TimestampingService::new())]);

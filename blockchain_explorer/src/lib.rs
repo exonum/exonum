@@ -1,5 +1,3 @@
-#![feature(type_ascription)]
-
 mod explorer;
 pub mod helpers;
 
