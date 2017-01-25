@@ -21,11 +21,10 @@ pub mod wallet;
 use byteorder::{ByteOrder, LittleEndian};
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
-use exonum::crypto::{PublicKey, Hash, hash};
-use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List,
-                      View as StorageView};
+use exonum::crypto::{PublicKey, Hash};
+use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
+                      MemoryDB, Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
-use exonum::node::State;
 
 use wallet::{Wallet, WalletId};
 
@@ -147,25 +146,23 @@ impl From<RawMessage> for CurrencyTx {
 }
 
 pub struct CurrencySchema<'a> {
-    view: &'a StorageView,
+    view: &'a View,
 }
 
 impl<'a> CurrencySchema<'a> {
-    pub fn new(view: &'a StorageView) -> CurrencySchema {
+    pub fn new(view: &'a View) -> CurrencySchema {
         CurrencySchema { view: view }
     }
 
-    pub fn wallets(&self) -> MerkleTable<MapTable<StorageView, [u8], Vec<u8>>, u64, Wallet> {
+    pub fn wallets(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, Wallet> {
         MerkleTable::new(MapTable::new(vec![20], self.view))
     }
 
-    pub fn wallet_ids
-        (&self)
-         -> MerklePatriciaTable<MapTable<StorageView, [u8], Vec<u8>>, PublicKey, u64> {
+    pub fn wallet_ids(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, u64> {
         MerklePatriciaTable::new(MapTable::new(vec![21], self.view))
     }
 
-    pub fn wallet(&self, pub_key: &PublicKey) -> Result<Option<(WalletId, Wallet)>, Error> {
+    pub fn wallet(&self, pub_key: &PublicKey) -> StorageResult<Option<(WalletId, Wallet)>> {
         if let Some(id) = self.wallet_ids().get(pub_key)? {
             let wallet_pair = self.wallets().get(id)?.map(|wallet| (id, wallet));
             return Ok(wallet_pair);
@@ -175,10 +172,22 @@ impl<'a> CurrencySchema<'a> {
 
     pub fn wallet_history(&self,
                           id: WalletId)
-                          -> MerkleTable<MapTable<StorageView, [u8], Vec<u8>>, u64, Hash> {
+                          -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
         let mut prefix = vec![22; 9];
         LittleEndian::write_u64(&mut prefix[1..], id);
         MerkleTable::new(MapTable::new(prefix, self.view))
+    }
+
+    pub fn state_hash(&self) -> StorageResult<Hash> {
+        let db = MemoryDB::new();
+        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+
+        let wallets = self.wallets();
+        let wallet_ids = self.wallet_ids();
+
+        hashes.append(wallets.root_hash()?)?;
+        hashes.append(wallet_ids.root_hash()?)?;
+        hashes.root_hash()
     }
 }
 
@@ -195,7 +204,7 @@ impl Transaction for CurrencyTx {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, view: &StorageView) -> Result<(), Error> {
+    fn execute(&self, view: &View) -> Result<(), Error> {
         let tx_hash = Message::hash(self);
 
         let schema = CurrencySchema::new(view);
@@ -256,31 +265,13 @@ impl Service for CurrencyService {
         CRYPTOCURRENCY
     }
 
-    fn handle_genesis_block(&self, _: &StorageView) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn state_hash(&self, view: &StorageView) -> Result<Hash, Error> {
+    fn state_hash(&self, view: &View) -> Option<StorageResult<Hash>> {
         let schema = CurrencySchema::new(view);
-        let wallets = schema.wallets();
-        let wallet_ids = schema.wallet_ids();
-
-        let mut hashes = Vec::new();
-        hashes.extend_from_slice(wallets.root_hash()?.as_ref());
-        hashes.extend_from_slice(wallet_ids.root_hash()?.as_ref());
-
-        Ok(hash(&hashes))
+        Some(schema.state_hash())
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         CurrencyTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
-    }
-
-    fn handle_commit(&self,
-                     _: &StorageView,
-                     _: &mut State)
-                     -> Result<Vec<Box<Transaction>>, Error> {
-        Ok(Vec::new())
     }
 }
 

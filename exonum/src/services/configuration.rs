@@ -1,10 +1,10 @@
 use std::fmt;
 
 use ::blockchain::{Service, Transaction, Schema};
-use ::crypto::{PublicKey, Hash, hash};
+use ::crypto::{PublicKey, Hash};
 use ::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
-use ::storage::{View, Map, MerklePatriciaTable, MapTable, Result as StorageResult};
-use ::node::State;
+use ::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
+                Result as StorageResult};
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
@@ -128,6 +128,15 @@ impl<'a> ConfigurationSchema<'a> {
         // config_votes patricia merkletree <pub_key> последний голос
         MerklePatriciaTable::new(MapTable::new(vec![05], self.view))
     }
+
+    pub fn state_hash(&self) -> StorageResult<Hash> {
+        let db = MemoryDB::new();
+        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+
+        hashes.append(self.config_proposes().root_hash()?)?;
+        hashes.append(self.config_votes().root_hash()?)?;
+        hashes.root_hash()
+    }
 }
 
 impl TxConfigPropose {
@@ -227,22 +236,12 @@ impl Service for ConfigurationService {
         CONFIG_SERVICE
     }
 
-    fn state_hash(&self, view: &View) -> StorageResult<Hash> {
+    fn state_hash(&self, view: &View) -> Option<StorageResult<Hash>> {
         let schema = ConfigurationSchema::new(view);
-
-        let mut buf = Vec::new();
-        buf.extend_from_slice(schema.config_proposes().root_hash()?.as_ref());
-        buf.extend_from_slice(schema.config_votes().root_hash()?.as_ref());
-        Ok(hash(buf.as_ref()))
+        Some(schema.state_hash())
     }
+
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
-    }
-
-    fn handle_genesis_block(&self, _: &View) -> StorageResult<()> {
-        Ok(())
-    }
-    fn handle_commit(&self, _: &View, _: &mut State) -> StorageResult<Vec<Box<Transaction>>> {
-        Ok(Vec::new())
     }
 }
