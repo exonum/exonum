@@ -859,6 +859,7 @@ mod tests {
     use ::storage::{Map, MemoryDB, MapTable};
     use ::storage::utils::bytes_to_hex;
     use serde_json;
+    use serde::{Serialize, Serializer};
 
     use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX};
     use super::proofpathtokey::RootProofNode;
@@ -877,6 +878,21 @@ mod tests {
             }
             node
         }
+    }
+
+    fn serialize_str_u8<S, A>(data: &A, serializer: &mut S) -> Result<(), S::Error>
+        where S: Serializer,
+              A: AsRef<[u8]>
+    {
+        serializer.serialize_str(&bytes_to_hex(data.as_ref()))
+    }
+    #[derive(Serialize)]
+    struct ProofInfo<'a, A: AsRef<[u8]>, V: Serialize + 'a> {
+        root_hash: Hash,
+        #[serde(serialize_with = "serialize_str_u8")]
+        searched_key: A,
+        proof: &'a RootProofNode<V>,
+        key_found: bool,
     }
 
     // Makes large data set with unique keys
@@ -1366,16 +1382,20 @@ mod tests {
             RootProofNode::Empty => {} 
             _ => assert!(false),
         }
-
         {
             let check_res =
                 search_res.verify_root_proof_consistency(&vec![244;32], table.root_hash().unwrap())
                     .unwrap();
             assert!(check_res.is_none());
         }
-        // TODO:UNCOMMENT
-        let json_repre = serde_json::to_string(&search_res).unwrap();
-        println!("thall: {:?}", json_repre);
+        let proof_info = ProofInfo {
+            root_hash: table.root_hash().unwrap(),
+            searched_key: &vec![244; 32],
+            proof: &search_res,
+            key_found: false,
+        };
+        let json_repre = serde_json::to_string(&proof_info).unwrap();
+        println!("{}", json_repre);
     }
 
     #[test]
@@ -1391,14 +1411,21 @@ mod tests {
         let table_root = table.root_hash().unwrap();
         let proof_path = table.construct_path_to_key(&searched_key).unwrap();
 
-        // TODO:UNCOMMENT
         {
             let check_res = proof_path.verify_root_proof_consistency(&searched_key, table_root)
                 .unwrap();
             assert!(check_res.is_none());
         }
-        let json_repre = serde_json::to_string(&proof_path).unwrap();
-        println!("{}", json_repre);
+        {
+            let proof_info = ProofInfo {
+                root_hash: table_root,
+                searched_key: &searched_key,
+                proof: &proof_path,
+                key_found: false,
+            };
+            let json_repre = serde_json::to_string(&proof_info).unwrap();
+            println!("{}", json_repre);
+        }
 
         match proof_path {
             RootProofNode::LeafRootExclusive(key, hash_val) => {
@@ -1410,15 +1437,21 @@ mod tests {
 
         let proof_path = table.construct_path_to_key(&root_key).unwrap();
         assert_eq!(table_root, proof_path.compute_proof_root());
-        println!("{:?}", bytes_to_hex(&root_key));
         {
             let check_res = proof_path.verify_root_proof_consistency(&root_key, table_root)
                 .unwrap();
             assert_eq!(*check_res.unwrap(), root_val);
         }
-        let json_repre = serde_json::to_string(&proof_path).unwrap();
-        println!("{}", json_repre);
-
+        {
+            let proof_info = ProofInfo {
+                root_hash: table_root,
+                searched_key: &root_key,
+                proof: &proof_path,
+                key_found: true,
+            };
+            let json_repre = serde_json::to_string(&proof_info).unwrap();
+            println!("{}", json_repre);
+        }
         match proof_path {
             RootProofNode::LeafRootInclusive(key, val) => {
                 assert_eq!(key.db_key_data, BitSlice::from_bytes(&root_key).to_db_key());
@@ -1443,14 +1476,20 @@ mod tests {
 
         for item in &data {
             let proof_path_to_key = table.construct_path_to_key(&item.0).unwrap();
-            println!("{:?}", bytes_to_hex(&item.0));
             assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
             let check_res =
                 proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert_eq!(*proved_value.unwrap(), item.1);
 
-            let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
+            let proof_info = ProofInfo {
+                root_hash: table_root_hash,
+                searched_key: &item.0,
+                proof: &proof_path_to_key,
+                key_found: true,
+            };
+
+            let json_repre = serde_json::to_string(&proof_info).unwrap();
             println!("{}", json_repre);
         }
     }
@@ -1479,14 +1518,19 @@ mod tests {
         let table_root_hash = table1.root_hash().unwrap();
         for key in &keys_to_remove {
             let proof_path_to_key = table1.construct_path_to_key(key).unwrap();
-            println!("{:?}", bytes_to_hex(key));
             assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
             let check_res = proof_path_to_key.verify_root_proof_consistency(key, table_root_hash);
             assert!(check_res.is_ok());
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert!(proved_value.is_none());
 
-            let json_repre = serde_json::to_string(&proof_path_to_key).unwrap();
+            let proof_info = ProofInfo {
+                root_hash: table_root_hash,
+                searched_key: key,
+                proof: &proof_path_to_key,
+                key_found: false,
+            };
+            let json_repre = serde_json::to_string(&proof_info).unwrap();
             println!("{}", json_repre);
         }
     }
