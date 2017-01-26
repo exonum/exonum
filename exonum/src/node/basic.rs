@@ -116,7 +116,7 @@ impl<S> NodeHandler<S>
         let status = Status::new(self.state.id(),
                                  self.state.height(),
                                  &hash,
-                                 &self.secret_key);
+                                 self.state.secret_key());
         trace!("Broadcast status: {:?}", status);
         self.broadcast(status.raw());
 
@@ -138,10 +138,10 @@ impl<S> NodeHandler<S>
                 .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
-            let msg = RequestPeers::new(&self.public_key,
+            let msg = RequestPeers::new(self.state.public_key(),
                                         peer.pub_key(),
                                         self.channel.get_time(),
-                                        &self.secret_key);
+                                        self.state.secret_key());
             trace!("Request peers from peer with addr {:?}", peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }

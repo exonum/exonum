@@ -7,7 +7,7 @@ use time::Duration;
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
                              BitVec};
 
-use super::super::crypto::{PublicKey, Hash};
+use super::super::crypto::{PublicKey, SecretKey, Hash};
 use super::super::storage::Patch;
 use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
 
@@ -30,6 +30,7 @@ pub type ValidatorId = u32;
 
 pub struct State {
     id: u32,
+    secret_key: SecretKey,
     validators: Vec<PublicKey>,
     consensus_config: ConsensusConfig,
 
@@ -251,19 +252,8 @@ impl BlockState {
 }
 
 impl State {
-    fn update_config(&mut self, config: StoredConfiguration) {
-
-        let id = config.validators
-            .iter()
-            .position(|pk| pk == self.public_key().unwrap())
-            .unwrap();
-
-        self.id = id as u32;
-        self.validators = config.validators;
-        self.consensus_config = config.consensus;
-    }
-
     pub fn new(id: u32,
+               secret_key: SecretKey,
                validators: Vec<PublicKey>,
                connect: Connect,
                last_hash: Hash,
@@ -276,6 +266,7 @@ impl State {
         State {
             id: id,
 
+            secret_key: secret_key,
             peers: HashMap::new(),
             connections: HashMap::new(),
             validators: validators,
@@ -307,6 +298,17 @@ impl State {
 
             consensus_config: consensus_config,
         }
+    }
+
+    fn update_config(&mut self, config: StoredConfiguration) {
+        let id = config.validators
+            .iter()
+            .position(|pk| pk == self.public_key())
+            .unwrap();
+
+        self.id = id as u32;
+        self.validators = config.validators;
+        self.consensus_config = config.consensus;
     }
 
     pub fn consensus_config(&self) -> &ConsensusConfig {
@@ -343,8 +345,12 @@ impl State {
         self.validators.get(id as usize)
     }
 
-    pub fn public_key(&self) -> Option<&PublicKey> {
-        self.public_key_of(self.id)
+    pub fn public_key(&self) -> &PublicKey {
+        self.public_key_of(self.id).unwrap()
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {
