@@ -18,7 +18,7 @@ impl<S> NodeHandler<S>
 {
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
-        if msg.to() != &self.public_key {
+        if msg.to() != self.state.public_key() {
             return;
         }
 
@@ -161,13 +161,13 @@ impl<S> NodeHandler<S>
             .map(|tx_hash| schema.transactions().get(tx_hash).unwrap().unwrap())
             .collect::<Vec<_>>();
 
-        let block_msg = Block::new(&self.public_key,
+        let block_msg = Block::new(self.state.public_key(),
                                    msg.from(),
                                    self.channel.get_time(),
                                    block,
                                    precommits,
                                    transactions,
-                                   &self.secret_key);
+                                   self.state.secret_key());
         self.send_to_peer(*msg.from(), block_msg.raw());
     }
 }

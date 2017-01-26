@@ -46,8 +46,6 @@ pub struct TxSender<S>
 pub struct NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
     pub state: State,
     pub channel: S,
     pub blockchain: Blockchain,
@@ -109,6 +107,7 @@ impl<S> NodeHandler<S>
         });
 
         let state = State::new(id as u32,
+                               config.listener.secret_key,
                                stored.validators,
                                connect,
                                last_hash,
@@ -116,8 +115,6 @@ impl<S> NodeHandler<S>
                                stored.consensus);
 
         NodeHandler {
-            public_key: config.listener.public_key,
-            secret_key: config.listener.secret_key,
             state: state,
             channel: sender,
             blockchain: blockchain,
