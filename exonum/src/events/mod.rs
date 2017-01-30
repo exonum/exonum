@@ -60,7 +60,7 @@ pub trait EventHandler {
     fn handle_application_event(&mut self, event: Self::ApplicationEvent);
 }
 
-pub trait Channel: Send {
+pub trait Channel: Send + Clone {
     type ApplicationEvent: Send;
     type Timeout: Send;
 
@@ -93,7 +93,6 @@ pub struct Events<H: EventHandler> {
     event_loop: EventLoop<H>,
 }
 
-#[derive(Clone)]
 pub struct MioChannel<E: Send, T: Send> {
     address: SocketAddr,
     inner: mio::Sender<InternalEvent<E, T>>,
@@ -103,7 +102,16 @@ impl<E: Send, T: Send> MioChannel<E, T> {
     pub fn new(addr: SocketAddr, inner: mio::Sender<InternalEvent<E, T>>) -> MioChannel<E, T> {
         MioChannel {
             address: addr,
-            inner: inner,
+            inner: inner.clone(),
+        }
+    }
+}
+
+impl<E: Send, T: Send> Clone for MioChannel<E, T> {
+    fn clone(&self) -> MioChannel<E, T> {
+        MioChannel {
+            address: self.address,
+            inner: self.inner.clone(),
         }
     }
 }

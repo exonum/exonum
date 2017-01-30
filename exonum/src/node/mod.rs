@@ -22,12 +22,12 @@ use self::adjusted_propose_timeout::*;
 
 pub type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum ExternalMessage {
     Transaction(Box<Transaction>),
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NodeTimeout {
     Status,
     Round(u64, u32),
@@ -46,8 +46,6 @@ pub struct TxSender<S>
 pub struct NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
     pub state: State,
     pub channel: S,
     pub blockchain: Blockchain,
@@ -82,7 +80,7 @@ pub struct Configuration {
 }
 
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> NodeHandler<S> {
         // FIXME: remove unwraps here, use FATAL log level instead
@@ -109,6 +107,7 @@ impl<S> NodeHandler<S>
         });
 
         let state = State::new(id as u32,
+                               config.listener.secret_key,
                                stored.validators,
                                connect,
                                last_hash,
@@ -116,8 +115,6 @@ impl<S> NodeHandler<S>
                                stored.consensus);
 
         NodeHandler {
-            public_key: config.listener.public_key,
-            secret_key: config.listener.secret_key,
             state: state,
             channel: sender,
             blockchain: blockchain,
@@ -295,7 +292,7 @@ impl<S> NodeHandler<S>
 }
 
 impl<S> EventHandler for NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     type Timeout = NodeTimeout;
     type ApplicationEvent = ExternalMessage;

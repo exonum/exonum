@@ -15,7 +15,7 @@ use bit_vec;
 
 use ::crypto::PublicKey;
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_SIZE};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_SIZE};
 pub use self::error::Error;
 pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;
@@ -90,12 +90,12 @@ impl RequestMessage {
 
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
-            RequestMessage::Propose(ref msg) => msg.verify(public_key),
-            RequestMessage::Transactions(ref msg) => msg.verify(public_key),
-            RequestMessage::Prevotes(ref msg) => msg.verify(public_key),
-            RequestMessage::Precommits(ref msg) => msg.verify(public_key),
-            RequestMessage::Peers(ref msg) => msg.verify(public_key),
-            RequestMessage::Block(ref msg) => msg.verify(public_key),
+            RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Transactions(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Prevotes(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Precommits(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Peers(ref msg) => msg.verify_signature(public_key),
+            RequestMessage::Block(ref msg) => msg.verify_signature(public_key),
         }
     }
 
@@ -159,9 +159,9 @@ impl ConsensusMessage {
 
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
-            ConsensusMessage::Propose(ref msg) => msg.verify(public_key),
-            ConsensusMessage::Prevote(ref msg) => msg.verify(public_key),
-            ConsensusMessage::Precommit(ref msg) => msg.verify(public_key),
+            ConsensusMessage::Propose(ref msg) => msg.verify_signature(public_key),
+            ConsensusMessage::Prevote(ref msg) => msg.verify_signature(public_key),
+            ConsensusMessage::Precommit(ref msg) => msg.verify_signature(public_key),
         }
     }
 }
@@ -179,40 +179,44 @@ impl fmt::Debug for ConsensusMessage {
 impl Any {
     pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
         // TODO: check input message size
-        Ok(match raw.message_type() {
-            CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
-            STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
-            BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
+        let msg =
+            if raw.service_id() == CONSENSUS {
+                match raw.message_type() {
+                    CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
+                    STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
+                    BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
 
-            PROPOSE_MESSAGE_ID => {
-                Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
-            }
-            PREVOTE_MESSAGE_ID => {
-                Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?))
-            }
-            PRECOMMIT_MESSAGE_ID => {
-                Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?))
-            }
+                    PROPOSE_MESSAGE_ID => {
+                        Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
+                    }
+                    PREVOTE_MESSAGE_ID => {
+                        Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?))
+                    }
+                    PRECOMMIT_MESSAGE_ID => {
+                        Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?))
+                    }
 
-            REQUEST_PROPOSE_MESSAGE_ID => {
-                Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?))
-            }
-            REQUEST_TRANSACTIONS_MESSAGE_ID => {
-                Any::Request(RequestMessage::Transactions(RequestTransactions::from_raw(raw)?))
-            }
-            REQUEST_PREVOTES_MESSAGE_ID => {
-                Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?))
-            }
-            REQUEST_PRECOMMITS_MESSAGE_ID => {
-                Any::Request(RequestMessage::Precommits(RequestPrecommits::from_raw(raw)?))
-            }
-            REQUEST_PEERS_MESSAGE_ID => {
-                Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))
-            }
-            REQUEST_BLOCK_MESSAGE_ID => {
-                Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
-            }
-            _ => Any::Transaction(raw),
-        })
+                    REQUEST_PROPOSE_MESSAGE_ID => {
+                        Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?))
+                    }
+                    REQUEST_TRANSACTIONS_MESSAGE_ID => Any::Request(RequestMessage::Transactions(RequestTransactions::from_raw(raw)?)),
+                    REQUEST_PREVOTES_MESSAGE_ID => {
+                        Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?))
+                    }
+                    REQUEST_PRECOMMITS_MESSAGE_ID => {
+                        Any::Request(RequestMessage::Precommits(RequestPrecommits::from_raw(raw)?))
+                    }
+                    REQUEST_PEERS_MESSAGE_ID => {
+                        Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))
+                    }
+                    REQUEST_BLOCK_MESSAGE_ID => {
+                        Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
+                    }
+                    _ => panic!("Wrong consensus message type"),
+                }
+            } else {
+                Any::Transaction(raw)
+            };
+        Ok(msg)
     }
 }

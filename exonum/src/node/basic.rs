@@ -11,7 +11,7 @@ use super::super::events::Channel;
 use super::{ExternalMessage, NodeTimeout};
 
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn handle_message(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
@@ -90,7 +90,7 @@ impl<S> NodeHandler<S>
             let peer = match self.state.public_key_of(msg.validator()) {
                 // Incorrect signature of message
                 Some(public_key) => {
-                    if !msg.verify(public_key) {
+                    if !msg.verify_signature(public_key) {
                         return;
                     }
                     *public_key
@@ -116,7 +116,7 @@ impl<S> NodeHandler<S>
         let status = Status::new(self.state.id(),
                                  self.state.height(),
                                  &hash,
-                                 &self.secret_key);
+                                 self.state.secret_key());
         trace!("Broadcast status: {:?}", status);
         self.broadcast(status.raw());
 
@@ -138,10 +138,10 @@ impl<S> NodeHandler<S>
                 .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
-            let msg = RequestPeers::new(&self.public_key,
+            let msg = RequestPeers::new(self.state.public_key(),
                                         peer.pub_key(),
                                         self.channel.get_time(),
-                                        &self.secret_key);
+                                        self.state.secret_key());
             trace!("Request peers from peer with addr {:?}", peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
