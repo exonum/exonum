@@ -57,15 +57,7 @@ $ cargo build --manifest-path exonum/Cargo.toml
 
 ### Сборка тестовых приложений:
 
-Пример для сборки узла тестовой сети:
-```
-$ cargo build --manifest-path sandbox/Cargo.toml --example timestamping
-```
-Тестовые приложения можно устанавливать в .cargo
-```
-$ cd cryptocurrency
-$ cargo install
-```
+Смотри репозитории `cryptocurrency-demo` или `timestamping-demo`
 
 # Развертка тестовой сети
 
@@ -123,7 +115,7 @@ supervisorctl start cryptocurrency_backend:*
 ```
 Более подробную информацию о командах можно найти в `man supervisorctl`
 
-## Генерация транзакций
+## Генерация транзакций (FIXME нуждается в полной переработке в рамках отдельного крейта)
 
 В состав тестовой сети включена утилита для генерации потока транзакций, которая называется `tx_generator`.
 Для своей работы она пользуется тем же самым конфигурационным файлом, что и `cryptocurrency`,

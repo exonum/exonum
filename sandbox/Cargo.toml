@@ -4,9 +4,7 @@ version = "0.1.0"
 authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re>"]
 
 [dependencies]
-exonum = {version="0.1", path="../exonum", features=["memorydb"]}
-timestamping = {version="0.1", path="../timestamping", features=["memorydb"]}
-cryptocurrency = {version="0.1", path="../cryptocurrency", features=["memorydb"]}
+exonum = {version="0.1", path="../exonum", features=["memorydb", "sandbox_events"]}
 blockchain_explorer = {version="0.1", path="../blockchain_explorer", features=["memorydb"]}
 
 log = "0.3"

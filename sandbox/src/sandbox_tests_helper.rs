@@ -8,10 +8,7 @@ use exonum::blockchain::Block;
 use exonum::crypto::{hash, Hash, HASH_SIZE};
 use exonum::messages::BitVec;
 
-use super::timestamping_sandbox;
 use super::sandbox::Sandbox;
-use super::TimestampingTxGenerator;
-use exonum::storage::MemoryDB;
 use timestamping::TimestampTx;
 
 type Transaction = TimestampTx;
@@ -306,7 +303,7 @@ pub fn add_one_height_with_transaction(sandbox: &TimestampingSandbox,
             sandbox.assert_lock(round, Some(propose.hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
-            let propose_time = sandbox.time();
+            // let propose_time = sandbox.time();
             // let block = Block::new(initial_height, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
             //            let block = Block::new(initial_height, round, propose_time, &hash(&[]), &tx.hash(), &hash(&[]));
             //            let block = Block::new(initial_height, round, propose_time, &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(), &hash(&[]));
@@ -367,10 +364,6 @@ fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[
                  sandbox.s(VALIDATOR_0 as usize))
 }
 
-fn get_propose(sandbox: &TimestampingSandbox) -> Propose {
-    get_propose_with_transactions(sandbox, &[])
-}
-
 /// assumptions:
 /// - that we come in this function with leader state
 /// - in current round propose_timeout is not triggered yet
@@ -383,7 +376,6 @@ fn check_and_broadcast_propose_and_prevote(sandbox: &TimestampingSandbox,
         return None;
     }
 
-    let round_timeout = sandbox.round_timeout(); //use local var to save long code call
     let time_millis_science_round_start_copy = {
         *sandbox_state.time_millis_science_round_start.borrow()
     };
@@ -451,7 +443,7 @@ pub fn make_request_propose_from_precommit(sandbox: &TimestampingSandbox,
 pub fn make_request_prevote_from_precommit(sandbox: &TimestampingSandbox,
                                            precommit: Precommit)
                                            -> RequestPrevotes {
-    let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
+    let validators = BitVec::from_elem(sandbox.n_validators(), false);
     //    validators.set(precommit.validator() as usize, true);
     RequestPrevotes::new(sandbox.p(VALIDATOR_0 as usize),
                          sandbox.p(precommit.validator() as usize),
