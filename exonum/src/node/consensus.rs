@@ -11,14 +11,11 @@ use super::super::storage::{Map, Patch};
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
 
 use super::super::events::Channel;
-use super::{ExternalMessage, NodeTimeout};
 
 const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 // TODO reduce view invokations
-impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
-{
+impl NodeHandler {
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {

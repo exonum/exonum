@@ -4,8 +4,6 @@ members = [
     "3rdparty/leveldb-sys",
     "3rdparty/leveldb",
     "blockchain_explorer",
-    "cryptocurrency",
     "exonum",
     "sandbox",
-    "timestamping",
 ]

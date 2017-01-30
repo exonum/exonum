@@ -8,11 +8,8 @@ use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestP
 use super::{NodeHandler, RequestData};
 
 use super::super::events::Channel;
-use super::{ExternalMessage, NodeTimeout};
 
-impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
-{
+impl NodeHandler {
     pub fn handle_message(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method

@@ -1,9 +1,9 @@
 extern crate exonum;
 extern crate sandbox;
 
-use exonum::messages::{Message, Propose, Prevote, Precommit};
+// use exonum::messages::{Message, Propose, Prevote, Precommit};
 
-use sandbox::timestamping_sandbox;
+// use sandbox::timestamping_sandbox;
 
 
 // =======================

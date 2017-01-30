@@ -1,6 +1,3 @@
-#[macro_use(message)]
-extern crate exonum;
-
 use exonum::messages::{FromRaw, Message, RawTransaction, Error as MessageError};
 use exonum::crypto::PublicKey;
 use exonum::storage::{Error, View as StorageView};

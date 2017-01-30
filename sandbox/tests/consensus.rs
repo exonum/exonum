@@ -1,23 +1,20 @@
 extern crate exonum;
 extern crate sandbox;
 extern crate time;
-extern crate timestamping;
 #[macro_use]
 extern crate log;
 
 use time::Duration;
 
-use timestamping::TimestampTx;
-
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
                        RequestPrevotes, RequestPrecommits};
-use exonum::blockchain::Block;
-use exonum::crypto::{hash, gen_keypair};
+use exonum::crypto::gen_keypair;
 use exonum::messages::BitVec;
-use exonum::node::state::{REQUEST_BLOCK_WAIT, REQUEST_PRECOMMITS_WAIT, REQUEST_PREVOTES_WAIT,
-                          REQUEST_PROPOSE_WAIT, REQUEST_TRANSACTIONS_WAIT};
+use exonum::node::state::{REQUEST_PRECOMMITS_WAIT, REQUEST_PREVOTES_WAIT, REQUEST_PROPOSE_WAIT,
+                          REQUEST_TRANSACTIONS_WAIT};
 use exonum::node::state::{Round, Height};
 
+use sandbox::timestamping::TimestampTx;
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox_tests_helper::*;
 
