@@ -7,15 +7,17 @@ mod genesis;
 mod service;
 
 use std::sync::Arc;
+use std::collections::HashMap;
 
 use time::Timespec;
 use vec_map::VecMap;
 
-use ::crypto::{Hash, hash};
+use ::crypto::Hash;
 use ::messages::{RawMessage, Precommit};
 use ::node::State;
 
-use ::storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
+use ::storage::{MerkleTable, MemoryDB, Patch, Database, Fork, Error, Map, List, Storage,
+                View as StorageView};
 
 pub use self::block::Block;
 pub use self::schema::{ConfigurationData, Schema};
@@ -100,19 +102,19 @@ impl Blockchain {
                 schema.commit_actual_configuration(0, config_propose.serialize().as_ref())?;
             };
             self.merge(&view.changes())?;
-            self.create_patch(0, 0, time, &[])?.2
+            self.create_patch(0, 0, time, &[], &HashMap::new())?.1
         };
         self.merge(&patch)?;
         Ok(())
     }
 
-    // TODO use Iterator to avoid memory allocations?
     pub fn create_patch(&self,
                         height: u64,
                         round: u32,
                         time: Timespec,
-                        txs: &[(Hash, Box<Transaction>)])
-                        -> Result<(Hash, Vec<Hash>, Patch), Error> {
+                        tx_hashes: &[Hash],
+                        pool: &HashMap<Hash, Box<Transaction>>)
+                        -> Result<(Hash, Patch), Error> {
         // Create fork
         let fork = self.view();
         // Create databa schema
@@ -120,31 +122,32 @@ impl Blockchain {
         // Get last hash
         let last_hash = self.last_hash()?;
         // Save & execute transactions
-        let mut tx_hashes = Vec::new();
-        for &(hash, ref tx) in txs {
+        for hash in tx_hashes {
+            let tx = &pool[hash];
             tx.execute(&fork)?;
             schema.transactions()
-                .put(&hash, tx.raw().clone())
+                .put(hash, tx.raw().clone())
                 .unwrap();
             schema.block_txs(height)
-                .append(hash)
+                .append(*hash)
                 .unwrap();
-            tx_hashes.push(hash);
         }
         // Get tx hash
         let tx_hash = schema.block_txs(height).root_hash()?;
         // Get state hash
         let state_hash = {
-            // TODO Implement me with merkle table
-            let mut buf = Vec::new();
-            // Add core configs hashes
-            buf.extend_from_slice(schema.configs().root_hash()?.as_ref());
+            let db = MemoryDB::new();
+            let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+
+            // Add core state hashes
+            hashes.append(schema.state_hash()?)?;
             // Add state hashes from extensions
             for service in self.service_map.values() {
-                let hash = service.state_hash(&fork)?;
-                buf.extend_from_slice(hash.as_ref());
+                if let Some(hash) = service.state_hash(&fork) {
+                    hashes.append(hash?)?;
+                }
             }
-            hash(&buf)
+            hashes.root_hash()?
         };
 
         // Create block
@@ -156,7 +159,7 @@ impl Blockchain {
         schema.heights().append(block_hash).is_ok();
         // Save block
         schema.blocks().put(&block_hash, block).is_ok();
-        Ok((block_hash, tx_hashes, fork.changes()))
+        Ok((block_hash, fork.changes()))
     }
 
     pub fn commit<'a, I>(&self,
@@ -183,7 +186,7 @@ impl Blockchain {
             let mut txs = Vec::new();
             for service in self.service_map.values() {
                 let t = service.handle_commit(&view, state)?;
-                txs.extend_from_slice(&t);
+                txs.extend(t.into_iter());
             }
 
             (view.changes(), txs)

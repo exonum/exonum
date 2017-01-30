@@ -1,9 +1,7 @@
-use std::slice::SliceConcatExt;
-
 use ::crypto::Hash;
 use ::messages::{RawMessage, Precommit};
 use ::storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, HeightBytes,
-                Error, Map, List};
+                Error, Map, List, MemoryDB};
 
 use super::Block;
 use super::config::StoredConfiguration;
@@ -110,5 +108,13 @@ impl<'a> Schema<'a> {
             }
         }
         Ok(None)
+    }
+
+    pub fn state_hash(&self) -> Result<Hash, Error> {
+        let db = MemoryDB::new();
+        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+
+        hashes.append(self.configs().root_hash()?)?;
+        hashes.root_hash()
     }
 }

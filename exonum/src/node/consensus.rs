@@ -17,7 +17,7 @@ const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 // TODO reduce view invokations
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> + Clone
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
@@ -129,7 +129,7 @@ impl<S> NodeHandler<S>
     // TODO write helper function which returns Result
     pub fn handle_block(&mut self, msg: Block) {
         // Request are sended to us
-        if msg.to() != &self.public_key {
+        if msg.to() != self.state.public_key() {
             error!("Received block that intended for another peer, to={}, from={}",
                    msg.to().to_hex(),
                    msg.from().to_hex());
@@ -198,7 +198,7 @@ impl<S> NodeHandler<S>
             let view = &self.blockchain.view();
             let schema = Schema::new(view);
             // Verify transactions
-            let mut txs = Vec::new();
+            let mut tx_hashes = Vec::new();
             for raw in msg.transactions() {
                 if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                     let hash = tx.hash();
@@ -211,24 +211,25 @@ impl<S> NodeHandler<S>
                         error!("Incorrect transaction in block detected, block={:?}", msg);
                         return;
                     }
-                    txs.push((hash, tx));
+                    self.state.add_transaction(hash, tx);
+                    tx_hashes.push(hash);
                 } else {
                     error!("Unknown transaction in block detected, block={:?}", msg);
                     return;
                 }
             }
 
-            let (block_hash, txs, patch) = self.create_block(block.height(),
-                                                             block.propose_round(),
-                                                             block.time(),
-                                                             txs.as_slice());
+            let (block_hash, patch) = self.create_block(block.height(),
+                                                        block.propose_round(),
+                                                        block.time(),
+                                                        tx_hashes.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
                 panic!("Block_hash incorrect in received block={:?}", msg);
             }
 
             // Commit block
-            self.state.add_block(block_hash, patch, txs, propose_round);
+            self.state.add_block(block_hash, patch, tx_hashes, propose_round);
         }
         self.commit(block_hash, precommits.iter());
         self.request_next_block();
@@ -419,7 +420,7 @@ impl<S> NodeHandler<S>
 
         for tx in new_txs {
             assert!(tx.verify());
-            self.handle_incoming_tx(tx.clone());
+            self.handle_incoming_tx(tx);
         }
 
         let height = self.state.height();
@@ -581,7 +582,7 @@ impl<S> NodeHandler<S>
                                    self.channel.get_time(),
                                    self.state.last_hash(),
                                    &txs,
-                                   &self.secret_key);
+                                   self.state.secret_key());
         trace!("Broadcast propose: {:?}", propose);
         self.broadcast(propose.raw());
 
@@ -603,12 +604,12 @@ impl<S> NodeHandler<S>
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    RequestPropose::new(&self.public_key,
+                    RequestPropose::new(self.state.public_key(),
                                         &peer,
                                         self.channel.get_time(),
                                         self.state.height(),
                                         propose_hash,
-                                        &self.secret_key)
+                                        self.state.secret_key())
                         .raw()
                         .clone()
                 }
@@ -620,28 +621,28 @@ impl<S> NodeHandler<S>
                         .iter()
                         .cloned()
                         .collect();
-                    RequestTransactions::new(&self.public_key,
+                    RequestTransactions::new(self.state.public_key(),
                                              &peer,
                                              self.channel.get_time(),
                                              &txs,
-                                             &self.secret_key)
+                                             self.state.secret_key())
                         .raw()
                         .clone()
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    RequestPrevotes::new(&self.public_key,
+                    RequestPrevotes::new(self.state.public_key(),
                                          &peer,
                                          self.channel.get_time(),
                                          self.state.height(),
                                          round,
                                          propose_hash,
                                          self.state.known_prevotes(round, propose_hash),
-                                         &self.secret_key)
+                                         self.state.secret_key())
                         .raw()
                         .clone()
                 }
                 RequestData::Precommits(round, ref propose_hash, ref block_hash) => {
-                    RequestPrecommits::new(&self.public_key,
+                    RequestPrecommits::new(self.state.public_key(),
                                            &peer,
                                            self.channel.get_time(),
                                            self.state.height(),
@@ -649,16 +650,16 @@ impl<S> NodeHandler<S>
                                            propose_hash,
                                            block_hash,
                                            self.state.known_precommits(round, propose_hash),
-                                           &self.secret_key)
+                                           self.state.secret_key())
                         .raw()
                         .clone()
                 }
                 RequestData::Block(height) => {
-                    RequestBlock::new(&self.public_key,
+                    RequestBlock::new(self.state.public_key(),
                                       &peer,
                                       self.channel.get_time(),
                                       height,
-                                      &self.secret_key)
+                                      self.state.secret_key())
                         .raw()
                         .clone()
                 }
@@ -679,29 +680,28 @@ impl<S> NodeHandler<S>
                         height: Height,
                         round: Round,
                         time: Timespec,
-                        txs: &[(Hash, Box<Transaction>)])
-                        -> (Hash, Vec<Hash>, Patch) {
+                        tx_hashes: &[Hash])
+                        -> (Hash, Patch) {
         self.blockchain
-            .create_patch(height, round, time, txs)
+            .create_patch(height, round, time, tx_hashes, self.state.transactions())
             .unwrap()
     }
 
     // FIXME: remove this bull shit
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
-        let propose = self.state.propose(propose_hash).unwrap().message().clone();
-        let txs = propose.transactions()
-            .iter()
-            .map(|tx_hash| {
-                let tx = self.state.transactions().get(tx_hash).unwrap();
-                (*tx_hash, tx.clone())
-            })
-            .collect::<Vec<_>>();
-        let (block_hash, txs, patch) = self.create_block(propose.height(),
-                                                         propose.round(),
-                                                         propose.time(),
-                                                         txs.as_slice());
+        let propose = self.state
+            .propose(propose_hash)
+            .unwrap()
+            .message()
+            .clone();
+
+        let tx_hashes = propose.transactions().to_vec();
+        let (block_hash, patch) = self.create_block(propose.height(),
+                                                    propose.round(),
+                                                    propose.time(),
+                                                    tx_hashes.as_slice());
         // Save patch
-        self.state.add_block(block_hash, patch, txs, propose.round());
+        self.state.add_block(block_hash, patch, tx_hashes, propose.round());
         block_hash
     }
 
@@ -757,7 +757,7 @@ impl<S> NodeHandler<S>
                                    round,
                                    propose_hash,
                                    locked_round,
-                                   &self.secret_key);
+                                   self.state.secret_key());
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
@@ -770,7 +770,7 @@ impl<S> NodeHandler<S>
                                        round,
                                        propose_hash,
                                        block_hash,
-                                       &self.secret_key);
+                                       self.state.secret_key());
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
@@ -784,7 +784,7 @@ impl<S> NodeHandler<S>
                             precommit: &Precommit)
                             -> Result<(), String> {
         if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
-            if !precommit.verify(pub_key) {
+            if !precommit.verify_signature(pub_key) {
                 let e = format!("Received wrong signed precommit, precommit={:?}", precommit);
                 return Err(e);
             }

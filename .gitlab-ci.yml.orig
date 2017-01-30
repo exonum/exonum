@@ -1,0 +1,275 @@
+before_script:
+- sudo apt-get -qq update
+- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+- curl https://sh.rustup.rs -sSf | sh -s -- -y
+- source $HOME/.cargo/env
+- rustup override set nightly-2017-01-08
+- npm config set prefix $HOME/.npm
+- export NODE_PATH=$HOME/.npm/lib/node_modules
+- npm install --global yo gulp-cli bower grunt grunt-cli forever generator-karma generator-angular
+- export PATH=$PWD/target/release/:$HOME/.npm/bin:$PATH
+- rustc --version
+- cargo --version
+- export
+
+after_script:
+- npm config delete prefix
+
+stages:
+  - build
+  - test
+  - bench
+  - deploy
+
+cache:
+  key: global
+  paths:
+  - target/
+  - drm-frontend/node_modules/
+  - drm-frontend/bower_components/
+  - landing/node_modules/
+  - landing/bower_components/
+  - blog/node_modules/
+  - registry-frontend/node_modules/
+  - registry-frontend/bower_components/
+
+variables:
+  SODIUM_LIB_DIR: /usr/lib/x86_64-linux-gnu
+  LEVELDB_LIB_DIR: /usr/lib/x86_64-linux-gnu
+  TESTNET_DESTDIR: "/home/gitlab-runner/testnet" #FIXME use $HOME variable or deploy into /srv
+  # Variables for anchoring rpc
+  ANCHORING_HOST: http://exonum.com/bitcoind
+  ANCHORING_PASSWORD: 9gBLW3fxQY
+  ANCHORING_USER: docsuser
+
+exonum-build:
+  script:
+  - cargo rustc --manifest-path exonum/Cargo.toml --features clippy -- -D warnings
+  - cargo rustc --manifest-path blockchain_explorer/Cargo.toml --lib -- -D warnings
+  - cargo build --manifest-path cryptocurrency/Cargo.toml
+  - cargo build --manifest-path timestamping/Cargo.toml --lib
+  - cargo build --manifest-path services/anchoring/Cargo.toml
+  - cargo build --manifest-path sandbox/Cargo.toml
+  - cargo build --release --manifest-path blockchain_explorer/Cargo.toml
+  - cargo build --release --manifest-path cryptocurrency/Cargo.toml
+  artifacts:
+    paths:
+    - target/release/cryptocurrency
+    - target/release/exonumctl
+  stage: build
+
+frontends-build:
+  script:
+  # Build drm-frontend
+  - cd drm-frontend
+  - npm install
+  - bower install
+  - gulp
+  # Build landing
+  - cd ../landing
+  - npm install
+  - bower install
+  - gulp
+  # Build blog
+  - cd ../blog
+  - npm install --production
+  # Build registry-frontend
+  - cd ../registry-frontend
+  - npm install
+  - bower install
+  - grunt build
+  artifacts:
+    paths:
+    - drm-frontend/dist
+    - landing/dist
+    - registry-frontend/dist
+  stage: build
+
+# Tests section
+
+exonum-test:
+  script:
+  - cargo test --all
+  stage: test
+
+# Benchmark section
+
+exonum-bench:
+  script:
+  - cargo bench --manifest-path exonum/Cargo.toml --features long_benchmarks
+  when: manual
+  stage: bench
+
+cryptocurrency-network-bench:
+  script:
+  - testnet/testnetctl.sh clear cryptocurrency_bench
+  - testnet/testnetctl.sh update
+  - cd cryptocurrency && cargo install -f && cd ..
+  - cryptocurrency generate -o $TESTNET_DESTDIR/cryptocurrency_bench 9 --anchoring-host $ANCHORING_HOST --anchoring-user $ANCHORING_USER --anchoring-password $ANCHORING_PASSWORD --anchoring-funds 10000
+  - testnet/testnetctl.sh start cryptocurrency_bench
+  - testnet/tests/drm_api_test.py
+  after_script:
+  - testnet/testnetctl.sh stop cryptocurrency_bench
+  when: manual
+  stage: bench
+<<<<<<< HEAD
+
+# Deploy 
+
+# Supervisord section
+
+testnet:
+  script:
+  - testnet/testnetctl.sh enable
+  stage: deploy
+
+# Backends section
+
+cryptocurrency-backend:
+  script:
+  - testnet/testnetctl.sh update
+  - cd cryptocurrency && cargo install -f && cd ..
+  - testnet/testnetctl.sh generate cryptocurrency_backend 4 4100
+  - testnet/testnetctl.sh restart cryptocurrency_backend
+  environment: Cryptocurrency
+  when: manual
+  stage: deploy
+
+=======
+  
+>>>>>>> Add anchoring service to cryptocurrency
+# Frontends section
+
+drm-frontend:
+  script:
+  - sudo rsync -rtv drm-frontend/dist/ /var/www/exonum.com/demo/drm
+  only:
+  - master
+  when: manual
+  stage: deploy
+
+drm-frontend-preview:
+  script:
+  - sudo mkdir -p /var/www/exonum.com/demo/drm/$CI_BUILD_REF_NAME
+  - sudo rsync -rtv drm-frontend/dist/ /var/www/exonum.com/demo/drm/$CI_BUILD_REF_NAME
+  only: 
+  - branches
+  when: manual
+  stage: deploy
+
+landing:
+  script:
+  - sudo rsync -rtv landing/dist/ /var/www/exonum.com/
+  only:
+  - master
+  when: manual
+  stage: deploy
+
+landing-preview:
+  script:
+  - sudo mkdir -p /var/www/exonum.com/$CI_BUILD_REF_NAME
+  - sudo rsync -rtv landing/dist/ /var/www/exonum.com/$CI_BUILD_REF_NAME
+  only:
+  - branches
+  when: manual
+  stage: deploy
+
+blog:
+  script:
+  - set +e
+  - sudo forever stop /var/www/exonum.com/blog/index.js
+  - set -e
+  # Run immediate db backup
+  - if test -f "/var/www/exonum.com/blog/backup.sh"; then /var/www/exonum.com/blog/backup.sh && echo "Backup blog database" `date '+%Y/%m/%Y-%m-%d-%H:%S'`;fi
+  # Create link to cron script
+  - sudo rm -rf /etc/cron.weekly/blog
+  - if test -f "/var/www/exonum.com/blog/cron"; then sudo ln -f /var/www/exonum.com/blog/cron /etc/cron.weekly/blog;fi
+  - sudo rsync -rv blog/ /var/www/exonum.com/blog/
+  - cd /var/www/exonum.com/blog/
+  - sudo rm -rf ./content/themes/exonum/assets
+  - sudo ln -sf /var/www/exonum.com/assets/ ./content/themes/exonum/assets
+  - sudo rm -rf ./content/themes/exonum/templates
+  - sudo ln -sf /var/www/exonum.com/templates/ ./content/themes/exonum/templates
+  - sudo NODE_ENV=production forever start index.js
+  only:
+  - master
+  when: manual
+  stage: deploy
+
+registry-frontend:
+  script:
+  - sudo rsync -rtv registry-frontend/dist/ /var/www/exonum.com/demo/land
+  only:
+  - master
+  when: manual
+  stage: deploy
+
+registry-frontend-preview:
+  script:
+  - sudo mkdir -p /var/www/exonum.com/demo/land/$CI_BUILD_REF_NAME
+  - sudo rsync -rtv registry-frontend/dist/ /var/www/exonum.com/demo/land/$CI_BUILD_REF_NAME
+  only:
+  - branches
+  when: manual
+  stage: deploy
+
+voting:
+  script:
+  - sudo rsync -rtv voting/ /var/www/exonum.com/demo/voting/
+  only:
+  - master
+  when: manual
+  stage: deploy
+
+voting-preview:
+  script:
+  - sudo mkdir -p /var/www/exonum.com/demo/voting/$CI_BUILD_REF_NAME
+  - sudo rsync -rtv voting/ /var/www/exonum.com/demo/voting/$CI_BUILD_REF_NAME
+  only:
+  - branches
+  when: manual
+  stage: deploy
+
+registry-frontend:
+  script:
+  - sudo rsync -rtv registry-frontend/dist/ /var/www/exonum.com/demo/land
+  only:
+  - master
+  when: manual
+  stage: deploy
+
+registry-frontend-preview:
+  script:
+  - sudo mkdir -p /var/www/exonum.com/demo/land/$CI_BUILD_REF_NAME
+  - sudo rsync -rtv registry-frontend/dist/ /var/www/exonum.com/demo/land/$CI_BUILD_REF_NAME
+  only:
+  - branches
+  when: manual
+  stage: deploy
+
+registry-frontend:
+  script:
+  - sudo rsync -rtv registry-frontend/dist/ /var/www/exonum.com/demo/land
+  only:
+  - master
+  when: manual
+  stage: deploy
+
+registry-frontend-preview:
+  script:
+  - sudo mkdir -p /var/www/exonum.com/demo/land/$CI_BUILD_REF_NAME
+  - sudo rsync -rtv registry-frontend/dist/ /var/www/exonum.com/demo/land/$CI_BUILD_REF_NAME
+  only:
+  - branches
+  when: manual
+  stage: deploy
+
+# Documents section
+
+exonum-docs:
+  script:
+  - cargo doc --manifest-path sandbox/Cargo.toml
+  - sudo rsync -rt target/doc/ /var/www/exonum.com/doc/
+  only: 
+  - master
+  stage: deploy

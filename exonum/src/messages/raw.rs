@@ -72,7 +72,7 @@ impl MessageBuffer {
         unsafe { mem::transmute(&self.raw[sign_idx]) }
     }
 
-    pub fn verify(&self, pub_key: &PublicKey) -> bool {
+    pub fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         verify(self.signature(), self.body(), pub_key)
     }
 
@@ -135,17 +135,20 @@ impl MessageWriter {
     }
 }
 
-pub trait Message: Debug + Clone + PartialEq + Sized + Send {
+pub trait Message: Debug + Send {
     fn raw(&self) -> &RawMessage;
-    fn from_raw(raw: RawMessage) -> Result<Self, Error>;
 
     fn hash(&self) -> Hash {
         self.raw().hash()
     }
 
-    fn verify(&self, pub_key: &PublicKey) -> bool {
-        self.raw().verify(pub_key)
+    fn verify_signature(&self, pub_key: &PublicKey) -> bool {
+        self.raw().verify_signature(pub_key)
     }
+}
+
+pub trait FromRaw: Sized + Send + Message {
+    fn from_raw(raw: RawMessage) -> Result<Self, Error>;
 }
 
 // #[test]

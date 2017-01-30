@@ -1,10 +1,10 @@
 use std::fmt;
 
 use ::blockchain::{Service, Transaction, Schema};
-use ::crypto::{PublicKey, Hash, hash};
-use ::messages::{RawMessage, Message, RawTransaction, Error as MessageError};
-use ::storage::{View, Map, MerklePatriciaTable, MapTable, Result as StorageResult};
-use ::node::State;
+use ::crypto::{PublicKey, Hash};
+use ::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
+use ::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
+                Result as StorageResult};
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
@@ -64,29 +64,19 @@ impl ConfigTx {
             ConfigTx::ConfigVote(ref msg) => msg.height(),
         }
     }
+}
 
-    pub fn raw(&self) -> &RawMessage {
+impl fmt::Debug for ConfigTx {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.raw(),
-            ConfigTx::ConfigVote(ref msg) => msg.raw(),
+            ConfigTx::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
+            ConfigTx::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
         }
     }
+}
 
-    pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.verify(public_key),
-            ConfigTx::ConfigVote(ref msg) => msg.verify(public_key),
-        }
-    }
-
-    pub fn hash(&self) -> Hash {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.hash(),
-            ConfigTx::ConfigVote(ref msg) => msg.hash(),
-        }
-    }
-
-    pub fn from_raw(raw: RawMessage) -> Result<ConfigTx, MessageError> {
+impl FromRaw for ConfigTx {
+    fn from_raw(raw: RawMessage) -> Result<ConfigTx, MessageError> {
         match raw.message_type() {
             CONFIG_PROPOSE_MESSAGE_ID => {
                 Ok(ConfigTx::ConfigPropose(TxConfigPropose::from_raw(raw)?))
@@ -97,11 +87,25 @@ impl ConfigTx {
     }
 }
 
-impl fmt::Debug for ConfigTx {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+impl Message for ConfigTx {
+    fn raw(&self) -> &RawMessage {
         match *self {
-            ConfigTx::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
-            ConfigTx::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
+            ConfigTx::ConfigPropose(ref msg) => msg.raw(),
+            ConfigTx::ConfigVote(ref msg) => msg.raw(),
+        }
+    }
+
+    fn verify_signature(&self, public_key: &PublicKey) -> bool {
+        match *self {
+            ConfigTx::ConfigPropose(ref msg) => msg.verify_signature(public_key),
+            ConfigTx::ConfigVote(ref msg) => msg.verify_signature(public_key),
+        }
+    }
+
+    fn hash(&self) -> Hash {
+        match *self {
+            ConfigTx::ConfigPropose(ref msg) => msg.hash(),
+            ConfigTx::ConfigVote(ref msg) => msg.hash(),
         }
     }
 }
@@ -123,6 +127,15 @@ impl<'a> ConfigurationSchema<'a> {
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, TxConfigVote> {
         // config_votes patricia merkletree <pub_key> последний голос
         MerklePatriciaTable::new(MapTable::new(vec![05], self.view))
+    }
+
+    pub fn state_hash(&self) -> StorageResult<Hash> {
+        let db = MemoryDB::new();
+        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+
+        hashes.append(self.config_proposes().root_hash()?)?;
+        hashes.append(self.config_votes().root_hash()?)?;
+        hashes.root_hash()
     }
 }
 
@@ -200,24 +213,15 @@ impl TxConfigVote {
 }
 
 impl Transaction for ConfigTx {
-    fn hash(&self) -> Hash {
-        ConfigTx::hash(self)
-    }
     fn verify(&self) -> bool {
-        self.verify(self.from())
+        self.verify_signature(self.from())
     }
+
     fn execute(&self, view: &View) -> StorageResult<()> {
         match *self {
             ConfigTx::ConfigPropose(ref tx) => tx.execute(view),
             ConfigTx::ConfigVote(ref tx) => tx.execute(view),
         }
-    }
-
-    fn raw(&self) -> &RawTransaction {
-        ConfigTx::raw(self)
-    }
-    fn clone_box(&self) -> Box<Transaction> {
-        Box::new(self.clone())
     }
 }
 
@@ -232,22 +236,12 @@ impl Service for ConfigurationService {
         CONFIG_SERVICE
     }
 
-    fn state_hash(&self, view: &View) -> StorageResult<Hash> {
+    fn state_hash(&self, view: &View) -> Option<StorageResult<Hash>> {
         let schema = ConfigurationSchema::new(view);
-
-        let mut buf = Vec::new();
-        buf.extend_from_slice(schema.config_proposes().root_hash()?.as_ref());
-        buf.extend_from_slice(schema.config_votes().root_hash()?.as_ref());
-        Ok(hash(buf.as_ref()))
+        Some(schema.state_hash())
     }
+
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
-    }
-
-    fn handle_genesis_block(&self, _: &View) -> StorageResult<()> {
-        Ok(())
-    }
-    fn handle_commit(&self, _: &View, _: &mut State) -> StorageResult<Vec<Box<Transaction>>> {
-        Ok(Vec::new())
     }
 }
