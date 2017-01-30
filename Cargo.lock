@@ -2,11 +2,11 @@
 name = "cryptocurrency"
 version = "0.1.0"
 dependencies = [
- "blockchain_explorer 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)",
+ "blockchain_explorer 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)",
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.19.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "exonum 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)",
+ "exonum 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)",
  "hyper 0.9.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonway 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -50,12 +50,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "blockchain_explorer"
 version = "0.1.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37#a84b2e37d7749d4ff6033be26917a05cb8fd61bc"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce#8ced381f8e9b4764c79786112b7acfcf7113afce"
 dependencies = [
  "clap 2.19.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "colored 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "exonum 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)",
+ "exonum 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustless 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.22 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -169,12 +169,12 @@ dependencies = [
 [[package]]
 name = "exonum"
 version = "0.1.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37#a84b2e37d7749d4ff6033be26917a05cb8fd61bc"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce#8ced381f8e9b4764c79786112b7acfcf7113afce"
 dependencies = [
  "bit-vec 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "leveldb 0.9.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)",
+ "leveldb 0.9.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -186,6 +186,7 @@ dependencies = [
  "time 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "valico 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vec_map 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -310,16 +311,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "leveldb"
 version = "0.9.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37#a84b2e37d7749d4ff6033be26917a05cb8fd61bc"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce#8ced381f8e9b4764c79786112b7acfcf7113afce"
 dependencies = [
- "leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)",
+ "leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)",
  "libc 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "leveldb-sys"
 version = "3.0.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37#a84b2e37d7749d4ff6033be26917a05cb8fd61bc"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce#8ced381f8e9b4764c79786112b7acfcf7113afce"
 dependencies = [
  "libc 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -990,7 +991,7 @@ dependencies = [
 "checksum bit-vec 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "5b97c2c8e8bbb4251754f559df8af22fb264853c7d009084a576cdf12565089d"
 "checksum bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
-"checksum blockchain_explorer 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)" = "<none>"
+"checksum blockchain_explorer 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)" = "<none>"
 "checksum bodyparser 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "07b171b407e583dc8f01011a713f20575a81ac60acecf3b8153012709aeb1fd6"
 "checksum byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0fc10e8cc6b2580fda3f36eb6dc5316657f812a3df879a44a66fc9f0fdbc4855"
 "checksum bytes 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c129aff112dcc562970abb69e2508b40850dd24c274761bb50fb8a0067ba6c27"
@@ -1003,7 +1004,7 @@ dependencies = [
 "checksum dtoa 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0dd841b58510c9618291ffa448da2e4e0f699d984d436122372f446dae62263d"
 "checksum env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "15abd780e45b3ea4f76b4e9a26ff4843258dd8a3eed2775a0e7368c2e7936c2f"
 "checksum error 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "a6e606f14042bb87cc02ef6a14db6c90ab92ed6f62d87e69377bc759fd7987cc"
-"checksum exonum 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)" = "<none>"
+"checksum exonum 0.1.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)" = "<none>"
 "checksum gcc 0.3.41 (registry+https://github.com/rust-lang/crates.io-index)" = "3689e1982a563af74960ae3a4758aa632bb8fd984cfc3cc3b60ee6109477ab6e"
 "checksum gdi32-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0912515a8ff24ba900422ecda800b52f4016a56251922d397c576bf92c690518"
 "checksum hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d6a22814455d41612f41161581c2883c0c6a1c41852729b17d5ed88f01e153aa"
@@ -1018,8 +1019,8 @@ dependencies = [
 "checksum language-tags 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a91d884b6667cd606bb5a69aa0c99ba811a115fc68915e7056ec08a46e93199a"
 "checksum lazy_static 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)" = "cf186d1a8aa5f5bee5fd662bc9c1b949e0259e1bcc379d1f006847b0080c7417"
 "checksum lazy_static 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6abe0ee2e758cd6bc8a2cd56726359007748fbf4128da998b65d0b70f881e19b"
-"checksum leveldb 0.9.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)" = "<none>"
-"checksum leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=a84b2e37)" = "<none>"
+"checksum leveldb 0.9.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)" = "<none>"
+"checksum leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git?rev=8ced381f8e9b4764c79786112b7acfcf7113afce)" = "<none>"
 "checksum libc 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)" = "9e030dc72013ed68994d1b2cbf36a94dd0e58418ba949c4b0db7eeb70a7a6352"
 "checksum libressl-pnacl-sys 2.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "cbc058951ab6a3ef35ca16462d7642c4867e6403520811f28537a4e2f2db3e71"
 "checksum libsodium-sys 0.0.12 (registry+https://github.com/rust-lang/crates.io-index)" = "44e9986c330611ccd26ea74e502c70e5ebab2874c4c23f2f5f3c5a6ed3fbfbc6"

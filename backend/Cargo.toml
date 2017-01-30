@@ -22,8 +22,8 @@ jsonway = "1.0"
 
 [dependencies.exonum]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "a84b2e37"
+rev = "8ced381f8e9b4764c79786112b7acfcf7113afce"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "a84b2e37"
+rev = "8ced381f8e9b4764c79786112b7acfcf7113afce"
