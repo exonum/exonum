@@ -1,10 +1,15 @@
+#[macro_use]
+extern crate exonum;
+#[macro_use]
+extern crate log;
+
 use std::fmt;
 
-use ::blockchain::{Service, Transaction, Schema, NodeState};
-use ::crypto::{PublicKey, Hash};
-use ::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
-use ::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
-                Result as StorageResult};
+use exonum::blockchain::{Service, Transaction, Schema, NodeState};
+use exonum::crypto::{PublicKey, Hash};
+use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
+use exonum::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
+                      Result as StorageResult};
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;

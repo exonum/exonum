@@ -6,4 +6,5 @@ members = [
     "blockchain_explorer",
     "exonum",
     "sandbox",
+    "services/configuration",
 ]
