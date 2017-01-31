@@ -319,9 +319,18 @@ impl State {
         self.id
     }
 
-    // TODO Move to blockchain (and store therein)
     pub fn validators(&self) -> &[PublicKey] {
         &self.validators
+    }
+
+    pub fn propose_timeout(&self) -> i64 {
+        self.consensus_config.propose_timeout
+    }
+
+    pub fn set_propose_timeout(&mut self, timeout: i64) {
+        debug_assert!(timeout > 0);
+        debug_assert!(timeout < self.consensus_config.round_timeout);
+        self.consensus_config.propose_timeout = timeout;
     }
 
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
