@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ::blockchain::{Service, Transaction, Schema};
+use ::blockchain::{Service, Transaction, Schema, NodeState};
 use ::crypto::{PublicKey, Hash};
 use ::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use ::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
@@ -243,5 +243,19 @@ impl Service for ConfigurationService {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+    }
+
+    fn handle_commit(&self, state: &mut NodeState) -> StorageResult<()> {
+        let actual_config = {
+            let schema = Schema::new(state.view());
+            let height = state.height();
+            schema.get_configuration_at_height(height)?
+        };
+
+        if let Some(config) = actual_config {
+            info!("Updated node config={:#?}", config);
+            state.update_config(config);
+        }
+        Ok(())
     }
 }

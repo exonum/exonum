@@ -425,11 +425,7 @@ impl NodeHandler {
 
         // Update state to new height
         let round = self.actual_round();
-
-        let view = self.blockchain.view();
-        let schema = Schema::new(&view);
-        let config = schema.get_configuration_at_height(height).unwrap();
-        self.state.new_height(&block_hash, round, config);
+        self.state.new_height(&block_hash, round);
 
         info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}",
               height,

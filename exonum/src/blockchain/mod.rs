@@ -23,7 +23,7 @@ pub use self::block::Block;
 pub use self::schema::{ConfigurationData, Schema};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction};
+pub use self::service::{Service, Transaction, NodeState};
 
 #[derive(Clone)]
 pub struct Blockchain {
@@ -182,14 +182,11 @@ impl Blockchain {
                 schema.precommits(&block_hash).append(precommit.clone())?;
             }
 
-            // create special txs like anchoring or fee
-            let mut txs = Vec::new();
+            let mut node_state = NodeState::new(state, &view);
             for service in self.service_map.values() {
-                let t = service.handle_commit(&view, state)?;
-                txs.extend(t.into_iter());
+                service.handle_commit(&mut node_state)?;
             }
-
-            (view.changes(), txs)
+            (view.changes(), node_state.transactions())
         };
         self.merge(&patch)?;
         Ok(txs)
