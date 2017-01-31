@@ -79,7 +79,7 @@ impl NodeHandler {
         // check time of the propose
         let round = msg.round();
         let start_time = self.round_start_time(round) +
-                         Duration::milliseconds(self.adjusted_propose_timeout());
+                         Duration::milliseconds(self.state.propose_timeout());
         let end_time = start_time + Duration::milliseconds(self.round_timeout());
 
         if msg.time() < start_time || msg.time() > end_time {
@@ -168,7 +168,7 @@ impl NodeHandler {
         // Verify propose time
         let propose_round = block.propose_round();
         let start_time = self.round_start_time(propose_round) +
-                         Duration::milliseconds(self.adjusted_propose_timeout());
+                         Duration::milliseconds(self.state.propose_timeout());
         let end_time = start_time + Duration::milliseconds(self.round_timeout());
         if msg.time() < start_time || block.time() > end_time {
             error!("Received block with wrong propose time, block={:?}", msg);
@@ -426,6 +426,10 @@ impl NodeHandler {
         // Update state to new height
         let round = self.actual_round();
         self.state.new_height(&block_hash, round);
+
+        let view = self.blockchain.view();
+        self.state
+            .set_propose_timeout(self.propose_timeout_adjuster.adjusted_propose_timeout(&view));
 
         info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}",
               height,

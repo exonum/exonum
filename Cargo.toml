@@ -7,4 +7,5 @@ members = [
     "exonum",
     "sandbox",
     "services/configuration",
+    "services/propose_timeout_adjuster",
 ]

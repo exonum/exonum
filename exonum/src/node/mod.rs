@@ -219,15 +219,10 @@ impl NodeHandler {
         self.channel.add_timeout(timeout, time);
     }
 
-    /// getter for adjusted_propose_timeout
-    pub fn adjusted_propose_timeout(&self) -> i64 {
-        self.propose_timeout_adjuster.adjusted_propose_timeout(&self.blockchain.view())
-    }
-
     pub fn add_propose_timeout(&mut self) {
         //        let time = self.round_start_time(self.state.round()) +
         //                   Duration::milliseconds(self.propose_timeout);
-        let adjusted_propose_timeout = self.adjusted_propose_timeout();//cache adjusted_propose_timeout because this value will be used 2 times
+        let adjusted_propose_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
                    Duration::milliseconds(adjusted_propose_timeout);
         self.propose_timeout_adjuster.update_last_propose_timeout(adjusted_propose_timeout);
@@ -276,7 +271,7 @@ impl NodeHandler {
         let propose = self.last_block_time();
         debug_assert!(now >= propose);
 
-        let duration = (now - propose - Duration::milliseconds(self.adjusted_propose_timeout()))
+        let duration = (now - propose - Duration::milliseconds(self.state.propose_timeout()))
             .num_milliseconds();
         if duration > 0 {
             let round = (duration / self.round_timeout()) as Round + 1;
