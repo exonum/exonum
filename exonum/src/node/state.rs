@@ -300,7 +300,7 @@ impl State {
         }
     }
 
-    fn update_config(&mut self, config: StoredConfiguration) {
+    pub fn update_config(&mut self, config: StoredConfiguration) {
         let id = config.validators
             .iter()
             .position(|pk| pk == self.public_key())
@@ -424,10 +424,7 @@ impl State {
     }
 
     // FIXME use block_hash
-    pub fn new_height(&mut self,
-                      block_hash: &Hash,
-                      round: Round,
-                      new_config: Option<StoredConfiguration>) {
+    pub fn new_height(&mut self, block_hash: &Hash, round: Round) {
         self.height += 1;
         self.round = round;
         self.locked_round = 0;
@@ -448,11 +445,6 @@ impl State {
         self.our_prevotes.clear();
         self.our_precommits.clear();
         self.requests.clear(); // FIXME: clear all timeouts
-
-        if let Some(config) = new_config {
-            self.update_config(config);
-        }
-
     }
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
