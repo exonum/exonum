@@ -5,7 +5,8 @@ use time;
 use super::super::crypto::{hash, gen_keypair};
 use super::super::blockchain;
 use super::{Field, RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
-            Block, RequestBlock, BitVec};
+            Block, BlockProof, RequestBlock, BitVec};
+use serde_json;
 
 #[test]
 fn test_bitvec() {
@@ -248,6 +249,10 @@ fn test_precommit() {
     assert_eq!(precommit.propose_hash(), &propose_hash);
     assert_eq!(precommit.block_hash(), &block_hash);
     assert!(precommit.verify_signature(&public_key));
+    let json_str = serde_json::to_string(&precommit).unwrap();
+    println!("{}", json_str);
+    assert!(json_str.contains("\"b11546c0ad0e7659284b3e575dcaf1bca271a87afe8a5a6fbdf9e398a8af1edf\""));
+    assert!(json_str.contains("321321312"));
 }
 
 #[test]
@@ -321,6 +326,13 @@ fn test_block() {
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits);
     assert_eq!(block2.transactions(), transactions);
+    let block_proof = BlockProof {
+        block: content.clone(),
+        precommits: precommits.clone(),
+    };
+    let json_str = serde_json::to_string(&block_proof).unwrap();
+    println!("{}", json_str);
+
 }
 
 #[test]
