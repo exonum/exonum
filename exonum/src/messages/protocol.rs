@@ -3,6 +3,7 @@ use time::Timespec;
 use super::super::crypto::{Hash, PublicKey};
 use super::{RawMessage, BitVec};
 use super::super::blockchain;
+use serde::{Serialize, Serializer};
 
 pub const CONSENSUS: u16 = 0;
 
@@ -80,6 +81,39 @@ message! {
     }
 }
 
+impl Serialize for Precommit {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        struct BodySerializeHelper<'a> {
+            precommit: &'a Precommit,
+        }
+
+        impl<'a> Serialize for BodySerializeHelper<'a> {
+            fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+                where S: Serializer
+            {
+                let mut state = ser.serialize_struct("Body", 5)?;
+
+                ser.serialize_struct_elt(&mut state, "validator", self.precommit.validator())?;
+                ser.serialize_struct_elt(&mut state, "height", self.precommit.height())?;
+                ser.serialize_struct_elt(&mut state, "round", self.precommit.round())?;
+                ser.serialize_struct_elt(&mut state,
+                                          "propose_hash",
+                                          self.precommit.propose_hash())?;
+                ser.serialize_struct_elt(&mut state, "block_hash", self.precommit.block_hash())?;
+                ser.serialize_struct_end(state)
+            }
+        }
+        let helper = BodySerializeHelper { precommit: self };
+        let signature = self.raw.signature();
+        let mut state = ser.serialize_struct("Precommit", 2)?;
+        ser.serialize_struct_elt(&mut state, "body", &helper)?;
+        ser.serialize_struct_elt(&mut state, "signature", signature)?;
+        ser.serialize_struct_end(state)
+    }
+}
+
 // сообщение о текущем состоянии
 message! {
     Status {
@@ -107,6 +141,12 @@ message! {
         precommits:     Vec<Precommit>      [80 => 88]
         transactions:   Vec<RawMessage>     [88 => 96]
     }
+}
+
+#[derive(Serialize)]
+pub struct BlockProof {
+    pub block: blockchain::Block,
+    pub precommits: Vec<Precommit>,
 }
 
 // запрос на получение предложения
