@@ -329,7 +329,17 @@ mod tests {
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
+    use serde::Serialize;
     const KEY_SIZE: usize = 10;
+
+    #[derive(Serialize)]
+    struct ProofInfo<V: Serialize> {
+        root_hash: Hash,
+        list_length: usize,
+        proof: Proofnode<V>,
+        range_st: usize,
+        range_end: usize,
+    }
 
     fn generate_fully_random_data_keys(len: usize) -> Vec<(Vec<u8>)> {
         let mut rng = thread_rng();
@@ -413,23 +423,35 @@ mod tests {
         }
         table.get(0u32).unwrap();
         let table_root_hash = table.root_hash().unwrap();
+        let table_len = table.len().unwrap() as usize;
 
         for _ in 0..50 {
             let start_range = rng.gen_range(0u32, num_vals);
             let end_range = rng.gen_range(start_range + 1, num_vals + 1);
             let range_proof = table.construct_path_for_range(start_range, end_range).unwrap();
             assert_eq!(range_proof.compute_proof_root(), table_root_hash);
-            let (inds, actual_vals): (Vec<_>, Vec<_>) =
-                proof_indices_values(&range_proof).into_iter().unzip();
-            assert_eq!(inds,
-                       (start_range as usize..end_range as usize).collect::<Vec<_>>());
-            let expect_vals = &values[start_range as usize..end_range as usize];
-            let paired = expect_vals.iter().zip(actual_vals);
-            for pair in paired {
-                assert_eq!(*pair.0, *pair.1);
+
+            {
+                let (inds, actual_vals): (Vec<_>, Vec<_>) =
+                    proof_indices_values(&range_proof).into_iter().unzip();
+                assert_eq!(inds,
+                           (start_range as usize..end_range as usize).collect::<Vec<_>>());
+                let expect_vals = &values[start_range as usize..end_range as usize];
+                let paired = expect_vals.iter().zip(actual_vals);
+                for pair in paired {
+                    assert_eq!(*pair.0, *pair.1);
+                }
             }
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
+            let proof_info = ProofInfo {
+                root_hash: table_root_hash,
+                list_length: table_len,
+                proof: range_proof,
+                range_st: start_range as usize,
+                range_end: end_range as usize,
+            };
+            println!("{}", serde_json::to_string(&proof_info).unwrap());
 
             // println!("{}", json_repre);
             let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
@@ -490,6 +512,8 @@ mod tests {
 
         for (inserted, exp_root, proof_ind) in expected_hash_comb {
             table.append(inserted).unwrap();
+            let table_len = table.len().unwrap() as usize;
+
             assert_eq!(table.root_hash().unwrap(), exp_root);
             let range_proof = table.construct_path_for_range(proof_ind, proof_ind + 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
@@ -503,6 +527,15 @@ mod tests {
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
             // println!("{:?}", deser_proof);
 
+            let proof_info = ProofInfo {
+                root_hash: exp_root,
+                list_length: table_len,
+                proof: range_proof,
+                range_st: proof_ind as usize,
+                range_end: (proof_ind + 1) as usize,
+            };
+            println!("{}", serde_json::to_string(&proof_info).unwrap());
+
             let range_proof = table.construct_path_for_range(0, proof_ind + 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(),
@@ -515,7 +548,35 @@ mod tests {
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (proof_ind + 1) as usize);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
+            let proof_info = ProofInfo {
+                root_hash: exp_root,
+                list_length: table_len,
+                proof: range_proof,
+                range_st: 0,
+                range_end: (proof_ind + 1) as usize,
+            };
+            println!("{}", serde_json::to_string(&proof_info).unwrap());
             // println!("{:?}", deser_proof);
+            let range_proof = table.construct_path_for_range(0, 1).unwrap();
+            assert_eq!(range_proof.compute_proof_root(), exp_root);
+            assert_eq!(proof_indices_values(&range_proof).len(), 1);
+
+            let json_repre = serde_json::to_string(&range_proof).unwrap();
+            // println!("{}", json_repre);
+            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
+            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            assert_eq!(proof_indices_values(&deser_proof).len(), 1);
+            assert_eq!(deser_proof.compute_proof_root(), exp_root);
+            // println!("{:?}", deser_proof);
+
+            let proof_info = ProofInfo {
+                root_hash: exp_root,
+                list_length: table_len,
+                proof: range_proof,
+                range_st: 0,
+                range_end: 1,
+            };
+            println!("{}", serde_json::to_string(&proof_info).unwrap());
         }
 
         let range_proof = table.construct_path_for_range(0, 8).unwrap();
