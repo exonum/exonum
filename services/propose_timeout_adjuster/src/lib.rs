@@ -9,14 +9,17 @@ extern crate exonum;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+extern crate serde_json;
+
+use serde_json::value::{ToJson, Value, from_value};
 
 use exonum::blockchain::{Schema, Service, NodeState, Transaction};
-use exonum::storage::{List, Map, Error as StorageError};
+use exonum::storage::{View, List, Map, Error as StorageError};
 use exonum::messages::{RawTransaction, Error as MessageError};
 
 pub const PROPOSE_TIMEOUT_ADJUST_SERVICE: u16 = 2;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProposeTimeoutAdjusterConfig {
     pub propose_timeout_min: i64,
     pub propose_timeout_max: i64,
@@ -48,6 +51,8 @@ impl ProposeTimeoutAdjusterService {
 
     pub fn adjusted_propose_timeout(&self, state: &NodeState) -> Result<i64, StorageError> {
         let schema = Schema::new(state.view());
+        let cfg: ProposeTimeoutAdjusterConfig = from_value(state.service_config(self).clone())
+            .unwrap();
 
         let last_block_hash = schema.heights().last()?;
         let last_height = match last_block_hash {
@@ -65,22 +70,22 @@ impl ProposeTimeoutAdjusterService {
 
             // min(1, block / (ALPHA * MAX_BLOCK))
             let block_filling_rate: f64 = (1 as f64).min(last_block_size as f64 /
-                                                         (self.cfg.target_block_portion_feel *
-                                                          self.cfg.desired_block_size_max as f64));
+                                                         (cfg.target_block_portion_feel *
+                                                          cfg.desired_block_size_max as f64));
 
             //(DELTA_T_MAX - DELTA_T_MIN)
-            let adjusted_propose_timeout_range: i64 = self.cfg.propose_timeout_max -
-                                                      self.cfg.propose_timeout_min;
+            let adjusted_propose_timeout_range: i64 = cfg.propose_timeout_max -
+                                                      cfg.propose_timeout_min;
 
             // collect parts in original formula:
-            let target_propose_timeout: f64 = (self.cfg.propose_timeout_max as f64) +
+            let target_propose_timeout: f64 = (cfg.propose_timeout_max as f64) +
                                               adjusted_propose_timeout_range as f64 *
                                               block_filling_rate;
 
             // delta_t = delta_t * BETA + (1-BETA) * target_delta_t
             let adjusted_propose_timeout: f64 =
-                target_propose_timeout as f64 * self.cfg.speed_of_adjustment +
-                state.propose_timeout() as f64 * ((1 as f64) - self.cfg.speed_of_adjustment);
+                target_propose_timeout as f64 * cfg.speed_of_adjustment +
+                state.propose_timeout() as f64 * ((1 as f64) - cfg.speed_of_adjustment);
 
             Ok(adjusted_propose_timeout as i64)
         }
@@ -96,9 +101,14 @@ impl Service for ProposeTimeoutAdjusterService {
         Err(MessageError::IncorrectMessageType { message_type: raw.message_type() })
     }
 
+    fn handle_genesis_block(&self, _: &View) -> Result<Value, StorageError> {
+        Ok(self.cfg.to_json())
+    }
+
     fn handle_commit(&self, state: &mut NodeState) -> Result<(), StorageError> {
         let new_timeout = self.adjusted_propose_timeout(state)?;
-        state.set_propose_timeout(new_timeout as u64);
+        trace!("New propose timeout={}ms", new_timeout);
+        state.set_propose_timeout(new_timeout);
         Ok(())
     }
 }

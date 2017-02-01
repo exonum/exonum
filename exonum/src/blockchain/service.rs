@@ -23,8 +23,8 @@ pub trait Service: Send + Sync + 'static {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    fn handle_genesis_block(&self, _: &View) -> Result<(), StorageError> {
-        Ok(())
+    fn handle_genesis_block(&self, _: &View) -> Result<Value, StorageError> {
+        Ok(Value::Null)
     }
 
     fn handle_commit(&self, _: &mut NodeState) -> Result<(), StorageError> {
@@ -72,16 +72,23 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.consensus_config()
     }
 
+    pub fn service_config(&self, service: &Service) -> &Value {
+        self.state
+            .services_config()
+            .get(&service.service_id())
+            .unwrap()
+    }
+
     pub fn update_config(&mut self, new_config: StoredConfiguration) {
         self.state.update_config(new_config)
     }
 
-    pub fn propose_timeout(&self) -> u64 {
-        unimplemented!();
+    pub fn propose_timeout(&self) -> i64 {
+        self.state.propose_timeout()
     }
 
-    pub fn set_propose_timeout(&mut self, _: u64) {
-        unimplemented!();
+    pub fn set_propose_timeout(&mut self, timeout: i64) {
+        self.state.set_propose_timeout(timeout)
     }
 
     // TODO temporary violation of encapsulation

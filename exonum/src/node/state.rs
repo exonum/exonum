@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
 
 use time::Duration;
+use serde_json::Value;
 
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
                              BitVec};
@@ -33,6 +34,7 @@ pub struct State {
     secret_key: SecretKey,
     validators: Vec<PublicKey>,
     consensus_config: ConsensusConfig,
+    services_config: HashMap<u16, Value>,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -254,14 +256,13 @@ impl BlockState {
 impl State {
     pub fn new(id: u32,
                secret_key: SecretKey,
-               validators: Vec<PublicKey>,
+               stored: StoredConfiguration,
                connect: Connect,
                last_hash: Hash,
-               last_height: u64,
-               consensus_config: ConsensusConfig)
+               last_height: u64)
                -> State {
 
-        let validators_len = validators.len();
+        let validators_len = stored.validators.len();
 
         State {
             id: id,
@@ -269,7 +270,7 @@ impl State {
             secret_key: secret_key,
             peers: HashMap::new(),
             connections: HashMap::new(),
-            validators: validators,
+            validators: stored.validators,
             height: last_height,
             round: 0,
             locked_round: 0,
@@ -296,8 +297,25 @@ impl State {
 
             requests: HashMap::new(),
 
-            consensus_config: consensus_config,
+            consensus_config: stored.consensus,
+            services_config: stored.services,
         }
+    }
+
+    pub fn id(&self) -> ValidatorId {
+        self.id
+    }
+
+    pub fn validators(&self) -> &[PublicKey] {
+        &self.validators
+    }
+
+    pub fn consensus_config(&self) -> &ConsensusConfig {
+        &self.consensus_config
+    }
+
+    pub fn services_config(&self) -> &HashMap<u16, Value> {
+        &self.services_config
     }
 
     pub fn update_config(&mut self, config: StoredConfiguration) {
@@ -309,18 +327,6 @@ impl State {
         self.id = id as u32;
         self.validators = config.validators;
         self.consensus_config = config.consensus;
-    }
-
-    pub fn consensus_config(&self) -> &ConsensusConfig {
-        &self.consensus_config
-    }
-
-    pub fn id(&self) -> ValidatorId {
-        self.id
-    }
-
-    pub fn validators(&self) -> &[PublicKey] {
-        &self.validators
     }
 
     pub fn propose_timeout(&self) -> i64 {
