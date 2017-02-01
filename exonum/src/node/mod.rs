@@ -110,11 +110,10 @@ impl NodeHandler {
 
         let state = State::new(id as u32,
                                config.listener.secret_key,
-                               stored.validators,
+                               stored,
                                connect,
                                last_hash,
-                               last_height,
-                               stored.consensus);
+                               last_height);
 
         NodeHandler {
             state: state,

@@ -74,10 +74,11 @@ impl Blockchain {
     }
 
     pub fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
-        let config_propose = StoredConfiguration {
+        let mut config_propose = StoredConfiguration {
             actual_from: 0,
             validators: cfg.validators,
             consensus: cfg.consensus,
+            services: HashMap::new(),
         };
         let time = Timespec {
             sec: cfg.time as i64,
@@ -87,8 +88,9 @@ impl Blockchain {
         let patch = {
             let view = self.view();
             // Update service tables
-            for service in self.service_map.values() {
-                service.handle_genesis_block(&view)?;
+            for (id, service) in self.service_map.iter() {
+                let cfg = service.handle_genesis_block(&view)?;
+                config_propose.services.insert(id as u16, cfg);
             }
             // Commit actual configuration
             {

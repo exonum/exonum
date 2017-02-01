@@ -11,6 +11,7 @@ blockchain_explorer = {version="0.1", path="../../blockchain_explorer"}
 time = "0.1"
 serde = "0.8"
 serde_derive = "0.8"
+serde_json = "0.8"
 
 clap = "2.14"
 env_logger = "0.3"
