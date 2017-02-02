@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use ::crypto::Hash;
+use ::crypto::{Hash, PublicKey, SecretKey};
 use ::storage::{View, Error as StorageError};
 use ::messages::{Message, RawTransaction, Error as MessageError};
 use ::node::State;
@@ -47,15 +47,6 @@ impl<'a, 'b> NodeState<'a, 'b> {
         }
     }
 
-    pub fn add_transaction<T: Transaction>(&mut self, tx: T) {
-        assert!(tx.verify());
-        self.txs.push(Box::new(tx));
-    }
-
-    pub fn transactions(self) -> Vec<Box<Transaction>> {
-        self.txs
-    }
-
     pub fn view(&self) -> &View {
         self.view
     }
@@ -66,6 +57,14 @@ impl<'a, 'b> NodeState<'a, 'b> {
 
     pub fn round(&self) -> u32 {
         self.state.round()
+    }
+
+    pub fn validators(&self) -> &[PublicKey] {
+        self.state.validators()
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        self.state.secret_key()
     }
 
     pub fn consensus_config(&self) -> &ConsensusConfig {
@@ -91,8 +90,12 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.set_propose_timeout(timeout)
     }
 
-    // TODO temporary violation of encapsulation
-    pub fn state(&self) -> &State {
-        self.state
+    pub fn add_transaction<T: Transaction>(&mut self, tx: T) {
+        assert!(tx.verify());
+        self.txs.push(Box::new(tx));
+    }
+
+    pub fn transactions(self) -> Vec<Box<Transaction>> {
+        self.txs
     }
 }
