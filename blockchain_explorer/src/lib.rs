@@ -1,5 +1,5 @@
 mod explorer;
-pub mod config;
+// pub mod config;
 pub mod helpers;
 
 extern crate time;
@@ -33,7 +33,7 @@ use valico::json_dsl;
 use exonum::crypto::{Hash, HexValue, ToHex};
 use exonum::storage::Error as StorageError;
 use exonum::messages::RawTransaction;
-use exonum::blockchain::{Blockchain, Schema};
+use exonum::blockchain::Blockchain;
 use exonum::node::NodeConfig;
 
 
