@@ -30,4 +30,3 @@ env_logger = "0.3"
 default = []
 long_benchmarks = []
 memorydb = []
-sandbox_events = []
