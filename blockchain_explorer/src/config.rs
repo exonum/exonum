@@ -1,24 +1,12 @@
-#![feature(type_ascription)]
-#![feature(proc_macro)]
-
-use std::ops::Deref;
-use std::marker::PhantomData;
-use std::error;
-use std::fmt;
 use jsonway;
 use serde_json::value::from_value;
 
-use serde::{Serialize, Serializer};
-use serde::de;
-use serde::de::{Visitor, Deserialize, Deserializer};
 use rustless::json::ToJson;
 use rustless::{Api, Nesting};
 use valico::json_dsl;
 
-use exonum::crypto::{Hash, PublicKey, SecretKey, HexValue, ToHex};
-use exonum::storage::Error as StorageError;
+use exonum::crypto::{Hash, PublicKey, SecretKey, HexValue};
 use exonum::blockchain::Blockchain;
-use exonum::storage::Map;
 use exonum::blockchain::Schema;
 use exonum::node::NodeConfig;
 use exonum::services::configuration::{TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
@@ -26,6 +14,7 @@ use ::ValueNotFound;
 use exonum::messages::RawTransaction;
 use exonum::node::NodeChannel;
 use exonum::node::TxSender;
+use exonum::blockchain::config::{ConsensusConfig, StoredConfiguration};
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
 
 #[derive(Serialize)]
@@ -43,49 +32,16 @@ struct ConfigProposeInfo {
 
 #[derive(Deserialize)]
 struct ConfigProposeRequest {
-    pub height: u64,
-    pub config: Vec<u8>,
-    pub actual_from_height: u64,
+    pub actual_from: u64,
+    pub validators: Vec<PublicKey>,
+    pub consensus: ConsensusConfig,
 }
 
 #[derive(Deserialize)]
 struct ConfigVoteRequest {
-    pub height: u64,
     pub hash_propose: Hash,
     pub seed: u64,
     pub revoke: bool,
-}
-
-impl ConfigProposeRequest {
-    fn into_tx(&self, pub_key: &PublicKey, sec_key: &SecretKey) -> TxConfigPropose {
-        TxConfigPropose::new(pub_key,
-                             self.height,
-                             self.config.as_ref(),
-                             self.actual_from_height,
-                             &sec_key)
-    }
-}
-
-impl ConfigVoteRequest {
-    fn into_tx(&self, pub_key: &PublicKey, sec_key: &SecretKey) -> TxConfigVote {
-        TxConfigVote::new(pub_key,
-                          self.height,
-                          &self.hash_propose,
-                          self.seed,
-                          self.revoke,
-                          &sec_key)
-    }
-}
-
-impl From<TxConfigPropose> for ConfigProposeInfo {
-    fn from(src: TxConfigPropose) -> ConfigProposeInfo {
-        ConfigProposeInfo {
-            from: *src.from(),
-            height: src.height(),
-            config: src.config().to_vec(),
-            actual_from_height: src.actual_from_height(),
-        }
-    }
 }
 
 pub fn make_api<T>(api: &mut Api, b: Blockchain, tx_sender: TxSender<NodeChannel>, cfg: NodeConfig)
@@ -103,20 +59,37 @@ pub fn make_api<T>(api: &mut Api, b: Blockchain, tx_sender: TxSender<NodeChannel
             })
         });
         api.put("propose", |endpoint| {
-            let b = b.clone();
             let c = cfg.clone();
+            let b = b.clone();
+            let sender = tx_sender.clone();
             endpoint.summary("Puts new ConfigPropose");
             endpoint.params(|params| {
-                params.opt_typed("config", json_dsl::string());
-                params.opt_typed("height", json_dsl::u64());
-                params.opt_typed("actual_from_height", json_dsl::u64());
+                params.req_typed("actual_from", json_dsl::u64());
+                params.req_types("validators", json_dsl::array_of(json_dsl::string()));
+                params.req_nested("consensus", |params| {
+                    params.req_typed("round_timeout", json_dsl::u64);
+                    params.req_typed("status_timeout", json_dsl::u64);
+                    params.req_typed("peers_timeout", json_dsl::u64);
+                    params.req_typed("propose_timeout", json_dsl::u64);
+                    params.req_typed("txs_block_limit", json_dsl::u64);
+                });
             });
             endpoint.handle(move |client, params| {
                 match from_value::<ConfigProposeRequest>(params.clone()) {
                     Ok(config_propose_request) => {
-                        let config_propose =
-                            config_propose_request.into_tx(&c.public_key, &c.secret_key);
-                        match tx_sender.send(ConfigTx::ConfigPropose(config_propose)) {
+                        let height = Schema::new(&b.view()).last_height().unwrap();
+                        let config = StoredConfiguration {
+                            actual_from: params.find("actual_from").unwrap(),
+                            validators: params.find("validators").unwrap(),
+                            consensus: from_value::<ConsensusConfig>(params.find("consensus")
+                                .unwrap()
+                                .clone()),
+                        };
+                        let config_propose = TxConfigPropose::new(&c.public_key,
+                                                                  height,
+                                                                  config.serialize(),
+                                                                  &c.secret_key);
+                        match sender.send(ConfigTx::ConfigPropose(config_propose)) {
                             Ok(tx_hash) => {
                                 let json = &jsonway::object(|json| json.set("tx_hash", tx_hash))
                                     .unwrap();
@@ -130,27 +103,27 @@ pub fn make_api<T>(api: &mut Api, b: Blockchain, tx_sender: TxSender<NodeChannel
             })
         });
         api.put("vote", |endpoint| {
-            let b = b.clone();
             let c = cfg.clone();
+            let b = b.clone();
+            let sender = tx_sender.clone();
             endpoint.summary("Puts new ConfigVote");
             endpoint.params(|params| {
-                params.opt_typed("height", json_dsl::u64());
                 params.opt_typed("hash_propose", json_dsl::string());
                 params.opt_typed("seed", json_dsl::u64());
                 params.opt_typed("revoke", json_dsl::boolean());
             });
 
             endpoint.handle(move |client, params| {
-                let sender = tx_sender.clone();
                 match from_value::<ConfigVoteRequest>(params.clone()) {
                     Ok(config_vote_request) => {
-                        let config_vote = config_vote_request.into_tx(&c.public_key, &c.secret_key);
+                        let height = Schema::new(&b.view()).last_height().unwrap();
+                        let config_vote =
+                            config_vote_request.into_tx(height, &c.public_key, &c.secret_key);
                         match sender.send(ConfigTx::ConfigVote(config_vote)) {
                             Ok(tx_hash) => {
-                                // let json = &jsonway::object(|json| json.set("tx_hash", tx_hash))
-                                //     .unwrap();
-                                // client.json(json)
-                                client.error(ValueNotFound::new("Can't parse ConfigVote request"))
+                                let json = &jsonway::object(|json| json.set("tx_hash", tx_hash))
+                                    .unwrap();
+                                client.json(json)
                             }
                             Err(e) => client.error(e),
                         }
@@ -190,7 +163,6 @@ pub fn make_api<T>(api: &mut Api, b: Blockchain, tx_sender: TxSender<NodeChannel
             endpoint.handle(move |client, params| {
                 let from = PublicKey::from_hex(params.find("from").unwrap().as_str().unwrap())
                     .unwrap();
-                let view = b.view();
                 match ConfigurationSchema::new(&b.view()).get_vote(&from).unwrap() {
                     Some(vote) => {
                         let vote_value = VoteValue { revoke: vote.revoke() };
