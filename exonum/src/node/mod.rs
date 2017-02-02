@@ -6,7 +6,6 @@ use time::{Duration, Timespec};
 use super::crypto::{PublicKey, SecretKey, Hash};
 use super::events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
                     EventHandler, Result as EventsResult, Error as EventsError};
-#[cfg(not(feature="sandbox_events"))]
 use super::events::{MioChannel, Network, EventLoop};
 use super::blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use super::messages::{Connect, RawMessage};
@@ -17,13 +16,6 @@ mod basic;
 mod consensus;
 mod requests;
 mod adjusted_propose_timeout;
-#[cfg(feature="sandbox_events")]
-pub mod sandbox;
-
-#[cfg(not(feature="sandbox_events"))]
-pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
-#[cfg(feature="sandbox_events")]
-pub type NodeChannel = sandbox::SandboxChannel;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
 use self::adjusted_propose_timeout::*;
@@ -45,13 +37,17 @@ pub enum NodeTimeout {
 }
 
 #[derive(Clone)]
-pub struct TxSender {
-    inner: NodeChannel,
+pub struct TxSender<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+{
+    inner: S,
 }
 
-pub struct NodeHandler {
+pub struct NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+{
     pub state: State,
-    pub channel: NodeChannel,
+    pub channel: S,
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
@@ -83,8 +79,16 @@ pub struct Configuration {
     pub peer_discovery: Vec<SocketAddr>,
 }
 
-impl NodeHandler {
-    pub fn new(blockchain: Blockchain, sender: NodeChannel, config: Configuration) -> NodeHandler {
+pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
+
+pub struct Node {
+    reactor: Events<NodeHandler<NodeChannel>>,
+}
+
+impl<S> NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+{
+    pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> NodeHandler<S> {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block().unwrap();
@@ -287,7 +291,9 @@ impl NodeHandler {
     }
 }
 
-impl EventHandler for NodeHandler {
+impl<S> EventHandler for NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+{
     type Timeout = NodeTimeout;
     type ApplicationEvent = ExternalMessage;
 
@@ -319,8 +325,10 @@ impl EventHandler for NodeHandler {
     }
 }
 
-impl TxSender {
-    pub fn new(inner: NodeChannel) -> TxSender {
+impl<S> TxSender<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+{
+    pub fn new(inner: S) -> TxSender<S> {
         TxSender { inner: inner }
     }
 
@@ -334,12 +342,7 @@ impl TxSender {
     }
 }
 
-pub struct Node {
-    reactor: Events<NodeHandler>,
-}
-
 impl Node {
-    #[cfg(not(feature="sandbox_events"))]
     pub fn new(blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
         blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
 
@@ -370,7 +373,7 @@ impl Node {
         self.reactor.handler().state()
     }
 
-    pub fn channel(&self) -> TxSender {
+    pub fn channel(&self) -> TxSender<NodeChannel> {
         TxSender::new(self.reactor.handler().channel.clone())
     }
 }

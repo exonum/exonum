@@ -2,20 +2,22 @@ use std::collections::HashSet;
 
 use time::{Duration, Timespec};
 
-use super::super::crypto::{Hash, PublicKey, HexValue};
-use super::super::blockchain::{Schema, Transaction};
-use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
-                             RequestPropose, RequestTransactions, RequestPrevotes,
-                             RequestPrecommits, RequestBlock, Block, RawTransaction};
-use super::super::storage::{Map, Patch};
-use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
+use ::crypto::{Hash, PublicKey, HexValue};
+use ::blockchain::{Schema, Transaction};
+use ::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
+                 RequestTransactions, RequestPrevotes, RequestPrecommits, RequestBlock, Block,
+                 RawTransaction};
+use ::storage::{Map, Patch};
+use ::events::Channel;
 
-use super::super::events::Channel;
+use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
 
 const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 // TODO reduce view invokations
-impl NodeHandler {
+impl<S> NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+{
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
