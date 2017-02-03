@@ -429,10 +429,6 @@ impl<S> NodeHandler<S>
         let round = self.actual_round();
         self.state.new_height(&block_hash, round);
 
-        let view = self.blockchain.view();
-        self.state
-            .set_propose_timeout(self.propose_timeout_adjuster.adjusted_propose_timeout(&view));
-
         info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}",
               height,
               propose_round,
