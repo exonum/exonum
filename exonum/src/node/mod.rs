@@ -15,12 +15,9 @@ pub mod state;//temporary solution to get access to WAIT consts
 mod basic;
 mod consensus;
 mod requests;
-mod adjusted_propose_timeout;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
-use self::adjusted_propose_timeout::*;
 
-pub type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
 
 #[derive(Debug)]
 pub enum ExternalMessage {
@@ -51,7 +48,6 @@ pub struct NodeHandler<S>
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -108,9 +104,6 @@ impl<S> NodeHandler<S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        let propose_timeout_adjuster = Box::new(adjusted_propose_timeout::ConstProposeTimeout {
-            propose_timeout: stored.consensus.propose_timeout as i64,
-        });
 
         let state = State::new(id as u32,
                                config.listener.secret_key,
@@ -123,7 +116,6 @@ impl<S> NodeHandler<S>
             state: state,
             channel: sender,
             blockchain: blockchain,
-            propose_timeout_adjuster: propose_timeout_adjuster,
             peer_discovery: config.peer_discovery,
         }
     }
@@ -228,7 +220,6 @@ impl<S> NodeHandler<S>
         let adjusted_propose_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
                    Duration::milliseconds(adjusted_propose_timeout);
-        self.propose_timeout_adjuster.update_last_propose_timeout(adjusted_propose_timeout);
 
         trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
