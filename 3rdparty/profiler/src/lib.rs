@@ -165,6 +165,14 @@ macro_rules! profiler_span{
     }
 }
 
+#[macro_export]
+macro_rules! profiler_next_span{
+    ($name:expr) => {
+            $crate::end();
+            $crate::start($name);
+    }
+}
+
 pub struct ProfilerSpan<'a> {
     name: &'static str,
     _phantom: PhantomData<&'a ()>

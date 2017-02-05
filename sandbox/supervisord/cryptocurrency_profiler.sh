@@ -2,7 +2,7 @@
 
 testnet_dir=/tmp/exonum_profiler
 
-
+TIMEOUT=1500
 scriptdir=`pwd`
 supervisor_conf=${scriptdir}/sandbox/supervisord/etc/supervisord.conf
 export PATH=${scriptdir}/target/release:$PATH
@@ -12,9 +12,9 @@ export RUST_LOG="exonum=debug,sandbox=debug"
 
 start_generator() {
 
-    until tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000 $1 $2 2>> $TESTNET_DESTDIR/log/supervisor/tx_generator-stderr.log;
+    until tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t ${TIMEOUT} $1 $2 2>> $TESTNET_DESTDIR/log/supervisor/tx_generator-stderr.log;
     do
-        echo "#"
+        sleep 1
     done;
 
 }
@@ -29,10 +29,8 @@ run() {
     supervisorctl -c ${supervisor_conf} start cryptocurrency_profiler:* 
 
     # for now im just using big enought count
-    until tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t 1000  cryptocurrency 50000000 2> /dev/null; 
-    do 
-    echo "#"
-    done &
+    tx_generator run -c $TESTNET_DESTDIR/validators/3.toml -d $TESTNET_DESTDIR/db/node_gen -t ${TIMEOUT}  cryptocurrency 50000000 2> /dev/null
+
     pid=$!;
     
     #wait for report
