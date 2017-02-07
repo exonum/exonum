@@ -19,40 +19,40 @@ impl<'a> Schema<'a> {
         Schema { view: view }
     }
 
-    pub fn transactions(&self) -> MapTable<StorageView, Hash, RawMessage> {
+    pub fn transactions(&self) -> MapTable<Hash, RawMessage> {
         MapTable::new(vec![00], self.view)
     }
 
-    pub fn blocks(&self) -> MapTable<StorageView, Hash, Block> {
+    pub fn blocks(&self) -> MapTable<Hash, Block> {
         MapTable::new(vec![01], self.view)
     }
 
-    pub fn heights(&self) -> ListTable<MapTable<StorageView, [u8], Vec<u8>>, u64, Hash> {
+    pub fn heights(&self) -> ListTable<MapTable<[u8], Vec<u8>>, u64, Hash> {
         ListTable::new(MapTable::new(vec![02], self.view))
     }
 
     pub fn block_txs(&self,
                      height: u64)
-                     -> MerkleTable<MapTable<StorageView, [u8], Vec<u8>>, u32, Hash> {
+                     -> MerkleTable<MapTable<[u8], Vec<u8>>, u32, Hash> {
         MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.view))
     }
 
     pub fn precommits(&self,
                       hash: &Hash)
-                      -> ListTable<MapTable<StorageView, [u8], Vec<u8>>, u32, Precommit> {
+                      -> ListTable<MapTable<[u8], Vec<u8>>, u32, Precommit> {
         ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.view))
     }
 
     pub fn configs
         (&self)
-         -> MerklePatriciaTable<MapTable<StorageView, [u8], Vec<u8>>, HeightBytes, ConfigurationData> {
+         -> MerklePatriciaTable<MapTable<[u8], Vec<u8>>, HeightBytes, ConfigurationData> {
         // configs patricia merkletree <высота блока> json
         MerklePatriciaTable::new(MapTable::new(vec![06], self.view))
     }
 
     // TODO: consider List index to reduce storage volume
     pub fn configs_heights(&self)
-                           -> ListTable<MapTable<StorageView, [u8], Vec<u8>>, u64, HeightBytes> {
+                           -> ListTable<MapTable<[u8], Vec<u8>>, u64, HeightBytes> {
         ListTable::new(MapTable::new(vec![07], self.view))
     }
 
