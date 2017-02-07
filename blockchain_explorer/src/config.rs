@@ -44,6 +44,19 @@ struct ConfigVoteRequest {
     pub revoke: bool,
 }
 
+#[derive(Clone)]
+pub struct ConfigApi {
+    pub blockchain: Blockchain,
+    pub channel: TxSender,
+    pub cfg: NodeConfig,
+}
+
+impl ConfigApi {}
+
+impl Api for ConfigApi {
+    fn wire(&self, router: &mut Router) {}
+}
+
 pub fn make_api<T>(api: &mut Api, b: Blockchain, tx_sender: TxSender<NodeChannel>, cfg: NodeConfig)
     where T: TransactionInfo + From<RawTransaction>
 {
