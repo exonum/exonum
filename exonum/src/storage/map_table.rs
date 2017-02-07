@@ -1,57 +1,58 @@
 use std::marker::PhantomData;
 // use std::iter::Iterator;
 
-use super::{Map, Error, StorageValue};
+use super::base_table::BaseTable;
+
+use super::{Storage, Map, Error, StorageKey, StorageValue};
 // use super::{Iterable, Seekable}
 
-pub struct MapTable<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> {
-    prefix: Vec<u8>,
-    storage: &'a T,
+pub struct MapTable<'a, K, V> {
+    base: BaseTable<'a>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
 
-impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> MapTable<'a, T, K, V> {
-    pub fn new(prefix: Vec<u8>, storage: &'a T) -> Self {
+impl<'a, K, V> MapTable<'a, K, V> {
+    pub fn new(prefix: Vec<u8>, storage: &'a Storage) -> Self {
         MapTable {
-            prefix: prefix,
-            storage: storage,
+            base: BaseTable::new(prefix, storage),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
 }
 
-impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: AsRef<[u8]>,
+impl<'a, K, V> Map<K, V> for MapTable<'a, K, V>
+    where K: StorageKey,
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
-        let v = self.storage.get(&[&self.prefix, key.as_ref()].concat())?;
+        let v = self.base.get(key)?;
         Ok(v.map(StorageValue::deserialize))
     }
 
     fn put(&self, key: &K, value: V) -> Result<(), Error> {
-        self.storage.put(&[&self.prefix, key.as_ref()].concat(), value.serialize())
+        self.storage.put(key, value.serialize())
     }
 
     fn delete(&self, key: &K) -> Result<(), Error> {
-        self.storage.delete(&[&self.prefix, key.as_ref()].concat())
+        self.storage.delete(key)
     }
+
     fn find_key(&self, origin_key: &K) -> Result<Option<Vec<u8>>, Error> {
-        let key = [&self.prefix, origin_key.as_ref()].concat();
-        let result = match self.storage.find_key(&key)? {
-            Some(x) => {
-                if !x.starts_with(&key) {
-                    None
-                } else {
-                    Some(x[self.prefix.len()..].to_vec())
-                }
-            }
-            None => None,
-        };
-        Ok(result)
+        unimplemented!();
+    //     let key = [&self.prefix, origin_key.as_ref()].concat();
+    //     let result = match self.storage.find_key(&key)? {
+    //         Some(x) => {
+    //             if !x.starts_with(&key) {
+    //                 None
+    //             } else {
+    //                 Some(x[self.prefix.len()..].to_vec())
+    //             }
+    //         }
+    //         None => None,
+    //     };
+    //     Ok(result)
     }
 }
 
