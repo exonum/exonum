@@ -3,22 +3,23 @@ use num::{Integer, range, ToPrimitive};
 use std::marker::PhantomData;
 use std::cell::Cell;
 
-use super::{Map, Error, StorageValue, List};
+use super::base_table::BaseTable;
 
-pub struct ListTable<T: Map<[u8], Vec<u8>>, K, V> {
-    map: T,
+use super::{View, Map, Error, StorageValue, StorageKey, List};
+
+pub struct ListTable<'a, K, V> {
+    base: BaseTable<'a>,
     count: Cell<Option<K>>,
     _v: PhantomData<V>,
 }
 
-impl<'a, T, K, V> ListTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+impl<'a, K, V> ListTable<'a, K, V>
+    where K: Integer + Copy + Clone + ToPrimitive + StorageKey,
           V: StorageValue
 {
-    pub fn new(map: T) -> Self {
+    pub fn new(prefix: Vec<u8>, view: View) -> Self {
         ListTable {
-            map: map,
+            base: BaseTable::new(prefix, view),
             count: Cell::new(None),
             _v: PhantomData,
         }
@@ -34,15 +35,14 @@ impl<'a, T, K, V> ListTable<T, K, V>
     }
 }
 
-impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+impl<'a, K, V> List<K, V> for ListTable<'a, K, V>
+    where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
           V: StorageValue
 {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
-        self.map.put(&len.serialize(), value.serialize())?;
-        self.map.put(&[], (len + K::one()).serialize())?;
+        self.base.put(&len.serialize(), value.serialize())?;
+        self.base.put(&[], (len + K::one()).serialize())?;
         self.count.set(Some(len + K::one()));
         Ok(())
     }
@@ -52,16 +52,16 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
     {
         let mut len = self.len()?;
         for value in iter {
-            self.map.put(&len.serialize(), value.serialize())?;
+            self.base.put(&len.serialize(), value.serialize())?;
             len = len + K::one();
         }
-        self.map.put(&[], len.serialize())?;
+        self.base.put(&[], len.serialize())?;
         self.count.set(Some(len));
         Ok(())
     }
 
     fn get(&self, index: K) -> Result<Option<V>, Error> {
-        let value = self.map.get(&index.serialize())?;
+        let value = self.base.get(&index.serialize())?;
         Ok(value.map(StorageValue::deserialize))
     }
 
@@ -69,7 +69,7 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
         if index >= self.len()? {
             return Err(Error::new("Wrong index!"));
         }
-        self.map.put(&index.serialize(), value.serialize())
+        self.base.put(&index.serialize(), value.serialize())
     }
 
     fn last(&self) -> Result<Option<V>, Error> {
@@ -90,7 +90,7 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
             return Ok(count);
         }
 
-        let v = self.map.get(&[])?;
+        let v = self.base.get(&[])?;
         let c = v.map_or_else(K::zero, K::deserialize);
         self.count.set(Some(c));
         Ok(c)

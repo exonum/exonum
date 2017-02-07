@@ -27,19 +27,15 @@ impl<'a> Schema<'a> {
         MapTable::new(vec![01], self.view)
     }
 
-    pub fn heights(&self) -> ListTable<MapTable<[u8], Vec<u8>>, u64, Hash> {
+    pub fn heights(&self) -> ListTable<'a, u64, Hash> {
         ListTable::new(MapTable::new(vec![02], self.view))
     }
 
-    pub fn block_txs(&self,
-                     height: u64)
-                     -> MerkleTable<MapTable<[u8], Vec<u8>>, u32, Hash> {
+    pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<[u8], Vec<u8>>, u32, Hash> {
         MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.view))
     }
 
-    pub fn precommits(&self,
-                      hash: &Hash)
-                      -> ListTable<MapTable<[u8], Vec<u8>>, u32, Precommit> {
+    pub fn precommits(&self, hash: &Hash) -> ListTable<'a, u32, Precommit> {
         ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.view))
     }
 
@@ -51,8 +47,7 @@ impl<'a> Schema<'a> {
     }
 
     // TODO: consider List index to reduce storage volume
-    pub fn configs_heights(&self)
-                           -> ListTable<MapTable<[u8], Vec<u8>>, u64, HeightBytes> {
+    pub fn configs_heights(&self) -> ListTable<'a, u64, HeightBytes> {
         ListTable::new(MapTable::new(vec![07], self.view))
     }
 

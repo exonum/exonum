@@ -1,15 +1,15 @@
-use super::{Map, Storage, Error, StorageKey};
+use super::{Map, View, Error, StorageKey};
 
 pub struct BaseTable<'a> {
     prefix: Vec<u8>,
-    storage: &'a Storage,
+    view: &'a View,
 }
 
 impl<'a> BaseTable<'a> {
-    pub fn new(prefix: Vec<u8>, storage: &'a Storage) -> Self {
+    pub fn new(prefix: Vec<u8>, view: &'a View) -> Self {
         BaseTable {
             prefix: prefix,
-            storage: storage,            
+            view: view,            
         }
     }
 
@@ -21,14 +21,14 @@ impl<'a> BaseTable<'a> {
     }
 
     fn get<K: StorageKey>(&self, key: &K) -> Result<Option<Vec<u8>>, Error> {        
-        self.storage.get(&self.prefixed_key(key))
+        self.view.get(&self.prefixed_key(key))
     }
 
     fn put<K: StorageKey>(&self, key: &K, value: Vec<u8>) -> Result<(), Error> {
-        self.storage.put(&self.prefixed_key(key), value)
+        self.view.put(&self.prefixed_key(key), value)
     }
 
     fn delete<K: StorageKey>(&self, key: &K) -> Result<(), Error> {
-        self.storage.delete(&self.prefixed_key(key))
+        self.view.delete(&self.prefixed_key(key))
     }
 }

@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use super::base_table::BaseTable;
 
-use super::{Storage, Map, Error, StorageKey, StorageValue};
+use super::{View, Map, Error, StorageKey, StorageValue};
 // use super::{Iterable, Seekable}
 
 pub struct MapTable<'a, K, V> {
@@ -13,9 +13,9 @@ pub struct MapTable<'a, K, V> {
 }
 
 impl<'a, K, V> MapTable<'a, K, V> {
-    pub fn new(prefix: Vec<u8>, storage: &'a Storage) -> Self {
+    pub fn new(prefix: Vec<u8>, view: &'a View) -> Self {
         MapTable {
-            base: BaseTable::new(prefix, storage),
+            base: BaseTable::new(prefix, view),
             _k: PhantomData,
             _v: PhantomData,
         }
