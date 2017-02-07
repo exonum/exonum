@@ -117,14 +117,14 @@ impl<'a> ConfigurationSchema<'a> {
 
     fn config_proposes
         (&self)
-         -> MerklePatriciaTable<MapTable<[u8], Vec<u8>>, Hash, TxConfigPropose> {
+         -> MerklePatriciaTable<'a, Hash, TxConfigPropose> {
         // config_propose paricia merkletree <hash_tx> транзакция пропоз
         MerklePatriciaTable::new(MapTable::new(vec![04], self.view))
     }
 
     fn config_votes
         (&self)
-         -> MerklePatriciaTable<MapTable<[u8], Vec<u8>>, PublicKey, TxConfigVote> {
+         -> MerklePatriciaTable<'a, PublicKey, TxConfigVote> {
         // config_votes patricia merkletree <pub_key> последний голос
         MerklePatriciaTable::new(MapTable::new(vec![05], self.view))
     }
