@@ -6,15 +6,19 @@ use num::{Integer, ToPrimitive};
 use std::fmt;
 use std::error;
 
+mod db;
 mod leveldb;
 mod memorydb;
+
+mod base_table;
 mod map_table;
 mod list_table;
 mod merkle_table;
+mod merkle_patricia_table;
+
 mod keys;
 mod values;
-mod db;
-mod merkle_patricia_table;
+
 mod utils; 
 
 pub use leveldb::options::Options as LevelDBOptions;
