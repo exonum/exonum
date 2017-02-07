@@ -35,7 +35,7 @@ fn index_of_first_element_in_subtree<K>(subtree_root_height: K, subtree_root_ind
 }
 mod hash_rules {
     use ::crypto::{hash, Hash};
-    use ::storage::fields::StorageValue;
+    use ::storage::StorageValue;
     // pub const LEAF_DOMAIN: u8 = 00;
     // pub const BRANCH_DOMAIN: u8 = 01;
     // pub const SINGLE_BRANCH_DOMAIN: u8 = 02;
@@ -325,7 +325,7 @@ mod tests {
 
     use ::crypto::{Hash, hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
-    use ::storage::fields::DeserializeFromJson;
+    use ::storage::values::DeserializeFromJson;
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
