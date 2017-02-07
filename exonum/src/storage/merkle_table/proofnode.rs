@@ -1,5 +1,5 @@
 use ::storage::{StorageValue, Error};
-use ::storage::fields::DeserializeFromJson;
+use ::storage::values::DeserializeFromJson;
 use ::crypto::Hash;
 use std::fmt;
 use serde::{Serialize, Serializer};
