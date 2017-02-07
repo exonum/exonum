@@ -41,7 +41,7 @@ impl<'a> Schema<'a> {
 
     pub fn configs
         (&self)
-         -> MerklePatriciaTable<MapTable<[u8], Vec<u8>>, HeightBytes, ConfigurationData> {
+         -> MerklePatriciaTable<'a, HeightBytes, ConfigurationData> {
         // configs patricia merkletree <высота блока> json
         MerklePatriciaTable::new(MapTable::new(vec![06], self.view))
     }

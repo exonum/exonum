@@ -7,7 +7,10 @@ use std::ops::Not;
 use super::utils::bytes_to_hex;
 
 use ::crypto::{hash, Hash, HASH_SIZE};
-use super::{Map, Error, StorageValue};
+
+use super::base_table::BaseTable;
+use super::{Map, Error, View, StorageKey, StorageValue};
+
 use self::proofpathtokey::{RootProofNode, BranchProofNode, ProofNode, BitVec};
 
 const BRANCH_KEY_PREFIX: u8 = 00;
@@ -310,8 +313,8 @@ impl StorageValue for BranchNode {
 
 type Entry<V> = (Vec<u8>, Node<V>);
 
-pub struct MerklePatriciaTable<T: Map<[u8], Vec<u8>>, K: ?Sized, V> {
-    map: T,
+pub struct MerklePatriciaTable<'a, K, V> {
+    base: BaseTable<'a>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -324,10 +327,10 @@ enum RemoveResult {
 }
 
 // TODO avoid reallocations where is possible.
-impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaTable<T, K, V> {
-    pub fn new(map: T) -> Self {
+impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
+    pub fn new(prefix: Vec<u8>, view: View) -> Self {
         MerklePatriciaTable {
-            map: map,
+            base: BaseTable::new(prefix, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -770,9 +773,8 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
     // }
 }
 
-impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: AsRef<[u8]>,
+impl<'a, K, V> Map<K, V> for MerklePatriciaTable<'a, K, V>
+    where K: StorageKey,
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
