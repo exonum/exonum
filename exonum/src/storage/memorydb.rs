@@ -32,6 +32,7 @@ impl MemoryDB {
     }
 }
 
+// FIXME: remove this implementation
 impl Map<[u8], Vec<u8>> for MemoryDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         Ok(self.map.read().unwrap().get(key).cloned())
@@ -114,6 +115,20 @@ impl Fork for MemoryDBView {
 
 impl Database for MemoryDB {
     type Fork = MemoryDBView;
+
+    // fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    //     Ok(self.map.read().unwrap().get(key).cloned())
+    // }
+
+    // fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    //     self.map.write().unwrap().insert(key.to_vec(), value);
+    //     Ok(())
+    // }
+
+    // fn delete(&self, key: &[u8]) -> Result<(), Error> {
+    //     self.map.write().unwrap().remove(key);
+    //     Ok(())
+    // }
 
     fn fork(&self) -> Self::Fork {
         MemoryDBView::new(self)

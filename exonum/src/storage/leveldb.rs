@@ -63,6 +63,17 @@ impl LevelDB {
     }
 }
 
+impl LevelDBView {
+    pub fn new(from: &LevelDB) -> LevelDBView {
+        LevelDBView {
+            _db: from.db.clone(),
+            snap: unsafe { mem::transmute(from.db.snapshot()) },
+            changes: RefCell::default(),
+        }
+    }
+}
+
+// FIXME: remove this implementation
 impl Map<[u8], Vec<u8>> for LevelDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         self.db
@@ -90,15 +101,6 @@ impl Map<[u8], Vec<u8>> for LevelDB {
     }
 }
 
-impl LevelDBView {
-    pub fn new(from: &LevelDB) -> LevelDBView {
-        LevelDBView {
-            _db: from.db.clone(),
-            snap: unsafe { mem::transmute(from.db.snapshot()) },
-            changes: RefCell::default(),
-        }
-    }
-}
 
 impl Map<[u8], Vec<u8>> for LevelDBView {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
@@ -165,6 +167,22 @@ impl Database for LevelDB {
     fn fork(&self) -> Self::Fork {
         LevelDBView::new(self)
     }
+
+    // fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    //     self.db
+    //         .get(LEVELDB_READ_OPTIONS, key)
+    //         .map_err(Into::into)
+    // }
+
+    // fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+    //     let result = self.db.put(LEVELDB_WRITE_OPTIONS, key, &value);
+    //     result.map_err(Into::into)
+    // }
+
+    // fn delete(&self, key: &[u8]) -> Result<(), Error> {
+    //     let result = self.db.delete(LEVELDB_WRITE_OPTIONS, key);
+    //     result.map_err(Into::into)
+    // }
 
     fn merge(&self, patch: &Patch) -> Result<(), Error> {
         let mut batch = Writebatch::new();
