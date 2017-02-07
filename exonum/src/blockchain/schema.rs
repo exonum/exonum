@@ -31,7 +31,7 @@ impl<'a> Schema<'a> {
         ListTable::new(MapTable::new(vec![02], self.view))
     }
 
-    pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<[u8], Vec<u8>>, u32, Hash> {
+    pub fn block_txs(&self, height: u64) -> MerkleTable<'a, u32, Hash> {
         MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.view))
     }
 

@@ -3,13 +3,14 @@ use num::{Integer, range, ToPrimitive, pow};
 use std::marker::PhantomData;
 use std::cell::Cell;
 use ::crypto::{hash, Hash};
-use super::{Map, List, Error, StorageValue};
+
+use super::base_table::BaseTable;
+use super::{Map, View, List, Error, StorageKey, StorageValue};
 
 
 use self::proofnode::Proofnode;
 
 mod proofnode;
-
 
 type Range<K> = Option<(K, K)>;
 
@@ -33,6 +34,7 @@ fn index_of_first_element_in_subtree<K>(subtree_root_height: K, subtree_root_ind
     pow(K::one() + K::one(),
         (subtree_root_height - K::one()).to_usize().unwrap()) * subtree_root_index
 }
+
 mod hash_rules {
     use ::crypto::{hash, Hash};
     use ::storage::StorageValue;
@@ -59,20 +61,19 @@ mod hash_rules {
 /// 0  | Записанные данные
 /// 1  | Хэши от исходных данных
 /// 2..| Дерево хешей, где каждая новая высота считает Hash(Hash(h - 1, i), Hash(h - 1, i + 1))
-pub struct MerkleTable<T: Map<[u8], Vec<u8>>, K, V> {
-    map: T,
+pub struct MerkleTable<'a, K, V> {
+    base: BaseTable<'a>,
     count: Cell<Option<K>>,
     _v: PhantomData<V>,
 }
 
-impl<'a, T, K, V> MerkleTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+impl<'a, K, V> MerkleTable<'a, K, V>
+    where K: Integer + Copy + Clone + ToPrimitive + StorageKey,
           V: StorageValue
 {
-    pub fn new(map: T) -> Self {
+    pub fn new(prefix: Vec<u8>, view: View) -> Self {
         MerkleTable {
-            map: map,
+            base: BaseTable::new(prefix, view),
             count: Cell::new(None),
             _v: PhantomData,
         }
@@ -175,7 +176,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
     fn set_len(&self, len: K) -> Result<(), Error> {
         self.count.set(Some(len));
-        self.map.put(&[], len.serialize())
+        self.base.put(&[], len.serialize())
     }
 
     // TODO reduce reallocations. We can create a key by one allocation.
@@ -186,7 +187,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     fn get_hash(&self, height: K, index: K) -> Result<Option<Hash>, Error> {
         debug_assert!(height > K::zero());
 
-        let v = self.map.get(&Self::db_key(height, index))?;
+        let v = self.base.get(&Self::db_key(height, index))?;
         let hash = v.map(|x| {
             debug_assert_eq!(x.len(), 32);
             Hash::from_slice(&x).unwrap()
@@ -198,7 +199,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         // FIXME avoid reallocation
         let vec = bytes.as_ref().to_vec();
         let key = Self::db_key(height, index);
-        self.map.put(&key, vec)
+        self.base.put(&key, vec)
     }
 
     fn append_hash(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
@@ -252,16 +253,15 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     }
 }
 
-impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
+impl<'a, K, V> List<K, V> for MerkleTable<'a, K, V>
+    where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
           V: StorageValue
 {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.append_hash(len, hash_rules::hash_leaf(&value))?;
 
-        self.map.put(&Self::db_key(K::zero(), len), value.serialize())?;
+        self.base.put(&Self::db_key(K::zero(), len), value.serialize())?;
         self.set_len(len + K::one())?;
         Ok(())
     }
@@ -276,7 +276,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
     }
 
     fn get(&self, index: K) -> Result<Option<V>, Error> {
-        let value = self.map.get(&Self::db_key(K::zero(), index))?;
+        let value = self.base.get(&Self::db_key(K::zero(), index))?;
         Ok(value.map(StorageValue::deserialize))
     }
 
@@ -286,7 +286,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
         }
 
         self.update_hash_subtree(index, hash_rules::hash_leaf(&value))?;
-        self.map.put(&Self::db_key(K::zero(), index), value.serialize())
+        self.base.put(&Self::db_key(K::zero(), index), value.serialize())
     }
 
 
@@ -308,7 +308,7 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
             return Ok(count);
         }
 
-        let v = self.map.get(&[])?;
+        let v = self.base.get(&[])?;
         let c = v.map_or_else(K::zero, K::deserialize);
         self.count.set(Some(c));
         Ok(c)
