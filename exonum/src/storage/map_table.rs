@@ -32,17 +32,17 @@ impl<'a, K, V> Map<K, V> for MapTable<'a, K, V>
     }
 
     fn put(&self, key: &K, value: V) -> Result<(), Error> {
-        self.storage.put(key, value.serialize())
+        self.base.put(key, value.serialize())
     }
 
     fn delete(&self, key: &K) -> Result<(), Error> {
-        self.storage.delete(key)
+        self.base.delete(key)
     }
 
     fn find_key(&self, origin_key: &K) -> Result<Option<Vec<u8>>, Error> {
         unimplemented!();
     //     let key = [&self.prefix, origin_key.as_ref()].concat();
-    //     let result = match self.storage.find_key(&key)? {
+    //     let result = match self.base.find_key(&key)? {
     //         Some(x) => {
     //             if !x.starts_with(&key) {
     //                 None
@@ -91,7 +91,7 @@ impl<'a, K, V> Map<K, V> for MapTable<'a, K, V>
 //     type IntoIter = MapTableIterator<'a, <&'a T as Iterable>::Iter>;
 
 //     fn into_iter(self) -> Self::IntoIter {
-//         let mut iter = self.storage.iter();
+//         let mut iter = self.base.iter();
 //         iter.seek(&self.prefix);
 //         MapTableIterator {
 //             iter: iter,
@@ -111,7 +111,7 @@ impl<'a, K, V> Map<K, V> for MapTable<'a, K, V>
 //     type Iter = MapTableIterator<'a, <&'a T as Iterable>::Iter>;
 
 //     fn iter(self) -> Self::Iter {
-//         let mut iter = self.storage.iter();
+//         let mut iter = self.base.iter();
 //         iter.seek(&self.prefix);
 //         MapTableIterator {
 //             iter: iter,

@@ -13,22 +13,27 @@ impl<'a> BaseTable<'a> {
         }
     }
 
-    fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
+    pub fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
         let mut v = Vec::with_capacity(self.prefix.len() + K::size());
         v.extend_from_slice(&self.prefix);
         key.write(&mut v);
         v
     }
 
-    fn get<K: StorageKey>(&self, key: &K) -> Result<Option<Vec<u8>>, Error> {        
+    pub fn get<K: StorageKey>(&self, key: &K) -> Result<Option<Vec<u8>>, Error> {        
         self.view.get(&self.prefixed_key(key))
     }
 
-    fn put<K: StorageKey>(&self, key: &K, value: Vec<u8>) -> Result<(), Error> {
+    pub fn put<K: StorageKey>(&self, key: &K, value: Vec<u8>) -> Result<(), Error> {
         self.view.put(&self.prefixed_key(key), value)
     }
 
-    fn delete<K: StorageKey>(&self, key: &K) -> Result<(), Error> {
+    pub fn delete<K: StorageKey>(&self, key: &K) -> Result<(), Error> {
         self.view.delete(&self.prefixed_key(key))
+    }
+
+    // FIXME: remove this
+    pub fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        unimplemented!();
     }
 }

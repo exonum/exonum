@@ -6,6 +6,8 @@ use num::{Integer, ToPrimitive};
 use std::fmt;
 use std::error;
 
+use ::crypto::{Hash, HASH_SIZE, hash};
+
 mod db;
 mod leveldb;
 mod memorydb;
@@ -29,8 +31,8 @@ pub use self::db::{Database, Patch, Fork, Change};
 pub use self::memorydb::{MemoryDB, MemoryDBView};
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
-pub use self::keys::StorageKey;
-pub use self::values::{StorageValue, HeightBytes};
+pub use self::keys::{StorageKey, VoidKey};
+pub use self::values::{StorageValue};
 pub use self::merkle_table::MerkleTable; 
 pub use self::merkle_patricia_table::{MerklePatriciaTable};
 pub use self::utils::bytes_to_hex; 
@@ -63,14 +65,14 @@ pub trait Map<K: ?Sized, V> {
     fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>>;
 }
 
-pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
+pub trait List<V> {
     fn append(&self, value: V) -> Result<()>;
     fn extend<I: IntoIterator<Item = V>>(&self, iter: I) -> Result<()>;
-    fn get(&self, index: K) -> Result<Option<V>>;
-    fn set(&self, index: K, value: V) -> Result<()>;
+    fn get(&self, index: u64) -> Result<Option<V>>;
+    fn set(&self, index: u64, value: V) -> Result<()>;
     fn last(&self) -> Result<Option<V>>;
     fn is_empty(&self) -> Result<bool>;
-    fn len(&self) -> Result<K>;
+    fn len(&self) -> Result<u64>;
 }
 
 impl Error {
@@ -109,3 +111,18 @@ mod details {
 
 pub type Storage = details::Storage;
 pub type View = details::View;
+
+pub fn merkle_hash(hashes: &[Hash]) -> Hash {    
+    match hashes.len() {
+        0 => Hash::default(),
+        1 => hashes[0],
+        n => {
+            let (left, right) = hashes.split_at(n.next_power_of_two() / 2);
+            // TODO: allocate on stack
+            let mut v = Vec::with_capacity(HASH_SIZE * 2);
+            v.extend_from_slice(merkle_hash(left).as_ref());
+            v.extend_from_slice(merkle_hash(right).as_ref());
+            hash(&v)
+        }
+    }    
+}

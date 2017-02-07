@@ -5,18 +5,20 @@ use std::cell::Cell;
 use ::crypto::{hash, Hash};
 
 use super::base_table::BaseTable;
-use super::{Map, View, List, Error, StorageKey, StorageValue};
+use super::{Map, View, List, Error, StorageKey, VoidKey, StorageValue};
 
 
 use self::proofnode::Proofnode;
 
+const HEIGHT_SHIFT : u64 = 58;
+// TODO: add checks for overflow
+const MAX_LENGTH : u64 = 288230376151711743; // 2 ** 58 - 1
+
 mod proofnode;
 
-type Range<K> = Option<(K, K)>;
+type Range = Option<(u64, u64)>;
 
-fn split_range<K>(start: K, middle: K, end: K) -> (Range<K>, Range<K>)
-    where K: Integer + Copy + ToPrimitive
-{
+fn split_range(start: u64, middle: u64, end: u64) -> (Range, Range) {
     debug_assert!(start < end);
     if middle >= end {
         (Some((start, end)), None)
@@ -28,11 +30,9 @@ fn split_range<K>(start: K, middle: K, end: K) -> (Range<K>, Range<K>)
     }
 }
 
-fn index_of_first_element_in_subtree<K>(subtree_root_height: K, subtree_root_index: K) -> K
-    where K: Integer + Copy + ToPrimitive
-{
-    pow(K::one() + K::one(),
-        (subtree_root_height - K::one()).to_usize().unwrap()) * subtree_root_index
+fn index_of_first_element_in_subtree(subtree_root_height: u64, subtree_root_index: u64) -> u64 {
+    pow(1 + 1,
+        (subtree_root_height - 1).to_usize().unwrap()) * subtree_root_index
 }
 
 mod hash_rules {
@@ -61,17 +61,14 @@ mod hash_rules {
 /// 0  | Записанные данные
 /// 1  | Хэши от исходных данных
 /// 2..| Дерево хешей, где каждая новая высота считает Hash(Hash(h - 1, i), Hash(h - 1, i + 1))
-pub struct MerkleTable<'a, K, V> {
+pub struct MerkleTable<'a, V> {
     base: BaseTable<'a>,
-    count: Cell<Option<K>>,
+    count: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
 
-impl<'a, K, V> MerkleTable<'a, K, V>
-    where K: Integer + Copy + Clone + ToPrimitive + StorageKey,
-          V: StorageValue
-{
-    pub fn new(prefix: Vec<u8>, view: View) -> Self {
+impl<'a, V: StorageValue> MerkleTable<'a, V> {
+    pub fn new(prefix: Vec<u8>, view: &'a View) -> Self {
         MerkleTable {
             base: BaseTable::new(prefix, view),
             count: Cell::new(None),
@@ -84,29 +81,29 @@ impl<'a, K, V> MerkleTable<'a, K, V>
         Ok(if self.is_empty()? {
             Vec::new()
         } else {
-            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
+            range(0, self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
         })
     }
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
-        self.get_hash(self.height()?, K::zero())
+        self.get_hash(self.height()?, 0)
             .map(|h| h.unwrap_or_else(|| hash(&[])))
     }
 
     fn construct_proof_subtree(&self,
-                               node_height: K,
-                               node_index: K,
-                               range_start: K,
-                               range_end: K)
+                               node_height: u64,
+                               node_index: u64,
+                               range_start: u64,
+                               range_end: u64)
                                -> Result<Proofnode<V>, Error> {
 
         let res: Proofnode<V>;
-        if node_height == K::one() {
+        if node_height == 1 {
             res = Proofnode::Leaf(self.get(node_index)?.unwrap());
-        } else if node_height > K::one() {
-            let subtree_hight = node_height - K::one();
-            let left_child_index = node_index * (K::one() + K::one());
-            let righ_child_index = node_index * (K::one() + K::one()) + K::one();
+        } else if node_height > 1 {
+            let subtree_hight = node_height - 1;
+            let left_child_index = node_index * (1 + 1);
+            let righ_child_index = node_index * (1 + 1) + 1;
             let right_subtree_first_index = index_of_first_element_in_subtree(subtree_hight,
                                                                               righ_child_index);
             let (left_range, right_range) =
@@ -143,10 +140,10 @@ impl<'a, K, V> MerkleTable<'a, K, V>
     }
 
     pub fn construct_path_for_range(&self,
-                                    range_start: K,
-                                    range_end: K)
+                                    range_start: u64,
+                                    range_end: u64)
                                     -> Result<Proofnode<V>, Error> {
-        if (range_start < K::zero() || range_end > self.len()?) || range_end <= range_start {
+        if (range_start < 0 || range_end > self.len()?) || range_end <= range_start {
             return Err(Error::new(format!("Illegal range boundaries for MerkleTable. len: \
                                            {:?}, range start: {:?}, range_end: {:?}",
                                           self.len()?.to_usize().unwrap(),
@@ -154,38 +151,38 @@ impl<'a, K, V> MerkleTable<'a, K, V>
                                           range_end.to_usize().unwrap())));
         }
 
-        self.construct_proof_subtree(self.height()?, K::zero(), range_start, range_end)
+        self.construct_proof_subtree(self.height()?, 0, range_start, range_end)
     }
 
-    fn height(&self) -> Result<K, Error> {
+    fn height(&self) -> Result<u64, Error> {
         let len = self.len()?;
-        let h = Self::upper_power_of_two(len) + K::one();
+        let h = Self::upper_power_of_two(len) + 1;
         Ok(h)
     }
 
     // TODO replace by library method
-    fn upper_power_of_two(v: K) -> K {
-        let mut p = K::one();
-        let mut i = K::zero();
+    fn upper_power_of_two(v: u64) -> u64 {
+        let mut p = 1;
+        let mut i = 0;
         while p < v {
-            p = p * (K::one() + K::one());
-            i = i + K::one();
+            p = p * (1 + 1);
+            i = i + 1;
         }
         i
     }
 
-    fn set_len(&self, len: K) -> Result<(), Error> {
+    fn set_len(&self, len: u64) -> Result<(), Error> {
         self.count.set(Some(len));
-        self.base.put(&[], len.serialize())
+        self.base.put(&VoidKey, len.serialize())
     }
 
     // TODO reduce reallocations. We can create a key by one allocation.
-    fn db_key(h: K, i: K) -> Vec<u8> {
-        [h.serialize(), i.serialize()].concat()
+    fn db_key(h: u64, i: u64) -> u64 {
+        (h << HEIGHT_SHIFT) + i
     }
 
-    fn get_hash(&self, height: K, index: K) -> Result<Option<Hash>, Error> {
-        debug_assert!(height > K::zero());
+    fn get_hash(&self, height: u64, index: u64) -> Result<Option<Hash>, Error> {
+        debug_assert!(height > 0);
 
         let v = self.base.get(&Self::db_key(height, index))?;
         let hash = v.map(|x| {
@@ -195,17 +192,17 @@ impl<'a, K, V> MerkleTable<'a, K, V>
         Ok(hash)
     }
 
-    fn set_hash(&self, height: K, index: K, bytes: Hash) -> Result<(), Error> {
+    fn set_hash(&self, height: u64, index: u64, bytes: Hash) -> Result<(), Error> {
         // FIXME avoid reallocation
         let vec = bytes.as_ref().to_vec();
         let key = Self::db_key(height, index);
         self.base.put(&key, vec)
     }
 
-    fn append_hash(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
-        self.set_hash(K::one(), index, bytes)?;
-        let mut current_height = K::one();
-        while index != K::zero() {
+    fn append_hash(&self, mut index: u64, bytes: Hash) -> Result<(), Error> {
+        self.set_hash(1, index, bytes)?;
+        let mut current_height = 1;
+        while index != 0 {
             // Left leaf, Right leaf is empty
             let new_hash = if index.is_even() {
                 let h1 = self.get_hash(current_height, index)?.unwrap();
@@ -214,55 +211,52 @@ impl<'a, K, V> MerkleTable<'a, K, V>
 
             } else {
                 // Right leaf
-                let h1 = self.get_hash(current_height, index - K::one())?.unwrap();
+                let h1 = self.get_hash(current_height, index - 1)?.unwrap();
                 let h2 = self.get_hash(current_height, index)?.unwrap();
                 hash_rules::hash_branch(h1, h2)
             };
-            current_height = current_height + K::one();
-            index = index / (K::one() + K::one());
+            current_height = current_height + 1;
+            index = index / (1 + 1);
             self.set_hash(current_height, index, new_hash)?;
         }
         Ok(())
     }
 
-    fn update_hash_subtree(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
-        self.set_hash(K::one(), index, bytes)?;
+    fn update_hash_subtree(&self, mut index: u64, bytes: Hash) -> Result<(), Error> {
+        self.set_hash(1, index, bytes)?;
 
         let height = self.height()?;
-        let mut current_height = K::one();
+        let mut current_height = 1;
         while current_height != height {
             let i = if !index.is_even() {
-                index - K::one()
+                index - 1
             } else {
                 index
             };
 
             let h1 = self.get_hash(current_height, i)?.unwrap();
-            let h2 = self.get_hash(current_height, i + K::one())?;
+            let h2 = self.get_hash(current_height, i + 1)?;
             let new_hash = if let Some(h2) = h2 {
                 hash_rules::hash_branch(h1, h2)
             } else {
                 hash_rules::hash_single_branch(h1)
             };
 
-            current_height = current_height + K::one();
-            index = index / (K::one() + K::one());
+            current_height = current_height + 1;
+            index = index / (1 + 1);
             self.set_hash(current_height, index, new_hash)?;
         }
         Ok(())
     }
 }
 
-impl<'a, K, V> List<K, V> for MerkleTable<'a, K, V>
-    where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue
-{
+impl<'a, V: StorageValue> List<V> for MerkleTable<'a, V> {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.append_hash(len, hash_rules::hash_leaf(&value))?;
 
-        self.base.put(&Self::db_key(K::zero(), len), value.serialize())?;
-        self.set_len(len + K::one())?;
+        self.base.put(&Self::db_key(0, len), value.serialize())?;
+        self.set_len(len + 1)?;
         Ok(())
     }
 
@@ -275,41 +269,40 @@ impl<'a, K, V> List<K, V> for MerkleTable<'a, K, V>
         Ok(())
     }
 
-    fn get(&self, index: K) -> Result<Option<V>, Error> {
-        let value = self.base.get(&Self::db_key(K::zero(), index))?;
+    fn get(&self, index: u64) -> Result<Option<V>, Error> {
+        let value = self.base.get(&Self::db_key(0, index))?;
         Ok(value.map(StorageValue::deserialize))
     }
 
-    fn set(&self, index: K, value: V) -> Result<(), Error> {
-        if index >= self.len()? || index < K::zero() {
+    fn set(&self, index: u64, value: V) -> Result<(), Error> {
+        if index >= self.len()? || index < 0 {
             return Err(Error::new("Wrong index!"));
         }
 
         self.update_hash_subtree(index, hash_rules::hash_leaf(&value))?;
-        self.base.put(&Self::db_key(K::zero(), index), value.serialize())
+        self.base.put(&Self::db_key(0, index), value.serialize())
     }
 
 
     fn last(&self) -> Result<Option<V>, Error> {
         let len = self.len()?;
-        if len == K::zero() {
+        if len == 0 {
             Ok(None)
         } else {
-            self.get(len - K::one())
+            self.get(len - 1)
         }
     }
 
     fn is_empty(&self) -> Result<bool, Error> {
-        Ok(self.len()? == K::zero())
+        Ok(self.len()? == 0)
     }
 
-    fn len(&self) -> Result<K, Error> {
+    fn len(&self) -> Result<u64, Error> {
         if let Some(count) = self.count.get() {
             return Ok(count);
         }
 
-        let v = self.base.get(&[])?;
-        let c = v.map_or_else(K::zero, K::deserialize);
+        let c = self.base.get(&VoidKey)?.map(StorageValue::deserialize).unwrap_or(0);
         self.count.set(Some(c));
         Ok(c)
     }

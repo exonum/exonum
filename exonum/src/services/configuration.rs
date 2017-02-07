@@ -3,8 +3,8 @@ use std::fmt;
 use ::blockchain::{Service, Transaction, Schema};
 use ::crypto::{PublicKey, Hash};
 use ::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
-use ::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
-                Result as StorageResult};
+use ::storage::{MerkleTable, MemoryDB, Database, Map, List, View, MapTable, MerklePatriciaTable,
+                Result as StorageResult, merkle_hash};
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
@@ -119,23 +119,18 @@ impl<'a> ConfigurationSchema<'a> {
         (&self)
          -> MerklePatriciaTable<'a, Hash, TxConfigPropose> {
         // config_propose paricia merkletree <hash_tx> транзакция пропоз
-        MerklePatriciaTable::new(MapTable::new(vec![04], self.view))
+        MerklePatriciaTable::new(vec![04], self.view)
     }
 
     fn config_votes
         (&self)
          -> MerklePatriciaTable<'a, PublicKey, TxConfigVote> {
         // config_votes patricia merkletree <pub_key> последний голос
-        MerklePatriciaTable::new(MapTable::new(vec![05], self.view))
+        MerklePatriciaTable::new(vec![05], self.view)
     }
 
     pub fn state_hash(&self) -> StorageResult<Hash> {
-        let db = MemoryDB::new();
-        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
-
-        hashes.append(self.config_proposes().root_hash()?)?;
-        hashes.append(self.config_votes().root_hash()?)?;
-        hashes.root_hash()
+        Ok(merkle_hash(&[self.config_proposes().root_hash()?, self.config_votes().root_hash()?]))
     }
 }
 

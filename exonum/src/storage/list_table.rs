@@ -5,19 +5,16 @@ use std::cell::Cell;
 
 use super::base_table::BaseTable;
 
-use super::{View, Map, Error, StorageValue, StorageKey, List};
+use super::{View, Map, Error, StorageValue, StorageKey, VoidKey, List};
 
-pub struct ListTable<'a, K, V> {
+pub struct ListTable<'a, V> {
     base: BaseTable<'a>,
-    count: Cell<Option<K>>,
+    count: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
 
-impl<'a, K, V> ListTable<'a, K, V>
-    where K: Integer + Copy + Clone + ToPrimitive + StorageKey,
-          V: StorageValue
-{
-    pub fn new(prefix: Vec<u8>, view: View) -> Self {
+impl<'a, V: StorageValue> ListTable<'a, V> {
+    pub fn new(prefix: Vec<u8>, view: &'a View) -> Self {
         ListTable {
             base: BaseTable::new(prefix, view),
             count: Cell::new(None),
@@ -30,20 +27,17 @@ impl<'a, K, V> ListTable<'a, K, V>
         Ok(if self.is_empty()? {
             Vec::new()
         } else {
-            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
+            range(0, self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
         })
     }
 }
 
-impl<'a, K, V> List<K, V> for ListTable<'a, K, V>
-    where K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue
-{
+impl<'a, V: StorageValue> List<V> for ListTable<'a, V> {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
-        self.base.put(&len.serialize(), value.serialize())?;
-        self.base.put(&[], (len + K::one()).serialize())?;
-        self.count.set(Some(len + K::one()));
+        self.base.put(&len, value.serialize())?;
+        self.base.put(&VoidKey, (len + 1).serialize())?;
+        self.count.set(Some(len + 1));
         Ok(())
     }
 
@@ -52,46 +46,45 @@ impl<'a, K, V> List<K, V> for ListTable<'a, K, V>
     {
         let mut len = self.len()?;
         for value in iter {
-            self.base.put(&len.serialize(), value.serialize())?;
-            len = len + K::one();
+            self.base.put(&len, value.serialize())?;
+            len = len + 1;
         }
-        self.base.put(&[], len.serialize())?;
+        self.base.put(&VoidKey, len.serialize())?;
         self.count.set(Some(len));
         Ok(())
     }
 
-    fn get(&self, index: K) -> Result<Option<V>, Error> {
-        let value = self.base.get(&index.serialize())?;
+    fn get(&self, index: u64) -> Result<Option<V>, Error> {
+        let value = self.base.get(&index)?;
         Ok(value.map(StorageValue::deserialize))
     }
 
-    fn set(&self, index: K, value: V) -> Result<(), Error> {
+    fn set(&self, index: u64, value: V) -> Result<(), Error> {
         if index >= self.len()? {
             return Err(Error::new("Wrong index!"));
         }
-        self.base.put(&index.serialize(), value.serialize())
+        self.base.put(&index, value.serialize())
     }
 
     fn last(&self) -> Result<Option<V>, Error> {
         let len = self.len()?;
-        if len == K::zero() {
+        if len == 0 {
             Ok(None)
         } else {
-            self.get(len - K::one())
+            self.get(len - 1)
         }
     }
 
     fn is_empty(&self) -> Result<bool, Error> {
-        Ok(self.len()? == K::zero())
+        Ok(self.len()? == 0)
     }
 
-    fn len(&self) -> Result<K, Error> {
+    fn len(&self) -> Result<u64, Error> {
         if let Some(count) = self.count.get() {
             return Ok(count);
         }
 
-        let v = self.base.get(&[])?;
-        let c = v.map_or_else(K::zero, K::deserialize);
+        let c = self.base.get(&VoidKey)?.map(StorageValue::deserialize).unwrap_or(0);
         self.count.set(Some(c));
         Ok(c)
     }

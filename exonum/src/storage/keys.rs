@@ -8,6 +8,22 @@ pub trait StorageKey {
     fn read(buffer: &[u8]) -> Self;
 }
 
+pub struct VoidKey;
+
+impl StorageKey for VoidKey {
+    fn size() -> usize {
+        0
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>) {
+        // no-op
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        VoidKey
+    }
+}
+
 impl StorageKey for u8 {
     fn size() -> usize {
         1

@@ -328,7 +328,7 @@ enum RemoveResult {
 
 // TODO avoid reallocations where is possible.
 impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
-    pub fn new(prefix: Vec<u8>, view: View) -> Self {
+    pub fn new(prefix: Vec<u8>, view: &'a View) -> Self {
         MerklePatriciaTable {
             base: BaseTable::new(prefix, view),
             _k: PhantomData,
@@ -478,7 +478,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
             Some((prefix, Node::Leaf(_))) => {
                 let key = key_slice.to_db_key();
                 if key == prefix {
-                    self.map.delete(&key)?;
+                    self.base.delete(&key)?;
                 }
                 Ok(())
             }
@@ -490,7 +490,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
                     let suffix_slice = key_slice.mid(i);
                     match self.do_remove_node(&branch, &suffix_slice)? {
                         RemoveResult::Leaf => {
-                            self.map.delete(&prefix)?;
+                            self.base.delete(&prefix)?;
                         }
                         RemoveResult::Branch((key, hash)) => {
                             let mut new_child_slice = BitSlice::from_db_key(key.as_ref());
@@ -524,7 +524,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
         if i == child_slice.len() {
             match self.read_node(child_slice.to_db_key())? {
                 Node::Leaf(_) => {
-                    self.map.delete(&key_slice.to_db_key())?;
+                    self.base.delete(&key_slice.to_db_key())?;
                     return Ok(RemoveResult::Leaf);
                 }
                 Node::Branch(mut branch) => {
@@ -535,7 +535,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
                             let key = branch.child_slice(child).to_db_key();
                             let hash = branch.child_hash(child);
 
-                            self.map.delete(&child_slice.to_db_key())?;
+                            self.base.delete(&child_slice.to_db_key())?;
 
                             return Ok(RemoveResult::Branch((key, *hash)));
                         }
@@ -712,12 +712,12 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
     }
 
     fn root_prefix(&self) -> Result<Option<Vec<u8>>, Error> {
-        self.map.find_key(&[])
+        self.base.find_key(&[])
     }
 
     fn read_node<A: AsRef<[u8]>>(&self, key: A) -> Result<Node<V>, Error> {
         let db_key = key.as_ref();
-        match self.map.get(db_key.as_ref())? {
+        match self.base.get(db_key.as_ref())? {
             Some(data) => {
                 match db_key[0] {
                     LEAF_KEY_PREFIX => Ok(Node::Leaf(StorageValue::deserialize(data))),
@@ -735,13 +735,13 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
         let hash = value.hash();
         let db_key = key.to_db_key();
         let bytes = value.serialize();
-        self.map.put(&db_key, bytes)?;
+        self.base.put(&db_key, bytes)?;
         Ok(hash)
     }
 
     fn insert_branch(&self, key: &BitSlice, branch: BranchNode) -> Result<(), Error> {
         let db_key = key.to_db_key();
-        self.map.put(&db_key, branch.serialize())
+        self.base.put(&db_key, branch.serialize())
     }
 
     // TODO replace by debug trait impl
@@ -779,7 +779,7 @@ impl<'a, K, V> Map<K, V> for MerklePatriciaTable<'a, K, V>
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
         let db_key = BitSlice::from_bytes(key.as_ref()).to_db_key();
-        let v = self.map.get(db_key.as_ref())?;
+        let v = self.base.get(db_key.as_ref())?;
         Ok(v.map(StorageValue::deserialize))
     }
 
@@ -800,7 +800,7 @@ impl<'a, K, V> Map<K, V> for MerklePatriciaTable<'a, K, V>
         db_key[0] = LEAF_KEY_PREFIX;
         db_key[1..key.len() + 1].copy_from_slice(key);
 
-        let r = self.map.find_key(db_key.as_slice())?;
+        let r = self.base.find_key(db_key.as_slice())?;
         Ok(r.map(|v| v[1..v.len() - 1].to_vec()))
     }
 }

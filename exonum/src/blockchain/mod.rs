@@ -17,7 +17,7 @@ use ::messages::{RawMessage, Precommit};
 use ::node::State;
 
 use ::storage::{MerkleTable, MemoryDB, Patch, Database, Fork, Error, Map, List, Storage,
-                View as StorageView};
+                View as StorageView, merkle_hash};
 
 pub use self::block::Block;
 pub use self::schema::{ConfigurationData, Schema};
@@ -137,17 +137,17 @@ impl Blockchain {
         // Get state hash
         let state_hash = {
             let db = MemoryDB::new();
-            let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+            let hashes = Vec::new();
 
             // Add core state hashes
-            hashes.append(schema.state_hash()?)?;
+            hashes.push(schema.state_hash()?);
             // Add state hashes from extensions
             for service in self.service_map.values() {
                 if let Some(hash) = service.state_hash(&fork) {
-                    hashes.append(hash?)?;
+                    hashes.push(hash?);
                 }
             }
-            hashes.root_hash()?
+            merkle_hash(&hashes)
         };
 
         // Create block
