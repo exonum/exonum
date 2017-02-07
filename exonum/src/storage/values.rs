@@ -1,6 +1,6 @@
 use std::mem;
 use std::sync::Arc;
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{ByteOrder, LittleEndian};
 use super::Error;
 
 use ::crypto::{Hash, hash};
@@ -20,9 +20,6 @@ impl<T: Deserialize> DeserializeFromJson for T {
     }
 }
 
-#[derive(Clone)]
-pub struct HeightBytes(pub [u8; 32]);
-
 pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;
     fn deserialize(v: Vec<u8>) -> Self;
@@ -32,17 +29,17 @@ pub trait StorageValue {
 impl StorageValue for u16 {
     fn serialize(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<u16>()];
-        BigEndian::write_u16(&mut v, self);
+        LittleEndian::write_u16(&mut v, self);
         v
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
-        BigEndian::read_u16(&v)
+        LittleEndian::read_u16(&v)
     }
 
     fn hash(&self) -> Hash {
         let mut v = vec![0; mem::size_of::<u16>()];
-        BigEndian::write_u16(&mut v, *self);
+        LittleEndian::write_u16(&mut v, *self);
         hash(&v)
     }
 }
@@ -51,17 +48,17 @@ impl StorageValue for u32 {
     // TODO: return Cow<[u8]>
     fn serialize(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<u32>()];
-        BigEndian::write_u32(&mut v, self);
+        LittleEndian::write_u32(&mut v, self);
         v
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
-        BigEndian::read_u32(&v)
+        LittleEndian::read_u32(&v)
     }
 
     fn hash(&self) -> Hash {
         let mut v = vec![0; mem::size_of::<u32>()];
-        BigEndian::write_u32(&mut v, *self);
+        LittleEndian::write_u32(&mut v, *self);
         hash(&v)
     }
 }
@@ -69,17 +66,17 @@ impl StorageValue for u32 {
 impl StorageValue for u64 {
     fn serialize(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<u64>()];
-        BigEndian::write_u64(&mut v, self);
+        LittleEndian::write_u64(&mut v, self);
         v
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
-        BigEndian::read_u64(&v)
+        LittleEndian::read_u64(&v)
     }
 
     fn hash(&self) -> Hash {
         let mut v = vec![0; mem::size_of::<u64>()];
-        BigEndian::write_u64(&mut v, *self);
+        LittleEndian::write_u64(&mut v, *self);
         hash(&v)
     }
 }
@@ -87,17 +84,17 @@ impl StorageValue for u64 {
 impl StorageValue for i64 {
     fn serialize(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<i64>()];
-        BigEndian::write_i64(&mut v, self);
+        LittleEndian::write_i64(&mut v, self);
         v
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
-        BigEndian::read_i64(&v)
+        LittleEndian::read_i64(&v)
     }
 
     fn hash(&self) -> Hash {
         let mut v = vec![0; mem::size_of::<i64>()];
-        BigEndian::write_i64(&mut v, *self);
+        LittleEndian::write_i64(&mut v, *self);
         hash(&v)
     }
 }
@@ -157,41 +154,5 @@ impl StorageValue for Vec<u8> {
 
     fn hash(&self) -> Hash {
         hash(self)
-    }
-}
-
-impl AsRef<[u8]> for HeightBytes {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
-    }
-}
-
-impl From<u64> for HeightBytes {
-    fn from(b: u64) -> HeightBytes {
-        let mut v = [0u8; 32];
-        BigEndian::write_u64(&mut v, b);
-        HeightBytes(v)
-    }
-}
-
-impl From<HeightBytes> for u64 {
-    fn from(b: HeightBytes) -> u64 {
-        BigEndian::read_u64(b.as_ref())
-    }
-}
-
-impl StorageValue for HeightBytes {
-    fn serialize(self) -> Vec<u8> {
-        self.as_ref().to_vec()
-    }
-
-    fn deserialize(v: Vec<u8>) -> Self {
-        let mut b = [0u8; 32];
-        b.clone_from_slice(v.as_slice());
-        HeightBytes(b)
-    }
-
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
     }
 }

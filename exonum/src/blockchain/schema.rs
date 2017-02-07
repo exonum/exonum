@@ -1,7 +1,7 @@
 use ::crypto::Hash;
 use ::messages::{RawMessage, Precommit};
-use ::storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, HeightBytes,
-                Error, Map, List, MemoryDB};
+use ::storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable,
+                Error, Map, List, MemoryDB, merkle_hash};
 
 use super::Block;
 use super::config::StoredConfiguration;
@@ -27,28 +27,28 @@ impl<'a> Schema<'a> {
         MapTable::new(vec![01], self.view)
     }
 
-    pub fn heights(&self) -> ListTable<'a, u64, Hash> {
-        ListTable::new(MapTable::new(vec![02], self.view))
+    pub fn heights(&self) -> ListTable<'a, Hash> {
+        ListTable::new(vec![02], self.view)
     }
 
-    pub fn block_txs(&self, height: u64) -> MerkleTable<'a, u32, Hash> {
-        MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.view))
+    pub fn block_txs(&self, height: u64) -> MerkleTable<'a, Hash> {
+        MerkleTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.view)
     }
 
-    pub fn precommits(&self, hash: &Hash) -> ListTable<'a, u32, Precommit> {
-        ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.view))
+    pub fn precommits(&self, hash: &Hash) -> ListTable<'a, Precommit> {
+        ListTable::new([&[03], hash.as_ref()].concat(), self.view)
     }
 
     pub fn configs
         (&self)
-         -> MerklePatriciaTable<'a, HeightBytes, ConfigurationData> {
+         -> MerklePatriciaTable<'a, u64, ConfigurationData> {
         // configs patricia merkletree <высота блока> json
-        MerklePatriciaTable::new(MapTable::new(vec![06], self.view))
+        MerklePatriciaTable::new(vec![06], self.view)
     }
 
     // TODO: consider List index to reduce storage volume
-    pub fn configs_heights(&self) -> ListTable<'a, u64, HeightBytes> {
-        ListTable::new(MapTable::new(vec![07], self.view))
+    pub fn configs_heights(&self) -> ListTable<'a, u64> {
+        ListTable::new(vec![07], self.view)
     }
 
     pub fn last_block(&self) -> Result<Option<Block>, Error> {
@@ -106,10 +106,6 @@ impl<'a> Schema<'a> {
     }
 
     pub fn state_hash(&self) -> Result<Hash, Error> {
-        let db = MemoryDB::new();
-        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
-
-        hashes.append(self.configs().root_hash()?)?;
-        hashes.root_hash()
+        self.configs().root_hash()      
     }
 }
