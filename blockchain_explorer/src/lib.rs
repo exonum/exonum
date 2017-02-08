@@ -112,14 +112,14 @@ pub struct ExplorerApi {
 }
 
 impl ExplorerApi {
-    fn get_blocks(&self, blocks_request: BlocksRequest) -> Result<Vec<BlockInfo<T>>, ApiError> {
-        let view = self.blockchain.clone().view();
-        let explorer = BlockchainExplorer::new(&view, self.cfg.clone());
-        match explorer.blocks_range(blocks_request.count, blocks_request.from) {
-            Ok(blocks) => Ok(blocks),
-            Err(e) => Err(ApiError::IncorrectRequest),
-        }
-    }
+    // fn get_blocks(&self, blocks_request: BlocksRequest) -> Result<Vec<BlockInfo<T>>, ApiError> {
+    //     let view = self.blockchain.clone().view();
+    //     let explorer = BlockchainExplorer::new(&view, self.cfg.clone());
+    //     match explorer.blocks_range(blocks_request.count, blocks_request.from) {
+    //         Ok(blocks) => Ok(blocks),
+    //         Err(e) => Err(ApiError::IncorrectRequest),
+    //     }
+    // }
 }
 
 impl Api for ExplorerApi {
