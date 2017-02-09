@@ -1,4 +1,4 @@
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{ByteOrder, BigEndian, WriteBytesExt};
 use ::crypto::{Hash, PublicKey};
 
 
@@ -44,7 +44,7 @@ impl StorageKey for u16 {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        BigEndian::write_u16(buffer, *self)
+        buffer.write_u16::<BigEndian>(*self).unwrap()
     }
 
     fn read(buffer: &[u8]) -> Self {
@@ -58,7 +58,7 @@ impl StorageKey for u32 {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        BigEndian::write_u32(buffer, *self)
+        buffer.write_u32::<BigEndian>(*self).unwrap()
     }
 
     fn read(buffer: &[u8]) -> Self {
@@ -72,7 +72,7 @@ impl StorageKey for u64 {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        BigEndian::write_u64(buffer, *self)
+        buffer.write_u64::<BigEndian>(*self).unwrap()
     }
 
     fn read(buffer: &[u8]) -> Self {
@@ -116,7 +116,7 @@ impl StorageKey for Vec<u8> {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {        
-        buffer.copy_from_slice(self)
+        buffer.extend_from_slice(self)
     }
 
     fn read(buffer: &[u8]) -> Self {        
