@@ -1,6 +1,7 @@
 
 use exonum::messages::Field;
-use exonum::crypto::{PublicKey, Hash, hash};
+use exonum::crypto::{PublicKey, Hash, hash, ToHex};
+use serde::{Serialize, Serializer};
 
 pub type WalletId = u64;
 
@@ -32,9 +33,21 @@ impl Wallet {
     }
 }
 
+impl Serialize for Wallet {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let mut state = ser.serialize_struct("wallet", 3)?;
+        ser.serialize_struct_elt(&mut state, "balance", self.balance())?;
+        ser.serialize_struct_elt(&mut state, "name", self.name())?;
+        ser.serialize_struct_elt(&mut state, "history_hash", self.history_hash().to_hex())?;
+        ser.serialize_struct_end(state)
+    }
+}
+
 #[test]
 fn test_wallet() {
-    let hash = Hash::new([2; 32]); 
+    let hash = Hash::new([2; 32]);
     let name = "foobar abacaba Юникод всяуи";
     let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
     let wallet = Wallet::new(&pub_key, name, -100500, &hash);

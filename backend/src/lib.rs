@@ -1,17 +1,28 @@
 extern crate rand;
 extern crate time;
 extern crate serde;
+extern crate cookie;
 #[macro_use]
 extern crate serde_derive;
 extern crate byteorder;
+extern crate jsonway;
 #[macro_use]
 extern crate log;
 #[cfg(test)]
 extern crate tempdir;
+extern crate serde_json;
 
 #[macro_use(message, storage_value)]
 extern crate exonum;
 extern crate blockchain_explorer;
+extern crate router;
+extern crate iron;
+extern crate hyper;
+extern crate bodyparser;
+
+use serde::{Serialize, Serializer};
+use exonum::crypto::HexValue;
+use blockchain_explorer::TransactionInfo;
 
 pub mod api;
 pub mod wallet;
@@ -31,6 +42,9 @@ pub const CRYPTOCURRENCY: u16 = 128;
 pub const TX_TRANSFER_ID: u16 = 128;
 pub const TX_ISSUE_ID: u16 = 129;
 pub const TX_WALLET_ID: u16 = 130;
+
+use exonum::node::{TxSender, NodeChannel};
+pub type CurrencyTxSender = TxSender<NodeChannel>;
 
 message! {
     TxTransfer {
@@ -84,6 +98,40 @@ impl CurrencyTx {
         }
     }
 }
+
+impl Serialize for CurrencyTx {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let mut state;
+        match *self {
+            CurrencyTx::Issue(ref issue) => {
+                state = ser.serialize_struct("transaction", 4)?;
+                ser.serialize_struct_elt(&mut state, "type", "issue")?;
+                ser.serialize_struct_elt(&mut state, "wallet", issue.wallet().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "amount", issue.amount())?;
+                ser.serialize_struct_elt(&mut state, "seed", issue.seed())?;
+            }
+            CurrencyTx::Transfer(ref transfer) => {
+                state = ser.serialize_struct("transaction", 5)?;
+                ser.serialize_struct_elt(&mut state, "type", "transfer")?;
+                ser.serialize_struct_elt(&mut state, "from", transfer.from().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "to", transfer.to().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "amount", transfer.amount())?;
+                ser.serialize_struct_elt(&mut state, "seed", transfer.seed())?;
+            }
+            CurrencyTx::CreateWallet(ref wallet) => {
+                state = ser.serialize_struct("transaction", 3)?;
+                ser.serialize_struct_elt(&mut state, "type", "create_wallet")?;
+                ser.serialize_struct_elt(&mut state, "pub_key", wallet.pub_key().to_hex())?;
+                ser.serialize_struct_elt(&mut state, "name", wallet.name())?;
+            }
+        }
+        ser.serialize_struct_end(state)
+    }
+}
+
+impl TransactionInfo for CurrencyTx {}
 
 impl Message for CurrencyTx {
     fn raw(&self) -> &RawMessage {

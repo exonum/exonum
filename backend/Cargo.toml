@@ -8,22 +8,25 @@ env_logger = "0.3"
 clap = {version="2.14", features=["unstable"]}
 
 rustless = "0.9"
-iron = "0.4"
-hyper = "0.9"
-valico = "1.0"
 time = "0.1"
 rand = "0.3"
 log = "0.3"
 byteorder = "0.5"
-
 serde = "0.8"
 serde_derive = "0.8"
 jsonway = "1.0"
+iron = "0.5.1"
+bodyparser = "0.5.0"
+router = "0.5.1"
+headers = "0.1.0"
+hyper = "0.10.4"
+serde_json = "0.8"
+cookie = "0.6.0"
 
 [dependencies.exonum]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "8ced381f8e9b4764c79786112b7acfcf7113afce"
+rev = "146cc58d6dfe2c0fe7f7afd7f8e6c86f37730df7"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "8ced381f8e9b4764c79786112b7acfcf7113afce"
+rev = "146cc58d6dfe2c0fe7f7afd7f8e6c86f37730df7"
