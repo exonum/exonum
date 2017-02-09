@@ -6,8 +6,7 @@ use rustless::{Api, Nesting};
 use valico::json_dsl;
 
 use exonum::crypto::{Hash, PublicKey, SecretKey, HexValue};
-use exonum::blockchain::Blockchain;
-use exonum::blockchain::Schema;
+use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::NodeConfig;
 use exonum::services::configuration::{TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use ::ValueNotFound;
