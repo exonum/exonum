@@ -1,4 +1,3 @@
-use exonum::node::NodeConfig;
 use exonum::blockchain::Blockchain;
 use serde_json::value::ToJson;
 use serde_json::Value as JValue;
@@ -19,12 +18,11 @@ pub struct BlocksRequest {
 #[derive(Clone)]
 pub struct ExplorerApi {
     pub blockchain: Blockchain,
-    pub cfg: NodeConfig,
 }
 
 impl ExplorerApi {
     fn get_blocks(&self, blocks_request: BlocksRequest) -> Result<Vec<BlockInfo>, ApiError> {
-        let explorer = BlockchainExplorer::new(&self.blockchain, self.cfg.clone());
+        let explorer = BlockchainExplorer::new(&self.blockchain);
         match explorer.blocks_range(blocks_request.count, blocks_request.from) {
             Ok(blocks) => Ok(blocks),
             Err(e) => Err(ApiError::Storage(e)),
@@ -32,7 +30,7 @@ impl ExplorerApi {
     }
 
     fn get_block(&self, height: u64) -> Result<Option<BlockInfo>, ApiError> {
-        let explorer = BlockchainExplorer::new(&self.blockchain, self.cfg.clone());
+        let explorer = BlockchainExplorer::new(&self.blockchain);
         match explorer.block_info_with_height(height) {
             Ok(block_info) => Ok(block_info),
             Err(e) => Err(ApiError::Storage(e)),
@@ -40,7 +38,7 @@ impl ExplorerApi {
     }
 
     fn get_transaction(&self, hash_str: &String) -> Result<Option<JValue>, ApiError> {
-        let explorer = BlockchainExplorer::new(&self.blockchain, self.cfg.clone());
+        let explorer = BlockchainExplorer::new(&self.blockchain);
         let hash = Hash::from_hex(hash_str)?;
         match explorer.tx_info(&hash) {
             Ok(tx_info) => Ok(tx_info),
