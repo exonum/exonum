@@ -4,9 +4,8 @@ use serde::Serialize;
 
 use exonum::storage::{Map, List};
 use exonum::storage::Result as StorageResult;
-use exonum::crypto::{Hash, PublicKey};
+use exonum::crypto::Hash;
 use exonum::blockchain::Schema;
-use exonum::node::NodeConfig;
 use exonum::blockchain::Blockchain;
 use serde_json::Value;
 
@@ -14,7 +13,6 @@ use api::HexField;
 
 pub struct BlockchainExplorer<'a> {
     blockchain: &'a Blockchain,
-    validators: Vec<PublicKey>,
 }
 
 pub trait TransactionInfo: Serialize {}
@@ -34,11 +32,8 @@ pub struct BlockInfo {
 }
 
 impl<'a> BlockchainExplorer<'a> {
-    pub fn new(blockchain: &'a Blockchain, cfg: NodeConfig) -> BlockchainExplorer {
-        BlockchainExplorer {
-            blockchain: blockchain,
-            validators: cfg.genesis.validators,
-        }
+    pub fn new(blockchain: &'a Blockchain) -> BlockchainExplorer {
+        BlockchainExplorer { blockchain: blockchain }
     }
 
     pub fn tx_info(&self, tx_hash: &Hash) -> StorageResult<Option<Value>> {
@@ -70,10 +65,11 @@ impl<'a> BlockchainExplorer<'a> {
                 }
             };
 
+            let config = schema.get_actual_configuration()?;
             // TODO Find more common solution
             // FIXME this code was copied from state.rs
             let proposer = ((height + block.propose_round() as u64) %
-                            (self.validators.len() as u64)) as u32;
+                            (config.validators.len() as u64)) as u32;
 
             let precommits_count = schema.precommits(block_hash).len()? as u64;
             let info = BlockInfo {
