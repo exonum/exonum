@@ -1,5 +1,5 @@
 use ::crypto::Hash;
-use ::messages::{RawMessage, Precommit};
+use ::messages::{RawMessage, Precommit, BlockProof};
 use ::storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, HeightBytes,
                 Error, Map, List, MemoryDB};
 
@@ -41,6 +41,21 @@ impl<'a> Schema<'a> {
                       hash: &Hash)
                       -> ListTable<MapTable<StorageView, [u8], Vec<u8>>, u32, Precommit> {
         ListTable::new(MapTable::new([&[03], hash.as_ref()].concat(), self.view))
+    }
+
+    pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
+        let block_hash = match self.heights().get(height)? {
+            None => return Ok(None), 
+            Some(block_hash) => block_hash, 
+        }; 
+        let block = self.blocks().get(&block_hash)?.unwrap(); 
+        let precommits_table = self.precommits(&block_hash); 
+        let precommits = precommits_table.values()?; 
+        let res = BlockProof {
+            block: block, 
+            precommits: precommits, 
+        }; 
+        Ok(Some(res))
     }
 
     pub fn configs
