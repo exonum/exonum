@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use super::{Map, Result, Error};
+use super::{Map, Result};
 
 // TODO In this implementation there are extra memory allocations when key is passed into specific database.
 // Think about key type. Maybe we can use keys with fixed length?

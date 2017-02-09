@@ -3,8 +3,7 @@ use std::fmt;
 use ::blockchain::{Service, Transaction, Schema};
 use ::crypto::{PublicKey, Hash};
 use ::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
-use ::storage::{MerkleTable, MemoryDB, Database, Map, List, View, MapTable, MerklePatriciaTable,
-                Result as StorageResult, merkle_hash};
+use ::storage::{Map, View, MerklePatriciaTable, Result as StorageResult, merkle_hash};
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;

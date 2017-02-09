@@ -1,11 +1,11 @@
-use num::{Integer, range, ToPrimitive};
+use num::{range};
 
 use std::marker::PhantomData;
 use std::cell::Cell;
 
 use super::base_table::BaseTable;
 
-use super::{View, Map, Error, StorageValue, StorageKey, VoidKey, List};
+use super::{View, Error, StorageValue, VoidKey, List};
 
 pub struct ListTable<'a, V> {
     base: BaseTable<'a>,

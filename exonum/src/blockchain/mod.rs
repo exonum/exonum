@@ -16,8 +16,7 @@ use ::crypto::Hash;
 use ::messages::{RawMessage, Precommit};
 use ::node::State;
 
-use ::storage::{MerkleTable, MemoryDB, Patch, Database, Fork, Error, Map, List, Storage,
-                View as StorageView, merkle_hash};
+use ::storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView, merkle_hash};
 
 pub use self::block::Block;
 pub use self::schema::{ConfigurationData, Schema};
@@ -136,7 +135,6 @@ impl Blockchain {
         let tx_hash = schema.block_txs(height).root_hash()?;
         // Get state hash
         let state_hash = {
-            let db = MemoryDB::new();
             let mut hashes = Vec::new();
 
             // Add core state hashes

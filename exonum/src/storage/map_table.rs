@@ -39,7 +39,7 @@ impl<'a, K, V> Map<K, V> for MapTable<'a, K, V>
         self.base.delete(key)
     }
 
-    fn find_key(&self, origin_key: &K) -> Result<Option<Vec<u8>>, Error> {
+    fn find_key(&self, _: &K) -> Result<Option<Vec<u8>>, Error> {
         unimplemented!();
     //     let key = [&self.prefix, origin_key.as_ref()].concat();
     //     let result = match self.base.find_key(&key)? {
