@@ -222,7 +222,7 @@ implement_index_traits! {Signature}
 
 impl Default for Hash {
     fn default() -> Hash {
-        Hash::new([0; 32])
+        Hash::zero()
     }
 }
 

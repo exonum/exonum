@@ -95,7 +95,7 @@ impl MessageWriter {
                 }
                 Some(n) => {
                     self.position += n;
-                    if n == message.len() {
+                    if self.position == message.len() {
                         self.queue.pop_front();
                         self.position = 0;
                     }

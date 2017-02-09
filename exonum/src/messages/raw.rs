@@ -55,7 +55,7 @@ impl MessageBuffer {
         LittleEndian::read_u16(&self.raw[2..4])
     }
 
-    fn body(&self) -> &[u8] {
+    pub fn body(&self) -> &[u8] {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
