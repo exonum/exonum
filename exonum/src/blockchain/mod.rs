@@ -137,7 +137,7 @@ impl Blockchain {
         // Get state hash
         let state_hash = {
             let db = MemoryDB::new();
-            let hashes = Vec::new();
+            let mut hashes = Vec::new();
 
             // Add core state hashes
             hashes.push(schema.state_hash()?);

@@ -107,3 +107,21 @@ impl StorageKey for PublicKey {
         PublicKey::from_slice(buffer).unwrap()
     }
 }
+
+
+// FIXME: dirty hack for special for patricia merkle tree db keys, need to remove this implementation
+impl StorageKey for Vec<u8> {
+    fn size() -> usize {
+        34
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>) {
+        assert_eq!(self.len(), Self::size());
+        buffer.copy_from_slice(self)
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        assert_eq!(buffer.len(), Self::size());
+        buffer.to_vec()
+    }
+}
