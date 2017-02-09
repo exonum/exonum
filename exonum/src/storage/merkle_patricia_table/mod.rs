@@ -802,7 +802,7 @@ impl<'a, K, V> Map<K, V> for MerklePatriciaTable<'a, K, V>
         self.remove(BitSlice::from_bytes(&v))
     }
 
-    fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>, Error> {
+    fn find_key(&self, _key: &K) -> Result<Option<Vec<u8>>, Error> {
         unimplemented!();
         // let key = key.as_ref();
         // debug_assert!(key.len() <= KEY_SIZE);

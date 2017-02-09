@@ -1,7 +1,7 @@
 use ::crypto::Hash;
 use ::messages::{RawMessage, Precommit};
 use ::storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable,
-                Error, Map, List, MemoryDB, merkle_hash};
+                Error, Map, List};
 
 use super::Block;
 use super::config::StoredConfiguration;

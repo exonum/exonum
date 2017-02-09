@@ -1,8 +1,6 @@
 #[cfg(test)]
 mod tests;
 
-use num::{Integer, ToPrimitive};
-
 use std::fmt;
 use std::error;
 

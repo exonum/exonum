@@ -15,11 +15,11 @@ impl StorageKey for VoidKey {
         0
     }
 
-    fn write(&self, buffer: &mut Vec<u8>) {
+    fn write(&self, _buffer: &mut Vec<u8>) {
         // no-op
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(_buffer: &[u8]) -> Self {
         VoidKey
     }
 }

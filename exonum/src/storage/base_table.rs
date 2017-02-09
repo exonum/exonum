@@ -33,7 +33,7 @@ impl<'a> BaseTable<'a> {
     }
 
     // FIXME: remove this
-    pub fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    pub fn find_key(&self, _: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         unimplemented!();
     }
 }

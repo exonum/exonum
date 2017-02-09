@@ -5,14 +5,14 @@ use std::cell::Cell;
 use ::crypto::{hash, Hash};
 
 use super::base_table::BaseTable;
-use super::{Map, View, List, Error, StorageKey, VoidKey, StorageValue};
+use super::{View, List, Error, VoidKey, StorageValue};
 
 
 use self::proofnode::Proofnode;
 
 const HEIGHT_SHIFT : u64 = 58;
 // TODO: add checks for overflow
-const MAX_LENGTH : u64 = 288230376151711743; // 2 ** 58 - 1
+// const MAX_LENGTH : u64 = 288230376151711743; // 2 ** 58 - 1
 
 mod proofnode;
 
@@ -143,7 +143,7 @@ impl<'a, V: StorageValue> MerkleTable<'a, V> {
                                     range_start: u64,
                                     range_end: u64)
                                     -> Result<Proofnode<V>, Error> {
-        if (range_start < 0 || range_end > self.len()?) || range_end <= range_start {
+        if (range_end > self.len()?) || range_end <= range_start {
             return Err(Error::new(format!("Illegal range boundaries for MerkleTable. len: \
                                            {:?}, range start: {:?}, range_end: {:?}",
                                           self.len()?.to_usize().unwrap(),
@@ -275,7 +275,7 @@ impl<'a, V: StorageValue> List<V> for MerkleTable<'a, V> {
     }
 
     fn set(&self, index: u64, value: V) -> Result<(), Error> {
-        if index >= self.len()? || index < 0 {
+        if index >= self.len()? {
             return Err(Error::new("Wrong index!"));
         }
 
