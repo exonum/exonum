@@ -3,7 +3,7 @@ use ::crypto::{Hash, PublicKey};
 
 
 pub trait StorageKey {
-    fn size() -> usize;
+    fn size(&self) -> usize;
     fn write(&self, buffer: &mut Vec<u8>);
     fn read(buffer: &[u8]) -> Self;
 }
@@ -11,7 +11,7 @@ pub trait StorageKey {
 pub struct VoidKey;
 
 impl StorageKey for VoidKey {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         0
     }
 
@@ -25,7 +25,7 @@ impl StorageKey for VoidKey {
 }
 
 impl StorageKey for u8 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         1
     }
 
@@ -39,7 +39,7 @@ impl StorageKey for u8 {
 }
 
 impl StorageKey for u16 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         2
     }
 
@@ -53,7 +53,7 @@ impl StorageKey for u16 {
 }
 
 impl StorageKey for u32 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         4
     }
 
@@ -67,7 +67,7 @@ impl StorageKey for u32 {
 }
 
 impl StorageKey for u64 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         8
     }
 
@@ -81,7 +81,7 @@ impl StorageKey for u64 {
 }
 
 impl StorageKey for Hash {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         32
     }
 
@@ -95,7 +95,7 @@ impl StorageKey for Hash {
 }
 
 impl StorageKey for PublicKey {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         32
     }
 
@@ -111,17 +111,15 @@ impl StorageKey for PublicKey {
 
 // FIXME: dirty hack for special for patricia merkle tree db keys, need to remove this implementation
 impl StorageKey for Vec<u8> {
-    fn size() -> usize {
-        34
+    fn size(&self) -> usize {
+        self.len()
     }
 
-    fn write(&self, buffer: &mut Vec<u8>) {
-        assert_eq!(self.len(), Self::size());
+    fn write(&self, buffer: &mut Vec<u8>) {        
         buffer.copy_from_slice(self)
     }
 
-    fn read(buffer: &[u8]) -> Self {
-        assert_eq!(buffer.len(), Self::size());
+    fn read(buffer: &[u8]) -> Self {        
         buffer.to_vec()
     }
 }

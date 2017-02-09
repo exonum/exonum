@@ -92,12 +92,12 @@ impl<'a, V: StorageValue> List<V> for ListTable<'a, V> {
 
 #[cfg(test)]
 mod tests {
-    use ::storage::{MemoryDB, List, ListTable, MapTable};
+    use ::storage::{MemoryDB, Database, List, ListTable, MapTable};
 
     #[test]
     fn test_list_table_methods() {
-        let storage = MemoryDB::new();
-        let list_table = ListTable::new(MapTable::new(vec![255], &storage));
+        let storage = MemoryDB::new().fork();
+        let list_table = ListTable::new(vec![255], &storage);
 
         assert!(list_table.is_empty().unwrap());
         assert_eq!(0, list_table.len().unwrap());
@@ -106,7 +106,7 @@ mod tests {
         let extended_by = vec![45u64, 3422u64, 234u64];
         list_table.extend(extended_by.into_iter()).unwrap();
         assert!(!list_table.is_empty().unwrap());
-        assert_eq!(Some(45u64), list_table.get(0u32).unwrap());
+        assert_eq!(Some(45u64), list_table.get(0u64).unwrap());
         assert_eq!(Some(3422u64), list_table.get(1).unwrap());
         assert_eq!(Some(234u64), list_table.get(2).unwrap());
         assert_eq!(3, list_table.len().unwrap());

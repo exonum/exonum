@@ -317,7 +317,7 @@ mod tests {
     use std::collections::HashSet;
 
     use ::crypto::{Hash, hash};
-    use ::storage::{MemoryDB, List, MapTable, MerkleTable};
+    use ::storage::{Database, MemoryDB, List, MapTable, MerkleTable};
     use ::storage::values::DeserializeFromJson;
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
@@ -357,8 +357,8 @@ mod tests {
 
     #[test]
     fn test_list_methods() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
 
         assert!(table.is_empty().unwrap());
         assert_eq!(table.len().unwrap(), 0);
@@ -372,15 +372,15 @@ mod tests {
         table.append(vec![3]).unwrap();
         assert_eq!(table.len().unwrap(), 3);
 
-        assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
+        assert_eq!(table.get(0u64).unwrap(), Some(vec![1]));
         assert_eq!(table.get(1).unwrap(), Some(vec![2]));
         assert_eq!(table.get(2).unwrap(), Some(vec![3]));
     }
 
     #[test]
     fn test_height() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
 
         table.append(vec![1]).unwrap();
         assert_eq!(table.height().unwrap(), 1);
@@ -395,7 +395,7 @@ mod tests {
         assert_eq!(table.height().unwrap(), 3);
 
         assert_eq!(table.len().unwrap(), 4);
-        assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
+        assert_eq!(table.get(0u64).unwrap(), Some(vec![1]));
         assert_eq!(table.get(1).unwrap(), Some(vec![2]));
         assert_eq!(table.get(2).unwrap(), Some(vec![3]));
         assert_eq!(table.get(3).unwrap(), Some(vec![4]));
@@ -406,20 +406,20 @@ mod tests {
 
     #[test]
     fn randomly_generate_proofs() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        let num_vals = 100u32;
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
+        let num_vals = 100u64;
         let values = generate_fully_random_data_keys(num_vals as usize);
         let mut rng = thread_rng();
         for value in &values {
             table.append(value.clone()).unwrap();
         }
-        table.get(0u32).unwrap();
+        table.get(0u64).unwrap();
         let table_root_hash = table.root_hash().unwrap();
         let table_len = table.len().unwrap() as usize;
 
         for _ in 0..50 {
-            let start_range = rng.gen_range(0u32, num_vals);
+            let start_range = rng.gen_range(0u64, num_vals);
             let end_range = rng.gen_range(start_range + 1, num_vals + 1);
             let range_proof = table.construct_path_for_range(start_range, end_range).unwrap();
             assert_eq!(range_proof.compute_proof_root(), table_root_hash);
@@ -458,8 +458,8 @@ mod tests {
 
     #[test]
     fn test_table_and_proof_roots() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
         let h1 = hash(&[1, 2]);
@@ -494,7 +494,7 @@ mod tests {
         let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
         let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
-        let expected_hash_comb: Vec<(Vec<u8>, Hash, u32)> = vec![(vec![1, 2], h1, 0),
+        let expected_hash_comb: Vec<(Vec<u8>, Hash, u64)> = vec![(vec![1, 2], h1, 0),
                                                                  (vec![2, 3], h12, 1),
                                                                  (vec![3, 4], h123, 2),
                                                                  (vec![4, 5], h1234, 3),
@@ -589,44 +589,44 @@ mod tests {
         range_proof = table.construct_path_for_range(2, 6).unwrap();
         assert_eq!(proof_indices_values(&range_proof).len(), 4);
         assert_eq!(range_proof.compute_proof_root(), h12345678);
-        assert_eq!(table.get(0u32).unwrap(), Some(vec![1, 2]));
+        assert_eq!(table.get(0u64).unwrap(), Some(vec![1, 2]));
     }
 
     #[test]
     #[should_panic]
     fn test_proof_illegal_lower_bound() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        table.construct_path_for_range(0u32, 1u32).unwrap();
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
+        table.construct_path_for_range(0u64, 1u64).unwrap();
         table.append(vec![1]).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_proof_illegal_bound_empty() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
         for i in 0u8..8 {
             table.append(vec![i]).unwrap();
         }
-        table.construct_path_for_range(8u32, 9).unwrap();
+        table.construct_path_for_range(8u64, 9).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_proof_illegal_range() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
         for i in 0u8..4 {
             table.append(vec![i]).unwrap();
         }
-        table.construct_path_for_range(2u32, 2).unwrap();
+        table.construct_path_for_range(2u64, 2).unwrap();
     }
 
     #[test]
     fn test_proof_structure() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
         assert_eq!(table.root_hash().unwrap(), hash(&[]));
 
         let h1 = hash(&vec![0, 1, 2]);
@@ -646,7 +646,7 @@ mod tests {
         }
 
         assert_eq!(table.root_hash().unwrap(), h12345);
-        let range_proof = table.construct_path_for_range(4u32, 5).unwrap();
+        let range_proof = table.construct_path_for_range(4u64, 5).unwrap();
         assert_eq!(range_proof.compute_proof_root(), h12345);
 
         assert_eq!(vec![4, 5, 6], *(proof_indices_values(&range_proof)[0].1));
@@ -669,7 +669,7 @@ mod tests {
             assert!(false);
         }
         table.append(vec![5, 6, 7]).unwrap();
-        // let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
+        // let range_proof = table.construct_path_for_range(3u64, 5).unwrap();
         // println!("{:?}", range_proof);
         // let json_repre = serde_json::to_string(&range_proof).unwrap();
         // println!("{}", json_repre );
@@ -677,12 +677,12 @@ mod tests {
 
     #[test]
     fn test_hash_in_values() {
-        let storage = MemoryDB::new();
-        let table = MerkleTable::new(MapTable::new(vec![255], &storage));
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
 
         let h = hash(&[1, 2, 3, 4]);
         table.append(h).unwrap();
-        assert_eq!(table.get(0u32).unwrap(), Some(h));
+        assert_eq!(table.get(0u64).unwrap(), Some(h));
     }
 
     #[test]
@@ -690,9 +690,9 @@ mod tests {
         let h1 = hash(&[1]);
         let h2 = hash(&[2]);
 
-        let s = MemoryDB::new();
-        let t = MerkleTable::new(MapTable::new(vec![255], &s));
-        assert_eq!(t.get(0u32).unwrap(), None);
+        let s = MemoryDB::new().fork();
+        let t = MerkleTable::new(vec![255], &s);
+        assert_eq!(t.get(0u64).unwrap(), None);
         t.append(vec![1]).unwrap();
         assert_eq!(t.root_hash().unwrap(), h1);
 
@@ -702,9 +702,9 @@ mod tests {
 
     #[test]
     fn test_hash_set_value() {
-        let s1 = MemoryDB::new();
-        let t1 = MerkleTable::new(MapTable::new(vec![255], &s1));
-        assert_eq!(t1.get(0u32).unwrap(), None);
+        let s1 = MemoryDB::new().fork();
+        let t1 = MerkleTable::new(vec![255], &s1);
+        assert_eq!(t1.get(0u64).unwrap(), None);
         t1.append(vec![1]).unwrap();
         t1.append(vec![2]).unwrap();
         t1.append(vec![3]).unwrap();
@@ -715,9 +715,9 @@ mod tests {
         t1.set(2, vec![5]).unwrap();
         t1.set(3, vec![1]).unwrap();
 
-        let s2 = MemoryDB::new();
-        let t2 = MerkleTable::new(MapTable::new(vec![255], &s2));
-        assert_eq!(t2.get(0u32).unwrap(), None);
+        let s2 = MemoryDB::new().fork();
+        let t2 = MerkleTable::new(vec![255], &s2);
+        assert_eq!(t2.get(0).unwrap(), None);
         t2.append(vec![4]).unwrap();
         t2.append(vec![7]).unwrap();
         t2.append(vec![5]).unwrap();
@@ -728,18 +728,18 @@ mod tests {
 
     #[test]
     fn test_indices_converting_for_merkle_range_proof() {
-        assert_eq!(index_of_first_element_in_subtree(4u32, 1u32), 8u32);
-        assert_eq!(index_of_first_element_in_subtree(5u32, 1u32), 16u32);
-        assert_eq!(index_of_first_element_in_subtree(3u32, 3u32), 12u32);
-        assert_eq!(index_of_first_element_in_subtree(2u32, 3u32), 6u32);
-        assert_eq!(index_of_first_element_in_subtree(1u32, 7u32), 7u32);
+        assert_eq!(index_of_first_element_in_subtree(4, 1), 8);
+        assert_eq!(index_of_first_element_in_subtree(5, 1), 16);
+        assert_eq!(index_of_first_element_in_subtree(3, 3), 12);
+        assert_eq!(index_of_first_element_in_subtree(2, 3), 6);
+        assert_eq!(index_of_first_element_in_subtree(1, 7), 7);
     }
 
     #[test]
     fn test_split_range() {
-        assert_eq!((Some((0u32, 17u32)), Some((17u32, 31u32))),
-                   split_range(0u32, 17u32, 31u32));
-        assert_eq!((Some((0u32, 31u32)), None), split_range(0u32, 31u32, 31u32));
-        assert_eq!((None, Some((5u32, 31u32))), split_range(5u32, 0u32, 31u32));
+        assert_eq!((Some((0, 17)), Some((17, 31))),
+                   split_range(0, 17, 31));
+        assert_eq!((Some((0, 31)), None), split_range(0, 31, 31));
+        assert_eq!((None, Some((5, 31))), split_range(5, 0, 31));
     }
 }
