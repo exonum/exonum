@@ -332,7 +332,13 @@ fn test_block() {
     };
     let json_str = serde_json::to_string(&block_proof).unwrap();
     println!("{}", json_str);
-
+    println!("Pub_key to verify precommits against: {:?}", pub_key );
+    let json_str = serde_json::to_string(&pub_key).unwrap();
+    println!("{}", json_str);
+    for (idx,precommit) in precommits.iter().enumerate() {
+        println!("precommit #{}:{:?}", idx, precommit.raw().body() );
+    }
+    
 }
 
 #[test]
