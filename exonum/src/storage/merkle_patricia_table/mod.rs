@@ -292,7 +292,7 @@ impl BranchNode {
 
         let db_key = slice.to_db_key();
 
-        self.raw[from..from + DB_KEY_SIZE].copy_from_slice(db_key.as_slice());
+        self.raw[from..from + DB_KEY_SIZE].copy_from_slice(&db_key);
         from + DB_KEY_SIZE
     }
 }
@@ -357,8 +357,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
         Ok(out)
     }
 
-    fn insert<A: AsRef<[u8]>>(&self, key: A, value: V) -> Result<(), Error> {
-        let key = key.as_ref();
+    fn insert(&self, key: &[u8], value: V) -> Result<(), Error> {
         debug_assert_eq!(key.len(), KEY_SIZE);
 
         let key_slice = BitSlice::from_bytes(key);
@@ -564,10 +563,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
         Ok(RemoveResult::KeyNotFound)
     }
 
-    pub fn construct_path_to_key<A: AsRef<[u8]>>(&self,
-                                                 searched_key: A)
-                                                 -> Result<RootProofNode<V>, Error> {
-        let searched_key = searched_key.as_ref();
+    pub fn construct_path_to_key(&self, searched_key: &[u8]) -> Result<RootProofNode<V>, Error> {
         debug_assert_eq!(searched_key.len(), KEY_SIZE);
         let searched_slice = BitSlice::from_bytes(searched_key);
         let suff_from = 0;
