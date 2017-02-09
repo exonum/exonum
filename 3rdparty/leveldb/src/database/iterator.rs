@@ -157,12 +157,11 @@ pub trait LevelDBIterator<'a> {
         }
     }
 
-    fn seek<K: AsRef<[u8]>>(&self, key: K) {
-        unsafe {
-            let k = key.as_ref();
+    fn seek(&self, key: &[u8]) {
+        unsafe {            
             leveldb_iter_seek(self.raw_iterator(),
-                              k.as_ptr() as *mut c_char,
-                              k.len() as size_t);
+                              key.as_ptr() as *mut c_char,
+                              key.len() as size_t);
         }
     }
 }

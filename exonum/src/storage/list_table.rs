@@ -92,7 +92,7 @@ impl<'a, V: StorageValue> List<V> for ListTable<'a, V> {
 
 #[cfg(test)]
 mod tests {
-    use ::storage::{MemoryDB, Database, List, ListTable, MapTable};
+    use ::storage::{MemoryDB, Database, List, ListTable};
 
     #[test]
     fn test_list_table_methods() {

@@ -865,7 +865,7 @@ mod tests {
     use rand::{thread_rng, Rng};
 
     use ::crypto::{hash, Hash};
-    use ::storage::{Map, Database, MemoryDB, MapTable};
+    use ::storage::{Map, Database, MemoryDB};
     use ::storage::utils::bytes_to_hex;
     use serde_json;
     use serde::{Serialize, Serializer};

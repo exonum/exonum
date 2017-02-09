@@ -317,7 +317,7 @@ mod tests {
     use std::collections::HashSet;
 
     use ::crypto::{Hash, hash};
-    use ::storage::{Database, MemoryDB, List, MapTable, MerkleTable};
+    use ::storage::{Database, MemoryDB, List, MerkleTable};
     use ::storage::values::DeserializeFromJson;
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
