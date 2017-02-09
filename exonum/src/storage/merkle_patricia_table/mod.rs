@@ -717,7 +717,8 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
 
     fn read_node<A: AsRef<[u8]>>(&self, key: A) -> Result<Node<V>, Error> {
         let db_key = key.as_ref();
-        match self.base.get(db_key.as_ref())? {
+        // FIXME: dirty hack, avoid to_vec
+        match self.base.get(&db_key.to_vec())? {
             Some(data) => {
                 match db_key[0] {
                     LEAF_KEY_PREFIX => Ok(Node::Leaf(StorageValue::deserialize(data))),
@@ -778,30 +779,40 @@ impl<'a, K, V> Map<K, V> for MerklePatriciaTable<'a, K, V>
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
-        let db_key = BitSlice::from_bytes(key.as_ref()).to_db_key();
-        let v = self.base.get(db_key.as_ref())?;
+        // FIXME: temporary hack, avoid reallocation here
+        let mut v = Vec::new();
+        key.write(&mut v);        
+        let db_key = BitSlice::from_bytes(&v).to_db_key();
+        let v = self.base.get(&db_key)?;
         Ok(v.map(StorageValue::deserialize))
     }
 
     fn put(&self, key: &K, value: V) -> Result<(), Error> {
-        // FIXME avoid reallocation
-        self.insert(key, value)
+        // FIXME: temporary hack, avoid reallocation here
+        let mut v = Vec::new();
+        key.write(&mut v);
+        self.insert(&v, value)
     }
 
     fn delete(&self, key: &K) -> Result<(), Error> {
-        self.remove(BitSlice::from_bytes(key.as_ref()))
+        // FIXME: temporary hack, avoid reallocation here
+        let mut v = Vec::new();
+        key.write(&mut v);        
+
+        self.remove(BitSlice::from_bytes(&v))
     }
 
     fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>, Error> {
-        let key = key.as_ref();
-        debug_assert!(key.len() <= KEY_SIZE);
+        unimplemented!();
+        // let key = key.as_ref();
+        // debug_assert!(key.len() <= KEY_SIZE);
 
-        let mut db_key = vec![0; DB_KEY_SIZE];
-        db_key[0] = LEAF_KEY_PREFIX;
-        db_key[1..key.len() + 1].copy_from_slice(key);
+        // let mut db_key = vec![0; DB_KEY_SIZE];
+        // db_key[0] = LEAF_KEY_PREFIX;
+        // db_key[1..key.len() + 1].copy_from_slice(key);
 
-        let r = self.base.find_key(db_key.as_slice())?;
-        Ok(r.map(|v| v[1..v.len() - 1].to_vec()))
+        // let r = self.base.find_key(db_key.as_slice())?;
+        // Ok(r.map(|v| v[1..v.len() - 1].to_vec()))
     }
 }
 
