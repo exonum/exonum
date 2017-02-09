@@ -303,7 +303,6 @@ pub fn add_one_height_with_transaction(sandbox: &TimestampingSandbox,
             sandbox.assert_lock(round, Some(propose.hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
-            // let propose_time = sandbox.time();
             // let block = Block::new(initial_height, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
             //            let block = Block::new(initial_height, round, propose_time, &hash(&[]), &tx.hash(), &hash(&[]));
             //            let block = Block::new(initial_height, round, propose_time, &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(), &hash(&[]));
