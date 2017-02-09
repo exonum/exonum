@@ -164,11 +164,6 @@ dependencies = [
 
 [[package]]
 name = "cookie"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "time 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)",
- "url 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
@@ -713,6 +708,20 @@ version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "semver 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "sandbox"
+version = "0.1.0"
+dependencies = [
+ "blockchain_explorer 0.1.0",
+ "clap 2.20.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "exonum 0.1.0",
+ "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
+ "time 0.1.36 (registry+https://github.com/rust-lang/crates.io-index)",
+ "timestamping 0.1.0",
 ]
 
 [[package]]
