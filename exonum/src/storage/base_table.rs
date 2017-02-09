@@ -14,7 +14,7 @@ impl<'a> BaseTable<'a> {
     }
 
     pub fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
-        let mut v = Vec::with_capacity(self.prefix.len() + K::size());
+        let mut v = Vec::with_capacity(self.prefix.len() + key.size());
         v.extend_from_slice(&self.prefix);
         key.write(&mut v);
         v
