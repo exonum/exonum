@@ -3,7 +3,8 @@ use time::Timespec;
 use super::super::crypto::{Hash, hash};
 use super::super::messages::Field;
 use super::super::storage::StorageValue;
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use ::messages::utils::{U64, TimespecSerdeHelper}; 
 
 pub const BLOCK_SIZE: usize = 116;
 
@@ -20,40 +21,39 @@ storage_value!(
     }
 );
 
+#[derive(Serialize, Deserialize)]
+struct BlockSerdeHelper {
+   height: U64,  
+   propose_round: u32, 
+   time: TimespecSerdeHelper, 
+   prev_hash: Hash, 
+   tx_hash: Hash, 
+   state_hash: Hash, 
+}
+
 impl Serialize for Block {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        struct TimespecHelper {
-            sec: i64,
-            nsec: i32,
-        }
-        impl Serialize for TimespecHelper {
-            fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-                where S: Serializer
-            {
-                let mut state = ser.serialize_struct("TimeSpecHelper", 22)?;
+        let helper = BlockSerdeHelper{
+            height: U64(self.height()), 
+            propose_round: self.propose_round(), 
+            time: TimespecSerdeHelper(self.time()), 
+            prev_hash: *self.prev_hash(), 
+            tx_hash: *self.tx_hash(), 
+            state_hash: *self.state_hash(), 
+        }; 
+        helper.serialize(ser)
+    }
+}
+impl Deserialize for Block {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let helper = <BlockSerdeHelper>::deserialize(deserializer)?; 
 
-                ser.serialize_struct_elt(&mut state, "sec", self.sec)?;
-                ser.serialize_struct_elt(&mut state, "nsec", self.nsec)?;
-                ser.serialize_struct_end(state)
-            }
-        }
-        let mut state = ser.serialize_struct("Block", 6)?;
-        let time = self.time();
-        let time_helper = TimespecHelper {
-            sec: time.sec,
-            nsec: time.nsec,
-        };
-
-        ser.serialize_struct_elt(&mut state, "height", self.height())?;
-        ser.serialize_struct_elt(&mut state, "propose_round", self.propose_round())?;
-        ser.serialize_struct_elt(&mut state, "time", time_helper)?;
-        ser.serialize_struct_elt(&mut state, "prev_hash", self.prev_hash())?;
-        ser.serialize_struct_elt(&mut state, "tx_hash", self.tx_hash())?;
-        ser.serialize_struct_elt(&mut state, "state_hash", self.state_hash())?;
-
-        ser.serialize_struct_end(state)
+        let block = Block::new(helper.height.0, helper.propose_round, helper.time.0, &helper.prev_hash, &helper.tx_hash, &helper.state_hash); 
+        Ok(block)
     }
 }
 // TODO: add network_id, block version?
@@ -66,7 +66,7 @@ impl<'a> Field<'a> for Block {
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Block {
         let data = <&[u8] as Field>::read(buffer, from, to);
-        Block::deserialize(data.to_vec())
+        <Block as StorageValue>::deserialize(data.to_vec())
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {

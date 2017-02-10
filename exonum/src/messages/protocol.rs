@@ -1,9 +1,10 @@
 use std::net::SocketAddr;
 use time::Timespec;
-use super::super::crypto::{Hash, PublicKey};
+use super::super::crypto::{Hash, PublicKey, Signature};
 use super::{RawMessage, BitVec};
 use super::super::blockchain;
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use ::messages::utils::{U64}; 
 
 pub const CONSENSUS: u16 = 0;
 
@@ -81,36 +82,48 @@ message! {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct PrecommitSerdeHelper {
+    body: PrecommitBodySerdeHelper, 
+    signature: Signature, 
+}
+
+#[derive(Serialize, Deserialize)]
+struct PrecommitBodySerdeHelper {
+   validator: u32,  
+   height: U64, 
+   round: u32, 
+   propose_hash: Hash, 
+   block_hash: Hash, 
+}
+
 impl Serialize for Precommit {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        struct BodySerializeHelper<'a> {
-            precommit: &'a Precommit,
-        }
+        let body = PrecommitBodySerdeHelper{ 
+            validator: self.validator(), 
+            height: U64(self.height()), 
+            round: self.round(), 
+            propose_hash: *self.propose_hash(), 
+            block_hash: *self.block_hash(), 
+        }; 
+        let helper = PrecommitSerdeHelper {
+            body: body, 
+            signature: *self.raw.signature(), 
+        }; 
+        helper.serialize(ser)
+    }
+}
 
-        impl<'a> Serialize for BodySerializeHelper<'a> {
-            fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-                where S: Serializer
-            {
-                let mut state = ser.serialize_struct("Body", 5)?;
+impl Deserialize for Precommit {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let h = <PrecommitSerdeHelper>::deserialize(deserializer)?; 
 
-                ser.serialize_struct_elt(&mut state, "validator", self.precommit.validator())?;
-                ser.serialize_struct_elt(&mut state, "height", self.precommit.height())?;
-                ser.serialize_struct_elt(&mut state, "round", self.precommit.round())?;
-                ser.serialize_struct_elt(&mut state,
-                                          "propose_hash",
-                                          self.precommit.propose_hash())?;
-                ser.serialize_struct_elt(&mut state, "block_hash", self.precommit.block_hash())?;
-                ser.serialize_struct_end(state)
-            }
-        }
-        let helper = BodySerializeHelper { precommit: self };
-        let signature = self.raw.signature();
-        let mut state = ser.serialize_struct("Precommit", 2)?;
-        ser.serialize_struct_elt(&mut state, "body", &helper)?;
-        ser.serialize_struct_elt(&mut state, "signature", signature)?;
-        ser.serialize_struct_end(state)
+        let precommit = Precommit::new_with_signature(h.body.validator, h.body.height.0, h.body.round, &h.body.propose_hash, &h.body.block_hash, &h.signature); 
+        Ok(precommit)
     }
 }
 
@@ -143,7 +156,7 @@ message! {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct BlockProof {
     pub block: blockchain::Block,
     pub precommits: Vec<Precommit>,

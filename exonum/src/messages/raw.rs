@@ -133,6 +133,14 @@ impl MessageWriter {
         self.raw.extend_from_slice(signature.as_ref());
         MessageBuffer { raw: self.raw }
     }
+
+    pub fn append_signature(mut self, signature: &Signature) -> MessageBuffer {
+        let payload_length = self.raw.len() + SIGNATURE_LENGTH; 
+        self.set_payload_length(payload_length); 
+        self.raw.extend_from_slice(signature.as_ref()); 
+        debug_assert_eq!(self.raw.len(), payload_length); 
+        MessageBuffer {raw: self.raw}
+    }
 }
 
 pub trait Message: Debug + Send {
