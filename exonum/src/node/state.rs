@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
 
 use time::Duration;
+use serde_json::Value;
 
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
                              BitVec};
@@ -31,8 +32,7 @@ pub type ValidatorId = u32;
 pub struct State {
     id: u32,
     secret_key: SecretKey,
-    validators: Vec<PublicKey>,
-    consensus_config: ConsensusConfig,
+    config: StoredConfiguration,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -254,14 +254,13 @@ impl BlockState {
 impl State {
     pub fn new(id: u32,
                secret_key: SecretKey,
-               validators: Vec<PublicKey>,
+               stored: StoredConfiguration,
                connect: Connect,
                last_hash: Hash,
-               last_height: u64,
-               consensus_config: ConsensusConfig)
+               last_height: u64)
                -> State {
 
-        let validators_len = validators.len();
+        let validators_len = stored.validators.len();
 
         State {
             id: id,
@@ -269,7 +268,6 @@ impl State {
             secret_key: secret_key,
             peers: HashMap::new(),
             connections: HashMap::new(),
-            validators: validators,
             height: last_height,
             round: 0,
             locked_round: 0,
@@ -296,32 +294,44 @@ impl State {
 
             requests: HashMap::new(),
 
-            consensus_config: consensus_config,
+            config: stored,
         }
-    }
-
-    fn update_config(&mut self, config: StoredConfiguration) {
-        let id = config.validators
-            .iter()
-            .position(|pk| pk == self.public_key())
-            .unwrap();
-
-        self.id = id as u32;
-        self.validators = config.validators;
-        self.consensus_config = config.consensus;
-    }
-
-    pub fn consensus_config(&self) -> &ConsensusConfig {
-        &self.consensus_config
     }
 
     pub fn id(&self) -> ValidatorId {
         self.id
     }
 
-    // TODO Move to blockchain (and store therein)
     pub fn validators(&self) -> &[PublicKey] {
-        &self.validators
+        &self.config.validators
+    }
+
+    pub fn consensus_config(&self) -> &ConsensusConfig {
+        &self.config.consensus
+    }
+
+    pub fn services_config(&self) -> &HashMap<u16, Value> {
+        &self.config.services
+    }
+
+    pub fn update_config(&mut self, config: StoredConfiguration) {
+        let id = config.validators
+            .iter()
+            .position(|pk| pk == self.public_key())
+            .unwrap();
+
+        self.id = id as u32;
+        self.config = config;
+    }
+
+    pub fn propose_timeout(&self) -> i64 {
+        self.config.consensus.propose_timeout
+    }
+
+    pub fn set_propose_timeout(&mut self, timeout: i64) {
+        debug_assert!(timeout > 0);
+        debug_assert!(timeout < self.config.consensus.round_timeout);
+        self.config.consensus.propose_timeout = timeout;
     }
 
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
@@ -332,7 +342,7 @@ impl State {
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
         if let Some(pubkey) = self.connections.remove(addr) {
             self.peers.remove(&pubkey);
-            return self.validators.contains(&pubkey);
+            return self.config.validators.contains(&pubkey);
         }
         false
     }
@@ -342,7 +352,7 @@ impl State {
     }
 
     pub fn public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
-        self.validators.get(id as usize)
+        self.validators().get(id as usize)
     }
 
     pub fn public_key(&self) -> &PublicKey {
@@ -354,7 +364,7 @@ impl State {
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {
-        ((self.height() + round as u64) % (self.validators.len() as u64)) as ValidatorId
+        ((self.height() + round as u64) % (self.validators().len() as u64)) as ValidatorId
     }
 
     pub fn validator_height(&self, id: ValidatorId) -> Height {
@@ -376,7 +386,7 @@ impl State {
 
     pub fn majority_count(&self) -> usize {
         // FIXME: What if validators count < 4?
-        self.validators.len() * 2 / 3 + 1
+        self.validators().len() * 2 / 3 + 1
     }
 
     pub fn height(&self) -> u64 {
@@ -424,10 +434,7 @@ impl State {
     }
 
     // FIXME use block_hash
-    pub fn new_height(&mut self,
-                      block_hash: &Hash,
-                      round: Round,
-                      new_config: Option<StoredConfiguration>) {
+    pub fn new_height(&mut self, block_hash: &Hash, round: Round) {
         self.height += 1;
         self.round = round;
         self.locked_round = 0;
@@ -448,11 +455,6 @@ impl State {
         self.our_prevotes.clear();
         self.our_precommits.clear();
         self.requests.clear(); // FIXME: clear all timeouts
-
-        if let Some(config) = new_config {
-            self.update_config(config);
-        }
-
     }
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
@@ -570,7 +572,7 @@ impl State {
         }
 
         let key = (msg.round(), *msg.propose_hash());
-        let validators_len = self.validators.len();
+        let validators_len = self.validators().len();
         let mut votes = self.prevotes.entry(key).or_insert_with(|| Votes::new(validators_len));
         votes.insert(msg);
         votes.count() >= majority_count
@@ -584,7 +586,7 @@ impl State {
     }
 
     pub fn known_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        let len = self.validators.len();
+        let len = self.validators().len();
         self.prevotes
             .get(&(round, *propose_hash))
             .map(|x| x.validators().clone())
@@ -592,7 +594,7 @@ impl State {
     }
 
     pub fn known_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        let len = self.validators.len();
+        let len = self.validators().len();
         self.precommits
             .get(&(round, *propose_hash))
             .map(|x| x.validators().clone())
@@ -613,7 +615,7 @@ impl State {
         }
 
         let key = (msg.round(), *msg.block_hash());
-        let validators_len = self.validators.len();
+        let validators_len = self.validators().len();
         let votes = self.precommits.entry(key).or_insert_with(|| Votes::new(validators_len));
         votes.insert(msg);
         votes.count() >= majority_count

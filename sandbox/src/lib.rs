@@ -6,13 +6,11 @@ extern crate log;
 
 extern crate clap;
 
+#[macro_use]
 extern crate exonum;
-extern crate timestamping;
-extern crate cryptocurrency;
 
+pub mod timestamping;
 pub mod sandbox;
 pub mod sandbox_tests_helper;
-mod tx_generator;
 
-pub use tx_generator::TimestampingTxGenerator;
 pub use self::sandbox::timestamping_sandbox;

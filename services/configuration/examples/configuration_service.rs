@@ -1,25 +1,27 @@
-extern crate exonum;
-extern crate timestamping;
-extern crate sandbox;
+extern crate env_logger;
 extern crate clap;
+#[macro_use]
+extern crate log;
+
+extern crate exonum;
 extern crate blockchain_explorer;
+extern crate configuration_service;
 
 use clap::App;
 
+use exonum::blockchain::{Blockchain, Service};
 use exonum::node::Node;
-use exonum::blockchain::Blockchain;
-
-use timestamping::TimestampingService;
 use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
+
+use configuration_service::ConfigurationService;
 
 fn main() {
     exonum::crypto::init();
     blockchain_explorer::helpers::init_logger().unwrap();
 
-    let app = App::new("Simple exonum demo program")
+    let app = App::new("Simple configuration service demo program")
         .version(env!("CARGO_PKG_VERSION"))
         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
-        .about("Exonum demo validator node")
         .subcommand(GenerateCommand::new())
         .subcommand(RunCommand::new());
     let matches = app.get_matches();
@@ -30,12 +32,12 @@ fn main() {
             let node_cfg = RunCommand::node_config(matches);
             let db = RunCommand::db(matches);
 
-            let blockchain = Blockchain::new(db, vec![Box::new(TimestampingService::new())]);
-            let mut node = Node::new(blockchain, node_cfg);
-            node.run().unwrap();
+            let services: Vec<Box<Service>> = vec![Box::new(ConfigurationService::new())];
+            let blockchain = Blockchain::new(db, services);
+            Node::new(blockchain, node_cfg).run().unwrap();
         }
         _ => {
-            unreachable!("Wrong subcommand");
+            panic!("Wrong subcommand");
         }
     }
 }

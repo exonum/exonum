@@ -1,11 +1,12 @@
 // FIXME avoiding a bug in clippy.
 #![cfg_attr(feature="clippy", allow(map_clone))]
 
-use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
-                             RequestPrevotes, RequestPrecommits, RequestBlock, Block};
-use super::super::blockchain::Schema;
-use super::super::storage::{Map, List};
-use super::super::events::Channel;
+use ::messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
+                 RequestPrecommits, RequestBlock, Block};
+use ::blockchain::Schema;
+use ::storage::{Map, List};
+use ::events::Channel;
+
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
 // TODO validate_heights нужно обновлять по любым сообщениям, а не только по status (если они корректно подписаны)

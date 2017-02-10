@@ -1,10 +1,15 @@
+#[macro_use]
+extern crate exonum;
+#[macro_use]
+extern crate log;
+
 use std::fmt;
 
-use ::blockchain::{Service, Transaction, Schema};
-use ::crypto::{PublicKey, Hash};
-use ::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
-use ::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
-                Result as StorageResult};
+use exonum::blockchain::{Service, Transaction, Schema, NodeState};
+use exonum::crypto::{PublicKey, Hash};
+use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
+use exonum::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
+                      Result as StorageResult};
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
@@ -243,5 +248,19 @@ impl Service for ConfigurationService {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+    }
+
+    fn handle_commit(&self, state: &mut NodeState) -> StorageResult<()> {
+        let actual_config = {
+            let schema = Schema::new(state.view());
+            let height = state.height();
+            schema.get_configuration_at_height(height)?
+        };
+
+        if let Some(config) = actual_config {
+            info!("Updated node config={:#?}", config);
+            state.update_config(config);
+        }
+        Ok(())
     }
 }

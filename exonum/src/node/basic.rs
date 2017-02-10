@@ -4,11 +4,10 @@ use std::net::SocketAddr;
 
 use rand::Rng;
 
-use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
-use super::{NodeHandler, RequestData};
+use ::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
+use ::events::Channel;
 
-use super::super::events::Channel;
-use super::{ExternalMessage, NodeTimeout};
+use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
 
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
