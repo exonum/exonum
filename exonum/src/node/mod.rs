@@ -4,9 +4,9 @@ use std::net::SocketAddr;
 use time::{Duration, Timespec};
 
 use super::crypto::{PublicKey, SecretKey, Hash};
-use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
-                    EventsConfiguration, Channel, EventHandler, Result as EventsResult,
-                    Error as EventsError};
+use super::events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
+                    EventHandler, Result as EventsResult, Error as EventsError};
+use super::events::{MioChannel, Network, EventLoop};
 use super::blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use super::messages::{Connect, RawMessage};
 
@@ -15,12 +15,9 @@ pub mod state;//temporary solution to get access to WAIT consts
 mod basic;
 mod consensus;
 mod requests;
-mod adjusted_propose_timeout;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId};
-use self::adjusted_propose_timeout::*;
 
-pub type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
 
 #[derive(Debug)]
 pub enum ExternalMessage {
@@ -51,7 +48,6 @@ pub struct NodeHandler<S>
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -79,6 +75,12 @@ pub struct Configuration {
     pub peer_discovery: Vec<SocketAddr>,
 }
 
+pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
+
+pub struct Node {
+    reactor: Events<NodeHandler<NodeChannel>>,
+}
+
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
@@ -102,23 +104,18 @@ impl<S> NodeHandler<S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        let propose_timeout_adjuster = Box::new(adjusted_propose_timeout::ConstProposeTimeout {
-            propose_timeout: stored.consensus.propose_timeout as i64,
-        });
 
         let state = State::new(id as u32,
                                config.listener.secret_key,
-                               stored.validators,
+                               stored,
                                connect,
                                last_hash,
-                               last_height,
-                               stored.consensus);
+                               last_height);
 
         NodeHandler {
             state: state,
             channel: sender,
             blockchain: blockchain,
-            propose_timeout_adjuster: propose_timeout_adjuster,
             peer_discovery: config.peer_discovery,
         }
     }
@@ -217,18 +214,12 @@ impl<S> NodeHandler<S>
         self.channel.add_timeout(timeout, time);
     }
 
-    /// getter for adjusted_propose_timeout
-    pub fn adjusted_propose_timeout(&self) -> i64 {
-        self.propose_timeout_adjuster.adjusted_propose_timeout(&self.blockchain.view())
-    }
-
     pub fn add_propose_timeout(&mut self) {
         //        let time = self.round_start_time(self.state.round()) +
         //                   Duration::milliseconds(self.propose_timeout);
-        let adjusted_propose_timeout = self.adjusted_propose_timeout();//cache adjusted_propose_timeout because this value will be used 2 times
+        let adjusted_propose_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
                    Duration::milliseconds(adjusted_propose_timeout);
-        self.propose_timeout_adjuster.update_last_propose_timeout(adjusted_propose_timeout);
 
         trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
                time,
@@ -274,7 +265,7 @@ impl<S> NodeHandler<S>
         let propose = self.last_block_time();
         debug_assert!(now >= propose);
 
-        let duration = (now - propose - Duration::milliseconds(self.adjusted_propose_timeout()))
+        let duration = (now - propose - Duration::milliseconds(self.state.propose_timeout()))
             .num_milliseconds();
         if duration > 0 {
             let round = (duration / self.round_timeout()) as Round + 1;
@@ -342,12 +333,6 @@ impl<S> TxSender<S>
     }
 }
 
-pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
-
-pub struct Node {
-    reactor: Events<NodeHandler<NodeChannel>>,
-}
-
 impl Node {
     pub fn new(blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
         blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
@@ -364,7 +349,7 @@ impl Node {
         };
         let network = Network::with_config(node_cfg.listen_address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
-        let channel = MioChannel::new(node_cfg.listen_address, event_loop.channel());
+        let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);
         Node { reactor: Events::with_event_loop(network, worker, event_loop) }
     }

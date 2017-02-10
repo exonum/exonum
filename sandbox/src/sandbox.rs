@@ -7,23 +7,22 @@ use std::ops::Drop;
 
 use time::{Timespec, Duration};
 
-use exonum::node::{NodeHandler, Configuration, ExternalMessage, NodeTimeout, ListenerConfig};
+use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction};
 use exonum::storage::{MemoryDB, Error as StorageError};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
-                     Channel, EventHandler, Result as EventsResult};
+                     EventHandler, Channel, Result as EventsResult};
 use exonum::crypto::{Hash, PublicKey, SecretKey, gen_keypair};
 use exonum::node::state::{Round, Height};
 
-use timestamping::{TimestampingService, TimestampTx};
+use ::timestamping::{TimestampingService, TimestampTx, TimestampingTxGenerator};
 
-use super::TimestampingTxGenerator;
+type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
 
 #[derive(PartialEq, Eq)]
-struct TimerPair(Timespec, NodeTimeout);
-type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
+pub struct TimerPair(pub Timespec, pub NodeTimeout);
 
 impl PartialOrd for TimerPair {
     fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
@@ -37,22 +36,17 @@ impl Ord for TimerPair {
     }
 }
 
-struct SandboxInner {
-    address: SocketAddr,
-    time: Timespec,
-    sended: VecDeque<(SocketAddr, RawMessage)>,
-    events: VecDeque<SandboxEvent>,
-    timers: BinaryHeap<TimerPair>,
-}
-
-pub struct SandboxReactor {
-    inner: Arc<Mutex<SandboxInner>>,
-    handler: NodeHandler<SandboxChannel>,
+pub struct SandboxInner {
+    pub address: SocketAddr,
+    pub time: Timespec,
+    pub sended: VecDeque<(SocketAddr, RawMessage)>,
+    pub events: VecDeque<SandboxEvent>,
+    pub timers: BinaryHeap<TimerPair>,
 }
 
 #[derive(Clone)]
 pub struct SandboxChannel {
-    inner: Arc<Mutex<SandboxInner>>,
+    pub inner: Arc<Mutex<SandboxInner>>,
 }
 
 impl SandboxChannel {
@@ -98,6 +92,11 @@ impl Channel for SandboxChannel {
         let pair = TimerPair(time, timeout);
         self.inner.lock().unwrap().timers.push(pair);
     }
+}
+
+pub struct SandboxReactor {
+    inner: Arc<Mutex<SandboxInner>>,
+    handler: NodeHandler<SandboxChannel>,
 }
 
 impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {

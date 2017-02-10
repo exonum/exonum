@@ -2,16 +2,15 @@ use std::collections::HashSet;
 
 use time::{Duration, Timespec};
 
-use super::super::crypto::{Hash, PublicKey, HexValue};
-use super::super::blockchain::{Schema, Transaction};
-use super::super::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message,
-                             RequestPropose, RequestTransactions, RequestPrevotes,
-                             RequestPrecommits, RequestBlock, Block, RawTransaction};
-use super::super::storage::{Map, Patch};
-use super::{NodeHandler, Round, Height, RequestData, ValidatorId};
+use ::crypto::{Hash, PublicKey, HexValue};
+use ::blockchain::{Schema, Transaction};
+use ::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
+                 RequestTransactions, RequestPrevotes, RequestPrecommits, RequestBlock, Block,
+                 RawTransaction};
+use ::storage::{Map, Patch};
+use ::events::Channel;
 
-use super::super::events::Channel;
-use super::{ExternalMessage, NodeTimeout};
+use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
 
 const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
@@ -82,7 +81,7 @@ impl<S> NodeHandler<S>
         // check time of the propose
         let round = msg.round();
         let start_time = self.round_start_time(round) +
-                         Duration::milliseconds(self.adjusted_propose_timeout());
+                         Duration::milliseconds(self.state.propose_timeout());
         let end_time = start_time + Duration::milliseconds(self.round_timeout());
 
         if msg.time() < start_time || msg.time() > end_time {
@@ -171,7 +170,7 @@ impl<S> NodeHandler<S>
         // Verify propose time
         let propose_round = block.propose_round();
         let start_time = self.round_start_time(propose_round) +
-                         Duration::milliseconds(self.adjusted_propose_timeout());
+                         Duration::milliseconds(self.state.propose_timeout());
         let end_time = start_time + Duration::milliseconds(self.round_timeout());
         if msg.time() < start_time || block.time() > end_time {
             error!("Received block with wrong propose time, block={:?}", msg);
@@ -428,11 +427,7 @@ impl<S> NodeHandler<S>
 
         // Update state to new height
         let round = self.actual_round();
-
-        let view = self.blockchain.view();
-        let schema = Schema::new(&view);
-        let config = schema.get_configuration_at_height(height).unwrap();
-        self.state.new_height(&block_hash, round, config);
+        self.state.new_height(&block_hash, round);
 
         info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}",
               height,

@@ -1,5 +1,9 @@
 use serde_json;
 
+use std::collections::HashMap;
+
+use serde_json::Value;
+
 use ::crypto::PublicKey;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -7,6 +11,7 @@ pub struct StoredConfiguration {
     pub actual_from: u64,
     pub validators: Vec<PublicKey>,
     pub consensus: ConsensusConfig,
+    pub services: HashMap<u16, Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
