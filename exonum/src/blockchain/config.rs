@@ -36,12 +36,10 @@ impl Default for ConsensusConfig {
 }
 
 impl StoredConfiguration {
-    #[allow(dead_code)]
     pub fn serialize(&self) -> Vec<u8> {
         serde_json::to_vec(&self).unwrap()
     }
 
-    #[allow(dead_code)]
     pub fn deserialize(serialized: &[u8]) -> Result<StoredConfiguration, &str> {
         let cfg: StoredConfiguration = serde_json::from_slice(serialized).unwrap();
         if cfg.is_valid() {
