@@ -145,11 +145,13 @@ impl<'a> ConfigurationSchema<'a> {
     }
     pub fn get_config_propose(&self,
                               hash: &Hash)
-                              -> Result<Option<TxConfigPropose>, ::storage::Error> {
+                              -> Result<Option<TxConfigPropose>, exonum::storage::Error> {
         self.config_proposes().get(hash)
     }
 
-    pub fn get_vote(&self, pub_key: &PublicKey) -> Result<Option<TxConfigVote>, ::storage::Error> {
+    pub fn get_vote(&self,
+                    pub_key: &PublicKey)
+                    -> Result<Option<TxConfigVote>, exonum::storage::Error> {
         self.config_votes().get(pub_key)
     }
 }
