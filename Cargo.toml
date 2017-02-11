@@ -3,11 +3,7 @@
 members = [
     "3rdparty/leveldb-sys",
     "3rdparty/leveldb",
-<<<<<<< HEAD
-    "blockchain_explorer",
-=======
     "blockchain_explorer",    
->>>>>>> CI fix
     "exonum",
     "sandbox",
     "services/configuration",
