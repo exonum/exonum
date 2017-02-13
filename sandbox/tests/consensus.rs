@@ -9,6 +9,7 @@ use time::Duration;
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
                        RequestPrevotes, RequestPrecommits};
 use exonum::crypto::gen_keypair;
+use exonum::blockchain::Block; 
 use exonum::messages::BitVec;
 use exonum::node::state::{REQUEST_PRECOMMITS_WAIT, REQUEST_PREVOTES_WAIT, REQUEST_PROPOSE_WAIT,
                           REQUEST_TRANSACTIONS_WAIT};
@@ -92,6 +93,44 @@ fn test_reach_thirteen_height() {
         add_one_height(&sandbox, &sandbox_state);
         sandbox.assert_state(height, ROUND_ONE);
     }
+}
+
+#[test]
+fn test_retrieve_block_and_precommits() {
+  let sandbox = timestamping_sandbox(); 
+  let sandbox_state = SandboxState::new(); 
+
+  let target_height = 6 as Height; 
+
+  for _ in 2..target_height+1 { 
+      add_one_height(&sandbox, &sandbox_state)
+  }
+  sandbox.assert_state(target_height, ROUND_ONE);
+ 
+  let bl_proof_option = sandbox.block_and_precommits(target_height-1).unwrap(); 
+  // use serde_json; 
+  assert!(bl_proof_option.is_some()); 
+  let block_proof = bl_proof_option.unwrap(); 
+  let block: Block = block_proof.block; 
+  let precommits: Vec<Precommit> = block_proof.precommits; 
+  let expected_height = target_height - 1; 
+  let expected_round = block.propose_round(); 
+  let expected_block_hash = block.hash(); 
+
+  assert_eq!(expected_height, block.height()); 
+  for precommit in precommits {
+    assert_eq!(expected_height, precommit.height()); 
+    assert_eq!(expected_round, precommit.round()); 
+    assert_eq!(expected_block_hash, *precommit.block_hash()); 
+    assert!(precommit.raw().verify_signature(&sandbox.p(precommit.validator() as usize))); 
+  }
+  // let json_str = serde_json::to_string(&bl_proof_option.unwrap()).unwrap(); 
+  // println!("{}", &json_str);
+  let bl_proof_option = sandbox.block_and_precommits(target_height).unwrap(); 
+  assert!(bl_proof_option.is_none()); 
+
+  // let validators = sandbox.validators.iter().map(|pair| pair.0 ).collect::<Vec<_>>(); 
+  // println!("validators public keys: {}", &serde_json::to_string(&validators).unwrap());
 }
 
 /// idea of the scenario is to:
