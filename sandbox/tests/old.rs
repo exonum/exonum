@@ -6,7 +6,7 @@ use time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit};
 use exonum::blockchain::Block;
-use exonum::crypto::hash;
+use exonum::crypto::Hash;
 
 use sandbox::timestamping_sandbox;
 
@@ -71,7 +71,7 @@ fn test_get_lock_and_send_precommit() {
                            1,
                            propose_time,
                            &sandbox.last_hash(),
-                           &hash(&[]),
+                           &Hash::zero(),
                            &sandbox.last_state_hash());
 
     sandbox.recv(propose.clone());
@@ -100,7 +100,7 @@ fn test_commit() {
                            1,
                            propose_time,
                            &sandbox.last_hash(),
-                           &hash(&[]),
+                           &Hash::zero(),
                            &sandbox.last_state_hash());
 
     sandbox.recv(propose.clone());

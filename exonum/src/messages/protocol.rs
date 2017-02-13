@@ -156,7 +156,7 @@ message! {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockProof {
     pub block: blockchain::Block,
     pub precommits: Vec<Precommit>,
