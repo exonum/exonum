@@ -250,9 +250,8 @@ fn test_precommit() {
     assert_eq!(precommit.block_hash(), &block_hash);
     assert!(precommit.verify_signature(&public_key));
     let json_str = serde_json::to_string(&precommit).unwrap();
-    println!("{}", json_str);
-    assert!(json_str.contains("\"b11546c0ad0e7659284b3e575dcaf1bca271a87afe8a5a6fbdf9e398a8af1edf\""));
-    assert!(json_str.contains("321321312"));
+    let precommit1 : Precommit = serde_json::from_str(&json_str).unwrap(); 
+    assert_eq!(precommit, precommit1);
 }
 
 #[test]
@@ -331,6 +330,8 @@ fn test_block() {
         precommits: precommits.clone(),
     };
     let json_str = serde_json::to_string(&block_proof).unwrap();
+    let  block_proof_1: BlockProof = serde_json::from_str(&json_str).unwrap(); 
+    assert_eq!(block_proof, block_proof_1);
     println!("{}", json_str);
     println!("Pub_key to verify precommits against: {:?}", pub_key );
     let json_str = serde_json::to_string(&pub_key).unwrap();
