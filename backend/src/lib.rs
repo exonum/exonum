@@ -19,6 +19,7 @@ extern crate router;
 extern crate iron;
 extern crate hyper;
 extern crate bodyparser;
+extern crate configuration_service;
 
 use serde::{Serialize, Serializer};
 use exonum::crypto::HexValue;

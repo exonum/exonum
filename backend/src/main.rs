@@ -18,6 +18,7 @@ extern crate blockchain_explorer;
 extern crate cryptocurrency;
 extern crate router;
 extern crate cookie;
+extern crate configuration_service;
 
 use std::net::SocketAddr;
 use std::thread;
@@ -26,7 +27,7 @@ use router::Router;
 
 use exonum::blockchain::{Blockchain, Service};
 use exonum::node::{Node, NodeConfig};
-use exonum::services::configuration::ConfigurationService;
+use configuration_service::ConfigurationService;
 
 use cryptocurrency::CurrencyService;
 use cryptocurrency::api::CryptocurrencyApi;
@@ -68,7 +69,7 @@ fn main() {
 
     let app = App::new("Simple cryptocurrency demo program")
         .version(env!("CARGO_PKG_VERSION"))
-        .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+        .author("Aleksey S. <aleksei.sidorov@bitfury.com>")
         .about("Demo cryptocurrency validator node")
         .subcommand(GenerateCommand::new())
         .subcommand(RunCommand::new().arg(Arg::with_name("HTTP_PORT")
