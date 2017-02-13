@@ -11,7 +11,7 @@ use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, Lis
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction};
 use exonum::storage::{MemoryDB, Error as StorageError};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult};
 use exonum::crypto::{Hash, PublicKey, SecretKey, gen_keypair};
@@ -168,7 +168,7 @@ pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
     tx_generator: RefCell<TimestampingTxGenerator>,
-    validators: Vec<(PublicKey, SecretKey)>,
+    pub validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
 }
 
@@ -360,6 +360,12 @@ impl Sandbox {
 
     pub fn current_round(&self) -> Round {
         self.reactor.borrow().handler.state().round()
+    }
+
+    pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, StorageError> {
+        let view = self.reactor.borrow().handler.blockchain.view(); 
+        let schema = Schema::new(&view); 
+        schema.block_and_precommits(height) 
     }
 
     pub fn current_height(&self) -> Height {
