@@ -3,10 +3,14 @@ extern crate exonum;
 #[macro_use]
 extern crate log;
 
+extern crate serde;
+
 use std::fmt;
 
+use serde::{Serialize, Serializer};
+
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
-use exonum::crypto::{PublicKey, Hash};
+use exonum::crypto::{PublicKey, Hash, HexValue};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
                       Result as StorageResult};
@@ -46,6 +50,46 @@ message! {
 pub enum ConfigTx {
     ConfigPropose(TxConfigPropose),
     ConfigVote(TxConfigVote),
+}
+
+impl Serialize for TxConfigPropose {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let mut state;
+        state = ser.serialize_struct("config_propose", 4)?;
+        ser.serialize_struct_elt(&mut state, "from", self.from().to_hex())?;
+        ser.serialize_struct_elt(&mut state, "height", self.height())?;
+        ser.serialize_struct_elt(&mut state, "config", self.config())?;
+        ser.serialize_struct_elt(&mut state, "actual_from_height", self.actual_from_height())?;
+        ser.serialize_struct_end(state)
+    }
+}
+
+impl Serialize for TxConfigVote {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let mut state;
+        state = ser.serialize_struct("vote", 5)?;
+        ser.serialize_struct_elt(&mut state, "from", self.from().to_hex())?;
+        ser.serialize_struct_elt(&mut state, "height", self.height())?;
+        ser.serialize_struct_elt(&mut state, "hash_propose", self.hash_propose().to_hex())?;
+        ser.serialize_struct_elt(&mut state, "seed", self.seed())?;
+        ser.serialize_struct_elt(&mut state, "revoke", self.revoke())?;
+        ser.serialize_struct_end(state)
+    }
+}
+
+impl Serialize for ConfigTx {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        match *self {
+            ConfigTx::ConfigPropose(ref propose) => propose.serialize(ser),
+            ConfigTx::ConfigVote(ref vote) => vote.serialize(ser),            
+        }
+    }
 }
 
 #[derive(Default)]
@@ -134,6 +178,7 @@ impl<'a> ConfigurationSchema<'a> {
         MerklePatriciaTable::new(MapTable::new(vec![05], self.view))
     }
 
+
     pub fn state_hash(&self) -> StorageResult<Hash> {
         let db = MemoryDB::new();
         let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
@@ -141,6 +186,17 @@ impl<'a> ConfigurationSchema<'a> {
         hashes.append(self.config_proposes().root_hash()?)?;
         hashes.append(self.config_votes().root_hash()?)?;
         hashes.root_hash()
+    }
+    pub fn get_config_propose(&self,
+                              hash: &Hash)
+                              -> Result<Option<TxConfigPropose>, exonum::storage::Error> {
+        self.config_proposes().get(hash)
+    }
+
+    pub fn get_vote(&self,
+                    pub_key: &PublicKey)
+                    -> Result<Option<TxConfigVote>, exonum::storage::Error> {
+        self.config_votes().get(pub_key)
     }
 }
 
@@ -180,7 +236,7 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        if config_schema.config_proposes().get(self.hash_propose())?.is_some() {
+        if config_schema.config_proposes().get(self.hash_propose())?.is_none() {
             error!("Received config_vote for unknown transaciton, msg={:?}",
                    self);
             return Ok(());
