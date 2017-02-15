@@ -1,7 +1,7 @@
 use rand::{Rng, XorShiftRng, SeedableRng};
 
 use exonum::messages::{FromRaw, Message, RawTransaction, Error as MessageError};
-use exonum::crypto::{PublicKey, SecretKey, gen_keypair};
+use exonum::crypto::{PublicKey, SecretKey, gen_keypair, Hash};
 use exonum::storage::{Error, View as StorageView};
 use exonum::blockchain::{Service, Transaction};
 
@@ -71,6 +71,10 @@ impl Transaction for TimestampTx {
 impl Service for TimestampingService {
     fn service_id(&self) -> u16 {
         TIMESTAMPING_SERVICE
+    }
+
+    fn state_hash(&self, _: &StorageView) -> Result<Vec<Hash>, Error> {
+        Ok(vec![Hash::new([127; 32]), Hash::new([128; 32])])
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {

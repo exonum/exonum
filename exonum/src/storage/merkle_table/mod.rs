@@ -8,7 +8,7 @@ use super::{Map, List, Error, StorageValue};
 
 use self::proofnode::Proofnode;
 
-mod proofnode;
+pub mod proofnode;
 
 
 type Range<K> = Option<(K, K)>;
@@ -409,6 +409,43 @@ mod tests {
 
         table.set(1, vec![10]).unwrap();
         assert_eq!(table.get(1).unwrap(), Some(vec![10]));
+    }
+
+    #[test]
+    fn generate_proof_in_table_containing_hashes() {
+        let storage = MemoryDB::new();
+        let table: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Hash>= MerkleTable::new(MapTable::new(vec![255], &storage));
+        let num_vals = 10u32;
+        let values = generate_fully_random_data_keys(num_vals as usize);
+        let hash_vals: Vec<Hash> = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>(); 
+        for value in &hash_vals {
+            table.append(*value).unwrap(); 
+        }
+        let table_root_hash = table.root_hash().unwrap();
+        let table_len = table.len().unwrap() as usize;
+        let st_r = 0; 
+        let end_r = 5; 
+        let range_proof = table.construct_path_for_range(st_r, end_r).unwrap();
+        assert_eq!(range_proof.compute_proof_root(), table_root_hash);
+        {
+            let (inds, actual_vals): (Vec<_>, Vec<&Hash>) =
+            proof_indices_values(&range_proof).into_iter().unzip();
+            assert_eq!(inds,
+            (st_r as usize..end_r as usize).collect::<Vec<_>>());
+            let expect_vals = &hash_vals[st_r as usize..end_r as usize];
+            let paired = expect_vals.iter().zip(actual_vals);
+            for pair in paired {
+                assert_eq!(*pair.0, *pair.1);
+            }
+        }
+        let proof_info = ProofInfo {
+            root_hash: table_root_hash,
+            list_length: table_len,
+            proof: range_proof,
+            range_st: st_r as usize,
+            range_end: end_r as usize,
+        };
+        println!("{}", serde_json::to_string(&proof_info).unwrap());
     }
 
     #[test]
