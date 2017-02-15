@@ -1,8 +1,10 @@
 use std::net::SocketAddr;
 use time::Timespec;
-use super::super::crypto::{Hash, PublicKey};
+use super::super::crypto::{Hash, PublicKey, Signature};
 use super::{RawMessage, BitVec};
 use super::super::blockchain;
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use ::messages::utils::{U64}; 
 
 pub const CONSENSUS: u16 = 0;
 
@@ -80,6 +82,51 @@ message! {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct PrecommitSerdeHelper {
+    body: PrecommitBodySerdeHelper, 
+    signature: Signature, 
+}
+
+#[derive(Serialize, Deserialize)]
+struct PrecommitBodySerdeHelper {
+   validator: u32,  
+   height: U64, 
+   round: u32, 
+   propose_hash: Hash, 
+   block_hash: Hash, 
+}
+
+impl Serialize for Precommit {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let body = PrecommitBodySerdeHelper{ 
+            validator: self.validator(), 
+            height: U64(self.height()), 
+            round: self.round(), 
+            propose_hash: *self.propose_hash(), 
+            block_hash: *self.block_hash(), 
+        }; 
+        let helper = PrecommitSerdeHelper {
+            body: body, 
+            signature: *self.raw.signature(), 
+        }; 
+        helper.serialize(ser)
+    }
+}
+
+impl Deserialize for Precommit {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let h = <PrecommitSerdeHelper>::deserialize(deserializer)?; 
+
+        let precommit = Precommit::new_with_signature(h.body.validator, h.body.height.0, h.body.round, &h.body.propose_hash, &h.body.block_hash, &h.signature); 
+        Ok(precommit)
+    }
+}
+
 // сообщение о текущем состоянии
 message! {
     Status {
@@ -107,6 +154,12 @@ message! {
         precommits:     Vec<Precommit>      [80 => 88]
         transactions:   Vec<RawMessage>     [88 => 96]
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BlockProof {
+    pub block: blockchain::Block,
+    pub precommits: Vec<Precommit>,
 }
 
 // запрос на получение предложения

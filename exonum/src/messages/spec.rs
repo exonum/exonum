@@ -35,6 +35,14 @@ macro_rules! message {
                 $(writer.write($field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
+            pub fn new_with_signature($($field_name: $field_type,)*
+                       signature: &$crate::crypto::Signature) -> $name {
+                use $crate::messages::{RawMessage, MessageWriter};
+                let mut writer = MessageWriter::new($extension, $id, $body);
+                $(writer.write($field_name, $from, $to);)*
+                $name { raw: RawMessage::new(writer.append_signature(signature)) }
+
+            }
             $(pub fn $field_name(&self) -> $field_type {
                 self.raw.read::<$field_type>($from, $to)
             })*

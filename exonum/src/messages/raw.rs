@@ -55,7 +55,7 @@ impl MessageBuffer {
         LittleEndian::read_u16(&self.raw[2..4])
     }
 
-    fn body(&self) -> &[u8] {
+    pub fn body(&self) -> &[u8] {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
@@ -132,6 +132,14 @@ impl MessageWriter {
         let signature = sign(&self.raw, secret_key);
         self.raw.extend_from_slice(signature.as_ref());
         MessageBuffer { raw: self.raw }
+    }
+
+    pub fn append_signature(mut self, signature: &Signature) -> MessageBuffer {
+        let payload_length = self.raw.len() + SIGNATURE_LENGTH; 
+        self.set_payload_length(payload_length); 
+        self.raw.extend_from_slice(signature.as_ref()); 
+        debug_assert_eq!(self.raw.len(), payload_length); 
+        MessageBuffer {raw: self.raw}
     }
 }
 

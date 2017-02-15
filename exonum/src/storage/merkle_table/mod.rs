@@ -2,7 +2,7 @@ use num::{Integer, range, ToPrimitive, pow};
 
 use std::marker::PhantomData;
 use std::cell::Cell;
-use ::crypto::{hash, Hash};
+use ::crypto::Hash;
 use super::{Map, List, Error, StorageValue};
 
 
@@ -89,7 +89,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
         self.get_hash(self.height()?, K::zero())
-            .map(|h| h.unwrap_or_else(|| hash(&[])))
+            .map(|h| h.unwrap_or_else(Hash::zero))
     }
 
     fn construct_proof_subtree(&self,
@@ -467,7 +467,7 @@ mod tests {
     fn test_table_and_proof_roots() {
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        assert_eq!(table.root_hash().unwrap(), hash(&[]));
+        assert_eq!(table.root_hash().unwrap(), Hash::zero());
 
         let h1 = hash(&[1, 2]);
         let h2 = hash(&[2, 3]);
@@ -634,7 +634,7 @@ mod tests {
     fn test_proof_structure() {
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        assert_eq!(table.root_hash().unwrap(), hash(&[]));
+        assert_eq!(table.root_hash().unwrap(), Hash::zero());
 
         let h1 = hash(&vec![0, 1, 2]);
         let h2 = hash(&vec![1, 2, 3]);

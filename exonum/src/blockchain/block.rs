@@ -3,6 +3,8 @@ use time::Timespec;
 use super::super::crypto::{Hash, hash};
 use super::super::messages::Field;
 use super::super::storage::StorageValue;
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use ::messages::utils::{U64, TimespecSerdeHelper}; 
 
 pub const BLOCK_SIZE: usize = 116;
 
@@ -19,6 +21,41 @@ storage_value!(
     }
 );
 
+#[derive(Serialize, Deserialize)]
+struct BlockSerdeHelper {
+   height: U64,  
+   propose_round: u32, 
+   time: TimespecSerdeHelper, 
+   prev_hash: Hash, 
+   tx_hash: Hash, 
+   state_hash: Hash, 
+}
+
+impl Serialize for Block {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let helper = BlockSerdeHelper{
+            height: U64(self.height()), 
+            propose_round: self.propose_round(), 
+            time: TimespecSerdeHelper(self.time()), 
+            prev_hash: *self.prev_hash(), 
+            tx_hash: *self.tx_hash(), 
+            state_hash: *self.state_hash(), 
+        }; 
+        helper.serialize(ser)
+    }
+}
+impl Deserialize for Block {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let helper = <BlockSerdeHelper>::deserialize(deserializer)?; 
+
+        let block = Block::new(helper.height.0, helper.propose_round, helper.time.0, &helper.prev_hash, &helper.tx_hash, &helper.state_hash); 
+        Ok(block)
+    }
+}
 // TODO: add network_id, block version?
 
 // TODO add generic implementation for whole storage values
@@ -29,7 +66,7 @@ impl<'a> Field<'a> for Block {
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Block {
         let data = <&[u8] as Field>::read(buffer, from, to);
-        Block::deserialize(data.to_vec())
+        <Block as StorageValue>::deserialize(data.to_vec())
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
@@ -54,4 +91,8 @@ fn test_block() {
     assert_eq!(block.tx_hash(), &tx_hash);
     assert_eq!(block.state_hash(), &state_hash);
     assert_eq!(block.propose_round(), round);
+    use serde_json;
+    let json_str = serde_json::to_string(&block).unwrap();
+    let block1 : Block = serde_json::from_str(&json_str).unwrap(); 
+    assert_eq!(block1,block);
 }
