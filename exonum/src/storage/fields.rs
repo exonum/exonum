@@ -112,7 +112,7 @@ impl StorageValue for Hash {
     }
 
     fn hash(&self) -> Hash {
-        *self
+        hash(self.as_ref())
     }
 }
 

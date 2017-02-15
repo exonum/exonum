@@ -17,8 +17,8 @@ pub trait Transaction: Message + 'static {
 pub trait Service: Send + Sync + 'static {
     fn service_id(&self) -> u16;
 
-    fn state_hash(&self, _: &View) -> Option<Result<Hash, StorageError>> {
-        None
+    fn state_hash(&self, _: &View) -> Result<Vec<Hash>, StorageError> {
+        Ok(Vec::new())
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;

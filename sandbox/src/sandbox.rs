@@ -10,7 +10,7 @@ use time::{Timespec, Duration};
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction};
-use exonum::storage::{MemoryDB, Error as StorageError};
+use exonum::storage::{MemoryDB, Error as StorageError, RootProofNode};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult};
@@ -339,6 +339,19 @@ impl Sandbox {
     pub fn last_state_hash(&self) -> Hash {
         let reactor = self.reactor.borrow();
         *reactor.last_block().unwrap().state_hash()
+    }
+
+    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> Result<RootProofNode<Hash>, StorageError>
+    {
+        let view = self.reactor.borrow().handler.blockchain.view(); 
+        let schema = Schema::new(&view);
+        schema.get_proof_to_service_table(service_id, table_idx)
+    }
+
+    pub fn get_configs_root_hash(&self) -> Result<Hash, StorageError> {
+        let view = self.reactor.borrow().handler.blockchain.view(); 
+        let schema = Schema::new(&view);
+        schema.configs().root_hash()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
