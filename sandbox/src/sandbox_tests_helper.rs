@@ -5,7 +5,7 @@ use std::cell::RefCell;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestPrevotes};
 use exonum::blockchain::Block;
-use exonum::crypto::{hash, Hash, HASH_SIZE};
+use exonum::crypto::{Hash, HASH_SIZE};
 use exonum::messages::BitVec;
 
 use super::sandbox::Sandbox;
@@ -108,7 +108,7 @@ impl<'a> BlockBuilder<'a> {
                    //   &[tx.hash(), tx2.hash()],
                    //   &[tx.hash()],
                    //   &[],
-                   self.tx_hash.unwrap_or(&hash(&[])),
+                   self.tx_hash.unwrap_or(&Hash::zero()),
                    self.state_hash.unwrap_or(&self.sandbox.last_state_hash()))
     }
 }
