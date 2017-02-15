@@ -3,7 +3,7 @@ var request = require('request');
 var router = express.Router();
 
 var baseUrl = 'http://127.0.0.1:2268/f/';
-var backendsUrl = 'http://127.0.0.1:1500/backends/timestamping/content';
+var backendsUrl = 'http://127.0.0.1:1500/timestamping/content';
 
 // router.post('/pay', function(req, res) {
 //     var db = req.db;
