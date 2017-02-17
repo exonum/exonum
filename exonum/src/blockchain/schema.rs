@@ -1,9 +1,9 @@
 use ::crypto::Hash;
 use ::messages::{RawMessage, Precommit, BlockProof};
 use ::storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, HeightBytes,
-                Error, Map, List, MemoryDB};
+                Error, Map, List, RootProofNode};
 
-use super::Block;
+use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
 pub type ConfigurationData = Vec<u8>;
@@ -71,6 +71,11 @@ impl<'a> Schema<'a> {
         ListTable::new(MapTable::new(vec![07], self.view))
     }
 
+    pub fn state_hash_aggregator(&self)
+                            -> MerklePatriciaTable<MapTable<StorageView, [u8], Vec<u8>>, Hash, Hash> {
+        MerklePatriciaTable::new(MapTable::new(vec![08], self.view)) 
+    }
+    
     pub fn last_block(&self) -> Result<Option<Block>, Error> {
         Ok(match self.heights().last()? {
             Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
@@ -125,11 +130,14 @@ impl<'a> Schema<'a> {
         Ok(None)
     }
 
-    pub fn state_hash(&self) -> Result<Hash, Error> {
-        let db = MemoryDB::new();
-        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+    pub fn core_state_hash(&self) -> Result<Vec<Hash>, Error> {
+        Ok(vec![self.configs().root_hash()?])
+    }
 
-        hashes.append(self.configs().root_hash()?)?;
-        hashes.root_hash()
+    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> Result<RootProofNode<Hash>, Error>
+    {
+        let key = Blockchain::service_table_unique_key(service_id, table_idx); 
+        let sum_table = self.state_hash_aggregator(); 
+        sum_table.construct_path_to_key(key)
     }
 }

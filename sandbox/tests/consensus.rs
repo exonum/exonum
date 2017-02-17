@@ -7,15 +7,15 @@ extern crate log;
 use time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
-                       RequestPrevotes, RequestPrecommits};
-use exonum::crypto::gen_keypair;
-use exonum::blockchain::Block; 
+                       RequestPrevotes, RequestPrecommits, CONSENSUS};
+use exonum::crypto::{gen_keypair, Hash};
+use exonum::blockchain::{Block, Blockchain};
 use exonum::messages::BitVec;
 use exonum::node::state::{REQUEST_PRECOMMITS_WAIT, REQUEST_PREVOTES_WAIT, REQUEST_PROPOSE_WAIT,
                           REQUEST_TRANSACTIONS_WAIT};
 use exonum::node::state::{Round, Height};
 
-use sandbox::timestamping::TimestampTx;
+use sandbox::timestamping::{TimestampTx, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox_tests_helper::*;
 
@@ -96,41 +96,78 @@ fn test_reach_thirteen_height() {
 }
 
 #[test]
+fn test_query_state_hash() {
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+    //we do not change the state hash in between blocks for TimestampingService for now
+    for _ in 0..2 {
+        let state_hash = sandbox.last_state_hash();
+        let configs_rh = sandbox.get_configs_root_hash().unwrap();
+        let configs_key = Blockchain::service_table_unique_key(CONSENSUS, 0);
+        // let timestamp_t1_rh = FIRST_TABLE_HASH;
+        let timestamp_t1_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 0);
+        // let timestamp_t2_rh = SECOND_TABLE_HASH;
+        let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
+
+        let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0).unwrap();
+        assert_eq!(state_hash, proof_configs.compute_proof_root());
+        assert_ne!(configs_rh, Hash::zero());
+        let opt_configs_h = proof_configs.verify_root_proof_consistency(configs_key, state_hash)
+            .unwrap();
+        assert_eq!(configs_rh, *opt_configs_h.unwrap());
+
+        let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0).unwrap();
+        assert_eq!(state_hash, proof_configs.compute_proof_root());
+        let opt_configs_h =
+            proof_configs.verify_root_proof_consistency(timestamp_t1_key, state_hash).unwrap();
+        assert_eq!([127; 32], *opt_configs_h.unwrap().as_ref());
+
+        let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1).unwrap();
+        assert_eq!(state_hash, proof_configs.compute_proof_root());
+        let opt_configs_h =
+            proof_configs.verify_root_proof_consistency(timestamp_t2_key, state_hash).unwrap();
+        assert_eq!([128; 32], *opt_configs_h.unwrap().as_ref());
+
+        add_one_height(&sandbox, &sandbox_state)
+    }
+}
+
+#[test]
 fn test_retrieve_block_and_precommits() {
-  let sandbox = timestamping_sandbox(); 
-  let sandbox_state = SandboxState::new(); 
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
 
-  let target_height = 6 as Height; 
+    let target_height = 6 as Height;
 
-  for _ in 2..target_height+1 { 
-      add_one_height(&sandbox, &sandbox_state)
-  }
-  sandbox.assert_state(target_height, ROUND_ONE);
- 
-  let bl_proof_option = sandbox.block_and_precommits(target_height-1).unwrap(); 
-  // use serde_json; 
-  assert!(bl_proof_option.is_some()); 
-  let block_proof = bl_proof_option.unwrap(); 
-  let block: Block = block_proof.block; 
-  let precommits: Vec<Precommit> = block_proof.precommits; 
-  let expected_height = target_height - 1; 
-  let expected_round = block.propose_round(); 
-  let expected_block_hash = block.hash(); 
+    for _ in 2..target_height + 1 {
+        add_one_height(&sandbox, &sandbox_state)
+    }
+    sandbox.assert_state(target_height, ROUND_ONE);
 
-  assert_eq!(expected_height, block.height()); 
-  for precommit in precommits {
-    assert_eq!(expected_height, precommit.height()); 
-    assert_eq!(expected_round, precommit.round()); 
-    assert_eq!(expected_block_hash, *precommit.block_hash()); 
-    assert!(precommit.raw().verify_signature(&sandbox.p(precommit.validator() as usize))); 
-  }
-  // let json_str = serde_json::to_string(&bl_proof_option.unwrap()).unwrap(); 
-  // println!("{}", &json_str);
-  let bl_proof_option = sandbox.block_and_precommits(target_height).unwrap(); 
-  assert!(bl_proof_option.is_none()); 
+    let bl_proof_option = sandbox.block_and_precommits(target_height - 1).unwrap();
+    // use serde_json;
+    assert!(bl_proof_option.is_some());
+    let block_proof = bl_proof_option.unwrap();
+    let block: Block = block_proof.block;
+    let precommits: Vec<Precommit> = block_proof.precommits;
+    let expected_height = target_height - 1;
+    let expected_round = block.propose_round();
+    let expected_block_hash = block.hash();
 
-  // let validators = sandbox.validators.iter().map(|pair| pair.0 ).collect::<Vec<_>>(); 
-  // println!("validators public keys: {}", &serde_json::to_string(&validators).unwrap());
+    assert_eq!(expected_height, block.height());
+    for precommit in precommits {
+        assert_eq!(expected_height, precommit.height());
+        assert_eq!(expected_round, precommit.round());
+        assert_eq!(expected_block_hash, *precommit.block_hash());
+        assert!(precommit.raw().verify_signature(&sandbox.p(precommit.validator() as usize)));
+    }
+    // let json_str = serde_json::to_string(&bl_proof_option.unwrap()).unwrap();
+    // println!("{}", &json_str);
+    let bl_proof_option = sandbox.block_and_precommits(target_height).unwrap();
+    assert!(bl_proof_option.is_none());
+
+    // let validators = sandbox.validators.iter().map(|pair| pair.0 ).collect::<Vec<_>>();
+    // println!("validators public keys: {}", &serde_json::to_string(&validators).unwrap());
 }
 
 /// idea of the scenario is to:

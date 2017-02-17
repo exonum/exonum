@@ -179,14 +179,10 @@ impl<'a> ConfigurationSchema<'a> {
     }
 
 
-    pub fn state_hash(&self) -> StorageResult<Hash> {
-        let db = MemoryDB::new();
-        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
-
-        hashes.append(self.config_proposes().root_hash()?)?;
-        hashes.append(self.config_votes().root_hash()?)?;
-        hashes.root_hash()
+    pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
+        Ok(vec![self.config_proposes().root_hash()?, self.config_votes().root_hash()?])
     }
+
     pub fn get_config_propose(&self,
                               hash: &Hash)
                               -> Result<Option<TxConfigPropose>, exonum::storage::Error> {
@@ -297,9 +293,9 @@ impl Service for ConfigurationService {
         CONFIG_SERVICE
     }
 
-    fn state_hash(&self, view: &View) -> Option<StorageResult<Hash>> {
+    fn state_hash(&self, view: &View) -> StorageResult<Vec<Hash>> {
         let schema = ConfigurationSchema::new(view);
-        Some(schema.state_hash())
+        schema.state_hash()
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
