@@ -202,7 +202,7 @@ pub trait Api {
                                 json: &serde_json::Value,
                                 cookies: Option<Vec<String>>)
                                 -> IronResult<Response> {
-        let mut resp = Response::with((status::Ok, json.as_str().unwrap()));
+        let mut resp = Response::with((status::Ok, serde_json::to_string(json).unwrap()));
         resp.headers.set(ContentType::json());
         if let Some(cookies) = cookies {
             resp.headers.set(SetCookie(cookies));
@@ -215,4 +215,37 @@ pub trait Api {
     }
 
     fn wire<'b>(&self, router: &'b mut Router);
+}
+
+#[cfg(test)]
+mod tests {
+    use router::Router;
+    use exonum::blockchain::Block;
+    use exonum::crypto::Hash;
+    use time::get_time;
+    use serde_json;
+    use super::Api;
+
+    #[test]
+    fn test_json_response_for_complex_val() {
+        let str_val = "sghdkgskgskldghshgsd";
+        let complex_val = Block::new(24,
+                                     2,
+                                     get_time(),
+                                     &Hash::new([24; 32]),
+                                     &Hash::new([34; 32]),
+                                     &Hash::new([38; 32]));
+        struct SampleAPI;
+        impl Api for SampleAPI {
+            fn wire<'b>(&self, _: &'b mut Router) {
+                return;
+            }
+        }
+        let stub = SampleAPI;
+        let result = stub.ok_response(&serde_json::to_value(str_val));
+        assert!(result.is_ok());
+        let result = stub.ok_response(&serde_json::to_value(complex_val));
+        assert!(result.is_ok());
+        print!("{:?}", result);
+    }
 }
