@@ -55,7 +55,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "blockchain_explorer"
 version = "0.1.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#41becdd8f933aa62ecbb7732357e32724a588e51"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#74696cd39fd49dbea9106b4f2f8556af9e926036"
 dependencies = [
  "bodyparser 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.20.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -144,7 +144,7 @@ dependencies = [
 [[package]]
 name = "configuration_service"
 version = "0.1.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#41becdd8f933aa62ecbb7732357e32724a588e51"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#74696cd39fd49dbea9106b4f2f8556af9e926036"
 dependencies = [
  "clap 2.20.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -187,7 +187,7 @@ dependencies = [
 [[package]]
 name = "exonum"
 version = "0.1.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#41becdd8f933aa62ecbb7732357e32724a588e51"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#74696cd39fd49dbea9106b4f2f8556af9e926036"
 dependencies = [
  "bit-vec 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -309,7 +309,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "leveldb"
 version = "0.9.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#41becdd8f933aa62ecbb7732357e32724a588e51"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#74696cd39fd49dbea9106b4f2f8556af9e926036"
 dependencies = [
  "leveldb-sys 3.0.0 (git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git)",
  "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -318,7 +318,7 @@ dependencies = [
 [[package]]
 name = "leveldb-sys"
 version = "3.0.0"
-source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#41becdd8f933aa62ecbb7732357e32724a588e51"
+source = "git+ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git#74696cd39fd49dbea9106b4f2f8556af9e926036"
 dependencies = [
  "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
