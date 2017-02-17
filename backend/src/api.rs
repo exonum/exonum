@@ -17,7 +17,7 @@ use exonum::storage::StorageValue;
 use exonum::crypto::{HexValue, PublicKey};
 use exonum::blockchain::Blockchain;
 
-use super::wallet::{Wallet, WalletId};
+use super::wallet::Wallet;
 use super::CurrencyTxSender;
 use super::{CurrencySchema, CurrencyTx, TxIssue, TxTransfer, TxCreateWallet};
 
@@ -29,19 +29,18 @@ pub struct WalletRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct IssueRequest {
-    pub amount: i64,
+    pub amount: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TransferRequest {
-    pub amount: i64,
+    pub amount: u64,
     pub to: String,
 }
 
 #[derive(Serialize)]
 pub struct WalletInfo {
     inner: Wallet,
-    id: WalletId,
     history: Vec<Value>,
 }
 
@@ -55,9 +54,9 @@ impl CryptocurrencyApi {
     fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
         let view = self.blockchain.view();
         let schema = CurrencySchema::new(&view);
-        match schema.wallet(&pub_key)? {
-            Some((id, wallet)) => {
-                let history = schema.wallet_history(id).values()?;
+        match schema.wallet(pub_key)? {
+            Some(wallet) => {
+                let history = schema.wallet_history(pub_key).values()?;
                 let txs = {
                     let mut v = Vec::new();
                     let explorer = BlockchainExplorer::new(&self.blockchain);
@@ -69,7 +68,6 @@ impl CryptocurrencyApi {
                     v
                 };
                 let info = WalletInfo {
-                    id: id,
                     inner: wallet,
                     history: txs,
                 };

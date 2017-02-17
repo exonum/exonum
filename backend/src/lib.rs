@@ -22,21 +22,19 @@ extern crate bodyparser;
 extern crate configuration_service;
 
 use serde::{Serialize, Serializer};
-use exonum::crypto::HexValue;
+use exonum::crypto::{HexValue, PUBLIC_KEY_LENGTH};
 use blockchain_explorer::TransactionInfo;
 
 pub mod api;
 pub mod wallet;
 
-use byteorder::{ByteOrder, LittleEndian};
-
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
-                      MemoryDB, Result as StorageResult};
+                      Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
 
-use wallet::{Wallet, WalletId};
+use wallet::Wallet;
 
 pub const CRYPTOCURRENCY: u16 = 128;
 
@@ -55,7 +53,7 @@ message! {
 
         from:        &PublicKey  [00 => 32]
         to:          &PublicKey  [32 => 64]
-        amount:      i64         [64 => 72]
+        amount:      u64         [64 => 72]
         seed:        u64         [72 => 80]
     }
 }
@@ -67,7 +65,7 @@ message! {
         const SIZE = 48;
 
         wallet:      &PublicKey  [00 => 32]
-        amount:      i64         [32 => 40]
+        amount:      u64         [32 => 40]
         seed:        u64         [40 => 48]
     }
 }
@@ -201,40 +199,24 @@ impl<'a> CurrencySchema<'a> {
         CurrencySchema { view: view }
     }
 
-    pub fn wallets(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, Wallet> {
-        MerkleTable::new(MapTable::new(vec![20], self.view))
+    pub fn wallets(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, Wallet> {
+        MerklePatriciaTable::new(MapTable::new(vec![20], self.view))
     }
 
-    pub fn wallet_ids(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, u64> {
-        MerklePatriciaTable::new(MapTable::new(vec![21], self.view))
-    }
-
-    pub fn wallet(&self, pub_key: &PublicKey) -> StorageResult<Option<(WalletId, Wallet)>> {
-        if let Some(id) = self.wallet_ids().get(pub_key)? {
-            let wallet_pair = self.wallets().get(id)?.map(|wallet| (id, wallet));
-            return Ok(wallet_pair);
-        }
-        Ok(None)
+    pub fn wallet(&self, pub_key: &PublicKey) -> StorageResult<Option<Wallet>> {
+        self.wallets().get(pub_key)
     }
 
     pub fn wallet_history(&self,
-                          id: WalletId)
+                          public_key: &PublicKey)
                           -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
-        let mut prefix = vec![22; 9];
-        LittleEndian::write_u64(&mut prefix[1..], id);
+        let mut prefix = vec![19; 1 + PUBLIC_KEY_LENGTH];
+        prefix[1..].copy_from_slice(public_key.as_ref());
         MerkleTable::new(MapTable::new(prefix, self.view))
     }
 
-    pub fn state_hash(&self) -> StorageResult<Hash> {
-        let db = MemoryDB::new();
-        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
-
-        let wallets = self.wallets();
-        let wallet_ids = self.wallet_ids();
-
-        hashes.append(wallets.root_hash()?)?;
-        hashes.append(wallet_ids.root_hash()?)?;
-        hashes.root_hash()
+    pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
+        Ok(vec![self.wallets().root_hash()?])
     }
 }
 
@@ -257,50 +239,58 @@ impl Transaction for CurrencyTx {
         let schema = CurrencySchema::new(view);
         match *self {
             CurrencyTx::Transfer(ref msg) => {
-                let from = schema.wallet(msg.from())?;
-                let to = schema.wallet(msg.to())?;
-                if let (Some(mut from), Some(mut to)) = (from, to) {
-                    if from.1.balance() < msg.amount() {
+                let sender_pub_key = msg.from();
+                let receiver_pub_key = msg.to();
+
+                let sender_w = schema.wallet(sender_pub_key)?;
+                let receiver_w = schema.wallet(receiver_pub_key)?;
+                if let (Some(mut sender), Some(mut receiver)) = (sender_w, receiver_w) {
+                    if sender.balance() < msg.amount() {
                         return Ok(());
                     }
-                    let from_history = schema.wallet_history(from.0);
-                    let to_history = schema.wallet_history(to.0);
-                    from_history.append(tx_hash)?;
-                    to_history.append(tx_hash)?;
+                    let sender_history = schema.wallet_history(sender_pub_key);
+                    let receiver_history = schema.wallet_history(receiver_pub_key);
+                    sender_history.append(tx_hash)?;
+                    receiver_history.append(tx_hash)?;
 
-                    from.1.transfer_to(&mut to.1, msg.amount());
-                    from.1.set_history_hash(&from_history.root_hash()?);
-                    to.1.set_history_hash(&to_history.root_hash()?);
+                    sender.transfer_to(&mut receiver, msg.amount());
+                    sender.set_history_hash(&sender_history.root_hash()?);
+                    sender.increase_history_len();
+                    receiver.set_history_hash(&receiver_history.root_hash()?);
+                    receiver.increase_history_len();
 
-                    schema.wallets().set(from.0, from.1)?;
-                    schema.wallets().set(to.0, to.1)?;
+                    schema.wallets().put(sender_pub_key, sender)?;
+                    schema.wallets().put(receiver_pub_key, receiver)?;
                 }
             }
             CurrencyTx::Issue(ref msg) => {
-                if let Some((id, mut wallet)) = schema.wallet(msg.wallet())? {
-                    let history = schema.wallet_history(id);
+                let pub_key = msg.wallet();
+                if let Some(mut wallet) = schema.wallet(pub_key)? {
+                    let history = schema.wallet_history(pub_key);
                     history.append(tx_hash)?;
 
                     let new_amount = wallet.balance() + msg.amount();
                     wallet.set_balance(new_amount);
                     wallet.set_history_hash(&history.root_hash()?);
-                    schema.wallets().set(id, wallet)?;
+                    wallet.increase_history_len();
+                    schema.wallets().put(pub_key, wallet)?;
                 }
             }
             CurrencyTx::CreateWallet(ref msg) => {
-                if let Some(_) = schema.wallet_ids().get(msg.pub_key())? {
+                let pub_key = msg.pub_key();
+                if let Some(_) = schema.wallet(pub_key)? {
                     return Ok(());
                 }
 
-                let id = schema.wallets().len()?;
-                schema.wallet_history(id).append(tx_hash)?;
+                let history = schema.wallet_history(pub_key);
+                history.append(tx_hash)?;
 
                 let wallet = Wallet::new(msg.pub_key(),
                                          msg.name(),
                                          0,
-                                         &schema.wallet_history(id).root_hash()?);
-                schema.wallets().append(wallet)?;
-                schema.wallet_ids().put(msg.pub_key(), id)?;
+                                         1, // history_len
+                                         &history.root_hash()?);
+                schema.wallets().put(pub_key, wallet)?;
             }
         };
         Ok(())
@@ -312,9 +302,9 @@ impl Service for CurrencyService {
         CRYPTOCURRENCY
     }
 
-    fn state_hash(&self, view: &View) -> Option<StorageResult<Hash>> {
+    fn state_hash(&self, view: &View) -> StorageResult<Vec<Hash>> {
         let schema = CurrencySchema::new(view);
-        Some(schema.state_hash())
+        schema.state_hash()
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
@@ -391,16 +381,16 @@ mod tests {
         let w1 = s.wallet(&p1).unwrap().unwrap();
         let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.0, 0);
-        assert_eq!(w2.0, 1);
-        assert_eq!(w1.1.name(), "tx1");
-        assert_eq!(w1.1.balance(), 0);
-        assert_eq!(w2.1.name(), "tx2");
-        assert_eq!(w2.1.balance(), 0);
-        let rh1 = s.wallet_history(w1.0).root_hash().unwrap();
-        let rh2 = s.wallet_history(w2.0).root_hash().unwrap();
-        assert_eq!(&rh1, w1.1.history_hash());
-        assert_eq!(&rh2, w2.1.history_hash());
+        assert_eq!(w1.name(), "tx1");
+        assert_eq!(w1.history_len(), 1);
+        assert_eq!(w1.balance(), 0);
+        assert_eq!(w2.name(), "tx2");
+        assert_eq!(w2.history_len(), 1);
+        assert_eq!(w2.balance(), 0);
+        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
+        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
+        assert_eq!(&rh1, w1.history_hash());
+        assert_eq!(&rh2, w2.history_hash());
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
@@ -409,27 +399,31 @@ mod tests {
         let w1 = s.wallet(&p1).unwrap().unwrap();
         let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.1.balance(), 1000);
-        assert_eq!(w2.1.balance(), 100);
-        let rh1 = s.wallet_history(w1.0).root_hash().unwrap();
-        let rh2 = s.wallet_history(w2.0).root_hash().unwrap();
-        assert_eq!(&rh1, w1.1.history_hash());
-        assert_eq!(&rh2, w2.1.history_hash());
+        assert_eq!(w1.balance(), 1000);
+        assert_eq!(w2.balance(), 100);
+        assert_eq!(w1.history_len(), 2);
+        assert_eq!(w2.history_len(), 2);
+        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
+        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
+        assert_eq!(&rh1, w1.history_hash());
+        assert_eq!(&rh2, w2.history_hash());
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
         CurrencyTx::from(tw.clone()).execute(&v).unwrap();
         let w1 = s.wallet(&p1).unwrap().unwrap();
         let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.1.balance(), 600);
-        assert_eq!(w2.1.balance(), 500);
-        let rh1 = s.wallet_history(w1.0).root_hash().unwrap();
-        let rh2 = s.wallet_history(w2.0).root_hash().unwrap();
-        assert_eq!(&rh1, w1.1.history_hash());
-        assert_eq!(&rh2, w2.1.history_hash());
+        assert_eq!(w1.balance(), 600);
+        assert_eq!(w2.balance(), 500);
+        assert_eq!(w1.history_len(), 3);
+        assert_eq!(w2.history_len(), 3);
+        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
+        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
+        assert_eq!(&rh1, w1.history_hash());
+        assert_eq!(&rh2, w2.history_hash());
 
-        let h1 = s.wallet_history(w1.0).values().unwrap();
-        let h2 = s.wallet_history(w2.0).values().unwrap();
+        let h1 = s.wallet_history(&p1).values().unwrap();
+        let h2 = s.wallet_history(&p2).values().unwrap();
         assert_eq!(h1, vec![cw1.hash(), iw1.hash(), tw.hash()]);
         assert_eq!(h2, vec![cw2.hash(), iw2.hash(), tw.hash()]);
     }
