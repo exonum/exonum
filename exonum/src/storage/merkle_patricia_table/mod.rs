@@ -1,4 +1,4 @@
-mod proofpathtokey;
+pub mod proofpathtokey;
 use std::mem;
 use std::cmp::{min, PartialEq};
 use std::marker::PhantomData;
@@ -1459,6 +1459,40 @@ mod tests {
             } 
             _ => assert!(false),
         }
+    }
+
+    #[test]
+    fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
+        let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(100).into_iter().map(|el| {
+            let (key, val) = el; 
+            (hash(&key), hash(&val))
+        }).collect::<Vec<_>>();
+
+        let storage = MemoryDB::new();
+        let map = MapTable::new(vec![255], &storage);
+        let table = MerklePatriciaTable::new(map);
+        for item in &data {
+            table.put(&item.0, item.1.clone()).unwrap();
+        }
+
+        let table_root_hash = table.root_hash().unwrap();
+        let item = data[0]; 
+        let proof_path_to_key = table.construct_path_to_key(&item.0).unwrap();
+        assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
+        let check_res =
+        proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
+        let proved_value: Option<&Hash> = check_res.unwrap();
+        assert_eq!(*proved_value.unwrap(), item.1);
+
+        let proof_info = ProofInfo {
+            root_hash: table_root_hash,
+            searched_key: item.0,
+            proof: &proof_path_to_key,
+            key_found: true,
+        };
+
+        let json_repre = serde_json::to_string(&proof_info).unwrap();
+        println!("{}", json_repre);
     }
 
     #[test]

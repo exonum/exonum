@@ -5,7 +5,7 @@ use std::cell::RefCell;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestPrevotes};
 use exonum::blockchain::Block;
-use exonum::crypto::{Hash, HASH_SIZE};
+use exonum::crypto::{Hash, HASH_SIZE, hash};
 use exonum::messages::BitVec;
 
 use super::sandbox::Sandbox;
@@ -39,9 +39,9 @@ pub struct BlockBuilder<'a> {
     round: Option<u32>,
     time: Option<Timespec>,
     duration_science_sandbox_time: Option<i64>,
-    prev_hash: Option<&'a Hash>,
-    tx_hash: Option<&'a Hash>,
-    state_hash: Option<&'a Hash>,
+    prev_hash: Option<Hash>,
+    tx_hash: Option<Hash>,
+    state_hash: Option<Hash>,
 
     sandbox: &'a TimestampingSandbox,
 }
@@ -84,17 +84,22 @@ impl<'a> BlockBuilder<'a> {
     }
 
     pub fn with_prev_hash(mut self, prev_hash: &'a Hash) -> Self {
-        self.prev_hash = Some(prev_hash);
+        self.prev_hash = Some(*prev_hash);
         self
     }
 
-    pub fn with_tx_hash(mut self, tx_hash: &'a Hash) -> Self {
-        self.tx_hash = Some(tx_hash);
+    pub fn with_tx_hash(mut self, individual_transaction_hash: &'a Hash) -> Self {
+        //root of merkle table, containing this single transaction
+        //exonum::storage::merkle_table 
+        //see how hash(&self) changed in exonum::storage::fields::StorageValue for Hash, 
+        //it's _hash(self.as_ref())_ as of now instead of _*self_ as it used to be
+        let merkle_root = hash(individual_transaction_hash.as_ref()); 
+        self.tx_hash = Some(merkle_root);
         self
     }
 
     pub fn with_state_hash(mut self, state_hash: &'a Hash) -> Self {
-        self.state_hash = Some(state_hash);
+        self.state_hash = Some(*state_hash);
         self
     }
 
@@ -104,12 +109,12 @@ impl<'a> BlockBuilder<'a> {
                    self.time.unwrap_or(self.sandbox.time() +
                                        Duration::milliseconds(self.duration_science_sandbox_time
                        .unwrap_or(0))),
-                   self.prev_hash.unwrap_or(&self.sandbox.last_hash()),
+                   &self.prev_hash.unwrap_or(self.sandbox.last_hash()),
                    //   &[tx.hash(), tx2.hash()],
                    //   &[tx.hash()],
                    //   &[],
-                   self.tx_hash.unwrap_or(&Hash::zero()),
-                   self.state_hash.unwrap_or(&self.sandbox.last_state_hash()))
+                   &self.tx_hash.unwrap_or(Hash::zero()),
+                   &self.state_hash.unwrap_or(self.sandbox.last_state_hash()))
     }
 }
 
