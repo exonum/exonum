@@ -1,7 +1,7 @@
 [package]
 name = "cryptocurrency"
 version = "0.1.0"
-authors = ["Ivan Ivashchenko <ivan.ivashchenko@bitfury.com"]
+authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re"]
 
 [dependencies]
 env_logger = "0.3"
@@ -21,17 +21,15 @@ headers = "0.1.0"
 hyper = "0.10.4"
 serde_json = "0.8"
 cookie = "0.6.0"
+tempdir = "0.3.5"
 
 [dependencies.exonum]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "270ede3ed567643d468c1b0d9dbd918c079edcf2"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "270ede3ed567643d468c1b0d9dbd918c079edcf2"
 
 [dependencies.configuration_service]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "270ede3ed567643d468c1b0d9dbd918c079edcf2"
 
 
