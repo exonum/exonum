@@ -3,6 +3,7 @@ use exonum::messages::Field;
 use exonum::crypto::{PublicKey, Hash, hash};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use exonum::messages::utils::U64;
+use exonum::storage::StorageValue;
 
 pub type WalletId = u64;
 
@@ -79,8 +80,31 @@ impl Deserialize for Wallet {
     }
 }
 
+
+#[allow(dead_code)]
+#[derive(Serialize)]
+struct WalletTestData {
+    wallet: Wallet,
+    hash: Hash,
+    raw: Vec<u8>,
+}
+
+#[allow(dead_code)]
+impl WalletTestData {
+    fn new(wallet: Wallet) -> WalletTestData {
+        let wallet_hash = wallet.hash();
+        let raw = StorageValue::serialize(wallet.clone());
+        WalletTestData {
+            wallet: wallet,
+            hash: wallet_hash,
+            raw: raw,
+        }
+    }
+}
+
 #[test]
 fn test_wallet() {
+    use serde_json;
     let hash = Hash::new([2; 32]);
     let name = "foobar abacaba Юникод всяуи";
     let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
@@ -92,6 +116,12 @@ fn test_wallet() {
     assert_eq!(wallet.balance(), 100500);
     assert_eq!(wallet.history_hash(), &hash);
     assert_eq!(wallet.history_len(), 0);
+
+    let json_str = serde_json::to_string(&wallet).unwrap();
+    let wallet1: Wallet = serde_json::from_str(&json_str).unwrap();
+    assert_eq!(wallet, wallet1);
+    println!("wallet test data: {}",
+             serde_json::to_string(&WalletTestData::new(wallet)).unwrap());
 }
 
 #[test]
@@ -121,18 +151,8 @@ fn test_wallet_serde() {
     assert_eq!(wallet1.history_hash(), &hash);
     assert_eq!(wallet1.history_len(), history_len);
 
-    #[derive(Serialize)]
-    struct WalletTestData {
-        wallet: Wallet,
-        hash: Hash,
-    }
-    let wallet_hash = wallet.hash();
-    let data = WalletTestData {
-        wallet: wallet,
-        hash: wallet_hash,
-    };
     println!("wallet test data: {}",
-             serde_json::to_string(&data).unwrap());
+             serde_json::to_string(&WalletTestData::new(wallet)).unwrap());
 }
 
 #[test]
