@@ -1,7 +1,8 @@
 
 use exonum::messages::Field;
-use exonum::crypto::{PublicKey, Hash, hash, ToHex};
-use serde::{Serialize, Serializer};
+use exonum::crypto::{PublicKey, Hash, hash};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use exonum::messages::utils::U64;
 
 pub type WalletId = u64;
 
@@ -39,16 +40,42 @@ impl Wallet {
         other.set_balance(other_amount);
     }
 }
+#[derive(Serialize, Deserialize)]
+struct WalletSerializeHelper {
+    pub_key: PublicKey,
+    name: String,
+    balance: U64,
+    history_len: U64,
+    history_hash: Hash,
+}
 
 impl Serialize for Wallet {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let mut state = ser.serialize_struct("wallet", 3)?;
-        ser.serialize_struct_elt(&mut state, "balance", self.balance())?;
-        ser.serialize_struct_elt(&mut state, "name", self.name())?;
-        ser.serialize_struct_elt(&mut state, "history_hash", self.history_hash().to_hex())?;
-        ser.serialize_struct_end(state)
+        let helper = WalletSerializeHelper {
+            pub_key: *self.pub_key(),
+            name: self.name().to_string(),
+            balance: U64(self.balance()),
+            history_len: U64(self.history_len()),
+            history_hash: *self.history_hash(),
+        };
+        helper.serialize(ser)
+    }
+}
+
+impl Deserialize for Wallet {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let helper = <WalletSerializeHelper>::deserialize(deserializer)?;
+
+        let wallet = Wallet::new(&helper.pub_key,
+                                 &helper.name,
+                                 helper.balance.0,
+                                 helper.history_len.0,
+                                 &helper.history_hash);
+        Ok(wallet)
     }
 }
 
@@ -65,6 +92,47 @@ fn test_wallet() {
     assert_eq!(wallet.balance(), 100500);
     assert_eq!(wallet.history_hash(), &hash);
     assert_eq!(wallet.history_len(), 0);
+}
+
+#[test]
+fn test_wallet_serde() {
+    use rand::{thread_rng, Rng};
+    use serde_json;
+    use exonum::crypto::{HASH_SIZE, gen_keypair};
+
+    let mut rng = thread_rng();
+    let string_len = rng.gen_range(20u8, 255u8);
+    let mut hash_bytes = [0; HASH_SIZE];
+
+    let (pub_key, _) = gen_keypair();
+    let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let balance = rng.next_u64();
+    let history_len = rng.next_u64();
+    rng.fill_bytes(&mut hash_bytes);
+    let hash = Hash::new(hash_bytes);
+    let wallet = Wallet::new(&pub_key, &name, balance, history_len, &hash);
+
+    let json_str = serde_json::to_string(&wallet).unwrap();
+    let wallet1: Wallet = serde_json::from_str(&json_str).unwrap();
+
+    assert_eq!(wallet1.pub_key(), &pub_key);
+    assert_eq!(wallet1.name(), &name);
+    assert_eq!(wallet1.balance(), balance);
+    assert_eq!(wallet1.history_hash(), &hash);
+    assert_eq!(wallet1.history_len(), history_len);
+
+    #[derive(Serialize)]
+    struct WalletTestData {
+        wallet: Wallet,
+        hash: Hash,
+    }
+    let wallet_hash = wallet.hash();
+    let data = WalletTestData {
+        wallet: wallet,
+        hash: wallet_hash,
+    };
+    println!("wallet test data: {}",
+             serde_json::to_string(&data).unwrap());
 }
 
 #[test]
