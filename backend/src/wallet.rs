@@ -104,7 +104,6 @@ impl WalletTestData {
 
 #[test]
 fn test_wallet() {
-    use serde_json;
     let hash = Hash::new([2; 32]);
     let name = "foobar abacaba Юникод всяуи";
     let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
@@ -116,43 +115,43 @@ fn test_wallet() {
     assert_eq!(wallet.balance(), 100500);
     assert_eq!(wallet.history_hash(), &hash);
     assert_eq!(wallet.history_len(), 0);
-
-    let json_str = serde_json::to_string(&wallet).unwrap();
-    let wallet1: Wallet = serde_json::from_str(&json_str).unwrap();
-    assert_eq!(wallet, wallet1);
-    println!("wallet test data: {}",
-             serde_json::to_string(&WalletTestData::new(wallet)).unwrap());
 }
 
 #[test]
 fn test_wallet_serde() {
-    use rand::{thread_rng, Rng};
     use serde_json;
+    use rand::{thread_rng, Rng};
     use exonum::crypto::{HASH_SIZE, gen_keypair};
 
     let mut rng = thread_rng();
-    let string_len = rng.gen_range(20u8, 255u8);
-    let mut hash_bytes = [0; HASH_SIZE];
+    let generator = move |_| {
+        let string_len = rng.gen_range(20u8, 255u8);
+        let mut hash_bytes = [0; HASH_SIZE];
 
-    let (pub_key, _) = gen_keypair();
-    let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
-    let balance = rng.next_u64();
-    let history_len = rng.next_u64();
-    rng.fill_bytes(&mut hash_bytes);
-    let hash = Hash::new(hash_bytes);
-    let wallet = Wallet::new(&pub_key, &name, balance, history_len, &hash);
-
-    let json_str = serde_json::to_string(&wallet).unwrap();
-    let wallet1: Wallet = serde_json::from_str(&json_str).unwrap();
-
-    assert_eq!(wallet1.pub_key(), &pub_key);
-    assert_eq!(wallet1.name(), &name);
-    assert_eq!(wallet1.balance(), balance);
-    assert_eq!(wallet1.history_hash(), &hash);
-    assert_eq!(wallet1.history_len(), history_len);
-
-    println!("wallet test data: {}",
-             serde_json::to_string(&WalletTestData::new(wallet)).unwrap());
+        let (pub_key, _) = gen_keypair();
+        let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+        let balance = rng.next_u64();
+        let history_len = rng.next_u64();
+        rng.fill_bytes(&mut hash_bytes);
+        let hash = Hash::new(hash_bytes);
+        Wallet::new(&pub_key, &name, balance, history_len, &hash)
+    };
+    let wallet_non_ascii = Wallet::new(&gen_keypair().0,
+                                       "foobar abacaba Юникод всяуи",
+                                       100500,
+                                       0,
+                                       &Hash::new([2; HASH_SIZE]));
+    let mut wallets = (0..50)
+        .map(generator)
+        .collect::<Vec<_>>();
+    wallets.push(wallet_non_ascii);
+    for wallet in wallets {
+        let json_str = serde_json::to_string(&wallet).unwrap();
+        let wallet1: Wallet = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(wallet, wallet1);
+        println!("wallet test data: {}",
+                 serde_json::to_string(&WalletTestData::new(wallet)).unwrap());
+    }
 }
 
 #[test]

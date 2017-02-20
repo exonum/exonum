@@ -22,8 +22,12 @@ extern crate bodyparser;
 extern crate configuration_service;
 
 use serde::{Serialize, Serializer};
-use exonum::crypto::{HexValue, PUBLIC_KEY_LENGTH};
+use serde::de::{self, Deserialize, Deserializer};
+use exonum::messages::utils::U64;
+use exonum::crypto::{PUBLIC_KEY_LENGTH, Signature};
 use blockchain_explorer::TransactionInfo;
+use serde_json::value::ToJson;
+use serde_json::from_value;
 
 pub mod api;
 pub mod wallet;
@@ -81,6 +85,34 @@ message! {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct TxSerdeHelper {
+    id: u16,
+    body: serde_json::Value,
+    signature: Signature,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TxIssueSerdeHelper {
+    wallet: PublicKey,
+    amount: U64,
+    seed: U64,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TxCreateSerdeHelper {
+    pub_key: PublicKey,
+    name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TxTransferSerdeHelper {
+    from: PublicKey,
+    to: PublicKey,
+    amount: U64,
+    seed: U64,
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum CurrencyTx {
     Transfer(TxTransfer),
@@ -102,31 +134,101 @@ impl Serialize for CurrencyTx {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let mut state;
+        let id: u16;
+        let signature = *self.raw().signature();
+        let body;
         match *self {
             CurrencyTx::Issue(ref issue) => {
-                state = ser.serialize_struct("transaction", 4)?;
-                ser.serialize_struct_elt(&mut state, "type", "issue")?;
-                ser.serialize_struct_elt(&mut state, "wallet", issue.wallet().to_hex())?;
-                ser.serialize_struct_elt(&mut state, "amount", issue.amount())?;
-                ser.serialize_struct_elt(&mut state, "seed", issue.seed())?;
+                id = TX_ISSUE_ID;
+                let issue_body = TxIssueSerdeHelper {
+                    wallet: *issue.wallet(),
+                    amount: U64(issue.amount()),
+                    seed: U64(issue.seed()),
+                };
+                body = issue_body.to_json();
             }
             CurrencyTx::Transfer(ref transfer) => {
-                state = ser.serialize_struct("transaction", 5)?;
-                ser.serialize_struct_elt(&mut state, "type", "transfer")?;
-                ser.serialize_struct_elt(&mut state, "from", transfer.from().to_hex())?;
-                ser.serialize_struct_elt(&mut state, "to", transfer.to().to_hex())?;
-                ser.serialize_struct_elt(&mut state, "amount", transfer.amount())?;
-                ser.serialize_struct_elt(&mut state, "seed", transfer.seed())?;
+                id = TX_TRANSFER_ID;
+                let transfer_body = TxTransferSerdeHelper {
+                    from: *transfer.from(),
+                    to: *transfer.to(),
+                    amount: U64(transfer.amount()),
+                    seed: U64(transfer.seed()),
+                };
+                body = transfer_body.to_json();
             }
             CurrencyTx::CreateWallet(ref wallet) => {
-                state = ser.serialize_struct("transaction", 3)?;
-                ser.serialize_struct_elt(&mut state, "type", "create_wallet")?;
-                ser.serialize_struct_elt(&mut state, "pub_key", wallet.pub_key().to_hex())?;
-                ser.serialize_struct_elt(&mut state, "name", wallet.name())?;
+                id = TX_WALLET_ID;
+                let create_body = TxCreateSerdeHelper {
+                    pub_key: *wallet.pub_key(),
+                    name: wallet.name().to_string(),
+                };
+                body = create_body.to_json();
             }
         }
-        ser.serialize_struct_end(state)
+        let h = TxSerdeHelper {
+            id: id,
+            body: body,
+            signature: signature,
+        };
+        h.serialize(ser)
+    }
+}
+
+impl Deserialize for CurrencyTx {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let h = <TxSerdeHelper>::deserialize(deserializer)?;
+        let res = match h.id {
+            TX_ISSUE_ID => {
+                let body_type = "Tx_ISSUE";
+                let body = from_value::<TxIssueSerdeHelper>(h.body).map_err(|e| {
+                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
+                                                   json. serde_json::error: {}",
+                                                  body_type,
+                                                  e))
+                    })?;
+                let tx = TxIssue::new_with_signature(&body.wallet,
+                                                     body.amount.0,
+                                                     body.seed.0,
+                                                     &h.signature);
+                CurrencyTx::Issue(tx)
+            }
+            TX_WALLET_ID => {
+                let body_type = "Tx_CREATE";
+                let body = from_value::<TxCreateSerdeHelper>(h.body).map_err(|e| {
+                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
+                                                   json. serde_json::error: {}",
+                                                  body_type,
+                                                  e))
+                    })?;
+                let tx =
+                    TxCreateWallet::new_with_signature(&body.pub_key, &body.name, &h.signature);
+                CurrencyTx::CreateWallet(tx)
+            }
+            TX_TRANSFER_ID => {
+                let body_type = "Tx_TRANSFER";
+                let body = from_value::<TxTransferSerdeHelper>(h.body).map_err(|e| {
+                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
+                                                   json. serde_json::error: {}",
+                                                  body_type,
+                                                  e))
+                    })?;
+                let tx = TxTransfer::new_with_signature(&body.from,
+                                                        &body.to,
+                                                        body.amount.0,
+                                                        body.seed.0,
+                                                        &h.signature);
+                CurrencyTx::Transfer(tx)
+            }
+            other => {
+                return Err(de::Error::custom(format!("Unknown transaction id for \
+                                                      Cryptocurrency Service: {}",
+                                                     other)));
+            }
+        };
+        Ok(res)
     }
 }
 
@@ -315,8 +417,10 @@ impl Service for CurrencyService {
 #[cfg(test)]
 mod tests {
     use byteorder::{ByteOrder, LittleEndian};
+    use rand::{thread_rng, Rng};
+    use serde_json;
 
-    use exonum::crypto::gen_keypair;
+    use exonum::crypto::{gen_keypair, Hash};
     use exonum::storage::Storage;
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::messages::{FromRaw, Message};
@@ -339,6 +443,96 @@ mod tests {
         options.create_if_missing = true;
         let dir = TempDir::new("cryptocurrency").unwrap();
         LevelDB::new(dir.path(), options).unwrap()
+    }
+
+    #[derive(Serialize)]
+    struct TransactionTestData {
+        transaction: CurrencyTx,
+        hash: Hash,
+        raw: Vec<u8>,
+    }
+
+    impl TransactionTestData {
+        fn new(transaction: CurrencyTx) -> TransactionTestData {
+            let hash = transaction.hash();
+            let raw = transaction.raw().as_ref().as_ref().to_vec();
+            TransactionTestData {
+                transaction: transaction,
+                hash: hash,
+                raw: raw,
+            }
+        }
+    }
+
+    #[test]
+    fn test_tx_transfer_serde() {
+        let mut rng = thread_rng();
+        let generator = move |_| {
+            let (p_from, s) = gen_keypair();
+            let (p_to, _) = gen_keypair();
+            let amount = rng.next_u64();
+            let seed = rng.next_u64();
+            TxTransfer::new(&p_from, &p_to, amount, seed, &s)
+        };
+        let create_txs = (0..50)
+            .map(generator)
+            .collect::<Vec<_>>();
+        for tx in create_txs {
+            let wrapped_tx = CurrencyTx::Transfer(tx);
+            let json_str = serde_json::to_string(&wrapped_tx).unwrap();
+            let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
+            assert_eq!(wrapped_tx, parsed_json);
+            println!("tx issue test_data: {}",
+                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_tx_issue_serde() {
+        let mut rng = thread_rng();
+        let generator = move |_| {
+            let (p, s) = gen_keypair();
+            let amount = rng.next_u64();
+            let seed = rng.next_u64();
+            TxIssue::new(&p, amount, seed, &s)
+        };
+        let create_txs = (0..50)
+            .map(generator)
+            .collect::<Vec<_>>();
+        for tx in create_txs {
+            let wrapped_tx = CurrencyTx::Issue(tx);
+            let json_str = serde_json::to_string(&wrapped_tx).unwrap();
+            let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
+            assert_eq!(wrapped_tx, parsed_json);
+            println!("tx issue test_data: {}",
+                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_tx_create_wallet_serde() {
+        let mut rng = thread_rng();
+        let generator = move |_| {
+            let (p, s) = gen_keypair();
+            let string_len = rng.gen_range(20u8, 255u8);
+            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+            TxCreateWallet::new(&p, &name, &s)
+        };
+        let (p, s) = gen_keypair();
+        let non_ascii_create =
+            TxCreateWallet::new(&p, "babd, Юникод еще работает", &s);
+        let mut create_txs = (0..50)
+            .map(generator)
+            .collect::<Vec<_>>();
+        create_txs.push(non_ascii_create);
+        for tx in create_txs {
+            let wrapped_tx = CurrencyTx::CreateWallet(tx);
+            let json_str = serde_json::to_string(&wrapped_tx).unwrap();
+            let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
+            assert_eq!(wrapped_tx, parsed_json);
+            println!("tx issue test_data: {}",
+                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+        }
     }
 
     #[test]
