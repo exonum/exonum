@@ -2,13 +2,13 @@ use std::collections::HashSet;
 
 use time::{Duration, Timespec};
 
-use ::crypto::{Hash, PublicKey, HexValue};
-use ::blockchain::{Schema, Transaction};
-use ::messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
-                 RequestTransactions, RequestPrevotes, RequestPrecommits, RequestBlock, Block,
-                 RawTransaction};
-use ::storage::{Map, Patch};
-use ::events::Channel;
+use crypto::{Hash, PublicKey, HexValue};
+use blockchain::{Schema, Transaction};
+use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
+               RequestTransactions, RequestPrevotes, RequestPrecommits, RequestBlock, Block,
+               RawTransaction};
+use storage::{Map, Patch};
+use events::Channel;
 
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
 
@@ -429,12 +429,14 @@ impl<S> NodeHandler<S>
         let round = self.actual_round();
         self.state.new_height(&block_hash, round);
 
-        info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}",
+        info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}, hash={}",
               height,
               propose_round,
               proposer,
               commited_txs,
-              self.state.transactions().len());
+              self.state.transactions().len(),
+              block_hash.to_hex(),
+              );
 
         // Add timeout for first round
         self.add_round_timeout();

@@ -13,4 +13,4 @@ pub mod timestamping;
 pub mod sandbox;
 pub mod sandbox_tests_helper;
 
-pub use self::sandbox::timestamping_sandbox;
+pub use self::sandbox::{timestamping_sandbox, sandbox_with_services};

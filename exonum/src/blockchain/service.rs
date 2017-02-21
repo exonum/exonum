@@ -51,6 +51,10 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.view
     }
 
+    pub fn id(&self) -> u32 {
+        self.state.id()
+    }
+
     pub fn height(&self) -> u64 {
         self.state.height()
     }
@@ -61,6 +65,10 @@ impl<'a, 'b> NodeState<'a, 'b> {
 
     pub fn validators(&self) -> &[PublicKey] {
         self.state.validators()
+    }
+
+    pub fn public_key(&self) -> &PublicKey {
+        self.state.public_key()
     }
 
     pub fn secret_key(&self) -> &SecretKey {
