@@ -56,7 +56,7 @@ fn test_check_leader() {
     let sandbox_state = SandboxState::new();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
     // TODO would be nice to check also for RequestPeers message which will  appear after 10 time units (at 11th round)
@@ -78,6 +78,26 @@ fn test_reach_one_height() {
 
     add_one_height(&sandbox, &sandbox_state);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+}
+
+/// idea of the test is to reach one height two times and compare block hash
+#[test]
+fn test_reach_one_height_repeatable() {
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    let hash_1 = sandbox.last_block().hash();
+
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    let hash_2 = sandbox.last_block().hash();
+
+    assert_eq!(hash_2, hash_1);
 }
 
 /// idea of the test is to reach some height
@@ -210,7 +230,7 @@ fn test_queue_propose_message_from_next_height() {
     let sandbox_state = SandboxState::new();
 
     // get some tx
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let future_propose_time = sandbox.time() + Duration::milliseconds(sandbox.round_timeout()) +
                               Duration::milliseconds(sandbox.round_timeout()) +
@@ -236,7 +256,7 @@ fn test_queue_propose_message_from_next_height() {
 
     sandbox.recv(future_propose.clone());
 
-    add_one_height_with_transaction(&sandbox, &sandbox_state, &tx.clone());
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
 
     println!("last_block={:#?}, hash={:?}",
              sandbox.last_block(),
@@ -391,7 +411,7 @@ fn ignore_propose_with_commited_transaction() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[*sandbox_state.committed_transaction_hash.borrow()])  //without this line Prevote would have been broadcast
+        .with_tx_hashes(sandbox_state.committed_transaction_hashes.borrow().as_ref())  //without this line Prevote would have been broadcast
         .build();
 
     sandbox.recv(propose.clone());
@@ -458,7 +478,7 @@ fn request_propose_when_get_prevote() {
 fn response_to_request_txs() {
     let sandbox = timestamping_sandbox();
 
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
     sandbox.recv(RequestTransactions::new(sandbox.p(VALIDATOR_1 as usize),
@@ -491,7 +511,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
     }
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
     sandbox.add_time(Duration::milliseconds(sandbox.propose_timeout()));
@@ -683,7 +703,7 @@ fn not_request_txs_when_get_tx_and_propose() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -734,7 +754,7 @@ fn request_txs_when_get_propose_or_prevote() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
@@ -1053,7 +1073,7 @@ fn lock_to_propose_and_send_prevote() {
     sandbox.recv(empty_propose.clone());
     sandbox.broadcast(make_prevote_from_propose(&sandbox, &empty_propose.clone()));
 
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
 
@@ -1185,7 +1205,7 @@ fn handle_precommit_we_are_fucked_up() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
@@ -1235,7 +1255,7 @@ fn handle_precommit_positive_scenario_commit() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
@@ -1405,7 +1425,7 @@ fn do_not_commit_if_propose_is_unknown() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
@@ -1468,7 +1488,7 @@ fn do_not_commit_if_tx_is_unknown() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
@@ -1538,7 +1558,7 @@ fn commit_using_unknown_propose_with_precommits() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
@@ -1624,7 +1644,7 @@ fn has_full_propose_we_are_fucked_up() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
@@ -1778,7 +1798,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let sandbox_state = SandboxState::new();
 
     // create some tx
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
 
     // precommits with this block will be received during get 1st height in fn add_one_height_with_transaction()
@@ -1833,7 +1853,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.recv(precommit_1.clone());//early precommit from future height
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    add_one_height_with_transaction(&sandbox, &sandbox_state, &tx.clone());
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
     assert_eq!(first_block.hash(), sandbox.last_hash());
 
@@ -1881,7 +1901,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     let sandbox_state = SandboxState::new();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     // here need to make height = 2 because later one more height will be added and node 0 will be leader at 1st round at 3th height
     // if height will be another, then test will fail on last lines because of absent propose and prevote
@@ -1983,7 +2003,7 @@ fn handle_tx_has_full_propose() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
@@ -2020,7 +2040,7 @@ fn broadcast_prevote_with_tx_positive() {
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -2051,9 +2071,9 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     let sandbox_state = SandboxState::new();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
-    add_one_height_with_transaction(&sandbox, &sandbox_state, &tx.clone());
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 
     // add rounds & become leader
@@ -2083,7 +2103,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_science_sandbox_time(sandbox.propose_timeout())
