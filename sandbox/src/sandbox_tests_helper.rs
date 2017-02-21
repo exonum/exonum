@@ -2,16 +2,17 @@
 
 use time::{Timespec, Duration};
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 
-use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestPrevotes};
+use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
+                       RequestPrevotes};
 use exonum::blockchain::Block;
 use exonum::crypto::{Hash, HASH_SIZE, hash};
 use exonum::messages::BitVec;
 
 use super::sandbox::Sandbox;
-use timestamping::TimestampTx;
+use timestamping::{TimestampTx, TimestampingTxGenerator};
 
-type Transaction = TimestampTx;
 pub type TimestampingSandbox = Sandbox;
 
 pub const HEIGHT_ZERO: u64 = 0;
@@ -94,6 +95,13 @@ impl<'a> BlockBuilder<'a> {
         //see how hash(&self) changed in exonum::storage::fields::StorageValue for Hash, 
         //it's _hash(self.as_ref())_ as of now instead of _*self_ as it used to be
         let merkle_root = hash(individual_transaction_hash.as_ref()); 
+        self.tx_hash = Some(merkle_root);
+        self
+    }
+
+    pub fn with_txs_hashes(mut self, tx_hashes: &[Hash]) -> Self {
+        //root of merkle table, containing this array of transactions
+        let merkle_root = compute_txs_root_hash(tx_hashes);
         self.tx_hash = Some(merkle_root);
         self
     }
@@ -201,7 +209,7 @@ impl<'a> ProposeBuilder<'a> {
 pub struct SandboxState {
     pub accepted_propose_hash: RefCell<Hash>,
     pub accepted_block_hash: RefCell<Hash>,
-    pub committed_transaction_hash: RefCell<Hash>,
+    pub committed_transaction_hashes: RefCell<Vec<Hash>>,
     pub time_millis_science_round_start: RefCell<i64>,
 }
 
@@ -210,7 +218,7 @@ impl SandboxState {
         SandboxState {
             accepted_block_hash: RefCell::new(empty_hash()),
             accepted_propose_hash: RefCell::new(empty_hash()),
-            committed_transaction_hash: RefCell::new(empty_hash()),
+            committed_transaction_hashes: RefCell::new(Vec::new()),
             time_millis_science_round_start: RefCell::new(0),
         }
     }
@@ -219,6 +227,16 @@ impl SandboxState {
 /// just returns valid Hash object filled with zeros
 pub fn empty_hash() -> Hash {
     Hash::from_slice(&[0; HASH_SIZE]).unwrap()
+}
+
+pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
+    // TODO use special function
+    use exonum::storage::{MemoryDB, List, MerkleTable};
+
+    let db = MemoryDB::new();
+    let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+    hashes.extend(txs.iter().cloned()).unwrap();
+    hashes.root_hash().unwrap()
 }
 
 pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
@@ -240,7 +258,7 @@ pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
         round_timeout - *sandbox_state.time_millis_science_round_start.borrow() % round_timeout;
 
     trace!("going to add {:?} millis", time_till_next_round);
-    sandbox.add_time(Duration::milliseconds(time_till_next_round));//here next round begins
+    sandbox.add_time(Duration::milliseconds(time_till_next_round)); //here next round begins
     trace!("sandbox_time after adding: {:?}", sandbox.time());
     trace!("round after: {:?}", sandbox.current_round());
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
@@ -257,34 +275,55 @@ pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
     }
 }
 
-pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {
-    // get some tx
-    let tx = sandbox.gen_tx();
-    add_one_height_with_transaction(sandbox, sandbox_state, &tx.clone());
+pub fn gen_timestamping_tx() -> TimestampTx {
+    let mut tx_gen = TimestampingTxGenerator::new(64);
+    tx_gen.next().unwrap()
 }
 
-pub fn add_one_height_with_transaction(sandbox: &TimestampingSandbox,
-                                       sandbox_state: &SandboxState,
-                                       tx: &Transaction) {
+pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {
+    // gen some tx
+    let tx = gen_timestamping_tx();
+    add_one_height_with_transactions(sandbox, sandbox_state, &[tx.raw().clone()]);
+}
+
+pub fn add_one_height_with_transactions(sandbox: &TimestampingSandbox,
+                                        sandbox_state: &SandboxState,
+                                        txs: &[RawTransaction]) {
+    // sort transaction in order accordingly their hashes
+    let mut tx_pool = BTreeMap::new();
+    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
+    let raw_txs = tx_pool.values()
+        .cloned()
+        .collect::<Vec<_>>();
+    let txs: &[RawTransaction] = raw_txs.as_ref();
+
     // pub fn add_one_height(sandbox: &TimestampSandbox, sandbox_state: &SandboxState) {
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
     // assert 1st round
     sandbox.assert_state(initial_height, ROUND_ONE);
 
-    sandbox.recv(tx.clone());
+    let hashes = {
+        let mut hashes = Vec::new();
+        for tx in txs.iter() {
+            sandbox.recv(tx.clone());
+            hashes.push(tx.hash());
+        }
+        hashes
+    };
+
     {
-        *sandbox_state.committed_transaction_hash.borrow_mut() = tx.hash();
+        *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
 
     for _ in 0..sandbox.n_validators() {
         //        add_round_with_transactions(&sandbox, &[tx.hash()]);
-        add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
+        add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
         let round: u32 = sandbox.current_round();
         if sandbox.is_leader() {
             // ok, we are leader
             trace!("ok, we are leader, round: {:?}", round);
-            let propose = get_propose_with_transactions(&sandbox, &[tx.hash()]);
+            let propose = get_propose_with_transactions(&sandbox, hashes.as_ref());
             trace!("propose.hash: {:?}", propose.hash());
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
             {
@@ -312,7 +351,7 @@ pub fn add_one_height_with_transaction(sandbox: &TimestampingSandbox,
             //            let block = Block::new(initial_height, round, propose_time, &hash(&[]), &tx.hash(), &hash(&[]));
             //            let block = Block::new(initial_height, round, propose_time, &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(), &hash(&[]));
             let block = BlockBuilder::new(sandbox)
-                .with_tx_hash(&tx.hash())
+                .with_txs_hashes(&hashes)
                 .build();
             //    let block = Block::new(h, propose_time, &hash(&[]), &hash(&[tx.hash()]), &hash(&[tx.hash()]));
             trace!("new_block: {:?}", block);
