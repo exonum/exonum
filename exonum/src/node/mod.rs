@@ -16,7 +16,7 @@ mod basic;
 mod consensus;
 mod requests;
 
-pub use self::state::{State, Round, Height, RequestData, ValidatorId};
+pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool};
 
 
 #[derive(Debug)]

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, BTreeSet};
+use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
 
@@ -26,7 +26,8 @@ pub const REQUEST_BLOCK_WAIT: u64 = 100;
 pub type Round = u32;
 pub type Height = u64;
 pub type ValidatorId = u32;
-
+// TODO replace by persistent TxPool
+pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
 
 pub struct State {
@@ -48,8 +49,7 @@ pub struct State {
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
-    // TODO replace by TxPool
-    transactions: HashMap<Hash, Box<Transaction>>,
+    transactions: TxPool,
 
     queued: Vec<ConsensusMessage>,
 
@@ -279,7 +279,7 @@ impl State {
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
-            transactions: HashMap::new(),
+            transactions: TxPool::new(),
 
             queued: Vec::new(),
 
@@ -310,7 +310,7 @@ impl State {
         &self.config.consensus
     }
 
-    pub fn services_config(&self) -> &HashMap<u16, Value> {
+    pub fn services_config(&self) -> &BTreeMap<u16, Value> {
         &self.config.services
     }
 
@@ -467,7 +467,7 @@ impl State {
         self.queued.push(msg);
     }
 
-    pub fn transactions(&self) -> &HashMap<Hash, Box<Transaction>> {
+    pub fn transactions(&self) -> &TxPool {
         &self.transactions
     }
 

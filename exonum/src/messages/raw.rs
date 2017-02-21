@@ -71,14 +71,6 @@ impl MessageBuffer {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         unsafe { mem::transmute(&self.raw[sign_idx]) }
     }
-
-    pub fn verify_signature(&self, pub_key: &PublicKey) -> bool {
-        verify(self.signature(), self.body(), pub_key)
-    }
-
-    pub fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
 }
 
 impl convert::AsRef<[u8]> for MessageBuffer {
@@ -157,6 +149,20 @@ pub trait Message: Debug + Send {
 
 pub trait FromRaw: Sized + Send + Message {
     fn from_raw(raw: RawMessage) -> Result<Self, Error>;
+}
+
+impl Message for RawMessage {
+    fn raw(&self) -> &RawMessage {
+        self
+    }
+
+    fn hash(&self) -> Hash {
+        hash(self.as_ref().as_ref())
+    }
+
+    fn verify_signature(&self, pub_key: &PublicKey) -> bool {
+        verify(self.signature(), self.body(), pub_key)
+    }
 }
 
 // #[test]

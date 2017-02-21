@@ -9,12 +9,14 @@ use time::{Timespec, Duration};
 
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction};
+                         Schema, Transaction, Service};
 use exonum::storage::{MemoryDB, Error as StorageError, RootProofNode};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult};
-use exonum::crypto::{Hash, PublicKey, SecretKey, gen_keypair};
+use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
+#[cfg(test)]
+use exonum::crypto::gen_keypair;
 use exonum::node::state::{Round, Height};
 
 use ::timestamping::{TimestampingService, TimestampTx, TimestampingTxGenerator};
@@ -167,7 +169,6 @@ impl SandboxReactor {
 pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
-    tx_generator: RefCell<TimestampingTxGenerator>,
     pub validators: Vec<(PublicKey, SecretKey)>,
     addresses: Vec<SocketAddr>,
 }
@@ -194,19 +195,6 @@ impl Sandbox {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
-    }
-
-    pub fn gen_tx(&self) -> TimestampTx {
-        self.tx_generator.borrow_mut().next().unwrap()
-    }
-
-    pub fn gen_txs(&self, count: usize) -> Vec<TimestampTx> {
-        let mut v = Vec::new();
-        let mut tx_generator = self.tx_generator.borrow_mut();
-        for _ in 0..count {
-            v.push(tx_generator.next().unwrap())
-        }
-        v
     }
 
     pub fn tx_from_raw(&self, raw: RawTransaction) -> Option<Box<Transaction>> {
@@ -266,7 +254,7 @@ impl Sandbox {
         let mut set: HashSet<SocketAddr> = HashSet::from_iter(self.addresses
             .iter()
             .skip(1)
-            .map(Clone::clone));
+            .cloned());
         for _ in 0..self.validators.len() - 1 {
             let sended = self.inner.lock().unwrap().sended.pop_front();
             if let Some((real_addr, real_msg)) = sended {
@@ -430,15 +418,18 @@ impl Drop for Sandbox {
     }
 }
 
-pub fn timestamping_sandbox() -> Sandbox {
-    let validators = vec![gen_keypair(), gen_keypair(), gen_keypair(), gen_keypair()];
+pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
+    let validators = vec![gen_keypair_from_seed(&Seed::new([12; 32])),
+                          gen_keypair_from_seed(&Seed::new([13; 32])),
+                          gen_keypair_from_seed(&Seed::new([16; 32])),
+                          gen_keypair_from_seed(&Seed::new([19; 32]))];
     let addresses: Vec<SocketAddr> = vec!["1.1.1.1:1".parse().unwrap(),
                                           "2.2.2.2:2".parse().unwrap(),
                                           "3.3.3.3:3".parse().unwrap(),
                                           "4.4.4.4:4".parse().unwrap()];
 
     let db = MemoryDB::new();
-    let blockchain = Blockchain::new(db, vec![Box::new(TimestampingService::new())]);
+    let blockchain = Blockchain::new(db, services);
 
     let consensus = ConsensusConfig {
         round_timeout: 1000,
@@ -447,7 +438,8 @@ pub fn timestamping_sandbox() -> Sandbox {
         propose_timeout: 200,
         txs_block_limit: 1000,
     };
-    let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
+    let mut genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
+    genesis.time = 1486720340;
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
@@ -478,13 +470,11 @@ pub fn timestamping_sandbox() -> Sandbox {
         inner: inner.clone(),
         handler: node,
     };
-    let tx_gen = TimestampingTxGenerator::new(64);
 
     reactor.handler.initialize();
     let sandbox = Sandbox {
         inner: inner.clone(),
         reactor: RefCell::new(reactor),
-        tx_generator: RefCell::new(tx_gen),
         validators: validators,
         addresses: addresses,
     };
@@ -492,6 +482,10 @@ pub fn timestamping_sandbox() -> Sandbox {
     sandbox.initialize();
     assert!(sandbox.propose_timeout() < sandbox.round_timeout()); //general assumption; necessary for correct work of consensus algorithm
     sandbox
+}
+
+pub fn timestamping_sandbox() -> Sandbox {
+    sandbox_with_services(vec![Box::new(TimestampingService::new())])
 }
 
 #[test]

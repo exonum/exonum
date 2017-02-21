@@ -98,18 +98,22 @@ impl<'a> Schema<'a> {
         Ok(())
     }
 
-    pub fn get_actual_configuration(&self) -> Result<StoredConfiguration, Error> {
+    pub fn get_actual_configurations_height(&self) -> Result<u64, Error> {
+        // TODO improve perfomance
         let h = self.last_height()? + 1;
         let heights = self.configs_heights();
         let height_values = heights.values().unwrap();
 
-        // TODO improve perfomance
         let idx = height_values.into_iter()
             .rposition(|r| u64::from(r) <= h)
             .unwrap();
-
         let height = heights.get(idx as u64)?.unwrap();
-        self.get_configuration_at_height(height.into()).map(|x| x.unwrap())
+        Ok(height.into())
+    }
+
+    pub fn get_actual_configuration(&self) -> Result<StoredConfiguration, Error> {
+        let height = self.get_actual_configurations_height()?;
+        self.get_configuration_at_height(height).map(|x| x.unwrap())
     }
 
     // FIXME Replace by result?

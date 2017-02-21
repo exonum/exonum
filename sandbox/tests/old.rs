@@ -9,14 +9,14 @@ use exonum::blockchain::Block;
 use exonum::crypto::Hash;
 
 use sandbox::timestamping_sandbox;
-
+use sandbox::sandbox_tests_helper::gen_timestamping_tx;
 
 #[test]
 fn test_send_propose_and_prevote() {
     let sandbox = timestamping_sandbox();
 
     // get some tx
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
     // round happens
