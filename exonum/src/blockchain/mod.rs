@@ -7,7 +7,7 @@ mod genesis;
 mod service;
 
 use std::sync::Arc;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use time::Timespec;
 use vec_map::VecMap;
@@ -16,7 +16,7 @@ use std::mem;
 
 use ::crypto::{Hash, hash};
 use ::messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
-use ::node::State;
+use ::node::{State, TxPool};
 
 use ::storage::{Patch, Database, Fork, Error, Map, List, Storage,
                 View as StorageView};
@@ -80,7 +80,7 @@ impl Blockchain {
             actual_from: 0,
             validators: cfg.validators,
             consensus: cfg.consensus,
-            services: HashMap::new(),
+            services: BTreeMap::new(),
         };
         let time = Timespec {
             sec: cfg.time as i64,
@@ -106,7 +106,7 @@ impl Blockchain {
                 schema.commit_actual_configuration(0, config_propose.serialize().as_ref())?;
             };
             self.merge(&view.changes())?;
-            self.create_patch(0, 0, time, &[], &HashMap::new())?.1
+            self.create_patch(0, 0, time, &[], &BTreeMap::new())?.1
         };
         self.merge(&patch)?;
         Ok(())
@@ -126,11 +126,11 @@ impl Blockchain {
                         round: u32,
                         time: Timespec,
                         tx_hashes: &[Hash],
-                        pool: &HashMap<Hash, Box<Transaction>>)
+                        pool: &TxPool)
                         -> Result<(Hash, Patch), Error> {
         // Create fork
         let fork = self.view();
-        // Create databa schema
+        // Create database schema
         let schema = Schema::new(&fork);
         // Get last hash
         let last_hash = self.last_hash()?;
