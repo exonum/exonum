@@ -15,6 +15,7 @@ extern crate serde_json;
 #[macro_use(message, storage_value)]
 extern crate exonum;
 extern crate blockchain_explorer;
+extern crate params;
 extern crate router;
 extern crate iron;
 extern crate hyper;
