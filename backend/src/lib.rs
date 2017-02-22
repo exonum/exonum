@@ -537,6 +537,28 @@ mod tests {
     }
 
     #[test]
+    fn generate_simple_scenario_transactions() {
+        let mut rng = thread_rng();
+        let (p1, s1) = gen_keypair();
+        let (p2, s2) = gen_keypair();
+        let tx_create_1 = TxCreateWallet::new(&p1, "Василий Васильевич", &s1);
+        let tx_create_2 = TxCreateWallet::new(&p2, "Иван Иващенко", &s2);
+        let tx_issue_1 = TxIssue::new(&p1, 6000, rng.next_u64(), &s1);
+        let tx_transfer_1 = TxTransfer::new(&p1, &p2, 3000, rng.next_u64(), &s1);
+        let tx_transfer_2 = TxTransfer::new(&p2, &p1, 1000, rng.next_u64(), &s2);
+        let txs: Vec<CurrencyTx> = vec![tx_create_1.into(),
+                                        tx_create_2.into(),
+                                        tx_issue_1.into(),
+                                        tx_transfer_1.into(),
+                                        tx_transfer_2.into()];
+        for (idx, tx) in txs.iter().enumerate() {
+            println!("transaction #{}: {}",
+                     idx,
+                     serde_json::to_string(tx).unwrap());
+        }
+    }
+
+    #[test]
     fn test_tx_create_wallet() {
         let (p, s) = gen_keypair();
         let n = "babd, Юникод еще работает";

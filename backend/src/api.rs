@@ -122,7 +122,7 @@ impl Api for CryptocurrencyApi {
         let _self = self.clone();
         let wallet_info = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["pub_key"]) {
+            match map.find(&["pubkey"]) {
                 Some(&Value::String(ref pub_key_string)) => {
                     let public_key =
                         PublicKey::from_hex(pub_key_string).map_err(|err| ApiError::FromHex(err))?;
@@ -146,6 +146,6 @@ impl Api for CryptocurrencyApi {
         };
 
         router.post("/v1/api/wallets/transaction", transaction, "transaction");
-        router.get("/v1/api/wallets/info/:pub_key", wallet_info, "wallet_info");
+        router.get("/v1/api/wallets/info", wallet_info, "wallet_info");
     }
 }
