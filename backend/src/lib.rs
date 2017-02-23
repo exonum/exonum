@@ -28,7 +28,7 @@ use exonum::messages::utils::U64;
 use exonum::crypto::{PUBLIC_KEY_LENGTH, Signature};
 use blockchain_explorer::TransactionInfo;
 use serde_json::value::ToJson;
-use serde_json::from_value;
+use serde_json::{Value, from_value};
 
 pub mod api;
 pub mod wallet;
@@ -88,7 +88,8 @@ message! {
 
 #[derive(Serialize, Deserialize)]
 struct TxSerdeHelper {
-    id: u16,
+    service_id: u16,
+    message_id: u16,
     body: serde_json::Value,
     signature: Signature,
 }
@@ -168,7 +169,8 @@ impl Serialize for CurrencyTx {
             }
         }
         let h = TxSerdeHelper {
-            id: id,
+            service_id: CRYPTOCURRENCY,
+            message_id: id,
             body: body,
             signature: signature,
         };
@@ -181,7 +183,16 @@ impl Deserialize for CurrencyTx {
         where D: Deserializer
     {
         let h = <TxSerdeHelper>::deserialize(deserializer)?;
-        let res = match h.id {
+        match h.service_id {
+            CRYPTOCURRENCY => {} 
+            other => {
+                return Err(de::Error::custom((format!("service_id doesn't match the expected. \
+                                                       actual: {}, expected: {}",
+                                                      other,
+                                                      CRYPTOCURRENCY))))
+            }
+        }
+        let res = match h.message_id {
             TX_ISSUE_ID => {
                 let body_type = "Tx_ISSUE";
                 let body = from_value::<TxIssueSerdeHelper>(h.body).map_err(|e| {
@@ -332,6 +343,10 @@ impl CurrencyService {
 }
 
 impl Transaction for CurrencyTx {
+    fn info(&self) -> Value {
+        self.to_json()
+    }
+
     fn verify(&self) -> bool {
         self.verify_signature(self.pub_key())
     }

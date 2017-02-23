@@ -34,6 +34,7 @@ use cryptocurrency::api::CryptocurrencyApi;
 
 use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
 use blockchain_explorer::api::Api;
+use blockchain_explorer::explorer_api::ExplorerApi;
 
 fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
     if let Some(port) = port {
@@ -46,11 +47,13 @@ fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
                 channel: channel.clone(),
                 blockchain: blockchain.clone(),
             };
+            let explorer_api = ExplorerApi { blockchain: blockchain.clone() };
             let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
             println!("Cryptocurrency node server started on {}", listen_address);
 
             let mut router = Router::new();
             cryptocurrency_api.wire(&mut router);
+            explorer_api.wire(&mut router);
             let chain = iron::Chain::new(router);
             iron::Iron::new(chain).http(listen_address).unwrap();
 

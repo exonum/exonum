@@ -135,17 +135,21 @@ impl Api for CryptocurrencyApi {
 
         let _self = self.clone();
         let transaction = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<CurrencyTx>>().unwrap() {
-                Some(transaction) => {
+            match req.get::<bodyparser::Struct<CurrencyTx>>() {
+                Ok(Some(transaction)) => {
                     let tx_hash = _self.transaction(transaction)?;
                     let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
                     _self.ok_response(json)
                 }
-                None => Err(ApiError::IncorrectRequest)?,
+                Ok(None) => Err(ApiError::IncorrectRequest)?,
+                Err(e) => {
+                    error!("Incorrect CurrencyTx request body received {}", e);
+                    Err(ApiError::IncorrectRequest)?
+                }
             }
         };
 
-        router.post("/v1/api/wallets/transaction", transaction, "transaction");
-        router.get("/v1/api/wallets/info", wallet_info, "wallet_info");
+        router.post("/api/v1/wallets/transaction", transaction, "transaction");
+        router.get("/api/v1/wallets/info", wallet_info, "wallet_info");
     }
 }
