@@ -6,9 +6,9 @@ members = [
     "3rdparty/flamer",
     "3rdparty/profiler",
     "blockchain_explorer",
-    "cryptocurrency",
     "exonum",
     "sandbox",
+    "services/profiler_service",
     "services/configuration",
     "services/propose_timeout_adjuster",
 ]
