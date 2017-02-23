@@ -12,7 +12,6 @@ use ::events::Channel;
 
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
 
-use profiler;
 
 const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
@@ -24,7 +23,6 @@ impl<S> NodeHandler<S>
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
 
         // Ignore messages from previous and future height
-        let mut profiler = profiler::ProfilerSpan::new("Ignore messages from previous and future height");
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
             warn!("Received consensus message from other height: msg.height={}, self.height={}",
                   msg.height(),
@@ -34,7 +32,6 @@ impl<S> NodeHandler<S>
 
         // Queued messages from next height or round
         // TODO: shoud we ignore messages from far rounds?
-        profiler.next_span("Queued messages from next height or round");
         if msg.height() == self.state.height() + 1 || msg.round() > self.state.round() {
             trace!("Received consensus message from future round: msg.height={}, msg.round={}, \
                     self.height={}, self.round={}",
@@ -46,11 +43,9 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        profiler.next_span("get validator public key");
         match self.state.public_key_of(msg.validator()) {
             // incorrect signature of message
             Some(public_key) => {
-                profiler.sub_span("verify signature");
                 if !msg.verify(public_key) {
                     error!("Received message with incorrect signature msg={:?}", msg);
                     return;
@@ -64,7 +59,6 @@ impl<S> NodeHandler<S>
         }
 
         trace!("Handle message={:?}", msg);
-        profiler.next_span("Handle message");
         match msg {
             ConsensusMessage::Propose(msg) => self.handle_propose(msg),
             ConsensusMessage::Prevote(msg) => self.handle_prevote(msg),
@@ -470,7 +464,6 @@ impl<S> NodeHandler<S>
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
         trace!("Handle transaction");
-        let mut profiler = profiler::ProfilerSpan::new("hash message");
         let hash = msg.hash();
         let tx = {
             let service_id = msg.service_id();
@@ -484,7 +477,6 @@ impl<S> NodeHandler<S>
         };
 
         // Make sure that it is new transaction
-        profiler.next_span("Make sure that it is new transaction");
         if self.state.transactions().contains_key(&hash) {
             return;
         }
@@ -494,14 +486,12 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        profiler.next_span("verify tx");
         if !tx.verify() {
             return;
         }
 
         let full_proposes = self.state.add_transaction(hash, tx);
         // Go to has full propose if we get last transaction
-        profiler.next_span("Go to has full propose if we get last transaction");
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));
             self.has_full_propose(hash, round);

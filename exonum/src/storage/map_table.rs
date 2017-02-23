@@ -29,10 +29,8 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
-        let mut profiler = profiler::ProfilerSpan::new("MapTable::get");
-        let mut profiler = profiler.sub_span("get from storage");
+        let _profiler = profiler::ProfilerSpan::new("MapTable::get");
         let v = self.storage.get(&[&self.prefix, key.as_ref()].concat())?;
-        profiler.next_span("deserialize");
         Ok(v.map(StorageValue::deserialize))
     }
 
