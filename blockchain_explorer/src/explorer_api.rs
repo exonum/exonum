@@ -5,7 +5,6 @@ use params::{Params, Value};
 use router::Router;
 use api::{Api, ApiError};
 use iron::prelude::*;
-use bodyparser;
 use explorer::{BlockInfo, BlockchainExplorer};
 use exonum::crypto::{Hash, HexValue};
 
@@ -37,7 +36,7 @@ impl ExplorerApi {
         }
     }
 
-    fn get_transaction(&self, hash_str: &String) -> Result<Option<JValue>, ApiError> {
+    fn get_transaction(&self, hash_str: &str) -> Result<Option<JValue>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         let hash = Hash::from_hex(hash_str)?;
         match explorer.tx_info(&hash) {
@@ -52,42 +51,58 @@ impl Api for ExplorerApi {
 
         let _self = self.clone();
         let blocks = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<BlocksRequest>>().unwrap() {
-                Some(request) => {
-                    let info = _self.get_blocks(request)?;
-                    _self.ok_response(&info.to_json())
+            let map = req.get_ref::<Params>().unwrap();
+            let count: u64;
+            let from: Option<u64>;
+            count = match map.find(&["count"]) {
+                Some(&Value::String(ref count_str)) => {
+                    count_str.parse().map_err(|_| ApiError::IncorrectRequest)?
                 }
-                None => Err(ApiError::IncorrectRequest)?,
-            }
+                _ => {
+                    return Err(ApiError::IncorrectRequest)?;
+                }
+            };
+            from = match map.find(&["from"]) {
+                Some(&Value::String(ref from_str)) => {
+                    Some(from_str.parse().map_err(|_| ApiError::IncorrectRequest)?)
+                } 
+                _ => None,
+            };
+            let info = _self.get_blocks(BlocksRequest {
+                    count: count,
+                    from: from,
+                })?;
+            _self.ok_response(&info.to_json())
         };
 
         let _self = self.clone();
         let block = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["block"]) {
-                Some(&Value::U64(height)) => {
+            let params = req.extensions.get::<Router>().unwrap();
+            match params.find("height") {
+                Some(height_str) => {
+                    let height: u64 = height_str.parse()
+                        .map_err(|_| ApiError::IncorrectRequest)?;
                     let info = _self.get_block(height)?;
                     _self.ok_response(&info.to_json())
-                }
-                _ => return Err(ApiError::IncorrectRequest)?,
+                } 
+                None => return Err(ApiError::IncorrectRequest)?, 
             }
         };
 
         let _self = self.clone();
         let transaction = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["hash"]) {
-                Some(&Value::String(ref hash)) => {
-                    let info = _self.get_transaction(hash)?;
+            let params = req.extensions.get::<Router>().unwrap();
+            match params.find("hash") {
+                Some(hash_str) => {
+                    let info = _self.get_transaction(hash_str)?;
                     _self.ok_response(&info.to_json())
                 }
-                _ => return Err(ApiError::IncorrectRequest)?,
+                None => return Err(ApiError::IncorrectRequest)?,
             }
         };
 
-        router.get("/v1/api/blockchain/blocks", blocks, "blocks");
-        router.get("/v1/api/blockchain/blocks/:height", block, "height");
-        router.get("/v1/api/blockchain/transactions/:hash", transaction, "hash");
-
+        router.get("/api/v1/blockchain/blocks", blocks, "blocks");
+        router.get("/api/v1/blockchain/blocks/:height", block, "height");
+        router.get("/api/v1/blockchain/transactions/:hash", transaction, "hash");
     }
 }
