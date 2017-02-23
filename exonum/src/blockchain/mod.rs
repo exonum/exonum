@@ -213,7 +213,8 @@ impl Blockchain {
             for precommit in precommits {
                 schema.precommits(&block_hash).append(precommit.clone())?;
             }
-
+            
+            let mut node_state = NodeState::new(state, &view);
             profiler.next_span("create special txs like anchoring or fee");
             for service in self.service_map.values() {
                 service.handle_commit(&mut node_state)?;
