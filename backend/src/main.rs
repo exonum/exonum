@@ -69,7 +69,7 @@ fn main() {
 
     let app = App::new("Simple cryptocurrency demo program")
         .version(env!("CARGO_PKG_VERSION"))
-        .author("Aleksey S. <aleksei.sidorov@bitfury.com>")
+        .author("Aleksey S. <aleksei.sidorov@xdev.re>")
         .about("Demo cryptocurrency validator node")
         .subcommand(GenerateCommand::new())
         .subcommand(RunCommand::new().arg(Arg::with_name("HTTP_PORT")
