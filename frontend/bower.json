@@ -1,0 +1,12 @@
+{
+  "name": "cryptocurrency-demo",
+  "description": "Cryptocurrency solution on Exonum private blockchain",
+  "authors": [
+    "BitFury Group Limited"
+  ],
+  "private": true,
+  "devDependencies": {
+    "bootstrap": "^3.3.7",
+    "jquery": "^3.1.1"
+  }
+}

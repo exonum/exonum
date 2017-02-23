@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Wallet</title>
+
+    <link rel="stylesheet" href="../bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../bower_components/bootstrap/dist/css/bootstrap-theme.css.map">
+</head>
+<body>
+
+<div class="container">
+    <div class="row">
+        <div class="col-sm-6 col-sm-offset-3">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h1 class="panel-title">Alice's wallet</h1>
+                </div>
+                <div class="panel-body">
+
+                    <table class="table table-bordered">
+                        <tbody>
+                        <tr>
+                            <td>Public key:</td>
+                            <td title="KzJp5B7mDpZ7kMHv67GowQRys9W9Hbaa5Rzj4PCoiyXfTk1fGAvH">KzJp5B7mDpZ7kMHv...</td>
+                        </tr>
+                        <tr class="text-primary">
+                            <td>Balance:</td>
+                            <td>$547.56</td>
+                        </tr>
+                        <tr>
+                            <td>Actual for block:</td>
+                            <td title="3248e0b82e9fd1bdf310568cf367ca18862b11fcef3e271611723c1e965ef59f">3248e0b82e9fd1bd...</td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="text-center">
+                        <div class="form-group">
+                            <a href="transfer.html" class="btn btn-lg btn-primary">Transfer</a>
+                            <a href="add-funds.html" class="btn btn-lg btn-success">Add Funds</a>
+                        </div>
+                        <div class="alert alert-info"><i class="glyphicon glyphicon-alert"></i> You haven't any money yet. Add some funds.</div>
+                    </div>
+
+                    <table class="table table-bordered table-striped">
+                        <thead>
+                        <tr>
+                            <th>Hash</th>
+                            <th>Time</th>
+                            <th>Transaction</th>
+                            <th>Balance</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td title="aa8f94fba3c89e90ec0e5e143d790b8c24fb86c40ce4b45253520ef00c512675">aa8f...</td>
+                            <td>14:55 20-03-2017</td>
+                            <td>transfer $24.07 to <span title="3248e0b82e9fd1bdf310568cf367ca18862b11fcef3e271611723c1e965ef59f">3248...</span></td>
+                            <td>$56.12</td>
+                        </tr>
+                        <tr>
+                            <td title="5bfbebc3272ca141bf2225af78a678070d4c7c1454ca2ed37abd25b04ba320e0">5bfb...</td>
+                            <td>14:53 20-03-2017</td>
+                            <td>receive $16.83 from <span title="e0b82e9fd1bdf310568cf367ca18862b11fcef3e271611723c1e965ef59f3248">e0b8...</span></td>
+                            <td>$91.70</td>
+                        </tr>
+                        <tr>
+                            <td title="d6f436461b29f2d886555f8ae8e58156252ea41e0982f6ab1410626a26f019ff">d6f4...</td>
+                            <td>14:48 20-03-2017</td>
+                            <td>add $20.00 to your wallet</td>
+                            <td>$80.55</td>
+                        </tr>
+                        </tbody>
+                    </table>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="../bower_components/jquery/dist/jquery.min.js"></script>
+<script src="../bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
+
+</body>
+</html>
