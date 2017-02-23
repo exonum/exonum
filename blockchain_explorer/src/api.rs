@@ -202,7 +202,7 @@ pub trait Api {
                                 json: &serde_json::Value,
                                 cookies: Option<Vec<String>>)
                                 -> IronResult<Response> {
-        let mut resp = Response::with((status::Ok, serde_json::to_string(json).unwrap()));
+        let mut resp = Response::with((status::Ok, serde_json::to_string_pretty(json).unwrap()));
         resp.headers.set(ContentType::json());
         if let Some(cookies) = cookies {
             resp.headers.set(SetCookie(cookies));
