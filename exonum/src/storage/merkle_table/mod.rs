@@ -325,7 +325,6 @@ mod tests {
 
     use ::crypto::{Hash, hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
-    use ::storage::fields::DeserializeFromJson;
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
@@ -414,24 +413,24 @@ mod tests {
     #[test]
     fn generate_proof_in_table_containing_hashes() {
         let storage = MemoryDB::new();
-        let table: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Hash>= MerkleTable::new(MapTable::new(vec![255], &storage));
+        let table: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Hash> =
+            MerkleTable::new(MapTable::new(vec![255], &storage));
         let num_vals = 10u32;
         let values = generate_fully_random_data_keys(num_vals as usize);
-        let hash_vals: Vec<Hash> = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>(); 
+        let hash_vals: Vec<Hash> = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>();
         for value in &hash_vals {
-            table.append(*value).unwrap(); 
+            table.append(*value).unwrap();
         }
         let table_root_hash = table.root_hash().unwrap();
         let table_len = table.len().unwrap() as usize;
-        let st_r = 0; 
-        let end_r = 5; 
+        let st_r = 0;
+        let end_r = 5;
         let range_proof = table.construct_path_for_range(st_r, end_r).unwrap();
         assert_eq!(range_proof.compute_proof_root(), table_root_hash);
         {
             let (inds, actual_vals): (Vec<_>, Vec<&Hash>) =
-            proof_indices_values(&range_proof).into_iter().unzip();
-            assert_eq!(inds,
-            (st_r as usize..end_r as usize).collect::<Vec<_>>());
+                proof_indices_values(&range_proof).into_iter().unzip();
+            assert_eq!(inds, (st_r as usize..end_r as usize).collect::<Vec<_>>());
             let expect_vals = &hash_vals[st_r as usize..end_r as usize];
             let paired = expect_vals.iter().zip(actual_vals);
             for pair in paired {
@@ -491,8 +490,7 @@ mod tests {
             println!("{}", serde_json::to_string(&proof_info).unwrap());
 
             // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (end_range - start_range) as usize);
             assert_eq!(deser_proof.compute_proof_root(), table_root_hash);
@@ -558,8 +556,7 @@ mod tests {
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
             // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(), 1);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
             // println!("{:?}", deser_proof);
@@ -580,8 +577,7 @@ mod tests {
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
             // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (proof_ind + 1) as usize);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
@@ -600,8 +596,7 @@ mod tests {
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
             // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(), 1);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
             // println!("{:?}", deser_proof);
