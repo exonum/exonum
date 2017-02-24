@@ -66,7 +66,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_propose(&mut self, msg: Propose) {
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
@@ -130,7 +129,6 @@ impl<S> NodeHandler<S>
     }
 
     // TODO write helper function which returns Result
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_block(&mut self, msg: Block) {
         // Request are sended to us
         if msg.to() != self.state.public_key() {
@@ -239,7 +237,6 @@ impl<S> NodeHandler<S>
         self.request_next_block();
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
         if self.state.locked_round() == 0 {
@@ -277,7 +274,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_prevote(&mut self, prevote: Prevote) {
         trace!("Handle prevote");
         // Add prevote
@@ -300,7 +296,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn has_majority_prevotes(&mut self, prevote_round: Round, propose_hash: &Hash) {
         // Remove request info
         self.remove_request(RequestData::Prevotes(prevote_round, *propose_hash));
@@ -310,7 +305,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn has_majority_precommits(&mut self,
                                    round: Round,
                                    propose_hash: &Hash,
@@ -353,7 +347,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
         for round in prevote_round...self.state.round() {
@@ -381,7 +374,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_precommit(&mut self, msg: Precommit) {
         trace!("Handle precommit");
         // Add precommit
@@ -409,7 +401,6 @@ impl<S> NodeHandler<S>
     }
 
     // FIXME: push precommits into storage
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
                                                          block_hash: Hash,
                                                          precommits: I) {
@@ -498,7 +489,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
         trace!("Handle incoming transaction");
         let hash = msg.hash();
@@ -525,7 +515,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
         // TODO debug asserts?
         if height != self.state.height() {
@@ -559,7 +548,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
         // TODO debug asserts?
         if height != self.state.height() {
@@ -607,7 +595,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("!!!!!!!!!!!!!!!!!!! HANDLE REQUEST TIMEOUT");
         // FIXME: check height?
@@ -688,7 +675,6 @@ impl<S> NodeHandler<S>
         self.state.leader(self.state.round()) == self.state.id()
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn create_block(&mut self,
                         height: Height,
                         round: Round,
@@ -719,7 +705,6 @@ impl<S> NodeHandler<S>
         block_hash
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) -> bool {
         let requested_data = match self.state.propose(propose_hash) {
             Some(state) => {
@@ -745,7 +730,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn request_next_block(&mut self) {
         // TODO randomize next peer
         let heights = self.state.validator_heights();
@@ -766,7 +750,6 @@ impl<S> NodeHandler<S>
         self.state.remove_request(&data)
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(self.state.id(),
@@ -781,7 +764,6 @@ impl<S> NodeHandler<S>
         has_majority_prevotes
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
         let precommit = Precommit::new(self.state.id(),
                                        self.state.height(),
@@ -795,7 +777,6 @@ impl<S> NodeHandler<S>
     }
 
     // TODO reuse where is possible
-    #[cfg_attr(feature="flame_profile", flame)]
     pub fn verify_precommit(&self,
                             block_hash: &Hash,
                             block_height: Height,
@@ -830,7 +811,6 @@ impl<S> NodeHandler<S>
         Ok(())
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
     fn public_key_of(&self, id: ValidatorId) -> PublicKey {
         *self.state.public_key_of(id).unwrap()
     }
