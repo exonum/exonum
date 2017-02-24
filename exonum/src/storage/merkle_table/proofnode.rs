@@ -1,9 +1,9 @@
-use ::storage::{StorageValue, Error};
-use ::storage::fields::DeserializeFromJson;
+use ::storage::StorageValue;
 use ::crypto::Hash;
 use std::fmt;
-use serde::{Serialize, Serializer};
-use serde_json::Value;
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::de::Error;
+use serde_json::{Error as SerdeJsonError, Value, from_value};
 use super::hash_rules;
 const LEFT_DESC: &'static str = "left";
 const RIGHT_DESC: &'static str = "right";
@@ -57,75 +57,112 @@ impl<V: Serialize> Serialize for Proofnode<V> {
         ser.serialize_struct_end(state)
     }
 }
-impl<V: DeserializeFromJson> DeserializeFromJson for Proofnode<V> {
-    fn deserialize(json: &Value) -> Result<Self, Error> {
+impl<V: Deserialize> Deserialize for Proofnode<V> {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        fn format_err_string(type_str: &str, value: Value, err: SerdeJsonError) -> String {
+            format!("Couldn't deserialize {} from serde_json::Value: {}, error: {}",
+                    type_str,
+                    value,
+                    err)
+        }
+
+        let json: Value = <Value as Deserialize>::deserialize(deserializer)?;
         if !json.is_object() {
-            return Err(Error::new(format!("Invalid json: it is expected to be json Object. \
-                                           json: {:?}",
-                                          json)));
+            return Err(D::Error::custom(format!("Invalid json: it is expected to be json \
+                                                 Object. json: {:?}",
+                                                json)));
         }
         let map_key_value = json.as_object().unwrap();
         let res: Self = match map_key_value.len() {
             2 => {
                 let left_value: &Value = match map_key_value.get(LEFT_DESC) {
                     None => {
-                        return Err(Error::new(format!("Invalid json: Key {} not found. Value: \
-                                                       {:?}",
-                                                      LEFT_DESC,
-                                                      json)))
+                        return Err(D::Error::custom(format!("Invalid json: Key {} not found. \
+                                                             Value: {:?}",
+                                                            LEFT_DESC,
+                                                            json)))
                     } 
                     Some(left) => left, 
                 };
                 let right_value: &Value = match map_key_value.get(RIGHT_DESC) {
                     None => {
-                        return Err(Error::new(format!("Invalid json: Key {} not found. Value: \
-                                                       {:?}",
-                                                      RIGHT_DESC,
-                                                      json)))
+                        return Err(D::Error::custom(format!("Invalid json: Key {} not found. \
+                                                          Value: {:?}",
+                                                            RIGHT_DESC,
+                                                            json)))
                     } 
                     Some(right) => right, 
                 };
                 if right_value.is_string() {
-                    let left_proof = Self::deserialize(left_value)?;
-                    let right_hash: Hash = DeserializeFromJson::deserialize(right_value)?;
+                    let left_proof: Proofnode<V> = from_value(left_value.clone()).map_err(|err| {
+                            D::Error::custom(format_err_string("Proofnode",
+                                                               left_value.clone(),
+                                                               err))
+                        })?;
+                    let right_hash: Hash = from_value(right_value.clone()).map_err(|err| {
+                            D::Error::custom(format_err_string("Hash", right_value.clone(), err))
+                        })?;
                     Proofnode::Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
-                    let right_proof = Self::deserialize(right_value)?;
-                    let left_hash: Hash = DeserializeFromJson::deserialize(left_value)?;
+                    let right_proof: Proofnode<V> = from_value(right_value.clone()).map_err(|err| {
+                            D::Error::custom(format_err_string("Proofnode",
+                                                               right_value.clone(),
+                                                               err))
+                        })?;
+                    let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
+                            D::Error::custom(format_err_string("Hash", left_value.clone(), err))
+                        })?;
                     Proofnode::Right(left_hash, Box::new(right_proof))
                 } else {
-                    let left_proof = Self::deserialize(left_value)?;
-                    let right_proof = Self::deserialize(right_value)?;
+                    let left_proof = from_value(left_value.clone()).map_err(|err| {
+                            D::Error::custom(format_err_string("Proofnode",
+                                                               left_value.clone(),
+                                                               err))
+                        })?;
+                    let right_proof = from_value(right_value.clone()).map_err(|err| {
+                            D::Error::custom(format_err_string("Proofnode",
+                                                               right_value.clone(),
+                                                               err))
+                        })?;
                     Proofnode::Full(Box::new(left_proof), Box::new(right_proof))
                 }
             } 
             1 => {
                 if map_key_value.get(VAL_DESC).is_none() && map_key_value.get(LEFT_DESC).is_none() {
-                    return Err(Error::new(format!("Invalid json: unknown key met. Expected: {} \
-                                                   or {}. json: {:?}",
-                                                  VAL_DESC,
-                                                  LEFT_DESC,
-                                                  json)));
+                    return Err(D::Error::custom(format!("Invalid json: unknown key met. \
+                                                         Expected: {} or {}. json: {:?}",
+                                                        VAL_DESC,
+                                                        LEFT_DESC,
+                                                        json)));
                 }
                 if let Some(leaf_value) = map_key_value.get(VAL_DESC) {
-                    let val: V = V::deserialize(leaf_value)?;
+                    let val: V = from_value(leaf_value.clone()).map_err(|err| {
+                            D::Error::custom(format_err_string("V", leaf_value.clone(), err))
+                        })?;
                     Proofnode::Leaf(val)
                 } else {
                     // LEFT_DESC is present
-                    let left_proof_value = map_key_value.get(LEFT_DESC).unwrap();
-                    let left_proof = Self::deserialize(left_proof_value)?;
+                    let left_value = map_key_value.get(LEFT_DESC).unwrap();
+                    let left_proof: Proofnode<V> = from_value(left_value.clone()).map_err(|err| {
+                            D::Error::custom(format_err_string("Proofnode",
+                                                               left_value.clone(),
+                                                               err))
+                        })?;
                     Proofnode::Left(Box::new(left_proof), None)
                 }
             } 
             _ => {
-                return Err(Error::new(format!("Invalid json: Number of keys should be either 1 \
-                                               or 2. json: {:?}",
-                                              json)))
+                return Err(D::Error::custom(format!("Invalid json: Number of keys should be \
+                                                     either 1 or 2. json: {:?}",
+                                                    json)))
             } 
         };
         Ok(res)
     }
 }
+
 impl<V: StorageValue> Proofnode<V> {
     pub fn compute_proof_root(&self) -> Hash {
         match *self {
