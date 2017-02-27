@@ -4,63 +4,30 @@
     <meta charset="UTF-8">
     <title>Cryptocurrency on Exonum blockchain</title>
 
-    <link rel="stylesheet" href="./bower_components/bootstrap/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="./bower_components/bootstrap/dist/css/bootstrap-theme.css.map">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/bower_components/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/bower_components/bootstrap/dist/css/bootstrap-theme.css.map">
 </head>
 <body>
 
 <app></app>
 
-<script src="./tags/app.tag" type="riot/tag"></script>
-<script src="./tags/welcome.tag" type="riot/tag"></script>
-<script src="./tags/register.tag" type="riot/tag"></script>
-<script src="./tags/wallet.tag" type="riot/tag"></script>
-<script src="./tags/transfer.tag" type="riot/tag"></script>
-<script src="./tags/add-funds.tag" type="riot/tag"></script>
-<script src="./tags/blockchain.tag" type="riot/tag"></script>
-<script src="./tags/block.tag" type="riot/tag"></script>
-<script src="./tags/transaction.tag" type="riot/tag"></script>
+<script src="/tags/app.tag" type="riot/tag"></script>
+<script src="/tags/welcome.tag" type="riot/tag"></script>
+<script src="/tags/register.tag" type="riot/tag"></script>
+<script src="/tags/wallet.tag" type="riot/tag"></script>
+<script src="/tags/transfer.tag" type="riot/tag"></script>
+<script src="/tags/add-funds.tag" type="riot/tag"></script>
+<script src="/tags/blockchain.tag" type="riot/tag"></script>
+<script src="/tags/block.tag" type="riot/tag"></script>
+<script src="/tags/transaction.tag" type="riot/tag"></script>
 
-<script src="./bower_components/riot/riot+compiler.min.js"></script>
-<script src="./bower_components/riot-route/dist/route.min.js"></script>
+<script src="/bower_components/riot/riot+compiler.min.js"></script>
+<script src="/bower_components/riot-route/dist/route.min.js"></script>
 
 <script type="text/javascript">
 
     riot.mount('app');
-
-    route('/', function() {
-        var welcome = riot.mount('#content', 'welcome');
-    });
-
-    route('/register', function() {
-        var register = riot.mount('#content', 'register');
-    });
-
-    route('/user/*', function(publicKey) {
-        var wallet = riot.mount('#content', 'wallet');
-    });
-
-    route('/user/*/transfer', function(publicKey) {
-        var blockchain = riot.mount('#content', 'transfer');
-    });
-
-    route('/user/*/add-funds', function(publicKey) {
-        var blockchain = riot.mount('#content', 'add-funds');
-    });
-
-    route('/blockchain', function() {
-        var blockchain = riot.mount('#content', 'blockchain');
-    });
-
-    route('/blockchain/*', function(hash) {
-        var block = riot.mount('#content', 'block');
-    });
-
-    route('/blockchain/transaction/*', function(hash) {
-        var block = riot.mount('#content', 'transaction');
-    });
-
-    route.start(true);
 
 </script>
 

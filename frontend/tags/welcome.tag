@@ -10,5 +10,9 @@
         <a href="/#/blockchain" class="btn btn-lg btn-link">View blockchain</a>
     </div>
 
-    <script></script>
+    <script>
+        this.on('mount', function() {
+            this.opts.title.trigger('change', 'Login');
+        });
+    </script>
 </welcome>

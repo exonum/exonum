@@ -1,5 +1,4 @@
 <transaction>
-
     <!-- Add funds -->
     <table class="table text-center">
         <thead>
@@ -119,4 +118,9 @@
     <button class="btn btn-lg btn-block btn-primary">Reload page</button>
     <a class="btn btn-lg btn-block btn-default" href="wallet.html">Back</a>
 
+    <script>
+        this.on('mount', function() {
+            this.opts.title.trigger('change', 'Transaction');
+        });
+    </script>
 </transaction>
