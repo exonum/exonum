@@ -20,4 +20,10 @@
             <a href="wallet.html" class="btn btn-lg btn-default">Back</a>
         </div>
     </div>
+
+    <script>
+        this.on('mount', function() {
+            this.opts.title.trigger('change', 'Add Funds');
+        });
+    </script>
 </add-funds>

@@ -14,4 +14,10 @@
             </div>
         </div>
     </form>
+
+    <script>
+        this.on('mount', function() {
+            this.opts.title.trigger('change', 'Register');
+        });
+    </script>
 </register>
