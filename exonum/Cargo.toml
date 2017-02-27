@@ -4,27 +4,26 @@ version = "0.1.0"
 authors = ["Bitfury Inc. <ivan.ivashchenko@xdev.re>"]
 
 [dependencies]
-log = "0.3"
-mio = "0.5"
-time = "0.1"
-byteorder = "0.5"
-hex = "0.2"
-num = "0.1"
-bit-vec = "0.4"
+log = "0.3.0"
+mio = "0.5.0"
+time = "0.1.0"
+byteorder = "0.5.0"
+hex = "0.2.0"
+num = "0.1.37"
+bit-vec = "0.4.0"
 vec_map = "0.6.0"
 sodiumoxide = "0.0.13"
-rand = "0.3"
+rand = "0.3.0"
 leveldb = {version="0.9", path="../3rdparty/leveldb"}
-serde = "0.8"
-serde_derive = "0.8"
-valico = "1"
-serde_json = "0.8"
-toml = {version="0.2", default-features=false, features=["serde"]}
+serde = "0.8.0"
+serde_derive = "0.8.0"
+serde_json = "0.8.0"
+toml = {version="0.2.0", default-features=false, features=["serde"]}
 clippy = {version = "0.0.107", optional = true}
 
 [dev-dependencies]
-tempdir = "0.3"
-env_logger = "0.3"
+tempdir = "0.3.0"
+env_logger = "0.3.0"
 
 [features]
 default = []
