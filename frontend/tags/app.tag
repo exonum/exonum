@@ -20,6 +20,15 @@
 
         this.on('mount', function() {
 
+            // shared observable to manage app title
+            var titleObservable = riot.observable();
+
+            titleObservable.on('change', function(value) {
+                self.title = value;
+                self.update();
+            });
+
+            // global mixin with common functions and constants
             var Common = {
                 api: {
                     baseUrl: 'http://exonum.com/backends/currency/api/v1'
@@ -27,8 +36,11 @@
 
                 init: function() {
                     this.on('mount', function() {
-                        self.title = this.title;
-                        self.update();
+                        // add title if it is predefined in component
+                        if (this.title) {
+                            self.title = this.title;
+                            self.update();
+                        }
                     });
                 }
             };
@@ -36,35 +48,35 @@
             riot.mixin(Common);
 
             route('/', function() {
-                var register = riot.mount('#content', 'welcome');
+                riot.mount('#content', 'welcome');
             });
 
             route('/register', function() {
-                var register = riot.mount('#content', 'register');
+                riot.mount('#content', 'register');
             });
 
             route('/user/*', function(publicKey) {
-                var wallet = riot.mount('#content', 'wallet');
+                riot.mount('#content', 'wallet', {publicKey: publicKey, titleObservable: titleObservable});
             });
 
             route('/user/*/transfer', function(publicKey) {
-                var blockchain = riot.mount('#content', 'transfer');
+                riot.mount('#content', 'transfer');
             });
 
             route('/user/*/add-funds', function(publicKey) {
-                var blockchain = riot.mount('#content', 'add-funds');
+                riot.mount('#content', 'add-funds');
             });
 
             route('/blockchain', function() {
-                var blockchain = riot.mount('#content', 'blockchain');
+                riot.mount('#content', 'blockchain');
             });
 
             route('/blockchain/*', function(hash) {
-                var block = riot.mount('#content', 'block');
+                riot.mount('#content', 'block');
             });
 
             route('/blockchain/transaction/*', function(hash) {
-                var block = riot.mount('#content', 'transaction');
+                riot.mount('#content', 'transaction');
             });
 
             route.start(true);

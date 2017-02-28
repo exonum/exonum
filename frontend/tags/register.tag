@@ -10,7 +10,7 @@
         <div class="form-group">
             <div class="col-sm-offset-4 col-sm-8">
                 <button type="submit" class="btn btn-lg btn-primary" disabled={ !text }>Create wallet</button>
-                <a href="/#/" class="btn btn-lg btn-default">Back</a>
+                <a href="/#" class="btn btn-lg btn-default">Back</a>
             </div>
         </div>
     </form>
@@ -24,11 +24,13 @@
 
         register(e) {
             e.preventDefault();
+
             if (this.text) {
+                // TODO move outside
                 var TxCreateWallet = Exonum.newMessage({
                     size: 40,
                     service_id: 128,
-                    message_type: 130,
+                    message_id: 130,
                     fields: {
                         pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
                         name: {type: Exonum.String, size: 8, from: 32, to: 40}
@@ -44,14 +46,16 @@
                 $.ajax({
                     method: 'POST',
                     url: this.api.baseUrl + '/wallets/transaction',
-                    data: {
+                    contentType: 'application/json',
+                    data: JSON.stringify({
                         service_id: 128,
                         message_id: 130,
                         body: data,
                         signature: signature
-                    },
+                    }),
                     success: function(data, textStatus, jqXHR) {
-                        // TODO redirect
+                        route('/user/' + pair.publicKey);
+                        // TODO pair to localStorage
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
                         console.error(textStatus);
