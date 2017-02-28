@@ -58,21 +58,21 @@
         </thead>
         <tbody>
         <tr>
-            <td><a href="/#/blockchain/transaction/1389145fbba35e5c7eea4ae4f72dadcb1f8539e6ec1a5175fc0cee7b813de208">14:55 20-03-2017</a></td>
+            <td><a href="/#blockchain/transaction/1389145fbba35e5c7eea4ae4f72dadcb1f8539e6ec1a5175fc0cee7b813de208">14:55 20-03-2017</a></td>
             <td>transfer <strong>$24.07</strong> from <a href="wallet.html">Tomas</a> to <a href="wallet.html">Jakob</a></td>
         </tr>
         <tr>
-            <td><a href="/#/blockchain/transaction/0c6e7b813de2081d89145fbbc35e5c7eea4ae4f72dadcb1f8539e6ec1a5175fc">14:53 20-03-2017</a></td>
+            <td><a href="/#blockchain/transaction/0c6e7b813de2081d89145fbbc35e5c7eea4ae4f72dadcb1f8539e6ec1a5175fc">14:53 20-03-2017</a></td>
             <td>receive <strong>$16.83</strong> from <a href="wallet.html">Alex</a> from <a href="wallet.html">Bob</a></td>
         </tr>
         <tr>
-            <td><a href="/#/blockchain/transaction/7eea4fe4f72dadcb1f8539e6ec1f5175fc0c6e7b813de2081389145fbbc35e5c">14:48 20-03-2017</a></td>
+            <td><a href="/#blockchain/transaction/7eea4fe4f72dadcb1f8539e6ec1f5175fc0c6e7b813de2081389145fbbc35e5c">14:48 20-03-2017</a></td>
             <td>add <strong>$20.00</strong> to <a href="wallet.html">Alex</a>'s wallet</td>
         </tr>
         </tbody>
     </table>
 
-    <a class="btn btn-lg btn-block btn-default" href="/#/blockchain">Back</a>
+    <a class="btn btn-lg btn-block btn-default" href="/#blockchain">Back</a>
 
     <!-- Not found state -->
     <ul class="list-group">
