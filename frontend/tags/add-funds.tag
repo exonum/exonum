@@ -22,8 +22,6 @@
     </div>
 
     <script>
-        this.on('mount', function() {
-            this.opts.title.trigger('change', 'Add Funds');
-        });
+        this.title = 'Add Funds';
     </script>
 </add-funds>

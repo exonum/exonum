@@ -119,8 +119,6 @@
     <a class="btn btn-lg btn-block btn-default" href="wallet.html">Back</a>
 
     <script>
-        this.on('mount', function() {
-            this.opts.title.trigger('change', 'Transaction');
-        });
+        this.title = 'Transaction';
     </script>
 </transaction>

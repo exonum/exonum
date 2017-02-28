@@ -83,8 +83,6 @@
     <a class="btn btn-lg btn-block btn-default" href="blockchain.html">Back</a>
 
     <script>
-        this.on('mount', function() {
-            this.opts.title.trigger('change', 'Block');
-        });
+        this.title = 'Block';
     </script>
 </block>

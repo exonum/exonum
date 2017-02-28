@@ -20,43 +20,51 @@
 
         this.on('mount', function() {
 
-            var title = riot.observable();
+            var Common = {
+                api: {
+                    baseUrl: 'http://exonum.com/backends/currency/api/v1'
+                },
 
-            title.on('change', function(value) {
-                self.title = value;
-                self.update();
-            });
+                init: function() {
+                    this.on('mount', function() {
+                        self.title = this.title;
+                        self.update();
+                    });
+                }
+            };
+
+            riot.mixin(Common);
 
             route('/', function() {
-                var register = riot.mount('#content', 'welcome', {title: title});
+                var register = riot.mount('#content', 'welcome');
             });
 
             route('/register', function() {
-                var register = riot.mount('#content', 'register', {title: title});
+                var register = riot.mount('#content', 'register');
             });
 
             route('/user/*', function(publicKey) {
-                var wallet = riot.mount('#content', 'wallet', {title: title});
+                var wallet = riot.mount('#content', 'wallet');
             });
 
             route('/user/*/transfer', function(publicKey) {
-                var blockchain = riot.mount('#content', 'transfer', {title: title});
+                var blockchain = riot.mount('#content', 'transfer');
             });
 
             route('/user/*/add-funds', function(publicKey) {
-                var blockchain = riot.mount('#content', 'add-funds', {title: title});
+                var blockchain = riot.mount('#content', 'add-funds');
             });
 
             route('/blockchain', function() {
-                var blockchain = riot.mount('#content', 'blockchain', {title: title});
+                var blockchain = riot.mount('#content', 'blockchain');
             });
 
             route('/blockchain/*', function(hash) {
-                var block = riot.mount('#content', 'block', {title: title});
+                var block = riot.mount('#content', 'block');
             });
 
             route('/blockchain/transaction/*', function(hash) {
-                var block = riot.mount('#content', 'transaction', {title: title});
+                var block = riot.mount('#content', 'transaction');
             });
 
             route.start(true);

@@ -46,8 +46,6 @@
     <a class="btn btn-lg btn-block btn-default" href="/#/">Log out</a>
 
     <script>
-        this.on('mount', function() {
-            this.opts.title.trigger('change', 'User');
-        });
+        this.title = 'User';
     </script>
 </wallet>

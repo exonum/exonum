@@ -16,19 +16,48 @@
     </form>
 
     <script>
-        this.on('mount', function() {
-            this.opts.title.trigger('change', 'Register');
-        });
+        this.title = 'Register';
 
         edit(e) {
             this.text = e.target.value;
         }
 
         register(e) {
+            e.preventDefault();
             if (this.text) {
-                // TODO do ajax request, redirect or show error
+                var TxCreateWallet = Exonum.newMessage({
+                    size: 40,
+                    service_id: 128,
+                    message_type: 130,
+                    fields: {
+                        pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                        name: {type: Exonum.String, size: 8, from: 32, to: 40}
+                    }
+                });
+                var pair = Exonum.keyPair();
+                var data = {
+                    pub_key: pair.publicKey,
+                    name: this.text
+                };
+                var signature = Exonum.sign(data, TxCreateWallet, pair.secretKey);
+
+                $.ajax({
+                    method: 'POST',
+                    url: this.api.baseUrl + '/wallets/transaction',
+                    data: {
+                        service_id: 128,
+                        message_id: 130,
+                        body: data,
+                        signature: signature
+                    },
+                    success: function(data, textStatus, jqXHR) {
+                        // TODO redirect
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        console.error(textStatus);
+                    }
+                });
             }
-            e.preventDefault()
         }
     </script>
 </register>
