@@ -71,8 +71,8 @@
                 riot.mount('#content', 'blockchain');
             });
 
-            route('/blockchain/*', function(hash) {
-                riot.mount('#content', 'block');
+            route('/blockchain/*', function(height) {
+                riot.mount('#content', 'block', {height: height});
             });
 
             route('/blockchain/transaction/*', function(hash) {
