@@ -32,6 +32,7 @@
     <script>
         var self = this;
 
+        // TODO refactor
         var validators = [
             '7e2b6889b2e8b60e0e8d71be55b9cbf6aaa9bf397ef7b1d6b8564d862b120bea',
             '2f1e58c0752503e3b66a5f68d97ab44cac196c75608b53682c3da1f824f9391f',
@@ -184,18 +185,6 @@
                 transactions: transactions
             };
         }
-
-        var Block = Exonum.newType({
-            size: 116,
-            fields: {
-                height: {type: Exonum.Uint64, size: 8, from: 0, to: 8},
-                propose_round: {type: Exonum.Uint32, size: 4, from: 8, to: 12},
-                time: {type: Exonum.Timespec, size: 8, from: 12, to: 20},
-                prev_hash: {type: Exonum.Hash, size: 32, from: 20, to: 52},
-                tx_hash: {type: Exonum.Hash, size: 32, from: 52, to: 84},
-                state_hash: {type: Exonum.Hash, size: 32, from: 84, to: 116}
-            }
-        });
 
         $.ajax({
             method: 'GET',
