@@ -10,16 +10,16 @@ use time::{Timespec, Duration};
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
-use exonum::storage::{MemoryDB, Error as StorageError, RootProofNode};
+use exonum::storage::{MemoryDB, Error as StorageError, RootProofNode, Fork};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::node::state::{Round, Height};
+use exonum::node::state::{Round, Height, TxPool};
 
-use ::timestamping::{TimestampingService, TimestampTx, TimestampingTxGenerator};
+use timestamping::TimestampingService;
 
 type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
 
@@ -329,15 +329,53 @@ impl Sandbox {
         *reactor.last_block().unwrap().state_hash()
     }
 
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> Result<RootProofNode<Hash>, StorageError>
+    /// Extract state_hash from fake block
+    pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
+        where I: IntoIterator<Item = &'a RawTransaction>
     {
-        let view = self.reactor.borrow().handler.blockchain.view(); 
+        let ref blockchain = self.reactor.borrow().handler.blockchain;
+        let (hashes, tx_pool) = {
+            let mut pool = TxPool::new();
+            let mut hashes = Vec::new();
+            for raw in txs {
+                let tx = blockchain.tx_from_raw(raw.clone()).unwrap();
+                let hash = tx.hash();
+                hashes.push(hash);
+                pool.insert(hash, tx);
+            }
+            (hashes, pool)
+        };
+
+        let view = {
+            let db = blockchain.view();
+            let (_, patch) = blockchain.create_patch(self.current_height(),
+                              self.current_round(),
+                              self.time(),
+                              &hashes,
+                              &tx_pool)
+                .unwrap();
+            db.merge(&patch);
+            db
+        };
+        Schema::new(&view)
+            .last_block()
+            .unwrap()
+            .unwrap()
+            .state_hash()
+            .clone()
+    }
+
+    pub fn get_proof_to_service_table(&self,
+                                      service_id: u16,
+                                      table_idx: usize)
+                                      -> Result<RootProofNode<Hash>, StorageError> {
+        let view = self.reactor.borrow().handler.blockchain.view();
         let schema = Schema::new(&view);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
     pub fn get_configs_root_hash(&self) -> Result<Hash, StorageError> {
-        let view = self.reactor.borrow().handler.blockchain.view(); 
+        let view = self.reactor.borrow().handler.blockchain.view();
         let schema = Schema::new(&view);
         schema.configs().root_hash()
     }
@@ -364,9 +402,9 @@ impl Sandbox {
     }
 
     pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, StorageError> {
-        let view = self.reactor.borrow().handler.blockchain.view(); 
-        let schema = Schema::new(&view); 
-        schema.block_and_precommits(height) 
+        let view = self.reactor.borrow().handler.blockchain.view();
+        let schema = Schema::new(&view);
+        schema.block_and_precommits(height)
     }
 
     pub fn current_height(&self) -> Height {
