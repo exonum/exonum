@@ -2,4 +2,5 @@
 
 members = [
     "backend",
+    "backend/cryptocurrency_api_tests"
 ]

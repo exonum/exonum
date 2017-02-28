@@ -1,0 +1,30 @@
+[package]
+name = "cryptocurrency_api_tests"
+version = "0.1.0"
+authors = ["Oleg Kuzmin <oleg.kuzmin@bitfury.com>"]
+
+[dependencies]
+iron = "0.5.1"
+serde = "0.8.23"
+serde_derive = "0.8"
+rand = "0.3"
+serde_json = "0.8"
+router = "0.5.1"
+log = "0.3"
+iron-test = { git = "https://github.com/reem/iron-test" }
+cryptocurrency = {version="0.1.0", path="../"}
+
+[dependencies.exonum]
+git = "ssh://git@github.com/exonum/exonum-core.git"
+version = "0.1.0"
+rev = "5c7c349c829a254e176be9409620b95f55140643"
+
+[dependencies.blockchain_explorer]
+git = "ssh://git@github.com/exonum/exonum-core.git"
+version = "0.1.0"
+rev = "5c7c349c829a254e176be9409620b95f55140643"
+
+[dependencies.sandbox]
+git = "ssh://git@github.com/exonum/exonum-core.git"
+version = "0.1.0"
+rev = "5c7c349c829a254e176be9409620b95f55140643"
