@@ -60,11 +60,11 @@
             });
 
             route('/user/*/transfer', function(publicKey) {
-                riot.mount('#content', 'transfer');
+                riot.mount('#content', 'transfer', {publicKey: publicKey});
             });
 
             route('/user/*/add-funds', function(publicKey) {
-                riot.mount('#content', 'add-funds');
+                riot.mount('#content', 'add-funds', {publicKey: publicKey});
             });
 
             route('/blockchain', function() {
