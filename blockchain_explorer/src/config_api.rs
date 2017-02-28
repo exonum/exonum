@@ -9,7 +9,7 @@ use exonum::blockchain::{Blockchain, ConsensusConfig, StoredConfiguration, Schem
 use configuration_service::{TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use exonum::storage::{StorageValue, Error as StorageError};
 
-use exonum::node::{TxSender, NodeChannel, NodeConfig};
+use exonum::node::{TxSender, NodeChannel, NodeConfig, TransactionSend};
 pub type ConfigTxSender = TxSender<NodeChannel>;
 
 #[derive(Serialize)]
@@ -59,7 +59,7 @@ impl ConfigApi {
                            -> Result<Option<ConfigProposeInfo>, ApiError> {
         let hash = Hash::from_hex(hash_str)?;
         if let Some(propose) =
-            ConfigurationSchema::new(&self.blockchain.view()).get_config_propose(&hash)? {
+               ConfigurationSchema::new(&self.blockchain.view()).get_config_propose(&hash)? {
             match StoredConfiguration::deserialize(propose.config()) {
                 Ok(config) => {
                     return Ok(Some(ConfigProposeInfo {

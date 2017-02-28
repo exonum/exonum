@@ -60,7 +60,7 @@ pub trait EventHandler {
     fn handle_application_event(&mut self, event: Self::ApplicationEvent);
 }
 
-pub trait Channel: Send + Clone {
+pub trait Channel: Sync + Send + Clone {
     type ApplicationEvent: Send;
     type Timeout: Send;
 
