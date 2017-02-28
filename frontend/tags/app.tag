@@ -71,12 +71,12 @@
                 riot.mount('#content', 'blockchain');
             });
 
-            route('/blockchain/*', function(height) {
+            route('/blockchain/block/*', function(height) {
                 riot.mount('#content', 'block', {height: height});
             });
 
             route('/blockchain/transaction/*', function(hash) {
-                riot.mount('#content', 'transaction');
+                riot.mount('#content', 'transaction', {hash: hash, titleObservable: titleObservable});
             });
 
             route.start(true);

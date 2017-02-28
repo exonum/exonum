@@ -1,12 +1,12 @@
 <wallet>
     <div class="text-center">
-        <h2>${ balance }</h2>
-        <h6>Block #<a href="/#blockchain/{ blockHeight }">{ blockHeight }</a></h6>
-        <h6>{ blockTime }</h6>
+        <h2 if={ balance }>${ balance }</h2>
+        <h6 if={ blockHeight }>Block #<a href="/#blockchain/block/{ blockHeight }">{ blockHeight }</a></h6>
+        <h6 if={ blockTime }>{ blockTime }</h6>
     </div>
 
     <div class="text-center">
-        <div class="alert alert-warning { hidden: balance === 0 }">
+        <div  if={ balance === 0 } class="alert alert-warning">
             <i class="glyphicon glyphicon-alert"></i> You haven't any money yet. Add some funds.
         </div>
         <div class="form-group">

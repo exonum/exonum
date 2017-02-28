@@ -31,17 +31,10 @@
                 </div>
             </li>
             <li class="list-group-item">
-
                 <div class="checkbox">
                     <label>
                         <input type="checkbox" value="" disabled checked>
                         Approved by <strong>{ block.precommits_count }</strong> validators
-                    </label>
-                </div>
-                <div class="checkbox">
-                    <label>
-                        <input type="checkbox" value="" disabled>
-                        Anchored on Bitcoin blockchain
                     </label>
                 </div>
             </li>
@@ -77,8 +70,6 @@
         <i class="glyphicon glyphicon-ban-circle"></i> The server is not know the requested block. <br>Wait a few seconds and reload the page.
     </p>
 
-    <button if={ notFound } class="btn btn-lg btn-block btn-primary" onclick={ reload }>Reload page</button>
-
     <a class="btn btn-lg btn-block btn-default" href="#" onclick={ back }>Back</a>
 
     <script>
@@ -88,27 +79,6 @@
 
         back(e) {
             history.back();
-        }
-
-        // TODO optimize ajax
-        reload(e) {
-            $.ajax({
-                method: 'GET',
-                url: this.api.baseUrl + '/blockchain/blocks/' + this.opts.height,
-                success: function(data, textStatus, jqXHR) {
-                    if (data == null) {
-                        self.notFound = true;
-                        self.update();
-                        return;
-                    }
-                    self.notFound = false;
-                    self.block = data;
-                    self.update();
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error(textStatus);
-                }
-            });
         }
 
         $.ajax({
