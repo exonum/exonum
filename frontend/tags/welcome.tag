@@ -11,8 +11,6 @@
     </div>
 
     <script>
-        this.on('mount', function() {
-            this.opts.title.trigger('change', 'Login');
-        });
+        this.title = 'Login';
     </script>
 </welcome>

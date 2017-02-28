@@ -51,8 +51,6 @@
     </div>
 
     <script>
-        this.on('mount', function() {
-            this.opts.title.trigger('change', 'Transfer');
-        });
+        this.title = 'Transfer';
     </script>
 </transfer>
