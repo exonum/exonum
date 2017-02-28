@@ -1,7 +1,7 @@
 <wallet>
     <div class="text-center">
         <h2>${ balance }</h2>
-        <h6>Block <a href="/#blockchain/{ blockHash }">{ blockHash }</a></h6>
+        <h6>Block #<a href="/#blockchain/{ blockHeight }">{ blockHeight }</a></h6>
         <h6>{ blockTime }</h6>
     </div>
 
@@ -206,7 +206,7 @@
                 self.opts.titleObservable.trigger('change', walletData.wallet.name);
 
                 self.balance = walletData.wallet.balance;
-                self.blockHash = Exonum.hash(data.block_info.block, Block);
+                self.blockHeight = data.block_info.block.height;
                 self.blockTime = data.block_info.block.time;
                 self.update();
 
