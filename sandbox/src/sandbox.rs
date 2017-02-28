@@ -222,6 +222,10 @@ impl Sandbox {
         self.inner.lock().unwrap().time.clone()
     }
 
+    pub fn blockchain_copy(&self) -> Blockchain {
+        self.reactor.borrow().handler.blockchain.clone()
+    }
+
     pub fn recv<T: Message>(&self, msg: T) {
         self.check_unexpected_message();
         let mut reactor = self.reactor.borrow_mut();
