@@ -9,7 +9,7 @@
         <tbody>
         <tr each={ blocks }>
             <td>{ propose_time }</td>
-            <td><a href="/#blockchain/{ height }">{ height }</a></td>
+            <td><a href="/#blockchain/block/{ height }">{ height }</a></td>
         </tr>
         </tbody>
     </table>
