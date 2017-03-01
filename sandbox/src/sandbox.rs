@@ -1,6 +1,6 @@
 use std::collections::{VecDeque, BinaryHeap, HashSet};
 use std::iter::FromIterator;
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref};
 use std::sync::{Arc, Mutex};
 use std::net::SocketAddr;
 use std::ops::Drop;
@@ -222,8 +222,8 @@ impl Sandbox {
         self.inner.lock().unwrap().time.clone()
     }
 
-    pub fn blockchain_copy(&self) -> Blockchain {
-        self.reactor.borrow().handler.blockchain.clone()
+    pub fn blockchain_copy(&self) -> Ref<Blockchain> {
+        Ref::map(self.reactor.borrow(), |reactor| &reactor.handler.blockchain)
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
