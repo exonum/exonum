@@ -24,7 +24,27 @@
             <th>Description</th>
         </tr>
         </thead>
-        <tbody id="wallet-transactions"></tbody>
+        <tbody each={ transactions }>
+
+        <tr>
+            <td>
+                <a href="/#blockchain/transaction/{ hash }">{ hash }</a>
+            </td>
+            <td if={message_id === 130}>
+                wallet has been created
+            </td>
+            <td if={message_id === 129}>
+                add <strong>${ body.amount }</strong> to your wallet
+            </td>
+            <td if={message_id === 128 && body.from === opts.publicKey}>
+                send <strong>${ body.amount }</strong> to <a href="/#user/{ body.to }">{ body.to }</a>
+            </td>
+            <td if={message_id === 128 && body.to === opts.publicKey}>
+                receive <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }">{ body.from }</a>
+            </td>
+        </tr>
+
+        </tbody>
     </table>
 
     <a class="btn btn-lg btn-block btn-default" href="/#">Log out</a>
@@ -175,9 +195,13 @@
             for (var i in HashesOftransactions) {
                 if (!HashesOftransactions.hasOwnProperty(i)) {
                     continue;
-                } if (!verifyTransaction(transactions[i], HashesOftransactions[i])) {
+                }
+
+                if (!verifyTransaction(transactions[i], HashesOftransactions[i])) {
                     return undefined;
                 }
+
+                transactions[i].hash = HashesOftransactions[i];
             }
 
             return {
@@ -197,38 +221,39 @@
                 self.balance = walletData.wallet.balance;
                 self.blockHeight = data.block_info.block.height;
                 self.blockTime = data.block_info.block.time;
+                self.transactions = walletData.transactions;
                 self.update();
 
-                for (var i = 0; i < walletData.transactions.length; i++) {
-                    switch(walletData.transactions[i].message_id) {
-                        case 128:
-                            if (walletData.transactions[i].body.from === self.opts.publicKey) {
-                                riot.mount('#wallet-transactions', 'wallet-transaction-send-transfer', {
-                                    hash: Exonum.hash(walletData.transactions[i].body, getTransactionType(walletData.transactions[i])),
-                                    amount: walletData.transactions[i].body.amount,
-                                    to: walletData.transactions[i].body.to
-                                });
-                            } else {
-                                riot.mount('#wallet-transactions', 'wallet-transaction-receive-transfer', {
-                                    hash: Exonum.hash(walletData.transactions[i].body, getTransactionType(walletData.transactions[i])),
-                                    amount: walletData.transactions[i].body.amount,
-                                    from: walletData.transactions[i].body.from
-                                });
-                            }
-                            break;
-                        case 129:
-                            riot.mount('#wallet-transactions', 'wallet-transaction-add-funds', {
-                                hash: Exonum.hash(walletData.transactions[i].body, getTransactionType(walletData.transactions[i])),
-                                amount: walletData.transactions[i].body.amount
-                            });
-                            break;
-                        case 130:riot.mount('#wallet-transactions', 'wallet-transaction-create-wallet', {
-                                hash: Exonum.hash(walletData.transactions[i].body, getTransactionType(walletData.transactions[i]))
-                            });
-                            break;
-                    }
-
-                }
+//                for (var i = 0; i < .length; i++) {
+//                    switch(walletData.transactions[i].message_id) {
+//                        case 128:
+//                            if (walletData.transactions[i].body.from === self.opts.publicKey) {
+//                                riot.mount('#wallet-transactions', 'wallet-transaction-send-transfer', {
+//                                    hash: Exonum.hash(walletData.transactions[i].body, getTransactionType(walletData.transactions[i])),
+//                                    amount: walletData.transactions[i].body.amount,
+//                                    to: walletData.transactions[i].body.to
+//                                });
+//                            } else {
+//                                riot.mount('#wallet-transactions', 'wallet-transaction-receive-transfer', {
+//                                    hash: Exonum.hash(walletData.transactions[i].body, getTransactionType(walletData.transactions[i])),
+//                                    amount: walletData.transactions[i].body.amount,
+//                                    from: walletData.transactions[i].body.from
+//                                });
+//                            }
+//                            break;
+//                        case 129:
+//                            riot.mount('#wallet-transactions', 'wallet-transaction-add-funds', {
+//                                hash: Exonum.hash(walletData.transactions[i].body, getTransactionType(walletData.transactions[i])),
+//                                amount: walletData.transactions[i].body.amount
+//                            });
+//                            break;
+//                        case 130:riot.mount('#wallet-transactions', 'wallet-transaction-create-wallet', {
+//                                hash: Exonum.hash(walletData.transactions[i].body, getTransactionType(walletData.transactions[i]))
+//                            });
+//                            break;
+//                    }
+//
+//                }
             },
             error: function(jqXHR, textStatus, errorThrown) {
                 console.error(textStatus);
