@@ -66,9 +66,11 @@
         </table>
     </virtual>
 
-    <p if={ notFound } class="text-muted text-center">
-        <i class="glyphicon glyphicon-ban-circle"></i> The server is not know the requested block. <br>Wait a few seconds and reload the page.
-    </p>
+    <virtual if={ notFound }>
+        <p class="text-muted text-center">
+            <i class="glyphicon glyphicon-ban-circle"></i> The server is not know the requested block. <br>Wait a few seconds and reload the page.
+        </p>
+    </virtual>
 
     <a class="btn btn-lg btn-block btn-default" href="/#blockchain/">Back</a>
 
