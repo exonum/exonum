@@ -90,17 +90,17 @@ impl<'a> BlockBuilder<'a> {
     }
 
     pub fn with_tx_hash(mut self, individual_transaction_hash: &'a Hash) -> Self {
-        //root of merkle table, containing this single transaction
-        //exonum::storage::merkle_table
-        //see how hash(&self) changed in exonum::storage::fields::StorageValue for Hash,
-        //it's _hash(self.as_ref())_ as of now instead of _*self_ as it used to be
+        // root of merkle table, containing this single transaction
+        // exonum::storage::merkle_table
+        // see how hash(&self) changed in exonum::storage::fields::StorageValue for Hash,
+        // it's _hash(self.as_ref())_ as of now instead of _*self_ as it used to be
         let merkle_root = hash(individual_transaction_hash.as_ref());
         self.tx_hash = Some(merkle_root);
         self
     }
 
     pub fn with_txs_hashes(mut self, tx_hashes: &[Hash]) -> Self {
-        //root of merkle table, containing this array of transactions
+        // root of merkle table, containing this array of transactions
         let merkle_root = compute_txs_root_hash(tx_hashes);
         self.tx_hash = Some(merkle_root);
         self
@@ -313,7 +313,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
         }
         hashes
     };
-
+    let hashes = &sandbox.filter_present_transactions(&hashes);
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
@@ -352,7 +352,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
             // let block = Block::new(initial_height, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
             //            let block = Block::new(initial_height, round, propose_time, &hash(&[]), &tx.hash(), &hash(&[]));
             //            let block = Block::new(initial_height, round, propose_time, &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(), &hash(&[]));
-            
+
             let state_hash = sandbox.compute_state_hash(&raw_txs);
             let block = BlockBuilder::new(sandbox)
                 .with_txs_hashes(&hashes)
