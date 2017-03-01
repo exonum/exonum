@@ -10,7 +10,7 @@
             <i class="glyphicon glyphicon-alert"></i> You haven't any money yet. Add some funds.
         </div>
         <div class="form-group">
-            <a href="/#user/{ opts.publicKey }/transfer" class="btn btn-lg btn-primary">Transfer</a>
+            <button class="btn btn-lg btn-primary" disabled={ balance == 0 } onclick={ transfer }>Transfer</button>
             <a href="/#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-success">Add Funds</a>
         </div>
     </div>
@@ -36,10 +36,10 @@
             <td if={message_id === 129}>
                 add <strong>${ body.amount }</strong> to your wallet
             </td>
-            <td if={message_id === 128 && body.from === opts.publicKey}>
+            <td if={message_id === 128 && body.from === parent.opts.publicKey}>
                 send <strong>${ body.amount }</strong> to <a href="/#user/{ body.to }">{ body.to }</a>
             </td>
-            <td if={message_id === 128 && body.to === opts.publicKey}>
+            <td if={message_id === 128 && body.to === parent.opts.publicKey}>
                 receive <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }">{ body.from }</a>
             </td>
         </tr>
@@ -59,6 +59,10 @@
             '8ce8ba0974e10d45d89b48a409015ebfe15a4aa9f9410951b266764b91c9d535',
             '11110c9c4b06d7cc0df9311aae089771b04b696a8eaa105ba39a186bcceed0c2'
         ];
+
+        transfer(e) {
+            route('/user/' + self.opts.publicKey + '/transfer');
+        }
 
         function getTransactionType(transaction) {
             switch (transaction.message_id) {
