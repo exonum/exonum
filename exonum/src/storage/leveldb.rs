@@ -6,6 +6,7 @@ use std::error;
 use std::sync::Arc;
 use std::cell::RefCell;
 use std::collections::Bound::{Included, Unbounded};
+use std::cmp::Ordering;
 // use std::iter::Iterator;
 
 use leveldb::database::Database as LevelDatabase;
@@ -129,23 +130,47 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
     }
 
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        // TODO merge with the same function in memorydb
-        let out = {
-            let map = self.changes.borrow();
-            let mut it = map.range::<[u8], [u8]>(Included(key), Unbounded);
-            it.next().map(|x| x.0.to_vec())
-        };
-        if out.is_none() {
-            let it = self.snap.keys_iter(LEVELDB_READ_OPTIONS);
-            it.seek(key.to_vec());
-            if it.valid() {
-                let key = it.key();
-                return Ok(Some(key.to_vec()));
+        let map_changes = self.changes.borrow();
+        let mut it_changes = map_changes.range::<[u8], [u8]>(Included(key), Unbounded);
+        let mut it_snapshot = self.snap.keys_iter(LEVELDB_READ_OPTIONS).from(key);
+
+        let res: Option<Vec<u8>>;
+        let least_put_key: Option<Vec<u8>> = it_changes.find(|entry| {
+                match *entry.1 {
+                    Change::Delete => false,
+                    Change::Put(_) => true, 
+                }
+            })
+            .map(|x| x.0.to_vec());
+
+        loop {
+            let first_snapshot: Option<&[u8]> = it_snapshot.next();
+            match first_snapshot {
+                Some(snap_key) => {
+                    let change_for_key: Option<&Change> = map_changes.get(snap_key);
+                    if let Some(&Change::Delete) = change_for_key {
+                        continue;
+                    } else {
+                        let snap_key_vec = snap_key.to_vec();
+
+                        if let Some(put_key) = least_put_key {
+                            let cmp = snap_key_vec.cmp(&put_key);
+                            if let Ordering::Greater = cmp {
+                                res = Some(put_key);
+                                break;
+                            }
+                        }
+                        res = Some(snap_key_vec);
+                        break;
+                    }
+                } 
+                None => {
+                    res = least_put_key;
+                    break;
+                }
             }
-            Ok(None)
-        } else {
-            Ok(out)
         }
+        Ok(res)
     }
 }
 
