@@ -10,7 +10,7 @@ use time::{Timespec, Duration};
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
-use exonum::storage::{MemoryDB, Error as StorageError, RootProofNode, Fork};
+use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult};
@@ -333,6 +333,26 @@ impl Sandbox {
         *reactor.last_block().unwrap().state_hash()
     }
 
+    pub fn filter_present_transactions(&self, txs: &[Hash]) -> Vec<Hash> {
+        let mut unique_set: HashSet<Hash> = HashSet::new();
+        let view = self.reactor.borrow().handler.blockchain.view();
+        let schema = Schema::new(&view);
+        let schema_transactions = schema.transactions();
+        let res: Vec<Hash> = txs.iter()
+            .filter(|elem| {
+                if unique_set.contains(elem) {
+                    return false;
+                }
+                unique_set.insert(**elem);
+                if schema_transactions.get(elem).unwrap().is_some() {
+                    return false;
+                }
+                true
+            })
+            .map(|elem| *elem)
+            .collect::<Vec<_>>();
+        res
+    }
     /// Extract state_hash from fake block
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
         where I: IntoIterator<Item = &'a RawTransaction>
