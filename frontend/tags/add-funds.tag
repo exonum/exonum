@@ -29,12 +29,18 @@
         addFunds(e) {
             e.preventDefault();
             var amount = $(e.target).data('amount');
+            var secretKey;
+            var users = JSON.parse(window.localStorage.getItem('users'));
+            for (var i = 0; i < users.length; i++) {
+                if (users[i].publicKey === self.opts.publicKey) {
+                    secretKey = users[i].secretKey
+                }
+            }
             // TODO move outside
             var TxAddFunds = Exonum.newMessage({
                 size: 48,
                 service_id: 128,
                 message_id: 129,
-                signature: transaction.signature,
                 fields: {
                     wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
                     amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
@@ -47,7 +53,6 @@
                 amount: amount,
                 seed: seed
             };
-            var secretKey = 'zzz'; // TODO get
             var signature = Exonum.sign(data, TxAddFunds, secretKey);
 
             $.ajax({
