@@ -6,7 +6,7 @@
     </div>
 
     <div class="text-center">
-        <div  if={ balance === 0 } class="alert alert-warning">
+        <div if={ balance === 0 } class="alert alert-warning">
             <i class="glyphicon glyphicon-alert"></i> You haven't any money yet. Add some funds.
         </div>
         <div class="form-group">
@@ -24,14 +24,14 @@
             <th>Description</th>
         </tr>
         </thead>
-        <tbody each={ transactions }>
+        <tbody>
 
-        <tr>
+        <tr each={ transactions }>
             <td>
                 <a href="/#blockchain/transaction/{ hash }">{ hash }</a>
             </td>
             <td if={message_id === 130}>
-                wallet has been created
+                create wallet
             </td>
             <td if={message_id === 129}>
                 add <strong>${ body.amount }</strong> to your wallet
