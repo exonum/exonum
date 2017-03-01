@@ -1,5 +1,5 @@
 <add-funds>
-    <div if={ !succeed }>
+    <virtual if={ !succeed }>
         <div class="text-center">
             <h2 if={ balance }>${ balance }</h2>
             <h6 if={ blockHeight }>Block #<a href="/#blockchain/block/{ blockHeight }">{ blockHeight }</a></h6>
@@ -10,7 +10,7 @@
         <button type="submit" class="btn btn-lg btn-block btn-success" onclick={ addFunds } data-amount="50">Add $50.00</button>
         <button type="submit" class="btn btn-lg btn-block btn-success" onclick={ addFunds } data-amount="100">Add $100.00</button>
         <a class="btn btn-lg btn-block btn-default" href="#" onclick={ back }>Back</a>
-    </div>
+    </virtual>
 
     <div if={ succeed } class="text-center">
         <p class="lead">Excellent! Funds will be transfered in a seconds.</p>

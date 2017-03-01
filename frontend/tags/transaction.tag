@@ -1,5 +1,5 @@
 <transaction>
-    <div if={ transaction && transaction.message_id === 128 }>
+    <virtual if={ transaction && transaction.message_id === 128 }>
         <table class="table text-center">
             <thead>
             <tr>
@@ -18,9 +18,9 @@
         <div class="text-center">
             <h2>${ transaction.body.amount }</h2>
         </div>
-    </div>
+    </virtual>
 
-    <div if={ transaction && transaction.message_id === 129 }>
+    <virtual if={ transaction && transaction.message_id === 129 }>
         <table class="table text-center">
             <thead>
             <tr>
@@ -37,9 +37,9 @@
         <div class="text-center">
             <h2>${ transaction.body.amount }</h2>
         </div>
-    </div>
+    </virtual>
 
-    <div if={ transaction && transaction.message_id === 130 }>
+    <virtual if={ transaction && transaction.message_id === 130 }>
         <table class="table text-center">
             <thead>
             <tr>
@@ -52,7 +52,7 @@
             </tr>
             </tbody>
         </table>
-    </div>
+    </virtual>
 
     <p if={ notFound } class="text-muted text-center">
         <i class="glyphicon glyphicon-ban-circle"></i> The server is not know the requested transaction. <br>Wait a few seconds and reload the page.
