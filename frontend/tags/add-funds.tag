@@ -13,7 +13,7 @@
     </div>
 
     <div if={ succeed } class="text-center">
-        <p class="lead">Excellent! Now you transfer funds to other wallets.</p>
+        <p class="lead">Excellent! Funds will be transfered in a seconds.</p>
         <a class="btn btn-lg btn-block btn-default" href="/#user/{ opts.publicKey }">Back</a>
     </div>
 
@@ -28,7 +28,7 @@
 
         addFunds(e) {
             e.preventDefault();
-            var amount = $(e.target).data('amount');
+            var amount = $(e.target).data('amount').toString();
             var secretKey;
             var users = JSON.parse(window.localStorage.getItem('users'));
             for (var i = 0; i < users.length; i++) {
@@ -43,7 +43,7 @@
                 message_id: 129,
                 fields: {
                     wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                    amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
+                    amount: {type: Exonum.Uint64, size: 8, from: 32, to: 40},
                     seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
                 }
             });
@@ -57,7 +57,7 @@
 
             $.ajax({
                 method: 'POST',
-                url: this.api.baseUrl + '/wallets/transaction',
+                url: self.api.baseUrl + '/wallets/transaction',
                 contentType: 'application/json',
                 data: JSON.stringify({
                     service_id: 128,
@@ -70,7 +70,7 @@
 
                     $.ajax({
                         method: 'GET',
-                        url: this.api.baseUrl + '/wallets/info?pubkey=' + self.opts.publicKey,
+                        url: self.api.baseUrl + '/wallets/info?pubkey=' + self.opts.publicKey,
                         success: function(data, textStatus, jqXHR) {
                             var walletData = getWallet(data, self.opts.publicKey);
 
