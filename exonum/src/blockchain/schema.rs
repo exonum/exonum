@@ -107,8 +107,7 @@ impl<'a> Schema<'a> {
         let idx = height_values.into_iter()
             .rposition(|r| u64::from(r) <= h)
             .unwrap();
-        let height = heights.get(idx as u64)?.unwrap();
-        Ok(height.into())
+        Ok(idx as u64)
     }
 
     pub fn get_actual_configuration(&self) -> Result<StoredConfiguration, Error> {
