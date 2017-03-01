@@ -8,7 +8,7 @@
         </thead>
         <tbody>
         <tr each={ blocks }>
-            <td>{ propose_time }</td>
+            <td>{ moment(propose_time * 1000).format('MMM DD YYYY, HH:mm:ss') }</td>
             <td><a href="/#blockchain/block/{ height }">{ height }</a></td>
         </tr>
         </tbody>

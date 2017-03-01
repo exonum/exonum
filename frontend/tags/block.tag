@@ -11,11 +11,11 @@
             <li class="list-group-item">
                 <div class="row">
                     <div class="col-md-3 text-muted">Hash:</div>
-                    <div class="col-md-9">{ block.hash }</div>
+                    <div class="col-md-9">{ truncate(block.hash, 24) }</div>
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">Propose time:</div>
-                    <div class="col-md-9">{ block.propose_time }</div>
+                    <div class="col-md-9">{ moment(block.propose_time * 1000).format('MMM DD YYYY, HH:mm:ss') }</div>
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">Proposer:</div>
@@ -23,11 +23,11 @@
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">Tx hash:</div>
-                    <div class="col-md-9">{ block.tx_hash }</div>
+                    <div class="col-md-9">{ truncate(block.tx_hash, 24) }</div>
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">State hash:</div>
-                    <div class="col-md-9">{ block.state_hash }</div>
+                    <div class="col-md-9">{ truncate(block.state_hash, 24) }</div>
                 </div>
             </li>
             <li class="list-group-item">
@@ -51,15 +51,15 @@
             </thead>
             <tbody>
             <tr each={ block.txs }>
-                <td><a href="/#blockchain/transaction/{ hash }">{ hash }</a></td>
+                <td><a href="/#blockchain/transaction/{ hash }">{ parent.truncate(hash, 16) }</a></td>
                 <td if={message_id === 130}>
                     create <a href="/#user/{ body.pub_key }">{ body.name }</a> wallet
                 </td>
                 <td if={message_id === 129}>
-                    add <strong>${ body.amount }</strong> to <a href="/#user/{ body.wallet }">{ body.wallet }</a> wallet
+                    add <strong>${ body.amount }</strong> to <a href="/#user/{ body.wallet }">{ parent.truncate(body.wallet, 16) }</a> wallet
                 </td>
                 <td if={message_id === 128}>
-                    send <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }">{ body.from }</a> to <a href="/#user/{ body.to }">{ body.to }</a>
+                    send <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }">{ parent.truncate(body.from, 12) }</a> to <a href="/#user/{ body.to }">{ parent.truncate(body.to, 12) }</a>
                 </td>
             </tr>
             </tbody>

@@ -9,8 +9,8 @@
             </thead>
             <tbody>
             <tr>
-                <td class="h4"><a href="/#user/{ transaction.body.from }">{ transaction.body.from }</a></td>
-                <td class="h4"><a href="/#user/{ transaction.body.to }">{ transaction.body.to }</a></td>
+                <td class="h4"><a href="/#user/{ transaction.body.from }">{ truncate(transaction.body.from, 16) }</a></td>
+                <td class="h4"><a href="/#user/{ transaction.body.to }">{ truncate(transaction.body.to, 16) }</a></td>
             </tr>
             </tbody>
         </table>

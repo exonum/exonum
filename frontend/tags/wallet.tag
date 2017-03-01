@@ -2,7 +2,7 @@
     <div class="text-center">
         <h2 if={ balance }>${ balance }</h2>
         <h6 if={ blockHeight }>Block #<a href="/#blockchain/block/{ blockHeight }">{ blockHeight }</a></h6>
-        <h6 if={ blockTime }>{ blockTime }</h6>
+        <h6 if={ blockTime }>{ moment(blockTime / 1000000).format('MMM DD YYYY, HH:mm:ss') }</h6>
     </div>
 
     <div class="text-center">
@@ -28,7 +28,7 @@
 
         <tr each={ transactions }>
             <td>
-                <a href="/#blockchain/transaction/{ hash }">{ hash }</a>
+                <a href="/#blockchain/transaction/{ hash }">{ parent.truncate(hash, 16) }</a>
             </td>
             <td if={message_id === 130}>
                 create wallet
@@ -37,10 +37,10 @@
                 add <strong>${ body.amount }</strong> to your wallet
             </td>
             <td if={message_id === 128 && body.from === parent.opts.publicKey}>
-                send <strong>${ body.amount }</strong> to <a href="/#user/{ body.to }">{ body.to }</a>
+                send <strong>${ body.amount }</strong> to <a href="/#user/{ body.to }">{ parent.truncate(body.to, 16) }</a>
             </td>
             <td if={message_id === 128 && body.to === parent.opts.publicKey}>
-                receive <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }">{ body.from }</a>
+                receive <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }">{ parent.truncate(body.from, 16) }</a>
             </td>
         </tr>
 
