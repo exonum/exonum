@@ -55,7 +55,12 @@
                     }),
                     success: function(data, textStatus, jqXHR) {
                         route('/user/' + pair.publicKey);
-                        // TODO pair to localStorage
+                        var users = JSON.parse(window.localStorage.getItem('users'));
+                        if (!users) {
+                            users = [];
+                        }
+                        users.push(pair);
+                        window.localStorage.setItem('users', JSON.stringify(users));
                     },
                     error: function(jqXHR, textStatus, errorThrown) {
                         console.error(textStatus);
