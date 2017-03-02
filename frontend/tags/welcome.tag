@@ -11,6 +11,6 @@
 
     <script>
         this.title = 'Login';
-        this.users = JSON.parse(window.localStorage.getItem('users'));
+        this.users = this.localStorage.getUsers();
     </script>
 </welcome>
