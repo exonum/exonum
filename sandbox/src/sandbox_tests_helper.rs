@@ -291,6 +291,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                                txs: I)
     where I: IntoIterator<Item = &'a RawTransaction>
 {
+    let txs = sandbox.filter_present_transactions(txs);
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
@@ -313,7 +314,6 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
         }
         hashes
     };
-    let hashes = &sandbox.filter_present_transactions(&hashes);
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
