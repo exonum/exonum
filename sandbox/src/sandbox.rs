@@ -333,23 +333,26 @@ impl Sandbox {
         *reactor.last_block().unwrap().state_hash()
     }
 
-    pub fn filter_present_transactions(&self, txs: &[Hash]) -> Vec<Hash> {
+    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<RawMessage>
+        where I: IntoIterator<Item = &'a RawMessage>
+    {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let view = self.reactor.borrow().handler.blockchain.view();
         let schema = Schema::new(&view);
         let schema_transactions = schema.transactions();
-        let res: Vec<Hash> = txs.iter()
+        let res: Vec<RawTransaction> = txs.into_iter()
             .filter(|elem| {
-                if unique_set.contains(elem) {
+                let hash_elem = elem.hash();
+                if unique_set.contains(&hash_elem) {
                     return false;
                 }
-                unique_set.insert(**elem);
-                if schema_transactions.get(elem).unwrap().is_some() {
+                unique_set.insert(hash_elem);
+                if schema_transactions.get(&hash_elem).unwrap().is_some() {
                     return false;
                 }
                 true
             })
-            .map(|elem| *elem)
+            .map(|elem| elem.clone())
             .collect::<Vec<_>>();
         res
     }
