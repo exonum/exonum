@@ -1,36 +1,34 @@
 function Cryptocurrency() {
-    var transactions = {
-        128: Exonum.newMessage({
-            size: 80,
-            service_id: 128,
-            message_id: 128,
-            fields: {
-                from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-                amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
-                seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-            }
-        }),
-        129: Exonum.newMessage({
-            size: 48,
-            service_id: 128,
-            message_id: 129,
-            fields: {
-                wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
-                seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-            }
-        }),
-        130: Exonum.newMessage({
-            size: 40,
-            service_id: 128,
-            message_id: 130,
-            fields: {
-                pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                name: {type: Exonum.String, size: 8, from: 32, to: 40}
-            }
-        })
-    };
+
+    var Transactions = [{
+        size: 80,
+        service_id: 128,
+        message_id: 128,
+        fields: {
+            from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
+            amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
+            seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
+        }
+    }, {
+        size: 48,
+        service_id: 128,
+        message_id: 129,
+        fields: {
+            wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
+            seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
+        }
+    }, {
+        size: 40,
+        service_id: 128,
+        message_id: 130,
+        fields: {
+            pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            name: {type: Exonum.String, size: 8, from: 32, to: 40}
+        }
+    }];
+
     var Wallet = Exonum.newType({
         size: 88,
         fields: {
@@ -42,29 +40,52 @@ function Cryptocurrency() {
         }
     });
 
-    function verifyTransaction(transaction, hash) {
-        var Type = transactions[transaction.message_id];
-        var publicKey;
+    function Transaction(messageId) {
+        for (var i in Transactions) {
+            if (!Transactions.hasOwnProperty(i)) {
+                continue;
+            } else if (Transactions[i].message_id === messageId) {
+                return Exonum.newMessage(Transactions[i]); // add signature if defined
+            }
+        }
 
+        console.error('Invalid message_id field');
+        return;
+    }
+
+    function getPublicKeyOfTransaction(transaction) {
         switch (transaction.message_id) {
             case 128:
-                publicKey = transaction.body.from;
+                return transaction.body.from;
                 break;
             case 129:
-                publicKey = transaction.body.wallet;
+                return transaction.body.wallet;
                 break;
             case 130:
-                publicKey = transaction.body.pub_key;
+                return transaction.body.pub_key;
                 break;
             default:
                 console.error('Invalid message_id field');
-                return false;
+                return;
         }
+    }
 
-        if (Exonum.hash(transaction.body, Type) !== hash) {
+    /**
+     * Validation of transaction
+     * @param transaction
+     * @param hash
+     * @returns {boolean}
+     */
+    function validateTransaction(transaction, hash) {
+        var type = new Transaction(transaction.message_id);
+        var publicKey = getPublicKeyOfTransaction(transaction);
+
+        type.signature = transaction.signature;
+
+        if (Exonum.hash(transaction.body, type) !== hash) {
             console.error('Wrong transaction hash.');
             return false;
-        } else if (!Exonum.verifySignature(transaction.body, Type, transaction.signature, publicKey)) {
+        } else if (!Exonum.verifySignature(transaction.body, type, transaction.signature, publicKey)) {
             console.error('Wrong transaction signature.');
             return false;
         }
@@ -72,11 +93,20 @@ function Cryptocurrency() {
         return true;
     }
 
-    function parseBlock(publicKey, validators, response) {
-        if (!Exonum.verifyBlock(response.block_info, validators)) {
+    /**
+     * Validate structure
+     * @param publicKey
+     * @param validators
+     * @param data
+     * @returns {{block: Object, wallet: Object, transactions: Array}}
+     */
+    function getBlock(publicKey, validators, data) {
+        // validate block
+        if (!Exonum.verifyBlock(data.block_info, validators)) {
             return undefined;
         }
 
+        // find root hash of table with wallets in the tree of all tables
         var TableKey = Exonum.newType({
             size: 4,
             fields: {
@@ -84,51 +114,119 @@ function Cryptocurrency() {
                 table_index: {type: Exonum.Uint16, size: 2, from: 2, to: 4}
             }
         });
-        var walletsTableData = {
+        var tableKeyData = {
             service_id: 128,
             table_index: 0
         };
-        var walletsTableKey = Exonum.hash(walletsTableData, TableKey);
-        var walletsTableRootHash = Exonum.merklePatriciaProof(response.block_info.block.state_hash, response.wallet.mpt_proof, walletsTableKey);
-        if (walletsTableRootHash === null) {
-            console.error('Wallets can not exist.');
+        var tableKey = Exonum.hash(tableKeyData, TableKey);
+        var walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey);
+        if (walletsHash === null) {
             return undefined;
         }
 
-        var wallet = Exonum.merklePatriciaProof(walletsTableRootHash, response.wallet.value, publicKey, Wallet);
+        // find wallet in the tree of all wallets
+        var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
         if (wallet === null) {
             return null;
         }
 
-        var HashesOftransactions = Exonum.merkleProof(wallet.history_hash, wallet.history_len, response.wallet_history.mt_proof, [0, wallet.history_len]);
-        var transactions = response.wallet_history.values;
+        // find hashes of all transactions
+        var hashes = Exonum.merkleProof(wallet.history_hash, wallet.history_len, data.wallet_history.mt_proof, [0, wallet.history_len]);
 
-        if (transactions.length !== HashesOftransactions.length) {
+        if (data.wallet_history.values.length !== hashes.length) {
             console.error('Number of transaction hashes is not equal to transactions number.');
             return undefined;
         }
 
-        for (var i in HashesOftransactions) {
-            if (!HashesOftransactions.hasOwnProperty(i)) {
+        var transactions = [];
+        for (var i in hashes) {
+            if (!hashes.hasOwnProperty(i)) {
                 continue;
             }
 
-            if (!verifyTransaction(transactions[i], HashesOftransactions[i])) {
+            if (!validateTransaction(data.wallet_history.values[i], hashes[i])) {
                 return undefined;
             }
 
-            transactions[i].hash = HashesOftransactions[i]; // TODO do a separate API method; it is also required in other services
+            var transaction = data.wallet_history.values[i];
+            transaction.hash = hashes[i];
+
+            transactions.push(transaction);
         }
 
         return {
+            block: data.block_info.block,
             wallet: wallet,
             transactions: transactions
         };
     }
 
+    /**
+     * Generate new wallet with passed name
+     * @param name
+     * @returns {{pair: Object, transaction: Object}}
+     */
+    function createWalletTransaction(name) {
+        var pair = Exonum.keyPair();
+        var data = {
+            pub_key: pair.publicKey,
+            name: name
+        };
+        var signature = Exonum.sign(data, Transaction(130), pair.secretKey);
+        var transaction = {
+            service_id: 128,
+            message_id: 130,
+            body: data,
+            signature: signature
+        };
+        return {
+            pair: pair,
+            transaction: transaction
+        }
+    }
+
+    function addFundsTransaction(amount, wallet, secretKey) {
+        var seed = Exonum.randomUint64();
+        var data = {
+            wallet: wallet,
+            amount: amount,
+            seed: seed
+        };
+        var signature = Exonum.sign(data, Transaction(129), secretKey);
+
+        return {
+            service_id: 128,
+            message_id: 129,
+            body: data,
+            signature: signature
+        };
+    }
+
+    function transferTransaction(amount, from, to, secretKey) {
+        var seed = Exonum.randomUint64();
+        var data = {
+            from: from,
+            to: to,
+            amount: amount,
+            seed: seed
+        };
+        var signature = Exonum.sign(data, Transaction(128), secretKey);
+
+        return {
+            service_id: 128,
+            message_id: 128,
+            body: data,
+            signature: signature
+        };
+    }
+
     return {
-        transactions: transactions,
         Wallet: Wallet,
-        parseBlock: parseBlock
+        Transaction: Transaction,
+        getBlock: getBlock,
+        createWalletTransaction: createWalletTransaction,
+        addFundsTransaction: addFundsTransaction,
+        transferTransaction: transferTransaction
     };
+
 }

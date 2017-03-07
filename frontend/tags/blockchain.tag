@@ -8,7 +8,7 @@
         </thead>
         <tbody>
         <tr each={ blocks }>
-            <td>{ moment(propose_time * 1000).format('MMM DD YYYY, HH:mm:ss') }</td>
+            <td>{ moment(propose_time * 1000).format('HH:mm:ss, DD MMM YYYY') }</td>
             <td><a href="/#blockchain/block/{ height }">{ height }</a></td>
         </tr>
         </tbody>
@@ -28,48 +28,25 @@
 
         this.title = 'Blockchain';
 
-        // TODO refactor ajax requests
+        this.api.loadBlockchain(function(data) {
+            self.blocks = data;
+            self.update();
+        });
 
         previous(e) {
             e.preventDefault();
-            $.ajax({
-                method: 'GET',
-                url: this.api.baseUrl + '/blockchain/blocks?count=10&from=' + (self.blocks[0].height - 9),
-                success: function(data, textStatus, jqXHR) {
-                    self.blocks = data;
-                    self.update();
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error(textStatus);
-                }
+            self.api.loadBlockchain(self.blocks[0].height - 9, function(data) {
+                self.blocks = data;
+                self.update();
             });
         }
 
         next(e) {
             e.preventDefault();
-            $.ajax({
-                method: 'GET',
-                url: this.api.baseUrl + '/blockchain/blocks?count=10&from=' + (self.blocks[0].height + 11),
-                success: function(data, textStatus, jqXHR) {
-                    self.blocks = data;
-                    self.update();
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error(textStatus);
-                }
-            });
-        }
-
-        $.ajax({
-            method: 'GET',
-            url: this.api.baseUrl + '/blockchain/blocks?count=10',
-            success: function(data, textStatus, jqXHR) {
+            self.api.loadBlockchain(self.blocks[0].height + 11, function(data) {
                 self.blocks = data;
                 self.update();
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.error(textStatus);
-            }
-        });
+            });
+        }
     </script>
 </blockchain>

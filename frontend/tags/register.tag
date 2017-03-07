@@ -30,55 +30,22 @@
         }
 
         register(e) {
-            e.preventDefault();
-
             var name = this.text;
 
+            e.preventDefault();
+
             if (name) {
-                // TODO move outside
-                var TxCreateWallet = Exonum.newMessage({
-                    size: 40,
-                    service_id: 128,
-                    message_id: 130,
-                    fields: {
-                        pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                        name: {type: Exonum.String, size: 8, from: 32, to: 40}
-                    }
-                });
-                var pair = Exonum.keyPair();
-                var data = {
-                    pub_key: pair.publicKey,
-                    name: name
-                };
-                var signature = Exonum.sign(data, TxCreateWallet, pair.secretKey);
+                var wallet = self.api.cryptocurrency.createWalletTransaction(name);
 
-                $.ajax({
-                    method: 'POST',
-                    url: this.api.baseUrl + '/wallets/transaction',
-                    contentType: 'application/json',
-                    data: JSON.stringify({
-                        service_id: 128,
-                        message_id: 130,
-                        body: data,
-                        signature: signature
-                    }),
-                    success: function(data, textStatus, jqXHR) {
-                        var users = JSON.parse(window.localStorage.getItem('users'));
-                        if (!users) {users = [];}
-                        users.push({
-                            publicKey: pair.publicKey,
-                            secretKey: pair.secretKey,
-                            name: name
-                        });
-                        window.localStorage.setItem('users', JSON.stringify(users));
-
-                        self.publicKey = pair.publicKey;
-                        self.succeed = true;
-                        self.update();
-                    },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        console.error(textStatus);
-                    }
+                self.api.submitTransaction(wallet.transaction, function() {
+                    self.localStorage.addUser({
+                        name: name,
+                        publicKey: wallet.pair.publicKey,
+                        secretKey: wallet.pair.secretKey
+                    });
+                    self.publicKey = wallet.pair.publicKey;
+                    self.succeed = true;
+                    self.update();
                 });
             }
         }
