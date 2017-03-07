@@ -30,15 +30,74 @@
         // global mixin with common functions and constants
         riot.mixin({
             api: {
-                baseUrl: baseUrl,
-                validators: validators,
+                cryptocurrency: cryptocurrency,
                 getWallet: function(publicKey, callback) {
                     $.ajax({
                         method: 'GET',
                         url: baseUrl + '/wallets/info?pubkey=' + publicKey,
                         success: function(response, textStatus, jqXHR) {
-                            callback(cryptocurrency.parseBlock(publicKey, validators, response));
+                            var data = cryptocurrency.getBlock(publicKey, validators, response);
+                            callback(data);
                         },
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            console.error(textStatus);
+                        }
+                    });
+                },
+                submitTransaction: function(transaction, callback) {
+                    $.ajax({
+                        method: 'POST',
+                        url: baseUrl + '/wallets/transaction',
+                        contentType: 'application/json',
+                        data: JSON.stringify(transaction),
+                        success: callback,
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            console.error(textStatus);
+                        }
+                    });
+                },
+                loadBlockchain: function(from, callback) {
+                    var callback = callback;
+                    var urlSuffix = '';
+                    if (typeof callback === 'undefined') {
+                        callback = from;
+                    } else {
+                        urlSuffix += '&from=' + from;
+                    }
+                    $.ajax({
+                        method: 'GET',
+                        url: baseUrl + '/blockchain/blocks?count=10' + urlSuffix,
+                        success: callback,
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            console.error(textStatus);
+                        }
+                    });
+                },
+                loadBlock: function(height, callback) {
+                    $.ajax({
+                        method: 'GET',
+                        url: baseUrl + '/blockchain/blocks/' + height,
+                        success: function(data, textStatus, jqXHR) {
+                            if (data) {
+                                for (var i in data.txs) {
+                                    var type = cryptocurrency.Transaction(data.txs[i].message_id);
+                                    type.signature = data.txs[i].signature;
+                                    // calculate hash for each transaction
+                                    data.txs[i].hash = Exonum.hash(data.txs[i].body, type);
+                                }
+                            }
+                            callback(data);
+                        },
+                        error: function(jqXHR, textStatus, errorThrown) {
+                            console.error(textStatus);
+                        }
+                    });
+                },
+                loadTransaction: function(hash, callback) {
+                    $.ajax({
+                        method: 'GET',
+                        url: baseUrl + '/blockchain/transactions/' + hash,
+                        success: callback,
                         error: function(jqXHR, textStatus, errorThrown) {
                             console.error(textStatus);
                         }
@@ -47,11 +106,22 @@
             },
 
             localStorage: {
-                getUser: function() {},
                 getUsers: function() {
                     return JSON.parse(window.localStorage.getItem('users')) || [];
                 },
-                setUser: function() {}
+                addUser: function(user) {
+                    var users = JSON.parse(window.localStorage.getItem('users')) || [];
+                    users.push(user);
+                    window.localStorage.setItem('users', JSON.stringify(users));
+                },
+                getUser: function(publicKey) {
+                    var users = JSON.parse(window.localStorage.getItem('users')) || [];
+                    for (var i = 0; i < users.length; i++) {
+                        if (users[i].publicKey === publicKey) {
+                            return users[i];
+                        }
+                    }
+                }
             },
 
             truncate: function(str, limit) {

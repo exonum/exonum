@@ -15,7 +15,7 @@
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">Propose time:</div>
-                    <div class="col-md-9">{ moment(block.propose_time * 1000).format('MMM DD YYYY, HH:mm:ss') }</div>
+                    <div class="col-md-9">{ moment(block.propose_time * 1000).format('HH:mm:ss, DD MMM YYYY') }</div>
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">Proposer:</div>
@@ -45,7 +45,7 @@
         <table class="table table-striped">
             <thead>
             <tr>
-                <th>Date</th>
+                <th>Hash</th>
                 <th>Description</th>
             </tr>
             </thead>
@@ -76,10 +76,19 @@
 
     <script>
         var self = this;
-
         var height = parseInt(this.opts.height);
 
         this.title = 'Block #' + height;
+
+        this.api.loadBlock(height, function(data) {
+            if (data == null) {
+                self.notFound = true;
+            } else {
+                self.block = data;
+            }
+
+            self.update();
+        });
 
         previous(e) {
             e.preventDefault();
@@ -90,68 +99,5 @@
             e.preventDefault();
             route('/blockchain/block/' + (height + 1));
         }
-
-        function getTransactionType(transaction) {
-            switch (transaction.message_id) {
-                case 128:
-                    return Exonum.newMessage({
-                        size: 80,
-                        service_id: 128,
-                        message_id: 128,
-                        signature: transaction.signature,
-                        fields: {
-                            from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                            to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-                            amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
-                            seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-                        }
-                    });
-                    break;
-                case 129:
-                    return Exonum.newMessage({
-                        size: 48,
-                        service_id: 128,
-                        message_id: 129,
-                        signature: transaction.signature,
-                        fields: {
-                            wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                            amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
-                            seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-                        }
-                    });
-                case 130:
-                    return Exonum.newMessage({
-                        size: 40,
-                        service_id: 128,
-                        message_id: 130,
-                        signature: transaction.signature,
-                        fields: {
-                            pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                            name: {type: Exonum.String, size: 8, from: 32, to: 40}
-                        }
-                    });
-                    break;
-            }
-        }
-
-        $.ajax({
-            method: 'GET',
-            url: this.api.baseUrl + '/blockchain/blocks/' + height,
-            success: function(data, textStatus, jqXHR) {
-                if (data == null) {
-                    self.notFound = true;
-                    self.update();
-                    return;
-                }
-                self.block = data;
-                for (var i in self.block.txs) {
-                    self.block.txs[i].hash = Exonum.hash(self.block.txs[i].body, getTransactionType(self.block.txs[i]));
-                }
-                self.update();
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.error(textStatus);
-            }
-        });
     </script>
 </block>
