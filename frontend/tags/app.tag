@@ -124,10 +124,6 @@
                 }
             },
 
-            truncate: function(str, limit) {
-                return (limit < str.length) ? str.substr(0, limit - 1) + '...' : str;
-            },
-
             init: function() {
                 this.on('mount', function() {
                     // add title if it is predefined in component

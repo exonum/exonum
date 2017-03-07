@@ -1,3 +1,28 @@
 body {
     padding: 20px 0 0;
 }
+
+.no-border {
+    border: none;
+}
+
+.custom-table {
+    padding: 0 20px 20px;
+}
+
+.custom-table-header {
+    padding-bottom: 5px;
+    border-bottom: 1px solid #ddd;
+    font-weight: bold;
+}
+
+.custom-table-column {
+    padding-top: 5px;
+    border-top: 1px solid #ddd;
+}
+
+.truncate {
+    font-family: "Lucida Console", Monaco, Courier, monospace;
+    font-size: 0.9em;
+    word-wrap: break-word;
+}

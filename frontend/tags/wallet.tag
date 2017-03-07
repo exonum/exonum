@@ -13,35 +13,31 @@
     </div>
 
     <virtual if={ transactions }>
-        <legend class="text-center">Transactions history</legend>
+        <legend class="text-center no-border">Transactions history</legend>
 
-        <table class="table table-striped">
-            <thead>
-            <tr>
-                <th>Hash</th>
-                <th>Description</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr each={ transactions }>
-                <td>
-                    <a href="/#blockchain/transaction/{ hash }">{ parent.truncate(hash, 16) }</a>
-                </td>
-                <td if={message_id === 130}>
+        <div class="custom-table">
+            <div class="row">
+                <div class="col-xs-6 custom-table-header">Hash</div>
+                <div class="col-xs-6 custom-table-header">Description</div>
+            </div>
+            <div class="row" each={ transactions }>
+                <div class="col-xs-6 custom-table-column truncate">
+                    <a href="/#blockchain/transaction/{ hash }">{ hash }</a>
+                </div>
+                <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
                     create wallet
-                </td>
-                <td if={message_id === 129}>
+                </div>
+                <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
                     add <strong>${ body.amount }</strong> to your wallet
-                </td>
-                <td if={message_id === 128 && body.from === parent.opts.publicKey}>
-                    send <strong>${ body.amount }</strong> to <a href="/#user/{ body.to }">{ parent.truncate(body.to, 16) }</a>
-                </td>
-                <td if={message_id === 128 && body.to === parent.opts.publicKey}>
-                    receive <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }">{ parent.truncate(body.from, 16) }</a>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+                </div>
+                <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
+                    send <strong>${ body.amount }</strong> to <a href="/#user/{ body.to }" class="truncate">{ body.to }</a>
+                </div>
+                <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
+                    receive <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }" class="truncate">{ body.from }</a>
+                </div>
+            </div>
+        </div>
     </virtual>
 
     <a class="btn btn-lg btn-block btn-default" href="/#">Log out</a>

@@ -11,7 +11,7 @@
             <li class="list-group-item">
                 <div class="row">
                     <div class="col-md-3 text-muted">Hash:</div>
-                    <div class="col-md-9">{ truncate(block.hash, 24) }</div>
+                    <div class="col-md-9 truncate">{ block.hash }</div>
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">Propose time:</div>
@@ -23,11 +23,11 @@
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">Tx hash:</div>
-                    <div class="col-md-9">{ truncate(block.tx_hash, 24) }</div>
+                    <div class="col-md-9 truncate">{ block.tx_hash }</div>
                 </div>
                 <div class="row">
                     <div class="col-md-3 text-muted">State hash:</div>
-                    <div class="col-md-9">{ truncate(block.state_hash, 24) }</div>
+                    <div class="col-md-9 truncate">{ block.state_hash }</div>
                 </div>
             </li>
             <li class="list-group-item">
@@ -40,30 +40,28 @@
             </li>
         </ul>
 
-        <legend class="text-center">Transactions</legend>
+        <legend class="text-center no-border">Transactions</legend>
 
-        <table class="table table-striped">
-            <thead>
-            <tr>
-                <th>Hash</th>
-                <th>Description</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr each={ block.txs }>
-                <td><a href="/#blockchain/transaction/{ hash }">{ parent.truncate(hash, 16) }</a></td>
-                <td if={message_id === 130}>
+        <div class="custom-table">
+            <div class="row">
+                <div class="col-xs-6 custom-table-header">Hash</div>
+                <div class="col-xs-6 custom-table-header">Description</div>
+            </div>
+            <div class="row" each={ block.txs }>
+                <div class="col-xs-6 custom-table-column truncate">
+                    <a href="/#blockchain/transaction/{ hash }">{ hash }</a>
+                </div>
+                <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
                     create <a href="/#user/{ body.pub_key }">{ body.name }</a> wallet
-                </td>
-                <td if={message_id === 129}>
-                    add <strong>${ body.amount }</strong> to <a href="/#user/{ body.wallet }">{ parent.truncate(body.wallet, 16) }</a> wallet
-                </td>
-                <td if={message_id === 128}>
-                    send <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }">{ parent.truncate(body.from, 12) }</a> to <a href="/#user/{ body.to }">{ parent.truncate(body.to, 12) }</a>
-                </td>
-            </tr>
-            </tbody>
-        </table>
+                </div>
+                <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
+                    add <strong>${ body.amount }</strong> to <a href="/#user/{ body.wallet }" class="truncate">{ body.wallet }</a> wallet
+                </div>
+                <div class="col-xs-6 custom-table-column" if={ message_id === 128 }>
+                    send <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }" class="truncate">{ body.from }</a> to <a href="/#user/{ body.to }" class="truncate">{ body.to }</a>
+                </div>
+            </div>
+        </div>
     </virtual>
 
     <virtual if={ notFound }>
