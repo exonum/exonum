@@ -1,20 +1,20 @@
 <transaction>
     <virtual if={ transaction }>
         <virtual if={ transaction.message_id === 128 }>
-            <table class="table text-center">
-                <thead>
-                <tr>
-                    <th class="text-center">From</th>
-                    <th class="text-center">To</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <td class="h4"><a href="/#user/{ transaction.body.from }">{ truncate(transaction.body.from, 16) }</a></td>
-                    <td class="h4"><a href="/#user/{ transaction.body.to }">{ truncate(transaction.body.to, 16) }</a></td>
-                </tr>
-                </tbody>
-            </table>
+            <div class="custom-table text-center">
+                <div class="row">
+                    <div class="col-xs-6 custom-table-header">From</div>
+                    <div class="col-xs-6 custom-table-header">To</div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-6 custom-table-column truncate">
+                        <a href="/#user/{ transaction.body.from }">{ transaction.body.from }</a>
+                    </div>
+                    <div class="col-xs-6 custom-table-column truncate">
+                        <a href="/#user/{ transaction.body.to }">{ transaction.body.to }</a>
+                    </div>
+                </div>
+            </div>
 
             <div class="text-center">
                 <h2>${ transaction.body.amount }</h2>
@@ -22,18 +22,16 @@
         </virtual>
 
         <virtual if={ transaction.message_id === 129 }>
-            <table class="table text-center">
-                <thead>
-                <tr>
-                    <th class="text-center">To</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <td class="h4"><a href="/#user/{ transaction.body.wallet }">{ truncate(transaction.body.wallet, 16) }</a></td>
-                </tr>
-                </tbody>
-            </table>
+            <div class="custom-table text-center">
+                <div class="row">
+                    <div class="col-sm-12 custom-table-header">To</div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12 custom-table-column truncate">
+                        <a href="/#user/{ transaction.body.wallet }">{ transaction.body.wallet }</a>
+                    </div>
+                </div>
+            </div>
 
             <div class="text-center">
                 <h2>${ transaction.body.amount }</h2>
@@ -41,18 +39,16 @@
         </virtual>
 
         <virtual if={ transaction.message_id === 130 }>
-            <table class="table text-center">
-                <thead>
-                <tr>
-                    <th class="text-center">Name</th>
-                </tr>
-                </thead>
-                <tbody>
-                <tr>
-                    <td class="h4"><a href="/#user/{ transaction.body.pub_key }">{ truncate(transaction.body.name, 16) }</a></td>
-                </tr>
-                </tbody>
-            </table>
+            <div class="custom-table text-center">
+                <div class="row">
+                    <div class="col-sm-12 custom-table-header">Name</div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-12 custom-table-column truncate">
+                        <a href="/#user/{ transaction.body.pub_key }">{ transaction.body.name }</a>
+                    </div>
+                </div>
+            </div>
         </virtual>
     </virtual>
 
