@@ -4,6 +4,7 @@ use std::cell::{RefCell, Ref};
 use std::sync::{Arc, Mutex};
 use std::net::SocketAddr;
 use std::ops::Drop;
+use std::collections::HashMap; 
 
 use time::{Timespec, Duration};
 
@@ -169,21 +170,22 @@ impl SandboxReactor {
 pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
-    pub validators: Vec<(PublicKey, SecretKey)>,
+    //pub validators: Vec<(PublicKey, SecretKey)>,
+    pub validators_map: HashMap<PublicKey, SecretKey>, 
     addresses: Vec<SocketAddr>,
 }
 
 impl Sandbox {
     fn initialize(&self) {
-        let connect = Connect::new(self.p(0), self.a(0), self.time(), self.s(0));
+        let connect = Connect::new(&self.p(0), self.a(0), self.time(), self.s(0));
 
-        self.recv(Connect::new(self.p(1), self.a(1), self.time(), self.s(1)));
+        self.recv(Connect::new(&self.p(1), self.a(1), self.time(), self.s(1)));
         self.send(self.a(1), connect.clone());
 
-        self.recv(Connect::new(self.p(2), self.a(2), self.time(), self.s(2)));
+        self.recv(Connect::new(&self.p(2), self.a(2), self.time(), self.s(2)));
         self.send(self.a(2), connect.clone());
 
-        self.recv(Connect::new(self.p(3), self.a(3), self.time(), self.s(3)));
+        self.recv(Connect::new(&self.p(3), self.a(3), self.time(), self.s(3)));
         self.send(self.a(3), connect.clone());
 
         self.check_unexpected_message()
@@ -202,20 +204,30 @@ impl Sandbox {
         reactor.handler.blockchain.tx_from_raw(raw)
     }
 
-    pub fn p(&self, id: usize) -> &PublicKey {
-        &self.validators[id].0
+    pub fn p(&self, id: usize) -> PublicKey {
+        self.validators()[id]
+        //&self.validators[id].0
     }
 
     pub fn s(&self, id: usize) -> &SecretKey {
-        &self.validators[id].1
+        let p = self.p(id); 
+        &self.validators_map[&p]
+        //&self.validators[id].1
     }
 
     pub fn a(&self, id: usize) -> SocketAddr {
         self.addresses[id].clone()
     }
 
+    fn validators(&self) -> Vec<PublicKey> {
+        let view = self.blockchain_copy().view(); 
+        let schema = Schema::new(&view); 
+        let conf = schema.get_actual_configuration().unwrap(); 
+        conf.validators.clone()
+    }
+
     pub fn n_validators(&self) -> usize {
-        self.validators.len()
+        self.validators().len()
     }
 
     pub fn time(&self) -> Timespec {
@@ -259,7 +271,7 @@ impl Sandbox {
             .iter()
             .skip(1)
             .cloned());
-        for _ in 0..self.validators.len() - 1 {
+        for _ in 0..self.n_validators() - 1 {
             let sended = self.inner.lock().unwrap().sended.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
@@ -535,12 +547,13 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         inner: inner.clone(),
         handler: node,
     };
-
+    let mut validators_map = HashMap::new(); 
+    validators_map.extend(validators); 
     reactor.handler.initialize();
     let sandbox = Sandbox {
         inner: inner.clone(),
         reactor: RefCell::new(reactor),
-        validators: validators,
+        validators_map: validators_map,
         addresses: addresses,
     };
 
@@ -563,7 +576,7 @@ fn test_sandbox_recv_and_send() {
     let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.send(s.a(2), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
+    s.send(s.a(2), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
 }
 
 #[test]
@@ -581,7 +594,7 @@ fn test_sandbox_assert_status() {
 #[should_panic(expected = "Expected to send the message")]
 fn test_sandbox_expected_to_send_but_nothing_happened() {
     let s = timestamping_sandbox();
-    s.send(s.a(1), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
+    s.send(s.a(1), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
 }
 
 #[test]
@@ -590,7 +603,7 @@ fn test_sandbox_expected_to_send_another_message() {
     let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.send(s.a(1), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
+    s.send(s.a(1), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
 }
 
 #[test]
