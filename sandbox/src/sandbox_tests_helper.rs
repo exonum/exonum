@@ -480,8 +480,8 @@ pub fn receive_valid_propose_with_transactions(sandbox: &TimestampingSandbox,
 pub fn make_request_propose_from_precommit(sandbox: &TimestampingSandbox,
                                            precommit: Precommit)
                                            -> RequestPropose {
-    RequestPropose::new(sandbox.p(VALIDATOR_0 as usize),
-                        sandbox.p(precommit.validator() as usize),
+    RequestPropose::new(&sandbox.p(VALIDATOR_0 as usize),
+                        &sandbox.p(precommit.validator() as usize),
                         sandbox.time(),
                         precommit.height(),
                         precommit.propose_hash(),
@@ -493,8 +493,8 @@ pub fn make_request_prevote_from_precommit(sandbox: &TimestampingSandbox,
                                            -> RequestPrevotes {
     let validators = BitVec::from_elem(sandbox.n_validators(), false);
     //    validators.set(precommit.validator() as usize, true);
-    RequestPrevotes::new(sandbox.p(VALIDATOR_0 as usize),
-                         sandbox.p(precommit.validator() as usize),
+    RequestPrevotes::new(&sandbox.p(VALIDATOR_0 as usize),
+                         &sandbox.p(precommit.validator() as usize),
                          sandbox.time(),
                          precommit.height(),
                          precommit.round(),
