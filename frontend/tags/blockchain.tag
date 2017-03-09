@@ -9,7 +9,7 @@
         <tbody>
         <tr each={ blocks }>
             <td>{ moment(propose_time * 1000).format('HH:mm:ss, DD MMM YYYY') }</td>
-            <td><a href="/#blockchain/block/{ height }">{ height }</a></td>
+            <td><a href="#blockchain/block/{ height }">{ height }</a></td>
         </tr>
         </tbody>
     </table>
@@ -21,7 +21,7 @@
         </ul>
     </nav>
 
-    <a class="btn btn-lg btn-block btn-default" href="/#">Back</a>
+    <a class="btn btn-lg btn-block btn-default" href="#">Back</a>
 
     <script>
         var self = this;

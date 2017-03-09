@@ -3,7 +3,7 @@
         <virtual if={ wallet && block }>
             <div class="text-center">
                 <h2 if={ wallet.balance }>${ wallet.balance }</h2>
-                <h6 if={ block.height }>Block #<a href="/#blockchain/block/{ block.height }">{ block.height }</a></h6>
+                <h6 if={ block.height }>Block #<a href="#blockchain/block/{ block.height }">{ block.height }</a></h6>
             </div>
         </virtual>
 
@@ -15,7 +15,7 @@
 
     <p if={ succeed } class="lead text-center">Excellent! Funds will be transfered in a seconds.</p>
 
-    <a class="btn btn-lg btn-block btn-default" href="/#user/{ opts.publicKey }">Back</a>
+    <a class="btn btn-lg btn-block btn-default" href="#user/{ opts.publicKey }">Back</a>
 
     <script>
         var self = this;
