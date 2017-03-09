@@ -241,7 +241,8 @@ pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
 
 pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
                                    sandbox_state: &SandboxState,
-                                   transactions: &[Hash]) {
+                                   transactions: &[Hash]) -> Option<Propose> {
+    let mut res = None; 
     let round_timeout = sandbox.round_timeout(); //use local var to save long code call
 
     trace!("-------------------------add_round_with_transactions started-------------------------");
@@ -250,7 +251,7 @@ pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
     trace!("is_leader before time adding: {:?}", sandbox.is_leader());
 
     if sandbox.is_leader() {
-        check_and_broadcast_propose_and_prevote(&sandbox, &sandbox_state, transactions);
+        res = check_and_broadcast_propose_and_prevote(&sandbox, &sandbox_state, transactions);
     }
 
     // how much time left till next round_timeout
@@ -271,8 +272,9 @@ pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
 
 
     if sandbox.is_leader() {
-        check_and_broadcast_propose_and_prevote(&sandbox, &sandbox_state, transactions);
+        res = check_and_broadcast_propose_and_prevote(&sandbox, &sandbox_state, transactions);
     }
+    res
 }
 
 pub fn gen_timestamping_tx() -> TimestampTx {
@@ -291,8 +293,8 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                                txs: I)
     where I: IntoIterator<Item = &'a RawTransaction>
 {
-    let txs = sandbox.filter_present_transactions(txs);
     // sort transaction in order accordingly their hashes
+    let txs = sandbox.filter_present_transactions(txs);
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
     let raw_txs = tx_pool.values()
@@ -300,7 +302,6 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
         .collect::<Vec<_>>();
     let txs: &[RawTransaction] = raw_txs.as_ref();
 
-    // pub fn add_one_height(sandbox: &TimestampSandbox, sandbox_state: &SandboxState) {
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
     // assert 1st round
@@ -317,15 +318,15 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
+    let mut propose: Option<Propose>; 
 
     for _ in 0..sandbox.n_validators() {
-        //        add_round_with_transactions(&sandbox, &[tx.hash()]);
-        add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
+        propose = add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
         let round: u32 = sandbox.current_round();
         if sandbox.is_leader() {
             // ok, we are leader
             trace!("ok, we are leader, round: {:?}", round);
-            let propose = get_propose_with_transactions(&sandbox, hashes.as_ref());
+            let propose = propose.unwrap();
             trace!("propose.hash: {:?}", propose.hash());
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
             {
@@ -333,32 +334,24 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
             }
 
 
-            sandbox.recv(Prevote::new(VALIDATOR_1,
-                                      initial_height,
-                                      round,
-                                      &propose.hash(),
-                                      LOCK_ZERO,
-                                      sandbox.s(VALIDATOR_1 as usize)));
-            //            sandbox.assert_lock(LOCK_ZERO, None);
-            sandbox.recv(Prevote::new(VALIDATOR_2,
-                                      initial_height,
-                                      round,
-                                      &propose.hash(),
-                                      LOCK_ZERO,
-                                      sandbox.s(VALIDATOR_2 as usize)));
+            for val_idx in 1..sandbox.majority_count() {
+                sandbox.recv(Prevote::new(val_idx as u32,
+                                          initial_height,
+                                          round,
+                                          &propose.hash(),
+                                          LOCK_ZERO,
+                                          sandbox.s(val_idx)));
+            }
             sandbox.assert_lock(round, Some(propose.hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
-            // let block = Block::new(initial_height, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
-            //            let block = Block::new(initial_height, round, propose_time, &hash(&[]), &tx.hash(), &hash(&[]));
-            //            let block = Block::new(initial_height, round, propose_time, &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(), &hash(&[]));
 
             let state_hash = sandbox.compute_state_hash(&raw_txs);
             let block = BlockBuilder::new(sandbox)
                 .with_txs_hashes(&hashes)
                 .with_state_hash(&state_hash)
                 .build();
-            //    let block = Block::new(h, propose_time, &hash(&[]), &hash(&[tx.hash()]), &hash(&[tx.hash()]));
+
             trace!("new_block: {:?}", block);
             trace!("new_block.hash(): {:?}", block.hash());
             {
@@ -372,22 +365,20 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                              &block.hash(),
                                              sandbox.s(VALIDATOR_0 as usize)));
             sandbox.assert_lock(round, Some(propose.hash()));
-            sandbox.recv(Precommit::new(VALIDATOR_2,
-                                        initial_height,
-                                        round,
-                                        &propose.hash(),
-                                        &block.hash(),
-                                        sandbox.s(VALIDATOR_2 as usize)));
 
-            sandbox.assert_state(initial_height, round);
-            sandbox.recv(Precommit::new(VALIDATOR_3,
-                                        initial_height,
-                                        round,
-                                        &propose.hash(),
-                                        &block.hash(),
-                                        sandbox.s(VALIDATOR_3 as usize)));
+            for val_idx in 1..sandbox.majority_count() {
+                sandbox.recv(Precommit::new(val_idx as u32,
+                                            initial_height,
+                                            round,
+                                            &propose.hash(),
+                                            &block.hash(),
+                                            sandbox.s(val_idx)));
+
+                if val_idx != sandbox.majority_count() -1 {
+                    sandbox.assert_state(initial_height, round);
+                } 
+            }
             sandbox.assert_state(initial_height + 1, ROUND_ONE);
-
             {
                 *sandbox_state.time_millis_science_round_start.borrow_mut() = 0;
             }
