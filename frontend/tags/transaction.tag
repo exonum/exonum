@@ -8,10 +8,10 @@
                 </div>
                 <div class="row">
                     <div class="col-xs-6 custom-table-column truncate">
-                        <a href="/#user/{ transaction.body.from }">{ transaction.body.from }</a>
+                        <a href="#user/{ transaction.body.from }">{ transaction.body.from }</a>
                     </div>
                     <div class="col-xs-6 custom-table-column truncate">
-                        <a href="/#user/{ transaction.body.to }">{ transaction.body.to }</a>
+                        <a href="#user/{ transaction.body.to }">{ transaction.body.to }</a>
                     </div>
                 </div>
             </div>
@@ -28,7 +28,7 @@
                 </div>
                 <div class="row">
                     <div class="col-sm-12 custom-table-column truncate">
-                        <a href="/#user/{ transaction.body.wallet }">{ transaction.body.wallet }</a>
+                        <a href="#user/{ transaction.body.wallet }">{ transaction.body.wallet }</a>
                     </div>
                 </div>
             </div>
@@ -45,7 +45,7 @@
                 </div>
                 <div class="row">
                     <div class="col-sm-12 custom-table-column truncate">
-                        <a href="/#user/{ transaction.body.pub_key }">{ transaction.body.name }</a>
+                        <a href="#user/{ transaction.body.pub_key }">{ transaction.body.name }</a>
                     </div>
                 </div>
             </div>

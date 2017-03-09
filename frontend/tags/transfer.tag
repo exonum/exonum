@@ -3,7 +3,7 @@
         <virtual if={ wallet && block }>
             <div class="text-center">
                 <h2 if={ wallet.balance }>${ wallet.balance }</h2>
-                <h6 if={ block.height }>Block #<a href="/#blockchain/block/{ block.height }">{ block.height }</a></h6>
+                <h6 if={ block.height }>Block #<a href="#blockchain/block/{ block.height }">{ block.height }</a></h6>
             </div>
         </virtual>
 
@@ -26,7 +26,7 @@
             <div class="form-group">
                 <div class="col-sm-offset-4 col-sm-8">
                     <button type="submit" class="btn btn-lg btn-primary" disabled="{ !amount }">Transfer</button>
-                    <a class="btn btn-lg btn-default" href="/#user/{ opts.publicKey }">Back</a>
+                    <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Back</a>
                 </div>
             </div>
         </form>
@@ -34,18 +34,18 @@
 
     <div if={ submitted && !succeed } class="text-center">
         <form class="form" onsubmit={ approve }>
-            <p class="lead">Are you sure you want to send <strong>${ amount }</strong> to <a href="/#user/{ reciever.publicKey }">{ reciever.name }</a>?</p>
+            <p class="lead">Are you sure you want to send <strong>${ amount }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>?</p>
             <div class="form-group">
                 <button type="submit" class="btn btn-lg btn-primary">Approve</button>
-                <a class="btn btn-lg btn-default" href="/#user/{ opts.publicKey }/transfer">Cancel</a>
+                <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }/transfer">Cancel</a>
             </div>
         </form>
     </div>
 
     <div if={ succeed } class="text-center">
-        <p class="lead">Transfer approved. You've sent <strong>${ amount }</strong> to <a href="/#user/{ reciever.publicKey }">{ reciever.name }</a>.</p>
+        <p class="lead">Transfer approved. You've sent <strong>${ amount }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>.</p>
         <div class="form-group">
-            <a class="btn btn-lg btn-default" href="/#user/{ opts.publicKey }">Back</a>
+            <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Back</a>
         </div>
     </div>
 

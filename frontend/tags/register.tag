@@ -10,14 +10,14 @@
         <div class="form-group">
             <div class="col-sm-offset-4 col-sm-8">
                 <button type="submit" class="btn btn-lg btn-primary" disabled={ !text }>Create wallet</button>
-                <a href="/#" class="btn btn-lg btn-default">Back</a>
+                <a href="#" class="btn btn-lg btn-default">Back</a>
             </div>
         </div>
     </form>
 
     <div if={ succeed } class="text-center">
         <p class="lead">Wallet created! Login and manage the wallet.</p>
-        <a class="btn btn-lg btn-block btn-default" href="/#user/{ publicKey }">Log in</a>
+        <a class="btn btn-lg btn-block btn-default" href="#user/{ publicKey }">Log in</a>
     </div>
 
     <script>

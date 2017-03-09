@@ -49,16 +49,16 @@
             </div>
             <div class="row" each={ block.txs }>
                 <div class="col-xs-6 custom-table-column truncate">
-                    <a href="/#blockchain/transaction/{ hash }">{ hash }</a>
+                    <a href="#blockchain/transaction/{ hash }">{ hash }</a>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
-                    create <a href="/#user/{ body.pub_key }">{ body.name }</a> wallet
+                    create <a href="#user/{ body.pub_key }">{ body.name }</a> wallet
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
-                    <a href="/#user/{ body.wallet }" class="truncate">{ body.wallet }</a> add <strong>${ body.amount }</strong>
+                    <a href="#user/{ body.wallet }" class="truncate">{ body.wallet }</a> add <strong>${ body.amount }</strong>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 128 }>
-                    <a href="/#user/{ body.from }" class="truncate">{ body.from }</a> send <strong>${ body.amount }</strong> to <a href="/#user/{ body.to }" class="truncate">{ body.to }</a>
+                    <a href="#user/{ body.from }" class="truncate">{ body.from }</a> send <strong>${ body.amount }</strong> to <a href="#user/{ body.to }" class="truncate">{ body.to }</a>
                 </div>
             </div>
         </div>
@@ -70,7 +70,7 @@
         </p>
     </virtual>
 
-    <a class="btn btn-lg btn-block btn-default" href="/#blockchain/">Back</a>
+    <a class="btn btn-lg btn-block btn-default" href="#blockchain/">Back</a>
 
     <script>
         var self = this;
