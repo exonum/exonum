@@ -1,8 +1,11 @@
-function Cryptocurrency() {
+/**
+ * Business logic
+ */
+function Cryptocurrency(serviceId, validators) {
 
     var Transactions = [{
         size: 80,
-        service_id: 128,
+        service_id: serviceId,
         message_id: 128,
         fields: {
             from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -12,7 +15,7 @@ function Cryptocurrency() {
         }
     }, {
         size: 48,
-        service_id: 128,
+        service_id: serviceId,
         message_id: 129,
         fields: {
             wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -21,14 +24,13 @@ function Cryptocurrency() {
         }
     }, {
         size: 40,
-        service_id: 128,
+        service_id: serviceId,
         message_id: 130,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
             name: {type: Exonum.String, size: 8, from: 32, to: 40}
         }
     }];
-
     var Wallet = Exonum.newType({
         size: 88,
         fields: {
@@ -53,7 +55,7 @@ function Cryptocurrency() {
         return;
     }
 
-    function getPublicKeyOfTransaction(transaction) {
+    function getPublicKeyOfTransactionOwner(transaction) {
         switch (transaction.message_id) {
             case 128:
                 return transaction.body.from;
@@ -70,15 +72,9 @@ function Cryptocurrency() {
         }
     }
 
-    /**
-     * Validation of transaction
-     * @param transaction
-     * @param hash
-     * @returns {boolean}
-     */
     function validateTransaction(transaction, hash) {
         var type = new Transaction(transaction.message_id);
-        var publicKey = getPublicKeyOfTransaction(transaction);
+        var publicKey = getPublicKeyOfTransactionOwner(transaction);
 
         type.signature = transaction.signature;
 
@@ -93,14 +89,7 @@ function Cryptocurrency() {
         return true;
     }
 
-    /**
-     * Validate structure
-     * @param publicKey
-     * @param validators
-     * @param data
-     * @returns {{block: Object, wallet: Object, transactions: Array}}
-     */
-    function getBlock(publicKey, validators, data) {
+    function getBlock(publicKey, data) {
         // validate block
         if (!Exonum.verifyBlock(data.block_info, validators)) {
             return undefined;
@@ -115,7 +104,7 @@ function Cryptocurrency() {
             }
         });
         var tableKeyData = {
-            service_id: 128,
+            service_id: serviceId,
             table_index: 0
         };
         var tableKey = Exonum.hash(tableKeyData, TableKey);
@@ -160,12 +149,16 @@ function Cryptocurrency() {
             transactions: transactions
         };
     }
+    
+    function calcHashesOfTransactions(transactions) {
+        for (var i in transactions) {
+            var type = new Transaction(transactions[i].message_id);
 
-    /**
-     * Generate new wallet with passed name
-     * @param name
-     * @returns {{pair: Object, transaction: Object}}
-     */
+            type.signature = transactions[i].signature;
+            transactions[i].hash = Exonum.hash(transactions[i].body, type);
+        }
+    }
+
     function createWalletTransaction(name) {
         var pair = Exonum.keyPair();
         var data = {
@@ -174,7 +167,7 @@ function Cryptocurrency() {
         };
         var signature = Exonum.sign(data, Transaction(130), pair.secretKey);
         var transaction = {
-            service_id: 128,
+            service_id: serviceId,
             message_id: 130,
             body: data,
             signature: signature
@@ -195,7 +188,7 @@ function Cryptocurrency() {
         var signature = Exonum.sign(data, Transaction(129), secretKey);
 
         return {
-            service_id: 128,
+            service_id: serviceId,
             message_id: 129,
             body: data,
             signature: signature
@@ -213,7 +206,7 @@ function Cryptocurrency() {
         var signature = Exonum.sign(data, Transaction(128), secretKey);
 
         return {
-            service_id: 128,
+            service_id: serviceId,
             message_id: 128,
             body: data,
             signature: signature
@@ -221,9 +214,9 @@ function Cryptocurrency() {
     }
 
     return {
-        Wallet: Wallet,
         Transaction: Transaction,
         getBlock: getBlock,
+        calcHashesOfTransactions: calcHashesOfTransactions,
         createWalletTransaction: createWalletTransaction,
         addFundsTransaction: addFundsTransaction,
         transferTransaction: transferTransaction

@@ -23,6 +23,6 @@ body {
 
 .truncate {
     font-family: "Lucida Console", Monaco, Courier, monospace;
-    font-size: 0.9em;
+    font-size: 0.875em;
     word-wrap: break-word;
 }
