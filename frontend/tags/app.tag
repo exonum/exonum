@@ -17,6 +17,7 @@
     <script>
         var self = this;
         var baseUrl = 'http://exonum.com/backends/currency/api/v1';
+        var serviceId = 128;
         var validators = [
             '7e2b6889b2e8b60e0e8d71be55b9cbf6aaa9bf397ef7b1d6b8564d862b120bea',
             '2f1e58c0752503e3b66a5f68d97ab44cac196c75608b53682c3da1f824f9391f',
@@ -25,18 +26,19 @@
         ];
 
         // business logic
-        var cryptocurrency = Cryptocurrency();
+        var cryptocurrency = Cryptocurrency(serviceId, validators);
 
         // global mixin with common functions and constants
         riot.mixin({
             api: {
                 cryptocurrency: cryptocurrency,
+
                 getWallet: function(publicKey, callback) {
                     $.ajax({
                         method: 'GET',
                         url: baseUrl + '/wallets/info?pubkey=' + publicKey,
                         success: function(response, textStatus, jqXHR) {
-                            var data = cryptocurrency.getBlock(publicKey, validators, response);
+                            var data = cryptocurrency.getBlock(publicKey, response);
                             callback(data);
                         },
                         error: function(jqXHR, textStatus, errorThrown) {
@@ -44,6 +46,7 @@
                         }
                     });
                 },
+
                 submitTransaction: function(transaction, callback) {
                     $.ajax({
                         method: 'POST',
@@ -56,6 +59,7 @@
                         }
                     });
                 },
+
                 loadBlockchain: function(from, callback) {
                     var callback = callback;
                     var urlSuffix = '';
@@ -73,18 +77,14 @@
                         }
                     });
                 },
+
                 loadBlock: function(height, callback) {
                     $.ajax({
                         method: 'GET',
                         url: baseUrl + '/blockchain/blocks/' + height,
                         success: function(data, textStatus, jqXHR) {
                             if (data) {
-                                for (var i in data.txs) {
-                                    var type = cryptocurrency.Transaction(data.txs[i].message_id);
-                                    type.signature = data.txs[i].signature;
-                                    // calculate hash for each transaction
-                                    data.txs[i].hash = Exonum.hash(data.txs[i].body, type);
-                                }
+                                cryptocurrency.calcHashesOfTransactions(data.txs);
                             }
                             callback(data);
                         },
@@ -93,6 +93,7 @@
                         }
                     });
                 },
+
                 loadTransaction: function(hash, callback) {
                     $.ajax({
                         method: 'GET',
@@ -109,11 +110,13 @@
                 getUsers: function() {
                     return JSON.parse(window.localStorage.getItem('users')) || [];
                 },
+
                 addUser: function(user) {
                     var users = JSON.parse(window.localStorage.getItem('users')) || [];
                     users.push(user);
                     window.localStorage.setItem('users', JSON.stringify(users));
                 },
+
                 getUser: function(publicKey) {
                     var users = JSON.parse(window.localStorage.getItem('users')) || [];
                     for (var i = 0; i < users.length; i++) {
