@@ -55,10 +55,10 @@
                     create <a href="/#user/{ body.pub_key }">{ body.name }</a> wallet
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
-                    add <strong>${ body.amount }</strong> to <a href="/#user/{ body.wallet }" class="truncate">{ body.wallet }</a> wallet
+                    <a href="/#user/{ body.wallet }" class="truncate">{ body.wallet }</a> add <strong>${ body.amount }</strong>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 128 }>
-                    send <strong>${ body.amount }</strong> from <a href="/#user/{ body.from }" class="truncate">{ body.from }</a> to <a href="/#user/{ body.to }" class="truncate">{ body.to }</a>
+                    <a href="/#user/{ body.from }" class="truncate">{ body.from }</a> send <strong>${ body.amount }</strong> to <a href="/#user/{ body.to }" class="truncate">{ body.to }</a>
                 </div>
             </div>
         </div>

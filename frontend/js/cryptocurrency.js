@@ -78,10 +78,10 @@ function Cryptocurrency(serviceId, validators) {
 
         type.signature = transaction.signature;
 
-        if (Exonum.hash(transaction.body, type) !== hash) {
+        if (type.hash(transaction.body) !== hash) {
             console.error('Wrong transaction hash.');
             return false;
-        } else if (!Exonum.verifySignature(transaction.body, type, transaction.signature, publicKey)) {
+        } else if (!type.verifySignature(transaction.body, transaction.signature, publicKey)) {
             console.error('Wrong transaction signature.');
             return false;
         }
@@ -107,7 +107,7 @@ function Cryptocurrency(serviceId, validators) {
             service_id: serviceId,
             table_index: 0
         };
-        var tableKey = Exonum.hash(tableKeyData, TableKey);
+        var tableKey = TableKey.hash(tableKeyData);
         var walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey);
         if (walletsHash === null) {
             return undefined;
@@ -155,7 +155,7 @@ function Cryptocurrency(serviceId, validators) {
             var type = new Transaction(transactions[i].message_id);
 
             type.signature = transactions[i].signature;
-            transactions[i].hash = Exonum.hash(transactions[i].body, type);
+            transactions[i].hash = type.hash(transactions[i].body);
         }
     }
 
@@ -165,7 +165,7 @@ function Cryptocurrency(serviceId, validators) {
             pub_key: pair.publicKey,
             name: name
         };
-        var signature = Exonum.sign(data, Transaction(130), pair.secretKey);
+        var signature = Transaction(130).sign(data, pair.secretKey);
         var transaction = {
             service_id: serviceId,
             message_id: 130,
@@ -185,7 +185,7 @@ function Cryptocurrency(serviceId, validators) {
             amount: amount,
             seed: seed
         };
-        var signature = Exonum.sign(data, Transaction(129), secretKey);
+        var signature = Transaction(129).sign(data, secretKey);
 
         return {
             service_id: serviceId,
@@ -203,7 +203,7 @@ function Cryptocurrency(serviceId, validators) {
             amount: amount,
             seed: seed
         };
-        var signature = Exonum.sign(data, Transaction(128), secretKey);
+        var signature = Transaction(128).sign(data, secretKey);
 
         return {
             service_id: serviceId,
