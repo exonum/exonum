@@ -220,9 +220,7 @@ impl Sandbox {
     }
 
     fn validators(&self) -> Vec<PublicKey> {
-        let view = self.blockchain_copy().view(); 
-        let schema = Schema::new(&view); 
-        let conf = schema.get_actual_configuration().unwrap(); 
+        let conf = self.cfg(); 
         conf.validators.clone()
     }
 
@@ -426,6 +424,12 @@ impl Sandbox {
 
     pub fn propose_timeout(&self) -> i64 {
         self.cfg().consensus.propose_timeout
+    }
+
+    
+    pub fn majority_count(&self) -> usize {
+        debug_assert!(self.n_validators() >= 4); 
+        self.n_validators() * 2 / 3 + 1
     }
 
     pub fn round_timeout(&self) -> i64 {

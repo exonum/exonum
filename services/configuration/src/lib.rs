@@ -12,7 +12,7 @@ use serde::{Serialize, Serializer};
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
 use exonum::crypto::{PublicKey, Hash, HexValue};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
-use exonum::storage::{MerkleTable, MemoryDB, Map, List, View, MapTable, MerklePatriciaTable,
+use exonum::storage::{Map, View, MapTable, MerklePatriciaTable,
                       Result as StorageResult};
 
 pub const CONFIG_SERVICE: u16 = 1;
