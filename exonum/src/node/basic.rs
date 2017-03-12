@@ -18,7 +18,9 @@ impl<S> NodeHandler<S>
         //     if !raw.verify() {
         //         return;
         //     }
-
+        
+        //FIXME: add whitelist verify public_key
+        
         let msg = Any::from_raw(raw).unwrap();
         match msg {
             Any::Connect(msg) => self.handle_connect(msg),
@@ -77,28 +79,32 @@ impl<S> NodeHandler<S>
 
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
+
+        let peer = msg.from();
+
         // Handle message from future height
         if msg.height() > height {
-            // Check validator height info
-            // FIXME: make sure that validator id < validator count
-            if msg.height() > self.state.validator_height(msg.validator()) {
-                // Update validator height
-                self.state.set_validator_height(msg.validator(), msg.height());
+
+            //verify message
+            if !msg.verify_signature(peer) {
+                return;
             }
-            // Verify validator if and signature
-            let peer = match self.state.public_key_of(msg.validator()) {
-                // Incorrect signature of message
-                Some(public_key) => {
-                    if !msg.verify_signature(public_key) {
-                        return;
+            
+            match self.state.get_validator_id(peer) {
+                // if message is status of validator 
+                Some(id) => {
+                    // Check validator height info
+                    if msg.height() > self.state.validator_height(id) {
+                        // Update validator height
+                        self.state.set_validator_height(id, msg.height());
                     }
-                    *public_key
                 }
-                // Incorrect validator id
-                None => return,
-            };
+                // if it just FullNode's message
+                None => (),
+            }
+
             // Request block
-            self.request(RequestData::Block(height), peer);
+            self.request(RequestData::Block(height), peer.clone());
         }
     }
 
@@ -112,7 +118,7 @@ impl<S> NodeHandler<S>
     pub fn handle_status_timeout(&mut self) {
         let hash = self.blockchain.last_hash().unwrap();
         // Send status
-        let status = Status::new(self.state.id(),
+        let status = Status::new(self.state.public_key(),
                                  self.state.height(),
                                  &hash,
                                  self.state.secret_key());

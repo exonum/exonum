@@ -8,7 +8,7 @@ use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPr
 use storage::{Map, Patch};
 use events::Channel;
 
-use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout, NodeType};
 
 
 // TODO reduce view invokations
@@ -401,7 +401,7 @@ impl<S> NodeHandler<S>
         // Add timeout for first round
         self.add_round_timeout();
         // Send propose we is leader
-        if self.is_leader() {
+        if self.state.is_leader() {
             self.add_propose_timeout();
         }
 
@@ -497,7 +497,7 @@ impl<S> NodeHandler<S>
             if has_majority_prevotes {
                 self.has_majority_prevotes(round, &hash);
             }
-        } else if self.is_leader() {
+        } else if self.state.is_leader() {
             self.add_propose_timeout();
         }
 
@@ -522,34 +522,36 @@ impl<S> NodeHandler<S>
         if self.state.have_prevote(round) {
             return;
         }
+        if let NodeType::Validator(id) = self.state.node_type() {
 
-        info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
+            info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
 
-        let round = self.state.round();
-        let max_count = ::std::cmp::min(self.txs_block_limit() as usize,
-                                        self.state.transactions().len());
-        let txs: Vec<Hash> = self.state
-            .transactions()
-            .keys()
-            .take(max_count)
-            .cloned()
-            .collect();
-        let propose = Propose::new(self.state.id(),
-                                   self.state.height(),
-                                   round,
-                                   self.state.last_hash(),
-                                   &txs,
-                                   self.state.secret_key());
-        trace!("Broadcast propose: {:?}", propose);
-        self.broadcast(propose.raw());
+            let round = self.state.round();
+            let max_count = ::std::cmp::min(self.txs_block_limit() as usize,
+                                            self.state.transactions().len());
+            let txs: Vec<Hash> = self.state
+                .transactions()
+                .keys()
+                .take(max_count)
+                .cloned()
+                .collect();
+            let propose = Propose::new(self.state.id(),
+                                    self.state.height(),
+                                    round,
+                                    self.state.last_hash(),
+                                    &txs,
+                                    self.state.secret_key());
+            trace!("Broadcast propose: {:?}", propose);
+            self.broadcast(propose.raw());
 
-        // Save our propose into state
-        let hash = self.state.add_self_propose(propose);
+            // Save our propose into state
+            let hash = self.state.add_self_propose(propose);
 
-        // Send prevote
-        let has_majority_prevotes = self.broadcast_prevote(round, &hash);
-        if has_majority_prevotes {
-            self.has_majority_prevotes(round, &hash);
+            // Send prevote
+            let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+            if has_majority_prevotes {
+                self.has_majority_prevotes(round, &hash);
+            }
         }
     }
 
@@ -621,11 +623,6 @@ impl<S> NodeHandler<S>
                    peer);
             self.send_to_peer(peer, &message);
         }
-    }
-
-    // TODO: move this to state
-    pub fn is_leader(&self) -> bool {
-        self.state.leader(self.state.round()) == self.state.id()
     }
 
     pub fn create_block(&mut self,
@@ -702,30 +699,36 @@ impl<S> NodeHandler<S>
     }
 
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
-        let locked_round = self.state.locked_round();
-        let prevote = Prevote::new(self.state.id(),
-                                   self.state.height(),
-                                   round,
-                                   propose_hash,
-                                   locked_round,
-                                   self.state.secret_key());
-        let has_majority_prevotes = self.state.add_prevote(&prevote);
-        trace!("Broadcast prevote: {:?}", prevote);
-        self.broadcast(prevote.raw());
-        has_majority_prevotes
-    }
-
-    pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
-        let precommit = Precommit::new(self.state.id(),
+        if let NodeType::Validator(id) = self.state.node_type() {
+            let locked_round = self.state.locked_round();
+            let prevote = Prevote::new(id,
                                        self.state.height(),
                                        round,
                                        propose_hash,
                                        block_hash,
                                        self.channel.get_time(),
                                        self.state.secret_key());
-        self.state.add_precommit(&precommit);
-        trace!("Broadcast precommit: {:?}", precommit);
-        self.broadcast(precommit.raw());
+            let has_majority_prevotes = self.state.add_prevote(&prevote);
+            trace!("Broadcast prevote: {:?}", prevote);
+            self.broadcast(prevote.raw());
+            has_majority_prevotes
+        } else {
+            false
+        }
+    }
+
+    pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
+       if let NodeType::Validator(id) = self.state.node_type() {
+            let precommit = Precommit::new(id,
+                                           self.state.height(),
+                                           round,
+                                           propose_hash,
+                                           block_hash,
+                                           self.state.secret_key());
+            self.state.add_precommit(&precommit);
+            trace!("Broadcast precommit: {:?}", precommit);
+            self.broadcast(precommit.raw());
+        }
     }
 
     // TODO reuse where is possible
