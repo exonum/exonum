@@ -32,14 +32,16 @@ pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
 
 pub struct State {
-    id: u32,
+    node_type: NodeType,
+
     secret_key: SecretKey,
     config: StoredConfiguration,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
-    height: u64,
     height_start_time: SystemTime,
+    height: Height,
+
     round: Round,
     locked_round: Round,
     locked_propose: Option<Hash>,
@@ -71,6 +73,12 @@ pub struct State {
     validator_heights: Vec<Height>,
 }
 
+// Тип ноды, если нода валидатор, то содержит id валидатора
+#[derive(Debug, Clone, Copy)]
+pub enum NodeType {
+    Validator(ValidatorId),
+    FullNode(PublicKey)
+}
 
 // Данные, которые нас интересуют,
 // специфичны для некоторой высоты
@@ -133,6 +141,31 @@ pub struct Votes<T: VoteMessage> {
     messages: Vec<T>,
     validators: BitVec,
     count: usize,
+}
+
+impl NodeType {
+    pub fn new(validator_id: Option<ValidatorId>, pk: &PublicKey) -> NodeType {
+        if let Some(id)  = validator_id {
+            NodeType::Validator(id)
+        } else {
+            NodeType::FullNode(pk.clone())
+        }
+    }
+
+    pub fn get_validator_id(&self) -> Option<ValidatorId> {
+        if let &NodeType::Validator(id) = self {
+            Some(id)
+        } else {
+            None
+        }
+    }
+    pub fn expect_validator_id(&self, msg: &str) -> ValidatorId {
+        if let &NodeType::Validator(id) = self {
+            id
+        } else {
+            panic!("{} for node_type: {:?}", msg, self)
+        }
+    }
 }
 
 impl<T> Votes<T>
@@ -254,7 +287,7 @@ impl BlockState {
 }
 
 impl State {
-    pub fn new(id: u32,
+    pub fn new(node_type: NodeType,
                secret_key: SecretKey,
                stored: StoredConfiguration,
                connect: Connect,
@@ -266,7 +299,7 @@ impl State {
         let validators_len = stored.validators.len();
 
         State {
-            id: id,
+            node_type: node_type,
 
             secret_key: secret_key,
             peers: HashMap::new(),
@@ -302,8 +335,14 @@ impl State {
         }
     }
 
-    pub fn id(&self) -> ValidatorId {
-        self.id
+    pub fn node_type(&self) -> NodeType {
+        self.node_type
+    }
+
+    pub fn is_leader(&self) -> bool {
+        self.node_type.get_validator_id()
+                      .map(|id| self.leader(self.round()) == id)
+                      .unwrap_or(false)
     }
 
     pub fn validators(&self) -> &[PublicKey] {
@@ -314,6 +353,13 @@ impl State {
         &self.config
     }
 
+    pub fn get_validator_id(&self, peer: &PublicKey) -> Option<ValidatorId> {
+        self.validators()
+            .iter()
+            .position(|pk| pk == peer)
+            .map(|id| id as ValidatorId)
+    }
+    
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
     }
@@ -323,14 +369,13 @@ impl State {
     }
 
     pub fn update_config(&mut self, config: StoredConfiguration) {
-        let id = config.validators
+        let node_type = NodeType::new(config.validators
             .iter()
             .position(|pk| pk == self.public_key())
-            .expect(&format!("self.public_key:{:?} not found in new actual config validators list:{:?}", 
-                    self.public_key(), 
-                    config.validators));
+            .map(|id| id as ValidatorId),
+            self.public_key());
 
-        self.id = id as u32;
+        self.node_type = node_type;
         self.config = config;
     }
 
@@ -365,7 +410,10 @@ impl State {
     }
 
     pub fn public_key(&self) -> &PublicKey {
-        self.public_key_of(self.id).unwrap()
+        match self.node_type {
+            NodeType::Validator(id) =>  self.public_key_of(id).unwrap(),
+            NodeType::FullNode(ref pk) => pk
+        }
     }
 
     pub fn secret_key(&self) -> &SecretKey {
@@ -384,6 +432,7 @@ impl State {
         self.validator_heights[id as usize] = height;
     }
 
+    // FIXME: название не отображает суть
     pub fn validator_heights(&self) -> Vec<ValidatorId> {
         self.validator_heights
             .iter()
@@ -521,7 +570,8 @@ impl State {
     }
 
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
-        debug_assert_eq!(msg.validator(), self.id);
+        let id = self.node_type.expect_validator_id("called add_self_propose");
+        debug_assert_eq!(msg.validator(), id);
         let propose_hash = msg.hash();
         self.proposes.insert(propose_hash,
                              ProposeState {
@@ -580,14 +630,16 @@ impl State {
 
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
         let majority_count = self.majority_count();
-        if msg.validator() == self.id() {
-            if let Some(other) = self.our_prevotes.insert(msg.round(), msg.clone()) {
-                if &other != msg {
-                    panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
-                           other,
-                           msg);
-                }
-            }
+        match self.node_type() {
+            NodeType::Validator(id) if id == msg.validator() => 
+                    if let Some(other) = self.our_prevotes.insert(msg.round(), msg.clone()) {
+                        if &other != msg {
+                            panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
+                                   other,
+                                   msg);
+                        }
+                    },
+            NodeType::Validator(_) | NodeType::FullNode(_) => {},
         }
 
         let key = (msg.round(), *msg.propose_hash());
@@ -622,15 +674,17 @@ impl State {
 
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
         let majority_count = self.majority_count();
-        if msg.validator() == self.id() {
-            if let Some(other) = self.our_precommits.insert(msg.round(), msg.clone()) {
-                if other.propose_hash() != msg.propose_hash() {
-                    panic!("Trying to send different precommits for same round, old={:?}, \
-                            new={:?}",
-                           other,
-                           msg);
-                }
-            }
+        match self.node_type() {
+            NodeType::Validator(id) if id == msg.validator() => 
+                        if let Some(other) = self.our_precommits.insert(msg.round(), msg.clone()) {
+                            if other.propose_hash() != msg.propose_hash() {
+                                panic!("Trying to send different precommits for same round, old={:?}, \
+                                        new={:?}",
+                                       other,
+                                       msg);
+                            }
+                        },
+            NodeType::Validator(_) | NodeType::FullNode(_) => {},
         }
 
         let key = (msg.round(), *msg.block_hash());
