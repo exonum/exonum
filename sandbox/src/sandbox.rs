@@ -498,8 +498,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let consensus = ConsensusConfig {
         round_timeout: 1000,
-        status_timeout: 50000,
-        peers_timeout: 50000,
+        status_timeout: 600000,
+        peers_timeout: 600000,
         propose_timeout: 200,
         txs_block_limit: 1000,
     };
