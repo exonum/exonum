@@ -306,6 +306,10 @@ impl State {
         &self.config.validators
     }
 
+    pub fn config(&self) -> &StoredConfiguration {
+        &self.config
+    }
+
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
     }

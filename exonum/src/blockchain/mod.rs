@@ -113,11 +113,11 @@ impl Blockchain {
     }
 
     pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
-        debug_assert!(table_idx <= u16::max_value() as usize); 
-        let size = mem::size_of::<u16>(); 
-        let mut vec = vec![0; 2 * size]; 
-        LittleEndian::write_u16(&mut vec[0..size], service_id); 
-        LittleEndian::write_u16(&mut vec[size..2*size], table_idx as u16); 
+        debug_assert!(table_idx <= u16::max_value() as usize);
+        let size = mem::size_of::<u16>();
+        let mut vec = vec![0; 2 * size];
+        LittleEndian::write_u16(&mut vec[0..size], service_id);
+        LittleEndian::write_u16(&mut vec[size..2*size], table_idx as u16);
         hash(&vec)
     }
 
@@ -149,18 +149,18 @@ impl Blockchain {
         let tx_hash = schema.block_txs(height).root_hash()?;
         // Get state hash
         let state_hash = {
-            let sum_table = schema.state_hash_aggregator(); 
+            let sum_table = schema.state_hash_aggregator();
             let vec_core_state = schema.core_state_hash()?;
             for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
-                let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx); 
-                sum_table.put(&key, core_table_hash)?; 
-            } 
+                let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
+                sum_table.put(&key, core_table_hash)?;
+            }
             for service in self.service_map.values(){
-                let service_id = service.service_id(); 
-                let vec_service_state = service.state_hash(&fork)?; 
+                let service_id = service.service_id();
+                let vec_service_state = service.state_hash(&fork)?;
                 for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
-                    let key = Blockchain::service_table_unique_key(service_id, idx); 
-                    sum_table.put(&key, service_table_hash)?; 
+                    let key = Blockchain::service_table_unique_key(service_id, idx);
+                    sum_table.put(&key, service_table_hash)?;
                 }
             }
             sum_table.root_hash()?

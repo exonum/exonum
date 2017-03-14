@@ -114,7 +114,9 @@ impl<'a> Schema<'a> {
         let height = self.configs_heights()
             .get(idx)?
             .unwrap();
-        self.get_configuration_at_height(height).map(|x| x.unwrap())
+        let res = self.get_configuration_at_height(height).map(|x| x.unwrap());
+        trace!("Retrieved actual_config: {:?}", res);
+        res
     }
 
     pub fn get_following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
