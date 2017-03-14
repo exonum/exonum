@@ -75,6 +75,10 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.secret_key()
     }
 
+    pub fn actual_config(&self) -> &StoredConfiguration {
+        self.state.config()
+    }
+
     pub fn consensus_config(&self) -> &ConsensusConfig {
         self.state.consensus_config()
     }
