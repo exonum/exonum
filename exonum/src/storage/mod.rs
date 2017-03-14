@@ -77,7 +77,7 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
                 Ok(())
             }
             _ => {
-                return Err(Error::new("One of swap indexes is not present in list"))
+                Err(Error::new("One of swap indexes is not present in list"))
             }
         }
     }
