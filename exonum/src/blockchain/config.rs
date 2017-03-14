@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use ::crypto::PublicKey;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
     pub actual_from: u64,
     pub validators: Vec<PublicKey>,
@@ -14,7 +14,7 @@ pub struct StoredConfiguration {
     pub services: BTreeMap<u16, Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
     pub round_timeout: i64,
     pub status_timeout: i64,

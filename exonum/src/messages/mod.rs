@@ -9,7 +9,7 @@ mod raw;
 mod error;
 mod fields;
 mod protocol;
-pub mod utils; 
+pub mod utils;
 
 use time::Timespec;
 use bit_vec;

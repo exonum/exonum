@@ -14,7 +14,7 @@ mod merkle_table;
 mod fields;
 mod db;
 mod merkle_patricia_table;
-mod utils; 
+mod utils;
 
 pub use leveldb::options::Options as LevelDBOptions;
 pub use leveldb::database::cache::Cache as LevelDBCache;
@@ -25,11 +25,11 @@ pub use self::memorydb::{MemoryDB, MemoryDBView};
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::fields::{StorageValue, HeightBytes};
-pub use self::merkle_table::MerkleTable; 
-pub use self::merkle_table::proofnode::Proofnode; 
+pub use self::merkle_table::MerkleTable;
+pub use self::merkle_table::proofnode::Proofnode;
 pub use self::merkle_patricia_table::{MerklePatriciaTable};
-pub use self::merkle_patricia_table::proofpathtokey::RootProofNode; 
-pub use self::utils::bytes_to_hex; 
+pub use self::merkle_patricia_table::proofpathtokey::RootProofNode;
+pub use self::utils::bytes_to_hex;
 
 #[derive(Debug)]
 pub struct Error {

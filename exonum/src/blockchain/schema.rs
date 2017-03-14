@@ -43,8 +43,8 @@ impl<'a> Schema<'a> {
 
     pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
         let block_hash = match self.heights().get(height)? {
-            None => return Ok(None), 
-            Some(block_hash) => block_hash, 
+            None => return Ok(None),
+            Some(block_hash) => block_hash,
         };
         let block = self.blocks().get(&block_hash)?.unwrap();
         let precommits_table = self.precommits(&block_hash);

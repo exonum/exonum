@@ -242,7 +242,7 @@ pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
 pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
                                    sandbox_state: &SandboxState,
                                    transactions: &[Hash]) -> Option<Propose> {
-    let mut res = None; 
+    let mut res = None;
     let round_timeout = sandbox.round_timeout(); //use local var to save long code call
 
     trace!("-------------------------add_round_with_transactions started-------------------------");
@@ -318,7 +318,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
-    let mut propose: Option<Propose>; 
+    let mut propose: Option<Propose>;
 
     for _ in 0..sandbox.n_validators() {
         propose = add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
@@ -376,7 +376,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
 
                 if val_idx != sandbox.majority_count() -1 {
                     sandbox.assert_state(initial_height, round);
-                } 
+                }
             }
             sandbox.assert_state(initial_height + 1, ROUND_ONE);
             {
