@@ -27,7 +27,7 @@ pub use self::list_table::ListTable;
 pub use self::fields::{StorageValue, HeightBytes};
 pub use self::merkle_table::MerkleTable;
 pub use self::merkle_table::proofnode::Proofnode;
-pub use self::merkle_patricia_table::{MerklePatriciaTable};
+pub use self::merkle_patricia_table::MerklePatriciaTable;
 pub use self::merkle_patricia_table::proofpathtokey::RootProofNode;
 pub use self::utils::bytes_to_hex;
 
@@ -67,6 +67,20 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
     fn last(&self) -> Result<Option<V>>;
     fn is_empty(&self) -> Result<bool>;
     fn len(&self) -> Result<K>;
+    fn swap(&self, i: K, j: K) -> Result<()> {
+        let first_val = self.get(i)?;
+        let second_val = self.get(j)?;
+        match (first_val, second_val) {
+            (Some(i_val), Some(j_val)) => {
+                self.set(j, i_val)?;
+                self.set(i, j_val)?;
+                Ok(())
+            }
+            _ => {
+                return Err(Error::new("One of swap indexes is not present in list"))
+            }
+        }
+    }
 }
 
 impl Error {

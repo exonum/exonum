@@ -118,22 +118,22 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
                     let right_proof =
                         self.construct_proof_subtree(subtree_hight, righ_child_index, r_s, r_e)?;
                     Proofnode::Full(Box::new(left_proof), Box::new(right_proof))
-                } 
+                }
                 (Some((l_s, l_e)), None) => {
                     let left_proof =
                         self.construct_proof_subtree(subtree_hight, left_child_index, l_s, l_e)?;
                     let right_hash = self.get_hash(subtree_hight, righ_child_index)?;
                     Proofnode::Left(Box::new(left_proof), right_hash)
-                } 
+                }
                 (None, Some((r_s, r_e))) => {
                     let left_hash = self.get_hash(subtree_hight, left_child_index)?.unwrap();
                     let right_proof =
                         self.construct_proof_subtree(subtree_hight, righ_child_index, r_s, r_e)?;
                     Proofnode::Right(left_hash, Box::new(right_proof))
-                } 
+                }
                 (None, None) => {
                     unreachable!();
-                } 
+                }
             };
         } else {
             unreachable!();
@@ -414,24 +414,24 @@ mod tests {
     #[test]
     fn generate_proof_in_table_containing_hashes() {
         let storage = MemoryDB::new();
-        let table: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Hash>= MerkleTable::new(MapTable::new(vec![255], &storage));
+        let table: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Hash> =
+            MerkleTable::new(MapTable::new(vec![255], &storage));
         let num_vals = 10u32;
         let values = generate_fully_random_data_keys(num_vals as usize);
-        let hash_vals: Vec<Hash> = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>(); 
+        let hash_vals: Vec<Hash> = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>();
         for value in &hash_vals {
-            table.append(*value).unwrap(); 
+            table.append(*value).unwrap();
         }
         let table_root_hash = table.root_hash().unwrap();
         let table_len = table.len().unwrap() as usize;
-        let st_r = 0; 
-        let end_r = 5; 
+        let st_r = 0;
+        let end_r = 5;
         let range_proof = table.construct_path_for_range(st_r, end_r).unwrap();
         assert_eq!(range_proof.compute_proof_root(), table_root_hash);
         {
             let (inds, actual_vals): (Vec<_>, Vec<&Hash>) =
-            proof_indices_values(&range_proof).into_iter().unzip();
-            assert_eq!(inds,
-            (st_r as usize..end_r as usize).collect::<Vec<_>>());
+                proof_indices_values(&range_proof).into_iter().unzip();
+            assert_eq!(inds, (st_r as usize..end_r as usize).collect::<Vec<_>>());
             let expect_vals = &hash_vals[st_r as usize..end_r as usize];
             let paired = expect_vals.iter().zip(actual_vals);
             for pair in paired {
@@ -742,6 +742,34 @@ mod tests {
 
         t.set(0, vec![2]).unwrap();
         assert_eq!(t.root_hash().unwrap(), h2);
+    }
+
+    #[test]
+    fn test_swap_values() {
+
+        let s1 = MemoryDB::new();
+        let t1: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Vec<u8>> =
+            MerkleTable::new(MapTable::new(vec![255], &s1));
+        let values1 = vec![
+            vec![1],
+            vec![2],
+            vec![33],
+            vec![44],
+        ];
+        t1.extend(values1).unwrap();
+        t1.swap(2, 3).unwrap();
+
+        let s2 = MemoryDB::new();
+        let t2: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Vec<u8>> =
+            MerkleTable::new(MapTable::new(vec![255], &s2));
+        let values2 = vec![
+            vec![1],
+            vec![2],
+            vec![44],
+            vec![33],
+        ];
+        t2.extend(values2).unwrap();
+        assert_eq!(t1.root_hash().unwrap(), t2.root_hash().unwrap());
     }
 
     #[test]

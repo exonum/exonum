@@ -40,8 +40,8 @@ mod tests {
     }
 
     #[test]
-    fn change_service_config() {
-        blockchain_explorer::helpers::init_logger();
+    fn test_change_service_config() {
+        let _ = blockchain_explorer::helpers::init_logger();
         let sandbox = configuration_sandbox();
         let sandbox_state = SandboxState::new();
         let initial_cfg = sandbox.cfg();
@@ -109,9 +109,9 @@ mod tests {
 
     /// regression: votes' were summed for all proposes simultaneously, and not for the same propose
     #[test]
-    fn regression_majority_votes_for_different_proposes() {
+    fn test_regression_majority_votes_for_different_proposes() {
 
-        blockchain_explorer::helpers::init_logger();
+        let _ = blockchain_explorer::helpers::init_logger();
         let sandbox = configuration_sandbox();
         let sandbox_state = SandboxState::new();
 
@@ -173,9 +173,9 @@ mod tests {
     }
 
     #[test]
-    fn regression_new_vote_for_older_config_applies_old_config() {
+    fn test_regression_new_vote_for_older_config_applies_old_config() {
 
-        blockchain_explorer::helpers::init_logger();
+        let _ = blockchain_explorer::helpers::init_logger();
         let sandbox = configuration_sandbox();
         let sandbox_state = SandboxState::new();
 
