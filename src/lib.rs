@@ -21,9 +21,9 @@ pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
 
 message! {
     TxConfigPropose {
-        const TYPE = CONFIG_SERVICE;        
+        const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 56; 
+        const SIZE = 56;
 
         from:           &PublicKey  [00 => 32]
         height:         u64         [32 => 40]
@@ -34,10 +34,10 @@ message! {
 
 message! {
     TxConfigVote {
-        const TYPE = CONFIG_SERVICE;   
+        const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_VOTE_MESSAGE_ID;
-        const SIZE = 81; 
-        
+        const SIZE = 81;
+
         from:           &PublicKey  [00 => 32]
         height:         u64         [32 => 40]
         hash_propose:   &Hash       [40 => 72] // hash of transacion we're voting for
@@ -87,7 +87,7 @@ impl Serialize for ConfigTx {
     {
         match *self {
             ConfigTx::ConfigPropose(ref propose) => propose.serialize(ser),
-            ConfigTx::ConfigVote(ref vote) => vote.serialize(ser),            
+            ConfigTx::ConfigVote(ref vote) => vote.serialize(ser),
         }
     }
 }
@@ -164,14 +164,14 @@ impl<'a> ConfigurationSchema<'a> {
         ConfigurationSchema { view: view }
     }
 
-    fn config_proposes
+    pub fn config_proposes
         (&self)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, TxConfigPropose> {
         // config_propose paricia merkletree <hash_tx> транзакция пропоз
         MerklePatriciaTable::new(MapTable::new(vec![04], self.view))
     }
 
-    fn config_votes
+    pub fn config_votes
         (&self)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, TxConfigVote> {
         // config_votes patricia merkletree <pub_key> последний голос
@@ -247,6 +247,7 @@ impl TxConfigVote {
 
         let msg = self.clone();
         config_schema.config_votes().put(msg.from(), self.clone())?;
+        info!("posted tx: {:?}", self.clone());
 
         let mut votes_count = 0;
         for pub_key in config.validators.clone() {
@@ -257,7 +258,8 @@ impl TxConfigVote {
             }
         }
 
-        if votes_count > 2 / 3 * config.validators.len() {
+        info!("majority count: {}", 2 * config.validators.len() /3);
+        if votes_count > 2 * config.validators.len() / 3 {
             if let Some(config_propose) =
                 config_schema.config_proposes()
                     .get(self.hash_propose())? {
