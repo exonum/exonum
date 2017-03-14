@@ -4,7 +4,7 @@ use std::cell::{RefCell, Ref};
 use std::sync::{Arc, Mutex};
 use std::net::SocketAddr;
 use std::ops::Drop;
-use std::collections::HashMap; 
+use std::collections::HashMap;
 
 use time::{Timespec, Duration};
 
@@ -171,7 +171,7 @@ pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
     //pub validators: Vec<(PublicKey, SecretKey)>,
-    pub validators_map: HashMap<PublicKey, SecretKey>, 
+    pub validators_map: HashMap<PublicKey, SecretKey>,
     addresses: Vec<SocketAddr>,
 }
 
@@ -210,7 +210,7 @@ impl Sandbox {
     }
 
     pub fn s(&self, id: usize) -> &SecretKey {
-        let p = self.p(id); 
+        let p = self.p(id);
         &self.validators_map[&p]
         //&self.validators[id].1
     }
@@ -219,8 +219,8 @@ impl Sandbox {
         self.addresses[id].clone()
     }
 
-    fn validators(&self) -> Vec<PublicKey> {
-        let conf = self.cfg(); 
+    pub fn validators(&self) -> Vec<PublicKey> {
+        let conf = self.cfg();
         conf.validators.clone()
     }
 
@@ -426,9 +426,9 @@ impl Sandbox {
         self.cfg().consensus.propose_timeout
     }
 
-    
+
     pub fn majority_count(&self) -> usize {
-        debug_assert!(self.n_validators() >= 4); 
+        debug_assert!(self.n_validators() >= 4);
         self.n_validators() * 2 / 3 + 1
     }
 
@@ -551,8 +551,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         inner: inner.clone(),
         handler: node,
     };
-    let mut validators_map = HashMap::new(); 
-    validators_map.extend(validators); 
+    let mut validators_map = HashMap::new();
+    validators_map.extend(validators);
     reactor.handler.initialize();
     let sandbox = Sandbox {
         inner: inner.clone(),
