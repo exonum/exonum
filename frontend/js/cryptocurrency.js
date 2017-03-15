@@ -150,7 +150,7 @@ function Cryptocurrency(serviceId, validators) {
         };
     }
     
-    function calcHashesOfTransactions(transactions) {
+    function calculateHashesOfTransactions(transactions) {
         for (var i in transactions) {
             var type = new Transaction(transactions[i].message_id);
 
@@ -216,7 +216,7 @@ function Cryptocurrency(serviceId, validators) {
     return {
         Transaction: Transaction,
         getBlock: getBlock,
-        calcHashesOfTransactions: calcHashesOfTransactions,
+        calculateHashesOfTransactions: calculateHashesOfTransactions,
         createWalletTransaction: createWalletTransaction,
         addFundsTransaction: addFundsTransaction,
         transferTransaction: transferTransaction

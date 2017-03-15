@@ -84,7 +84,7 @@
                         url: baseUrl + '/blockchain/blocks/' + height,
                         success: function(data, textStatus, jqXHR) {
                             if (data) {
-                                cryptocurrency.calcHashesOfTransactions(data.txs);
+                                cryptocurrency.calculateHashesOfTransactions(data.txs);
                             }
                             callback(data);
                         },
