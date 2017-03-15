@@ -10,10 +10,11 @@ use std::fmt;
 use serde::{Serialize, Serializer};
 
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
-use exonum::crypto::{PublicKey, Hash, HexValue};
+use exonum::crypto::{PublicKey, Hash, HASH_SIZE};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
-use exonum::storage::{Map, View, MapTable, MerklePatriciaTable,
+use exonum::storage::{StorageValue, Map, View, MapTable, MerklePatriciaTable,
                       Result as StorageResult};
+use exonum::blockchain::StoredConfiguration;
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
@@ -54,10 +55,9 @@ impl Serialize for TxConfigPropose {
     {
         let mut state;
         state = ser.serialize_struct("config_propose", 4)?;
-        ser.serialize_struct_elt(&mut state, "from", self.from().to_hex())?;
-        ser.serialize_struct_elt(&mut state, "height", self.height())?;
-        ser.serialize_struct_elt(&mut state, "config", self.config())?;
-        ser.serialize_struct_elt(&mut state, "actual_from_height", self.actual_from_height())?;
+        ser.serialize_struct_elt(&mut state, "from", self.from())?;
+        ser.serialize_struct_elt(&mut state, "previous_config_hash", self.prev_cfg_hash())?;
+        ser.serialize_struct_elt(&mut state, "config", self.cfg())?;
         ser.serialize_struct_end(state)
     }
 }
@@ -68,11 +68,8 @@ impl Serialize for TxConfigVote {
     {
         let mut state;
         state = ser.serialize_struct("vote", 5)?;
-        ser.serialize_struct_elt(&mut state, "from", self.from().to_hex())?;
-        ser.serialize_struct_elt(&mut state, "height", self.height())?;
-        ser.serialize_struct_elt(&mut state, "hash_propose", self.hash_propose().to_hex())?;
-        ser.serialize_struct_elt(&mut state, "seed", self.seed())?;
-        ser.serialize_struct_elt(&mut state, "revoke", self.revoke())?;
+        ser.serialize_struct_elt(&mut state, "from", self.from())?;
+        ser.serialize_struct_elt(&mut state, "config_hash", self.cfg_hash())?;
         ser.serialize_struct_end(state)
     }
 }
@@ -100,13 +97,6 @@ impl ConfigTx {
         match *self {
             ConfigTx::ConfigPropose(ref msg) => msg.from(),
             ConfigTx::ConfigVote(ref msg) => msg.from(),
-        }
-    }
-
-    pub fn height(&self) -> u64 {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.height(),
-            ConfigTx::ConfigVote(ref msg) => msg.height(),
         }
     }
 }
@@ -149,8 +139,8 @@ impl Message for ConfigTx {
 
     fn hash(&self) -> Hash {
         match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.hash(),
-            ConfigTx::ConfigVote(ref msg) => msg.hash(),
+            ConfigTx::ConfigPropose(ref msg) =>Message::hash(msg),
+            ConfigTx::ConfigVote(ref msg) => Message::hash(msg),
         }
     }
 }
@@ -160,35 +150,25 @@ impl<'a> ConfigurationSchema<'a> {
         ConfigurationSchema { view: view }
     }
 
+    /// mapping Hash(config) -> TxConfigPropose
     pub fn config_proposes
         (&self)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, TxConfigPropose> {
-        // config_propose paricia merkletree <hash_tx> транзакция пропоз
         MerklePatriciaTable::new(MapTable::new(vec![04], self.view))
     }
 
+    /// mapping Validator_public_key -> TxConfigVote
     pub fn config_votes
-        (&self)
+        (&self, config_hash: Hash)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, TxConfigVote> {
-        // config_votes patricia merkletree <pub_key> последний голос
-        MerklePatriciaTable::new(MapTable::new(vec![05], self.view))
+        let mut prefix = vec![05; 1 + HASH_SIZE];
+        prefix[1..].copy_from_slice(config_hash.as_ref());
+        MerklePatriciaTable::new(MapTable::new(prefix, self.view))
     }
 
 
     pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
-        Ok(vec![self.config_proposes().root_hash()?, self.config_votes().root_hash()?])
-    }
-
-    pub fn get_config_propose(&self,
-                              hash: &Hash)
-                              -> Result<Option<TxConfigPropose>, exonum::storage::Error> {
-        self.config_proposes().get(hash)
-    }
-
-    pub fn get_vote(&self,
-                    pub_key: &PublicKey)
-                    -> Result<Option<TxConfigVote>, exonum::storage::Error> {
-        self.config_votes().get(pub_key)
+        Ok(Vec::new())
     }
 }
 
@@ -197,73 +177,55 @@ impl TxConfigPropose {
         let blockchain_schema = Schema::new(view);
         let config_schema = ConfigurationSchema::new(view);
 
-        let config = blockchain_schema.get_actual_configuration()?;
-        if !config.validators.contains(self.from()) {
-            error!("ConfigPropose from unknown validator: {:?}", self.from());
+        let actual_config: StoredConfiguration = blockchain_schema.get_actual_configuration()?;
+        let following_config: Option<StoredConfiguration> = blockchain_schema.get_following_configuration()?;
+        if let Some(foll_cfg) = following_config {
+            error!("Discarding TxConfigPropose: {:?} as there is an already scheduled next config: {:?} ", self, foll_cfg);
             return Ok(());
         }
 
-        let hash = self.hash();
-        if config_schema.config_proposes().get(&hash)?.is_some() {
-            error!("Received config_propose has already been handled, msg={:?}",
+        let actual_config_hash = actual_config.hash();
+        if *self.prev_cfg_hash() != actual_config_hash {
+            error!("Discarding TxConfigPropose:{:?} which does not reference actual config: {:?}", self, actual_config);
+            return Ok(());
+        }
+
+        if !actual_config.validators.contains(self.from()) {
+            error!("TxConfigPropose:{:?} from unknown validator. ", self.from());
+            return Ok(());
+        }
+
+        let config_candidate = StoredConfiguration::deserialize_err(self.cfg());
+        if config_candidate.is_err() {
+            error!("Discarding TxConfigPropose:{:?} which contains config, which cannot be parsed: {:?}", self, config_candidate);
+            return Ok(());
+        }
+
+        let config_candidate_body = config_candidate.unwrap();
+        let current_height = blockchain_schema.last_height()? + 1;
+        let actual_from = config_candidate_body.actual_from;
+        if actual_from <= current_height {
+            error!("Discarding TxConfigPropose:{:?} which has actual_from height less than current: {:?}", self, current_height);
+            return Ok(());
+        }
+
+        let config_hash = config_candidate_body.hash();
+
+        if config_schema.config_proposes().get(&config_hash)?.is_some() {
+            error!("Discarding TxConfigPropose that has already been handled, msg={:?}",
                    self);
             return Ok(());
         }
 
-        trace!("Handle ConfigPropose");
-        config_schema.config_proposes().put(&hash, self.clone())?;
+        config_schema.config_proposes().put(&config_hash, self.clone())?;
+        trace!("Put TxConfigPropose {:?} to config_proposes table", self);
         Ok(())
     }
 }
 
 impl TxConfigVote {
     fn execute(&self, view: &View) -> StorageResult<()> {
-        let blockchain_schema = Schema::new(view);
-        let config_schema = ConfigurationSchema::new(view);
-
-        let config = blockchain_schema.get_actual_configuration()?;
-
-        if !config.validators.contains(self.from()) {
-            error!("ConfigVote from unknown validator: {:?}", self.from());
-            return Ok(());
-        }
-
-        if config_schema.config_proposes().get(self.hash_propose())?.is_none() {
-            error!("Received config_vote for unknown transaciton, msg={:?}",
-                   self);
-            return Ok(());
-        }
-
-        if let Some(vote) = config_schema.config_votes().get(self.from())? {
-            if vote.seed() != self.seed() - 1 {
-                error!("Received config_vote with wrong seed, msg={:?}", self);
-                return Ok(());
-            }
-        }
-
-        let msg = self.clone();
-        config_schema.config_votes().put(msg.from(), self.clone())?;
-        info!("posted tx: {:?}", self.clone());
-
-        let mut votes_count = 0;
-        for pub_key in config.validators.clone() {
-            if let Some(vote) = config_schema.config_votes().get(&pub_key)? {
-                if !vote.revoke() {
-                    votes_count += 1;
-                }
-            }
-        }
-
-        info!("majority count: {}", 2 * config.validators.len() /3);
-        if votes_count > 2 * config.validators.len() / 3 {
-            if let Some(config_propose) =
-                config_schema.config_proposes()
-                    .get(self.hash_propose())? {
-                blockchain_schema.commit_actual_configuration(config_propose.actual_from_height(),
-                                                 config_propose.config())?;
-            }
-        }
-        Ok(())
+        unimplemented!();
     }
 }
 

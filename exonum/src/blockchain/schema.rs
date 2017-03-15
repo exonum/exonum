@@ -99,10 +99,11 @@ impl<'a> Schema<'a> {
         if actual_from > 0 {
             let last_actual_from = self.configs_actual_from()
                 .last()?
-                .expect(&format!("configs_actual_from table returned None on last()"))
+                .expect("configs_actual_from table returned None on last()")
                 .actual_from();
             if actual_from <= last_actual_from {
-                return Err(Error::new(format!("Attempting to commit configuration with actual_from {:?} less than the last committed actual_from {:?}",  actual_from, last_actual_from)));
+                return Err(Error::new(format!("Attempting to commit configuration with actual_from {:?} less than \
+                                              the last committed actual_from {:?}",  actual_from, last_actual_from)));
             }
         }
         let cfg_hash = config_data.hash();
@@ -121,7 +122,8 @@ impl<'a> Schema<'a> {
 
         let idx = cfg_references.into_iter()
          .rposition(|r| r.actual_from() <= h)
-         .expect(&format!("Couldn't find a config in configs_actual_from table with actual_from height less than the current height: {:?}", h));
+         .expect(&format!("Couldn't find a config in configs_actual_from table with actual_from height less than \
+                          the current height: {:?}", h));
         Ok(idx as u64)
     }
 
