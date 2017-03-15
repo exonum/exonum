@@ -19,10 +19,6 @@ impl<T: Deserialize> DeserializeFromJson for T {
             .map_err(|e| Error::new(format!("Error deserializing from json: {}", e)))
     }
 }
-
-#[derive(Clone)]
-pub struct HeightBytes(pub [u8; 32]);
-
 pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;
     fn deserialize(v: Vec<u8>) -> Self;
@@ -160,38 +156,4 @@ impl StorageValue for Vec<u8> {
     }
 }
 
-impl AsRef<[u8]> for HeightBytes {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
-    }
-}
 
-impl From<u64> for HeightBytes {
-    fn from(b: u64) -> HeightBytes {
-        let mut v = [0u8; 32];
-        BigEndian::write_u64(&mut v, b);
-        HeightBytes(v)
-    }
-}
-
-impl From<HeightBytes> for u64 {
-    fn from(b: HeightBytes) -> u64 {
-        BigEndian::read_u64(b.as_ref())
-    }
-}
-
-impl StorageValue for HeightBytes {
-    fn serialize(self) -> Vec<u8> {
-        self.as_ref().to_vec()
-    }
-
-    fn deserialize(v: Vec<u8>) -> Self {
-        let mut b = [0u8; 32];
-        b.clone_from_slice(v.as_slice());
-        HeightBytes(b)
-    }
-
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
-}

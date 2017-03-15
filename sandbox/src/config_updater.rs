@@ -2,6 +2,7 @@ use exonum::crypto::{PublicKey, Hash};
 use exonum::blockchain::{Service, Transaction, Schema};
 use exonum::messages::{RawTransaction, Message, FromRaw, Error as MessageError};
 use exonum::storage::{View, Error as StorageError};
+use exonum::blockchain::StoredConfiguration;
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
@@ -34,7 +35,7 @@ impl Transaction for TxConfig {
 
     fn execute(&self, view: &View) -> Result<(), StorageError> {
         let schema = Schema::new(view);
-        schema.commit_actual_configuration(self.actual_from_height(), self.config())
+        schema.commit_actual_configuration(StoredConfiguration::deserialize_err(self.config()).unwrap())
     }
 }
 

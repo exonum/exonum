@@ -22,7 +22,7 @@ use ::storage::{Patch, Database, Fork, Error, Map, List, Storage,
                 View as StorageView};
 
 pub use self::block::Block;
-pub use self::schema::{ConfigurationData, Schema};
+pub use self::schema::Schema;
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, NodeState};
@@ -103,7 +103,7 @@ impl Blockchain {
                     let _ = block_hash;
                     return Ok(());
                 }
-                schema.commit_actual_configuration(0, config_propose.serialize().as_ref())?;
+                schema.commit_actual_configuration(config_propose)?;
             };
             self.merge(&view.changes())?;
             self.create_patch(0, 0, time, &[], &BTreeMap::new())?.1
