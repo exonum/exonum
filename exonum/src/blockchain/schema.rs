@@ -1,12 +1,19 @@
-use crypto::Hash;
+use crypto::{Hash, hash};
 use messages::{RawMessage, Precommit, BlockProof};
-use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, HeightBytes,
-              Error, Map, List, RootProofNode, View};
+use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
+              List, RootProofNode, View};
 
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
-pub type ConfigurationData = Vec<u8>;
+storage_value! (
+    ConfigReference {
+        const SIZE = 40;
+        actual_from: u64    [00 => 08]
+        cfg_hash:    &Hash  [08 => 40]
+    }
+);
+
 
 pub struct Schema<'a> {
     view: &'a View,
@@ -29,9 +36,7 @@ impl<'a> Schema<'a> {
         ListTable::new(MapTable::new(vec![02], self.view))
     }
 
-    pub fn block_txs(&self,
-                     height: u64)
-                     -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u32, Hash> {
+    pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u32, Hash> {
         MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.view))
     }
 
@@ -58,14 +63,15 @@ impl<'a> Schema<'a> {
 
     pub fn configs
         (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, HeightBytes, ConfigurationData> {
+         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StoredConfiguration> {
         // configs patricia merkletree <высота блока> json
         MerklePatriciaTable::new(MapTable::new(vec![06], self.view))
     }
 
     // TODO: consider List index to reduce storage volume
-    pub fn configs_heights(&self)
-                           -> ListTable<MapTable<View, [u8], Vec<u8>>, u64, HeightBytes> {
+    pub fn configs_actual_from
+        (&self)
+         -> ListTable<MapTable<View, [u8], Vec<u8>>, u64, ConfigReference> {
         ListTable::new(MapTable::new(vec![07], self.view))
     }
 
@@ -87,65 +93,69 @@ impl<'a> Schema<'a> {
     }
 
     pub fn commit_actual_configuration(&self,
-                                       actual_from: u64,
-                                       config_data: &[u8])
+                                       config_data: StoredConfiguration)
                                        -> Result<(), Error> {
-        let height_bytecode = actual_from.into();
-        self.configs().put(&height_bytecode, config_data.to_vec())?;
-        self.configs_heights().append(height_bytecode)?;
+        let actual_from = config_data.actual_from;
+        if actual_from > 0 {
+            let last_actual_from = self.configs_actual_from()
+                .last()?
+                .expect(&format!("configs_actual_from table returned None on last()"))
+                .actual_from();
+            if actual_from <= last_actual_from {
+                return Err(Error::new(format!("Attempting to commit configuration with actual_from {:?} less than the last committed actual_from {:?}",  actual_from, last_actual_from)));
+            }
+        }
+        let cfg_hash = config_data.hash();
+
+        self.configs().put(&cfg_hash, config_data)?;
+        let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
+        self.configs_actual_from().append(cfg_ref)?;
         // TODO: clear storages
         Ok(())
     }
 
     pub fn get_actual_configurations_index(&self) -> Result<u64, Error> {
-        // TODO improve perfomance, use iterators and binary search
         let h = self.last_height()? + 1;
-        let heights = self.configs_heights();
-        let height_values = heights.values().unwrap();
+        let configs_actual_from = self.configs_actual_from();
+        let cfg_references: Vec<ConfigReference> = configs_actual_from.values()?;
 
-        let idx = height_values.into_iter()
-            .rposition(|r| u64::from(r) <= h)
-            .unwrap();
+        let idx = cfg_references.into_iter()
+         .rposition(|r| r.actual_from() <= h)
+         .expect(&format!("Couldn't find a config in configs_actual_from table with actual_from height less than the current height: {:?}", h));
         Ok(idx as u64)
     }
 
     pub fn get_actual_configuration(&self) -> Result<StoredConfiguration, Error> {
         let idx = self.get_actual_configurations_index()?;
-        let height = self.configs_heights()
+        let cfg_ref: ConfigReference = self.configs_actual_from()
             .get(idx)?
-            .unwrap();
-        let res = self.get_configuration_at_height(height).map(|x| x.unwrap());
+            .expect(&format!("No element at idx {:?} in configs_actual_from table", idx));
+        let cfg_hash = cfg_ref.cfg_hash();
+        let res = self.get_configuration_by_hash(cfg_hash).map(|x| {
+            x.expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash))
+        });
         trace!("Retrieved actual_config: {:?}", res);
         res
     }
 
     pub fn get_following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
         let idx = self.get_actual_configurations_index()?;
-        if let Some(height) = self.configs_heights().get(idx + 1)? {
-            self.get_configuration_at_height(height)
-        } else {
-            Ok(None)
-        }
+        let res = match self.configs_actual_from().get(idx + 1)? {
+            Some(cfg_ref) => {
+                let cfg_hash = cfg_ref.cfg_hash();
+                let cfg = self.get_configuration_by_hash(cfg_hash)?
+                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+                Some(cfg)
+            }
+            None => None,
+        };
+        Ok(res)
     }
 
-    pub fn get_configuration_at_height<H>(&self,
-                                          height: H)
-                                          -> Result<Option<StoredConfiguration>, Error>
-        where H: Into<HeightBytes>
-    {
-        let configs = self.configs();
-        let height = height.into();
-        if let Some(config) = configs.get(&height)? {
-            match StoredConfiguration::deserialize(&config) {
-                Ok(configuration) => {
-                    return Ok(Some(configuration));
-                }
-                Err(_) => {
-                    error!("Can't parse found configuration at height: {}", u64::from(height));
-                }
-            }
-        }
-        Ok(None)
+    pub fn get_configuration_by_hash(&self,
+                                     hash: &Hash)
+                                     -> Result<Option<StoredConfiguration>, Error> {
+        self.configs().get(hash)
     }
 
     pub fn core_state_hash(&self) -> Result<Vec<Hash>, Error> {

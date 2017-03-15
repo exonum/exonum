@@ -4,7 +4,9 @@ mod tests;
 use num::{Integer, ToPrimitive};
 
 use std::fmt;
-use std::error;
+use std::error::Error as ErrorTrait;
+use std::convert;
+use serde_json;
 
 mod leveldb;
 mod memorydb;
@@ -24,7 +26,7 @@ pub use self::db::{Database, Patch, Fork, Change};
 pub use self::memorydb::{MemoryDB, MemoryDBView};
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
-pub use self::fields::{StorageValue, HeightBytes};
+pub use self::fields::StorageValue;
 pub use self::merkle_table::MerkleTable;
 pub use self::merkle_table::proofnode::Proofnode;
 pub use self::merkle_patricia_table::MerklePatriciaTable;
@@ -95,9 +97,15 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
+impl ErrorTrait for Error {
     fn description(&self) -> &str {
         &self.message
+    }
+}
+
+impl convert::From<serde_json::error::Error> for Error {
+    fn from(message: serde_json::error::Error) -> Error {
+        Error::new(message.description())
     }
 }
 

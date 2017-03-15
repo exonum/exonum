@@ -23,12 +23,11 @@ message! {
     TxConfigPropose {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 56;
+        const SIZE = 72;
 
         from:           &PublicKey  [00 => 32]
-        height:         u64         [32 => 40]
-        config:        &[u8]        [40 => 48] // serialized config bytes
-        actual_from_height: u64     [48 => 56] // с какой высоты становится актуальным
+        prev_cfg_hash:  &Hash       [32 => 64]
+        cfg:            &[u8]       [64 => 72] // serialized config bytes
     }
 }
 
@@ -36,13 +35,10 @@ message! {
     TxConfigVote {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_VOTE_MESSAGE_ID;
-        const SIZE = 81;
+        const SIZE = 64;
 
         from:           &PublicKey  [00 => 32]
-        height:         u64         [32 => 40]
-        hash_propose:   &Hash       [40 => 72] // hash of transacion we're voting for
-        seed:           u64         [72 => 80] // incremental (1, 2, 3, 4, 5, 6, 7) проверять +1
-        revoke:         bool        [80 => 81] // голос_за=false / отозвать=true
+        cfg_hash:       &Hash       [32 => 64] // hash of config we're voting for
     }
 }
 
