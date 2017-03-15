@@ -369,12 +369,13 @@ impl State {
     }
 
     pub fn update_config(&mut self, config: StoredConfiguration) {
+        info!("Updating node config={:#?}", config);
         let node_type = NodeType::new(config.validators
             .iter()
             .position(|pk| pk == self.public_key())
             .map(|id| id as ValidatorId),
             self.public_key());
-
+        info!("NodeType={:#?}", node_type);
         self.node_type = node_type;
         self.config = config;
     }

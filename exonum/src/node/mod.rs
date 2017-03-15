@@ -98,7 +98,7 @@ impl<S> NodeHandler<S>
             .position(|pk| pk == &config.listener.public_key)
             .map(|id| id as ValidatorId),
             &config.listener.public_key);
-
+        info!("NodeType={:#?}", node_type);
         let connect = Connect::new(&config.listener.public_key,
                                    sender.address(),
                                    sender.get_time(),
