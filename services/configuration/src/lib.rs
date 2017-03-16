@@ -4,12 +4,14 @@ extern crate exonum;
 extern crate log;
 
 extern crate serde;
+extern crate serde_json;
 
 use std::fmt;
 
 use serde::{Serialize, Serializer};
 
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
+use exonum::node::State;
 use exonum::crypto::{PublicKey, Hash, HASH_SIZE};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, Map, View, MapTable, MerklePatriciaTable,
@@ -57,7 +59,11 @@ impl Serialize for TxConfigPropose {
         state = ser.serialize_struct("config_propose", 4)?;
         ser.serialize_struct_elt(&mut state, "from", self.from())?;
         ser.serialize_struct_elt(&mut state, "previous_config_hash", self.prev_cfg_hash())?;
-        ser.serialize_struct_elt(&mut state, "config", self.cfg())?;
+        if let Ok(cfg) = StoredConfiguration::deserialize_err(self.cfg()){
+           ser.serialize_struct_elt(&mut state, "config", cfg)?;
+        } else {
+           ser.serialize_struct_elt(&mut state, "config", self.cfg())?;
+        }
         ser.serialize_struct_end(state)
     }
 }
@@ -177,27 +183,31 @@ impl TxConfigPropose {
         let blockchain_schema = Schema::new(view);
         let config_schema = ConfigurationSchema::new(view);
 
-        let actual_config: StoredConfiguration = blockchain_schema.get_actual_configuration()?;
         let following_config: Option<StoredConfiguration> = blockchain_schema.get_following_configuration()?;
         if let Some(foll_cfg) = following_config {
-            error!("Discarding TxConfigPropose: {:?} as there is an already scheduled next config: {:?} ", self, foll_cfg);
+            let self_repr = serde_json::to_string(self)?;
+            error!("Discarding TxConfigPropose: {} as there is an already scheduled next config: {:?} ", self_repr, foll_cfg);
             return Ok(());
         }
 
+        let actual_config: StoredConfiguration = blockchain_schema.get_actual_configuration()?;
         let actual_config_hash = actual_config.hash();
         if *self.prev_cfg_hash() != actual_config_hash {
-            error!("Discarding TxConfigPropose:{:?} which does not reference actual config: {:?}", self, actual_config);
+            let self_repr = serde_json::to_string(self)?;
+            error!("Discarding TxConfigPropose:{} which does not reference actual config: {:?}", self_repr, actual_config);
             return Ok(());
         }
 
         if !actual_config.validators.contains(self.from()) {
-            error!("TxConfigPropose:{:?} from unknown validator. ", self.from());
+            let self_repr = serde_json::to_string(self)?;
+            error!("Discarding TxConfigPropose:{} from unknown validator. ", self_repr);
             return Ok(());
         }
 
         let config_candidate = StoredConfiguration::deserialize_err(self.cfg());
         if config_candidate.is_err() {
-            error!("Discarding TxConfigPropose:{:?} which contains config, which cannot be parsed: {:?}", self, config_candidate);
+            let self_repr = serde_json::to_string(self)?;
+            error!("Discarding TxConfigPropose:{} which contains config, which cannot be parsed: {:?}", self_repr, config_candidate);
             return Ok(());
         }
 
@@ -205,27 +215,84 @@ impl TxConfigPropose {
         let current_height = blockchain_schema.last_height()? + 1;
         let actual_from = config_candidate_body.actual_from;
         if actual_from <= current_height {
-            error!("Discarding TxConfigPropose:{:?} which has actual_from height less than current: {:?}", self, current_height);
+            let self_repr = serde_json::to_string(self)?;
+            error!("Discarding TxConfigPropose:{} which has actual_from height less than or equal to current: {:?}", self_repr, current_height);
             return Ok(());
         }
 
         let config_hash = config_candidate_body.hash();
 
-        if config_schema.config_proposes().get(&config_hash)?.is_some() {
-            error!("Discarding TxConfigPropose that has already been handled, msg={:?}",
-                   self);
+        if let Some(tx_propose) = config_schema.config_proposes().get(&config_hash)? {
+            let self_repr = serde_json::to_string(self)?;
+            let another_propose_repr = serde_json::to_string(&tx_propose)?;
+            error!("Discarding TxConfigPropose:{} which contains an already posted config. Previous TxConfigPropose:{}",
+                   self_repr, another_propose_repr);
             return Ok(());
         }
 
         config_schema.config_proposes().put(&config_hash, self.clone())?;
-        trace!("Put TxConfigPropose {:?} to config_proposes table", self);
+
+        let self_repr = serde_json::to_string(self)?;
+        debug!("Put TxConfigPropose:{} to config_proposes table", self_repr);
         Ok(())
     }
 }
 
 impl TxConfigVote {
     fn execute(&self, view: &View) -> StorageResult<()> {
-        unimplemented!();
+        let blockchain_schema = Schema::new(view);
+        let config_schema = ConfigurationSchema::new(view);
+
+        let propose_option = config_schema.config_proposes().get(self.cfg_hash())?;
+        if propose_option.is_none() {
+            error!("Discarding TxConfigVote:{:?} which references unknown config hash", self);
+            return Ok(());
+        }
+
+        let following_config: Option<StoredConfiguration> = blockchain_schema.get_following_configuration()?;
+        if let Some(foll_cfg) = following_config {
+            error!("Discarding TxConfigVote: {:?} as there is an already scheduled next config: {:?} ", self, foll_cfg);
+            return Ok(());
+        }
+
+        let referenced_tx_propose = propose_option.unwrap();
+        let actual_config: StoredConfiguration = blockchain_schema.get_actual_configuration()?;
+        let actual_config_hash = actual_config.hash();
+        if *referenced_tx_propose.prev_cfg_hash() != actual_config_hash {
+            let propose_repr = serde_json::to_string(&referenced_tx_propose)?;
+            error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} does not reference actual config: {:?}", self, propose_repr, actual_config);
+            return Ok(());
+        }
+
+        if !actual_config.validators.contains(self.from()) {
+            error!("Discarding TxConfigVote:{:?} from unknown validator. ", self.from());
+            return Ok(());
+        }
+
+        let current_height = blockchain_schema.last_height()? + 1;
+        let parsed_config =StoredConfiguration::deserialize_err(referenced_tx_propose.cfg()).unwrap();
+        let actual_from = parsed_config.actual_from;
+        if actual_from <= current_height {
+            let propose_repr = serde_json::to_string(&referenced_tx_propose)?;
+            error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} has actual_from height less than or equal to current: {:?}", self, propose_repr,  current_height);
+            return Ok(());
+        }
+
+        let votes_for_cfg = config_schema.config_votes(*self.cfg_hash());
+        votes_for_cfg.put(self.from(), self.clone())?;
+        debug!("Put TxConfigVote:{:?} to corresponding cfg config_votes table", self);
+
+        let mut votes_count = 0;
+        for pub_key in &actual_config.validators {
+            if let Some(_) = votes_for_cfg.get(&pub_key)? {
+                    votes_count += 1;
+            }
+        }
+
+        if votes_count >= State::byzantine_majority_count(actual_config.validators.len()) {
+            blockchain_schema.commit_actual_configuration(parsed_config)?;
+        }
+        Ok(())
     }
 }
 
