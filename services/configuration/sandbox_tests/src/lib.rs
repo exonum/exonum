@@ -40,6 +40,83 @@ mod tests {
     }
 
     #[test]
+    fn test_config_txs_discarded_when_following_config_present() {
+        let _ = blockchain_explorer::helpers::init_logger();
+        let sandbox = configuration_sandbox();
+        let sandbox_state = SandboxState::new();
+        let initial_cfg = sandbox.cfg();
+        sandbox.assert_state(1, 1);
+
+        let services = gen_timestamping_cfg("Following cfg at height 6");
+        let following_config = StoredConfiguration {
+            actual_from: 6,
+            validators: sandbox.validators(),
+            consensus: sandbox.cfg().consensus,
+            services: services,
+        };
+
+        let foll_cfg_bytes = following_config.clone().serialize();
+        let foll_cfg_hash = following_config.hash();
+        let initial_cfg_hash = initial_cfg.hash();
+
+        let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+                                              &initial_cfg_hash,
+                                              &foll_cfg_bytes,
+                                              sandbox.s(1));
+        add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+        sandbox.assert_state(2, 1);
+        let view = sandbox.blockchain_ref().view();
+        let schema = ConfigurationSchema::new(&view);
+        let proposes = schema.config_proposes();
+        assert_eq!(Some(propose_tx), proposes.get(&foll_cfg_hash).unwrap());
+
+        let votes = (0..3).map(|validator|{
+            TxConfigVote::new(&sandbox.p(validator), &foll_cfg_hash, sandbox.s(validator)).raw().clone()
+        }).collect::<Vec<_>>();
+        add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
+        sandbox.assert_state(3, 1);
+        assert_eq!(sandbox.cfg(), initial_cfg);
+        assert_eq!(sandbox.following_cfg(), Some(following_config.clone()));
+
+        let services = gen_timestamping_cfg("New cfg");
+        let new_cfg = StoredConfiguration {
+            actual_from: 7,
+            validators: sandbox.validators(),
+            consensus: sandbox.cfg().consensus,
+            services: services,
+        };
+        let new_cfg_bytes = new_cfg.clone().serialize();
+        let new_cfg_hash = new_cfg.hash();
+
+        let propose_tx_new = TxConfigPropose::new(&sandbox.p(1),
+                                              &initial_cfg_hash,
+                                              &new_cfg_bytes,
+                                              sandbox.s(1));
+        add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx_new.raw().clone()]);
+        sandbox.assert_state(4, 1);
+
+        let view = sandbox.blockchain_ref().view();
+        let schema = ConfigurationSchema::new(&view);
+        let proposes = schema.config_proposes();
+        assert_eq!(None, proposes.get(&new_cfg_hash).unwrap());
+
+        let vote_validator_3 = TxConfigVote::new(&sandbox.p(3), &foll_cfg_hash, sandbox.s(3));
+        add_one_height_with_transactions(&sandbox, &sandbox_state, &[vote_validator_3.raw().clone()]);
+        sandbox.assert_state(5, 1);
+
+        let view = sandbox.blockchain_ref().view();
+        let schema = ConfigurationSchema::new(&view);
+        let votes_for_following_cfg = schema.config_votes(foll_cfg_hash);
+        assert!(votes_for_following_cfg.get(&sandbox.p(0)).unwrap().is_some());
+        assert!(votes_for_following_cfg.get(&sandbox.p(3)).unwrap().is_none());
+        assert_eq!(initial_cfg, sandbox.cfg());
+
+        add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
+        sandbox.assert_state(6, 1);
+        assert_eq!(following_config, sandbox.cfg());
+    }
+
+    #[test]
     fn test_change_service_config() {
         let _ = blockchain_explorer::helpers::init_logger();
         let sandbox = configuration_sandbox();
