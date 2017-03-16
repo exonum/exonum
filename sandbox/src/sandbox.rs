@@ -157,6 +157,12 @@ impl SandboxReactor {
         schema.get_actual_configuration()
     }
 
+    pub fn following_config(&self) -> Result<Option<StoredConfiguration>, StorageError> {
+        let view = self.handler.blockchain.view();
+        let schema = Schema::new(&view);
+        schema.get_following_configuration()
+    }
+
     pub fn handle_message(&mut self, msg: RawMessage) {
         let event = Event::Incoming(msg);
         self.handler.handle_event(event);
@@ -420,6 +426,11 @@ impl Sandbox {
     pub fn cfg(&self) -> StoredConfiguration {
         let reactor = self.reactor.borrow();
         reactor.actual_config().unwrap()
+    }
+
+    pub fn following_cfg(&self) -> Option<StoredConfiguration> {
+        let reactor = self.reactor.borrow();
+        reactor.following_config().unwrap()
     }
 
     pub fn propose_timeout(&self) -> i64 {
