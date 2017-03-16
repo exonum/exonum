@@ -11,16 +11,35 @@ body {
     padding: 0 15px;
 }
 
-.custom-table-header {
-    padding-bottom: 5px;
+.custom-table-hover > .row:hover {
+    background-color: #fafafa;
+    cursor: pointer;
+}
+
+.custom-table-hover > .row:first-child:hover {
+    background-color: transparent;
+    cursor: default;
+}
+
+.custom-table-header-column {
+    padding: 0 5px 5px;
     border-bottom: 1px solid #ddd;
     font-weight: bold;
 }
 
 .custom-table-column {
-    padding-bottom: 10px;
-    padding-top: 10px;
+    padding: 10px 5px;
     border-top: 1px solid #ddd;
+}
+
+@media (min-width: 768px) {
+    .custom-table-header-column {
+        padding: 0 10px 5px;
+    }
+
+    .custom-table-column {
+        padding: 10px;
+    }
 }
 
 .custom-dd {
@@ -50,13 +69,7 @@ body {
 }
 
 .collapsed {
-    color: #337ab7;
     cursor: pointer;
-}
-
-.collapsed:hover,
-.collapsed:focus {
-    color: #23527c;
 }
 
 .space-top {

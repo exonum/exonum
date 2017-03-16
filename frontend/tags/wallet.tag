@@ -29,12 +29,12 @@
 
         <div class="custom-table">
             <div class="row">
-                <div class="col-xs-6 custom-table-header">Hash</div>
-                <div class="col-xs-6 custom-table-header">Description</div>
+                <div class="col-xs-6 custom-table-header-column">Hash</div>
+                <div class="col-xs-6 custom-table-header-column">Description</div>
             </div>
             <div class="row" each={ transactions }>
                 <div class="col-xs-6 custom-table-column">
-                    <truncate val={ hash } digits=16></truncate>
+                    <truncate val={ hash } digits=12></truncate>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
                     Create wallet

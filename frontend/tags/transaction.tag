@@ -3,8 +3,8 @@
         <virtual if={ transaction.message_id === 128 }>
             <div class="custom-table text-center">
                 <div class="row">
-                    <div class="col-xs-6 custom-table-header">From</div>
-                    <div class="col-xs-6 custom-table-header">To</div>
+                    <div class="col-xs-6 custom-table-header-column">From</div>
+                    <div class="col-xs-6 custom-table-header-column">To</div>
                 </div>
                 <div class="row">
                     <div class="col-xs-6 custom-table-column monospace expanded">
@@ -24,7 +24,7 @@
         <virtual if={ transaction.message_id === 129 }>
             <div class="custom-table text-center">
                 <div class="row">
-                    <div class="col-sm-12 custom-table-header">To</div>
+                    <div class="col-sm-12 custom-table-header-column">To</div>
                 </div>
                 <div class="row">
                     <div class="col-sm-12 custom-table-column monospace expanded">
@@ -41,7 +41,7 @@
         <virtual if={ transaction.message_id === 130 }>
             <div class="custom-table text-center">
                 <div class="row">
-                    <div class="col-sm-12 custom-table-header">Name</div>
+                    <div class="col-sm-12 custom-table-header-column">Name</div>
                 </div>
                 <div class="row">
                     <div class="col-sm-12 custom-table-column">
