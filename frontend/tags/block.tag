@@ -2,8 +2,8 @@
     <virtual if={ block }>
         <nav>
             <ul class="pager">
-                <li class="previous"><a href="#" onclick={ previous }><span aria-hidden="true">&larr;</span> Previous block</a></li>
-                <li class="next"><a href="#" onclick={ next }>Next block <span aria-hidden="true">&rarr;</span></a></a></li>
+                <li class="previous"><a href="#" onclick={ previous }><span aria-hidden="true">&larr;</span> Previous<span class="hidden-xs"> block</span></a></li>
+                <li class="next"><a href="#" onclick={ next }>Next<span class="hidden-xs"> block</span> <span aria-hidden="true">&rarr;</span></a></a></li>
             </ul>
         </nav>
 
@@ -13,7 +13,7 @@
                     <strong>Hash</strong>
                 </div>
                 <div class="col-xs-6 custom-dd-column">
-                    <truncate val={ block.hash } digits=16></truncate>
+                    <truncate val={ block.hash } digits=12></truncate>
                 </div>
             </div>
             <div class="row">
@@ -37,7 +37,7 @@
                     <strong>Tx hash</strong>
                 </div>
                 <div class="col-xs-6 custom-dd-column">
-                    <truncate val={ block.tx_hash } digits=16></truncate>
+                    <truncate val={ block.tx_hash } digits=12></truncate>
                 </div>
             </div>
             <div class="row">
@@ -45,7 +45,7 @@
                     <strong>State hash</strong>
                 </div>
                 <div class="col-xs-6 custom-dd-column">
-                    <truncate val={ block.state_hash } digits=16></truncate>
+                    <truncate val={ block.state_hash } digits=12></truncate>
                 </div>
             </div>
             <div class="row">
@@ -62,12 +62,12 @@
 
         <div class="custom-table">
             <div class="row">
-                <div class="col-xs-6 custom-table-header">Hash</div>
-                <div class="col-xs-6 custom-table-header">Description</div>
+                <div class="col-xs-6 custom-table-header-column">Hash</div>
+                <div class="col-xs-6 custom-table-header-column">Description</div>
             </div>
             <div class="row" each={ block.txs }>
                 <div class="col-xs-6 custom-table-column">
-                    <truncate val={ hash } digits=16></truncate>
+                    <truncate val={ hash } digits=12></truncate>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
                     Create { body.name } wallet

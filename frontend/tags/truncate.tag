@@ -7,8 +7,10 @@
         this.truncated = this.opts.val.substring(0, this.opts.digits || 8) + '…';
 
         expand(e) {
-            e.preventDefault();
             if (this.collapsed) {
+                e.preventDefault();
+                e.stopPropagation();
+
                 this.collapsed = false;
                 this.update();
             }
