@@ -1,16 +1,41 @@
 <wallet>
-    <div if="{ wallet && block }" class="text-center">
-        <h2>${ wallet.balance }</h2>
-        <h6>Block #<a href="#blockchain/block/{ block.height }">{ block.height }</a></h6>
-        <h6>{ moment(block.time / 1000000).format('HH:mm:ss, DD MMM YYYY') }</h6>
-        <div if={ wallet.balance == 0 } class="alert alert-warning">
+    <virtual if="{ wallet && block }">
+
+        <table class="table table-bordered">
+            <tbody>
+            <tr>
+                <th>Balance</th>
+                <td>{ numeral(wallet.balance).format('$0,0') }</td>
+            </tr>
+            <tr>
+                <th>Name</th>
+                <td>{ wallet.name }</td>
+            </tr>
+            <tr>
+                <th>Updated</th>
+                <td>{ moment(block.time / 1000000).fromNow() }</td>
+            </tr>
+            <tr>
+                <th>Block</th>
+                <td class="truncate"><a href="#blockchain/block/{ block.height }">{ block.height }</a></td>
+            </tr>
+            </tbody>
+        </table>
+
+        <div if={ wallet.balance == 0 } class="alert alert-warning text-center">
             <i class="glyphicon glyphicon-alert"></i> You haven't any money yet. Add some funds.
         </div>
+
         <div class="form-group">
-            <button class="btn btn-lg btn-primary" disabled={ wallet.balance == 0 } onclick={ transfer }>Transfer</button>
-            <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-success">Add Funds</a>
+            <button class="btn btn-lg btn-block btn-primary" disabled={ wallet.balance== 0 } onclick={ transfer }>
+                Transfer
+            </button>
         </div>
-    </div>
+
+        <div class="form-group">
+            <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
+        </div>
+    </virtual>
 
     <virtual if={ transactions }>
         <legend class="text-center no-border">Transactions history</legend>
@@ -22,19 +47,19 @@
             </div>
             <div class="row" each={ transactions }>
                 <div class="col-xs-6 custom-table-column truncate">
-                    <a href="#blockchain/transaction/{ hash }">{ hash }</a>
+                    { hash }
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
-                    create wallet
+                    Create wallet
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
-                    add <strong>${ body.amount }</strong> to your wallet
+                    Add <strong>{ numeral(body.amount).format('$0,0') }</strong> to your wallet
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
-                    send <strong>${ body.amount }</strong> to <a href="#user/{ body.to }" class="truncate">{ body.to }</a>
+                    Send <strong>{ numeral(body.amount).format('$0,0') }</strong> to <span class="truncate">{ body.to }</span>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
-                    receive <strong>${ body.amount }</strong> from <a href="#user/{ body.from }" class="truncate">{ body.from }</a>
+                    Receive <strong>{ numeral(body.amount).format('$0,0') }</strong> from <span class="truncate">{ body.from }</span>
                 </div>
             </div>
         </div>
@@ -45,10 +70,9 @@
     <script>
         var self = this;
 
-        this.api.getWallet(self.opts.publicKey, function(data) {
-            // update app title
-            self.opts.titleObservable.trigger('change', data.wallet.name);
+        this.title = 'Your wallet';
 
+        this.api.getWallet(self.opts.publicKey, function(data) {
             self.block = data.block;
             self.wallet = data.wallet;
             self.transactions = data.transactions;

@@ -1,15 +1,26 @@
 <blockchain>
+    <nav>
+        <ul class="pager">
+            <li class="previous"><a href="#" onclick={ previous }><span aria-hidden="true">&larr;</span> Older</a></li>
+            <li class="next"><a href="#" onclick={ next }>Newer <span aria-hidden="true">&rarr;</span></a></a></li>
+        </ul>
+    </nav>
+
     <table class="table table-striped">
         <thead>
         <tr>
-            <th>Date</th>
+            <th>Hash</th>
             <th>Height</th>
+            <th>Transaction count</th>
+            <th>Date</th>
         </tr>
         </thead>
         <tbody>
         <tr each={ blocks }>
-            <td>{ moment(propose_time * 1000).format('HH:mm:ss, DD MMM YYYY') }</td>
-            <td><a href="#blockchain/block/{ height }">{ height }</a></td>
+            <td class="truncate">{ hash }</td>
+            <td class="truncate"><a href="#blockchain/block/{ height }">{ height }</a></td>
+            <td class="truncate">{ tx_count }</td>
+            <td>{ moment(propose_time * 1000).fromNow() }</td>
         </tr>
         </tbody>
     </table>
