@@ -7,10 +7,10 @@
                     <div class="col-xs-6 custom-table-header">To</div>
                 </div>
                 <div class="row">
-                    <div class="col-xs-6 custom-table-column truncate">
+                    <div class="col-xs-6 custom-table-column monospace expanded">
                         <a href="#user/{ transaction.body.from }">{ transaction.body.from }</a>
                     </div>
-                    <div class="col-xs-6 custom-table-column truncate">
+                    <div class="col-xs-6 custom-table-column monospace expanded">
                         <a href="#user/{ transaction.body.to }">{ transaction.body.to }</a>
                     </div>
                 </div>
@@ -27,7 +27,7 @@
                     <div class="col-sm-12 custom-table-header">To</div>
                 </div>
                 <div class="row">
-                    <div class="col-sm-12 custom-table-column truncate">
+                    <div class="col-sm-12 custom-table-column monospace expanded">
                         <a href="#user/{ transaction.body.wallet }">{ transaction.body.wallet }</a>
                     </div>
                 </div>
@@ -83,6 +83,7 @@
         });
 
         back(e) {
+            e.preventDefault();
             history.back();
         }
     </script>

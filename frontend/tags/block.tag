@@ -7,36 +7,58 @@
             </ul>
         </nav>
 
-        <table class="table table-bordered">
-            <tbody>
-            <tr>
-                <th>Hash</th>
-                <td class="truncate">{ block.hash }</td>
-            </tr>
-            <tr>
-                <th>Propose time</th>
-                <td>{ moment(block.propose_time * 1000).fromNow() }</td>
-            </tr>
-            <tr>
-                <th>Proposer</th>
-                <td class="truncate">{ block.proposer }</td>
-            </tr>
-            <tr>
-                <th>Tx hash</th>
-                <td class="truncate">{ block.tx_hash }</td>
-            </tr>
-            <tr>
-                <th>State hash</th>
-                <td class="truncate">{ block.state_hash }</td>
-            </tr>
-            <tr>
-                <th>Approved by</th>
-                <td><strong>{ block.precommits_count }</strong> validators</td>
-            </tr>
-            </tbody>
-        </table>
+        <div class="custom-dd">
+            <div class="row">
+                <div class="col-xs-6 custom-dd-column">
+                    <strong>Hash</strong>
+                </div>
+                <div class="col-xs-6 custom-dd-column">
+                    <truncate val={ block.hash } digits=16></truncate>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-xs-6 custom-dd-column">
+                    <strong>Propose time</strong>
+                </div>
+                <div class="col-xs-6 custom-dd-column">
+                    { moment(block.propose_time * 1000).fromNow() }
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-xs-6 custom-dd-column">
+                    <strong>Proposer</strong>
+                </div>
+                <div class="col-xs-6 custom-dd-column">
+                    { block.proposer }
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-xs-6 custom-dd-column">
+                    <strong>Tx hash</strong>
+                </div>
+                <div class="col-xs-6 custom-dd-column">
+                    <truncate val={ block.tx_hash } digits=16></truncate>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-xs-6 custom-dd-column">
+                    <strong>State hash</strong>
+                </div>
+                <div class="col-xs-6 custom-dd-column">
+                    <truncate val={ block.state_hash } digits=16></truncate>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-xs-6 custom-dd-column">
+                    <strong>Approved by</strong>
+                </div>
+                <div class="col-xs-6 custom-dd-column">
+                    { block.precommits_count } validators
+                </div>
+            </div>
+        </div>
 
-        <legend class="text-center no-border">Transactions</legend>
+        <legend class="text-center no-border space-top">Transactions</legend>
 
         <div class="custom-table">
             <div class="row">
@@ -44,17 +66,17 @@
                 <div class="col-xs-6 custom-table-header">Description</div>
             </div>
             <div class="row" each={ block.txs }>
-                <div class="col-xs-6 custom-table-column truncate">
-                    { hash }
+                <div class="col-xs-6 custom-table-column">
+                    <truncate val={ hash } digits=16></truncate>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
                     Create { body.name } wallet
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
-                    <span class="truncate">{ body.wallet }</span> add funds of <strong>{ numeral(body.amount).format('$0,0') }</strong>
+                    <truncate val={ body.wallet }></truncate> add funds of <strong>{ numeral(body.amount).format('$0,0') }</strong>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 128 }>
-                    <span class="truncate">{ body.from }</span> send <strong>{ numeral(body.amount).format('$0,0') }</strong> to <span class="truncate">{ body.to }</span>
+                    <truncate val={ body.from }></truncate> send <strong>{ numeral(body.amount).format('$0,0') }</strong> to <truncate val={ body.to }></truncate>
                 </div>
             </div>
         </div>

@@ -10,6 +10,7 @@
                     </div>
                     <div id="content" class="panel-body"></div>
                 </div>
+                <p class="text-center text-muted">Find out more on <a href="http://exonum.com/" target="_blank">exonum.com</a></p>
             </div>
         </div>
     </div>

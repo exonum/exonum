@@ -1,26 +1,7 @@
 <transfer>
     <virtual if={ !succeed && !submitted }>
         <virtual if={ wallet && block }>
-            <table class="table table-bordered">
-                <tbody>
-                <tr>
-                    <th>Balance</th>
-                    <td>{ numeral(wallet.balance).format('$0,0') }</td>
-                </tr>
-                <tr>
-                    <th>Name</th>
-                    <td>{ wallet.name }</td>
-                </tr>
-                <tr>
-                    <th>Updated</th>
-                    <td>{ moment(block.time / 1000000).fromNow() }</td>
-                </tr>
-                <tr>
-                    <th>Block</th>
-                    <td class="truncate"><a href="#blockchain/block/{ block.height }">{ block.height }</a></td>
-                </tr>
-                </tbody>
-            </table>
+            <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
         </virtual>
 
         <form class="form-horizontal" onsubmit={ submit }>
@@ -52,7 +33,7 @@
             <p class="lead">Are you sure you want to send <strong>{ numeral(amount).format('$0,0') }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>?</p>
             <div class="form-group">
                 <button type="submit" class="btn btn-lg btn-primary">Approve</button>
-                <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }/transfer">Cancel</a>
+                <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Cancel</a>
             </div>
         </form>
     </div>

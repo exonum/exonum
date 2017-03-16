@@ -7,7 +7,8 @@ body {
 }
 
 .custom-table {
-    padding: 0 20px 20px;
+    margin: 0 0 15px;
+    padding: 0 15px;
 }
 
 .custom-table-header {
@@ -17,12 +18,47 @@ body {
 }
 
 .custom-table-column {
-    padding-top: 5px;
+    padding-bottom: 10px;
+    padding-top: 10px;
     border-top: 1px solid #ddd;
 }
 
-.truncate {
+.custom-dd {
+    margin: 0 0 15px;
+    padding: 0 15px;
+    border-bottom: 1px solid #ddd;
+    border-left: 1px solid #ddd;
+    border-right: 1px solid #ddd;
+    line-height: 1;
+}
+
+.custom-dd-column {
+    padding-bottom: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+}
+
+.monospace {
     font-family: "Lucida Console", Monaco, Courier, monospace;
     font-size: 0.875em;
+    line-height: 1.15;
+    letter-spacing: 0.025em;
+}
+
+.expanded {
     word-wrap: break-word;
+}
+
+.collapsed {
+    color: #337ab7;
+    cursor: pointer;
+}
+
+.collapsed:hover,
+.collapsed:focus {
+    color: #23527c;
+}
+
+.space-top {
+    margin-top: 30px;
 }
