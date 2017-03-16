@@ -73,12 +73,7 @@
 
         refresh(e) {
             e.preventDefault();
-            this.api.getWallet(self.opts.publicKey, function(data) {
-                self.block = data.block;
-                self.wallet = data.wallet;
-                self.transactions = data.transactions;
-                self.update();
-            });
+            window.location.reload();
         }
     </script>
 </wallet>
