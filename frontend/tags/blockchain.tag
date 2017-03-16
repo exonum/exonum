@@ -17,9 +17,9 @@
         </thead>
         <tbody>
         <tr each={ blocks }>
-            <td class="truncate">{ hash }</td>
-            <td class="truncate"><a href="#blockchain/block/{ height }">{ height }</a></td>
-            <td class="truncate">{ tx_count }</td>
+            <td><truncate val={ hash }></truncate></td>
+            <td class="monospace"><a href="#blockchain/block/{ height }">{ height }</a></td>
+            <td class="monospace">{ tx_count }</td>
             <td>{ moment(propose_time * 1000).fromNow() }</td>
         </tr>
         </tbody>
