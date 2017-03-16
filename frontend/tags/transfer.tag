@@ -1,14 +1,29 @@
 <transfer>
     <virtual if={ !succeed && !submitted }>
         <virtual if={ wallet && block }>
-            <div class="text-center">
-                <h2 if={ wallet.balance }>${ wallet.balance }</h2>
-                <h6 if={ block.height }>Block #<a href="#blockchain/block/{ block.height }">{ block.height }</a></h6>
-            </div>
+            <table class="table table-bordered">
+                <tbody>
+                <tr>
+                    <th>Balance</th>
+                    <td>{ numeral(wallet.balance).format('$0,0') }</td>
+                </tr>
+                <tr>
+                    <th>Name</th>
+                    <td>{ wallet.name }</td>
+                </tr>
+                <tr>
+                    <th>Updated</th>
+                    <td>{ moment(block.time / 1000000).fromNow() }</td>
+                </tr>
+                <tr>
+                    <th>Block</th>
+                    <td class="truncate"><a href="#blockchain/block/{ block.height }">{ block.height }</a></td>
+                </tr>
+                </tbody>
+            </table>
         </virtual>
 
         <form class="form-horizontal" onsubmit={ submit }>
-            <legend class="text-center">Transfer</legend>
             <div class="form-group">
                 <div class="col-sm-4 control-label">Reciever:</div>
                 <div class="col-sm-8">
@@ -34,7 +49,7 @@
 
     <div if={ submitted && !succeed } class="text-center">
         <form class="form" onsubmit={ approve }>
-            <p class="lead">Are you sure you want to send <strong>${ amount }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>?</p>
+            <p class="lead">Are you sure you want to send <strong>{ numeral(amount).format('$0,0') }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>?</p>
             <div class="form-group">
                 <button type="submit" class="btn btn-lg btn-primary">Approve</button>
                 <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }/transfer">Cancel</a>
@@ -43,7 +58,7 @@
     </div>
 
     <div if={ succeed } class="text-center">
-        <p class="lead">Transfer approved. You've sent <strong>${ amount }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>.</p>
+        <p class="lead">Transfer approved. You've sent <strong>{ numeral(amount).format('$0,0') }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>.</p>
         <div class="form-group">
             <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Back</a>
         </div>
@@ -62,7 +77,11 @@
         });
 
         edit(e) {
-            this.amount = e.target.value;
+            if (e.target.value > 0 && e.target.value.toLowerCase().indexOf('e') === -1) {
+                this.amount = e.target.value;
+            } else {
+                this.amount = 0;
+            }
         }
 
         submit(e) {

@@ -7,38 +7,34 @@
             </ul>
         </nav>
 
-        <ul class="list-group">
-            <li class="list-group-item">
-                <div class="row">
-                    <div class="col-md-3 text-muted">Hash:</div>
-                    <div class="col-md-9 truncate">{ block.hash }</div>
-                </div>
-                <div class="row">
-                    <div class="col-md-3 text-muted">Propose time:</div>
-                    <div class="col-md-9">{ moment(block.propose_time * 1000).format('HH:mm:ss, DD MMM YYYY') }</div>
-                </div>
-                <div class="row">
-                    <div class="col-md-3 text-muted">Proposer:</div>
-                    <div class="col-md-9">#{ block.proposer }</div>
-                </div>
-                <div class="row">
-                    <div class="col-md-3 text-muted">Tx hash:</div>
-                    <div class="col-md-9 truncate">{ block.tx_hash }</div>
-                </div>
-                <div class="row">
-                    <div class="col-md-3 text-muted">State hash:</div>
-                    <div class="col-md-9 truncate">{ block.state_hash }</div>
-                </div>
-            </li>
-            <li class="list-group-item">
-                <div class="checkbox">
-                    <label>
-                        <input type="checkbox" value="" disabled checked>
-                        Approved by <strong>{ block.precommits_count }</strong> validators
-                    </label>
-                </div>
-            </li>
-        </ul>
+        <table class="table table-bordered">
+            <tbody>
+            <tr>
+                <th>Hash</th>
+                <td class="truncate">{ block.hash }</td>
+            </tr>
+            <tr>
+                <th>Propose time</th>
+                <td>{ moment(block.propose_time * 1000).fromNow() }</td>
+            </tr>
+            <tr>
+                <th>Proposer</th>
+                <td class="truncate">{ block.proposer }</td>
+            </tr>
+            <tr>
+                <th>Tx hash</th>
+                <td class="truncate">{ block.tx_hash }</td>
+            </tr>
+            <tr>
+                <th>State hash</th>
+                <td class="truncate">{ block.state_hash }</td>
+            </tr>
+            <tr>
+                <th>Approved by</th>
+                <td><strong>{ block.precommits_count }</strong> validators</td>
+            </tr>
+            </tbody>
+        </table>
 
         <legend class="text-center no-border">Transactions</legend>
 
@@ -49,16 +45,16 @@
             </div>
             <div class="row" each={ block.txs }>
                 <div class="col-xs-6 custom-table-column truncate">
-                    <a href="#blockchain/transaction/{ hash }">{ hash }</a>
+                    { hash }
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
-                    create <a href="#user/{ body.pub_key }">{ body.name }</a> wallet
+                    Create { body.name } wallet
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
-                    <a href="#user/{ body.wallet }" class="truncate">{ body.wallet }</a> add <strong>${ body.amount }</strong>
+                    <span class="truncate">{ body.wallet }</span> add funds of <strong>{ numeral(body.amount).format('$0,0') }</strong>
                 </div>
                 <div class="col-xs-6 custom-table-column" if={ message_id === 128 }>
-                    <a href="#user/{ body.from }" class="truncate">{ body.from }</a> send <strong>${ body.amount }</strong> to <a href="#user/{ body.to }" class="truncate">{ body.to }</a>
+                    <span class="truncate">{ body.from }</span> send <strong>{ numeral(body.amount).format('$0,0') }</strong> to <span class="truncate">{ body.to }</span>
                 </div>
             </div>
         </div>
@@ -76,7 +72,7 @@
         var self = this;
         var height = parseInt(this.opts.height);
 
-        this.title = 'Block #' + height;
+        this.title = 'Block ' + height;
 
         this.api.loadBlock(height, function(data) {
             if (data == null) {

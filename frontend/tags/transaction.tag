@@ -17,7 +17,7 @@
             </div>
 
             <div class="text-center">
-                <h2>${ transaction.body.amount }</h2>
+                <h2>{ numeral(transaction.body.amount).format('$0,0') }</h2>
             </div>
         </virtual>
 
@@ -34,7 +34,7 @@
             </div>
 
             <div class="text-center">
-                <h2>${ transaction.body.amount }</h2>
+                <h2>{ numeral(transaction.body.amount).format('$0,0') }</h2>
             </div>
         </virtual>
 
@@ -44,7 +44,7 @@
                     <div class="col-sm-12 custom-table-header">Name</div>
                 </div>
                 <div class="row">
-                    <div class="col-sm-12 custom-table-column truncate">
+                    <div class="col-sm-12 custom-table-column">
                         <a href="#user/{ transaction.body.pub_key }">{ transaction.body.name }</a>
                     </div>
                 </div>

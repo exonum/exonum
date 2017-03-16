@@ -1,13 +1,28 @@
 <add-funds>
     <virtual if={ !succeed }>
         <virtual if={ wallet && block }>
-            <div class="text-center">
-                <h2 if={ wallet.balance }>${ wallet.balance }</h2>
-                <h6 if={ block.height }>Block #<a href="#blockchain/block/{ block.height }">{ block.height }</a></h6>
-            </div>
+            <table class="table table-bordered">
+                <tbody>
+                <tr>
+                    <th>Balance</th>
+                    <td>{ numeral(wallet.balance).format('$0,0') }</td>
+                </tr>
+                <tr>
+                    <th>Name</th>
+                    <td>{ wallet.name }</td>
+                </tr>
+                <tr>
+                    <th>Updated</th>
+                    <td>{ moment(block.time / 1000000).fromNow() }</td>
+                </tr>
+                <tr>
+                    <th>Block</th>
+                    <td class="truncate"><a href="#blockchain/block/{ block.height }">{ block.height }</a></td>
+                </tr>
+                </tbody>
+            </table>
         </virtual>
 
-        <legend class="text-center">Add funds</legend>
         <button type="submit" class="btn btn-lg btn-block btn-success" onclick={ addFunds } data-amount="10">Add $10.00</button>
         <button type="submit" class="btn btn-lg btn-block btn-success" onclick={ addFunds } data-amount="50">Add $50.00</button>
         <button type="submit" class="btn btn-lg btn-block btn-success" onclick={ addFunds } data-amount="100">Add $100.00</button>
