@@ -33,6 +33,4 @@
             </div>
         </div>
     </div>
-
-    <script></script>
 </wallet-summary>
