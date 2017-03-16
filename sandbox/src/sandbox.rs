@@ -232,7 +232,7 @@ impl Sandbox {
         self.inner.lock().unwrap().time.clone()
     }
 
-    pub fn blockchain_copy(&self) -> Ref<Blockchain> {
+    pub fn blockchain_ref(&self) -> Ref<Blockchain> {
         Ref::map(self.reactor.borrow(), |reactor| &reactor.handler.blockchain)
     }
 
