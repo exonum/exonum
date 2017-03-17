@@ -13,7 +13,7 @@ extern crate log;
 mod tests {
 
     use std::collections::BTreeMap;
-    use exonum::crypto::{Hash, PublicKey, Seed, HASH_SIZE, gen_keypair_from_seed};
+    use exonum::crypto::{Hash, PublicKey, Seed, HASH_SIZE, gen_keypair_from_seed, hash};
     use exonum::storage::{Map, StorageValue, Error as StorageError};
     use exonum::messages::Message;
     use exonum::blockchain::config::StoredConfiguration;
@@ -75,6 +75,81 @@ mod tests {
             consensus: sandbox.cfg().consensus,
             services: services,
         }
+    }
+
+    #[test]
+    fn test_discard_proposes_with_expired_actual_from() {
+        let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
+
+        let target_height = 10;
+        for _ in 1..target_height {
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
+        }
+        sandbox.assert_state(target_height, 1);
+
+        let new_cfg = generate_config_with_message(target_height, "First cfg", &sandbox);
+        {
+            let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+                                                  &initial_cfg.hash(),
+                                                  &new_cfg.clone().serialize(),
+                                                  sandbox.s(1));
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+            sandbox.assert_state(target_height + 1, 1);
+            assert_eq!(None, get_propose(&sandbox, new_cfg.hash()).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_discard_votes_with_expired_actual_from() {
+        let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
+        sandbox.assert_state(1, 1);
+        let target_height = 10;
+
+        let new_cfg = generate_config_with_message(target_height, "First cfg", &sandbox);
+        {
+            let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+                                                  &initial_cfg.hash(),
+                                                  &new_cfg.clone().serialize(),
+                                                  sandbox.s(1));
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+            sandbox.assert_state(2, 1);
+            assert_eq!(Some(propose_tx),
+                       get_propose(&sandbox, new_cfg.hash()).unwrap());
+        }
+        {
+            let legal_vote = TxConfigVote::new(&sandbox.p(3), &new_cfg.hash(), sandbox.s(3));
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[legal_vote.raw().clone()]);
+            sandbox.assert_state(3, 1);
+            assert_eq!(Some(legal_vote),
+                       get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(3)).unwrap());
+        }
+        {
+            for _ in 3..target_height {
+                add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
+            }
+            sandbox.assert_state(target_height, 1);
+        }
+        {
+            let illegal_vote = TxConfigVote::new(&sandbox.p(0), &new_cfg.hash(), sandbox.s(0));
+            add_one_height_with_transactions(&sandbox,
+                                             &sandbox_state,
+                                             &[illegal_vote.raw().clone()]);
+            sandbox.assert_state(target_height + 1, 1);
+            assert_eq!(None,
+                       get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(0)).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_discard_invalid_config_json() {
+        let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
+        sandbox.assert_state(1, 1);
+        let new_cfg = [70; 74]; //invalid json bytes
+        let propose_tx =
+            TxConfigPropose::new(&sandbox.p(1), &initial_cfg.hash(), &new_cfg, sandbox.s(1));
+        add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+        sandbox.assert_state(2, 1);
+        assert_eq!(None, get_propose(&sandbox, hash(&new_cfg)).unwrap());
     }
 
     #[test]
@@ -380,8 +455,8 @@ mod tests {
             let mut votes_for_new_cfg1 = Vec::new();
             for validator in 0..3 {
                 votes_for_new_cfg1.push(TxConfigVote::new(&sandbox.p(validator),
-                                             &new_cfg1.hash(),
-                                             sandbox.s(validator))
+                                                          &new_cfg1.hash(),
+                                                          sandbox.s(validator))
                     .raw()
                     .clone());
             }
@@ -404,8 +479,8 @@ mod tests {
             let mut votes_for_new_cfg2 = Vec::new();
             for validator in 0..3 {
                 votes_for_new_cfg2.push(TxConfigVote::new(&sandbox.p(validator),
-                                             &new_cfg2.hash(),
-                                             sandbox.s(validator))
+                                                          &new_cfg2.hash(),
+                                                          sandbox.s(validator))
                     .raw()
                     .clone());
             }
