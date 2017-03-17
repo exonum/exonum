@@ -2,10 +2,6 @@
     <virtual if="{ wallet && block }">
         <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
 
-        <div if={ wallet.balance == 0 } class="alert alert-warning text-center">
-            <i class="glyphicon glyphicon-alert"></i> You haven't any money yet. Add some funds.
-        </div>
-
         <div class="form-group">
             <button class="btn btn-lg btn-block btn-primary" disabled={ wallet.balance== 0 } onclick={ transfer }>
                 Transfer
@@ -57,12 +53,17 @@
         var self = this;
 
         this.title = 'Your wallet';
-
+        this.toggleLoading(true);
         this.api.getWallet(self.opts.publicKey, function(data) {
             self.block = data.block;
             self.wallet = data.wallet;
             self.transactions = data.transactions;
             self.update();
+            self.toggleLoading(false);
+
+            if (self.wallet.balance == 0) {
+                self.notify('warning', 'You haven\'t any money yet. Add some funds.');
+            }
         });
 
         transfer(e) {

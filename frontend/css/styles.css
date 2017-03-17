@@ -22,14 +22,14 @@ body {
 }
 
 .custom-table-header-column {
-    padding: 0 5px 5px;
     border-bottom: 1px solid #ddd;
     font-weight: bold;
+    padding: 0 5px 5px;
 }
 
 .custom-table-column {
-    padding: 10px 5px;
     border-top: 1px solid #ddd;
+    padding: 10px 5px;
 }
 
 @media (min-width: 768px) {
@@ -43,25 +43,25 @@ body {
 }
 
 .custom-dd {
-    margin: 0 0 15px;
-    padding: 0 15px;
     border-bottom: 1px solid #ddd;
     border-left: 1px solid #ddd;
     border-right: 1px solid #ddd;
     line-height: 1;
+    margin: 0 0 15px;
+    padding: 0 15px;
 }
 
 .custom-dd-column {
+    border-top: 1px solid #ddd;
     padding-bottom: 10px;
     padding-top: 10px;
-    border-top: 1px solid #ddd;
 }
 
 .monospace {
     font-family: "Lucida Console", Monaco, Courier, monospace;
     font-size: 0.875em;
-    line-height: 1.15;
     letter-spacing: 0.025em;
+    line-height: 1.15;
 }
 
 .expanded {
@@ -74,4 +74,37 @@ body {
 
 .space-top {
     margin-top: 30px;
+}
+
+.loader {
+    height: 100%;
+    left: 0;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 100;
+}
+
+.loader:before {
+    background-color: rgba(255, 255, 255, .9);
+    content: '';
+    display: block;
+    height: 100%;
+    left: 0;
+    position: absolute;
+    top: 0;
+    width: 100%;
+}
+
+.loader:after {
+    background-image: url(../images/ring.gif);
+    background-size: 100%;
+    content: '';
+    display: block;
+    height: 60px;
+    left: 50%;
+    margin: -30px 0 0 -30px;
+    position: absolute;
+    top: 50%;
+    width: 60px;
 }

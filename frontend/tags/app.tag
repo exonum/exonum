@@ -15,6 +15,8 @@
         </div>
     </div>
 
+    <div class="loader" if={ loading }></div>
+
     <script>
         var self = this;
         var baseUrl = 'http://exonum.com/backends/currency/api/v1';
@@ -142,6 +144,16 @@
                 });
             },
 
+            setTitle: function(title) {
+                self.title = title;
+                self.update();
+            },
+
+            toggleLoading: function(state) {
+                self.loading = state;
+                self.update();
+            },
+
             init: function() {
                 this.on('mount', function() {
                     // add title if it is predefined in component
@@ -151,13 +163,6 @@
                     }
                 });
             }
-        });
-
-        // shared observable to dynamically update app title
-        var titleObservable = riot.observable();
-        titleObservable.on('change', function(value) {
-            self.title = value;
-            self.update();
         });
 
         // init app routes
@@ -172,7 +177,7 @@
             });
 
             route('/user/*', function(publicKey) {
-                riot.mount('#content', 'wallet', {publicKey: publicKey, titleObservable: titleObservable});
+                riot.mount('#content', 'wallet', {publicKey: publicKey});
             });
 
             route('/user/*/transfer', function(publicKey) {
@@ -192,7 +197,7 @@
             });
 
             route('/blockchain/transaction/*', function(hash) {
-                riot.mount('#content', 'transaction', {hash: hash, titleObservable: titleObservable});
+                riot.mount('#content', 'transaction', {hash: hash});
             });
 
             route('/blockchain..', function() {
