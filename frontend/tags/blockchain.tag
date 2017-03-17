@@ -1,8 +1,9 @@
 <blockchain>
     <nav>
         <ul class="pager">
-            <li class="previous" if={ currentHeight > 9 || !currentHeight }><a href="#" onclick={ previous }><span aria-hidden="true">&larr;</span> Older</a></li>
-            <li class="next"><a href="#" onclick={ next }>Newer <span aria-hidden="true">&rarr;</span></a></a></li>
+            <li class="previous" if={ hasPrevious }><a href="#" onclick={ previous }><span aria-hidden="true">&larr;</span> Older</a></li>
+            <li class="next" if={ hasNext }><a href="#" onclick={ next }>Newer <span aria-hidden="true">&rarr;</span></a></li>
+            <li class="next" if={ hasRefresh }><a href="#" onclick={ refresh }>Refresh</a></li>
         </ul>
     </nav>
 
@@ -38,27 +39,27 @@
         var self = this;
 
         this.title = 'Blockchain explorer';
+        this.height = parseInt(this.opts.height);
 
-        this.currentHeight = parseInt(this.opts.height);
+        this.api.loadBlockchain(self.height + 1, function(data) {
+            self.blocks = data;
 
-        // TODO refactor, rework duplicating
-        if (isNaN(this.currentHeight)) {
-            this.api.loadBlockchain(function(data) {
-                self.blocks = data;
-                if (isNaN(self.localStorage.getNewestHeight()) || self.localStorage.getNewestHeight() < self.blocks[0].height) {
-                    self.localStorage.setNewestHeight(self.blocks[0].height);
-                }
-                self.update();
-            });
-        } else {
-            this.api.loadBlockchain(this.currentHeight + 1, function(data) {
-                self.blocks = data;
-                if (isNaN(self.localStorage.getNewestHeight()) || self.localStorage.getNewestHeight() < self.blocks[0].height) {
-                    self.localStorage.setNewestHeight(self.blocks[0].height);
-                }
-                self.update();
-            });
-        }
+            // toggle previous button
+            if (self.blocks[0].height > 9) {
+                self.hasPrevious = true;
+            }
+
+            // toggle next and refresh buttons
+            var newest = self.localStorage.getNewestHeight();
+            if (isNaN(newest) || self.blocks[0].height >= newest)  {
+                self.localStorage.setNewestHeight(self.blocks[0].height);
+                self.hasRefresh = true;
+            } else {
+                self.hasNext = true;
+            }
+
+            self.update();
+        });
 
         rowClick(height, e) {
             e.preventDefault();
@@ -67,24 +68,22 @@
 
         previous(e) {
             e.preventDefault();
-            var newHeight = self.blocks[0].height - 10;
-
-            if (newHeight < 9) {
-                newHeight = 9;
+            var height = self.blocks[0].height - 10;
+            if (height < 9) {
+                height = 9;
             }
-
-            route('/blockchain/' + newHeight);
+            route('/blockchain/' + height);
         }
 
         next(e) {
             e.preventDefault();
-            var newHeight = self.blocks[0].height + 10;
+            var height = self.blocks[0].height + 10;
+            route('/blockchain/' + height);
+        }
 
-            if (newHeight < self.localStorage.getNewestHeight()) {
-                route('/blockchain/' + newHeight);
-            } else {
-                route('/blockchain');
-            }
+        refresh(e) {
+            e.preventDefault();
+            window.location.reload();
         }
     </script>
 </blockchain>
