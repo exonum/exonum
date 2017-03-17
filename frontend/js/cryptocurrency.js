@@ -159,23 +159,23 @@ function Cryptocurrency(serviceId, validators) {
         }
     }
 
-    function createWalletTransaction(name) {
-        var pair = Exonum.keyPair();
+    function keyPair() {
+        return Exonum.keyPair();
+    }
+
+    function createWalletTransaction(publicKey, name, secretKey) {
         var data = {
-            pub_key: pair.publicKey,
+            pub_key: publicKey,
             name: name
         };
-        var signature = Transaction(130).sign(data, pair.secretKey);
-        var transaction = {
+        var signature = Transaction(130).sign(data, secretKey);
+
+        return {
             service_id: serviceId,
             message_id: 130,
             body: data,
             signature: signature
         };
-        return {
-            pair: pair,
-            transaction: transaction
-        }
     }
 
     function addFundsTransaction(amount, wallet, secretKey) {
@@ -217,6 +217,7 @@ function Cryptocurrency(serviceId, validators) {
         Transaction: Transaction,
         getBlock: getBlock,
         calculateHashesOfTransactions: calculateHashesOfTransactions,
+        keyPair: keyPair,
         createWalletTransaction: createWalletTransaction,
         addFundsTransaction: addFundsTransaction,
         transferTransaction: transferTransaction
