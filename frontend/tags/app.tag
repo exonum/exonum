@@ -50,13 +50,34 @@
                     });
                 },
 
-                submitTransaction: function(transaction, callback) {
+                submitTransaction: function(transaction, publicKey, callback) {
+                    var hash = cryptocurrency.getHashOfTransaction(transaction);
+                    var self = this;
+
+                    function loop() {
+                        self.api.getWallet(publicKey, function(data) {
+                            if (data) {
+                                for (var i in data.transactions) {
+                                    if (data.transactions[i].hash === hash) {
+                                        callback();
+                                        self.toggleLoading(false);
+                                        return;
+                                    }
+                                }
+                            }
+
+                            setTimeout(loop, 1000);
+                        });
+                    }
+
+                    self.toggleLoading(true);
+
                     $.ajax({
                         method: 'POST',
                         url: baseUrl + '/wallets/transaction',
                         contentType: 'application/json',
                         data: JSON.stringify(transaction),
-                        success: callback,
+                        success: loop,
                         error: function(jqXHR, textStatus, errorThrown) {
                             console.error(textStatus);
                         }
@@ -83,8 +104,10 @@
                         method: 'GET',
                         url: baseUrl + '/blockchain/blocks/' + height,
                         success: function(data, textStatus, jqXHR) {
-                            if (data) {
-                                cryptocurrency.calculateHashesOfTransactions(data.txs);
+                            if (data && data.txs) {
+                                for (var i in data.txs) {
+                                    data.txs[i].hash = cryptocurrency.getHashOfTransaction(data.txs[i]);
+                                }
                             }
                             callback(data);
                         },
