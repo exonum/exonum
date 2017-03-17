@@ -62,16 +62,13 @@
                 },
 
                 loadBlockchain: function(from, callback) {
-                    var callback = callback;
-                    var urlSuffix = '';
-                    if (typeof callback === 'undefined') {
-                        callback = from;
-                    } else {
-                        urlSuffix += '&from=' + from;
+                    var suffix = '';
+                    if (!isNaN(from)) {
+                        suffix += '&from=' + from;
                     }
                     $.ajax({
                         method: 'GET',
-                        url: baseUrl + '/blockchain/blocks?count=10' + urlSuffix,
+                        url: baseUrl + '/blockchain/blocks?count=10' + suffix,
                         success: callback,
                         error: function(jqXHR, textStatus, errorThrown) {
                             console.error(textStatus);
