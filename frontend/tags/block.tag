@@ -95,7 +95,7 @@
         var height = parseInt(this.opts.height);
 
         this.title = 'Block ' + height;
-
+        this.toggleLoading(true);
         this.api.loadBlock(height, function(data) {
             if (data == null) {
                 self.notFound = true;
@@ -104,6 +104,7 @@
             }
 
             self.update();
+            self.toggleLoading(false);
         });
 
         // toggle previous button

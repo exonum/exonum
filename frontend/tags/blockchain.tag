@@ -40,7 +40,7 @@
 
         this.title = 'Blockchain explorer';
         this.height = parseInt(this.opts.height);
-
+        this.toggleLoading(true);
         this.api.loadBlockchain(self.height + 1, function(data) {
             self.blocks = data;
 
@@ -59,6 +59,7 @@
             }
 
             self.update();
+            self.toggleLoading(false);
         });
 
         rowClick(height, e) {

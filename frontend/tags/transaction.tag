@@ -61,25 +61,27 @@
     <script>
         var self = this;
 
+        this.toggleLoading(true);
         this.api.loadTransaction(this.opts.hash, function(data, textStatus, jqXHR) {
             if (data.type === 'FromHex') {
                 self.notFound = true;
             } else {
                 switch(data.message_id) {
                     case 128:
-                        self.opts.titleObservable.trigger('change', 'Transfer Transaction');
+                        self.setTitle('Transfer Transaction');
                         break;
                     case 129:
-                        self.opts.titleObservable.trigger('change', 'Add Funds Transaction');
+                        self.setTitle('Add Funds Transaction');
                         break;
                     case 130:
-                        self.opts.titleObservable.trigger('change', 'Create Wallet Transaction');
+                        self.setTitle('Create Wallet Transaction');
                         break;
                 }
                 self.transaction = data;
             }
 
             self.update();
+            self.toggleLoading(false);
         });
 
         back(e) {

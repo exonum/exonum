@@ -31,11 +31,12 @@
 
         this.title = 'Transfer';
         this.users = this.localStorage.getUsers();
-
+        this.toggleLoading(true);
         this.api.getWallet(self.opts.publicKey, function(data) {
             self.block = data.block;
             self.wallet = data.wallet;
             self.update();
+            self.toggleLoading(false);
         });
 
         edit(e) {
