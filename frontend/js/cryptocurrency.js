@@ -150,13 +150,12 @@ function Cryptocurrency(serviceId, validators) {
         };
     }
     
-    function calculateHashesOfTransactions(transactions) {
-        for (var i in transactions) {
-            var type = new Transaction(transactions[i].message_id);
+    function getHashOfTransaction(transaction) {
+        var type = new Transaction(transaction.message_id);
 
-            type.signature = transactions[i].signature;
-            transactions[i].hash = type.hash(transactions[i].body);
-        }
+        type.signature = transaction.signature;
+
+        return type.hash(transaction.body);
     }
 
     function keyPair() {
@@ -214,9 +213,8 @@ function Cryptocurrency(serviceId, validators) {
     }
 
     return {
-        Transaction: Transaction,
         getBlock: getBlock,
-        calculateHashesOfTransactions: calculateHashesOfTransactions,
+        getHashOfTransaction: getHashOfTransaction,
         keyPair: keyPair,
         createWalletTransaction: createWalletTransaction,
         addFundsTransaction: addFundsTransaction,

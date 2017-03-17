@@ -29,7 +29,7 @@
             var pair = self.api.cryptocurrency.keyPair();
             var transaction = self.api.cryptocurrency.createWalletTransaction(pair.publicKey, self.name, pair.secretKey);
 
-            self.api.submitTransaction(transaction, function() {
+            self.api.submitTransaction.call(self, transaction, pair.publicKey, function() {
                 self.localStorage.addUser({
                     name: self.name,
                     publicKey: pair.publicKey,

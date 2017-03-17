@@ -27,7 +27,7 @@
             var user = self.localStorage.getUser(self.opts.publicKey);
             var transaction = self.api.cryptocurrency.addFundsTransaction(amount, self.opts.publicKey, user.secretKey);
 
-            self.api.submitTransaction(transaction, function() {
+            self.api.submitTransaction.call(self, transaction, self.opts.publicKey, function() {
                 self.notify('success', 'Funds will be transfered in a seconds.');
                 route('/user/' + self.opts.publicKey);
             });
