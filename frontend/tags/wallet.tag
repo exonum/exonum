@@ -1,6 +1,5 @@
 <wallet>
     <virtual if="{ wallet && block }">
-
         <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
 
         <div if={ wallet.balance == 0 } class="alert alert-warning text-center">

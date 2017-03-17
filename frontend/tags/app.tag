@@ -133,6 +133,15 @@
                 }
             },
 
+            notify: function(type, text) {
+                noty({
+                    layout: 'topCenter',
+                    timeout: 5000,
+                    type: type || 'information',
+                    text: text
+                });
+            },
+
             init: function() {
                 this.on('mount', function() {
                     // add title if it is predefined in component

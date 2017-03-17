@@ -1,5 +1,5 @@
 <register>
-    <form if={ !succeed } class="form-horizontal" onsubmit={ register }>
+    <form class="form-horizontal" onsubmit={ register }>
         <legend class="text-center">Create wallet</legend>
         <div class="form-group">
             <div class="col-sm-4 control-label">Your name:</div>
@@ -9,16 +9,11 @@
         </div>
         <div class="form-group">
             <div class="col-sm-offset-4 col-sm-8">
-                <button type="submit" class="btn btn-lg btn-primary" disabled={ !text }>Create wallet</button>
+                <button type="submit" class="btn btn-lg btn-primary" disabled={ !name }>Create wallet</button>
                 <a href="#" class="btn btn-lg btn-default">Back</a>
             </div>
         </div>
     </form>
-
-    <div if={ succeed } class="text-center">
-        <p class="lead">Wallet created! Login and manage the wallet.</p>
-        <a class="btn btn-lg btn-block btn-default" href="#user/{ publicKey }">Log in</a>
-    </div>
 
     <script>
         var self = this;
@@ -26,28 +21,23 @@
         this.title = 'Register';
 
         edit(e) {
-            this.text = e.target.value;
+            this.name = e.target.value;
         }
 
         register(e) {
-            var name = this.text;
-
             e.preventDefault();
+            var pair = self.api.cryptocurrency.keyPair();
+            var transaction = self.api.cryptocurrency.createWalletTransaction(pair.publicKey, self.name, pair.secretKey);
 
-            if (name) {
-                var wallet = self.api.cryptocurrency.createWalletTransaction(name);
-
-                self.api.submitTransaction(wallet.transaction, function() {
-                    self.localStorage.addUser({
-                        name: name,
-                        publicKey: wallet.pair.publicKey,
-                        secretKey: wallet.pair.secretKey
-                    });
-                    self.publicKey = wallet.pair.publicKey;
-                    self.succeed = true;
-                    self.update();
+            self.api.submitTransaction(transaction, function() {
+                self.localStorage.addUser({
+                    name: self.name,
+                    publicKey: pair.publicKey,
+                    secretKey: pair.secretKey
                 });
-            }
+                self.notify('success', 'Wallet created. Login and manage the wallet.');
+                route('/');
+            });
         }
     </script>
 </register>

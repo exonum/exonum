@@ -1,49 +1,30 @@
 <transfer>
-    <virtual if={ !succeed && !submitted }>
-        <virtual if={ wallet && block }>
-            <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
-        </virtual>
-
-        <form class="form-horizontal" onsubmit={ submit }>
-            <div class="form-group">
-                <div class="col-sm-4 control-label">Reciever:</div>
-                <div class="col-sm-8">
-                    <select id="reciever" class="form-control">
-                        <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
-                    </select>
-                </div>
-            </div>
-            <div class="form-group">
-                <div class="col-sm-4 control-label">Amount, $:</div>
-                <div class="col-sm-8">
-                    <input type="number" class="form-control" onkeyup={ edit }>
-                </div>
-            </div>
-            <div class="form-group">
-                <div class="col-sm-offset-4 col-sm-8">
-                    <button type="submit" class="btn btn-lg btn-primary" disabled="{ !amount }">Transfer</button>
-                    <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Back</a>
-                </div>
-            </div>
-        </form>
+    <virtual if={ wallet && block }>
+        <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
     </virtual>
 
-    <div if={ submitted && !succeed } class="text-center">
-        <form class="form" onsubmit={ approve }>
-            <p class="lead">Are you sure you want to send <strong>{ numeral(amount).format('$0,0') }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>?</p>
-            <div class="form-group">
-                <button type="submit" class="btn btn-lg btn-primary">Approve</button>
-                <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Cancel</a>
-            </div>
-        </form>
-    </div>
-
-    <div if={ succeed } class="text-center">
-        <p class="lead">Transfer approved. You've sent <strong>{ numeral(amount).format('$0,0') }</strong> to <a href="#user/{ reciever.publicKey }">{ reciever.name }</a>.</p>
+    <form class="form-horizontal" onsubmit={ submit }>
         <div class="form-group">
-            <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Back</a>
+            <div class="col-sm-4 control-label">Receiver:</div>
+            <div class="col-sm-8">
+                <select id="receiver" class="form-control">
+                    <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
+                </select>
+            </div>
         </div>
-    </div>
+        <div class="form-group">
+            <div class="col-sm-4 control-label">Amount, $:</div>
+            <div class="col-sm-8">
+                <input type="number" class="form-control" onkeyup={ edit }>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-sm-offset-4 col-sm-8">
+                <button type="submit" class="btn btn-lg btn-primary" disabled="{ !amount }">Transfer</button>
+                <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Back</a>
+            </div>
+        </div>
+    </form>
 
     <script>
         var self = this;
@@ -67,23 +48,15 @@
 
         submit(e) {
             e.preventDefault();
-            this.reciever = {
-                publicKey: $('#reciever').val(),
-                name: $('#reciever option:selected').text()
-            }
-            this.submitted = true;
-            this.update();
-        }
 
-        approve(e) {
-            e.preventDefault();
             var amount = self.amount.toString();
+            var receiver = $('#receiver').val();
             var user = self.localStorage.getUser(self.opts.publicKey);
-            var transaction = self.api.cryptocurrency.transferTransaction(amount, self.opts.publicKey, self.reciever.publicKey, user.secretKey);
+            var transaction = self.api.cryptocurrency.transferTransaction(amount, self.opts.publicKey, receiver, user.secretKey);
 
             self.api.submitTransaction(transaction, function() {
-                self.succeed = true;
-                self.update();
+                self.notify('success', 'Transfer approved. Funds will be transfered in a seconds.');
+                route('/user/' + self.opts.publicKey);
             });
         }
     </script>
