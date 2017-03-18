@@ -96,21 +96,19 @@ impl<'a> Schema<'a> {
                                        config_data: StoredConfiguration)
                                        -> Result<(), Error> {
         let actual_from = config_data.actual_from;
-        if actual_from > 0 {
-            let last_actual_from = self.configs_actual_from()
-                .last()?
-                .expect("configs_actual_from table returned None on last()")
-                .actual_from();
+        if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
+            let last_actual_from = last_cfg_reference.actual_from();
             if actual_from <= last_actual_from {
                 return Err(Error::new(format!("Attempting to commit configuration with actual_from {:?} less than \
                                               the last committed actual_from {:?}",  actual_from, last_actual_from)));
             }
         }
         let cfg_hash = config_data.hash();
+        self.configs().put(&cfg_hash, config_data.clone())?;
 
-        self.configs().put(&cfg_hash, config_data)?;
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from().append(cfg_ref)?;
+        warn!("Scheduled the following configuration for acceptance: {:?}", config_data);
         // TODO: clear storages
         Ok(())
     }

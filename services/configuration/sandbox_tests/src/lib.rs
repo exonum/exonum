@@ -78,6 +78,57 @@ mod tests {
     }
 
     #[test]
+    fn test_discard_propose_for_same_cfg() {
+        let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
+        sandbox.assert_state(1, 1);
+        let new_cfg = generate_config_with_message(4, "First cfg", &sandbox);
+        let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+                                              &initial_cfg.hash(),
+                                              &new_cfg.clone().serialize(),
+                                              sandbox.s(1));
+        {
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+            sandbox.assert_state(2, 1);
+            assert_eq!(Some(propose_tx.clone()), get_propose(&sandbox, new_cfg.hash()).unwrap());
+        }
+        {
+            let duplicate_cfg_propose = TxConfigPropose::new(&sandbox.p(0),
+                                                  &initial_cfg.hash(),
+                                                  &new_cfg.clone().serialize(),
+                                                  sandbox.s(0));
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[duplicate_cfg_propose.raw().clone()]);
+            sandbox.assert_state(3, 1);
+            assert_eq!(Some(propose_tx), get_propose(&sandbox, new_cfg.hash()).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_discard_vote_for_absent_propose() {
+        let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
+        sandbox.assert_state(1, 1);
+        let new_cfg = generate_config_with_message(4, "First cfg", &sandbox);
+        let absent_cfg = generate_config_with_message(4, "Absent propose", &sandbox);
+        {
+            let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+                                                  &initial_cfg.hash(),
+                                                  &new_cfg.clone().serialize(),
+                                                  sandbox.s(1));
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+            sandbox.assert_state(2, 1);
+        }
+		{
+            let legal_vote = TxConfigVote::new(&sandbox.p(3), &new_cfg.hash(), sandbox.s(3));
+            let illegal_vote = TxConfigVote::new(&sandbox.p(3), &absent_cfg.hash(), sandbox.s(3));
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[legal_vote.raw().clone(), illegal_vote.raw().clone()]);
+            sandbox.assert_state(3, 1);
+            assert_eq!(Some(legal_vote),
+                       get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(3)).unwrap());
+            assert_eq!(None,
+                       get_vote_for_propose(&sandbox, absent_cfg.hash(), sandbox.p(3)).unwrap());
+        }
+    }
+
+    #[test]
     fn test_discard_proposes_with_expired_actual_from() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
 
