@@ -1,13 +1,13 @@
 use serde_json::value::ToJson;
 use params::{Params, Value};
 use router::Router;
-use api::{Api, ApiError};
+use blockchain_explorer::api::{Api, ApiError};
 use iron::prelude::*;
 use bodyparser;
 use exonum::crypto::{PublicKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, ConsensusConfig, StoredConfiguration, Schema};
-use configuration_service::{TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
-use exonum::storage::{StorageValue, Error as StorageError};
+use ::{TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
+use exonum::storage::{Map, StorageValue, Error as StorageError};
 
 use exonum::node::{TxSender, NodeChannel, NodeConfig, TransactionSend};
 pub type ConfigTxSender = TxSender<NodeChannel>;
@@ -20,23 +20,18 @@ struct TxHash {
 #[derive(Serialize)]
 struct ConfigProposeInfo {
     from: PublicKey,
-    height: u64,
     config: StoredConfiguration,
-    actual_from_height: u64,
 }
 
 #[derive(Clone, Deserialize)]
 struct ConfigProposeRequest {
-    pub actual_from: u64,
-    pub validators: Vec<PublicKey>,
-    pub consensus: ConsensusConfig,
+    pub previous_cfg_hash: Hash, 
+    pub config: StoredConfiguration, 
 }
 
 #[derive(Clone, Deserialize)]
 struct ConfigVoteRequest {
     pub hash_propose: Hash,
-    pub seed: u64,
-    pub revoke: bool,
 }
 
 #[derive(Clone)]
@@ -59,36 +54,25 @@ impl ConfigApi {
                            -> Result<Option<ConfigProposeInfo>, ApiError> {
         let hash = Hash::from_hex(hash_str)?;
         if let Some(propose) =
-               ConfigurationSchema::new(&self.blockchain.view()).get_config_propose(&hash)? {
-            match StoredConfiguration::deserialize(propose.config()) {
-                Ok(config) => {
-                    return Ok(Some(ConfigProposeInfo {
-                        from: *propose.from(),
-                        height: propose.height(),
-                        config: config,
-                        actual_from_height: propose.actual_from_height(),
-                    }));
-                }
-                Err(e) => return Err(ApiError::Storage(StorageError::new(e))),
-            }
+               ConfigurationSchema::new(&self.blockchain.view()).config_proposes().get(&hash)? {
+                unimplemented!();
         }
         Ok(None)
     }
 
     fn get_vote_by_key(&self, pub_key_str: &String) -> Result<Option<TxConfigVote>, ApiError> {
-        let pub_key = PublicKey::from_hex(pub_key_str)?;
-        match ConfigurationSchema::new(&self.blockchain.view()).get_vote(&pub_key) {
-            Ok(vote) => Ok(vote),
-            Err(e) => Err(ApiError::Storage(e)),
-        }
+        unimplemented!();
+        //let pub_key = PublicKey::from_hex(pub_key_str)?;
+        //match ConfigurationSchema::new(&self.blockchain.view()).get_vote(&pub_key) {
+            //Ok(vote) => Ok(vote),
+            //Err(e) => Err(ApiError::Storage(e)),
+        //}
     }
 
-    fn put_config_propose(&self, request: StoredConfiguration) -> Result<Hash, ApiError> {
-        let height = Schema::new(&self.blockchain.view()).last_height().unwrap();
+    fn put_config_propose(&self, request: ConfigProposeRequest) -> Result<Hash, ApiError> {
         let config_propose = TxConfigPropose::new(&self.config.public_key,
-                                                  height,
-                                                  request.serialize().as_slice(),
-                                                  request.actual_from,
+                                                  &request.previous_cfg_hash, 
+                                                  request.config.serialize().as_slice(),
                                                   &self.config.secret_key);
         let hash = config_propose.hash();
         match self.channel.send(ConfigTx::ConfigPropose(config_propose)) {
@@ -101,10 +85,7 @@ impl ConfigApi {
     fn put_vote(&self, request: ConfigVoteRequest) -> Result<Hash, ApiError> {
         let height = Schema::new(&self.blockchain.view()).last_height().unwrap();
         let config_vote = TxConfigVote::new(&self.config.public_key,
-                                            height,
                                             &request.hash_propose,
-                                            request.seed,
-                                            request.revoke,
                                             &self.config.secret_key);
         let hash = config_vote.hash();
         match self.channel.send(ConfigTx::ConfigVote(config_vote)) {
@@ -153,7 +134,7 @@ impl Api for ConfigApi {
 
         let _self = self.clone();
         let configs_propose = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<StoredConfiguration>>().unwrap() {
+            match req.get::<bodyparser::Struct<ConfigProposeRequest>>().unwrap() {
                 Some(request) => {
                     let hash = _self.put_config_propose(request)?;
                     let result = TxHash { tx_hash: hash.to_hex() };

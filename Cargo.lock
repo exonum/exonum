@@ -153,11 +153,17 @@ dependencies = [
 name = "configuration_service"
 version = "0.1.0"
 dependencies = [
+ "blockchain_explorer 0.1.0",
+ "bodyparser 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.20.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "exonum 0.1.0",
+ "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "params 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "router 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.8.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
