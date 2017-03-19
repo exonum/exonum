@@ -71,7 +71,6 @@ impl ConfigApi {
 
     fn put_config_propose(&self, request: ConfigProposeRequest) -> Result<Hash, ApiError> {
         let config_propose = TxConfigPropose::new(&self.config.public_key,
-                                                  &request.previous_cfg_hash, 
                                                   request.config.serialize().as_slice(),
                                                   &self.config.secret_key);
         let hash = config_propose.hash();

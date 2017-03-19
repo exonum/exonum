@@ -7,6 +7,7 @@ use ::crypto::{hash, PublicKey, Hash};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
+    pub previous_cfg_hash: Hash, 
     pub actual_from: u64,
     pub validators: Vec<PublicKey>,
     pub consensus: ConsensusConfig,

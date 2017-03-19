@@ -77,6 +77,7 @@ impl Blockchain {
 
     pub fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
+            previous_cfg_hash: Hash::zero(),
             actual_from: 0,
             validators: cfg.validators,
             consensus: cfg.consensus,

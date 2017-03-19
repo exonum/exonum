@@ -62,7 +62,7 @@ mod tests {
         cfg_string: String,
     }
 
-    fn generate_config_with_message(actual_from: u64,
+    fn generate_config_with_message(prev_cfg_hash: Hash, actual_from: u64,
                                     timestamping_service_cfg_message: &str,
                                     sandbox: &Sandbox)
                                     -> StoredConfiguration {
@@ -71,6 +71,7 @@ mod tests {
         let service_cfg = CfgStub { cfg_string: timestamping_service_cfg_message.to_string() };
         services.insert(tmstmp_id, service_cfg.to_json());
         StoredConfiguration {
+            previous_cfg_hash: prev_cfg_hash, 
             actual_from: actual_from,
             validators: sandbox.validators(),
             consensus: sandbox.cfg().consensus,
@@ -95,6 +96,7 @@ mod tests {
         let actual_from = 3;
         let services: BTreeMap<u16, Value> = BTreeMap::new();
         let added_keys_cfg = StoredConfiguration {
+            previous_cfg_hash: initial_cfg.hash(), 
             actual_from: actual_from,
             validators: validators.clone(),
             consensus: sandbox.cfg().consensus,
@@ -102,7 +104,6 @@ mod tests {
         };
         {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                                  &initial_cfg.hash(),
                                                   &added_keys_cfg.clone().serialize(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -126,10 +127,9 @@ mod tests {
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
             sandbox.assert_state(4, 1);
         }
-        let new_cfg = generate_config_with_message(8, "First cfg", &sandbox);
+        let new_cfg = generate_config_with_message(added_keys_cfg.hash(), 8, "First cfg", &sandbox);
         {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                                  &added_keys_cfg.hash(),
                                                   &new_cfg.clone().serialize(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -169,6 +169,7 @@ mod tests {
         let actual_from = 3;
         let services: BTreeMap<u16, Value> = BTreeMap::new();
         let excluding_cfg = StoredConfiguration {
+            previous_cfg_hash: initial_cfg.hash(), 
             actual_from: actual_from,
             validators: new_public_keys,
             consensus: sandbox.cfg().consensus,
@@ -176,7 +177,6 @@ mod tests {
         };
         {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                                  &initial_cfg.hash(),
                                                   &excluding_cfg.clone().serialize(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -200,9 +200,8 @@ mod tests {
     fn test_discard_propose_for_same_cfg() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
         sandbox.assert_state(1, 1);
-        let new_cfg = generate_config_with_message(4, "First cfg", &sandbox);
+        let new_cfg = generate_config_with_message(initial_cfg.hash(), 4, "First cfg", &sandbox);
         let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                              &initial_cfg.hash(),
                                               &new_cfg.clone().serialize(),
                                               sandbox.s(1));
         {
@@ -213,7 +212,6 @@ mod tests {
         }
         {
             let duplicate_cfg_propose = TxConfigPropose::new(&sandbox.p(0),
-                                                             &initial_cfg.hash(),
                                                              &new_cfg.clone().serialize(),
                                                              sandbox.s(0));
             add_one_height_with_transactions(&sandbox,
@@ -229,11 +227,10 @@ mod tests {
     fn test_discard_vote_for_absent_propose() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
         sandbox.assert_state(1, 1);
-        let new_cfg = generate_config_with_message(4, "First cfg", &sandbox);
-        let absent_cfg = generate_config_with_message(4, "Absent propose", &sandbox);
+        let new_cfg = generate_config_with_message(initial_cfg.hash(), 4, "First cfg", &sandbox);
+        let absent_cfg = generate_config_with_message(initial_cfg.hash(), 4, "Absent propose", &sandbox);
         {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                                  &initial_cfg.hash(),
                                                   &new_cfg.clone().serialize(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -265,10 +262,9 @@ mod tests {
             }
             sandbox.assert_state(target_height, 1);
         }
-        let new_cfg = generate_config_with_message(target_height, "First cfg", &sandbox);
+        let new_cfg = generate_config_with_message(initial_cfg.hash(), target_height, "First cfg", &sandbox);
         {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                                  &initial_cfg.hash(),
                                                   &new_cfg.clone().serialize(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -283,10 +279,9 @@ mod tests {
         sandbox.assert_state(1, 1);
         let target_height = 10;
 
-        let new_cfg = generate_config_with_message(target_height, "First cfg", &sandbox);
+        let new_cfg = generate_config_with_message(initial_cfg.hash(), target_height, "First cfg", &sandbox);
         {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                                  &initial_cfg.hash(),
                                                   &new_cfg.clone().serialize(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -320,12 +315,12 @@ mod tests {
 
     #[test]
     fn test_discard_invalid_config_json() {
-        let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
+        let (sandbox, sandbox_state, _) = configuration_sandbox();
         sandbox.assert_state(1, 1);
         let new_cfg = [70; 74]; //invalid json bytes
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1), &initial_cfg.hash(), &new_cfg, sandbox.s(1));
+                TxConfigPropose::new(&sandbox.p(1), &new_cfg, sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
             assert_eq!(None, get_propose(&sandbox, hash(&new_cfg)).unwrap());
@@ -343,10 +338,9 @@ mod tests {
             }
             sandbox.assert_state(target_height + 1, 1);
         }
-        let new_cfg = generate_config_with_message(target_height + 4, "First cfg", &sandbox);
+        let new_cfg = generate_config_with_message(initial_cfg.hash(), target_height + 4, "First cfg", &sandbox);
         {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                                  &initial_cfg.hash(),
                                                   &new_cfg.clone().serialize(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -394,11 +388,10 @@ mod tests {
         sandbox.assert_state(1, 1);
 
         let following_config =
-            generate_config_with_message(6, "Following cfg at height 6", &sandbox);
+            generate_config_with_message(initial_cfg.hash(), 6, "Following cfg at height 6", &sandbox);
 
         {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
-                                                  &initial_cfg.hash(),
                                                   &following_config.clone().serialize(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -421,11 +414,10 @@ mod tests {
             assert_eq!(sandbox.cfg(), initial_cfg);
             assert_eq!(sandbox.following_cfg(), Some(following_config.clone()));
         }
-        let new_cfg = generate_config_with_message(7, "New cfg", &sandbox);
+        let new_cfg = generate_config_with_message(initial_cfg.hash(), 7, "New cfg", &sandbox);
 
         {
             let propose_tx_new = TxConfigPropose::new(&sandbox.p(1),
-                                                      &initial_cfg.hash(),
                                                       &new_cfg.clone().serialize(),
                                                       sandbox.s(1));
             add_one_height_with_transactions(&sandbox,
@@ -464,17 +456,18 @@ mod tests {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
         sandbox.assert_state(1, 1);
 
-        let new_cfg = generate_config_with_message(6, "Following cfg at height 6", &sandbox);
-        let new_cfg_discarded_votes = generate_config_with_message(8, "discarded votes", &sandbox);
+        let new_cfg_bad_previous_cfg = generate_config_with_message(Hash::new([11; HASH_SIZE]), 6, "Following cfg at height 6", &sandbox);// not actual config hash
+
+        let new_cfg = generate_config_with_message(initial_cfg.hash(), 6, "Following cfg at height 6", &sandbox);
+        let new_cfg_discarded_votes = generate_config_with_message(initial_cfg.hash(), 8, "discarded votes", &sandbox);
+
         let (illegal_pub, illegal_sec) = gen_keypair_from_seed(&Seed::new([66; 32]));
 
         {
             let illegal_propose1 = TxConfigPropose::new(&sandbox.p(1),
-                                                        &Hash::new([11; HASH_SIZE]), // not actual config hash
-                                                        &new_cfg.clone().serialize(),
+                                                        &new_cfg_bad_previous_cfg.clone().serialize(),
                                                         sandbox.s(1));
             let illegal_propose2 = TxConfigPropose::new(&illegal_pub, // not a member of actual config
-                                                        &initial_cfg.hash(),
                                                         &new_cfg.clone().serialize(),
                                                         &illegal_sec);
             add_one_height_with_transactions(&sandbox,
@@ -482,15 +475,14 @@ mod tests {
                                              &[illegal_propose1.raw().clone(),
                                                illegal_propose2.raw().clone()]);
             sandbox.assert_state(2, 1);
+            assert_eq!(None, get_propose(&sandbox, new_cfg_bad_previous_cfg.hash()).unwrap());
             assert_eq!(None, get_propose(&sandbox, new_cfg.hash()).unwrap());
         }
         {
             let legal_propose1 = TxConfigPropose::new(&sandbox.p(1),
-                                                      &initial_cfg.hash(),
                                                       &new_cfg.clone().serialize(),
                                                       sandbox.s(1));
             let legal_propose2 = TxConfigPropose::new(&sandbox.p(1),
-                                                      &initial_cfg.hash(),
                                                       &new_cfg_discarded_votes.clone().serialize(),
                                                       sandbox.s(1));
             add_one_height_with_transactions(&sandbox,
@@ -563,13 +555,12 @@ mod tests {
 
         let actual_from = 5;
 
-        let new_cfg1 = generate_config_with_message(actual_from, "First cfg", &sandbox);
-        let new_cfg2 = generate_config_with_message(actual_from, "Second cfg", &sandbox);
+        let new_cfg1 = generate_config_with_message(initial_cfg.hash(), actual_from, "First cfg", &sandbox);
+        let new_cfg2 = generate_config_with_message(initial_cfg.hash(), actual_from, "Second cfg", &sandbox);
         {
             let mut proposes = Vec::new();
             for cfg in &[new_cfg1.clone(), new_cfg2.clone()] {
                 proposes.push(TxConfigPropose::new(&sandbox.p(1),
-                                                   &initial_cfg.hash(),
                                                    &cfg.clone().serialize(),
                                                    sandbox.s(1))
                     .raw()
@@ -618,12 +609,11 @@ mod tests {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
         sandbox.assert_state(1, 1);
 
-        let new_cfg1 = generate_config_with_message(3, "First cfg", &sandbox);
-        let new_cfg2 = generate_config_with_message(5, "Second cfg", &sandbox);
+        let new_cfg1 = generate_config_with_message(initial_cfg.hash(), 3, "First cfg", &sandbox);
+        let new_cfg2 = generate_config_with_message(new_cfg1.hash(), 5, "Second cfg", &sandbox);
 
         {
             let propose_tx1 = TxConfigPropose::new(&sandbox.p(1),
-                                                   &initial_cfg.hash(),
                                                    &new_cfg1.clone().serialize(),
                                                    sandbox.s(1));
 
@@ -647,7 +637,6 @@ mod tests {
         }
         {
             let propose_tx2 = TxConfigPropose::new(&sandbox.p(1),
-                                                   &new_cfg1.hash(),
                                                    &new_cfg2.clone().serialize(),
                                                    sandbox.s(1));
 
