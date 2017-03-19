@@ -34,11 +34,10 @@ message! {
     TxConfigPropose {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 72;
+        const SIZE = 40;
 
         from:           &PublicKey  [00 => 32]
-        prev_cfg_hash:  &Hash       [32 => 64]
-        cfg:            &[u8]       [64 => 72] // serialized config bytes
+        cfg:            &[u8]       [32 => 40] // serialized config bytes
     }
 }
 
@@ -66,7 +65,6 @@ impl Serialize for TxConfigPropose {
         let mut state;
         state = ser.serialize_struct("config_propose", 4)?;
         ser.serialize_struct_elt(&mut state, "from", self.from())?;
-        ser.serialize_struct_elt(&mut state, "previous_config_hash", self.prev_cfg_hash())?;
         if let Ok(cfg) = StoredConfiguration::deserialize_err(self.cfg()) {
             ser.serialize_struct_elt(&mut state, "config", cfg)?;
         } else {
@@ -203,13 +201,6 @@ impl TxConfigPropose {
         }
 
         let actual_config: StoredConfiguration = blockchain_schema.get_actual_configuration()?;
-        let actual_config_hash = actual_config.hash();
-        if *self.prev_cfg_hash() != actual_config_hash {
-            error!("Discarding TxConfigPropose:{} which does not reference actual config: {:?}",
-                   serde_json::to_string(self)?,
-                   actual_config);
-            return Ok(());
-        }
 
         if !actual_config.validators.contains(self.from()) {
             error!("Discarding TxConfigPropose:{} from unknown validator. ",
@@ -226,7 +217,15 @@ impl TxConfigPropose {
             return Ok(());
         }
 
+        let actual_config_hash = actual_config.hash();
         let config_candidate_body = config_candidate.unwrap();
+        if config_candidate_body.previous_cfg_hash != actual_config_hash {
+            error!("Discarding TxConfigPropose:{} which does not reference actual config: {:?}",
+                   serde_json::to_string(self)?,
+                   actual_config);
+            return Ok(());
+        }
+
         let current_height = blockchain_schema.last_height()? + 1;
         let actual_from = config_candidate_body.actual_from;
         if actual_from <= current_height {
@@ -276,10 +275,19 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        let referenced_tx_propose = propose_option.unwrap();
         let actual_config: StoredConfiguration = blockchain_schema.get_actual_configuration()?;
+
+        if !actual_config.validators.contains(self.from()) {
+            error!("Discarding TxConfigVote:{:?} from unknown validator. ",
+                   self);
+            return Ok(());
+        }
+
+        let referenced_tx_propose = propose_option.unwrap();
+        let parsed_config = StoredConfiguration::deserialize_err(referenced_tx_propose.cfg())
+            .unwrap();
         let actual_config_hash = actual_config.hash();
-        if *referenced_tx_propose.prev_cfg_hash() != actual_config_hash {
+        if parsed_config.previous_cfg_hash != actual_config_hash {
             error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} does \
                     not reference actual config: {:?}",
                    self,
@@ -288,15 +296,7 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        if !actual_config.validators.contains(self.from()) {
-            error!("Discarding TxConfigVote:{:?} from unknown validator. ",
-                   self);
-            return Ok(());
-        }
-
         let current_height = blockchain_schema.last_height()? + 1;
-        let parsed_config = StoredConfiguration::deserialize_err(referenced_tx_propose.cfg())
-            .unwrap();
         let actual_from = parsed_config.actual_from;
         if actual_from <= current_height {
             error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} has \
