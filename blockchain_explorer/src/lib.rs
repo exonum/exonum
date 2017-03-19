@@ -1,9 +1,7 @@
 mod explorer;
-// pub mod config;
 pub mod api;
 pub mod helpers;
 pub mod explorer_api;
-//pub mod config_api;
 
 extern crate time;
 extern crate serde;
@@ -26,6 +24,5 @@ extern crate iron;
 extern crate router;
 extern crate bodyparser;
 extern crate params;
-//extern crate configuration_service;
 
 pub use explorer::{TransactionInfo, BlockchainExplorer, BlockInfo};
