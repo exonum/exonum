@@ -320,7 +320,8 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
     }
     let mut propose: Option<Propose>;
 
-    for _ in 0..sandbox.n_validators() {
+    let n_validators = sandbox.n_validators();
+    for _ in 0..n_validators {
         propose = add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
         let round: u32 = sandbox.current_round();
         if sandbox.is_leader() {
@@ -334,7 +335,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
             }
 
 
-            for val_idx in 1..sandbox.majority_count() {
+            for val_idx in 1..sandbox.majority_count(n_validators) {
                 sandbox.recv(Prevote::new(val_idx as u32,
                                           initial_height,
                                           round,
@@ -366,7 +367,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                              sandbox.s(VALIDATOR_0 as usize)));
             sandbox.assert_lock(round, Some(propose.hash()));
 
-            for val_idx in 1..sandbox.majority_count() {
+            for val_idx in 1..sandbox.majority_count(n_validators) {
                 sandbox.recv(Precommit::new(val_idx as u32,
                                             initial_height,
                                             round,
@@ -374,7 +375,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                             &block.hash(),
                                             sandbox.s(val_idx)));
 
-                if val_idx != sandbox.majority_count() -1 {
+                if val_idx != sandbox.majority_count(n_validators) -1 {
                     sandbox.assert_state(initial_height, round);
                 }
             }

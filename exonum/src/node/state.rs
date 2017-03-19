@@ -322,7 +322,9 @@ impl State {
         let id = config.validators
             .iter()
             .position(|pk| pk == self.public_key())
-            .unwrap();
+            .expect(&format!("self.public_key:{:?} not found in new actual config validators list:{:?}", 
+                    self.public_key(), 
+                    config.validators));
 
         self.id = id as u32;
         self.config = config;
