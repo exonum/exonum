@@ -1,11 +1,19 @@
 #[macro_use]
 extern crate exonum;
+extern crate blockchain_explorer;
 #[macro_use]
 extern crate log;
 
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
+extern crate iron;
+extern crate router;
+extern crate bodyparser;
+extern crate params;
 
+pub mod config_api;
 use std::fmt;
 
 use serde::{Serialize, Serializer};
