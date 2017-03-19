@@ -2,7 +2,7 @@ use std::collections::{VecDeque, BinaryHeap, HashSet};
 use std::iter::FromIterator;
 use std::cell::{RefCell, Ref};
 use std::sync::{Arc, Mutex};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 use std::ops::Drop;
 use std::collections::HashMap;
 
@@ -176,25 +176,30 @@ impl SandboxReactor {
 pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
-    //pub validators: Vec<(PublicKey, SecretKey)>,
+    // pub validators: Vec<(PublicKey, SecretKey)>,
     pub validators_map: HashMap<PublicKey, SecretKey>,
     addresses: Vec<SocketAddr>,
 }
 
 impl Sandbox {
-    fn initialize(&self) {
-        let connect = Connect::new(&self.p(0), self.a(0), self.time(), self.s(0));
+    pub fn initialize(&self, connect_message_time: Timespec, start_index: usize, end_index: usize) {
+        let connect = Connect::new(&self.p(0), self.a(0), connect_message_time, self.s(0));
 
-        self.recv(Connect::new(&self.p(1), self.a(1), self.time(), self.s(1)));
-        self.send(self.a(1), connect.clone());
-
-        self.recv(Connect::new(&self.p(2), self.a(2), self.time(), self.s(2)));
-        self.send(self.a(2), connect.clone());
-
-        self.recv(Connect::new(&self.p(3), self.a(3), self.time(), self.s(3)));
-        self.send(self.a(3), connect.clone());
+        for validator in start_index..end_index {
+            self.recv(Connect::new(&self.p(validator),
+                                   self.a(validator),
+                                   self.time(),
+                                   self.s(validator)));
+            self.send(self.a(validator), connect.clone());
+        }
 
         self.check_unexpected_message()
+    }
+
+    pub fn set_validators_map(&mut self, new_addresses_len: u8, validators: Vec<(PublicKey, SecretKey)>) {
+        self.addresses =
+            (1..(new_addresses_len + 1) as u8).map(gen_primitive_socket_addr).collect::<Vec<_>>();
+        self.validators_map.extend(validators);
     }
 
     fn check_unexpected_message(&self) {
@@ -212,13 +217,13 @@ impl Sandbox {
 
     pub fn p(&self, id: usize) -> PublicKey {
         self.validators()[id]
-        //&self.validators[id].0
+        // &self.validators[id].0
     }
 
     pub fn s(&self, id: usize) -> &SecretKey {
         let p = self.p(id);
         &self.validators_map[&p]
-        //&self.validators[id].1
+        // &self.validators[id].1
     }
 
     pub fn a(&self, id: usize) -> SocketAddr {
@@ -438,9 +443,9 @@ impl Sandbox {
     }
 
 
-    pub fn majority_count(&self) -> usize {
-        debug_assert!(self.n_validators() >= 4);
-        self.n_validators() * 2 / 3 + 1
+    pub fn majority_count(&self, num_validators: usize) -> usize {
+        debug_assert!(num_validators >= 4);
+        num_validators * 2 / 3 + 1
     }
 
     pub fn round_timeout(&self) -> i64 {
@@ -510,15 +515,17 @@ impl Drop for Sandbox {
     }
 }
 
+fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
+    let addr = Ipv4Addr::new(idx, idx, idx, idx);
+    SocketAddr::new(IpAddr::V4(addr), idx as u16)
+}
+
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let validators = vec![gen_keypair_from_seed(&Seed::new([12; 32])),
                           gen_keypair_from_seed(&Seed::new([13; 32])),
                           gen_keypair_from_seed(&Seed::new([16; 32])),
                           gen_keypair_from_seed(&Seed::new([19; 32]))];
-    let addresses: Vec<SocketAddr> = vec!["1.1.1.1:1".parse().unwrap(),
-                                          "2.2.2.2:2".parse().unwrap(),
-                                          "3.3.3.3:3".parse().unwrap(),
-                                          "4.4.4.4:4".parse().unwrap()];
+    let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
     let db = MemoryDB::new();
     let blockchain = Blockchain::new(db, services);
@@ -563,7 +570,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         handler: node,
     };
     let mut validators_map = HashMap::new();
-    validators_map.extend(validators);
+    validators_map.extend(validators.clone());
     reactor.handler.initialize();
     let sandbox = Sandbox {
         inner: inner.clone(),
@@ -572,7 +579,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         addresses: addresses,
     };
 
-    sandbox.initialize();
+    sandbox.initialize(sandbox.time(), 1, validators.len());
     assert!(sandbox.propose_timeout() < sandbox.round_timeout()); //general assumption; necessary for correct work of consensus algorithm
     sandbox
 }
