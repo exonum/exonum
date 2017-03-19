@@ -53,7 +53,7 @@ mod tests {
                             -> Result<Option<TxConfigVote>, StorageError> {
         let view = sandbox.blockchain_ref().view();
         let schema = ConfigurationSchema::new(&view);
-        let votes_table = schema.config_votes(config_hash);
+        let votes_table = schema.config_votes(&config_hash);
         votes_table.get(&pubkey)
     }
 

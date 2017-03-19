@@ -172,7 +172,7 @@ impl<'a> ConfigurationSchema<'a> {
     /// mapping Validator_public_key -> TxConfigVote
     pub fn config_votes
         (&self,
-         config_hash: Hash)
+         config_hash: &Hash)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, TxConfigVote> {
         let mut prefix = vec![05; 1 + HASH_SIZE];
         prefix[1..].copy_from_slice(config_hash.as_ref());
@@ -307,7 +307,7 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        let votes_for_cfg = config_schema.config_votes(*self.cfg_hash());
+        let votes_for_cfg = config_schema.config_votes(self.cfg_hash());
         votes_for_cfg.put(self.from(), self.clone())?;
         debug!("Put TxConfigVote:{:?} to corresponding cfg config_votes table",
                self);
