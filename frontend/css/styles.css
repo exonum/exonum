@@ -6,6 +6,10 @@ body {
     border: none;
 }
 
+.page-title {
+    padding: 0 64px;
+}
+
 .custom-table {
     margin: 0 0 15px;
     padding: 0 15px;

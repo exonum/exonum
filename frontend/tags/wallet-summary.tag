@@ -1,19 +1,20 @@
 <wallet-summary>
+    <p class="text-center">Wallet details:</p>
     <div class="custom-dd">
-        <div class="row">
-            <div class="col-xs-6 custom-dd-column">
-                <strong>Balance</strong>
-            </div>
-            <div class="col-xs-6 custom-dd-column">
-                { numeral(opts.wallet.balance).format('$0,0') }
-            </div>
-        </div>
         <div class="row">
             <div class="col-xs-6 custom-dd-column">
                 <strong>Name</strong>
             </div>
             <div class="col-xs-6 custom-dd-column">
                 { opts.wallet.name }
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-6 custom-dd-column">
+                <strong>Balance</strong>
+            </div>
+            <div class="col-xs-6 custom-dd-column">
+                { numeral(opts.wallet.balance).format('$0,0') }
             </div>
         </div>
         <div class="row">
