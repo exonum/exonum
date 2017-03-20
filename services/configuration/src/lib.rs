@@ -18,9 +18,10 @@ use std::fmt;
 
 use serde::{Serialize, Serializer};
 
+use exonum::messages::Field;
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
 use exonum::node::State;
-use exonum::crypto::{PublicKey, Hash, HASH_SIZE};
+use exonum::crypto::{PublicKey, hash, Hash, HASH_SIZE};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, Map, View, MapTable, MerklePatriciaTable,
                       Result as StorageResult};
@@ -29,6 +30,24 @@ use exonum::blockchain::StoredConfiguration;
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
+
+storage_value! {
+    ConfigVotingData {
+        const SIZE = 48;
+
+        tx_propose:            TxConfigPropose   [00 => 08]
+        votes_history_hash:    &Hash             [08 => 40]
+        num_votes:             u64               [40 => 48]
+    }
+}
+
+impl ConfigVotingData {
+
+    pub fn set_history_hash(&mut self, hash: &Hash) {
+        Field::write(&hash, &mut self.raw, 8, 40);
+    }
+
+}
 
 message! {
     TxConfigPropose {
