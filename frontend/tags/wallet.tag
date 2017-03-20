@@ -1,6 +1,6 @@
 <wallet>
     <div class="panel-heading">
-        <a class="btn btn-default pull-right page-nav" href="#">
+        <a class="btn btn-default pull-right page-nav" href="#dashboard">
             <i class="glyphicon glyphicon-log-out"></i>
             <span class="hidden-xs">Logout</span>
         </a>
@@ -9,7 +9,7 @@
             <span class="hidden-xs">Refresh</span>
         </button>
         <div class="panel-title page-title text-center">
-            <div class="h4">Your wallet</div>
+            <div class="h4">Wallet</div>
         </div>
     </div>
     <div class="panel-body">
@@ -19,7 +19,7 @@
             <div class="form-group">
                 <p class="text-center">Transfer your funds to another account:</p>
                 <button class="btn btn-lg btn-block btn-primary" disabled={ wallet.balance== 0 } onclick={ transfer }>
-                    Transfer
+                    Transfer Funds
                 </button>
             </div>
 

@@ -5,7 +5,7 @@
             <span class="hidden-xs">Back</span>
         </a>
         <div class="panel-title page-title text-center">
-            <div class="h4">Transfer</div>
+            <div class="h4">Transfer Funds</div>
         </div>
     </div>
     <div class="panel-body">
@@ -25,7 +25,7 @@
                 <input type="number" class="form-control" onkeyup={ edit }>
             </div>
             <div class="form-group">
-                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled="{ !amount }">Transfer</button>
+                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled="{ !amount }">Make a Transfer</button>
             </div>
         </form>
     </div>
