@@ -1,9 +1,9 @@
 <blockchain>
     <div class="panel-heading">
-        <button class="btn btn-default pull-left page-nav">
-            &larr;
+        <a class="btn btn-default pull-left page-nav" href="#">
+            <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
-        </button>
+        </a>
         <div class="panel-title page-title text-center">
             <div class="h4">Blockchain explorer</div>
         </div>
