@@ -66,10 +66,10 @@ mod tests {
                                     timestamping_service_cfg_message: &str,
                                     sandbox: &Sandbox)
                                     -> StoredConfiguration {
-        let mut services: BTreeMap<u16, Value> = BTreeMap::new();
+        let mut services: BTreeMap<String, Value> = BTreeMap::new();
         let tmstmp_id = TimestampingService::new().service_id();
         let service_cfg = CfgStub { cfg_string: timestamping_service_cfg_message.to_string() };
-        services.insert(tmstmp_id, service_cfg.to_json());
+        services.insert(format!("{}", tmstmp_id), service_cfg.to_json());
         StoredConfiguration {
             previous_cfg_hash: prev_cfg_hash, 
             actual_from: actual_from,
@@ -94,7 +94,7 @@ mod tests {
         let new_len = validators.len();
 
         let actual_from = 3;
-        let services: BTreeMap<u16, Value> = BTreeMap::new();
+        let services: BTreeMap<String, Value> = BTreeMap::new();
         let added_keys_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(), 
             actual_from: actual_from,
@@ -167,7 +167,7 @@ mod tests {
             .collect::<Vec<_>>();
 
         let actual_from = 3;
-        let services: BTreeMap<u16, Value> = BTreeMap::new();
+        let services: BTreeMap<String, Value> = BTreeMap::new();
         let excluding_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(), 
             actual_from: actual_from,

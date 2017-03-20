@@ -93,7 +93,7 @@ impl Blockchain {
             // Update service tables
             for (id, service) in self.service_map.iter() {
                 let cfg = service.handle_genesis_block(&view)?;
-                config_propose.services.insert(id as u16, cfg);
+                config_propose.services.insert(format!("{}", id), cfg);
             }
             // Commit actual configuration
             {

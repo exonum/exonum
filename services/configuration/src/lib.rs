@@ -70,6 +70,7 @@ impl Serialize for TxConfigPropose {
         } else {
             ser.serialize_struct_elt(&mut state, "config", self.cfg())?;
         }
+        ser.serialize_struct_elt(&mut state, "signature", self.raw().signature())?;
         ser.serialize_struct_end(state)
     }
 }
@@ -82,6 +83,7 @@ impl Serialize for TxConfigVote {
         state = ser.serialize_struct("vote", 5)?;
         ser.serialize_struct_elt(&mut state, "from", self.from())?;
         ser.serialize_struct_elt(&mut state, "config_hash", self.cfg_hash())?;
+        ser.serialize_struct_elt(&mut state, "signature", self.raw().signature())?;
         ser.serialize_struct_end(state)
     }
 }

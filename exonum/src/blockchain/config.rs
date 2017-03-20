@@ -11,7 +11,7 @@ pub struct StoredConfiguration {
     pub actual_from: u64,
     pub validators: Vec<PublicKey>,
     pub consensus: ConsensusConfig,
-    pub services: BTreeMap<u16, serde_json::Value>,
+    pub services: BTreeMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

@@ -11,10 +11,17 @@ use exonum::storage::{Map, StorageValue};
 use exonum::node::{TxSender, NodeChannel, NodeConfig, TransactionSend};
 pub type ConfigTxSender = TxSender<NodeChannel>;
 
+#[derive(Serialize, Deserialize)]
+pub struct ConfigWithHash {
+    hash: Hash, 
+    config: StoredConfiguration, 
+}
+
 #[derive(Serialize)]
-pub enum ConfigInfo {
-    CommittedConfig(StoredConfiguration),
-    ProposedConfig(Option<TxConfigPropose>),
+pub struct ConfigInfo {
+    committed_config: Option<StoredConfiguration>, 
+    propose: Option<TxConfigPropose>, 
+    
 }
 
 #[derive(Serialize)]
@@ -23,13 +30,13 @@ pub enum ConfigVotesInfo {
     ProposeAbsent(Option<()>),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ProposeRequestResponse {
     tx_hash: Hash,
     cfg_hash: Hash,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct VoteRequestResponse {
     tx_hash: Hash,
 }
@@ -44,31 +51,36 @@ pub struct ConfigApi<T: TransactionSend + Clone> {
 impl<T> ConfigApi<T>
     where T: TransactionSend + Clone
 {
-    fn get_actual_config(&self) -> Result<StoredConfiguration, ApiError> {
-        match Schema::new(&self.blockchain.view()).get_actual_configuration() {
-            Ok(config) => Ok(config),
-            Err(e) => Err(ApiError::Storage(e)),
-        }
+    fn get_actual_config(&self) -> Result<ConfigWithHash, ApiError> {
+        let actual_cfg = Schema::new(&self.blockchain.view()).get_actual_configuration()?; 
+        let res = ConfigWithHash {
+            hash: actual_cfg.hash(), 
+            config: actual_cfg, 
+        };
+        Ok(res)
     }
 
-    fn get_following_config(&self) -> Result<Option<StoredConfiguration>, ApiError> {
-        match Schema::new(&self.blockchain.view()).get_following_configuration() {
-            Ok(config) => Ok(config),
-            Err(e) => Err(ApiError::Storage(e)),
-        }
+    fn get_following_config(&self) -> Result<Option<ConfigWithHash>, ApiError> {
+        let following_cfg = Schema::new(&self.blockchain.view()).get_following_configuration()?; 
+        let res = following_cfg.map(|cfg| ConfigWithHash {
+            hash: cfg.hash(), 
+            config: cfg, 
+        });
+        Ok(res)
     }
 
     fn get_config_by_hash(&self, hash: &Hash) -> Result<ConfigInfo, ApiError> {
         let view = self.blockchain.view();
         let general_schema = Schema::new(&view);
         let committed_config = general_schema.configs().get(hash)?;
-        if let Some(cfg) = committed_config {
-            return Ok(ConfigInfo::CommittedConfig(cfg));
-        }
 
         let configuration_schema = ConfigurationSchema::new(&view);
         let propose = configuration_schema.config_proposes().get(hash)?;
-        Ok(ConfigInfo::ProposedConfig(propose))
+        let res = ConfigInfo {
+            committed_config: committed_config, 
+            propose: propose, 
+        };
+        Ok(res)
     }
 
     fn put_config_propose(&self,
@@ -165,8 +177,10 @@ impl<T> Api for ConfigApi<T>
                     _self.ok_response(&info.to_json())
                 }
                 Ok(None) => Err(ApiError::IncorrectRequest)?,
-                Err(_) => Err(ApiError::IncorrectRequest)?,
-
+                Err(e) => {
+                    error!("Couldn't parse stored configurations:{:?}", e);
+                    Err(ApiError::IncorrectRequest)?
+                }
             }
         };
 
@@ -210,6 +224,5 @@ impl<T> Api for ConfigApi<T>
         router.post("/api/v1/configs/:hash/postvote",
                     put_config_vote,
                     "put_config_vote");
-
     }
 }
