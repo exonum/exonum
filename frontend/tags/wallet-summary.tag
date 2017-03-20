@@ -22,7 +22,7 @@
                 <strong>Balance</strong>
             </div>
             <div class="col-xs-6 custom-dd-column">
-                { numeral(opts.wallet.balance).format('$0,0') }
+                { numeral(opts.wallet.balance).format('$0,0.00') }
             </div>
         </div>
         <div class="row">

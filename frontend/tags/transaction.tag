@@ -27,7 +27,7 @@
                 </div>
 
                 <div class="text-center">
-                    <h2>{ numeral(transaction.body.amount).format('$0,0') }</h2>
+                    <h2>{ numeral(transaction.body.amount).format('$0,0.00') }</h2>
                 </div>
             </virtual>
 
@@ -44,7 +44,7 @@
                 </div>
 
                 <div class="text-center">
-                    <h2>{ numeral(transaction.body.amount).format('$0,0') }</h2>
+                    <h2>{ numeral(transaction.body.amount).format('$0,0.00') }</h2>
                 </div>
             </virtual>
 

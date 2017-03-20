@@ -83,10 +83,10 @@
                         Create { body.name } wallet
                     </div>
                     <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
-                        <truncate val={ body.wallet }></truncate> add funds of <strong>{ numeral(body.amount).format('$0,0') }</strong>
+                        <truncate val={ body.wallet }></truncate> add funds of <strong>{ numeral(body.amount).format('$0,0.00') }</strong>
                     </div>
                     <div class="col-xs-6 custom-table-column" if={ message_id === 128 }>
-                        <truncate val={ body.from }></truncate> send <strong>{ numeral(body.amount).format('$0,0') }</strong> to <truncate val={ body.to }></truncate>
+                        <truncate val={ body.from }></truncate> send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
                 </div>
             </div>
