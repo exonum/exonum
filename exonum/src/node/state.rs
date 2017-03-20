@@ -314,7 +314,7 @@ impl State {
         &self.config.consensus
     }
 
-    pub fn services_config(&self) -> &BTreeMap<u16, Value> {
+    pub fn services_config(&self) -> &BTreeMap<String, Value> {
         &self.config.services
     }
 
