@@ -3,12 +3,14 @@
         <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
 
         <div class="form-group">
+            <p class="text-center">Transfer your funds to another account:</p>
             <button class="btn btn-lg btn-block btn-primary" disabled={ wallet.balance== 0 } onclick={ transfer }>
                 Transfer
             </button>
         </div>
 
         <div class="form-group">
+            <p class="text-center">Add more finds to your account:</p>
             <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
         </div>
 

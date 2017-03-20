@@ -3,26 +3,22 @@
         <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
     </virtual>
 
-    <form class="form-horizontal" onsubmit={ submit }>
+    <form onsubmit={ submit }>
         <div class="form-group">
-            <div class="col-sm-4 control-label">Receiver:</div>
-            <div class="col-sm-8">
-                <select id="receiver" class="form-control">
-                    <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
-                </select>
-            </div>
+            <label class="control-label">Receiver:</label>
+            <select id="receiver" class="form-control">
+                <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
+            </select>
         </div>
         <div class="form-group">
-            <div class="col-sm-4 control-label">Amount, $:</div>
-            <div class="col-sm-8">
-                <input type="number" class="form-control" onkeyup={ edit }>
-            </div>
+            <label class="control-label">Amount, $:</label>
+            <input type="number" class="form-control" onkeyup={ edit }>
         </div>
         <div class="form-group">
-            <div class="col-sm-offset-4 col-sm-8">
-                <button type="submit" class="btn btn-lg btn-primary" disabled="{ !amount }">Transfer</button>
-                <a class="btn btn-lg btn-default" href="#user/{ opts.publicKey }">Back</a>
-            </div>
+            <button type="submit" class="btn btn-lg btn-block btn-primary" disabled="{ !amount }">Transfer</button>
+        </div>
+        <div class="form-group">
+            <a class="btn btn-lg btn-block btn-default" href="#user/{ opts.publicKey }">Back</a>
         </div>
     </form>
 
@@ -56,7 +52,7 @@
             var transaction = self.api.cryptocurrency.transferTransaction(amount, self.opts.publicKey, receiver, user.secretKey);
 
             self.api.submitTransaction.call(self, transaction, self.opts.publicKey, function() {
-                self.notify('success', 'Transfer approved. Funds will be transfered in a seconds.');
+                self.notify('success', 'Funds has been transferred.');
                 route('/user/' + self.opts.publicKey);
             });
         }
