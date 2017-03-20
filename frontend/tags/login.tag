@@ -1,6 +1,6 @@
 <login>
     <div class="panel-heading">
-        <a class="btn btn-default pull-left page-nav" href="#">
+        <a class="btn btn-default pull-left page-nav" href="#dashboard">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
         </a>

@@ -1,6 +1,6 @@
 <register>
     <div class="panel-heading">
-        <a class="btn btn-default pull-left page-nav" href="#">
+        <a class="btn btn-default pull-left page-nav" href="#dashboard">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
         </a>
@@ -15,7 +15,7 @@
                 <input type="text" class="form-control" onkeyup="{ editName }">
             </div>
             <div class="form-group">
-                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !name }>Register new wallet</button>
+                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !name }>Register a new wallet</button>
             </div>
         </form>
     </div>

@@ -1,5 +1,5 @@
 <wallet-summary>
-    <p class="text-center">Wallet details:</p>
+    <p class="text-center">Here is your wallet's details:</p>
     <div class="custom-dd">
         <div class="row">
             <div class="col-xs-6 custom-dd-column">
