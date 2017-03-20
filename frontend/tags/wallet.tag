@@ -45,13 +45,13 @@
                         Create wallet
                     </div>
                     <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
-                        Add <strong>{ numeral(body.amount).format('$0,0') }</strong> to your wallet
+                        Add <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to your wallet
                     </div>
                     <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
-                        Send <strong>{ numeral(body.amount).format('$0,0') }</strong> to <truncate val={ body.to }></truncate>
+                        Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
                     <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
-                        Receive <strong>{ numeral(body.amount).format('$0,0') }</strong> from <truncate val={ body.from }></truncate>
+                        Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
                     </div>
                 </div>
             </div>
