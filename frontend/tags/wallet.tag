@@ -1,60 +1,64 @@
 <wallet>
-    <virtual if="{ wallet && block }">
-        <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
-
-        <div class="form-group">
-            <p class="text-center">Transfer your funds to another account:</p>
-            <button class="btn btn-lg btn-block btn-primary" disabled={ wallet.balance== 0 } onclick={ transfer }>
-                Transfer
-            </button>
+    <div class="panel-heading">
+        <button class="btn btn-default pull-right page-nav" onclick={ refresh }>
+            <span class="hidden-xs">Refresh</span>
+        </button>
+        <button class="btn btn-default pull-left">
+            <span class="hidden-xs">Logout</span>
+        </button>
+        <div class="panel-title page-title text-center">
+            <div class="h4">Your wallet</div>
         </div>
+    </div>
+    <div class="panel-body">
+        <virtual if="{ wallet && block }">
+            <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
 
-        <div class="form-group">
-            <p class="text-center">Add more finds to your account:</p>
-            <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
-        </div>
-
-        <div class="form-group">
-            <button class="btn btn-lg btn-block btn-default" onclick={ refresh }>
-                Refresh
-            </button>
-        </div>
-    </virtual>
-
-    <virtual if={ transactions }>
-        <legend class="text-center no-border space-top">Transactions history</legend>
-
-        <div class="custom-table">
-            <div class="row">
-                <div class="col-xs-6 custom-table-header-column">Hash</div>
-                <div class="col-xs-6 custom-table-header-column">Description</div>
+            <div class="form-group">
+                <p class="text-center">Transfer your funds to another account:</p>
+                <button class="btn btn-lg btn-block btn-primary" disabled={ wallet.balance== 0 } onclick={ transfer }>
+                    Transfer
+                </button>
             </div>
-            <div class="row" each={ transactions }>
-                <div class="col-xs-6 custom-table-column">
-                    <truncate val={ hash } digits=12></truncate>
+
+            <div class="form-group">
+                <p class="text-center">Add more finds to your account:</p>
+                <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
+            </div>
+        </virtual>
+
+        <virtual if={ transactions }>
+            <legend class="text-center no-border space-top">Transactions history</legend>
+
+            <div class="custom-table">
+                <div class="row">
+                    <div class="col-xs-6 custom-table-header-column">Hash</div>
+                    <div class="col-xs-6 custom-table-header-column">Description</div>
                 </div>
-                <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
-                    Create wallet
-                </div>
-                <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
-                    Add <strong>{ numeral(body.amount).format('$0,0') }</strong> to your wallet
-                </div>
-                <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
-                    Send <strong>{ numeral(body.amount).format('$0,0') }</strong> to <truncate val={ body.to }></truncate>
-                </div>
-                <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
-                    Receive <strong>{ numeral(body.amount).format('$0,0') }</strong> from <truncate val={ body.from }></truncate>
+                <div class="row" each={ transactions }>
+                    <div class="col-xs-6 custom-table-column">
+                        <truncate val={ hash } digits=12></truncate>
+                    </div>
+                    <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
+                        Create wallet
+                    </div>
+                    <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
+                        Add <strong>{ numeral(body.amount).format('$0,0') }</strong> to your wallet
+                    </div>
+                    <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
+                        Send <strong>{ numeral(body.amount).format('$0,0') }</strong> to <truncate val={ body.to }></truncate>
+                    </div>
+                    <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
+                        Receive <strong>{ numeral(body.amount).format('$0,0') }</strong> from <truncate val={ body.from }></truncate>
+                    </div>
                 </div>
             </div>
-        </div>
-    </virtual>
-
-    <a class="btn btn-lg btn-block btn-default" href="#">Log out</a>
+        </virtual>
+    </div>
 
     <script>
         var self = this;
 
-        this.title = 'Your wallet';
         this.toggleLoading(true);
         this.api.getWallet(self.opts.publicKey, function(data) {
             self.block = data.block;

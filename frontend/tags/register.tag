@@ -1,24 +1,33 @@
 <register>
-    <form class="form-horizontal" onsubmit={ register }>
-        <legend class="text-center">Create wallet</legend>
-        <div class="form-group">
-            <div class="col-sm-4 control-label">Your name:</div>
-            <div class="col-sm-8">
-                <input type="text" class="form-control" onkeyup="{ edit }">
-            </div>
+    <div class="panel-heading">
+        <button class="btn btn-default pull-left page-nav">
+            &larr;
+            <span class="hidden-xs">Back</span>
+        </button>
+        <div class="panel-title page-title text-center">
+            <div class="h4">Register</div>
         </div>
-        <div class="form-group">
-            <div class="col-sm-offset-4 col-sm-8">
-                <button type="submit" class="btn btn-lg btn-primary" disabled={ !name }>Create wallet</button>
-                <a href="#" class="btn btn-lg btn-default">Back</a>
+    </div>
+    <div class="panel-body">
+        <form class="form-horizontal" onsubmit={ register }>
+            <legend class="text-center">Create wallet</legend>
+            <div class="form-group">
+                <div class="col-sm-4 control-label">Your name:</div>
+                <div class="col-sm-8">
+                    <input type="text" class="form-control" onkeyup="{ edit }">
+                </div>
             </div>
-        </div>
-    </form>
+            <div class="form-group">
+                <div class="col-sm-offset-4 col-sm-8">
+                    <button type="submit" class="btn btn-lg btn-primary" disabled={ !name }>Create wallet</button>
+                    <a href="#" class="btn btn-lg btn-default">Back</a>
+                </div>
+            </div>
+        </form>
+    </div>
 
     <script>
         var self = this;
-
-        this.title = 'Register';
 
         edit(e) {
             this.name = e.target.value;

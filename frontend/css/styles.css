@@ -10,6 +10,10 @@ body {
     padding: 0 64px;
 }
 
+.page-nav {
+    margin: 2px 0 0;
+}
+
 .custom-table {
     margin: 0 0 15px;
     padding: 0 15px;

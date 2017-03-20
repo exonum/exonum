@@ -1,19 +1,25 @@
 <welcome>
-    <div class="text-center">
-        <p class="lead">Welcome in cryptocurrency demo application.</p>
-        <div if={ !users } class="alert alert-warning">
-            <i class="glyphicon glyphicon-warning-sign"></i> You haven't any wallet yet.
+    <div class="panel-heading">
+        <div class="panel-title page-title text-center">
+            <div class="h4">Login</div>
         </div>
-        <p each={ users }><a href="#user/{ publicKey }" class="btn btn-lg btn-block btn-primary">Log in as {name}</a></p>
+    </div>
+    <div class="panel-body">
+        <div class="text-center">
+            <p class="lead">Welcome in cryptocurrency demo application.</p>
+            <div if={ !users } class="alert alert-warning">
+                <i class="glyphicon glyphicon-warning-sign"></i> You haven't any wallet yet.
+            </div>
+            <p each={ users }><a href="#user/{ publicKey }" class="btn btn-lg btn-block btn-primary">Log in as {name}</a></p>
 
-        <p><a href="#register" class="btn btn-lg btn-block btn-default">Create wallet</a></p>
+            <p><a href="#register" class="btn btn-lg btn-block btn-default">Create wallet</a></p>
 
-        <p>Explore blockchain:</p>
-        <a href="#blockchain" class="btn btn-lg btn-block btn-default">Blockchain explorer</a>
+            <p>Explore blockchain:</p>
+            <a href="#blockchain" class="btn btn-lg btn-block btn-default">Blockchain explorer</a>
+        </div>
     </div>
 
     <script>
-        this.title = 'Login';
         this.users = this.localStorage.getUsers();
     </script>
 </welcome>
