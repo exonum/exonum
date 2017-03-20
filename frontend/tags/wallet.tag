@@ -1,10 +1,12 @@
 <wallet>
     <div class="panel-heading">
-        <button class="btn btn-default pull-right page-nav" onclick={ refresh }>
-            <span class="hidden-xs">Refresh</span>
-        </button>
-        <button class="btn btn-default pull-left">
+        <a class="btn btn-default pull-right page-nav" href="#">
+            <i class="glyphicon glyphicon-log-out"></i>
             <span class="hidden-xs">Logout</span>
+        </a>
+        <button class="btn btn-default pull-left page-nav" onclick={ refresh }>
+            <i class="glyphicon glyphicon-refresh"></i>
+            <span class="hidden-xs">Refresh</span>
         </button>
         <div class="panel-title page-title text-center">
             <div class="h4">Your wallet</div>

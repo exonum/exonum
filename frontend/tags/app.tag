@@ -173,6 +173,10 @@
                 riot.mount('#content', 'welcome');
             });
 
+            route('/login', function() {
+                riot.mount('#content', 'login');
+            });
+
             route('/register', function() {
                 riot.mount('#content', 'register');
             });

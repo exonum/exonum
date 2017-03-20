@@ -1,27 +1,21 @@
 <register>
     <div class="panel-heading">
-        <button class="btn btn-default pull-left page-nav">
-            &larr;
+        <a class="btn btn-default pull-left page-nav" href="#">
+            <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
-        </button>
+        </a>
         <div class="panel-title page-title text-center">
             <div class="h4">Register</div>
         </div>
     </div>
     <div class="panel-body">
-        <form class="form-horizontal" onsubmit={ register }>
-            <legend class="text-center">Create wallet</legend>
+        <form onsubmit={ register }>
             <div class="form-group">
-                <div class="col-sm-4 control-label">Your name:</div>
-                <div class="col-sm-8">
-                    <input type="text" class="form-control" onkeyup="{ edit }">
-                </div>
+                <label class="control-label">Your name:</label>
+                <input type="text" class="form-control" onkeyup="{ editName }">
             </div>
             <div class="form-group">
-                <div class="col-sm-offset-4 col-sm-8">
-                    <button type="submit" class="btn btn-lg btn-primary" disabled={ !name }>Create wallet</button>
-                    <a href="#" class="btn btn-lg btn-default">Back</a>
-                </div>
+                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !name }>Register new wallet</button>
             </div>
         </form>
     </div>
@@ -29,7 +23,7 @@
     <script>
         var self = this;
 
-        edit(e) {
+        editName(e) {
             this.name = e.target.value;
         }
 

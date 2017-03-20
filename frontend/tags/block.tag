@@ -1,7 +1,7 @@
 <block>
     <div class="panel-heading">
         <a class="btn btn-default pull-left page-nav" href="#blockchain/">
-            &larr;
+            <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
         </a>
         <div class="panel-title page-title text-center">
