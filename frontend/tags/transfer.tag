@@ -1,31 +1,38 @@
 <transfer>
-    <virtual if={ wallet && block }>
-        <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
-    </virtual>
+    <div class="panel-heading">
+        <a class="btn btn-default pull-left page-nav" href="#user/{ opts.publicKey }">
+            &larr;
+            <span class="hidden-xs">Back</span>
+        </a>
+        <div class="panel-title page-title text-center">
+            <div class="h4">Transfer</div>
+        </div>
+    </div>
+    <div class="panel-body">
+        <virtual if={ wallet && block }>
+            <wallet-summary wallet={ wallet } block={ block }></wallet-summary>
+        </virtual>
 
-    <form onsubmit={ submit }>
-        <div class="form-group">
-            <label class="control-label">Receiver:</label>
-            <select id="receiver" class="form-control">
-                <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label class="control-label">Amount, $:</label>
-            <input type="number" class="form-control" onkeyup={ edit }>
-        </div>
-        <div class="form-group">
-            <button type="submit" class="btn btn-lg btn-block btn-primary" disabled="{ !amount }">Transfer</button>
-        </div>
-        <div class="form-group">
-            <a class="btn btn-lg btn-block btn-default" href="#user/{ opts.publicKey }">Back</a>
-        </div>
-    </form>
+        <form onsubmit={ submit }>
+            <div class="form-group">
+                <label class="control-label">Receiver:</label>
+                <select id="receiver" class="form-control">
+                    <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="control-label">Amount, $:</label>
+                <input type="number" class="form-control" onkeyup={ edit }>
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled="{ !amount }">Transfer</button>
+            </div>
+        </form>
+    </div>
 
     <script>
         var self = this;
 
-        this.title = 'Transfer';
         this.users = this.localStorage.getUsers();
         this.toggleLoading(true);
         this.api.getWallet(self.opts.publicKey, function(data) {

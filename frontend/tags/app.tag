@@ -2,14 +2,7 @@
     <div class="container">
         <div class="row">
             <div class="col-sm-6 col-sm-offset-3">
-                <div class="panel panel-default">
-                    <div class="panel-heading">
-                        <div class="panel-title page-title text-center">
-                            <div class="h4">{ title }</div>
-                        </div>
-                    </div>
-                    <div id="content" class="panel-body"></div>
-                </div>
+                <div id="content" class="panel panel-default"></div>
                 <p class="text-center text-muted">Find out more on <a href="http://exonum.com/" target="_blank">exonum.com</a></p>
             </div>
         </div>
@@ -167,24 +160,9 @@
                 });
             },
 
-            setTitle: function(title) {
-                self.title = title;
-                self.update();
-            },
-
             toggleLoading: function(state) {
                 self.loading = state;
                 self.update();
-            },
-
-            init: function() {
-                this.on('mount', function() {
-                    // add title if it is predefined in component
-                    if (this.title) {
-                        self.title = this.title;
-                        self.update();
-                    }
-                });
             }
         });
 
