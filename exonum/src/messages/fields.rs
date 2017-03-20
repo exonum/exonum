@@ -280,6 +280,29 @@ impl<'a> SegmentField<'a> for &'a [u8] {
     }
 }
 
+impl<'a, T: FromRaw> SegmentField<'a> for T {
+    fn item_size() -> usize {
+        1
+    }
+
+    fn from_slice(slice: &[u8]) -> Self {
+        FromRaw::from_raw(Arc::new(MessageBuffer::from_vec(slice.to_vec()))).unwrap()
+    }
+
+    fn as_slice(&self) -> &'a [u8] {
+        let self_slice = self.raw().as_ref().as_ref();
+        let len = self_slice.len();
+        unsafe {
+            ::std::slice::from_raw_parts((self_slice).as_ptr() as *const u8, 
+                                         len * Self::item_size())
+        }
+    }
+
+    fn count(&self) -> u32 {
+        self.raw().len() as u32
+    }
+}
+
 impl<'a> SegmentField<'a> for &'a [u16] {
     fn item_size() -> usize {
         mem::size_of::<u16>()
