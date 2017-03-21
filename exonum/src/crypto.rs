@@ -51,6 +51,12 @@ macro_rules! implement_public_sodium_wrapper {
     pub struct $name($name_from); 
 
     impl $name {
+        pub fn zero() -> Self {
+            $name::new([0; $size])
+        }
+    }
+
+    impl $name {
         pub fn new(ba: [u8; $size]) -> $name {
             $name($name_from(ba))
         }
@@ -83,6 +89,12 @@ macro_rules! implement_private_sodium_wrapper {
     pub struct $name($name_from); 
 
     impl $name {
+        pub fn zero() -> Self {
+            $name::new([0; $size])
+        }
+    }
+
+    impl $name {
         pub fn new(ba: [u8; $size]) -> $name {
             $name($name_from(ba))
         }
@@ -108,12 +120,6 @@ implement_public_sodium_wrapper! {Hash, Digest, HASH_SIZE}
 implement_public_sodium_wrapper! {Signature, SignatureSodium, SIGNATURE_LENGTH}
 implement_private_sodium_wrapper! {SecretKey, SecretKeySodium, SECRET_KEY_LENGTH}
 implement_private_sodium_wrapper! {Seed, SeedSodium, SEED_LENGTH}
-
-impl Hash {
-    pub fn zero() -> Self {
-        Hash::new([0; HASH_SIZE])
-    }
-}
 
 pub trait HexValue: Sized {
     fn to_hex(&self) -> String;

@@ -21,16 +21,15 @@ use serde::{Serialize, Serializer};
 use exonum::messages::Field;
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
 use exonum::node::State;
-use exonum::crypto::{PublicKey, hash, Hash, HASH_SIZE};
+use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
-use exonum::storage::{StorageValue, Map, View, MapTable, MerklePatriciaTable,
+use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
 use exonum::blockchain::StoredConfiguration;
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
-
 storage_value! {
     ConfigVotingData {
         const SIZE = 48;
@@ -42,11 +41,22 @@ storage_value! {
 }
 
 impl ConfigVotingData {
-
     pub fn set_history_hash(&mut self, hash: &Hash) {
         Field::write(&hash, &mut self.raw, 8, 40);
     }
+}
 
+impl Serialize for ConfigVotingData {
+    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        where S: Serializer
+    {
+        let mut state;
+        state = ser.serialize_struct("config voting data", 4)?;
+        ser.serialize_struct_elt(&mut state, "tx_propose", self.tx_propose())?;
+        ser.serialize_struct_elt(&mut state, "votes_history_hash", self.votes_history_hash())?;
+        ser.serialize_struct_elt(&mut state, "num_votes", self.num_votes())?;
+        ser.serialize_struct_end(state)
+    }
 }
 
 message! {
@@ -183,26 +193,93 @@ impl<'a> ConfigurationSchema<'a> {
         ConfigurationSchema { view: view }
     }
 
-    /// mapping Hash(config) -> TxConfigPropose
-    pub fn config_proposes
+    /// mapping hash(config) -> TxConfigPropose
+    fn config_data
         (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, TxConfigPropose> {
+         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, ConfigVotingData> {
         MerklePatriciaTable::new(MapTable::new(vec![04], self.view))
     }
-
-    /// mapping Validator_public_key -> TxConfigVote
-    pub fn config_votes
-        (&self,
-         config_hash: &Hash)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, TxConfigVote> {
+    /// mapping validator_id -> TxConfigVote
+    fn config_votes(&self,
+                    config_hash: &Hash)
+                    -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, TxConfigVote> {
         let mut prefix = vec![05; 1 + HASH_SIZE];
         prefix[1..].copy_from_slice(config_hash.as_ref());
-        MerklePatriciaTable::new(MapTable::new(prefix, self.view))
+        MerkleTable::new(MapTable::new(prefix, self.view))
     }
 
+    pub fn put_propose(&self,
+                       cfg_hash: &Hash,
+                       tx_propose: TxConfigPropose,
+                       num_validators: u64)
+                       -> StorageResult<()> {
+        let votes_table = self.config_votes(cfg_hash);
+        debug_assert!(votes_table.is_empty().unwrap());
+        let zerovote =
+            TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
+        for _ in 0..(num_validators as usize) {
+            votes_table.append(zerovote.clone())?;
+        }
+        let config_data =
+            ConfigVotingData::new(tx_propose, &votes_table.root_hash()?, num_validators);
+        let config_data_table = self.config_data();
+        debug_assert!(config_data_table.get(cfg_hash).unwrap().is_none());
+        config_data_table.put(cfg_hash, config_data)
+    }
+
+    pub fn get_propose(&self, cfg_hash: &Hash) -> StorageResult<Option<TxConfigPropose>> {
+        let option_config_data = self.config_data().get(cfg_hash)?;
+        Ok(option_config_data.map(|config_data| config_data.tx_propose()))
+    }
+
+    pub fn put_vote(&self, tx_vote: TxConfigVote) -> StorageResult<()> {
+        let cfg_hash = tx_vote.cfg_hash();
+        let config_data_table = self.config_data();
+        let mut propose_config_data = config_data_table.get(cfg_hash)?
+            .expect(&format!("Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
+                             &tx_vote));
+
+        let tx_propose = propose_config_data.tx_propose();
+        let prev_cfg_hash = StoredConfiguration::deserialize(tx_propose.cfg().to_vec())
+            .previous_cfg_hash;
+        let general_schema = Schema::new(self.view);
+        let prev_cfg = general_schema.configs()
+            .get(&prev_cfg_hash)?
+            .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigVote:{:?}",
+                             prev_cfg_hash,
+                             &tx_vote));
+        let from: &PublicKey = tx_vote.from();
+        let validator_id = prev_cfg.validators
+            .iter()
+            .position(|pk| pk == from)
+            .expect(&format!("See !prev_cfg.validators.contains(self.from()) for \
+                              TxConfigVote:{:?}",
+                             &tx_vote));
+
+        let votes_for_cfg_table = self.config_votes(cfg_hash);
+        votes_for_cfg_table.set(validator_id as u64, tx_vote.clone())?;
+        propose_config_data.set_history_hash(&votes_for_cfg_table.root_hash()?);
+        config_data_table.put(cfg_hash, propose_config_data)
+    }
+
+    pub fn get_votes(&self, cfg_hash: &Hash) -> StorageResult<Vec<Option<TxConfigVote>>> {
+        let zerovote =
+            TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
+        let votes_table = self.config_votes(cfg_hash); 
+        let votes_values = votes_table.values()?;
+        let votes_options = votes_values.into_iter()
+            .map(|vote|{
+                if vote == zerovote {
+                    None
+                } else {
+                    Some(vote)
+                }
+            }).collect::<Vec<_>>();
+        Ok(votes_options)
+    }
 
     pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
-        Ok(Vec::new())
+        Ok(vec![self.config_data().root_hash()?])
     }
 }
 
@@ -259,7 +336,7 @@ impl TxConfigPropose {
 
         let config_hash = config_candidate_body.hash();
 
-        if let Some(tx_propose) = config_schema.config_proposes().get(&config_hash)? {
+        if let Some(tx_propose) = config_schema.get_propose(&config_hash)? {
             error!("Discarding TxConfigPropose:{} which contains an already posted config. \
                     Previous TxConfigPropose:{}",
                    serde_json::to_string(self)?,
@@ -267,9 +344,12 @@ impl TxConfigPropose {
             return Ok(());
         }
 
-        config_schema.config_proposes().put(&config_hash, self.clone())?;
+        config_schema.put_propose(&config_hash,
+                         self.clone(),
+                         actual_config.validators.len() as u64)?;
 
-        debug!("Put TxConfigPropose:{} to config_proposes table", serde_json::to_string(self)?);
+        debug!("Put TxConfigPropose:{} to config_proposes table",
+               serde_json::to_string(self)?);
         Ok(())
     }
 }
@@ -279,7 +359,7 @@ impl TxConfigVote {
         let blockchain_schema = Schema::new(view);
         let config_schema = ConfigurationSchema::new(view);
 
-        let propose_option = config_schema.config_proposes().get(self.cfg_hash())?;
+        let propose_option = config_schema.get_propose(self.cfg_hash())?;
         if propose_option.is_none() {
             error!("Discarding TxConfigVote:{:?} which references unknown config hash",
                    self);
@@ -328,14 +408,14 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        let votes_for_cfg = config_schema.config_votes(self.cfg_hash());
-        votes_for_cfg.put(self.from(), self.clone())?;
+        config_schema.put_vote(self.clone())?;
         debug!("Put TxConfigVote:{:?} to corresponding cfg config_votes table",
                self);
 
         let mut votes_count = 0;
-        for pub_key in &actual_config.validators {
-            if let Some(_) = votes_for_cfg.get(&pub_key)? {
+
+        for vote_option in config_schema.get_votes(self.cfg_hash())?{
+            if let Some(_) = vote_option {
                 votes_count += 1;
             }
         }
