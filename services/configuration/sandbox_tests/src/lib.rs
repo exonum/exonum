@@ -13,9 +13,9 @@ extern crate log;
 mod tests {
 
     use std::collections::BTreeMap;
-    use exonum::crypto::{Hash, PublicKey, Seed, SEED_LENGTH, HASH_SIZE, gen_keypair_from_seed,
+    use exonum::crypto::{Hash, Seed, SEED_LENGTH, HASH_SIZE, gen_keypair_from_seed,
                          hash};
-    use exonum::storage::{Map, StorageValue, Error as StorageError};
+    use exonum::storage::{StorageValue, Error as StorageError};
     use exonum::messages::{Message, FromRaw};
     use exonum::blockchain::config::StoredConfiguration;
     use exonum::blockchain::Service;
