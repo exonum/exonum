@@ -5,7 +5,7 @@ use iron::prelude::*;
 use bodyparser;
 use exonum::crypto::{Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
-use ::{TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
+use ::{ConfigVotingData, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use exonum::storage::{Map, StorageValue};
 
 use exonum::node::{TxSender, NodeChannel, NodeConfig, TransactionSend};
@@ -13,15 +13,14 @@ pub type ConfigTxSender = TxSender<NodeChannel>;
 
 #[derive(Serialize, Deserialize)]
 pub struct ConfigWithHash {
-    hash: Hash, 
-    config: StoredConfiguration, 
+    hash: Hash,
+    config: StoredConfiguration,
 }
 
 #[derive(Serialize)]
 pub struct ConfigInfo {
-    committed_config: Option<StoredConfiguration>, 
-    propose: Option<TxConfigPropose>, 
-    
+    committed_config: Option<StoredConfiguration>,
+    propose: Option<ConfigVotingData>,
 }
 
 #[derive(Serialize)]
@@ -52,19 +51,21 @@ impl<T> ConfigApi<T>
     where T: TransactionSend + Clone
 {
     fn get_actual_config(&self) -> Result<ConfigWithHash, ApiError> {
-        let actual_cfg = Schema::new(&self.blockchain.view()).get_actual_configuration()?; 
+        let actual_cfg = Schema::new(&self.blockchain.view()).get_actual_configuration()?;
         let res = ConfigWithHash {
-            hash: actual_cfg.hash(), 
-            config: actual_cfg, 
+            hash: actual_cfg.hash(),
+            config: actual_cfg,
         };
         Ok(res)
     }
 
     fn get_following_config(&self) -> Result<Option<ConfigWithHash>, ApiError> {
-        let following_cfg = Schema::new(&self.blockchain.view()).get_following_configuration()?; 
-        let res = following_cfg.map(|cfg| ConfigWithHash {
-            hash: cfg.hash(), 
-            config: cfg, 
+        let following_cfg = Schema::new(&self.blockchain.view()).get_following_configuration()?;
+        let res = following_cfg.map(|cfg| {
+            ConfigWithHash {
+                hash: cfg.hash(),
+                config: cfg,
+            }
         });
         Ok(res)
     }
@@ -75,10 +76,10 @@ impl<T> ConfigApi<T>
         let committed_config = general_schema.configs().get(hash)?;
 
         let configuration_schema = ConfigurationSchema::new(&view);
-        let propose = configuration_schema.config_proposes().get(hash)?;
+        let propose = configuration_schema.config_data().get(hash)?;
         let res = ConfigInfo {
-            committed_config: committed_config, 
-            propose: propose, 
+            committed_config: committed_config,
+            propose: propose,
         };
         Ok(res)
     }
@@ -112,27 +113,11 @@ impl<T> ConfigApi<T>
 
     fn get_votes_for_propose(&self, cfg_hash: &Hash) -> Result<ConfigVotesInfo, ApiError> {
         let view = self.blockchain.view();
-        let general_schema = Schema::new(&view);
         let configuration_schema = ConfigurationSchema::new(&view);
-        let res = match configuration_schema.config_proposes().get(cfg_hash)? {
+        let res = match configuration_schema.config_data().get(cfg_hash)? {
             None => ConfigVotesInfo::ProposeAbsent(None), 
-            Some(tx_propose) => {
-                let proposed_cfg = StoredConfiguration::deserialize_err(tx_propose.cfg())
-                    .expect(&format!("Somehow posted invalid TxConfigPropose to proposes \
-                                      table:{:?}",
-                                     tx_propose));
-                let prev_cfg = general_schema.configs()
-                    .get(&proposed_cfg.previous_cfg_hash)?
-                    .expect(&format!("Somehow posted cfg propose with previous cfg not present \
-                                      in history:{:?}",
-                                     proposed_cfg));
-                let prev_validators = prev_cfg.validators;
-                let votes_for_propose_table = configuration_schema.config_votes(cfg_hash);
-                let mut vote_options = Vec::new();
-                for pub_key in &prev_validators {
-                    vote_options.push(votes_for_propose_table.get(pub_key)?);
-                }
-                ConfigVotesInfo::Votes(vote_options)
+            Some(_) => {
+                ConfigVotesInfo::Votes(configuration_schema.get_votes(cfg_hash)?)
             }
         };
         Ok(res)
