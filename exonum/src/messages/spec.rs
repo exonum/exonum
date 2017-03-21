@@ -28,6 +28,13 @@ macro_rules! message {
                 $crate::messages::Field::write(&self.raw, buffer, from, to);
             }
 
+            fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), $crate::messages::Error> {
+
+                let raw_message: $crate::messages::RawMessage = $crate::messages::Field::read(buffer, from, to);
+                $(raw_message.check::<$field_type>($from, $to)?;)*
+                Ok(())
+            }
+
             fn field_size() -> usize {
                 1
             }
