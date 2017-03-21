@@ -10,7 +10,7 @@
             <a href="#register" class="btn btn-lg btn-block btn-success">Register</a>
         </div>
 
-        <div class="form-group">
+        <div class="form-group" if={ users }>
             <p>Login into existed wallet:</p>
             <!--<a href="#login" class="btn btn-lg btn-block btn-primary">Login</a>-->
             <a href="#user/{ publicKey }" class="btn btn-lg btn-block btn-primary" each={ users }>{name}</a>
