@@ -6,7 +6,6 @@ use time::Timespec;
 use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::{Hash, PublicKey};
-
 use super::{Error, RawMessage, MessageBuffer, BitVec, FromRaw};
 
 pub trait Field<'a> {
@@ -277,29 +276,6 @@ impl<'a> SegmentField<'a> for &'a [u8] {
 
     fn count(&self) -> u32 {
         self.len() as u32
-    }
-}
-
-impl<'a, T: FromRaw> SegmentField<'a> for T {
-    fn item_size() -> usize {
-        1
-    }
-
-    fn from_slice(slice: &[u8]) -> Self {
-        FromRaw::from_raw(Arc::new(MessageBuffer::from_vec(slice.to_vec()))).unwrap()
-    }
-
-    fn as_slice(&self) -> &'a [u8] {
-        let self_slice = self.raw().as_ref().as_ref();
-        let len = self_slice.len();
-        unsafe {
-            ::std::slice::from_raw_parts((self_slice).as_ptr() as *const u8, 
-                                         len * Self::item_size())
-        }
-    }
-
-    fn count(&self) -> u32 {
-        self.raw().len() as u32
     }
 }
 
@@ -591,6 +567,22 @@ impl<'a> Field<'a> for Vec<u8> {
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
         <&[u8] as Field>::write(&self.as_slice(), buffer, from, to);
+    }
+}
+
+impl<'a> Field<'a> for RawMessage {
+    fn field_size() -> usize {
+        1
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> RawMessage {
+        let data = <Vec<u8> as Field>::read(buffer, from, to);
+        Arc::new(MessageBuffer::from_vec(data))
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        let self_slice = self.as_ref().as_ref();
+        <&[u8] as Field>::write(&self_slice, buffer, from, to);
     }
 }
 

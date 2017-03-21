@@ -10,6 +10,21 @@ macro_rules! storage_value {
             raw: Vec<u8>
         }
 
+        impl<'a> $crate::messages::Field<'a> for $name {
+            fn read(buffer: &'a [u8], from: usize, to: usize) -> Self {
+                let vec: Vec<u8> = $crate::messages::Field::read(buffer, from, to);
+                $crate::storage::StorageValue::deserialize(vec)
+            }
+
+            fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+                $crate::messages::Field::write(&self.raw, buffer, from, to);
+            }
+
+            fn field_size() -> usize {
+                1
+            }
+        }
+
         impl $crate::storage::StorageValue for $name {
             fn serialize(self) -> Vec<u8> {
                 self.raw

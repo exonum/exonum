@@ -1,8 +1,6 @@
 use time::Timespec;
 
 use super::super::crypto::{Hash, hash};
-use super::super::messages::Field;
-use super::super::storage::StorageValue;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use ::messages::utils::{U64, TimespecSerdeHelper}; 
 
@@ -57,22 +55,6 @@ impl Deserialize for Block {
     }
 }
 // TODO: add network_id, block version?
-
-// TODO add generic implementation for whole storage values
-impl<'a> Field<'a> for Block {
-    fn field_size() -> usize {
-        8
-    }
-
-    fn read(buffer: &'a [u8], from: usize, to: usize) -> Block {
-        let data = <&[u8] as Field>::read(buffer, from, to);
-        <Block as StorageValue>::deserialize(data.to_vec())
-    }
-
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-        <&[u8] as Field>::write(&self.clone().serialize().as_slice(), buffer, from, to);
-    }
-}
 
 
 #[test]
