@@ -16,7 +16,7 @@ mod tests {
     use exonum::crypto::{Hash, PublicKey, Seed, SEED_LENGTH, HASH_SIZE, gen_keypair_from_seed,
                          hash};
     use exonum::storage::{Map, StorageValue, Error as StorageError};
-    use exonum::messages::Message;
+    use exonum::messages::{Message, FromRaw};
     use exonum::blockchain::config::StoredConfiguration;
     use exonum::blockchain::Service;
     use sandbox::sandbox_with_services;
@@ -43,18 +43,15 @@ mod tests {
                    -> Result<Option<TxConfigPropose>, StorageError> {
         let view = sandbox.blockchain_ref().view();
         let schema = ConfigurationSchema::new(&view);
-        let proposes_table = schema.config_proposes();
-        proposes_table.get(&config_hash)
+        schema.get_propose(&config_hash)
     }
 
-    fn get_vote_for_propose(sandbox: &Sandbox,
-                            config_hash: Hash,
-                            pubkey: PublicKey)
-                            -> Result<Option<TxConfigVote>, StorageError> {
+    fn get_votes_for_propose(sandbox: &Sandbox,
+                            config_hash: Hash)
+                            -> Result<Vec<Option<TxConfigVote>>, StorageError> {
         let view = sandbox.blockchain_ref().view();
         let schema = ConfigurationSchema::new(&view);
-        let votes_table = schema.config_votes(&config_hash);
-        votes_table.get(&pubkey)
+        schema.get_votes(&config_hash)
     }
 
     #[derive(Serialize)]
@@ -244,10 +241,9 @@ mod tests {
                                              &[legal_vote.raw().clone(),
                                                illegal_vote.raw().clone()]);
             sandbox.assert_state(3, 1);
-            assert_eq!(Some(legal_vote),
-                       get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(3)).unwrap());
-            assert_eq!(None,
-                       get_vote_for_propose(&sandbox, absent_cfg.hash(), sandbox.p(3)).unwrap());
+            let votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            assert!(votes.contains(&Some(legal_vote)));
+            assert!(!votes.contains(&Some(illegal_vote)));
         }
     }
 
@@ -293,8 +289,8 @@ mod tests {
             let legal_vote = TxConfigVote::new(&sandbox.p(3), &new_cfg.hash(), sandbox.s(3));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[legal_vote.raw().clone()]);
             sandbox.assert_state(3, 1);
-            assert_eq!(Some(legal_vote),
-                       get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(3)).unwrap());
+            let votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            assert!(votes.contains(&Some(legal_vote)));
         }
         {
             for _ in 3..target_height {
@@ -308,8 +304,8 @@ mod tests {
                                              &sandbox_state,
                                              &[illegal_vote.raw().clone()]);
             sandbox.assert_state(target_height + 1, 1);
-            assert_eq!(None,
-                       get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(0)).unwrap());
+            let votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            assert!(!votes.contains(&Some(illegal_vote)));
         }
     }
 
@@ -349,25 +345,23 @@ mod tests {
                        get_propose(&sandbox, new_cfg.hash()).unwrap().unwrap());
         }
         {
-            let mut votes = Vec::new();
+            let mut expected_votes = Vec::new();
             for validator in 0..2 {
-                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                expected_votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &new_cfg.hash(),
                                              sandbox.s(validator))
                     .raw()
                     .clone());
             }
-            add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
+            let unposted_vote = TxConfigVote::new(&sandbox.p(2), &new_cfg.hash(), sandbox.s(2));
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
             sandbox.assert_state(target_height + 3, 1);
-            for validator in 0..2 {
-                assert_eq!(Some(&votes[validator]),
-                           get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(validator))
-                               .unwrap()
-                               .map(|vote| vote.raw().clone())
-                               .as_ref());
+            let actual_votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            for raw_vote in expected_votes {
+                let exp_vote = TxConfigVote::from_raw(raw_vote).unwrap();
+                assert!(actual_votes.contains(&Some(exp_vote)));
             }
-            assert_eq!(None,
-                       get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(2)).unwrap());
+            assert!(!actual_votes.contains(&Some(unposted_vote)));
             assert_eq!(initial_cfg, sandbox.cfg());
             assert_eq!(None, sandbox.following_cfg());
         }
@@ -375,9 +369,8 @@ mod tests {
             let vote3 = TxConfigVote::new(&sandbox.p(2), &new_cfg.hash(), sandbox.s(2));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[vote3.raw().clone()]);
             sandbox.assert_state(target_height + 4, 1);
-
-            assert_eq!(Some(vote3),
-                       get_vote_for_propose(&sandbox, new_cfg.hash(), sandbox.p(2)).unwrap());
+            let votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            assert!(votes.contains(&Some(vote3)));
             assert_eq!(new_cfg, sandbox.cfg());
         }
     }
@@ -427,20 +420,19 @@ mod tests {
 
             assert_eq!(None, get_propose(&sandbox, new_cfg.hash()).unwrap());
         }
-        {
-            let vote_validator_3 =
+        let vote_validator_0 =
+                TxConfigVote::new(&sandbox.p(0), &following_config.hash(), sandbox.s(0));
+        let vote_validator_3 =
                 TxConfigVote::new(&sandbox.p(3), &following_config.hash(), sandbox.s(3));
+        {
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[vote_validator_3.raw().clone()]);
             sandbox.assert_state(5, 1);
 
-            assert!(get_vote_for_propose(&sandbox, following_config.hash(), sandbox.p(0))
-                .unwrap()
-                .is_some());
-            assert!(get_vote_for_propose(&sandbox, following_config.hash(), sandbox.p(3))
-                .unwrap()
-                .is_none());
+            let votes = get_votes_for_propose(&sandbox, following_config.hash()).unwrap();
+            assert!(votes.contains(&Some(vote_validator_0)));
+            assert!(!votes.contains(&Some(vote_validator_3)));
             assert_eq!(initial_cfg, sandbox.cfg());
         }
         {
@@ -502,9 +494,8 @@ mod tests {
                                              &sandbox_state,
                                              &[illegal_validator_vote.raw().clone()]);
             sandbox.assert_state(4, 1);
-            assert_eq!(None,
-                       get_vote_for_propose(&sandbox, new_cfg_discarded_votes.hash(), illegal_pub)
-                           .unwrap());
+            let votes = get_votes_for_propose(&sandbox, new_cfg_discarded_votes.hash()).unwrap();
+            assert!(!votes.contains(&Some(illegal_validator_vote)));
         }
         {
             let votes = (0..3)
@@ -526,7 +517,7 @@ mod tests {
             assert_eq!(None, sandbox.following_cfg());
         }
         {
-            let votes = (0..3)
+            let expected_votes = (0..3)
                 .map(|validator| {
                     TxConfigVote::new(&sandbox.p(validator),
                                       &new_cfg_discarded_votes.hash(),
@@ -535,14 +526,12 @@ mod tests {
                         .clone()
                 })
                 .collect::<Vec<_>>();
-            add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
             sandbox.assert_state(7, 1);
-            for validator in 0..3 {
-                assert_eq!(None,
-                           get_vote_for_propose(&sandbox,
-                                                new_cfg_discarded_votes.hash(),
-                                                sandbox.p(validator))
-                               .unwrap());
+            let actual_votes = get_votes_for_propose(&sandbox, new_cfg_discarded_votes.hash()).unwrap();
+            for raw_vote in expected_votes {
+                let exp_vote = TxConfigVote::from_raw(raw_vote).unwrap();
+                assert!(!actual_votes.contains(&Some(exp_vote)));
             }
         }
     }
