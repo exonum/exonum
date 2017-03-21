@@ -124,13 +124,13 @@
 
             localStorage: {
                 getUsers: function() {
-                    return JSON.parse(window.localStorage.getItem('users')) || [];
+                    return JSON.parse(window.localStorage.getItem('cc_users')) || [];
                 },
 
                 addUser: function(user) {
-                    var users = JSON.parse(window.localStorage.getItem('users')) || [];
+                    var users = JSON.parse(window.localStorage.getItem('cc_users')) || [];
                     users.push(user);
-                    window.localStorage.setItem('users', JSON.stringify(users));
+                    window.localStorage.setItem('cc_users', JSON.stringify(users));
                 },
 
                 getUser: function(publicKey) {
