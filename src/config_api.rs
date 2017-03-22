@@ -3,18 +3,18 @@ use router::Router;
 use blockchain_explorer::api::{Api, ApiError};
 use iron::prelude::*;
 use bodyparser;
-use exonum::crypto::{Hash, HexValue};
+use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
 use ::{ConfigVotingData, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use exonum::storage::{Map, StorageValue};
 
-use exonum::node::{TxSender, NodeChannel, NodeConfig, TransactionSend};
+use exonum::node::{TxSender, NodeChannel, TransactionSend};
 pub type ConfigTxSender = TxSender<NodeChannel>;
 
 #[derive(Serialize, Deserialize)]
 pub struct ConfigWithHash {
-    hash: Hash,
-    config: StoredConfiguration,
+    pub hash: Hash,
+    pub config: StoredConfiguration,
 }
 
 #[derive(Serialize)]
@@ -44,7 +44,7 @@ pub struct VoteRequestResponse {
 pub struct ConfigApi<T: TransactionSend + Clone> {
     pub blockchain: Blockchain,
     pub channel: T,
-    pub config: NodeConfig,
+    pub config: (PublicKey, SecretKey),
 }
 
 impl<T> ConfigApi<T>
@@ -88,9 +88,9 @@ impl<T> ConfigApi<T>
                           cfg: StoredConfiguration)
                           -> Result<ProposeRequestResponse, ApiError> {
         let cfg_hash = cfg.hash();
-        let config_propose = TxConfigPropose::new(&self.config.public_key,
+        let config_propose = TxConfigPropose::new(&self.config.0,
                                                   &cfg.serialize(),
-                                                  &self.config.secret_key);
+                                                  &self.config.1);
         let tx_hash = config_propose.hash();
         let ch = self.channel.clone();
         ch.send(ConfigTx::ConfigPropose(config_propose))?;
@@ -103,7 +103,7 @@ impl<T> ConfigApi<T>
 
     fn put_config_vote(&self, cfg_hash: &Hash) -> Result<VoteRequestResponse, ApiError> {
         let config_vote =
-            TxConfigVote::new(&self.config.public_key, cfg_hash, &self.config.secret_key);
+            TxConfigVote::new(&self.config.0, cfg_hash, &self.config.1);
         let tx_hash = config_vote.hash();
         let ch = self.channel.clone();
         ch.send(ConfigTx::ConfigVote(config_vote))?;

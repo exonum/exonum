@@ -1,13 +1,19 @@
 #[macro_use]
-extern crate serde_derive;
+extern crate log;
+extern crate exonum;
 extern crate blockchain_explorer;
 extern crate sandbox;
-extern crate exonum;
 extern crate configuration_service;
+extern crate iron;
+extern crate router;
 extern crate serde_json;
 extern crate serde;
 #[macro_use]
-extern crate log;
+extern crate serde_derive;
+extern crate rand;
+
+#[cfg(test)]
+mod api_tests;
 
 #[cfg(test)]
 mod tests {
