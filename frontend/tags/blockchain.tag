@@ -61,11 +61,6 @@
             route('/blockchain/block/' + height);
         }
 
-        refresh(e) {
-            e.preventDefault();
-            window.location.reload();
-        }
-
         more(e) {
             e.preventDefault();
             self.toggleLoading(true);
@@ -74,6 +69,11 @@
                 self.update();
                 self.toggleLoading(false);
             });
+        }
+
+        refresh(e) {
+            e.preventDefault();
+            window.location.reload();
         }
     </script>
 </blockchain>

@@ -1,5 +1,9 @@
 <block>
     <div class="panel-heading">
+        <button class="btn btn-default pull-right page-nav" if={ notFound } onclick={ refresh }>
+            <i class="glyphicon glyphicon-refresh"></i>
+            <span class="hidden-xs">Refresh</span>
+        </button>
         <a class="btn btn-default pull-left page-nav" href="#blockchain/">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
@@ -94,7 +98,7 @@
 
         <virtual if={ notFound }>
             <p class="text-muted text-center">
-                <i class="glyphicon glyphicon-ban-circle"></i> The server is not know the requested block. <br>Wait a few seconds and reload the page.
+                <i class="glyphicon glyphicon-ban-circle"></i> The server is not know the requested block. <br>Wait a few seconds and refresh the page.
             </p>
         </virtual>
     </div>
@@ -123,6 +127,11 @@
         next(e) {
             e.preventDefault();
             route('/blockchain/block/' + (height + 1));
+        }
+
+        refresh(e) {
+            e.preventDefault();
+            window.location.reload();
         }
     </script>
 </block>
