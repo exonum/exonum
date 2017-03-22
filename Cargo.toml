@@ -12,6 +12,7 @@ log = "0.3"
 serde = "0.8"
 serde_derive = "0.8"
 serde_json = "0.8"
+lazy_static = "0.2.1"
 
 router = "0.5.1"
 iron = "0.5.1"

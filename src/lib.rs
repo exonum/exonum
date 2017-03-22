@@ -12,6 +12,8 @@ extern crate iron;
 extern crate router;
 extern crate bodyparser;
 extern crate params;
+#[macro_use]
+extern crate lazy_static;
 
 pub mod config_api;
 use std::fmt;
@@ -30,6 +32,11 @@ use exonum::blockchain::StoredConfiguration;
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
+
+lazy_static! {
+    static ref ZEROVOTE: TxConfigVote = TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
+}
+
 storage_value! {
     ConfigVotingData {
         const SIZE = 48;
@@ -215,10 +222,8 @@ impl<'a> ConfigurationSchema<'a> {
                        -> StorageResult<()> {
         let votes_table = self.config_votes(cfg_hash);
         debug_assert!(votes_table.is_empty().unwrap());
-        let zerovote =
-            TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
         for _ in 0..(num_validators as usize) {
-            votes_table.append(zerovote.clone())?;
+            votes_table.append(ZEROVOTE.clone())?;
         }
         let config_data =
             ConfigVotingData::new(tx_propose, &votes_table.root_hash()?, num_validators);
@@ -263,13 +268,11 @@ impl<'a> ConfigurationSchema<'a> {
     }
 
     pub fn get_votes(&self, cfg_hash: &Hash) -> StorageResult<Vec<Option<TxConfigVote>>> {
-        let zerovote =
-            TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
         let votes_table = self.config_votes(cfg_hash); 
         let votes_values = votes_table.values()?;
         let votes_options = votes_values.into_iter()
             .map(|vote|{
-                if vote == zerovote {
+                if vote == ZEROVOTE.clone() {
                     None
                 } else {
                     Some(vote)
