@@ -88,10 +88,19 @@ impl<'a> Schema<'a> {
         })
     }
 
-    pub fn last_height(&self) -> Result<u64, Error> {
-        self.last_block().map(|block| block.unwrap().height())
+    pub fn last_height(&self) -> Result<Option<u64>, Error> {
+        let block_opt = self.last_block()?; 
+        Ok(block_opt.map(|block| block.height()))
     }
 
+    pub fn current_height(&self) -> Result<u64, Error> {
+        let last_height = self.last_height()?;
+        let res = match last_height {
+            Some(last_height) => last_height + 1, 
+            None => 0, 
+        };
+        Ok(res)
+    }
     pub fn commit_actual_configuration(&self,
                                        config_data: StoredConfiguration)
                                        -> Result<(), Error> {
@@ -113,20 +122,20 @@ impl<'a> Schema<'a> {
         Ok(())
     }
 
-    pub fn get_actual_configurations_index(&self) -> Result<u64, Error> {
-        let h = self.last_height()? + 1;
+    pub fn get_actual_configuration_index_for_height(&self, height: u64) -> Result<u64, Error> {
         let configs_actual_from = self.configs_actual_from();
         let cfg_references: Vec<ConfigReference> = configs_actual_from.values()?;
 
         let idx = cfg_references.into_iter()
-         .rposition(|r| r.actual_from() <= h)
+         .rposition(|r| r.actual_from() <= height)
          .expect(&format!("Couldn't find a config in configs_actual_from table with actual_from height less than \
-                          the current height: {:?}", h));
+                          the height: {:?}", height));
         Ok(idx as u64)
     }
 
     pub fn get_actual_configuration(&self) -> Result<StoredConfiguration, Error> {
-        let idx = self.get_actual_configurations_index()?;
+        let current_height = self.current_height()?;
+        let idx = self.get_actual_configuration_index_for_height(current_height)?;
         let cfg_ref: ConfigReference = self.configs_actual_from()
             .get(idx)?
             .expect(&format!("No element at idx {:?} in configs_actual_from table", idx));
@@ -139,7 +148,8 @@ impl<'a> Schema<'a> {
     }
 
     pub fn get_following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
-        let idx = self.get_actual_configurations_index()?;
+        let current_height = self.current_height()?;
+        let idx = self.get_actual_configuration_index_for_height(current_height)?;
         let res = match self.configs_actual_from().get(idx + 1)? {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
