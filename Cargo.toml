@@ -6,7 +6,4 @@ members = [
     "blockchain_explorer",
     "exonum",
     "sandbox",
-    "services/configuration",
-    "services/configuration/sandbox_tests",
-    "services/propose_timeout_adjuster",
 ]
