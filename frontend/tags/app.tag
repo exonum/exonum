@@ -140,14 +140,6 @@
                             return users[i];
                         }
                     }
-                },
-
-                getNewestHeight: function() {
-                    return parseInt(window.localStorage.getItem('newestHeight'))
-                },
-
-                setNewestHeight: function(height) {
-                    window.localStorage.setItem('newestHeight', height)
                 }
             },
 
@@ -197,8 +189,8 @@
                 riot.mount('#content', 'add-funds', {publicKey: publicKey});
             });
 
-            route('/blockchain/*', function(height) {
-                riot.mount('#content', 'blockchain', {height: height});
+            route('/blockchain', function(height) {
+                riot.mount('#content', 'blockchain');
             });
 
             route('/blockchain/block/*', function(height) {
@@ -207,10 +199,6 @@
 
             route('/blockchain/transaction/*', function(hash) {
                 riot.mount('#content', 'transaction', {hash: hash});
-            });
-
-            route('/blockchain..', function() {
-                riot.mount('#content', 'blockchain');
             });
 
             route.start(true);

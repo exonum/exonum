@@ -12,8 +12,8 @@
         <virtual if={ block }>
             <nav>
                 <ul class="pager">
-                    <li class="previous" if={ hasPrevious }><a href="#" onclick={ previous }><span aria-hidden="true">&larr;</span> Previous<span class="hidden-xs"> block</span></a></li>
-                    <li class="next" if={ hasNext }><a href="#" onclick={ next }>Next<span class="hidden-xs"> block</span> <span aria-hidden="true">&rarr;</span></a></a></li>
+                    <li class="previous"><a href="#" onclick={ previous }><span aria-hidden="true">&larr;</span> Previous<span class="hidden-xs"> block</span></a></li>
+                    <li class="next"><a href="#" onclick={ next }>Next<span class="hidden-xs"> block</span> <span aria-hidden="true">&rarr;</span></a></a></li>
                 </ul>
             </nav>
 
@@ -114,17 +114,6 @@
             self.update();
             self.toggleLoading(false);
         });
-
-        // toggle previous button
-        if (height > 0) {
-            this.hasPrevious = true;
-        }
-
-        // toggle next button
-        var newest = self.localStorage.getNewestHeight();
-        if (!isNaN(newest) && height < newest)  {
-            self.hasNext = true;
-        }
 
         previous(e) {
             e.preventDefault();

@@ -39,7 +39,7 @@
                     secretKey: pair.secretKey
                 });
                 self.notify('success', 'Wallet has been created. Login and manage the wallet.');
-                route('/');
+                route('/dashboard');
             });
         }
     </script>
