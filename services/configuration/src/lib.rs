@@ -324,7 +324,7 @@ impl TxConfigPropose {
             return Ok(());
         }
 
-        let current_height = blockchain_schema.last_height()? + 1;
+        let current_height = blockchain_schema.current_height()?;
         let actual_from = config_candidate_body.actual_from;
         if actual_from <= current_height {
             error!("Discarding TxConfigPropose:{} which has actual_from height less than or \
@@ -397,7 +397,7 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        let current_height = blockchain_schema.last_height()? + 1;
+        let current_height = blockchain_schema.current_height()?;
         let actual_from = parsed_config.actual_from;
         if actual_from <= current_height {
             error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} has \
