@@ -1,5 +1,9 @@
 <blockchain>
     <div class="panel-heading">
+        <button class="btn btn-default pull-right page-nav" onclick={ refresh }>
+            <i class="glyphicon glyphicon-refresh"></i>
+            <span class="hidden-xs">Refresh</span>
+        </button>
         <a class="btn btn-default pull-left page-nav" href="#dashboard">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
@@ -9,14 +13,6 @@
         </div>
     </div>
     <div class="panel-body">
-        <nav>
-            <ul class="pager">
-                <li class="previous" if={ hasPrevious }><a href="#" onclick={ previous }><span aria-hidden="true">&larr;</span> Older</a></li>
-                <li class="next" if={ hasNext }><a href="#" onclick={ next }>Newer <span aria-hidden="true">&rarr;</span></a></li>
-                <li class="next" if={ hasRefresh }><a href="#" onclick={ refresh }>Refresh</a></li>
-            </ul>
-        </nav>
-
         <div class="custom-table custom-table-hover">
             <div class="row">
                 <div class="col-xs-4 col-sm-3 custom-table-header-column">Hash</div>
@@ -42,30 +38,20 @@
                 </div>
             </div>
         </div>
+
+        <div class="form-group">
+            <button class="btn btn-lg btn-block btn-primary" onclick={ more }>
+                Load more
+            </button>
+        </div>
     </div>
 
     <script>
         var self = this;
 
-        this.height = parseInt(this.opts.height);
         this.toggleLoading(true);
         this.api.loadBlockchain(self.height + 1, function(data) {
             self.blocks = data;
-
-            // toggle previous button
-            if (self.blocks[0].height > 9) {
-                self.hasPrevious = true;
-            }
-
-            // toggle next and refresh buttons
-            var newest = self.localStorage.getNewestHeight();
-            if (isNaN(newest) || self.blocks[0].height >= newest)  {
-                self.localStorage.setNewestHeight(self.blocks[0].height);
-                self.hasRefresh = true;
-            } else {
-                self.hasNext = true;
-            }
-
             self.update();
             self.toggleLoading(false);
         });
@@ -75,24 +61,19 @@
             route('/blockchain/block/' + height);
         }
 
-        previous(e) {
-            e.preventDefault();
-            var height = self.blocks[0].height - 10;
-            if (height < 9) {
-                height = 9;
-            }
-            route('/blockchain/' + height);
-        }
-
-        next(e) {
-            e.preventDefault();
-            var height = self.blocks[0].height + 10;
-            route('/blockchain/' + height);
-        }
-
         refresh(e) {
             e.preventDefault();
             window.location.reload();
+        }
+
+        more(e) {
+            e.preventDefault();
+            self.toggleLoading(true);
+            this.api.loadBlockchain(self.blocks[self.blocks.length - 1].height, function(data) {
+                self.blocks = self.blocks.concat(data);
+                self.update();
+                self.toggleLoading(false);
+            });
         }
     </script>
 </blockchain>

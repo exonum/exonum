@@ -1,13 +1,13 @@
 <wallet>
     <div class="panel-heading">
-        <a class="btn btn-default pull-right page-nav" href="#dashboard">
-            <i class="glyphicon glyphicon-log-out"></i>
-            <span class="hidden-xs">Logout</span>
-        </a>
-        <button class="btn btn-default pull-left page-nav" onclick={ refresh }>
+        <button class="btn btn-default pull-right page-nav" onclick={ refresh }>
             <i class="glyphicon glyphicon-refresh"></i>
             <span class="hidden-xs">Refresh</span>
         </button>
+        <a class="btn btn-default pull-left page-nav" href="#dashboard">
+            <i class="glyphicon glyphicon-log-out"></i>
+            <span class="hidden-xs">Logout</span>
+        </a>
         <div class="panel-title page-title text-center">
             <div class="h4">Wallet</div>
         </div>
@@ -56,6 +56,11 @@
                 </div>
             </div>
         </virtual>
+
+        <div class="form-group">
+            <p class="text-center">Explore all transactions:</p>
+            <a href="#blockchain" class="btn btn-lg btn-block btn-default">Blockchain Explorer</a>
+        </div>
     </div>
 
     <script>
