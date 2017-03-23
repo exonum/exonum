@@ -18,12 +18,13 @@ extern crate lazy_static;
 pub mod config_api;
 use std::fmt;
 
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use exonum::messages::Field;
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
+use exonum::messages::utils::{U64}; 
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
@@ -34,11 +35,11 @@ pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
 
 lazy_static! {
-    static ref ZEROVOTE: TxConfigVote = TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
+    pub static ref ZEROVOTE: TxConfigVote = TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
 }
 
 storage_value! {
-    ConfigVotingData {
+    StorageDataConfigPropose {
         const SIZE = 48;
 
         tx_propose:            TxConfigPropose   [00 => 08]
@@ -47,22 +48,40 @@ storage_value! {
     }
 }
 
-impl ConfigVotingData {
+impl StorageDataConfigPropose {
     pub fn set_history_hash(&mut self, hash: &Hash) {
         Field::write(&hash, &mut self.raw, 8, 40);
     }
 }
 
-impl Serialize for ConfigVotingData {
+#[derive(Serialize, Deserialize)]
+struct StorageDataConfigProposeSerdeHelper {
+    tx_propose: TxConfigPropose,
+    votes_history_hash: Hash,
+    num_votes: U64,
+}
+
+impl Serialize for StorageDataConfigPropose {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let mut state;
-        state = ser.serialize_struct("config voting data", 4)?;
-        ser.serialize_struct_elt(&mut state, "tx_propose", self.tx_propose())?;
-        ser.serialize_struct_elt(&mut state, "votes_history_hash", self.votes_history_hash())?;
-        ser.serialize_struct_elt(&mut state, "num_votes", self.num_votes())?;
-        ser.serialize_struct_end(state)
+        let helper = StorageDataConfigProposeSerdeHelper {
+            tx_propose: self.tx_propose(), 
+            votes_history_hash: *self.votes_history_hash(), 
+            num_votes: U64(self.num_votes()), 
+        };
+        helper.serialize(ser)
+    }
+}
+
+impl Deserialize for StorageDataConfigPropose {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let h = <StorageDataConfigProposeSerdeHelper>::deserialize(deserializer)?; 
+
+        let precommit = StorageDataConfigPropose::new(h.tx_propose, &h.votes_history_hash, h.num_votes.0); 
+        Ok(precommit)
     }
 }
 
@@ -94,20 +113,48 @@ pub enum ConfigTx {
     ConfigVote(TxConfigVote),
 }
 
+#[derive(Deserialize)]
+struct TxConfigProposeSerdeHelper {
+    from: PublicKey,
+    cfg: StoredConfiguration,
+    signature: Signature,
+}
+
+#[derive(Deserialize)]
+struct TxConfigVoteSerdeHelper {
+    from: PublicKey,
+    cfg_hash: Hash,
+    signature: Signature,
+}
+
 impl Serialize for TxConfigPropose {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
         let mut state;
-        state = ser.serialize_struct("config_propose", 4)?;
+        state = ser.serialize_struct("config_propose", 3)?;
         ser.serialize_struct_elt(&mut state, "from", self.from())?;
         if let Ok(cfg) = StoredConfiguration::deserialize_err(self.cfg()) {
-            ser.serialize_struct_elt(&mut state, "config", cfg)?;
+            ser.serialize_struct_elt(&mut state, "cfg", cfg)?;
         } else {
-            ser.serialize_struct_elt(&mut state, "config", self.cfg())?;
+            ser.serialize_struct_elt(&mut state, "cfg", self.cfg())?;
         }
         ser.serialize_struct_elt(&mut state, "signature", self.raw().signature())?;
         ser.serialize_struct_end(state)
+    }
+}
+
+impl Deserialize for TxConfigPropose {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let h = <TxConfigProposeSerdeHelper>::deserialize(deserializer)?;
+
+        let precommit = TxConfigPropose::new_with_signature(&h.from,
+                                                            &StorageValue::serialize(h.cfg
+                                                                .clone()),
+                                                            &h.signature);
+        Ok(precommit)
     }
 }
 
@@ -116,11 +163,22 @@ impl Serialize for TxConfigVote {
         where S: Serializer
     {
         let mut state;
-        state = ser.serialize_struct("vote", 5)?;
+        state = ser.serialize_struct("vote", 3)?;
         ser.serialize_struct_elt(&mut state, "from", self.from())?;
-        ser.serialize_struct_elt(&mut state, "config_hash", self.cfg_hash())?;
+        ser.serialize_struct_elt(&mut state, "cfg_hash", self.cfg_hash())?;
         ser.serialize_struct_elt(&mut state, "signature", self.raw().signature())?;
         ser.serialize_struct_end(state)
+    }
+}
+
+impl Deserialize for TxConfigVote {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let h = <TxConfigVoteSerdeHelper>::deserialize(deserializer)?;
+
+        let precommit = TxConfigVote::new_with_signature(&h.from, &h.cfg_hash, &h.signature);
+        Ok(precommit)
     }
 }
 
@@ -203,7 +261,7 @@ impl<'a> ConfigurationSchema<'a> {
     /// mapping hash(config) -> TxConfigPropose
     fn config_data
         (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, ConfigVotingData> {
+         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StorageDataConfigPropose> {
         MerklePatriciaTable::new(MapTable::new(vec![04], self.view))
     }
     /// mapping validator_id -> TxConfigVote
@@ -226,7 +284,7 @@ impl<'a> ConfigurationSchema<'a> {
             votes_table.append(ZEROVOTE.clone())?;
         }
         let config_data =
-            ConfigVotingData::new(tx_propose, &votes_table.root_hash()?, num_validators);
+            StorageDataConfigPropose::new(tx_propose, &votes_table.root_hash()?, num_validators);
         let config_data_table = self.config_data();
         debug_assert!(config_data_table.get(cfg_hash).unwrap().is_none());
         config_data_table.put(cfg_hash, config_data)
@@ -245,7 +303,7 @@ impl<'a> ConfigurationSchema<'a> {
                              &tx_vote));
 
         let tx_propose = propose_config_data.tx_propose();
-        let prev_cfg_hash = StoredConfiguration::deserialize(tx_propose.cfg().to_vec())
+        let prev_cfg_hash = <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec())
             .previous_cfg_hash;
         let general_schema = Schema::new(self.view);
         let prev_cfg = general_schema.configs()
@@ -268,16 +326,17 @@ impl<'a> ConfigurationSchema<'a> {
     }
 
     pub fn get_votes(&self, cfg_hash: &Hash) -> StorageResult<Vec<Option<TxConfigVote>>> {
-        let votes_table = self.config_votes(cfg_hash); 
+        let votes_table = self.config_votes(cfg_hash);
         let votes_values = votes_table.values()?;
         let votes_options = votes_values.into_iter()
-            .map(|vote|{
+            .map(|vote| {
                 if vote == ZEROVOTE.clone() {
                     None
                 } else {
                     Some(vote)
                 }
-            }).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
         Ok(votes_options)
     }
 
@@ -417,7 +476,7 @@ impl TxConfigVote {
 
         let mut votes_count = 0;
 
-        for vote_option in config_schema.get_votes(self.cfg_hash())?{
+        for vote_option in config_schema.get_votes(self.cfg_hash())? {
             if let Some(_) = vote_option {
                 votes_count += 1;
             }

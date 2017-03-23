@@ -5,39 +5,39 @@ use iron::prelude::*;
 use bodyparser;
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
-use ::{ConfigVotingData, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
+use ::{StorageDataConfigPropose, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use exonum::storage::{Map, StorageValue};
 
 use exonum::node::{TxSender, NodeChannel, TransactionSend};
 pub type ConfigTxSender = TxSender<NodeChannel>;
 
 #[derive(Serialize, Deserialize)]
-pub struct ConfigWithHash {
+pub struct ApiResponseConfigHashInfo {
     pub hash: Hash,
     pub config: StoredConfiguration,
 }
 
-#[derive(Serialize)]
-pub struct ConfigInfo {
-    committed_config: Option<StoredConfiguration>,
-    propose: Option<ConfigVotingData>,
+#[derive(Serialize, Deserialize)]
+pub struct ApiResponseConfigInfo {
+    pub committed_config: Option<StoredConfiguration>,
+    pub propose: Option<StorageDataConfigPropose>,
 }
 
-#[derive(Serialize)]
-pub enum ConfigVotesInfo {
+#[derive(Serialize, Deserialize)]
+pub enum ApiResponseVotesInfo {
     Votes(Vec<Option<TxConfigVote>>),
     ProposeAbsent(Option<()>),
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct ProposeRequestResponse {
-    tx_hash: Hash,
-    cfg_hash: Hash,
+pub struct ApiResponseProposePost {
+    pub tx_hash: Hash,
+    pub cfg_hash: Hash,
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct VoteRequestResponse {
-    tx_hash: Hash,
+pub struct ApiResponseVotePost {
+    pub tx_hash: Hash,
 }
 
 #[derive(Clone)]
@@ -50,19 +50,19 @@ pub struct ConfigApi<T: TransactionSend + Clone> {
 impl<T> ConfigApi<T>
     where T: TransactionSend + Clone
 {
-    fn get_actual_config(&self) -> Result<ConfigWithHash, ApiError> {
+    fn get_actual_config(&self) -> Result<ApiResponseConfigHashInfo, ApiError> {
         let actual_cfg = Schema::new(&self.blockchain.view()).get_actual_configuration()?;
-        let res = ConfigWithHash {
+        let res = ApiResponseConfigHashInfo {
             hash: actual_cfg.hash(),
             config: actual_cfg,
         };
         Ok(res)
     }
 
-    fn get_following_config(&self) -> Result<Option<ConfigWithHash>, ApiError> {
+    fn get_following_config(&self) -> Result<Option<ApiResponseConfigHashInfo>, ApiError> {
         let following_cfg = Schema::new(&self.blockchain.view()).get_following_configuration()?;
         let res = following_cfg.map(|cfg| {
-            ConfigWithHash {
+            ApiResponseConfigHashInfo {
                 hash: cfg.hash(),
                 config: cfg,
             }
@@ -70,14 +70,14 @@ impl<T> ConfigApi<T>
         Ok(res)
     }
 
-    fn get_config_by_hash(&self, hash: &Hash) -> Result<ConfigInfo, ApiError> {
+    fn get_config_by_hash(&self, hash: &Hash) -> Result<ApiResponseConfigInfo, ApiError> {
         let view = self.blockchain.view();
         let general_schema = Schema::new(&view);
         let committed_config = general_schema.configs().get(hash)?;
 
         let configuration_schema = ConfigurationSchema::new(&view);
         let propose = configuration_schema.config_data().get(hash)?;
-        let res = ConfigInfo {
+        let res = ApiResponseConfigInfo {
             committed_config: committed_config,
             propose: propose,
         };
@@ -86,39 +86,34 @@ impl<T> ConfigApi<T>
 
     fn put_config_propose(&self,
                           cfg: StoredConfiguration)
-                          -> Result<ProposeRequestResponse, ApiError> {
+                          -> Result<ApiResponseProposePost, ApiError> {
         let cfg_hash = cfg.hash();
-        let config_propose = TxConfigPropose::new(&self.config.0,
-                                                  &cfg.serialize(),
-                                                  &self.config.1);
+        let config_propose = TxConfigPropose::new(&self.config.0, &cfg.serialize(), &self.config.1);
         let tx_hash = config_propose.hash();
         let ch = self.channel.clone();
         ch.send(ConfigTx::ConfigPropose(config_propose))?;
-        let res = ProposeRequestResponse {
+        let res = ApiResponseProposePost {
             tx_hash: tx_hash,
             cfg_hash: cfg_hash,
         };
         Ok(res)
     }
 
-    fn put_config_vote(&self, cfg_hash: &Hash) -> Result<VoteRequestResponse, ApiError> {
-        let config_vote =
-            TxConfigVote::new(&self.config.0, cfg_hash, &self.config.1);
+    fn put_config_vote(&self, cfg_hash: &Hash) -> Result<ApiResponseVotePost, ApiError> {
+        let config_vote = TxConfigVote::new(&self.config.0, cfg_hash, &self.config.1);
         let tx_hash = config_vote.hash();
         let ch = self.channel.clone();
         ch.send(ConfigTx::ConfigVote(config_vote))?;
-        let res = VoteRequestResponse { tx_hash: tx_hash };
+        let res = ApiResponseVotePost { tx_hash: tx_hash };
         Ok(res)
     }
 
-    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> Result<ConfigVotesInfo, ApiError> {
+    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> Result<ApiResponseVotesInfo, ApiError> {
         let view = self.blockchain.view();
         let configuration_schema = ConfigurationSchema::new(&view);
         let res = match configuration_schema.config_data().get(cfg_hash)? {
-            None => ConfigVotesInfo::ProposeAbsent(None), 
-            Some(_) => {
-                ConfigVotesInfo::Votes(configuration_schema.get_votes(cfg_hash)?)
-            }
+            None => ApiResponseVotesInfo::ProposeAbsent(None), 
+            Some(_) => ApiResponseVotesInfo::Votes(configuration_schema.get_votes(cfg_hash)?),
         };
         Ok(res)
     }

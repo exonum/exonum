@@ -18,13 +18,11 @@ router = "0.5.1"
 iron = "0.5.1"
 bodyparser = "0.5.0"
 params = "0.6.0"
-#exonum = {version="0.1", path="../../dig2/digital-assets/exonum"} 
-#blockchain_explorer = {version="0.1", path="../../dig2/digital-assets/blockchain_explorer"}
 
 [dependencies.exonum]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "5a9e84bd8013bb2a772ffdd44eebd288ca8bad90"
+rev = "803f985a556ceeca8ed18256b83f90cfa0b2e370"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "5a9e84bd8013bb2a772ffdd44eebd288ca8bad90"
+rev = "803f985a556ceeca8ed18256b83f90cfa0b2e370"

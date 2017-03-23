@@ -17,20 +17,24 @@ use serde_json;
 use serde_json::value::ToJson;
 
 
-use exonum::storage::StorageValue; 
-use exonum::node::{NodeConfig, TransactionSend};
-use exonum::crypto::{Seed, Hash, PublicKey, gen_keypair, gen_keypair_from_seed};
-use exonum::blockchain::{StoredConfiguration, Service, Transaction};
+use exonum::storage::{MemoryDB, MerkleTable, StorageValue, List};
+use exonum::node::TransactionSend;
+use exonum::crypto::Hash;
+use exonum::blockchain::{Service, Transaction};
 use exonum::events::Error as EventsError;
 use exonum::messages::{FromRaw, Message, RawMessage};
-use configuration_service::{ConfigTx, ConfigurationService, ConfigurationSchema};
-use configuration_service::config_api::{ConfigWithHash, ConfigApi};
+use configuration_service::{StorageDataConfigPropose, ConfigTx, TxConfigPropose, TxConfigVote,
+                            ConfigurationService, ZEROVOTE};
+use configuration_service::config_api::{ApiResponseConfigInfo, ApiResponseConfigHashInfo,
+                                        ConfigApi, ApiResponseVotesInfo, ApiResponseProposePost,
+                                        ApiResponseVotePost};
 
 use blockchain_explorer::api::Api;
 use blockchain_explorer::helpers::init_logger;
 
 use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
+use super::generate_config_with_message;
 
 fn response_body(response: Response) -> serde_json::Value {
     if let Some(mut body) = response.body {
@@ -125,7 +129,7 @@ impl ConfigurationApiSandbox {
         let api = ConfigApi {
             channel: channel,
             blockchain: blockchain,
-            config: keypair, 
+            config: keypair,
         };
         let mut router = Router::new();
         api.wire(&mut router);
@@ -145,16 +149,62 @@ impl ConfigurationApiSandbox {
         add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());
     }
 
-    fn request_actual_config(&self)
-                                              -> IronResult<Response> {
+    fn get_actual_config(&self) -> IronResult<Response> {
         let api = self.obtain_test_api(0);
         request_get("/api/v1/config/actual", &api)
     }
 
-    fn request_following_config(&self)
-                                              -> IronResult<Response> {
+    fn get_following_config(&self) -> IronResult<Response> {
         let api = self.obtain_test_api(0);
         request_get("/api/v1/config/following", &api)
+    }
+
+    fn get_config_by_hash(&self, config_hash: Hash) -> IronResult<Response> {
+        let hash_str = serde_json::to_string(&config_hash).unwrap().replace("\"", "");
+        self.get_config_by_hash_str(hash_str)
+    }
+
+    fn get_config_by_hash_str<A: AsRef<str>>(&self, hash_str: A) -> IronResult<Response> {
+        let api = self.obtain_test_api(0);
+        request_get(format!("/api/v1/configs/{}", hash_str.as_ref()), &api)
+    }
+
+    fn get_config_votes(&self, config_hash: Hash) -> IronResult<Response> {
+        let hash_str = serde_json::to_string(&config_hash).unwrap().replace("\"", "");
+        self.get_config_votes_by_str(hash_str)
+    }
+
+    fn get_config_votes_by_str<A: AsRef<str>>(&self, hash_str: A) -> IronResult<Response> {
+        let api = self.obtain_test_api(0);
+        request_get(format!("/api/v1/configs/{}/votes", hash_str.as_ref()), &api)
+    }
+
+    fn post_config_propose<T: Serialize>(&self,
+                                         validator_id: usize,
+                                         config: T)
+                                         -> IronResult<Response> {
+        let api = self.obtain_test_api(validator_id);
+        request_post_body("/api/v1/configs/postpropose", config, &api)
+    }
+
+    fn post_config_vote<T: Serialize>(&self,
+                                      validator_id: usize,
+                                      config_hash: Hash,
+                                      body: T)
+                                      -> IronResult<Response> {
+        let hash_str = serde_json::to_string(&config_hash).unwrap().replace("\"", "");
+        self.post_config_vote_by_str(validator_id, hash_str, body)
+    }
+
+    fn post_config_vote_by_str<T: Serialize, A: AsRef<str>>(&self,
+                                                            validator_id: usize,
+                                                            hash_str: A,
+                                                            body: T)
+                                                            -> IronResult<Response> {
+        let api = self.obtain_test_api(validator_id);
+        request_post_body(format!("/api/v1/configs/{}/postvote", hash_str.as_ref()),
+                          body,
+                          &api)
     }
 }
 
@@ -173,18 +223,283 @@ struct ErrorResponse {
 fn test_get_actual_config() {
     let _ = init_logger();
     let api_sandbox = ConfigurationApiSandbox::new();
-    let resp_actual_config = api_sandbox.request_actual_config().unwrap(); 
-    let actual_body = response_body(resp_actual_config);
     let sand_cfg = api_sandbox.sandbox.cfg();
-    let expected_response_body = ConfigWithHash{
-        hash: sand_cfg.hash(), 
-        config: sand_cfg, 
+    let expected_body = ApiResponseConfigHashInfo {
+        hash: sand_cfg.hash(),
+        config: sand_cfg,
     };
-    assert_eq!(actual_body, expected_response_body.to_json());
 
-    let resp_following_config = api_sandbox.request_following_config().unwrap(); 
+    let resp_actual_config = api_sandbox.get_actual_config().unwrap();
+    let actual_body = response_body(resp_actual_config);
+    assert_eq!(actual_body, expected_body.to_json());
+}
+
+#[test]
+fn test_get_following_config() {
+    let _ = init_logger();
+    let api_sandbox = ConfigurationApiSandbox::new();
+    let mut rng = thread_rng();
+    let initial_cfg = api_sandbox.sandbox.cfg();
+
+    let string_len = rng.gen_range(20u8, 255u8);
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let following_cfg =
+        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+
+    {
+        api_sandbox.post_config_propose(0, following_cfg.clone()).unwrap();
+        api_sandbox.commit();
+    }
+    {
+        let n_validators = api_sandbox.sandbox.n_validators();
+        (0..api_sandbox.sandbox.majority_count(n_validators))
+            .inspect(|validator_id| {
+                api_sandbox.post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                    .unwrap();
+            })
+            .collect::<Vec<_>>();
+        api_sandbox.commit();
+    }
+
+    let expected_body = ApiResponseConfigHashInfo {
+        hash: following_cfg.hash(),
+        config: following_cfg,
+    };
+
+    let resp_following_config = api_sandbox.get_following_config().unwrap();
     let actual_body = response_body(resp_following_config);
-    let expected_body: Option<ConfigWithHash> = None;
+    assert_eq!(actual_body, expected_body.to_json());
+}
+
+#[test]
+fn test_get_config_by_hash1() {
+    let _ = init_logger();
+    let api_sandbox = ConfigurationApiSandbox::new();
+    let initial_cfg = api_sandbox.sandbox.cfg();
+
+    let expected_body = ApiResponseConfigInfo {
+        committed_config: Some(initial_cfg.clone()),
+        propose: None,
+    };
+
+    let resp_config_by_hash = api_sandbox.get_config_by_hash(initial_cfg.hash()).unwrap();
+    let actual_body = response_body(resp_config_by_hash);
+    assert_eq!(actual_body, expected_body.to_json());
+}
+
+#[test]
+fn test_get_config_by_hash2() {
+    let _ = init_logger();
+    let api_sandbox = ConfigurationApiSandbox::new();
+    let mut rng = thread_rng();
+    let initial_cfg = api_sandbox.sandbox.cfg();
+
+    let string_len = rng.gen_range(20u8, 255u8);
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let following_cfg =
+        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+
+    let proposer = 0;
+    {
+        api_sandbox.post_config_propose(proposer, following_cfg.clone()).unwrap();
+        api_sandbox.commit();
+    }
+
+    let expected_body = {
+        let expected_hash = {
+            let db = MemoryDB::new();
+            let hashes: MerkleTable<MemoryDB, u64, TxConfigVote> = MerkleTable::new(db);
+            for _ in 0..api_sandbox.sandbox.n_validators() {
+                hashes.append(ZEROVOTE.clone()).unwrap();
+            }
+            hashes.root_hash().unwrap()
+        };
+        let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
+                                  api_sandbox.sandbox.s(proposer).clone());
+        let expected_propose =
+            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+        let expected_voting_data =
+            StorageDataConfigPropose::new(expected_propose,
+                                          &expected_hash,
+                                          api_sandbox.sandbox.n_validators() as u64);
+        ApiResponseConfigInfo {
+            committed_config: None,
+            propose: Some(expected_voting_data),
+        }
+    };
+
+    let resp_config_by_hash = api_sandbox.get_config_by_hash(following_cfg.hash()).unwrap();
+    let actual_body = response_body(resp_config_by_hash);
+    assert_eq!(actual_body, expected_body.to_json());
+}
+
+#[test]
+fn test_get_config_by_hash3() {
+    let _ = init_logger();
+    let api_sandbox = ConfigurationApiSandbox::new();
+    let mut rng = thread_rng();
+    let initial_cfg = api_sandbox.sandbox.cfg();
+
+    let string_len = rng.gen_range(20u8, 255u8);
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let following_cfg =
+        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+
+    let proposer = 0;
+    {
+        api_sandbox.post_config_propose(proposer, following_cfg.clone()).unwrap();
+        api_sandbox.commit();
+    }
+    let votes = {
+        let n_validators = api_sandbox.sandbox.n_validators();
+        let excluded_validator = 2;
+        let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
+            .inspect(|validator_id| {
+                if *validator_id != excluded_validator {
+                    api_sandbox.post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                        .unwrap();
+                }
+            })
+            .map(|validator_id| {
+                if validator_id == excluded_validator {
+                    ZEROVOTE.clone()
+                } else {
+                    let (pub_key, sec_key) = (api_sandbox.sandbox.p(validator_id),
+                                              api_sandbox.sandbox.s(validator_id).clone());
+                    TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key)
+                }
+            })
+            .collect::<Vec<_>>();
+        api_sandbox.commit();
+        votes
+    };
+    let expected_body = {
+        let expected_hash = {
+            let db = MemoryDB::new();
+            let hashes: MerkleTable<MemoryDB, u64, TxConfigVote> = MerkleTable::new(db);
+            hashes.extend(votes).unwrap();
+            hashes.root_hash().unwrap()
+        };
+        let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
+                                  api_sandbox.sandbox.s(proposer).clone());
+        let expected_propose =
+            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+        let expected_voting_data =
+            StorageDataConfigPropose::new(expected_propose,
+                                          &expected_hash,
+                                          api_sandbox.sandbox.n_validators() as u64);
+        ApiResponseConfigInfo {
+            committed_config: Some(following_cfg.clone()),
+            propose: Some(expected_voting_data),
+        }
+    };
+
+    let resp_config_by_hash = api_sandbox.get_config_by_hash(following_cfg.hash()).unwrap();
+    let actual_body = response_body(resp_config_by_hash);
+    assert_eq!(actual_body, expected_body.to_json());
+}
+
+#[test]
+fn test_get_config_votes() {
+    let _ = init_logger();
+    let api_sandbox = ConfigurationApiSandbox::new();
+    let mut rng = thread_rng();
+    let initial_cfg = api_sandbox.sandbox.cfg();
+
+    let string_len = rng.gen_range(20u8, 255u8);
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let following_cfg =
+        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+
+    let expected_body = ApiResponseVotesInfo::ProposeAbsent(None);
+    let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
+    let actual_body = response_body(resp_config_votes);
+    assert_eq!(actual_body, expected_body.to_json());
+
+    let proposer = 0;
+    {
+        api_sandbox.post_config_propose(proposer, following_cfg.clone()).unwrap();
+        api_sandbox.commit();
+    }
+    let votes = {
+        let n_validators = api_sandbox.sandbox.n_validators();
+        let excluded_validator = 2;
+        let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
+            .inspect(|validator_id| {
+                if *validator_id != excluded_validator {
+                    api_sandbox.post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                        .unwrap();
+                }
+            })
+            .map(|validator_id| {
+                if validator_id == excluded_validator {
+                    None
+                } else {
+                    let (pub_key, sec_key) = (api_sandbox.sandbox.p(validator_id),
+                                              api_sandbox.sandbox.s(validator_id).clone());
+                    Some(TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key))
+                }
+            })
+            .collect::<Vec<_>>();
+        api_sandbox.commit();
+        votes
+    };
+    let expected_body = ApiResponseVotesInfo::Votes(votes);
+
+    let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
+    let actual_body = response_body(resp_config_votes);
+    assert_eq!(actual_body, expected_body.to_json());
+}
+
+#[test]
+fn test_post_propose_response() {
+    let _ = init_logger();
+    let api_sandbox = ConfigurationApiSandbox::new();
+    let mut rng = thread_rng();
+    let initial_cfg = api_sandbox.sandbox.cfg();
+
+    let string_len = rng.gen_range(20u8, 255u8);
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let following_cfg =
+        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+    let proposer = 0;
+    let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
+                              api_sandbox.sandbox.s(proposer).clone());
+    let expected_body = {
+        let propose_tx =
+            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+        ApiResponseProposePost {
+            tx_hash: Message::hash(&propose_tx),
+            cfg_hash: following_cfg.hash(),
+        }
+    };
+
+    let resp_config_post = api_sandbox.post_config_propose(proposer, following_cfg.clone())
+        .unwrap();
+    let actual_body = response_body(resp_config_post);
+    assert_eq!(actual_body, expected_body.to_json());
+}
+
+#[test]
+fn test_post_vote_response() {
+    let _ = init_logger();
+    let api_sandbox = ConfigurationApiSandbox::new();
+    let initial_cfg = api_sandbox.sandbox.cfg();
+
+    let following_cfg = generate_config_with_message(initial_cfg.hash(),
+                                                     10,
+                                                     "config which is voted for",
+                                                     &api_sandbox.sandbox);
+    let voter = 0;
+    let (pub_key, sec_key) = (api_sandbox.sandbox.p(voter), api_sandbox.sandbox.s(voter).clone());
+    let expected_body = {
+        let vote_tx = TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key);
+        ApiResponseVotePost { tx_hash: Message::hash(&vote_tx) }
+    };
+
+    let resp_config_post = api_sandbox.post_config_vote(voter, following_cfg.hash(), voter)
+        .unwrap();
+    let actual_body = response_body(resp_config_post);
     assert_eq!(actual_body, expected_body.to_json());
 }
 
@@ -204,6 +519,3 @@ fn assert_response_status(response: IronResult<Response>,
         _ => unreachable!(), 
     }
 }
-
-
-
