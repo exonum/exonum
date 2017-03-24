@@ -74,7 +74,13 @@ Backend returns wallet info in block with precommits.
 
 Here the list of necessary steps:
 
-1) Block can be verified with Exonum client using `Exonum.verifyBlock` method.
+1) Block can be verified with Exonum client:
+
+```javascript
+Exonum.verifyBlock(data.block_info, validators);
+```
+
+`validators` is the array of validators.
 
 2) Wallets table hash can be found at `wallet.mpt_proof` Merkle Patricia tree. Key for value is generated using `service_id` and `table_index`:
 
