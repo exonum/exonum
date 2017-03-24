@@ -41,15 +41,17 @@ pub struct ApiResponseVotePost {
 }
 
 #[derive(Clone)]
-pub struct ConfigApi<T: TransactionSend + Clone> {
-    pub blockchain: Blockchain,
+pub struct PrivateConfigApi<T: TransactionSend + Clone> {
     pub channel: T,
     pub config: (PublicKey, SecretKey),
 }
 
-impl<T> ConfigApi<T>
-    where T: TransactionSend + Clone
-{
+#[derive(Clone)]
+pub struct PublicConfigApi {
+    pub blockchain: Blockchain,
+}
+
+impl PublicConfigApi {
     fn get_actual_config(&self) -> Result<ApiResponseConfigHashInfo, ApiError> {
         let actual_cfg = Schema::new(&self.blockchain.view()).get_actual_configuration()?;
         let res = ApiResponseConfigHashInfo {
@@ -84,6 +86,21 @@ impl<T> ConfigApi<T>
         Ok(res)
     }
 
+
+    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> Result<ApiResponseVotesInfo, ApiError> {
+        let view = self.blockchain.view();
+        let configuration_schema = ConfigurationSchema::new(&view);
+        let res = match configuration_schema.config_data().get(cfg_hash)? {
+            None => ApiResponseVotesInfo::ProposeAbsent(None), 
+            Some(_) => ApiResponseVotesInfo::Votes(configuration_schema.get_votes(cfg_hash)?),
+        };
+        Ok(res)
+    }
+}
+
+impl<T> PrivateConfigApi<T>
+    where T: TransactionSend + Clone
+{
     fn put_config_propose(&self,
                           cfg: StoredConfiguration)
                           -> Result<ApiResponseProposePost, ApiError> {
@@ -107,20 +124,9 @@ impl<T> ConfigApi<T>
         let res = ApiResponseVotePost { tx_hash: tx_hash };
         Ok(res)
     }
-
-    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> Result<ApiResponseVotesInfo, ApiError> {
-        let view = self.blockchain.view();
-        let configuration_schema = ConfigurationSchema::new(&view);
-        let res = match configuration_schema.config_data().get(cfg_hash)? {
-            None => ApiResponseVotesInfo::ProposeAbsent(None), 
-            Some(_) => ApiResponseVotesInfo::Votes(configuration_schema.get_votes(cfg_hash)?),
-        };
-        Ok(res)
-    }
 }
 
-impl<T> Api for ConfigApi<T>
-    where T: 'static + TransactionSend + Clone
+impl Api for PublicConfigApi
 {
     fn wire(&self, router: &mut Router) {
 
@@ -150,6 +156,34 @@ impl<T> Api for ConfigApi<T>
         };
 
         let _self = self.clone();
+        let get_votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
+            let params = req.extensions.get::<Router>().unwrap();
+            match params.find("hash") {
+                Some(hash_str) => {
+                    let propose_cfg_hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
+                    let info = _self.get_votes_for_propose(&propose_cfg_hash)?;
+                    _self.ok_response(&info.to_json())
+                } 
+                None => return Err(ApiError::IncorrectRequest)?, 
+            }
+        };
+        router.get("/api/v1/config/actual", config_actual, "config_actual");
+        router.get("/api/v1/config/following",
+                   config_following,
+                   "config_following");
+        router.get("/api/v1/configs/:hash", config_by_hash, "config_by_hash");
+        router.get("/api/v1/configs/:hash/votes",
+                   get_votes_for_propose,
+                   "get_votes_for_propose");
+
+    }
+}
+
+impl<T> Api for PrivateConfigApi<T>
+    where T: 'static + TransactionSend + Clone
+{
+    fn wire(&self, router: &mut Router) {
+        let _self = self.clone();
         let put_config_propose = move |req: &mut Request| -> IronResult<Response> {
             match req.get::<bodyparser::Struct<StoredConfiguration>>() {
                 Ok(Some(cfg)) => {
@@ -176,28 +210,6 @@ impl<T> Api for ConfigApi<T>
                 None => return Err(ApiError::IncorrectRequest)?, 
             }
         };
-
-        let _self = self.clone();
-        let get_votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("hash") {
-                Some(hash_str) => {
-                    let propose_cfg_hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
-                    let info = _self.get_votes_for_propose(&propose_cfg_hash)?;
-                    _self.ok_response(&info.to_json())
-                } 
-                None => return Err(ApiError::IncorrectRequest)?, 
-            }
-        };
-        router.get("/api/v1/config/actual", config_actual, "config_actual");
-        router.get("/api/v1/config/following",
-                   config_following,
-                   "config_following");
-        router.get("/api/v1/configs/:hash", config_by_hash, "config_by_hash");
-        router.get("/api/v1/configs/:hash/votes",
-                   get_votes_for_propose,
-                   "get_votes_for_propose");
-
         router.post("/api/v1/configs/postpropose",
                     put_config_propose,
                     "put_config_propose");

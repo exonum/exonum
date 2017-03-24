@@ -25,8 +25,9 @@ use exonum::events::Error as EventsError;
 use exonum::messages::{FromRaw, Message, RawMessage};
 use configuration_service::{StorageDataConfigPropose, ConfigTx, TxConfigPropose, TxConfigVote,
                             ConfigurationService, ZEROVOTE};
-use configuration_service::config_api::{ApiResponseConfigInfo, ApiResponseConfigHashInfo,
-                                        ConfigApi, ApiResponseVotesInfo, ApiResponseProposePost,
+use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, 
+                                        ApiResponseConfigInfo, ApiResponseConfigHashInfo,
+                                        ApiResponseVotesInfo, ApiResponseProposePost,
                                         ApiResponseVotePost};
 
 use blockchain_explorer::api::Api;
@@ -126,13 +127,16 @@ impl ConfigurationApiSandbox {
         let channel = TestTxSender { transactions: self.transactions.clone() };
         let blockchain = self.sandbox.blockchain_ref().clone();
         let keypair = (self.sandbox.p(validator_id), self.sandbox.s(validator_id).clone());
-        let api = ConfigApi {
+        let pub_api = PublicConfigApi {
+            blockchain: blockchain.clone(),
+        };
+        let priv_api = PrivateConfigApi {
             channel: channel,
-            blockchain: blockchain,
             config: keypair,
         };
         let mut router = Router::new();
-        api.wire(&mut router);
+        pub_api.wire(&mut router);
+        priv_api.wire(&mut router);
         router
     }
 
