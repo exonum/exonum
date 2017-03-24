@@ -46,12 +46,14 @@ Then transaction data is signed:
 
 ```
 var seed = Exonum.randomUint64();
+
 var data = {
     from: ...,
     to: ...,
     amount: ...,
     seed: seed
 };
+
 var signature = TransferTransaction.sign(data, secretKey);
 ```
 
@@ -68,12 +70,56 @@ Finally, signed data and signature are submitted to server:
 
 #### Get wallet
 
-1. Verify block
+Backend returns wallet info in block with precommits.
 
-2. wallets table hash from merklePatricia tree
+Here the list of necessary steps:
 
-3. wallet data from wallets merklePatricia tree
+1) Block can be verified with Exonum client using `Exonum.verifyBlock` method.
 
-4. hashes of all transactions from merkle tree
+2) Wallets table hash can be found at `wallet.mpt_proof` Merkle Patricia tree. Key for value is generated using `service_id` and `table_index`:
 
-5. each hash is verified to make sure it match to transaction from array
+```javascript
+var TableKey = Exonum.newType({
+    size: 4,
+    fields: {
+        service_id: {type: Exonum.Uint16, size: 2, from: 0, to: 2},
+        table_index: {type: Exonum.Uint16, size: 2, from: 2, to: 4}
+    }
+});
+
+var tableKeyData = {
+    service_id: serviceId,
+    table_index: 0
+};
+
+var tableKey = TableKey.hash(tableKeyData);
+
+var walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey);
+```
+
+3) Wallet's data can be found at `wallet.value` Merkle Patricia tree. Wallets table hash from previous step is used as key.
+
+```
+var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
+```
+
+`publicKey` is the public key of wallet;
+
+`Wallet` is the custom type:
+
+```javascript
+var Wallet = Exonum.newType({
+    size: 88,
+    fields: {
+        pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+        name: {type: Exonum.String, size: 8, from: 32, to: 40},
+        balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
+        history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
+        history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
+    }
+});
+```
+
+4) Hashes of all transactions can be found at `wallet_history.mt_proof` Merkle tree.
+
+5) List of all transactions can be found at  `wallet.values`. Each transaction can be compared with hash from previous step.
