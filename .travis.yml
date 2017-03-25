@@ -11,15 +11,11 @@ install:
 script:
   - cargo rustc --manifest-path exonum/Cargo.toml --features clippy -- -D warnings
   - cargo rustc --manifest-path blockchain_explorer/Cargo.toml --lib -- -D warnings
-  - cargo build --manifest-path cryptocurrency/Cargo.toml
-  - cargo build --manifest-path timestamping/Cargo.toml --lib
   - cargo build --manifest-path sandbox/Cargo.toml
   - cargo build --release --manifest-path blockchain_explorer/Cargo.toml
-  - cargo build --release --manifest-path cryptocurrency/Cargo.toml
 #  - cargo test --all # disabled until the issue #3620 will be fixed   
   - cargo test --manifest-path exonum/Cargo.toml   
   - cargo test --manifest-path blockchain_explorer/Cargo.toml    
   - cargo test --manifest-path sandbox/Cargo.toml   
   - cargo test --manifest-path services/configuration/Cargo.toml   
   - cargo test --manifest-path services/propose_timeout_adjuster/Cargo.toml
-  
