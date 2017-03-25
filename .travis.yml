@@ -22,3 +22,4 @@ script:
   - cargo test --manifest-path sandbox/Cargo.toml   
   - cargo test --manifest-path services/configuration/Cargo.toml   
   - cargo test --manifest-path services/propose_timeout_adjuster/Cargo.toml
+  
