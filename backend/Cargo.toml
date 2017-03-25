@@ -23,10 +23,10 @@ serde_json = "0.8"
 colored = "1.3"
 
 [dependencies.exonum]
-git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "c208192b"
+git = "ssh://git@github.com/exonum/exonum-core.git"
+version = "0.1.0"
 
 [dependencies.blockchain_explorer]
-git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "c208192b"
+git = "ssh://git@github.com/exonum/exonum-core.git"
+version = "0.1.0"
 
