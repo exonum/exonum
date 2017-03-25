@@ -1,0 +1,12 @@
+sudo: required
+dist: trusty
+install:
+  - curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly-2017-01-08 -y
+  - source $HOME/.cargo/env
+  - rustc --version
+  - cargo --version
+  - sudo apt-get -qq update
+  - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+script:
+  - cargo build --release --verbose
+  - cargo test --release --verbose
