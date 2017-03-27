@@ -22,11 +22,101 @@ Frontend is a lightweight single page application implemented on [riotjs](https:
 
 Application is served by Node.js and communicates directly with backends REST api and uses Exonum client to convert data into appropriate format and parse it into JSON.
 
+All business logic is can be found in the file `cryptocurrency.js`.
+
 #### Submit transaction
 
-To create transaction the new entity of `newMessage` type should be declared.
+To create transaction of each type you need to declare the new entity of `newMessage` type.
 
-Here is example of how transfer transaction is declared:
+##### Create a new wallet transaction
+
+Here is an example of how `create a new wallet` transaction is declared:
+
+```
+var CreateWalletTransaction = {
+    size: 40,
+    service_id: 128,
+    message_id: 130,
+    fields: {
+        pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+        name: {type: Exonum.String, size: 8, from: 32, to: 40}
+    }
+};
+```
+
+Then new random pair of publicKey and secretKey is generated:
+
+```javascript
+var pair = Exonum.keyPair(); 
+```
+
+Then transaction data can be signed:
+
+```
+var data = {
+    pub_key: pair.publicKey,
+    name: ...
+};
+
+var signature = CreateWalletTransaction.sign(data, pair.secretKey);
+```
+
+Finally, signed data and signature can be submitted to server:
+
+```
+{
+    service_id: 128,
+    message_id: 130,
+    body: data,
+    signature: signature
+}
+```
+
+##### Add funds transaction
+
+Here is an example of how `add funds` transaction is declared:
+
+```
+var AddFundsTransaction = {
+    size: 48,
+    service_id: 128,
+    message_id: 129,
+    fields: {
+        wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+        amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
+        seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
+    }
+};
+```
+
+Then transaction data can be signed:
+
+```
+var seed = Exonum.randomUint64();
+
+var data = {
+    wallet: ...,
+    amount: ...,
+    seed: seed
+};
+
+var signature = TransferTransaction.sign(data, secretKey);
+```
+
+Finally, signed data and signature can be submitted to server:
+
+```
+{
+    service_id: 128,
+    message_id: 129,
+    body: data,
+    signature: signature
+}
+```
+
+##### Transfer transaction
+
+Here is an example of how `transfer` transaction is declared:
 
 ```
 var TransferTransaction = {
@@ -42,7 +132,7 @@ var TransferTransaction = {
 };
 ```
 
-Then transaction data is signed:
+Then transaction data can be signed:
 
 ```
 var seed = Exonum.randomUint64();
@@ -57,7 +147,7 @@ var data = {
 var signature = TransferTransaction.sign(data, secretKey);
 ```
 
-Finally, signed data and signature are submitted to server:
+Finally, signed data and signature can be submitted to server:
 
 ```
 {
@@ -70,11 +160,11 @@ Finally, signed data and signature are submitted to server:
 
 #### Get wallet
 
-Backend returns wallet info in block with precommits.
+Backend returns wallet info as a block with precommits.
 
-Here the list of necessary steps:
+Here the list of a necessary steps:
 
-1) Block can be verified with Exonum client:
+1) Verify block:
 
 ```javascript
 Exonum.verifyBlock(data.block_info, validators);
@@ -82,7 +172,7 @@ Exonum.verifyBlock(data.block_info, validators);
 
 `validators` is the array of validators.
 
-2) Wallets table hash can be found at `wallet.mpt_proof` Merkle Patricia tree. Key for value is generated using `service_id` and `table_index`:
+2) Find wallets table hash at Merkle Patricia tree stored in `wallet.mpt_proof`. Key of this value is generated using `service_id` and `table_index`:
 
 ```javascript
 var TableKey = Exonum.newType({
@@ -103,7 +193,7 @@ var tableKey = TableKey.hash(tableKeyData);
 var walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey);
 ```
 
-3) Wallet's data can be found at `wallet.value` Merkle Patricia tree. Wallets table hash from previous step is used as key.
+3) Find wallet's data at Merkle Patricia tree stored in `wallet.value`. Wallets table hash from previous step is used as key.
 
 ```
 var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
@@ -126,6 +216,8 @@ var Wallet = Exonum.newType({
 });
 ```
 
-4) Hashes of all transactions can be found at `wallet_history.mt_proof` Merkle tree.
+4) Find hashes of all transactions at Merkle tree in `wallet_history.mt_proof`.
 
-5) List of all transactions can be found at  `wallet.values`. Each transaction can be compared with hash from previous step.
+5) Find list of all transactions at array stored in `wallet.values`. Each transaction comparing with hash from previous step.
+
+The steps from above guarantees all wallet info reliability and consistency.
