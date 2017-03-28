@@ -32,7 +32,7 @@ To create transaction of each type you need to declare the new entity of `newMes
 
 Here is an example of how `create a new wallet` transaction is declared:
 
-```
+```javascript
 var CreateWalletTransaction = {
     size: 40,
     service_id: 128,
@@ -52,7 +52,7 @@ var pair = Exonum.keyPair();
 
 Then transaction data can be signed:
 
-```
+```javascript
 var data = {
     pub_key: pair.publicKey,
     name: ...
@@ -63,20 +63,27 @@ var signature = CreateWalletTransaction.sign(data, pair.secretKey);
 
 Finally, signed data and signature can be submitted to server:
 
-```
-{
-    service_id: 128,
-    message_id: 130,
-    body: data,
-    signature: signature
-}
+```javascript
+$.ajax({
+    method: 'POST',
+    url: '...',
+    contentType: 'application/json',
+    data: JSON.stringify({
+        service_id: 128,
+        message_id: 130,
+        body: data,
+        signature: signature
+    }),
+    success: ...,
+    error: ...
+});
 ```
 
 ##### Add funds transaction
 
 Here is an example of how `add funds` transaction is declared:
 
-```
+```javascript
 var AddFundsTransaction = {
     size: 48,
     service_id: 128,
@@ -91,7 +98,7 @@ var AddFundsTransaction = {
 
 Then transaction data can be signed:
 
-```
+```javascript
 var seed = Exonum.randomUint64();
 
 var data = {
@@ -105,20 +112,27 @@ var signature = TransferTransaction.sign(data, secretKey);
 
 Finally, signed data and signature can be submitted to server:
 
-```
-{
-    service_id: 128,
-    message_id: 129,
-    body: data,
-    signature: signature
-}
+```javascript
+$.ajax({
+    method: 'POST',
+    url: '...',
+    contentType: 'application/json',
+    data: JSON.stringify({
+        service_id: 128,
+        message_id: 129,
+        body: data,
+        signature: signature
+    }),
+    success: ...,
+    error: ...
+});
 ```
 
 ##### Transfer transaction
 
 Here is an example of how `transfer` transaction is declared:
 
-```
+```javascript
 var TransferTransaction = {
     size: 80,
     service_id: 128,
@@ -134,7 +148,7 @@ var TransferTransaction = {
 
 Then transaction data can be signed:
 
-```
+```javascript
 var seed = Exonum.randomUint64();
 
 var data = {
@@ -149,20 +163,44 @@ var signature = TransferTransaction.sign(data, secretKey);
 
 Finally, signed data and signature can be submitted to server:
 
-```
-{
-    service_id: 128,
-    message_id: 128,
-    body: data,
-    signature: signature
-}
+```javascript
+$.ajax({
+    method: 'POST',
+    url: '...',
+    contentType: 'application/json',
+    data: JSON.stringify({
+        service_id: 128,
+        message_id: 128,
+        body: data,
+        signature: signature
+    }),
+    success: ...,
+    error: ...
+});
 ```
 
 #### Get wallet
 
-Backend returns wallet info as a block with precommits.
+Wallet data is encoded inside next structure:
 
-Here the list of a necessary steps:
+```json
+{
+    "block_info": {
+        "block": {...},
+        "precommits": [...]
+    },
+    "wallet": {
+        "mpt_proof": {...},
+        "value": {...}
+    },
+    "wallet_history": {
+        "mt_proof": {...},
+        "values": [...]
+    }
+}
+```
+
+Here the list of a necessary steps to get wallet data:
 
 1) Verify block:
 
@@ -195,7 +233,7 @@ var walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, d
 
 3) Find wallet's data at Merkle Patricia tree stored in `wallet.value`. Wallets table hash from previous step is used as key.
 
-```
+```javascript
 var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
 ```
 
@@ -218,6 +256,28 @@ var Wallet = Exonum.newType({
 
 4) Find hashes of all transactions at Merkle tree in `wallet_history.mt_proof`.
 
-5) Find list of all transactions at array stored in `wallet.values`. Each transaction comparing with hash from previous step.
+```javascript
+var hashes = Exonum.merkleProof(wallet.history_hash, wallet.history_len, data.wallet_history.mt_proof, [0, wallet.history_len]);
+```
+
+5) Validate each transaction and its hash, append hash to transaction data.
+
+```javascript
+var transactions = [];
+for (var i in hashes) {
+    if (!hashes.hasOwnProperty(i)) {
+        continue;
+    }
+
+    if (!validateTransaction(data.wallet_history.values[i], hashes[i])) {
+        return undefined;
+    }
+
+    var transaction = data.wallet_history.values[i];
+    transaction.hash = hashes[i];
+
+    transactions.push(transaction);
+}
+```
 
 The steps from above guarantees all wallet info reliability and consistency.
