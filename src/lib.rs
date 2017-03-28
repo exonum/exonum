@@ -1,3 +1,109 @@
+//! # Introduction
+//!
+//!
+//! # Examples
+//!
+//! Run testnet in a single process (2 threads per node: 1 - for exonum node and 1 - for http listener)
+//!
+//! ```rust,no_run
+//! extern crate iron;
+//! extern crate tempdir;
+//! extern crate router;
+//! extern crate exonum;
+//! extern crate blockchain_explorer;
+//! extern crate configuration_service;
+//! 
+//! use std::thread;
+//! 
+//! use std::net::SocketAddr;
+//! use tempdir::TempDir;
+//! use router::Router;
+//! 
+//! use exonum::blockchain::Blockchain;
+//! use exonum::node::Node;
+//! use exonum::storage::{LevelDB, LevelDBOptions};
+//! use blockchain_explorer::api::Api;
+//! use blockchain_explorer::helpers::generate_testnet_config;
+//! use configuration_service::{ConfigurationService};
+//! use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi};
+//! 
+//! fn main() {
+//!     // Init crypto engine and pretty logger.
+//!     exonum::crypto::init();
+//!     blockchain_explorer::helpers::init_logger().unwrap();
+//! 
+//!     // Blockchain params
+//!     let count = 4;
+//!     // Inner exonum network start port (4000, 4001, 4002, ..)
+//!     let start_port = 4000;
+//!     // External http api port (8000, 8001, 8002, ...)
+//!     let api_port = 8000; 
+//!     let tmpdir_handle = TempDir::new("exonum_configuration").unwrap();
+//!     let destdir = tmpdir_handle.path();
+//! 
+//!     // Generate blockchain configuration
+//!     let node_cfgs = generate_testnet_config(count, start_port);
+//! 
+//!     // Create testnet threads
+//!     let node_threads = {
+//!         let mut node_threads = Vec::new();
+//!         for idx in 0..count as usize {
+//!             // Create configuration service for node[idx]
+//!             let service = ConfigurationService::new();
+//!             // Create database for node[idx]
+//!             let db = {
+//!                 let mut options = LevelDBOptions::new();
+//!                 let path = destdir.join(idx.to_string());
+//!                 options.create_if_missing = true;
+//!                 LevelDB::new(&path, options).expect("Unable to create database")
+//!             };
+//!             // Create node[idx]
+//!             let blockchain = Blockchain::new(db, vec![Box::new(service)]);
+//!             let mut node = Node::new(blockchain.clone(), node_cfgs[idx].clone());
+//!             let channel_clone = node.channel().clone();
+//!             let node_thread = thread::spawn(move || {
+//!                                                 // Run it in separate thread
+//!                                                 node.run().expect("Unable to run node");
+//!                                             });
+//!             node_threads.push(node_thread);
+//! 
+//!             let node_cfg = node_cfgs[idx].clone();
+//!             // Create node api thread
+//!             let api_thread = thread::spawn(move || {
+//! 
+//!                 let private_config_api = PrivateConfigApi {
+//!                     channel: channel_clone,
+//!                     config: (node_cfg.public_key, node_cfg.secret_key),
+//!                 };
+//! 
+//!                 let public_config_api = PublicConfigApi {
+//!                     blockchain: blockchain,
+//!                 };
+//! 
+//!                 let listen_address: SocketAddr =
+//!                     format!("127.0.0.1:{}", api_port+idx).parse().unwrap();
+//! 
+//!                 let mut router = Router::new();
+//!                 private_config_api.wire(&mut router);
+//!                 public_config_api.wire(&mut router);
+//!                 let chain = iron::Chain::new(router);
+//!                 iron::Iron::new(chain).http(listen_address).unwrap();
+//!             });
+//! 
+//!             node_threads.push(api_thread);
+//!         }
+//!         node_threads
+//!     };
+//! 
+//!     for node_thread in node_threads {
+//!         node_thread.join().unwrap();
+//!     }
+//! }
+//! ```
+//!
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+
 #[macro_use]
 extern crate exonum;
 extern crate blockchain_explorer;
@@ -42,8 +148,8 @@ storage_value! {
     StorageDataConfigPropose {
         const SIZE = 48;
 
-        tx_propose:            TxConfigPropose   [00 => 08]
-        votes_history_hash:    &Hash             [08 => 40]
+        tx_propose:            TxConfigPropose   [00 => 8]
+        votes_history_hash:    &Hash             [8 => 40]
         num_votes:             u64               [40 => 48]
     }
 }
@@ -262,13 +368,13 @@ impl<'a> ConfigurationSchema<'a> {
     fn config_data
         (&self)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StorageDataConfigPropose> {
-        MerklePatriciaTable::new(MapTable::new(vec![04], self.view))
+        MerklePatriciaTable::new(MapTable::new(vec![4], self.view))
     }
     /// mapping validator_id -> TxConfigVote
     fn config_votes(&self,
                     config_hash: &Hash)
                     -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, TxConfigVote> {
-        let mut prefix = vec![05; 1 + HASH_SIZE];
+        let mut prefix = vec![5; 1 + HASH_SIZE];
         prefix[1..].copy_from_slice(config_hash.as_ref());
         MerkleTable::new(MapTable::new(prefix, self.view))
     }
@@ -477,7 +583,7 @@ impl TxConfigVote {
         let mut votes_count = 0;
 
         for vote_option in config_schema.get_votes(self.cfg_hash())? {
-            if let Some(_) = vote_option {
+            if vote_option.is_some() {
                 votes_count += 1;
             }
         }
