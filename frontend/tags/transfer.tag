@@ -16,7 +16,7 @@
         <form onsubmit={ submit }>
             <div class="form-group">
                 <label class="control-label">Receiver:</label>
-                <select id="receiver" class="form-control">
+                <select id="receiver" class="form-control" disabled="{ users.length < 2 }">
                     <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
                 </select>
             </div>

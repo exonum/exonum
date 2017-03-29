@@ -134,7 +134,7 @@
                 },
 
                 getUser: function(publicKey) {
-                    var users = JSON.parse(window.localStorage.getItem('users')) || [];
+                    var users = JSON.parse(window.localStorage.getItem('cc_users')) || [];
                     for (var i = 0; i < users.length; i++) {
                         if (users[i].publicKey === publicKey) {
                             return users[i];
