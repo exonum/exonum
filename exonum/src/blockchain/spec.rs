@@ -20,10 +20,12 @@ macro_rules! storage_value {
                 $crate::messages::Field::write(&self.raw, buffer, from, to);
             }
 
-            fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), $crate::messages::Error> {
+            fn check(buffer: &'a [u8], from_st_val: usize, to_st_val: usize) -> Result<(), $crate::messages::Error> {
 
-                let raw_message: $crate::messages::RawMessage = $crate::messages::Field::read(buffer, from, to);
-                $(raw_message.check::<$field_type>($from, $to)?;)*
+                <Vec<u8> as $crate::messages::Field>::check(buffer, from_st_val, to_st_val)?;
+                let vec: Vec<u8> = $crate::messages::Field::read(buffer, from_st_val, to_st_val);
+                $( <$field_type as $crate::messages::Field>::check(&vec, $from, $to)?;)*
+                //$(raw_message.check::<$field_type>($from, $to)?;)*
                 Ok(())
             }
 
