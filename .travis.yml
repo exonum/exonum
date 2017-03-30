@@ -1,0 +1,19 @@
+sudo: required
+dist: trusty
+install:
+  - curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly-2017-01-08 -y
+  - source $HOME/.cargo/env
+  - rustc --version
+  - cargo --version
+  - sudo add-apt-repository -y ppa:chris-lea/libsodium
+  - sudo apt-get -qq update
+  - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+script:
+  - cargo rustc --manifest-path exonum/Cargo.toml --features clippy -- -D warnings
+  - cargo rustc --manifest-path blockchain_explorer/Cargo.toml --lib -- -D warnings
+  - cargo build --manifest-path sandbox/Cargo.toml
+  - cargo build --release --manifest-path blockchain_explorer/Cargo.toml
+#  - cargo test --all # disabled until the issue #3620 will be fixed   
+  - cargo test --manifest-path exonum/Cargo.toml   
+  - cargo test --manifest-path blockchain_explorer/Cargo.toml    
+  - cargo test --manifest-path sandbox/Cargo.toml   
