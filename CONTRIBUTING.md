@@ -1,10 +1,10 @@
 # Contributing to Exonum Core
 
-This contribution guide is quite similar to [Bitcoin Contribution Guide](https://github.com/bitcoin/bitcoin/blob/master/CONTRIBUTING.md)
+This contribution guide is partially derived from [Bitcoin Contribution Guide](https://github.com/bitcoin/bitcoin/blob/master/CONTRIBUTING.md)
 
-The Exonum Core project and its' separate modules operate an open contributor model where anyone is welcome to contribute towards development in the form of peer review, testing and patches. This document explains the practical process and guidelines for contributing. The guidelines are the same to other Exonum repositories.
+The Exonum Core project and its separate modules operate an open contributor model where anyone is welcome to contribute towards development in the form of peer review, testing and patches. This document explains the practical process and guidelines for contributing. The guidelines are the same for other Exonum repositories.
 
-Firstly in terms of structure, there is no particular concept of "Core developers" in the sense of privileged people. However, there're several people, who work in Exonum project team. Open source often naturally revolves around meritocracy where longer term contributors gain more trust from the developer community. However, some hierarchy is necessary for practical purposes. As such there are repository "maintainers" who are responsible for merging pull requests as well as a "lead maintainer" who is responsible for the release cycle, overall merging, moderation and appointment of maintainers.
+Firstly in terms of structure, there is no particular concept of "Core developers" in the sense of privileged people. Open source often naturally revolves around meritocracy where longer term contributors gain more trust from the developer community. However, some hierarchy is necessary for practical purposes. As such there are repository "maintainers" who are responsible for merging pull requests as well as a "lead maintainer" who is responsible for the release cycle, overall merging, moderation and appointment of maintainers.
 
 ## Contributor Workflow
 
