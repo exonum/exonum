@@ -23,7 +23,7 @@ use exonum::crypto::Hash;
 use exonum::blockchain::{Service, Transaction};
 use exonum::events::Error as EventsError;
 use exonum::messages::{FromRaw, Message, RawMessage};
-use configuration_service::{StorageDataConfigPropose, ConfigTx, TxConfigPropose, TxConfigVote,
+use configuration_service::{StorageValueConfigProposeData, ConfigTx, TxConfigPropose, TxConfigVote,
                             ConfigurationService, ZEROVOTE};
 use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, 
                                         ApiResponseConfigInfo, ApiResponseConfigHashInfo,
@@ -323,7 +323,7 @@ fn test_get_config_by_hash2() {
         let expected_propose =
             TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
         let expected_voting_data =
-            StorageDataConfigPropose::new(expected_propose,
+            StorageValueConfigProposeData::new(expected_propose,
                                           &expected_hash,
                                           api_sandbox.sandbox.n_validators() as u64);
         ApiResponseConfigInfo {
@@ -389,7 +389,7 @@ fn test_get_config_by_hash3() {
         let expected_propose =
             TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
         let expected_voting_data =
-            StorageDataConfigPropose::new(expected_propose,
+            StorageValueConfigProposeData::new(expected_propose,
                                           &expected_hash,
                                           api_sandbox.sandbox.n_validators() as u64);
         ApiResponseConfigInfo {

@@ -5,7 +5,7 @@ use iron::prelude::*;
 use bodyparser;
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
-use ::{StorageDataConfigPropose, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
+use ::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use exonum::storage::{Map, StorageValue};
 
 use exonum::node::{TxSender, NodeChannel, TransactionSend};
@@ -20,7 +20,7 @@ pub struct ApiResponseConfigHashInfo {
 #[derive(Serialize, Deserialize)]
 pub struct ApiResponseConfigInfo {
     pub committed_config: Option<StoredConfiguration>,
-    pub propose: Option<StorageDataConfigPropose>,
+    pub propose: Option<StorageValueConfigProposeData>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -126,8 +126,7 @@ impl<T> PrivateConfigApi<T>
     }
 }
 
-impl Api for PublicConfigApi
-{
+impl Api for PublicConfigApi {
     fn wire(&self, router: &mut Router) {
 
         let _self = self.clone();

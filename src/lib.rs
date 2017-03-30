@@ -1,9 +1,29 @@
 //! # Introduction
-//!
+//! This crate implements the standalone configuration service of `Exonum` blockchain, which, upon being plugged in, allows modifying 
+//! `Exonum` blockchain configuration by means of [propose config](struct.TxConfigPropose.html) and [vote for proposed config](struct.TxConfigVote.html) transactions, signed by validators - actual blockchain
+//! participants. 
+//! 
+//! It also contains http api implementation for public queries (get actual/following
+//! configuration, etc.) and private queries, intended for use only by validator nodes' admins (post configuration propose, post vote for a
+//! configuration propose).
+//! 
+//! `Exonum` blockchain configuration is composed of: 
+//! 
+//! - consensus algorithm parameters 
+//! - list of validators' public keys - list of identities of consensus participants
+//! - configuration of all services, plugged in for a specific blockchain instance. 
+//! 
+//! It also contains auxiliary fields: 
+//! 
+//! - actual_from - blockchain height, upon reaching which current config is to become actual. 
+//! - previous_cfg_hash - hash of previous configuration, which validators' set is allowed to cast
+//! votes for current config.
+//! 
+//! For details see [StoredConfiguration in exonum](../exonum/blockchain/config/struct.StoredConfiguration.html)
 //!
 //! # Examples
 //!
-//! Run testnet in a single process (2 threads per node: 1 - for exonum node and 1 - for http listener)
+//! Run `Exonum` blockchain testnet with single configuration service turned on for it in a single process (2 threads per node: 1 - for exonum node and 1 - for http api listener)
 //!
 //! ```rust,no_run
 //! extern crate iron;
@@ -12,13 +32,13 @@
 //! extern crate exonum;
 //! extern crate blockchain_explorer;
 //! extern crate configuration_service;
-//! 
+//!
 //! use std::thread;
-//! 
+//!
 //! use std::net::SocketAddr;
 //! use tempdir::TempDir;
 //! use router::Router;
-//! 
+//!
 //! use exonum::blockchain::Blockchain;
 //! use exonum::node::Node;
 //! use exonum::storage::{LevelDB, LevelDBOptions};
@@ -26,24 +46,24 @@
 //! use blockchain_explorer::helpers::generate_testnet_config;
 //! use configuration_service::{ConfigurationService};
 //! use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi};
-//! 
+//!
 //! fn main() {
 //!     // Init crypto engine and pretty logger.
 //!     exonum::crypto::init();
 //!     blockchain_explorer::helpers::init_logger().unwrap();
-//! 
+//!
 //!     // Blockchain params
 //!     let count = 4;
 //!     // Inner exonum network start port (4000, 4001, 4002, ..)
 //!     let start_port = 4000;
 //!     // External http api port (8000, 8001, 8002, ...)
-//!     let api_port = 8000; 
+//!     let api_port = 8000;
 //!     let tmpdir_handle = TempDir::new("exonum_configuration").unwrap();
 //!     let destdir = tmpdir_handle.path();
-//! 
+//!
 //!     // Generate blockchain configuration
 //!     let node_cfgs = generate_testnet_config(count, start_port);
-//! 
+//!
 //!     // Create testnet threads
 //!     let node_threads = {
 //!         let mut node_threads = Vec::new();
@@ -66,35 +86,35 @@
 //!                                                 node.run().expect("Unable to run node");
 //!                                             });
 //!             node_threads.push(node_thread);
-//! 
+//!
 //!             let node_cfg = node_cfgs[idx].clone();
 //!             // Create node api thread
 //!             let api_thread = thread::spawn(move || {
-//! 
+//!
 //!                 let private_config_api = PrivateConfigApi {
 //!                     channel: channel_clone,
 //!                     config: (node_cfg.public_key, node_cfg.secret_key),
 //!                 };
-//! 
+//!
 //!                 let public_config_api = PublicConfigApi {
 //!                     blockchain: blockchain,
 //!                 };
-//! 
+//!
 //!                 let listen_address: SocketAddr =
 //!                     format!("127.0.0.1:{}", api_port+idx).parse().unwrap();
-//! 
+//!
 //!                 let mut router = Router::new();
 //!                 private_config_api.wire(&mut router);
 //!                 public_config_api.wire(&mut router);
 //!                 let chain = iron::Chain::new(router);
 //!                 iron::Iron::new(chain).http(listen_address).unwrap();
 //!             });
-//! 
+//!
 //!             node_threads.push(api_thread);
 //!         }
 //!         node_threads
 //!     };
-//! 
+//!
 //!     for node_thread in node_threads {
 //!         node_thread.join().unwrap();
 //!     }
@@ -121,6 +141,7 @@ extern crate params;
 #[macro_use]
 extern crate lazy_static;
 
+/// Configuration service http api.
 pub mod config_api;
 use std::fmt;
 
@@ -130,22 +151,30 @@ use exonum::messages::Field;
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
-use exonum::messages::utils::{U64}; 
+use exonum::messages::utils::U64;
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
 use exonum::blockchain::StoredConfiguration;
 
+///Value of [service_id of ConfigurationService](struct.ConfigurationService.html#method.service_id) 
 pub const CONFIG_SERVICE: u16 = 1;
+///Value of [message_type](../exonum/messages/struct.MessageBuffer.html#method.message_type) of
+///[TxConfigPropose](struct.TxConfigPropose.html)
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
+///Value of [message_type](../exonum/messages/struct.MessageBuffer.html#method.message_type) of
+///[TxConfigVote](struct.TxConfigVote.html)
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
 
 lazy_static! {
+#[doc="
+Specific [TxConfigVote](TxConfigVote.t.html) with all bytes in message set to 0. 
+It is used as placeholder in database for votes of validators, which didn't cast votes."]
     pub static ref ZEROVOTE: TxConfigVote = TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
 }
 
 storage_value! {
-    StorageDataConfigPropose {
+    StorageValueConfigProposeData {
         const SIZE = 48;
 
         tx_propose:            TxConfigPropose   [00 => 8]
@@ -154,39 +183,54 @@ storage_value! {
     }
 }
 
-impl StorageDataConfigPropose {
+/// This structure logically contains 2 fields: 
+/// 
+/// 1 - [TxConfigPropose](TxConfigPropose.t.html) in [tx_propose](#method.tx_propose) field.
+/// 
+/// 2 - reference to [table with all validators' votes for a config propose](struct.ConfigurationSchema.html#method.config_votes), indexed by validator_id `u64` and containing values of [TxConfigVote](TxConfigVote.t.html) type. 
+/// 
+/// Length of the table is stored in [num_votes](#method.num_votes) field, which isn't changed
+/// after table initialization, because number of possible vote slots for a config is determined by
+/// number of validators in its previous config. 
+/// 
+/// Table's root hash - in [votes_history_hash](#method.votes_history_hash) field, which is
+/// modified after a vote from validator is added.
+impl StorageValueConfigProposeData {
+///Method to mutate [votes_history_hash](#method.votes_history_hash) field containing root hash of [table with all validators' votes for a config propose](struct.ConfigurationSchema.html#method.config_votes) after replacing [empty
+///vote](struct.ZEROVOTE.html) with a real [TxConfigVote](TxConfigVote.t.html) cast by a validator.
     pub fn set_history_hash(&mut self, hash: &Hash) {
         Field::write(&hash, &mut self.raw, 8, 40);
     }
 }
 
 #[derive(Serialize, Deserialize)]
-struct StorageDataConfigProposeSerdeHelper {
+struct StorageValueConfigProposeDataSerdeHelper {
     tx_propose: TxConfigPropose,
     votes_history_hash: Hash,
     num_votes: U64,
 }
 
-impl Serialize for StorageDataConfigPropose {
+impl Serialize for StorageValueConfigProposeData {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let helper = StorageDataConfigProposeSerdeHelper {
-            tx_propose: self.tx_propose(), 
-            votes_history_hash: *self.votes_history_hash(), 
-            num_votes: U64(self.num_votes()), 
+        let helper = StorageValueConfigProposeDataSerdeHelper {
+            tx_propose: self.tx_propose(),
+            votes_history_hash: *self.votes_history_hash(),
+            num_votes: U64(self.num_votes()),
         };
         helper.serialize(ser)
     }
 }
 
-impl Deserialize for StorageDataConfigPropose {
+impl Deserialize for StorageValueConfigProposeData {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
     {
-        let h = <StorageDataConfigProposeSerdeHelper>::deserialize(deserializer)?; 
+        let h = <StorageValueConfigProposeDataSerdeHelper>::deserialize(deserializer)?;
 
-        let precommit = StorageDataConfigPropose::new(h.tx_propose, &h.votes_history_hash, h.num_votes.0); 
+        let precommit =
+            StorageValueConfigProposeData::new(h.tx_propose, &h.votes_history_hash, h.num_votes.0);
         Ok(precommit)
     }
 }
@@ -365,13 +409,13 @@ impl<'a> ConfigurationSchema<'a> {
     }
 
     /// mapping hash(config) -> TxConfigPropose
-    fn config_data
+    pub fn config_data
         (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StorageDataConfigPropose> {
+         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StorageValueConfigProposeData> {
         MerklePatriciaTable::new(MapTable::new(vec![4], self.view))
     }
     /// mapping validator_id -> TxConfigVote
-    fn config_votes(&self,
+    pub fn config_votes(&self,
                     config_hash: &Hash)
                     -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, TxConfigVote> {
         let mut prefix = vec![5; 1 + HASH_SIZE];
@@ -390,7 +434,7 @@ impl<'a> ConfigurationSchema<'a> {
             votes_table.append(ZEROVOTE.clone())?;
         }
         let config_data =
-            StorageDataConfigPropose::new(tx_propose, &votes_table.root_hash()?, num_validators);
+            StorageValueConfigProposeData::new(tx_propose, &votes_table.root_hash()?, num_validators);
         let config_data_table = self.config_data();
         debug_assert!(config_data_table.get(cfg_hash).unwrap().is_none());
         config_data_table.put(cfg_hash, config_data)
