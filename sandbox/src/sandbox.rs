@@ -137,9 +137,14 @@ impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
 }
 
 impl SandboxReactor {
+
     pub fn is_leader(&self) -> bool {
-        self.handler.is_leader()
+        self.handler.state().is_leader()
     }
+
+    pub fn is_validator(&self) -> bool {
+        self.handler.state().node_type().get_validator_id().is_some()
+    }    
 
     pub fn last_block(&self) -> Result<Block, StorageError> {
         self.handler.blockchain.last_block()
@@ -337,6 +342,11 @@ impl Sandbox {
         reactor.is_leader()
     }
 
+    pub fn is_validator(&self) -> bool {
+        let reactor = self.reactor.borrow();
+        reactor.is_validator()
+    }
+    
     pub fn last_block(&self) -> Block {
         let reactor = self.reactor.borrow();
         reactor.last_block().unwrap()

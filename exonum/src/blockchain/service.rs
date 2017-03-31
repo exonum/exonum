@@ -5,6 +5,7 @@ use ::storage::{View, Error as StorageError};
 use ::messages::{Message, RawTransaction, Error as MessageError};
 use ::node::State;
 use ::events::Milliseconds;
+use ::node::state::NodeType;
 use ::blockchain::{StoredConfiguration, ConsensusConfig};
 
 pub trait Transaction: Message + 'static {
@@ -46,6 +47,10 @@ impl<'a, 'b> NodeState<'a, 'b> {
             view: view,
             txs: Vec::new(),
         }
+    }
+
+    pub fn node_type(&self) -> NodeType {
+       self.state.node_type()
     }
 
     pub fn view(&self) -> &View {
