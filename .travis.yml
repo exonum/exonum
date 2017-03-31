@@ -17,3 +17,8 @@ script:
   - cargo test --manifest-path exonum/Cargo.toml   
   - cargo test --manifest-path blockchain_explorer/Cargo.toml    
   - cargo test --manifest-path sandbox/Cargo.toml   
+notifications:
+  slack:
+    rooms:
+      secure: mPgzPDtK0I92kLIcl/s9xOLMOMhWLDUz3wro+pvfoAfHWpt8QDbni7ow2V0xgRNpJk/g3twFX9CWHNo+4qWBc1ivm30AViSqQjNspSAfJpxLi7aYzHQahv+lbd2Pvq87nSQcQoYyYFBferQTTuh05pxt+CjO3yxacBi5AUg+06MWUraMUUoVvKE+wPaoX1wZWC/Cp/3RSK77FIXZRGDVgM73JLh8uM4hTyTNCfkKIP15zFNrG/ZdLyoN5M+aq9ryk+eoML54gDk8e0u1PRNp6YUWMTzL5bgOYrxGDUD9j5guxkrQeBxuxDco/M5hsD94kLVBPWrGKjwngiES35IhadC2DbiePST2JjcOVkxXMNp96fO7qqxEIR7F+uG9IewULBA5EsgN7XIhJwlDpl82oSAjUA7XlNILCyqNlvuQTuOScPfLm2vU7HdOsZEbpDhElJZUBuGa/DDtjxbmDRkXruam7USgbQZ6/U5OR8XHdeU0uVIzVzLnhdjK8osusH5HGeGcqIvkM0WoM/1+rsQ6Xk2Bwgfdovv3R8dpi3SI0Yu6tU3KYw2zf4D0xtDkMJMc+aRSEM6d2BvOqhSR83+w/ry63hXBtpKYXst6mYq2pqfFx85vy2J0WTd330Rtm10daYc3MPqxtnNMsDyROlGObactCGvHcE8EpdzmcNy086k=
+
