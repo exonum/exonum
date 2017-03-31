@@ -1,13 +1,28 @@
+language: rust
+cache: cargo
 sudo: required
 dist: trusty
+
+before_install:
+- rustup override set nightly-2017-01-08
+- rustc --version
+- cargo --version
+- sudo add-apt-repository -y ppa:chris-lea/libsodium
+#- sudo apt-add-repository -y ppa:bitcoin/bitcoin
+- sudo apt-get -qq update
+
 install:
-  - curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly-2017-01-08 -y
-  - source $HOME/.cargo/env
-  - rustc --version
-  - cargo --version
-  - sudo add-apt-repository -y ppa:chris-lea/libsodium  
-  - sudo apt-get -qq update
-  - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+#- sudo apt-get -qq --yes install bitcoind
+
+#before_script:
+#- bitcoind -regtest -server -rpcuser=travis -rpcpassword=travis -daemon
+#- sleep 10
+#- bitcoin-cli -regtest -rpcuser=travis -rpcpassword=travis generate 200
 script:
-  - cargo build --release --verbose
-  - cargo test --release --verbose
+- cargo check --features clippy --verbose
+- cargo build --release --verbose
+#- cargo test --release --verbose
+- cargo test --manifest-path sandbox_tests/Cargo.toml --verbose
+#after_script:
+#- bitcoin-cli -regtest -rpcuser=travis -rpcpassword=travis stop

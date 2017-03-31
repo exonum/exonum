@@ -5,7 +5,7 @@ use iron::prelude::*;
 use bodyparser;
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
-use ::{StorageDataConfigPropose, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
+use ::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use exonum::storage::{Map, StorageValue};
 
 use exonum::node::{TxSender, NodeChannel, TransactionSend};
@@ -20,7 +20,7 @@ pub struct ApiResponseConfigHashInfo {
 #[derive(Serialize, Deserialize)]
 pub struct ApiResponseConfigInfo {
     pub committed_config: Option<StoredConfiguration>,
-    pub propose: Option<StorageDataConfigPropose>,
+    pub propose: Option<StorageValueConfigProposeData>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -126,8 +126,7 @@ impl<T> PrivateConfigApi<T>
     }
 }
 
-impl Api for PublicConfigApi
-{
+impl Api for PublicConfigApi {
     fn wire(&self, router: &mut Router) {
 
         let _self = self.clone();
@@ -151,7 +150,7 @@ impl Api for PublicConfigApi
                     let info = _self.get_config_by_hash(&hash)?;
                     _self.ok_response(&info.to_json())
                 } 
-                None => return Err(ApiError::IncorrectRequest)?, 
+                None => Err(ApiError::IncorrectRequest)?, 
             }
         };
 
@@ -164,7 +163,7 @@ impl Api for PublicConfigApi
                     let info = _self.get_votes_for_propose(&propose_cfg_hash)?;
                     _self.ok_response(&info.to_json())
                 } 
-                None => return Err(ApiError::IncorrectRequest)?, 
+                None => Err(ApiError::IncorrectRequest)?, 
             }
         };
         router.get("/api/v1/config/actual", config_actual, "config_actual");
@@ -207,7 +206,7 @@ impl<T> Api for PrivateConfigApi<T>
                     let info = _self.put_config_vote(&propose_cfg_hash)?;
                     _self.ok_response(&info.to_json())
                 } 
-                None => return Err(ApiError::IncorrectRequest)?, 
+                None => Err(ApiError::IncorrectRequest)?, 
             }
         };
         router.post("/api/v1/configs/postpropose",
