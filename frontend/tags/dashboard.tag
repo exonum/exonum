@@ -23,6 +23,6 @@
     </div>
 
     <script>
-        this.users = this.localStorage.getUsers();
+        this.users = this.storage.getUsers();
     </script>
 </dashboard>

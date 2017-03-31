@@ -37,18 +37,6 @@
 
         login(e) {
             e.preventDefault();
-//            var pair = self.api.cryptocurrency.keyPair();
-//            var transaction = self.api.cryptocurrency.createWalletTransaction(pair.publicKey, self.name, pair.secretKey);
-//
-//            self.api.submitTransaction.call(self, transaction, pair.publicKey, function() {
-//                self.localStorage.addUser({
-//                    name: self.name,
-//                    publicKey: pair.publicKey,
-//                    secretKey: pair.secretKey
-//                });
-//                self.notify('success', 'Wallet has been created. Login and manage the wallet.');
-//                route('/');
-//            });
         }
     </script>
 </login>

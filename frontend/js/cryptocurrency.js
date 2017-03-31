@@ -1,37 +1,15 @@
 /**
  * Business logic
  */
-function Cryptocurrency(serviceId, validators) {
+function CryptocurrencyService(params) {
 
-    var Transactions = [{
-        size: 80,
-        service_id: serviceId,
-        message_id: 128,
-        fields: {
-            from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-            amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
-            seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-        }
-    }, {
-        size: 48,
-        service_id: serviceId,
-        message_id: 129,
-        fields: {
-            wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
-            seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-        }
-    }, {
-        size: 40,
-        service_id: serviceId,
-        message_id: 130,
-        fields: {
-            pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            name: {type: Exonum.String, size: 8, from: 32, to: 40}
-        }
-    }];
-    var Wallet = Exonum.newType({
+    this.id = params.id;
+
+    this.validators = params.validators;
+
+    this.baseUrl = params.baseUrl;
+
+    this.Wallet = Exonum.newType({
         size: 88,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -42,57 +20,113 @@ function Cryptocurrency(serviceId, validators) {
         }
     });
 
-    function Transaction(messageId) {
-        for (var i in Transactions) {
-            if (!Transactions.hasOwnProperty(i)) {
-                continue;
-            } else if (Transactions[i].message_id === messageId) {
-                return Exonum.newMessage(Transactions[i]); // add signature if defined
+    this.AddFundsTransactionParams = {
+        size: 48,
+        service_id: params.id,
+        message_id: 129,
+        fields: {
+            wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
+            seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
+        }
+    };
+
+    this.CreateWalletTransactionParams = {
+        size: 40,
+        service_id: params.id,
+        message_id: 130,
+        fields: {
+            pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            name: {type: Exonum.String, size: 8, from: 32, to: 40}
+        }
+    };
+
+    this.TransferTransactionParams = {
+        size: 80,
+        service_id: params.id,
+        message_id: 128,
+        fields: {
+            from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
+            amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
+            seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
+        }
+    };
+
+    this.getTransactionTypeParams = function(id) {
+        switch (id) {
+            case 128:
+                return new Exonum.newMessage(this.TransferTransactionParams);
+                break;
+            case 129:
+                return new Exonum.newMessage(this.AddFundsTransactionParams);
+                break;
+            case 130:
+                return new Exonum.newMessage(this.CreateWalletTransactionParams);
+                break;
+        }
+    };
+
+    this.submitTransaction = function(typeParams, data, publicKey, secretKey, callback) {
+        var self = this;
+        var type = new Exonum.newMessage(typeParams);
+
+        type.signature = type.sign(data, secretKey);
+
+        var hash = type.hash(data);
+
+        function loop() {
+            self.getWallet(publicKey, function(block, wallet, transactions) {
+                if (Array.isArray(transactions)) {
+                    for (var i = 0; i < transactions.length; i++) {
+                        if (transactions[i].hash === hash) {
+                            callback();
+                            return;
+                        }
+                    }
+                }
+
+                setTimeout(loop, 1000);
+            });
+        }
+
+        $.ajax({
+            method: 'POST',
+            url: this.baseUrl + '/wallets/transaction',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                body: data,
+                message_id: type.message_id,
+                service_id: type.service_id,
+                signature: type.signature
+            }),
+            success: function(response, textStatus, jqXHR) {
+                loop();
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error(textStatus);
+            }
+        });
+    };
+
+    this.validateWallet = function(publicKey, data) {
+        function getPublicKeyOfTransaction(id, transaction) {
+            switch (id) {
+                case 128:
+                    return transaction.from;
+                    break;
+                case 129:
+                    return transaction.wallet;
+                    break;
+                case 130:
+                    return transaction.pub_key;
+                    break;
             }
         }
 
-        console.error('Invalid message_id field');
-        return;
-    }
-
-    function getPublicKeyOfTransactionOwner(transaction) {
-        switch (transaction.message_id) {
-            case 128:
-                return transaction.body.from;
-                break;
-            case 129:
-                return transaction.body.wallet;
-                break;
-            case 130:
-                return transaction.body.pub_key;
-                break;
-            default:
-                console.error('Invalid message_id field');
-                return;
-        }
-    }
-
-    function validateTransaction(transaction, hash) {
-        var type = new Transaction(transaction.message_id);
-        var publicKey = getPublicKeyOfTransactionOwner(transaction);
-
-        type.signature = transaction.signature;
-
-        if (type.hash(transaction.body) !== hash) {
-            console.error('Wrong transaction hash.');
-            return false;
-        } else if (!type.verifySignature(transaction.body, transaction.signature, publicKey)) {
-            console.error('Wrong transaction signature.');
-            return false;
-        }
-
-        return true;
-    }
-
-    function getBlock(publicKey, data) {
         // validate block
-        if (!Exonum.verifyBlock(data.block_info, validators)) {
-            return undefined;
+        if (!Exonum.verifyBlock(data.block_info, params.validators)) {
+            return;
         }
 
         // find root hash of table with wallets in the tree of all tables
@@ -104,19 +138,19 @@ function Cryptocurrency(serviceId, validators) {
             }
         });
         var tableKeyData = {
-            service_id: serviceId,
+            service_id: params.id,
             table_index: 0
         };
         var tableKey = TableKey.hash(tableKeyData);
         var walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey);
         if (walletsHash === null) {
-            return undefined;
+            return;
         }
 
         // find wallet in the tree of all wallets
-        var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
+        var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, this.Wallet);
         if (wallet === null) {
-            return null;
+            return;
         }
 
         // find hashes of all transactions
@@ -124,101 +158,123 @@ function Cryptocurrency(serviceId, validators) {
 
         if (data.wallet_history.values.length !== hashes.length) {
             console.error('Number of transaction hashes is not equal to transactions number.');
-            return undefined;
+            return;
         }
 
+        // validate each transaction
         var transactions = [];
-        for (var i in hashes) {
-            if (!hashes.hasOwnProperty(i)) {
-                continue;
-            }
-
-            if (!validateTransaction(data.wallet_history.values[i], hashes[i])) {
-                return undefined;
-            }
-
+        for (var i = 0; i < data.wallet_history.values.length; i++) {
             var transaction = data.wallet_history.values[i];
-            transaction.hash = hashes[i];
+            var type = this.getTransactionTypeParams(transaction.message_id);
+            var publicKey = getPublicKeyOfTransaction(transaction.message_id, transaction.body);
+            
+            type.signature = transaction.signature;
+            transaction.hash = type.hash(transaction.body);
+            if (transaction.hash !== hashes[i]) {
+                console.error('Wrong transaction hash.');
+                return;
+            } else if (!type.verifySignature(transaction.body, transaction.signature, publicKey)) {
+                console.error('Wrong transaction signature.');
+                return;
+            }
 
             transactions.push(transaction);
         }
 
-        return {
-            block: data.block_info.block,
-            wallet: wallet,
-            transactions: transactions
-        };
+        return [data.block_info.block, wallet, transactions];
     }
-    
-    function getHashOfTransaction(transaction) {
-        var type = new Transaction(transaction.message_id);
-
-        type.signature = transaction.signature;
-
-        return type.hash(transaction.body);
-    }
-
-    function keyPair() {
-        return Exonum.keyPair();
-    }
-
-    function createWalletTransaction(publicKey, name, secretKey) {
-        var data = {
-            pub_key: publicKey,
-            name: name
-        };
-        var signature = Transaction(130).sign(data, secretKey);
-
-        return {
-            service_id: serviceId,
-            message_id: 130,
-            body: data,
-            signature: signature
-        };
-    }
-
-    function addFundsTransaction(amount, wallet, secretKey) {
-        var seed = Exonum.randomUint64();
-        var data = {
-            wallet: wallet,
-            amount: amount,
-            seed: seed
-        };
-        var signature = Transaction(129).sign(data, secretKey);
-
-        return {
-            service_id: serviceId,
-            message_id: 129,
-            body: data,
-            signature: signature
-        };
-    }
-
-    function transferTransaction(amount, from, to, secretKey) {
-        var seed = Exonum.randomUint64();
-        var data = {
-            from: from,
-            to: to,
-            amount: amount,
-            seed: seed
-        };
-        var signature = Transaction(128).sign(data, secretKey);
-
-        return {
-            service_id: serviceId,
-            message_id: 128,
-            body: data,
-            signature: signature
-        };
-    }
-
-    return {
-        getBlock: getBlock,
-        getHashOfTransaction: getHashOfTransaction,
-        keyPair: keyPair,
-        createWalletTransaction: createWalletTransaction,
-        addFundsTransaction: addFundsTransaction,
-        transferTransaction: transferTransaction
-    };
 
 }
+
+CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
+    var self = this;
+    $.ajax({
+        method: 'GET',
+        url: this.baseUrl + '/wallets/info?pubkey=' + publicKey,
+        success: function(response, textStatus, jqXHR) {
+            callback.apply(this, self.validateWallet(publicKey, response));
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error(textStatus);
+        }
+    });
+};
+
+CryptocurrencyService.prototype.addFunds = function(amount, publicKey, secretKey, callback) {
+    var seed = Exonum.randomUint64();
+    var data = {
+        wallet: publicKey,
+        amount: amount,
+        seed: seed
+    };
+
+    this.submitTransaction(this.AddFundsTransactionParams, data, publicKey, secretKey, callback);
+};
+
+CryptocurrencyService.prototype.createWallet = function(publicKey, name, secretKey, callback) {
+    var data = {
+        pub_key: publicKey,
+        name: name
+    };
+    
+    this.submitTransaction(this.CreateWalletTransactionParams, data, publicKey, secretKey, callback);
+};
+
+CryptocurrencyService.prototype.transfer = function(amount, from, to, secretKey, callback) {
+    var seed = Exonum.randomUint64();
+    var data = {
+        from: from,
+        to: to,
+        amount: amount,
+        seed: seed
+    };
+
+    this.submitTransaction(this.TransferTransactionParams, data, from, secretKey, callback);
+};
+
+CryptocurrencyService.prototype.getBlocks = function(height, callback) {
+    var suffix = '';
+    if (!isNaN(height)) {
+        suffix += '&from=' + height;
+    }
+    $.ajax({
+        method: 'GET',
+        url: this.baseUrl + '/blockchain/blocks?count=10' + suffix,
+        success: callback,
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error(textStatus);
+        }
+    });
+};
+
+CryptocurrencyService.prototype.getBlock = function(height, callback) {
+    var self = this;
+    $.ajax({
+        method: 'GET',
+        url: this.baseUrl + '/blockchain/blocks/' + height,
+        success: function(data, textStatus, jqXHR) {
+            if (data && data.txs) {
+                for (var i in data.txs) {
+                    var type = self.getTransactionTypeParams(data.txs[i].message_id);
+                    type.signature = data.txs[i].signature;
+                    data.txs[i].hash = type.hash(data.txs[i].body);
+                }
+            }
+            callback(data);
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error(textStatus);
+        }
+    });
+};
+
+CryptocurrencyService.prototype.getTransaction = function(hash, callback) {
+    $.ajax({
+        method: 'GET',
+        url: this.baseUrl + '/blockchain/transactions/' + hash,
+        success: callback,
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error(textStatus);
+        }
+    });
+};

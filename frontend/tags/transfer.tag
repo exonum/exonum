@@ -33,11 +33,11 @@
     <script>
         var self = this;
 
-        this.users = this.localStorage.getUsers();
+        this.users = this.storage.getUsers();
         this.toggleLoading(true);
-        this.api.getWallet(self.opts.publicKey, function(data) {
-            self.block = data.block;
-            self.wallet = data.wallet;
+        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+            self.block = block;
+            self.wallet = wallet;
             self.update();
             self.toggleLoading(false);
         });
@@ -52,13 +52,13 @@
 
         submit(e) {
             e.preventDefault();
-
             var amount = self.amount.toString();
             var receiver = $('#receiver').val();
-            var user = self.localStorage.getUser(self.opts.publicKey);
-            var transaction = self.api.cryptocurrency.transferTransaction(amount, self.opts.publicKey, receiver, user.secretKey);
+            var user = self.storage.getUser(self.opts.publicKey);
 
-            self.api.submitTransaction.call(self, transaction, self.opts.publicKey, function() {
+            self.toggleLoading(true);
+            self.service.transfer(amount, self.opts.publicKey, receiver, user.secretKey, function() {
+                self.toggleLoading(false);
                 self.notify('success', 'Funds has been transferred.');
                 route('/user/' + self.opts.publicKey);
             });

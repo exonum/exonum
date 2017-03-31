@@ -29,15 +29,16 @@
 
         register(e) {
             e.preventDefault();
-            var pair = self.api.cryptocurrency.keyPair();
-            var transaction = self.api.cryptocurrency.createWalletTransaction(pair.publicKey, self.name, pair.secretKey);
+            var pair = self.core.keyPair();
 
-            self.api.submitTransaction.call(self, transaction, pair.publicKey, function() {
-                self.localStorage.addUser({
+            self.toggleLoading(true);
+            self.service.createWallet(pair.publicKey, self.name, pair.secretKey, function() {
+                self.storage.addUser({
                     name: self.name,
                     publicKey: pair.publicKey,
                     secretKey: pair.secretKey
                 });
+                self.toggleLoading(false);
                 self.notify('success', 'Wallet has been created. Login and manage the wallet.');
                 route('/dashboard');
             });

@@ -29,9 +29,9 @@
         var self = this;
 
         this.toggleLoading(true);
-        this.api.getWallet(self.opts.publicKey, function(data) {
-            self.block = data.block;
-            self.wallet = data.wallet;
+        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+            self.block = block;
+            self.wallet = wallet;
             self.update();
             self.toggleLoading(false);
         });
@@ -39,10 +39,11 @@
         addFunds(e) {
             e.preventDefault();
             var amount = $(e.target).data('amount').toString();
-            var user = self.localStorage.getUser(self.opts.publicKey);
-            var transaction = self.api.cryptocurrency.addFundsTransaction(amount, self.opts.publicKey, user.secretKey);
+            var user = self.storage.getUser(self.opts.publicKey);
 
-            self.api.submitTransaction.call(self, transaction, self.opts.publicKey, function() {
+            self.toggleLoading(true);
+            self.service.addFunds(amount, self.opts.publicKey, user.secretKey, function() {
+                self.toggleLoading(false);
                 self.notify('success', 'Funds has been added into your account.');
                 route('/user/' + self.opts.publicKey);
             });

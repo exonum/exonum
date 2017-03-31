@@ -1,6 +1,6 @@
 <block>
     <div class="panel-heading">
-        <button class="btn btn-default pull-right page-nav" if={ notFound } onclick={ refresh }>
+        <button class="btn btn-default pull-right page-nav" if={ !block } onclick={ refresh }>
             <i class="glyphicon glyphicon-refresh"></i>
             <span class="hidden-xs">Refresh</span>
         </button>
@@ -96,7 +96,7 @@
             </div>
         </virtual>
 
-        <virtual if={ notFound }>
+        <virtual if={ !block }>
             <p class="text-muted text-center">
                 <i class="glyphicon glyphicon-ban-circle"></i> The server is not know the requested block. <br>Wait a few seconds and refresh the page.
             </p>
@@ -108,13 +108,8 @@
         var height = parseInt(this.opts.height);
 
         this.toggleLoading(true);
-        this.api.loadBlock(height, function(data) {
-            if (data == null) {
-                self.notFound = true;
-            } else {
-                self.block = data;
-            }
-
+        this.service.getBlock(height, function(block) {
+            self.block = block;
             self.update();
             self.toggleLoading(false);
         });

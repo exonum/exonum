@@ -1,5 +1,9 @@
 <transaction>
     <div class="panel-heading">
+        <button class="btn btn-default pull-right page-nav" onclick={ refresh }>
+            <i class="glyphicon glyphicon-refresh"></i>
+            <span class="hidden-xs">Refresh</span>
+        </button>
         <button class="btn btn-default pull-left page-nav" onclick={ back }>
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
@@ -62,7 +66,7 @@
             </virtual>
         </virtual>
 
-        <p if={ notFound } class="text-muted text-center">
+        <p if={ !transaction } class="text-muted text-center">
             <i class="glyphicon glyphicon-ban-circle"></i> The server is not know the requested transaction. <br>Wait a few seconds and reload the page.
         </p>
     </div>
@@ -71,11 +75,9 @@
         var self = this;
 
         this.toggleLoading(true);
-        this.api.loadTransaction(this.opts.hash, function(data, textStatus, jqXHR) {
-            if (data.type === 'FromHex') {
-                self.notFound = true;
-            } else {
-                switch(data.message_id) {
+        this.service.getTransaction(this.opts.hash, function(transaction) {
+            if (transaction) {
+                switch(transaction.message_id) {
                     case 128:
                         self.title = 'Transfer Transaction';
                         break;
@@ -86,9 +88,10 @@
                         self.title = 'Create Wallet Transaction';
                         break;
                 }
-                self.transaction = data;
+                self.transaction = transaction;
+            } else  {
+                self.title = 'Transaction not found';
             }
-
             self.update();
             self.toggleLoading(false);
         });
@@ -96,6 +99,11 @@
         back(e) {
             e.preventDefault();
             history.back();
+        }
+
+        refresh(e) {
+            e.preventDefault();
+            window.location.reload();
         }
     </script>
 </transaction>

@@ -67,15 +67,15 @@
         var self = this;
 
         this.toggleLoading(true);
-        this.api.getWallet(self.opts.publicKey, function(data) {
-            self.block = data.block;
-            self.wallet = data.wallet;
-            self.transactions = data.transactions;
+        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+            self.block = block;
+            self.wallet = wallet;
+            self.transactions = transactions;
             self.update();
             self.toggleLoading(false);
 
-            if (self.wallet.balance == 0) {
-                self.notify('warning', 'You haven\'t any money yet. Add some funds.');
+            if (wallet.balance == 0) {
+                self.notify('warning', 'You have not any money yet. Add some funds.');
             }
         });
 

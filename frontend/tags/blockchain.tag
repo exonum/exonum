@@ -50,8 +50,8 @@
         var self = this;
 
         this.toggleLoading(true);
-        this.api.loadBlockchain(self.height + 1, function(data) {
-            self.blocks = data;
+        this.service.getBlocks(self.height + 1, function(blocks) {
+            self.blocks = blocks;
             self.update();
             self.toggleLoading(false);
         });
@@ -64,8 +64,8 @@
         more(e) {
             e.preventDefault();
             self.toggleLoading(true);
-            this.api.loadBlockchain(self.blocks[self.blocks.length - 1].height, function(data) {
-                self.blocks = self.blocks.concat(data);
+            this.service.getBlocks(self.blocks[self.blocks.length - 1].height, function(blocks) {
+                self.blocks = self.blocks.concat(blocks);
                 self.update();
                 self.toggleLoading(false);
             });

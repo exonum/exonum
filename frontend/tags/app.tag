@@ -12,117 +12,23 @@
 
     <script>
         var self = this;
-        var baseUrl = 'http://exonum.com/backends/currency/api/v1';
-        var serviceId = 128;
-        var validators = [
-            '7e2b6889b2e8b60e0e8d71be55b9cbf6aaa9bf397ef7b1d6b8564d862b120bea',
-            '2f1e58c0752503e3b66a5f68d97ab44cac196c75608b53682c3da1f824f9391f',
-            '8ce8ba0974e10d45d89b48a409015ebfe15a4aa9f9410951b266764b91c9d535',
-            '11110c9c4b06d7cc0df9311aae089771b04b696a8eaa105ba39a186bcceed0c2'
-        ];
-
-        // business logic
-        var cryptocurrency = Cryptocurrency(serviceId, validators);
+        var service = new CryptocurrencyService({
+            id: 128,
+            validators: [
+                '7e2b6889b2e8b60e0e8d71be55b9cbf6aaa9bf397ef7b1d6b8564d862b120bea',
+                '2f1e58c0752503e3b66a5f68d97ab44cac196c75608b53682c3da1f824f9391f',
+                '8ce8ba0974e10d45d89b48a409015ebfe15a4aa9f9410951b266764b91c9d535',
+                '11110c9c4b06d7cc0df9311aae089771b04b696a8eaa105ba39a186bcceed0c2'
+            ],
+            baseUrl: 'http://exonum.com/backends/currency/api/v1'
+        });
 
         // global mixin with common functions and constants
         riot.mixin({
-            api: {
-                cryptocurrency: cryptocurrency,
+            core: Exonum,
+            service: service,
 
-                getWallet: function(publicKey, callback) {
-                    $.ajax({
-                        method: 'GET',
-                        url: baseUrl + '/wallets/info?pubkey=' + publicKey,
-                        success: function(response, textStatus, jqXHR) {
-                            var data = cryptocurrency.getBlock(publicKey, response);
-                            callback(data);
-                        },
-                        error: function(jqXHR, textStatus, errorThrown) {
-                            console.error(textStatus);
-                        }
-                    });
-                },
-
-                submitTransaction: function(transaction, publicKey, callback) {
-                    var hash = cryptocurrency.getHashOfTransaction(transaction);
-                    var self = this;
-
-                    function loop() {
-                        self.api.getWallet(publicKey, function(data) {
-                            if (data) {
-                                for (var i in data.transactions) {
-                                    if (data.transactions[i].hash === hash) {
-                                        callback();
-                                        self.toggleLoading(false);
-                                        return;
-                                    }
-                                }
-                            }
-
-                            setTimeout(loop, 1000);
-                        });
-                    }
-
-                    self.toggleLoading(true);
-
-                    $.ajax({
-                        method: 'POST',
-                        url: baseUrl + '/wallets/transaction',
-                        contentType: 'application/json',
-                        data: JSON.stringify(transaction),
-                        success: loop,
-                        error: function(jqXHR, textStatus, errorThrown) {
-                            console.error(textStatus);
-                        }
-                    });
-                },
-
-                loadBlockchain: function(from, callback) {
-                    var suffix = '';
-                    if (!isNaN(from)) {
-                        suffix += '&from=' + from;
-                    }
-                    $.ajax({
-                        method: 'GET',
-                        url: baseUrl + '/blockchain/blocks?count=10' + suffix,
-                        success: callback,
-                        error: function(jqXHR, textStatus, errorThrown) {
-                            console.error(textStatus);
-                        }
-                    });
-                },
-
-                loadBlock: function(height, callback) {
-                    $.ajax({
-                        method: 'GET',
-                        url: baseUrl + '/blockchain/blocks/' + height,
-                        success: function(data, textStatus, jqXHR) {
-                            if (data && data.txs) {
-                                for (var i in data.txs) {
-                                    data.txs[i].hash = cryptocurrency.getHashOfTransaction(data.txs[i]);
-                                }
-                            }
-                            callback(data);
-                        },
-                        error: function(jqXHR, textStatus, errorThrown) {
-                            console.error(textStatus);
-                        }
-                    });
-                },
-
-                loadTransaction: function(hash, callback) {
-                    $.ajax({
-                        method: 'GET',
-                        url: baseUrl + '/blockchain/transactions/' + hash,
-                        success: callback,
-                        error: function(jqXHR, textStatus, errorThrown) {
-                            console.error(textStatus);
-                        }
-                    });
-                }
-            },
-
-            localStorage: {
+            storage: {
                 getUsers: function() {
                     return JSON.parse(window.localStorage.getItem('cc_users')) || [];
                 },
