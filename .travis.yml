@@ -2,27 +2,19 @@ language: rust
 cache: cargo
 sudo: required
 dist: trusty
-
 before_install:
 - rustup override set nightly-2017-01-08
 - rustc --version
 - cargo --version
 - sudo add-apt-repository -y ppa:chris-lea/libsodium
-#- sudo apt-add-repository -y ppa:bitcoin/bitcoin
 - sudo apt-get -qq update
-
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
-#- sudo apt-get -qq --yes install bitcoind
-
-#before_script:
-#- bitcoind -regtest -server -rpcuser=travis -rpcpassword=travis -daemon
-#- sleep 10
-#- bitcoin-cli -regtest -rpcuser=travis -rpcpassword=travis generate 200
 script:
 - cargo check --features clippy --verbose
 - cargo build --release --verbose
-#- cargo test --release --verbose
 - cargo test --manifest-path sandbox_tests/Cargo.toml --verbose
-#after_script:
-#- bitcoin-cli -regtest -rpcuser=travis -rpcpassword=travis stop
+notifications:
+  slack:
+    rooms:
+      secure: N3SOzAK7F4v3zAcvFBLdJmLJkLEpsp+euo75MErBmnk+goX18MAdXxJPIUA5ZPUHaO3pxtF0dB2U3G3b+AyF6rHTLxPTapa8M7N1i0p7LI7DyJGJ1rSnSmVpaX0C6a1dmzotCAF2WkyJWQwT5hq79VPbxIRsOuLDwxjPJwUffk8gDyTVHqqSb8KI9FPgsLpx54/TJJLmPYY2w8/+eZCjrgH0SZc9OX2ux29LflIGuRjKbYxrSkQrcQblr5Ak5k0YUfFeZ5NnQq5OE40wE7eBEVB8DK7lhgEeuMSTSat+/ShVINLZwL3aaCiHuF3VYlUtRjaEouoCatdGlvwNjo5DpKX81nXJoEjB0iQzZrDHIkbVPVOkkkBtWVuKCHue2nYb+rsI2kgtbjqb173JA/j2uZxYnc9xIEUe/VrqmZsXTyiUC7KCQc3Lk7A1juxUzn0gbzQkKcCeL48dEcnaAGrMqYY3P1O6I4U+LUlmixOTrEWEsXNQlLv0Ud9w+ZDjW+if0NxwB0jUgCB2cP6N1Wzyt0O3TwZ3+b6uyM2WrUYAv/mPu8FlUTZhJ33IvqtPTqsg6k4yZ2S8uBAmYCSjBLGDWusRKxwNep9s4VnhF7mqLr4U/y4FqvwnCKgx+7Nzcfoj4A9L6SO+kog1CUs3voLX2U96emGBZ/1Gs/o6KjoikHw=
