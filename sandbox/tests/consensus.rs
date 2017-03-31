@@ -463,8 +463,8 @@ fn request_propose_when_get_prevote() {
                               sandbox.s(VALIDATOR_2 as usize)));
     sandbox.add_time(Duration::milliseconds(sandbox.round_timeout() - 1));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 RequestPropose::new(sandbox.p(VALIDATOR_0 as usize),
-                                     sandbox.p(VALIDATOR_2 as usize),
+                 RequestPropose::new(&sandbox.p(VALIDATOR_0 as usize),
+                                     &sandbox.p(VALIDATOR_2 as usize),
                                      sandbox.time(),
                                      HEIGHT_ONE,
                                      &empty_hash(),
@@ -481,8 +481,8 @@ fn response_to_request_txs() {
     let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
-    sandbox.recv(RequestTransactions::new(sandbox.p(VALIDATOR_1 as usize),
-                                          sandbox.p(VALIDATOR_0 as usize),
+    sandbox.recv(RequestTransactions::new(&sandbox.p(VALIDATOR_1 as usize),
+                                          &sandbox.p(VALIDATOR_0 as usize),
                                           sandbox.time(),
                                           &[tx.hash()],
                                           sandbox.s(VALIDATOR_1 as usize)));
@@ -544,8 +544,8 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestPropose
-        sandbox.recv(RequestPropose::new(sandbox.p(VALIDATOR_3 as usize),
-                                         sandbox.p(VALIDATOR_0 as usize),
+        sandbox.recv(RequestPropose::new(&sandbox.p(VALIDATOR_3 as usize),
+                                         &sandbox.p(VALIDATOR_0 as usize),
                                          sandbox.time(),
                                          HEIGHT_ONE,
                                          &propose.hash(),
@@ -559,8 +559,8 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(VALIDATOR_3 as usize, true);
 
-        sandbox.recv(RequestPrevotes::new(sandbox.p(VALIDATOR_3 as usize),
-                                          sandbox.p(VALIDATOR_0 as usize),
+        sandbox.recv(RequestPrevotes::new(&sandbox.p(VALIDATOR_3 as usize),
+                                          &sandbox.p(VALIDATOR_0 as usize),
                                           sandbox.time(),
                                           HEIGHT_ONE,
                                           ROUND_THREE,
@@ -596,8 +596,8 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(VALIDATOR_3 as usize, true);
 
-        sandbox.recv(RequestPrecommits::new(sandbox.p(VALIDATOR_3 as usize),
-                                            sandbox.p(VALIDATOR_0 as usize),
+        sandbox.recv(RequestPrecommits::new(&sandbox.p(VALIDATOR_3 as usize),
+                                            &sandbox.p(VALIDATOR_0 as usize),
                                             sandbox.time(),
                                             HEIGHT_ONE,
                                             ROUND_THREE,
@@ -622,8 +622,8 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestTransactions
-        sandbox.recv(RequestTransactions::new(sandbox.p(VALIDATOR_1 as usize),
-                                              sandbox.p(VALIDATOR_0 as usize),
+        sandbox.recv(RequestTransactions::new(&sandbox.p(VALIDATOR_1 as usize),
+                                              &sandbox.p(VALIDATOR_0 as usize),
                                               sandbox.time(),
                                               &[tx.hash()],
                                               sandbox.s(VALIDATOR_1 as usize)));
@@ -633,8 +633,8 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestPropose negative
-        sandbox.recv(RequestPropose::new(sandbox.p(VALIDATOR_3 as usize),
-                                         sandbox.p(VALIDATOR_0 as usize),
+        sandbox.recv(RequestPropose::new(&sandbox.p(VALIDATOR_3 as usize),
+                                         &sandbox.p(VALIDATOR_0 as usize),
                                          sandbox.time(),
                                          HEIGHT_ONE,
                                          &propose.hash(),
@@ -652,8 +652,8 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(VALIDATOR_3 as usize, true);
 
-        sandbox.recv(RequestPrevotes::new(sandbox.p(VALIDATOR_3 as usize),
-                                          sandbox.p(VALIDATOR_0 as usize),
+        sandbox.recv(RequestPrevotes::new(&sandbox.p(VALIDATOR_3 as usize),
+                                          &sandbox.p(VALIDATOR_0 as usize),
                                           sandbox.time(),
                                           HEIGHT_ONE,
                                           ROUND_THREE,
@@ -673,8 +673,8 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(VALIDATOR_3 as usize, true);
 
-        sandbox.recv(RequestPrecommits::new(sandbox.p(VALIDATOR_3 as usize),
-                                            sandbox.p(VALIDATOR_0 as usize),
+        sandbox.recv(RequestPrecommits::new(&sandbox.p(VALIDATOR_3 as usize),
+                                            &sandbox.p(VALIDATOR_0 as usize),
                                             sandbox.time(),
                                             HEIGHT_ONE,
                                             ROUND_THREE,
@@ -765,8 +765,8 @@ fn request_txs_when_get_propose_or_prevote() {
     sandbox.add_time(Duration::milliseconds(sandbox.round_timeout() - 1));
 
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 RequestTransactions::new(sandbox.p(VALIDATOR_0 as usize),
-                                          sandbox.p(VALIDATOR_2 as usize),
+                 RequestTransactions::new(&sandbox.p(VALIDATOR_0 as usize),
+                                          &sandbox.p(VALIDATOR_2 as usize),
                                           sandbox.time(),
                                           &[tx.hash()],
                                           sandbox.s(VALIDATOR_0 as usize)));
@@ -783,8 +783,8 @@ fn request_txs_when_get_propose_or_prevote() {
     sandbox.add_time(Duration::milliseconds(sandbox.round_timeout() - 1));
 
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
-                 RequestTransactions::new(sandbox.p(VALIDATOR_0 as usize),
-                                          sandbox.p(VALIDATOR_3 as usize),
+                 RequestTransactions::new(&sandbox.p(VALIDATOR_0 as usize),
+                                          &sandbox.p(VALIDATOR_3 as usize),
                                           sandbox.time(),
                                           &[tx.hash()],
                                           sandbox.s(VALIDATOR_0 as usize)));
@@ -805,8 +805,8 @@ fn request_prevotes_when_get_prevote_message() {
                               sandbox.s(VALIDATOR_2 as usize)));
     sandbox.add_time(Duration::milliseconds(sandbox.round_timeout() - 1));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 RequestPropose::new(sandbox.p(VALIDATOR_0 as usize),
-                                     sandbox.p(VALIDATOR_2 as usize),
+                 RequestPropose::new(&sandbox.p(VALIDATOR_0 as usize),
+                                     &sandbox.p(VALIDATOR_2 as usize),
                                      sandbox.time(),
                                      HEIGHT_ONE,
                                      &empty_hash(),
@@ -816,8 +816,8 @@ fn request_prevotes_when_get_prevote_message() {
     validators.set(VALIDATOR_2 as usize, true);
 
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 RequestPrevotes::new(sandbox.p(VALIDATOR_0 as usize),
-                                      sandbox.p(VALIDATOR_2 as usize),
+                 RequestPrevotes::new(&sandbox.p(VALIDATOR_0 as usize),
+                                      &sandbox.p(VALIDATOR_2 as usize),
                                       sandbox.time(),
                                       HEIGHT_ONE,
                                       ROUND_ONE,
@@ -2013,8 +2013,8 @@ fn handle_tx_has_full_propose() {
     sandbox.recv(propose.clone());
     sandbox.add_time(Duration::milliseconds(REQUEST_TRANSACTIONS_WAIT as i64));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 RequestTransactions::new(sandbox.p(VALIDATOR_0 as usize),
-                                          sandbox.p(VALIDATOR_2 as usize),
+                 RequestTransactions::new(&sandbox.p(VALIDATOR_0 as usize),
+                                          &sandbox.p(VALIDATOR_2 as usize),
                                           sandbox.time(),
                                           &[tx.hash()],
                                           sandbox.s(VALIDATOR_0 as usize)));

@@ -316,14 +316,22 @@ impl<S> EventHandler for NodeHandler<S>
     }
 }
 
+pub trait TransactionSend: Send + Sync {
+    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()>;
+}
+
 impl<S> TxSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn new(inner: S) -> TxSender<S> {
         TxSender { inner: inner }
     }
+}
 
-    pub fn send<T: Transaction>(&self, tx: T) -> EventsResult<()> {
+impl<S> TransactionSend for TxSender<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+{
+    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()> {
         // TODO remove double data convertation
         if !tx.verify() {
             return Err(EventsError::new("Unable to verify transaction"));

@@ -1,25 +1,26 @@
 use std::collections::{VecDeque, BinaryHeap, HashSet};
 use std::iter::FromIterator;
-use std::cell::RefCell;
+use std::cell::{RefCell, Ref};
 use std::sync::{Arc, Mutex};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 use std::ops::Drop;
+use std::collections::HashMap;
 
 use time::{Timespec, Duration};
 
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
-use exonum::storage::{MemoryDB, Error as StorageError, RootProofNode};
+use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::node::state::{Round, Height};
+use exonum::node::state::{Round, Height, TxPool};
 
-use ::timestamping::{TimestampingService, TimestampTx, TimestampingTxGenerator};
+use timestamping::TimestampingService;
 
 type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
 
@@ -156,6 +157,12 @@ impl SandboxReactor {
         schema.get_actual_configuration()
     }
 
+    pub fn following_config(&self) -> Result<Option<StoredConfiguration>, StorageError> {
+        let view = self.handler.blockchain.view();
+        let schema = Schema::new(&view);
+        schema.get_following_configuration()
+    }
+
     pub fn handle_message(&mut self, msg: RawMessage) {
         let event = Event::Incoming(msg);
         self.handler.handle_event(event);
@@ -169,24 +176,30 @@ impl SandboxReactor {
 pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
-    pub validators: Vec<(PublicKey, SecretKey)>,
+    // pub validators: Vec<(PublicKey, SecretKey)>,
+    pub validators_map: HashMap<PublicKey, SecretKey>,
     addresses: Vec<SocketAddr>,
 }
 
 impl Sandbox {
-    fn initialize(&self) {
-        let connect = Connect::new(self.p(0), self.a(0), self.time(), self.s(0));
+    pub fn initialize(&self, connect_message_time: Timespec, start_index: usize, end_index: usize) {
+        let connect = Connect::new(&self.p(0), self.a(0), connect_message_time, self.s(0));
 
-        self.recv(Connect::new(self.p(1), self.a(1), self.time(), self.s(1)));
-        self.send(self.a(1), connect.clone());
-
-        self.recv(Connect::new(self.p(2), self.a(2), self.time(), self.s(2)));
-        self.send(self.a(2), connect.clone());
-
-        self.recv(Connect::new(self.p(3), self.a(3), self.time(), self.s(3)));
-        self.send(self.a(3), connect.clone());
+        for validator in start_index..end_index {
+            self.recv(Connect::new(&self.p(validator),
+                                   self.a(validator),
+                                   self.time(),
+                                   self.s(validator)));
+            self.send(self.a(validator), connect.clone());
+        }
 
         self.check_unexpected_message()
+    }
+
+    pub fn set_validators_map(&mut self, new_addresses_len: u8, validators: Vec<(PublicKey, SecretKey)>) {
+        self.addresses =
+            (1..(new_addresses_len + 1) as u8).map(gen_primitive_socket_addr).collect::<Vec<_>>();
+        self.validators_map.extend(validators);
     }
 
     fn check_unexpected_message(&self) {
@@ -202,24 +215,36 @@ impl Sandbox {
         reactor.handler.blockchain.tx_from_raw(raw)
     }
 
-    pub fn p(&self, id: usize) -> &PublicKey {
-        &self.validators[id].0
+    pub fn p(&self, id: usize) -> PublicKey {
+        self.validators()[id]
+        // &self.validators[id].0
     }
 
     pub fn s(&self, id: usize) -> &SecretKey {
-        &self.validators[id].1
+        let p = self.p(id);
+        &self.validators_map[&p]
+        // &self.validators[id].1
     }
 
     pub fn a(&self, id: usize) -> SocketAddr {
         self.addresses[id].clone()
     }
 
+    pub fn validators(&self) -> Vec<PublicKey> {
+        let conf = self.cfg();
+        conf.validators.clone()
+    }
+
     pub fn n_validators(&self) -> usize {
-        self.validators.len()
+        self.validators().len()
     }
 
     pub fn time(&self) -> Timespec {
         self.inner.lock().unwrap().time.clone()
+    }
+
+    pub fn blockchain_ref(&self) -> Ref<Blockchain> {
+        Ref::map(self.reactor.borrow(), |reactor| &reactor.handler.blockchain)
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -255,7 +280,7 @@ impl Sandbox {
             .iter()
             .skip(1)
             .cloned());
-        for _ in 0..self.validators.len() - 1 {
+        for _ in 0..self.n_validators() - 1 {
             let sended = self.inner.lock().unwrap().sended.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
@@ -329,15 +354,76 @@ impl Sandbox {
         *reactor.last_block().unwrap().state_hash()
     }
 
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> Result<RootProofNode<Hash>, StorageError>
+    pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<RawMessage>
+        where I: IntoIterator<Item = &'a RawMessage>
     {
-        let view = self.reactor.borrow().handler.blockchain.view(); 
+        let mut unique_set: HashSet<Hash> = HashSet::new();
+        let view = self.reactor.borrow().handler.blockchain.view();
+        let schema = Schema::new(&view);
+        let schema_transactions = schema.transactions();
+        let res: Vec<RawTransaction> = txs.into_iter()
+            .filter(|elem| {
+                let hash_elem = elem.hash();
+                if unique_set.contains(&hash_elem) {
+                    return false;
+                }
+                unique_set.insert(hash_elem);
+                if schema_transactions.get(&hash_elem).unwrap().is_some() {
+                    return false;
+                }
+                true
+            })
+            .map(|elem| elem.clone())
+            .collect::<Vec<_>>();
+        res
+    }
+    /// Extract state_hash from fake block
+    pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
+        where I: IntoIterator<Item = &'a RawTransaction>
+    {
+        let ref blockchain = self.reactor.borrow().handler.blockchain;
+        let (hashes, tx_pool) = {
+            let mut pool = TxPool::new();
+            let mut hashes = Vec::new();
+            for raw in txs {
+                let tx = blockchain.tx_from_raw(raw.clone()).unwrap();
+                let hash = tx.hash();
+                hashes.push(hash);
+                pool.insert(hash, tx);
+            }
+            (hashes, pool)
+        };
+
+        let view = {
+            let db = blockchain.view();
+            let (_, patch) = blockchain.create_patch(self.current_height(),
+                              self.current_round(),
+                              self.time(),
+                              &hashes,
+                              &tx_pool)
+                .unwrap();
+            db.merge(&patch);
+            db
+        };
+        Schema::new(&view)
+            .last_block()
+            .unwrap()
+            .unwrap()
+            .state_hash()
+            .clone()
+    }
+
+    pub fn get_proof_to_service_table(&self,
+                                      service_id: u16,
+                                      table_idx: usize)
+                                      -> Result<RootProofNode<Hash>, StorageError> {
+        let view = self.reactor.borrow().handler.blockchain.view();
         let schema = Schema::new(&view);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
     pub fn get_configs_root_hash(&self) -> Result<Hash, StorageError> {
-        let view = self.reactor.borrow().handler.blockchain.view(); 
+        let view = self.reactor.borrow().handler.blockchain.view();
         let schema = Schema::new(&view);
         schema.configs().root_hash()
     }
@@ -347,8 +433,19 @@ impl Sandbox {
         reactor.actual_config().unwrap()
     }
 
+    pub fn following_cfg(&self) -> Option<StoredConfiguration> {
+        let reactor = self.reactor.borrow();
+        reactor.following_config().unwrap()
+    }
+
     pub fn propose_timeout(&self) -> i64 {
         self.cfg().consensus.propose_timeout
+    }
+
+
+    pub fn majority_count(&self, num_validators: usize) -> usize {
+        debug_assert!(num_validators >= 4);
+        num_validators * 2 / 3 + 1
     }
 
     pub fn round_timeout(&self) -> i64 {
@@ -364,9 +461,9 @@ impl Sandbox {
     }
 
     pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, StorageError> {
-        let view = self.reactor.borrow().handler.blockchain.view(); 
-        let schema = Schema::new(&view); 
-        schema.block_and_precommits(height) 
+        let view = self.reactor.borrow().handler.blockchain.view();
+        let schema = Schema::new(&view);
+        schema.block_and_precommits(height)
     }
 
     pub fn current_height(&self) -> Height {
@@ -418,23 +515,25 @@ impl Drop for Sandbox {
     }
 }
 
+fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
+    let addr = Ipv4Addr::new(idx, idx, idx, idx);
+    SocketAddr::new(IpAddr::V4(addr), idx as u16)
+}
+
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let validators = vec![gen_keypair_from_seed(&Seed::new([12; 32])),
                           gen_keypair_from_seed(&Seed::new([13; 32])),
                           gen_keypair_from_seed(&Seed::new([16; 32])),
                           gen_keypair_from_seed(&Seed::new([19; 32]))];
-    let addresses: Vec<SocketAddr> = vec!["1.1.1.1:1".parse().unwrap(),
-                                          "2.2.2.2:2".parse().unwrap(),
-                                          "3.3.3.3:3".parse().unwrap(),
-                                          "4.4.4.4:4".parse().unwrap()];
+    let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
     let db = MemoryDB::new();
     let blockchain = Blockchain::new(db, services);
 
     let consensus = ConsensusConfig {
         round_timeout: 1000,
-        status_timeout: 50000,
-        peers_timeout: 50000,
+        status_timeout: 600000,
+        peers_timeout: 600000,
         propose_timeout: 200,
         txs_block_limit: 1000,
     };
@@ -470,16 +569,17 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         inner: inner.clone(),
         handler: node,
     };
-
+    let mut validators_map = HashMap::new();
+    validators_map.extend(validators.clone());
     reactor.handler.initialize();
     let sandbox = Sandbox {
         inner: inner.clone(),
         reactor: RefCell::new(reactor),
-        validators: validators,
+        validators_map: validators_map,
         addresses: addresses,
     };
 
-    sandbox.initialize();
+    sandbox.initialize(sandbox.time(), 1, validators.len());
     assert!(sandbox.propose_timeout() < sandbox.round_timeout()); //general assumption; necessary for correct work of consensus algorithm
     sandbox
 }
@@ -498,7 +598,7 @@ fn test_sandbox_recv_and_send() {
     let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.send(s.a(2), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
+    s.send(s.a(2), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
 }
 
 #[test]
@@ -516,7 +616,7 @@ fn test_sandbox_assert_status() {
 #[should_panic(expected = "Expected to send the message")]
 fn test_sandbox_expected_to_send_but_nothing_happened() {
     let s = timestamping_sandbox();
-    s.send(s.a(1), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
+    s.send(s.a(1), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
 }
 
 #[test]
@@ -525,7 +625,7 @@ fn test_sandbox_expected_to_send_another_message() {
     let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.send(s.a(1), Connect::new(s.p(0), s.a(0), s.time(), s.s(0)));
+    s.send(s.a(1), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
 }
 
 #[test]

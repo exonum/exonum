@@ -51,6 +51,10 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.view
     }
 
+    pub fn id(&self) -> u32 {
+        self.state.id()
+    }
+
     pub fn height(&self) -> u64 {
         self.state.height()
     }
@@ -63,8 +67,16 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.validators()
     }
 
+    pub fn public_key(&self) -> &PublicKey {
+        self.state.public_key()
+    }
+
     pub fn secret_key(&self) -> &SecretKey {
         self.state.secret_key()
+    }
+
+    pub fn actual_config(&self) -> &StoredConfiguration {
+        self.state.config()
     }
 
     pub fn consensus_config(&self) -> &ConsensusConfig {
@@ -72,9 +84,10 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 
     pub fn service_config(&self, service: &Service) -> &Value {
+        let id = service.service_id();
         self.state
             .services_config()
-            .get(&service.service_id())
+            .get(&format!("{}", id))
             .unwrap()
     }
 

@@ -18,6 +18,28 @@ macro_rules! message {
             }
         }
 
+        impl<'a> $crate::messages::Field<'a> for $name {
+            fn read(buffer: &'a [u8], from: usize, to: usize) -> Self {
+                let raw_message: $crate::messages::RawMessage = $crate::messages::Field::read(buffer, from, to);
+                $crate::messages::FromRaw::from_raw(raw_message).unwrap()
+            }
+
+            fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+                $crate::messages::Field::write(&self.raw, buffer, from, to);
+            }
+
+            fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), $crate::messages::Error> {
+
+                let raw_message: $crate::messages::RawMessage = $crate::messages::Field::read(buffer, from, to);
+                $(raw_message.check::<$field_type>($from, $to)?;)*
+                Ok(())
+            }
+
+            fn field_size() -> usize {
+                1
+            }
+        }
+
         impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::messages::Error> {

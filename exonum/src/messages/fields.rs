@@ -6,7 +6,6 @@ use time::Timespec;
 use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::{Hash, PublicKey};
-
 use super::{Error, RawMessage, MessageBuffer, BitVec, FromRaw};
 
 pub trait Field<'a> {
@@ -551,8 +550,12 @@ impl<'a, T> Field<'a> for Vec<T>
     }
 
     fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
-        // TODO check messages as messages
-        <Vec<RawMessage> as Field>::check(buffer, from, to)
+        <Vec<RawMessage> as Field>::check(buffer, from, to)?;
+        let raw_messages: Vec<RawMessage> = Field::read(buffer, from, to);
+        for raw in raw_messages {
+            T::from_raw(raw)?;
+        }
+        Ok(())
     }
 }
 
@@ -568,6 +571,32 @@ impl<'a> Field<'a> for Vec<u8> {
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
         <&[u8] as Field>::write(&self.as_slice(), buffer, from, to);
+    }
+
+    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
+        <&[u8] as Field>::check(buffer, from, to)?;
+        Ok(())
+    }
+}
+
+impl<'a> Field<'a> for RawMessage {
+    fn field_size() -> usize {
+        1
+    }
+
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> RawMessage {
+        let data = <Vec<u8> as Field>::read(buffer, from, to);
+        Arc::new(MessageBuffer::from_vec(data))
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        let self_slice = self.as_ref().as_ref();
+        <&[u8] as Field>::write(&self_slice, buffer, from, to);
+    }
+
+    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
+        <&[u8] as Field>::check(buffer, from, to)?;
+        Ok(())
     }
 }
 

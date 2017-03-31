@@ -6,7 +6,6 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re",
 
 [dependencies]
 exonum = {version="0.1", path="../exonum"}
-configuration_service = {version="0.1.0", path="../services/configuration"}
 
 time = "0.1"
 serde = "0.8"

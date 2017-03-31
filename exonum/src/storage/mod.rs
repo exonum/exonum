@@ -4,7 +4,9 @@ mod tests;
 use num::{Integer, ToPrimitive};
 
 use std::fmt;
-use std::error;
+use std::error::Error as ErrorTrait;
+use std::convert;
+use serde_json;
 
 mod leveldb;
 mod memorydb;
@@ -14,7 +16,7 @@ mod merkle_table;
 mod fields;
 mod db;
 mod merkle_patricia_table;
-mod utils; 
+mod utils;
 
 pub use leveldb::options::Options as LevelDBOptions;
 pub use leveldb::database::cache::Cache as LevelDBCache;
@@ -24,12 +26,12 @@ pub use self::db::{Database, Patch, Fork, Change};
 pub use self::memorydb::{MemoryDB, MemoryDBView};
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
-pub use self::fields::{StorageValue, HeightBytes};
-pub use self::merkle_table::MerkleTable; 
-pub use self::merkle_table::proofnode::Proofnode; 
-pub use self::merkle_patricia_table::{MerklePatriciaTable};
-pub use self::merkle_patricia_table::proofpathtokey::RootProofNode; 
-pub use self::utils::bytes_to_hex; 
+pub use self::fields::StorageValue;
+pub use self::merkle_table::MerkleTable;
+pub use self::merkle_table::proofnode::Proofnode;
+pub use self::merkle_patricia_table::MerklePatriciaTable;
+pub use self::merkle_patricia_table::proofpathtokey::RootProofNode;
+pub use self::utils::bytes_to_hex;
 
 #[derive(Debug)]
 pub struct Error {
@@ -67,6 +69,20 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
     fn last(&self) -> Result<Option<V>>;
     fn is_empty(&self) -> Result<bool>;
     fn len(&self) -> Result<K>;
+    fn swap(&self, i: K, j: K) -> Result<()> {
+        let first_val = self.get(i)?;
+        let second_val = self.get(j)?;
+        match (first_val, second_val) {
+            (Some(i_val), Some(j_val)) => {
+                self.set(j, i_val)?;
+                self.set(i, j_val)?;
+                Ok(())
+            }
+            _ => {
+                Err(Error::new("One of swap indexes is not present in list"))
+            }
+        }
+    }
 }
 
 impl Error {
@@ -81,9 +97,15 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
+impl ErrorTrait for Error {
     fn description(&self) -> &str {
         &self.message
+    }
+}
+
+impl convert::From<serde_json::error::Error> for Error {
+    fn from(message: serde_json::error::Error) -> Error {
+        Error::new(message.description())
     }
 }
 

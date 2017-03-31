@@ -22,7 +22,7 @@ use ::storage::{Patch, Database, Fork, Error, Map, List, Storage,
                 View as StorageView};
 
 pub use self::block::Block;
-pub use self::schema::{ConfigurationData, Schema};
+pub use self::schema::Schema;
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, NodeState};
@@ -77,6 +77,7 @@ impl Blockchain {
 
     pub fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
+            previous_cfg_hash: Hash::zero(),
             actual_from: 0,
             validators: cfg.validators,
             consensus: cfg.consensus,
@@ -92,7 +93,7 @@ impl Blockchain {
             // Update service tables
             for (id, service) in self.service_map.iter() {
                 let cfg = service.handle_genesis_block(&view)?;
-                config_propose.services.insert(id as u16, cfg);
+                config_propose.services.insert(format!("{}", id), cfg);
             }
             // Commit actual configuration
             {
@@ -103,7 +104,7 @@ impl Blockchain {
                     let _ = block_hash;
                     return Ok(());
                 }
-                schema.commit_actual_configuration(0, config_propose.serialize().as_ref())?;
+                schema.commit_actual_configuration(config_propose)?;
             };
             self.merge(&view.changes())?;
             self.create_patch(0, 0, time, &[], &BTreeMap::new())?.1
@@ -113,11 +114,11 @@ impl Blockchain {
     }
 
     pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
-        debug_assert!(table_idx <= u16::max_value() as usize); 
-        let size = mem::size_of::<u16>(); 
-        let mut vec = vec![0; 2 * size]; 
-        LittleEndian::write_u16(&mut vec[0..size], service_id); 
-        LittleEndian::write_u16(&mut vec[size..2*size], table_idx as u16); 
+        debug_assert!(table_idx <= u16::max_value() as usize);
+        let size = mem::size_of::<u16>();
+        let mut vec = vec![0; 2 * size];
+        LittleEndian::write_u16(&mut vec[0..size], service_id);
+        LittleEndian::write_u16(&mut vec[size..2*size], table_idx as u16);
         hash(&vec)
     }
 
@@ -149,18 +150,18 @@ impl Blockchain {
         let tx_hash = schema.block_txs(height).root_hash()?;
         // Get state hash
         let state_hash = {
-            let sum_table = schema.state_hash_aggregator(); 
+            let sum_table = schema.state_hash_aggregator();
             let vec_core_state = schema.core_state_hash()?;
             for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
-                let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx); 
-                sum_table.put(&key, core_table_hash)?; 
-            } 
+                let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
+                sum_table.put(&key, core_table_hash)?;
+            }
             for service in self.service_map.values(){
-                let service_id = service.service_id(); 
-                let vec_service_state = service.state_hash(&fork)?; 
+                let service_id = service.service_id();
+                let vec_service_state = service.state_hash(&fork)?;
                 for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
-                    let key = Blockchain::service_table_unique_key(service_id, idx); 
-                    sum_table.put(&key, service_table_hash)?; 
+                    let key = Blockchain::service_table_unique_key(service_id, idx);
+                    sum_table.put(&key, service_table_hash)?;
                 }
             }
             sum_table.root_hash()?

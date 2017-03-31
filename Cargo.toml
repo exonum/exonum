@@ -3,9 +3,7 @@
 members = [
     "3rdparty/leveldb-sys",
     "3rdparty/leveldb",
-    "blockchain_explorer",    
+    "blockchain_explorer",
     "exonum",
     "sandbox",
-    "services/configuration",
-    "services/propose_timeout_adjuster",
 ]

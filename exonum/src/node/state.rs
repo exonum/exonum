@@ -306,11 +306,15 @@ impl State {
         &self.config.validators
     }
 
+    pub fn config(&self) -> &StoredConfiguration {
+        &self.config
+    }
+
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
     }
 
-    pub fn services_config(&self) -> &BTreeMap<u16, Value> {
+    pub fn services_config(&self) -> &BTreeMap<String, Value> {
         &self.config.services
     }
 
@@ -318,7 +322,9 @@ impl State {
         let id = config.validators
             .iter()
             .position(|pk| pk == self.public_key())
-            .unwrap();
+            .expect(&format!("self.public_key:{:?} not found in new actual config validators list:{:?}", 
+                    self.public_key(), 
+                    config.validators));
 
         self.id = id as u32;
         self.config = config;
@@ -386,7 +392,12 @@ impl State {
 
     pub fn majority_count(&self) -> usize {
         // FIXME: What if validators count < 4?
-        self.validators().len() * 2 / 3 + 1
+        //self.validators().len() * 2 / 3 + 1
+        State::byzantine_majority_count(self.validators().len())
+    }
+
+    pub fn byzantine_majority_count(total: usize) -> usize {
+        total * 2 / 3 + 1
     }
 
     pub fn height(&self) -> u64 {
