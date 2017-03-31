@@ -7,7 +7,7 @@ use std::ops::Drop;
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
+use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
@@ -140,6 +140,10 @@ impl SandboxReactor {
 
     pub fn is_leader(&self) -> bool {
         self.handler.state().is_leader()
+    }
+
+    pub fn leader(&self, round: Round) -> ValidatorId {
+        self.handler.state().leader(round)
     }
 
     pub fn is_validator(&self) -> bool {
@@ -340,6 +344,11 @@ impl Sandbox {
     pub fn is_leader(&self) -> bool {
         let reactor = self.reactor.borrow();
         reactor.is_leader()
+    }
+
+    pub fn leader(&self, round: Round) -> ValidatorId {
+        let reactor = self.reactor.borrow();
+        reactor.leader(round)
     }
 
     pub fn is_validator(&self) -> bool {
