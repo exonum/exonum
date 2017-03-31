@@ -21,11 +21,11 @@ params = "0.6.0"
 clippy = {version = "0.0.107", optional = true}
 
 [dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/gisochre/exonum-core.git"
 version = "0.1.0"
-rev = "fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+rev = "9b5ba8548ef8acac86dd6f727f19336004323a23"
 
 [dependencies.blockchain_explorer]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/gisochre/exonum-core.git"
 version = "0.1.0"
-rev = "fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+rev = "9b5ba8548ef8acac86dd6f727f19336004323a23"
