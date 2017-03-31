@@ -15,8 +15,8 @@
 //! 
 //! It also contains auxiliary fields: 
 //! 
-//! - actual_from - blockchain height, upon reaching which current config is to become actual. 
-//! - previous_cfg_hash - hash of previous configuration, which validators' set is allowed to cast
+//! - `actual_from` - blockchain height, upon reaching which current config is to become actual. 
+//! - `previous_cfg_hash` - hash of previous configuration, which validators' set is allowed to cast
 //! votes for current config.
 //! 
 //! For details see [StoredConfiguration in exonum](../exonum/blockchain/config/struct.StoredConfiguration.html)
@@ -157,13 +157,14 @@ use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, Merk
                       Result as StorageResult};
 use exonum::blockchain::StoredConfiguration;
 
-///Value of [service_id of ConfigurationService](struct.ConfigurationService.html#method.service_id) 
+///Value of [service_id](struct.ConfigurationService.html#method.service_id) of
+///`ConfigurationService`
 pub const CONFIG_SERVICE: u16 = 1;
 ///Value of [message_type](../exonum/messages/struct.MessageBuffer.html#method.message_type) of
-///[TxConfigPropose](struct.TxConfigPropose.html)
+///`TxConfigPropose`
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 ///Value of [message_type](../exonum/messages/struct.MessageBuffer.html#method.message_type) of
-///[TxConfigVote](struct.TxConfigVote.html)
+///`TxConfigVote`
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
 
 lazy_static! {
@@ -185,19 +186,19 @@ storage_value! {
 
 /// This structure logically contains 2 fields: 
 /// 
-/// 1 - [TxConfigPropose](TxConfigPropose.t.html) in [tx_propose](#method.tx_propose) field.
+/// 1 - `TxConfigPropose` in `tx_propose` field.
 /// 
-/// 2 - reference to [table with all validators' votes for a config propose](struct.ConfigurationSchema.html#method.config_votes), indexed by validator_id `u64` and containing values of [TxConfigVote](TxConfigVote.t.html) type. 
+/// 2 - reference to [table with all validators' votes for a config propose](struct.ConfigurationSchema.html#method.config_votes), indexed by `validator_id` `u64` and containing values of `TxConfigVote` type. 
 /// 
-/// Length of the table is stored in [num_votes](#method.num_votes) field, which isn't changed
+/// Length of the table is stored in `num_votes` field, which isn't changed
 /// after table initialization, because number of possible vote slots for a config is determined by
 /// number of validators in its previous config. 
 /// 
-/// Table's root hash - in [votes_history_hash](#method.votes_history_hash) field, which is
+/// Table's root hash - in `votes_history_hash` field, which is
 /// modified after a vote from validator is added.
 impl StorageValueConfigProposeData {
-///Method to mutate [votes_history_hash](#method.votes_history_hash) field containing root hash of [table with all validators' votes for a config propose](struct.ConfigurationSchema.html#method.config_votes) after replacing [empty
-///vote](struct.ZEROVOTE.html) with a real [TxConfigVote](TxConfigVote.t.html) cast by a validator.
+///Method to mutate `votes_history_hash` field containing root hash of [table with all validators' votes for a config propose](struct.ConfigurationSchema.html#method.config_votes) after replacing [empty
+///vote](struct.ZEROVOTE.html) with a real `TxConfigVote` cast by a validator.
     pub fn set_history_hash(&mut self, hash: &Hash) {
         Field::write(&hash, &mut self.raw, 8, 40);
     }
@@ -242,7 +243,7 @@ message! {
         const SIZE = 40;
 
         from:           &PublicKey  [00 => 32]
-        cfg:            &[u8]       [32 => 40] // serialized config bytes
+        cfg:            &[u8]       [32 => 40] 
     }
 }
 
@@ -253,7 +254,7 @@ message! {
         const SIZE = 64;
 
         from:           &PublicKey  [00 => 32]
-        cfg_hash:       &Hash       [32 => 64] // hash of config we're voting for
+        cfg_hash:       &Hash       [32 => 64]
     }
 }
 
