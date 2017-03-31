@@ -36,26 +36,26 @@ impl Default for ConsensusConfig {
 }
 
 impl StoredConfiguration {
-    pub fn serialize_err(&self) -> Result<Vec<u8>, serde_json::error::Error> {
+    pub fn try_serialize(&self) -> Result<Vec<u8>, serde_json::error::Error> {
         serde_json::to_vec(&self)
     }
 
-    pub fn deserialize_err(serialized: &[u8]) -> Result<StoredConfiguration, serde_json::error::Error> {
+    pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, serde_json::error::Error> {
         serde_json::from_slice(serialized)
     }
 }
 
 impl StorageValue for StoredConfiguration {
     fn serialize(self) -> Vec<u8> {
-        self.serialize_err().unwrap()
+        self.try_serialize().unwrap()
     }
 
     fn deserialize(v: Vec<u8>) -> Self {
-        StoredConfiguration::deserialize_err(&v).unwrap()
+        StoredConfiguration::try_deserialize(&v).unwrap()
     }
 
     fn hash(&self) -> Hash {
-        let vec_bytes = self.serialize_err().unwrap();
+        let vec_bytes = self.try_serialize().unwrap();
         hash(&vec_bytes)
     }
 
