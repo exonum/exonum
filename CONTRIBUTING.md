@@ -35,7 +35,7 @@ The title of the pull request should be prefixed by the component or area that t
 - _Docs_ for changes to the documentation
 - _Net_ or _P2P_ for changes to the peer-to-peer network code
 - _API_ for changes to the external APIs
-- _Tests_ for changes to the bitcoin unit tests or QA tests
+- _Tests_ for changes to the Exonum unit tests or QA tests
 - _Trivial_ should **only** be used for PRs that do not change generated executable code. Notably, refactors (change of function arguments and code reorganization) and changes in behavior should **not** be marked as trivial. Examples of trivial PRs are changes to:
 
   - comments
