@@ -57,10 +57,6 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.view
     }
 
-    pub fn id(&self) -> u32 {
-        self.state.id()
-    }
-
     pub fn height(&self) -> u64 {
         self.state.height()
     }
