@@ -13,7 +13,7 @@ fn main() {
 
     let app = App::new("Blockchain control utility")
         .version(env!("CARGO_PKG_VERSION"))
-        .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+        .author("Aleksey S. <aleksei.sidorov@xdevre>")
         .about("Blockchain control utility")
         .subcommand(GenerateCommand::new());
 
