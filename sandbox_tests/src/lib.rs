@@ -60,7 +60,7 @@ mod tests {
     use sandbox::timestamping::TimestampingService;
     use sandbox::sandbox::Sandbox;
     use sandbox::sandbox_with_services;
-    use sandbox::sandbox_tests_helper::{SandboxState, add_one_height_with_transactions};
+    use sandbox::sandbox_tests_helper::{SandboxState, add_one_height_with_transactions, add_one_height_with_transactions_from_other};
     use configuration_service::{TxConfigPropose, TxConfigVote, ConfigurationService,
                                 ConfigurationSchema};
     use serde_json::Value;
@@ -89,6 +89,91 @@ mod tests {
         let view = sandbox.blockchain_ref().view();
         let schema = ConfigurationSchema::new(&view);
         schema.get_votes(&config_hash)
+    }
+
+    #[test]
+    fn test_full_node_to_validator() {
+        use super::CfgStub;
+        use exonum::blockchain::Service;
+        use serde_json::Value;
+        use serde_json::value::ToJson;
+        let _ = blockchain_explorer::helpers::init_logger();
+        let (sandbox, sandbox_state, initial_cfg)  = configuration_sandbox();
+        sandbox.assert_state(1, 1);
+        add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
+        sandbox.assert_state(2, 1);
+
+        assert_eq!(sandbox.is_validator(), true);
+
+        let validators = sandbox.validators();
+
+        let mut services: BTreeMap<String, Value> = BTreeMap::new();
+        let tmstmp_id = TimestampingService::new().service_id();
+        let service_cfg = CfgStub { cfg_string: "some test".to_string() };
+        services.insert(format!("{}", tmstmp_id), service_cfg.to_json());
+
+
+        let full_node_cfg = StoredConfiguration {
+            previous_cfg_hash: initial_cfg.hash(), 
+            actual_from: 4,
+            validators: validators[1..].iter().cloned().collect(),
+            consensus: sandbox.cfg().consensus,
+            services: services.clone(),
+        };
+
+
+
+        {
+            let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+                                                  &full_node_cfg.clone().serialize(),
+                                                  sandbox.s(1));
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+        }
+        {
+            let mut votes = Vec::new();
+            for validator in 0..3 {
+                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                                             &full_node_cfg.hash(),
+                                             sandbox.s(validator))
+                    .raw()
+                    .clone());
+            }
+            add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
+        }
+        sandbox.assert_state(4, 1);
+        assert_eq!(full_node_cfg, sandbox.cfg());
+        assert_eq!(sandbox.is_validator(), false);
+
+        let validator_cfg = StoredConfiguration {
+
+            previous_cfg_hash: full_node_cfg.hash(), 
+            actual_from: 6,
+            validators: validators[0..].iter().cloned().collect(),
+            consensus: sandbox.cfg().consensus,
+            services: services.clone(),
+        };
+       
+        {
+            let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+                                                  &validator_cfg.clone().serialize(),
+                                                  sandbox.s(1));
+            add_one_height_with_transactions_from_other(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+        }
+        {
+            let mut votes = Vec::new();
+            for validator in 0..3 {
+                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                                             &validator_cfg.hash(),
+                                             sandbox.s(validator))
+                    .raw()
+                    .clone());
+            }
+            add_one_height_with_transactions_from_other(&sandbox, &sandbox_state, &votes);
+        }
+        sandbox.assert_state(6, 1);
+        assert_eq!(validator_cfg, sandbox.cfg());
+        assert_eq!(sandbox.is_validator(), true);
+
     }
 
     #[test]
@@ -168,7 +253,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected="not found in new actual config validators list")]
     fn test_exclude_sandbox_node_from_config() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
         sandbox.assert_state(1, 1);
