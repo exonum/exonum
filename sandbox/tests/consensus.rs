@@ -1192,10 +1192,10 @@ fn lock_remove_request_prevotes() {
 }
 
 /// scenario: // HANDLE PRECOMMIT positive scenario
-///         - We are fucked up
+///         - Our block_hash different from precommits one.
 #[test]
-#[should_panic(expected = "We are fucked up...")]
-fn handle_precommit_we_are_fucked_up() {
+#[should_panic(expected = "Our block_hash different from precommits one.")]
+fn handle_precommit_different_block_hash() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
@@ -2353,7 +2353,7 @@ fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
 //     - COMMIT
 //         - if propose is known    //covered in do_not_commit_if_propose_is_unknown()
 //         - has all txs           //covered in do_not_commit_if_tx_is_unknown()
-//         - We are fucked up      //covered in handle_precommit_we_are_fucked_up()
+//         - Our block_hash different from precommits one      //covered in handle_precommit_different_block_hash()
 //     - add_unknown_propose_with_precommits    //covered in commit_using_unknown_propose_with_precommits()
 
 // COMMIT:
