@@ -410,12 +410,16 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
         //        add_round_with_transactions(&sandbox, &[tx.hash()]);
         add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
         let round: u32 = sandbox.current_round();
-        if VALIDATOR_3 == sandbox.leader(round) {
+        if VALIDATOR_1 == sandbox.leader(round) {
+            sandbox.add_time(Duration::milliseconds(sandbox.propose_timeout()));
             // ok, we are leader
-            trace!("ok, we are leader, round: {:?}", round);
-            let propose = get_propose_with_transactions_for_validator(&sandbox, hashes.as_ref(), VALIDATOR_3);
+            trace!("ok, validator 1 leader, round: {:?}", round);
+            let propose = get_propose_with_transactions_for_validator(&sandbox, hashes.as_ref(), VALIDATOR_1);
             trace!("propose.hash: {:?}", propose.hash());
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
+           /* {
+                *sandbox_state.accepted_propose_hash.borrow_mut() = propose.hash();
+            }*/
             sandbox.recv(propose.clone());
 
 
@@ -433,28 +437,29 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
                                       &propose.hash(),
                                       LOCK_ZERO,
                                       sandbox.s(VALIDATOR_2 as usize)));
+            sandbox.recv(Prevote::new(VALIDATOR_0,
+                                      initial_height,
+                                      round,
+                                      &propose.hash(),
+                                      LOCK_ZERO,
+                                      sandbox.s(VALIDATOR_0 as usize)));
             sandbox.assert_lock(round, Some(propose.hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
-            // let block = Block::new(initial_height, propose_time, &hash(&[]), &hash(&[]), &hash(&[]));
-            //            let block = Block::new(initial_height, round, propose_time, &hash(&[]), &tx.hash(), &hash(&[]));
-            //            let block = Block::new(initial_height, round, propose_time, &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(), &hash(&[]));
+            let state_hash = sandbox.compute_state_hash(&raw_txs);
             let block = BlockBuilder::new(sandbox)
                 .with_txs_hashes(&hashes)
+                .with_state_hash(&state_hash)
                 .build();
-            //    let block = Block::new(h, propose_time, &hash(&[]), &hash(&[tx.hash()]), &hash(&[tx.hash()]));
             trace!("new_block: {:?}", block);
             trace!("new_block.hash(): {:?}", block.hash());
-            {
-                *sandbox_state.accepted_block_hash.borrow_mut() = block.hash();
-            }
 
-            sandbox.recv(Precommit::new(VALIDATOR_3,
+            sandbox.recv(Precommit::new(VALIDATOR_0,
                                              initial_height,
                                              round,
                                              &propose.hash(),
                                              &block.hash(),
-                                             sandbox.s(VALIDATOR_3 as usize)));
+                                             sandbox.s(VALIDATOR_0 as usize)));
             sandbox.assert_lock(round, Some(propose.hash()));
 
             sandbox.recv(Precommit::new(VALIDATOR_1,

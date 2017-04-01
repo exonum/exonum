@@ -290,10 +290,7 @@ impl<S> NodeHandler<S>
             // Execute block and get state hash
             let our_block_hash = self.execute(propose_hash);
 
-            if &our_block_hash != block_hash {
-                panic!("We are fucked up...");
-            }
-
+            assert_eq!(&our_block_hash, block_hash, "Our block_hash different from precommits one.");
             let precommits = self.state
                 .precommits(round, our_block_hash)
                 .iter()
