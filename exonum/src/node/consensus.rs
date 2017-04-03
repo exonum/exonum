@@ -12,13 +12,16 @@ use events::Channel;
 
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
 
+
 const BLOCK_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 // TODO reduce view invokations
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
             warn!("Received consensus message from other height: msg.height={}, self.height={}",
@@ -451,6 +454,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
         trace!("Handle transaction");
         let hash = msg.hash();
@@ -685,6 +689,7 @@ impl<S> NodeHandler<S>
     }
 
     // FIXME: remove this bull shit
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         let propose = self.state
             .propose(propose_hash)

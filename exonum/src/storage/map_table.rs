@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 // use std::iter::Iterator;
 
 use super::{Map, Error, StorageValue};
+use profiler;
 // use super::{Iterable, Seekable}
 
 pub struct MapTable<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> {
@@ -28,6 +29,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
           V: StorageValue
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
+        let _profiler = profiler::ProfilerSpan::new("MapTable::get");
         let v = self.storage.get(&[&self.prefix, key.as_ref()].concat())?;
         Ok(v.map(StorageValue::deserialize))
     }
