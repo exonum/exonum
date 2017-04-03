@@ -110,7 +110,8 @@ impl<S> NodeHandler<S>
                                stored,
                                connect,
                                last_hash,
-                               last_height);
+                               last_height,
+                               sender.get_time());
 
         NodeHandler {
             state: state,
@@ -154,9 +155,8 @@ impl<S> NodeHandler<S>
             info!("Try to connect with peer {}", address);
         }
 
-        let round = self.actual_round();
+        let round = 1;
         self.state.jump_round(round);
-
         info!("Jump to round {}", round);
 
         self.add_round_timeout();
@@ -246,13 +246,6 @@ impl<S> NodeHandler<S>
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
-    pub fn last_block_time(&self) -> Timespec {
-        self.blockchain
-            .last_block()
-            .unwrap()
-            .time()
-    }
-
     pub fn last_block_hash(&self) -> Hash {
         self.blockchain
             .last_block()
@@ -260,25 +253,9 @@ impl<S> NodeHandler<S>
             .hash()
     }
 
-    pub fn actual_round(&self) -> Round {
-        let now = self.channel.get_time();
-        let propose = self.last_block_time();
-        debug_assert!(now >= propose);
-
-        let duration = (now - propose - Duration::milliseconds(self.state.propose_timeout()))
-            .num_milliseconds();
-        if duration > 0 {
-            let round = (duration / self.round_timeout()) as Round + 1;
-            ::std::cmp::max(1, round)
-        } else {
-            1
-        }
-    }
-
-    // FIXME find more flexible solution
     pub fn round_start_time(&self, round: Round) -> Timespec {
         let ms = (round - 1) as i64 * self.round_timeout();
-        self.last_block_time() + Duration::milliseconds(ms)
+        self.state.height_start_time() + Duration::milliseconds(ms)
     }
 }
 

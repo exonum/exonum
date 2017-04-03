@@ -139,7 +139,6 @@ impl<S> NodeHandler<S>
             let peer = peer.clone();
             let msg = RequestPeers::new(self.state.public_key(),
                                         peer.pub_key(),
-                                        self.channel.get_time(),
                                         self.state.secret_key());
             trace!("Request peers from peer with addr {:?}", peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());

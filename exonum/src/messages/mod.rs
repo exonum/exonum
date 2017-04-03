@@ -11,7 +11,6 @@ mod fields;
 mod protocol;
 pub mod utils;
 
-use time::Timespec;
 use bit_vec;
 
 use ::crypto::PublicKey;
@@ -78,17 +77,6 @@ impl RequestMessage {
         }
     }
 
-    pub fn time(&self) -> Timespec {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.time(),
-            RequestMessage::Transactions(ref msg) => msg.time(),
-            RequestMessage::Prevotes(ref msg) => msg.time(),
-            RequestMessage::Precommits(ref msg) => msg.time(),
-            RequestMessage::Peers(ref msg) => msg.time(),
-            RequestMessage::Block(ref msg) => msg.time(),
-        }
-    }
-    
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
