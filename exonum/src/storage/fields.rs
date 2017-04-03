@@ -1,24 +1,10 @@
 use std::mem;
 use std::sync::Arc;
 use byteorder::{ByteOrder, BigEndian};
-use super::Error;
 
 use ::crypto::{Hash, hash};
 use ::messages::{RawMessage, MessageBuffer, Message, FromRaw};
-use serde::Deserialize;
-use serde_json::Value;
-use serde_json::value::from_value;
 
-pub trait DeserializeFromJson: Sized {
-    fn deserialize(json: &Value) -> Result<Self, Error>;
-}
-
-impl<T: Deserialize> DeserializeFromJson for T {
-    fn deserialize(json: &Value) -> Result<Self, Error> {
-        from_value(json.clone())
-            .map_err(|e| Error::new(format!("Error deserializing from json: {}", e)))
-    }
-}
 pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;
     fn deserialize(v: Vec<u8>) -> Self;
