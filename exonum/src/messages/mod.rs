@@ -88,7 +88,8 @@ impl RequestMessage {
             RequestMessage::Block(ref msg) => msg.time(),
         }
     }
-
+    
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
             RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),

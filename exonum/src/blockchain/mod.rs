@@ -179,6 +179,7 @@ impl Blockchain {
         Ok((block_hash, fork.changes()))
     }
 
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I>(&self,
                          state: &mut State,
                          block_hash: Hash,
@@ -198,7 +199,7 @@ impl Blockchain {
             for precommit in precommits {
                 schema.precommits(&block_hash).append(precommit.clone())?;
             }
-
+            
             let mut node_state = NodeState::new(state, &view);
             for service in self.service_map.values() {
                 service.handle_commit(&mut node_state)?;
