@@ -398,7 +398,6 @@ impl Sandbox {
             let db = blockchain.view();
             let (_, patch) = blockchain.create_patch(self.current_height(),
                               self.current_round(),
-                              self.time(),
                               &hashes,
                               &tx_pool)
                 .unwrap();
@@ -538,7 +537,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         txs_block_limit: 1000,
     };
     let mut genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
-    genesis.time = 1486720340;
+    let time = Timespec::new(1486720340, 0);
+    genesis.time = time.sec as u64;
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
@@ -556,7 +556,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let inner = Arc::new(Mutex::new(SandboxInner {
         address: addresses[0].clone(),
-        time: blockchain.last_block().unwrap().time(),
+        time: time,
         sended: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
