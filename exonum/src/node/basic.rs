@@ -90,21 +90,16 @@ impl<S> NodeHandler<S>
                 return;
             }
             
-            match self.state.get_validator_id(peer) {
-                // if message is status of validator 
-                Some(id) => {
-                    // Check validator height info
-                    if msg.height() > self.state.validator_height(id) {
-                        // Update validator height
-                        self.state.set_validator_height(id, msg.height());
-                    }
+            if let Some(id) = self.state.get_validator_id(peer) {
+                // Check validator height info
+                if msg.height() > self.state.validator_height(id) {
+                    // Update validator height
+                    self.state.set_validator_height(id, msg.height());
                 }
-                // if it just FullNode's message
-                None => (),
             }
 
             // Request block
-            self.request(RequestData::Block(height), peer.clone());
+            self.request(RequestData::Block(height), *peer);
         }
     }
 
