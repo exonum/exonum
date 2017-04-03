@@ -148,19 +148,19 @@ impl NodeType {
         if let Some(id)  = validator_id {
             NodeType::Validator(id)
         } else {
-            NodeType::FullNode(pk.clone())
+            NodeType::FullNode(*pk)
         }
     }
 
     pub fn get_validator_id(&self) -> Option<ValidatorId> {
-        if let &NodeType::Validator(id) = self {
+        if let NodeType::Validator(id) = *self {
             Some(id)
         } else {
             None
         }
     }
     pub fn expect_validator_id(&self, msg: &str) -> ValidatorId {
-        if let &NodeType::Validator(id) = self {
+        if let NodeType::Validator(id) = *self {
             id
         } else {
             panic!("{} for node_type: {:?}", msg, self)
