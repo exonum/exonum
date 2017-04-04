@@ -222,7 +222,6 @@ mod tests {
     use router::Router;
     use exonum::blockchain::Block;
     use exonum::crypto::Hash;
-    use time::get_time;
     use serde_json;
     use super::Api;
 
@@ -231,7 +230,6 @@ mod tests {
         let str_val = "sghdkgskgskldghshgsd";
         let complex_val = Block::new(24,
                                      2,
-                                     get_time(),
                                      &Hash::new([24; 32]),
                                      &Hash::new([34; 32]),
                                      &Hash::new([38; 32]));
