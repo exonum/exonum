@@ -387,7 +387,7 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
         .collect::<Vec<_>>();
     let txs: &[RawTransaction] = raw_txs.as_ref();
 
-    // pub fn add_one_height(sandbox: &TimestampSandbox, sandbox_state: &SandboxState) {
+    
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
     // assert 1st round
@@ -405,8 +405,8 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
-
-    for _ in 0..sandbox.n_validators() {
+    let n_validators = sandbox.n_validators();
+    for _ in 0..n_validators {
         //        add_round_with_transactions(&sandbox, &[tx.hash()]);
         add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
         let round: u32 = sandbox.current_round();
@@ -421,28 +421,14 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
                 *sandbox_state.accepted_propose_hash.borrow_mut() = propose.hash();
             }*/
             sandbox.recv(propose.clone());
-
-
-
-            sandbox.recv(Prevote::new(VALIDATOR_1,
-                                      initial_height,
-                                      round,
-                                      &propose.hash(),
-                                      LOCK_ZERO,
-                                      sandbox.s(VALIDATOR_1 as usize)));
-            //            sandbox.assert_lock(LOCK_ZERO, None);
-            sandbox.recv(Prevote::new(VALIDATOR_2,
-                                      initial_height,
-                                      round,
-                                      &propose.hash(),
-                                      LOCK_ZERO,
-                                      sandbox.s(VALIDATOR_2 as usize)));
-            sandbox.recv(Prevote::new(VALIDATOR_0,
-                                      initial_height,
-                                      round,
-                                      &propose.hash(),
-                                      LOCK_ZERO,
-                                      sandbox.s(VALIDATOR_0 as usize)));
+            for val_idx in 0..sandbox.majority_count(n_validators) {
+                sandbox.recv(Prevote::new(val_idx as u32,
+                                          initial_height,
+                                          round,
+                                          &propose.hash(),
+                                          LOCK_ZERO,
+                                          sandbox.s(val_idx)));
+            }
             sandbox.assert_lock(round, Some(propose.hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
@@ -453,29 +439,19 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
                 .build();
             trace!("new_block: {:?}", block);
             trace!("new_block.hash(): {:?}", block.hash());
-
-            sandbox.recv(Precommit::new(VALIDATOR_0,
-                                             initial_height,
-                                             round,
-                                             &propose.hash(),
-                                             &block.hash(),
-                                             sandbox.s(VALIDATOR_0 as usize)));
+    
             sandbox.assert_lock(round, Some(propose.hash()));
+            sandbox.assert_state(initial_height, round);            
 
-            sandbox.recv(Precommit::new(VALIDATOR_1,
-                                        initial_height,
-                                        round,
-                                        &propose.hash(),
-                                        &block.hash(),
-                                        sandbox.s(VALIDATOR_1 as usize)));
+            for val_idx in 0..sandbox.majority_count(n_validators) {
+                sandbox.recv(Precommit::new(val_idx as u32,
+                                                 initial_height,
+                                                 round,
+                                                 &propose.hash(),
+                                                 &block.hash(),
+                                                 sandbox.s(val_idx)));
+            }
 
-            sandbox.assert_state(initial_height, round);
-            sandbox.recv(Precommit::new(VALIDATOR_2,
-                                        initial_height,
-                                        round,
-                                        &propose.hash(),
-                                        &block.hash(),
-                                        sandbox.s(VALIDATOR_2 as usize)));
             sandbox.assert_state(initial_height + 1, ROUND_ONE);
 
             {

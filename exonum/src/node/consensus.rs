@@ -532,7 +532,7 @@ impl<S> NodeHandler<S>
                 .take(max_count)
                 .cloned()
                 .collect();
-            let propose = Propose::new(self.state.id(),
+            let propose = Propose::new(id,
                                     self.state.height(),
                                     round,
                                     self.state.last_hash(),
@@ -677,7 +677,7 @@ impl<S> NodeHandler<S>
 
     pub fn request_next_block(&mut self) {
         // TODO randomize next peer
-        let heights = self.state.validator_heights();
+        let heights = self.state.validators_with_bigger_height();
         if !heights.is_empty() {
             for id in heights {
                 let peer = *self.state.public_key_of(id).unwrap();
@@ -699,12 +699,11 @@ impl<S> NodeHandler<S>
         if let NodeType::Validator(id) = self.state.node_type() {
             let locked_round = self.state.locked_round();
             let prevote = Prevote::new(id,
-                                       self.state.height(),
-                                       round,
-                                       propose_hash,
-                                       block_hash,
-                                       self.channel.get_time(),
-                                       self.state.secret_key());
+                                    self.state.height(),
+                                    round,
+                                    propose_hash,
+                                    locked_round,
+                                    self.state.secret_key());
             let has_majority_prevotes = self.state.add_prevote(&prevote);
             trace!("Broadcast prevote: {:?}", prevote);
             self.broadcast(prevote.raw());
@@ -721,6 +720,7 @@ impl<S> NodeHandler<S>
                                            round,
                                            propose_hash,
                                            block_hash,
+                                           self.channel.get_time(),
                                            self.state.secret_key());
             self.state.add_precommit(&precommit);
             trace!("Broadcast precommit: {:?}", precommit);
