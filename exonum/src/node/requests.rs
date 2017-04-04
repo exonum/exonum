@@ -12,28 +12,12 @@ use super::{NodeHandler, ExternalMessage, NodeTimeout};
 // TODO validate_heights нужно обновлять по любым сообщениям, а не только по status (если они корректно подписаны)
 // TODO propose имеет смысл запрашивать только тогда, когда мы знаем, что узел находится на нашей высоте
 
-const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
-
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
         if msg.to() != self.state.public_key() {
-            return;
-        }
-
-        // FIXME: we should use some epsilon for checking lifetime < 0
-        let lifetime = match (self.channel.get_time() - msg.time()).num_nanoseconds() {
-            Some(nanos) => nanos,
-            None => {
-                // Incorrect time into message
-                return;
-            }
-        };
-
-        // Incorrect time of the request
-        if lifetime < 0 || lifetime > REQUEST_ALIVE {
             return;
         }
 
@@ -164,7 +148,6 @@ impl<S> NodeHandler<S>
 
         let block_msg = Block::new(self.state.public_key(),
                                    msg.from(),
-                                   self.channel.get_time(),
                                    block,
                                    precommits,
                                    transactions,

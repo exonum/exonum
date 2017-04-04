@@ -175,7 +175,6 @@ fn test_propose() {
     let validator = 123_123;
     let height = 123_123_123;
     let round = 321_321_312;
-    let time = ::time::get_time();
     let prev_hash = hash(&[1, 2, 3]);
     let txs = vec![hash(&[1]), hash(&[2]), hash(&[2])];
     let (public_key, secret_key) = gen_keypair();
@@ -184,7 +183,6 @@ fn test_propose() {
     let propose = Propose::new(validator,
                                height,
                                round,
-                               time,
                                &prev_hash,
                                &txs,
                                &secret_key);
@@ -192,7 +190,6 @@ fn test_propose() {
     assert_eq!(propose.validator(), validator);
     assert_eq!(propose.height(), height);
     assert_eq!(propose.round(), round);
-    assert_eq!(propose.time(), time);
     assert_eq!(propose.prev_hash(), &prev_hash);
     assert_eq!(propose.transactions().len(), 3);
     assert_eq!(propose.transactions()[0], txs[0]);
@@ -234,6 +231,7 @@ fn test_precommit() {
     let propose_hash = hash(&[1, 2, 3]);
     let block_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
+    let time = time::get_time();
 
     // write
     let precommit = Precommit::new(validator,
@@ -241,6 +239,7 @@ fn test_precommit() {
                                    round,
                                    &propose_hash,
                                    &block_hash,
+                                   time,
                                    &secret_key);
     // read
     assert_eq!(precommit.validator(), validator);
@@ -249,6 +248,7 @@ fn test_precommit() {
     assert_eq!(precommit.propose_hash(), &propose_hash);
     assert_eq!(precommit.block_hash(), &block_hash);
     assert!(precommit.verify_signature(&public_key));
+    assert_eq!(precommit.time(), time);
     let json_str = serde_json::to_string(&precommit).unwrap();
     let precommit1 : Precommit = serde_json::from_str(&json_str).unwrap(); 
     assert_eq!(precommit, precommit1);
@@ -277,7 +277,6 @@ fn test_block() {
 
     let content = blockchain::Block::new(500,
                                          1,
-                                         time::get_time(),
                                          &hash(&[1]),
                                          &hash(&[2]),
                                          &hash(&[3]));
@@ -287,25 +286,27 @@ fn test_block() {
                                          25,
                                          &hash(&[1, 2, 3]),
                                          &hash(&[3, 2, 1]),
+                                         ts,
                                          &secret_key),
                           Precommit::new(13,
                                          25,
                                          35,
                                          &hash(&[4, 2, 3]),
                                          &hash(&[3, 3, 1]),
+                                         ts,
                                          &secret_key),
                           Precommit::new(323,
                                          15,
                                          25,
                                          &hash(&[1, 1, 3]),
                                          &hash(&[5, 2, 1]),
+                                         ts,
                                          &secret_key)];
     let transactions = vec![Status::new(1, 2, &hash(&[]), &secret_key).raw().clone(),
                             Status::new(2, 4, &hash(&[2]), &secret_key).raw().clone(),
                             Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone()];
     let block = Block::new(&pub_key,
                            &pub_key,
-                           ts,
                            content.clone(),
                            precommits.clone(),
                            transactions.clone(),
@@ -313,7 +314,6 @@ fn test_block() {
 
     assert_eq!(block.from(), &pub_key);
     assert_eq!(block.to(), &pub_key);
-    assert_eq!(block.time(), ts);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
@@ -321,7 +321,6 @@ fn test_block() {
     let block2 = Block::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
-    assert_eq!(block2.time(), ts);
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits);
     assert_eq!(block2.transactions(), transactions);
@@ -337,15 +336,13 @@ fn test_block() {
 #[test]
 fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
-    let ts = time::get_time();
 
-    let content = blockchain::Block::new(200, 1, ts, &hash(&[1]), &hash(&[2]), &hash(&[3]));
+    let content = blockchain::Block::new(200, 1, &hash(&[1]), &hash(&[2]), &hash(&[3]));
 
     let precommits = Vec::new();
     let transactions = Vec::new();
     let block = Block::new(&pub_key,
                            &pub_key,
-                           ts,
                            content.clone(),
                            precommits.clone(),
                            transactions.clone(),
@@ -353,7 +350,6 @@ fn test_empty_block() {
 
     assert_eq!(block.from(), &pub_key);
     assert_eq!(block.to(), &pub_key);
-    assert_eq!(block.time(), ts);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
@@ -361,7 +357,6 @@ fn test_empty_block() {
     let block2 = Block::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
-    assert_eq!(block2.time(), ts);
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits);
     assert_eq!(block2.transactions(), transactions);
@@ -370,14 +365,12 @@ fn test_empty_block() {
 #[test]
 fn test_request_block() {
     let (public_key, secret_key) = gen_keypair();
-    let time = time::get_time();
 
     // write
-    let request = RequestBlock::new(&public_key, &public_key, time, 1, &secret_key);
+    let request = RequestBlock::new(&public_key, &public_key, 1, &secret_key);
     // read
     assert_eq!(request.from(), &public_key);
     assert_eq!(request.height(), 1);
     assert_eq!(request.to(), &public_key);
-    assert_eq!(request.time(), time);
     assert!(request.verify_signature(&public_key));
 }

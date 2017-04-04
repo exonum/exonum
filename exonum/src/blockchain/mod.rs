@@ -9,7 +9,6 @@ mod service;
 use std::sync::Arc;
 use std::collections::BTreeMap;
 
-use time::Timespec;
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use std::mem;
@@ -83,10 +82,6 @@ impl Blockchain {
             consensus: cfg.consensus,
             services: BTreeMap::new(),
         };
-        let time = Timespec {
-            sec: cfg.time as i64,
-            nsec: 0,
-        };
 
         let patch = {
             let view = self.view();
@@ -107,7 +102,7 @@ impl Blockchain {
                 schema.commit_actual_configuration(config_propose)?;
             };
             self.merge(&view.changes())?;
-            self.create_patch(0, 0, time, &[], &BTreeMap::new())?.1
+            self.create_patch(0, 0, &[], &BTreeMap::new())?.1
         };
         self.merge(&patch)?;
         Ok(())
@@ -125,7 +120,6 @@ impl Blockchain {
     pub fn create_patch(&self,
                         height: u64,
                         round: u32,
-                        time: Timespec,
                         tx_hashes: &[Hash],
                         pool: &TxPool)
                         -> Result<(Hash, Patch), Error> {
@@ -168,7 +162,7 @@ impl Blockchain {
         };
 
         // Create block
-        let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
+        let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
         // Eval block hash
         let block_hash = block.hash();
         // Update height

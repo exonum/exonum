@@ -21,7 +21,6 @@ pub trait TransactionInfo: Serialize {}
 pub struct BlockInfo {
     height: u64,
     proposer: u32,
-    propose_time: i64,
 
     hash: HexField<Hash>,
     state_hash: HexField<Hash>,
@@ -75,7 +74,6 @@ impl<'a> BlockchainExplorer<'a> {
             let info = BlockInfo {
                 height: height,
                 proposer: proposer,
-                propose_time: block.time().sec,
 
                 hash: HexField(*block_hash),
                 state_hash: HexField(*block.state_hash()),
