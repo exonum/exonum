@@ -20,7 +20,6 @@ use exonum::storage::RootProofNode;
 use exonum::blockchain::{self, Blockchain};
 
 use super::wallet::Wallet;
-use super::CurrencyTxSender;
 use super::{CRYPTOCURRENCY, CurrencySchema, CurrencyTx};
 
 #[derive(Serialize)]
@@ -43,12 +42,14 @@ pub struct WalletInfo {
 }
 
 #[derive(Clone)]
-pub struct CryptocurrencyApi {
+pub struct CryptocurrencyApi<T: TransactionSend + Clone> {
     pub blockchain: Blockchain,
-    pub channel: CurrencyTxSender,
+    pub channel: T,
 }
 
-impl CryptocurrencyApi {
+impl<T> CryptocurrencyApi<T>
+    where T: TransactionSend + Clone
+{
     fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
         let view = self.blockchain.view();
         let general_schema = blockchain::Schema::new(&view);
@@ -118,7 +119,9 @@ impl CryptocurrencyApi {
     }
 }
 
-impl Api for CryptocurrencyApi {
+impl<T> Api for CryptocurrencyApi<T>
+    where T: 'static + TransactionSend + Clone
+{
     fn wire(&self, router: &mut Router) {
         let _self = self.clone();
         let wallet_info = move |req: &mut Request| -> IronResult<Response> {
@@ -126,11 +129,11 @@ impl Api for CryptocurrencyApi {
             match map.find(&["pubkey"]) {
                 Some(&Value::String(ref pub_key_string)) => {
                     let public_key =
-                        PublicKey::from_hex(pub_key_string).map_err(|err| ApiError::FromHex(err))?;
+                        PublicKey::from_hex(pub_key_string).map_err(ApiError::FromHex)?;
                     let info = _self.wallet_info(&public_key)?;
                     _self.ok_response(&info.to_json())
                 }
-                _ => return Err(ApiError::IncorrectRequest)?,
+                _ => Err(ApiError::IncorrectRequest)?,
             }
         };
 
@@ -149,8 +152,11 @@ impl Api for CryptocurrencyApi {
                 }
             }
         };
-
-        router.post("/api/v1/wallets/transaction", transaction, "transaction");
-        router.get("/api/v1/wallets/info", wallet_info, "wallet_info");
+        let route_post = "/api/v1/wallets/transaction";
+        let route_get = "/api/v1/wallets/info";
+        router.post(&route_post, transaction, "transaction");
+        info!("Created post route: {}", route_post);
+        router.get(&route_get, wallet_info, "wallet_info");
+        info!("Created get route: {}", route_get);
     }
 }

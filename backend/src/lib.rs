@@ -40,7 +40,6 @@ use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
-
 use wallet::Wallet;
 
 pub const CRYPTOCURRENCY: u16 = 128;
@@ -48,9 +47,6 @@ pub const CRYPTOCURRENCY: u16 = 128;
 pub const TX_TRANSFER_ID: u16 = 128;
 pub const TX_ISSUE_ID: u16 = 129;
 pub const TX_WALLET_ID: u16 = 130;
-
-use exonum::node::{TxSender, NodeChannel};
-pub type CurrencyTxSender = TxSender<NodeChannel>;
 
 message! {
     TxTransfer {
@@ -188,10 +184,10 @@ impl Deserialize for CurrencyTx {
         match h.service_id {
             CRYPTOCURRENCY => {} 
             other => {
-                return Err(de::Error::custom((format!("service_id doesn't match the expected. \
+                return Err(de::Error::custom(format!("service_id doesn't match the expected. \
                                                        actual: {}, expected: {}",
                                                       other,
-                                                      CRYPTOCURRENCY))))
+                                                      CRYPTOCURRENCY)))
             }
         }
         let res = match h.message_id {
@@ -336,6 +332,7 @@ impl<'a> CurrencySchema<'a> {
     }
 }
 
+#[derive(Default)]
 pub struct CurrencyService {}
 
 impl CurrencyService {
@@ -350,7 +347,12 @@ impl Transaction for CurrencyTx {
     }
 
     fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
+        let res = self.verify_signature(self.pub_key());
+        let res1 = match *self {
+            CurrencyTx::Transfer(ref msg) => *msg.from() != *msg.to(), 
+            _ => true,  
+        };
+        res && res1
     }
 
     fn execute(&self, view: &View) -> Result<(), Error> {
@@ -398,7 +400,7 @@ impl Transaction for CurrencyTx {
             }
             CurrencyTx::CreateWallet(ref msg) => {
                 let pub_key = msg.pub_key();
-                if let Some(_) = schema.wallet(pub_key)? {
+                if schema.wallet(pub_key)?.is_some() {
                     return Ok(());
                 }
 

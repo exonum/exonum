@@ -14,6 +14,7 @@ script:
 - cargo check --features clippy --manifest-path backend/Cargo.toml
 - cargo build --release --manifest-path backend/Cargo.toml
 - cargo test --release --manifest-path backend/Cargo.toml
+- cargo test --release --manifest-path backend/cryptocurrency_api_tests/Cargo.toml
 notifications:
   slack:
     rooms:
