@@ -21,7 +21,8 @@ configuration run -c ~/Downloads/test_cfg/validators/3.toml -d ~/Downloads/test_
 `http://127.0.0.1:8000/api/v1/configs/7aa8c6a39438443ccc2a31d28cbd6b3f897be9db3ff13711b85a3eddb5eebcba/votes` - посмотреть принятые голоса
 
  6) внести предложение за новый конфиг: 
- ```curl -X POST -d '{
+ ```
+ curl -X POST -d '{
         "actual_from": 1000,
         "consensus": {
                 "peers_timeout": 10000,
