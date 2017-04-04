@@ -45,7 +45,8 @@ configuration run -c ~/Downloads/test_cfg/validators/3.toml -d ~/Downloads/test_
 ```
 
 В ответ на curl придет ответ вида
-```{ cfg_hash: "…", tx_hash: "…"}
+```
+{ cfg_hash: "…", tx_hash: "…"}
 ```
 
 по cfg_hash - можно смотреть конфиг статус пропоуза `http://127.0.0.1:8000/api/v1/configs/cfg_hash`
