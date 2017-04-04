@@ -8,6 +8,7 @@ use jsonway;
 use params::{Params, Value};
 use blockchain_explorer::api::{Api, ApiError};
 
+use exonum::node::TransactionSend;
 use exonum::messages::BlockProof;
 use exonum::crypto::{HexValue, PublicKey, Hash};
 use exonum::storage::{StorageValue, List, Map};
