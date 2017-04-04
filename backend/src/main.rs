@@ -18,7 +18,6 @@ extern crate blockchain_explorer;
 extern crate cryptocurrency;
 extern crate router;
 extern crate cookie;
-extern crate configuration_service;
 
 use std::net::SocketAddr;
 use std::thread;
@@ -27,7 +26,6 @@ use router::Router;
 
 use exonum::blockchain::{Blockchain, Service};
 use exonum::node::{Node, NodeConfig};
-use configuration_service::ConfigurationService;
 
 use cryptocurrency::CurrencyService;
 use cryptocurrency::api::CryptocurrencyApi;
@@ -90,8 +88,7 @@ fn main() {
             let node_cfg = RunCommand::node_config(matches);
             let db = RunCommand::db(matches);
 
-            let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new()),
-                                                   Box::new(ConfigurationService::new())];
+            let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
             let blockchain = Blockchain::new(db, services);
             run_node(blockchain, node_cfg, port)
         }
