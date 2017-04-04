@@ -23,6 +23,8 @@ serde_json = "0.8"
 cookie = "0.6.0"
 tempdir = "0.3.5"
 params = "0.6.0"
+clippy = {version = "0.0.107", optional = true}
+
 
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
