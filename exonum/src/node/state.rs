@@ -73,7 +73,9 @@ pub struct State {
     validator_heights: Vec<Height>,
 }
 
-// Тип ноды, если нода валидатор, то содержит id валидатора
+/// Currently node can work in two mode:
+/// 1. As validator that make decisions in consensus.
+/// 2. As auditor full node that can check validity of network.
 #[derive(Debug, Clone, Copy)]
 pub enum NodeType {
     Validator(ValidatorId),
@@ -157,13 +159,6 @@ impl NodeType {
             Some(id)
         } else {
             None
-        }
-    }
-    pub fn expect_validator_id(&self, msg: &str) -> ValidatorId {
-        if let NodeType::Validator(id) = *self {
-            id
-        } else {
-            panic!("{} for node_type: {:?}", msg, self)
         }
     }
 }
@@ -433,8 +428,7 @@ impl State {
         self.validator_heights[id as usize] = height;
     }
 
-    // FIXME: название не отображает суть
-    pub fn validator_heights(&self) -> Vec<ValidatorId> {
+    pub fn validators_with_bigger_height(&self) -> Vec<ValidatorId> {
         self.validator_heights
             .iter()
             .enumerate()
@@ -571,7 +565,7 @@ impl State {
     }
 
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
-        let id = self.node_type.expect_validator_id("called add_self_propose");
+        let id = self.node_type.get_validator_id().expect("called add_self_propose");
         debug_assert_eq!(msg.validator(), id);
         let propose_hash = msg.hash();
         self.proposes.insert(propose_hash,
