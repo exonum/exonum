@@ -449,6 +449,7 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
                                                  round,
                                                  &propose.hash(),
                                                  &block.hash(),
+                                                 sandbox.time(),
                                                  sandbox.s(val_idx)));
             }
 
