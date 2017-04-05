@@ -19,6 +19,7 @@ use exonum::storage::RootProofNode;
 
 use exonum::blockchain::{self, Blockchain};
 
+use super::tx_metarecord::TxMetaRecord;
 use super::wallet::Wallet;
 use super::{CRYPTOCURRENCY, CurrencySchema, CurrencyTx};
 
@@ -30,7 +31,7 @@ pub struct HashMPTproofLinker<V: Serialize> {
 
 #[derive(Serialize)]
 pub struct HashMTproofLinker<V: Serialize> {
-    mt_proof: Proofnode<Hash>,
+    mt_proof: Proofnode<TxMetaRecord>,
     values: Vec<V>,
 }
 
@@ -84,14 +85,14 @@ impl<T> CryptocurrencyApi<T>
                 let history_len = history.len()?;
                 debug_assert!(history_len >= 1);
                 debug_assert_eq!(history_len, wallet.history_len());
-                let tx_hashes: Vec<Hash> = history.values()?;
+                let tx_records: Vec<TxMetaRecord> = history.values()?;
                 let transactions_table = general_schema.transactions();
-                let mut txs: Vec<CurrencyTx> = Vec::with_capacity(tx_hashes.len());
-                for hash in tx_hashes {
-                    let raw_message = transactions_table.get(&hash)?.unwrap();
+                let mut txs: Vec<CurrencyTx> = Vec::with_capacity(tx_records.len());
+                for record in tx_records {
+                    let raw_message = transactions_table.get(record.tx_hash())?.unwrap();
                     txs.push(CurrencyTx::from(raw_message));
                 }
-                let to_transaction_hashes: Proofnode<Hash> =
+                let to_transaction_hashes: Proofnode<TxMetaRecord> =
                     history.construct_path_for_range(0, history_len)?;
                 let path_to_transactions = HashMTproofLinker {
                     mt_proof: to_transaction_hashes,

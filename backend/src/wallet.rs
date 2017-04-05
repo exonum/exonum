@@ -5,7 +5,6 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use exonum::messages::utils::U64;
 use exonum::storage::StorageValue;
 
-pub type WalletId = u64;
 
 storage_value! {
     Wallet {
