@@ -132,6 +132,7 @@ mod tests {
         fn new() -> CurrencySandbox {
             let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
             let sandbox = sandbox_with_services(services);
+            info!("Sandbox validators list: {}", serde_json::to_string(&sandbox.validators()).unwrap());
             let state = SandboxState::new();
             CurrencySandbox {
                 sandbox: sandbox,
@@ -453,8 +454,8 @@ mod tests {
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
-        let expected_body1 = from_file("test_data/no_state_change1.json");
-        assert_eq!(body1, expected_body1, "no_state_change1");
+        let expected_body1 = from_file("test_data/commit_new_tx_create_wallet.json");
+        assert_eq!(body1, expected_body1, "false execution status create wallet");
 
         let (p_absent, s_absent) = gen_keypair_from_seed(&Seed::new([27; 32]));
         sandbox.post_transaction(CurrencyTx::from(TxIssue::new(&p_absent, 6000, 329832, &s_absent)))
@@ -472,8 +473,8 @@ mod tests {
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
-        let expected_body1 = from_file("test_data/no_state_change3.json");
-        assert_eq!(body1, expected_body1, "no_state_change3");
+        let expected_body1 = from_file("test_data/commit_new_transfer_not_sufficient_funds.json");
+        assert_eq!(body1, expected_body1, "commit_new_transfer_not_sufficient_funds");
     }
 
     #[test]
