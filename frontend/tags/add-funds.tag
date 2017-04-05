@@ -1,6 +1,6 @@
 <add-funds>
     <div class="panel-heading">
-        <a class="btn btn-default pull-left page-nav" href="#user/{ opts.publicKey }">
+        <a class="btn btn-default pull-left page-nav" href="#user/{ publicKey }">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
         </a>
@@ -27,9 +27,12 @@
 
     <script>
         var self = this;
+        var user = self.storage.getUser();
+
+        this.publicKey = user.publicKey;
 
         this.toggleLoading(true);
-        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
             self.block = block;
             self.wallet = wallet;
             self.update();
@@ -39,13 +42,13 @@
         addFunds(e) {
             e.preventDefault();
             var amount = $(e.target).data('amount').toString();
-            var user = self.storage.getUser(self.opts.publicKey);
+            var user = self.storage.getUser();
 
             self.toggleLoading(true);
-            self.service.addFunds(amount, self.opts.publicKey, user.secretKey, function() {
+            self.service.addFunds(amount, user.publicKey, user.secretKey, function() {
                 self.toggleLoading(false);
                 self.notify('success', 'Funds has been added into your account.');
-                route('/user/' + self.opts.publicKey);
+                route('/user');
             });
         }
     </script>

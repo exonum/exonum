@@ -4,10 +4,10 @@
             <i class="glyphicon glyphicon-refresh"></i>
             <span class="hidden-xs">Refresh</span>
         </button>
-        <a class="btn btn-default pull-left page-nav" href="#dashboard">
+        <button class="btn btn-default pull-left page-nav" onclick={ logout }>
             <i class="glyphicon glyphicon-log-out"></i>
             <span class="hidden-xs">Logout</span>
-        </a>
+        </button>
         <div class="panel-title page-title text-center">
             <div class="h4">Wallet</div>
         </div>
@@ -25,7 +25,7 @@
 
             <div class="form-group">
                 <p class="text-center">Add more finds to your account:</p>
-                <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
+                <a href="#user/{ publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
             </div>
         </virtual>
 
@@ -47,10 +47,10 @@
                     <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
                         Add <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to your wallet
                     </div>
-                    <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
+                    <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.from === parent.publicKey }>
                         Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
-                    <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
+                    <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.to === parent.publicKey }>
                         Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
                     </div>
                 </div>
@@ -65,9 +65,12 @@
 
     <script>
         var self = this;
+        var user = self.storage.getUser();
+
+        this.publicKey = user.publicKey;
 
         this.toggleLoading(true);
-        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
             self.block = block;
             self.wallet = wallet;
             self.transactions = transactions;
@@ -81,12 +84,18 @@
 
         transfer(e) {
             e.preventDefault();
-            route('/user/' + self.opts.publicKey + '/transfer');
+            route('/user/transfer');
         }
 
         refresh(e) {
             e.preventDefault();
             window.location.reload();
+        }
+
+        logout(e) {
+            e.preventDefault();
+            self.deleteUser();
+            route('/dashboard');
         }
     </script>
 </wallet>

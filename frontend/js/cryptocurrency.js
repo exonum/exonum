@@ -13,7 +13,7 @@ function CryptocurrencyService(params) {
         size: 88,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            name: {type: Exonum.String, size: 8, from: 32, to: 40},
+            login: {type: Exonum.String, size: 8, from: 32, to: 40},
             balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
             history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
             history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
@@ -32,12 +32,14 @@ function CryptocurrencyService(params) {
     };
 
     this.CreateWalletTransactionParams = {
-        size: 40,
+        size: 144,
         service_id: params.id,
         message_id: 130,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            name: {type: Exonum.String, size: 8, from: 32, to: 40}
+            login: {type: Exonum.String, size: 8, from: 32, to: 40},
+            sec_key_enc: {type: Exonum.String, size: 80, from: 40, to: 120},
+            nonce: {type: Exonum.Nonce, size: 24, from: 120, to: 144}
         }
     };
 
@@ -211,13 +213,18 @@ CryptocurrencyService.prototype.addFunds = function(amount, publicKey, secretKey
     this.submitTransaction(this.AddFundsTransactionParams, data, publicKey, secretKey, callback);
 };
 
-CryptocurrencyService.prototype.createWallet = function(publicKey, name, secretKey, callback) {
+CryptocurrencyService.prototype.createWallet = function(login, password, callback) {
+    var pair = Exonum.keyPair();
+    var nonce = Exonum.randomNonce();
+    var secretKeyEncrypted = Exonum.encryptDigest(pair.secretKey, nonce, password);
     var data = {
-        pub_key: publicKey,
-        name: name
+        login: login,
+        pub_key: pair.publicKey,
+        sec_key_enc: secretKeyEncrypted,
+        nonce: nonce
     };
     
-    this.submitTransaction(this.CreateWalletTransactionParams, data, publicKey, secretKey, callback);
+    this.submitTransaction(this.CreateWalletTransactionParams, data, pair.publicKey, pair.secretKey, callback);
 };
 
 CryptocurrencyService.prototype.transfer = function(amount, from, to, secretKey, callback) {
@@ -273,6 +280,24 @@ CryptocurrencyService.prototype.getTransaction = function(hash, callback) {
         method: 'GET',
         url: this.baseUrl + '/blockchain/transactions/' + hash,
         success: callback,
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error(textStatus);
+        }
+    });
+};
+
+CryptocurrencyService.prototype.login = function(login, password, callback, error) {
+    $.ajax({
+        method: 'GET',
+        url: this.baseUrl + '/auth?login=' + login,
+        success: function(data, textStatus, jqXHR) {
+            var secretKey = Exonum.decryptDigest(data.sec_key_enc, data.nonce, password);
+            if (secretKey !== false) {
+                callback(data.pub_key, secretKey);
+            } else {
+                error();
+            }
+        },
         error: function(jqXHR, textStatus, errorThrown) {
             console.error(textStatus);
         }

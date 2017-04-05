@@ -32,10 +32,13 @@
 
     <script>
         var self = this;
+        var user = self.storage.getUser();
 
-        this.users = this.storage.getUsers();
+        this.publicKey = user.publicKey;
+        this.users = [];
+
         this.toggleLoading(true);
-        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
             self.block = block;
             self.wallet = wallet;
             self.update();
@@ -54,13 +57,13 @@
             e.preventDefault();
             var amount = self.amount.toString();
             var receiver = $('#receiver').val();
-            var user = self.storage.getUser(self.opts.publicKey);
+            var user = self.storage.getUser();
 
             self.toggleLoading(true);
-            self.service.transfer(amount, self.opts.publicKey, receiver, user.secretKey, function() {
+            self.service.transfer(amount, user.publicKey, receiver, user.secretKey, function() {
                 self.toggleLoading(false);
                 self.notify('success', 'Funds has been transferred.');
-                route('/user/' + self.opts.publicKey);
+                route('/user');
             });
         }
     </script>

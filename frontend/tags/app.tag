@@ -25,27 +25,19 @@
 
         // global mixin with common functions and constants
         riot.mixin({
-            core: Exonum,
             service: service,
 
             storage: {
-                getUsers: function() {
-                    return JSON.parse(window.localStorage.getItem('cc_users')) || [];
-                },
-
                 addUser: function(user) {
-                    var users = JSON.parse(window.localStorage.getItem('cc_users')) || [];
-                    users.push(user);
-                    window.localStorage.setItem('cc_users', JSON.stringify(users));
+                    window.localStorage.setItem('user', JSON.stringify(user));
                 },
 
-                getUser: function(publicKey) {
-                    var users = JSON.parse(window.localStorage.getItem('cc_users')) || [];
-                    for (var i = 0; i < users.length; i++) {
-                        if (users[i].publicKey === publicKey) {
-                            return users[i];
-                        }
-                    }
+                getUser: function() {
+                    return JSON.parse(window.localStorage.getItem('user'));
+                },
+
+                deleteUser: function() {
+                    window.localStorage.removeItem('user');
                 }
             },
 
@@ -83,16 +75,16 @@
                 riot.mount('#content', 'register');
             });
 
-            route('/user/*', function(publicKey) {
-                riot.mount('#content', 'wallet', {publicKey: publicKey});
+            route('/user', function() {
+                riot.mount('#content', 'wallet');
             });
 
-            route('/user/*/transfer', function(publicKey) {
-                riot.mount('#content', 'transfer', {publicKey: publicKey});
+            route('/user/transfer', function() {
+                riot.mount('#content', 'transfer');
             });
 
-            route('/user/*/add-funds', function(publicKey) {
-                riot.mount('#content', 'add-funds', {publicKey: publicKey});
+            route('/user/add-funds', function() {
+                riot.mount('#content', 'add-funds');
             });
 
             route('/blockchain', function(height) {
