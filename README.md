@@ -34,12 +34,14 @@ Here is an example of how `create a new wallet` transaction is declared:
 
 ```javascript
 var CreateWalletTransaction = {
-    size: 40,
+    size: 144,
     service_id: 128,
     message_id: 130,
     fields: {
         pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-        name: {type: Exonum.String, size: 8, from: 32, to: 40}
+        login: {type: Exonum.String, size: 8, from: 32, to: 40},
+        sec_key_enc: {type: Exonum.String, size: 80, from: 40, to: 120},
+        nonce: {type: Exonum.Nonce, size: 24, from: 120, to: 144}
     }
 };
 ```
@@ -50,12 +52,26 @@ Then new random pair of publicKey and secretKey is generated:
 var pair = Exonum.keyPair(); 
 ```
 
+Then random nonce is generated:
+
+```javascript
+var nonce = Exonum.randomNonce();
+```
+
+Then secretKey is encrypted using password as key:
+
+```
+var secretKeyEncrypted = Exonum.encryptDigest(pair.secretKey, nonce, password);
+```
+
 Then transaction data can be signed:
 
 ```javascript
 var data = {
     pub_key: pair.publicKey,
-    name: ...
+    login: ...,
+    sec_key_enc: secretKeyEncrypted,
+    nonce: nonce
 };
 
 var signature = CreateWalletTransaction.sign(data, pair.secretKey);
