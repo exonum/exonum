@@ -156,7 +156,14 @@ function CryptocurrencyService(params) {
         }
 
         // find hashes of all transactions
-        var hashes = Exonum.merkleProof(wallet.history_hash, wallet.history_len, data.wallet_history.mt_proof, [0, wallet.history_len]);
+        var Transaction = Exonum.newType({
+            size: 33,
+            fields: {
+                tx_hash: {type: Exonum.Hash, size: 32, from: 0, to: 32},
+                execution_status: {type: Exonum.Bool, size: 1, from: 32, to: 33}
+            }
+        });
+        var hashes = Exonum.merkleProof(wallet.history_hash, wallet.history_len, data.wallet_history.mt_proof, [0, wallet.history_len], Transaction);
 
         if (data.wallet_history.values.length !== hashes.length) {
             console.error('Number of transaction hashes is not equal to transactions number.');
@@ -168,14 +175,16 @@ function CryptocurrencyService(params) {
         for (var i = 0; i < data.wallet_history.values.length; i++) {
             var transaction = data.wallet_history.values[i];
             var type = this.getTransactionTypeParams(transaction.message_id);
-            var publicKey = getPublicKeyOfTransaction(transaction.message_id, transaction.body);
+            var publicKeyOfTransaction = getPublicKeyOfTransaction(transaction.message_id, transaction.body);
             
             type.signature = transaction.signature;
             transaction.hash = type.hash(transaction.body);
-            if (transaction.hash !== hashes[i]) {
+            transaction.status = hashes[i].execution_status;
+
+            if (transaction.hash !== hashes[i].tx_hash) {
                 console.error('Wrong transaction hash.');
                 return;
-            } else if (!type.verifySignature(transaction.body, transaction.signature, publicKey)) {
+            } else if (!type.verifySignature(transaction.body, transaction.signature, publicKeyOfTransaction)) {
                 console.error('Wrong transaction signature.');
                 return;
             }

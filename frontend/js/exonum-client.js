@@ -584,6 +584,7 @@ var bigInt = (function (undefined) {
             guess, xlen, highx, highy, check;
         while (a_l) {
             part.unshift(a[--a_l]);
+            trim(part);
             if (compareAbs(part, b) < 0) {
                 result.push(0);
                 continue;
@@ -954,6 +955,9 @@ var bigInt = (function (undefined) {
         if (t.compare(0) === -1) {
         	t = t.add(n);
         }
+        if (this.isNegative()) {
+            return t.negate();
+        }
         return t;
     }
     SmallInteger.prototype.modInv = BigInteger.prototype.modInv;
@@ -1094,7 +1098,7 @@ var bigInt = (function (undefined) {
         b = parseValue(b);
         return a.greater(b) ? a : b;
     }
-    function min(a,b) {
+    function min(a, b) {
         a = parseValue(a);
         b = parseValue(b);
         return a.lesser(b) ? a : b;
@@ -6539,18 +6543,17 @@ require('../src/data-management');
 require('../src/validators');
 
 var Block = Exonum.newType({
-    size: 116,
+    size: 108,
     fields: {
         height: {type: Exonum.Uint64, size: 8, from: 0, to: 8},
         propose_round: {type: Exonum.Uint32, size: 4, from: 8, to: 12},
-        time: {type: Exonum.Timespec, size: 8, from: 12, to: 20},
-        prev_hash: {type: Exonum.Hash, size: 32, from: 20, to: 52},
-        tx_hash: {type: Exonum.Hash, size: 32, from: 52, to: 84},
-        state_hash: {type: Exonum.Hash, size: 32, from: 84, to: 116}
+        prev_hash: {type: Exonum.Hash, size: 32, from: 12, to: 44},
+        tx_hash: {type: Exonum.Hash, size: 32, from: 44, to: 76},
+        state_hash: {type: Exonum.Hash, size: 32, from: 76, to: 108}
     }
 });
 var Precommit = Exonum.newMessage({
-    size: 84,
+    size: 92,
     service_id: 0,
     message_id: 4,
     fields: {
@@ -6558,7 +6561,8 @@ var Precommit = Exonum.newMessage({
         height: {type: Exonum.Uint64, size: 8, from: 8, to: 16},
         round: {type: Exonum.Uint32, size: 4, from: 16, to: 20},
         propose_hash: {type: Exonum.Hash, size: 32, from: 20, to: 52},
-        block_hash: {type: Exonum.Hash, size: 32, from: 52, to: 84}
+        block_hash: {type: Exonum.Hash, size: 32, from: 52, to: 84},
+        time: {type: Exonum.Timespec, size: 8, from: 84, to: 92}
     }
 });
 
@@ -6748,8 +6752,12 @@ Exonum.binaryStringToHexadecimal = function(binaryStr) {
 Exonum.hexadecimalToBinaryString = function(str) {
     var binaryStr = '';
 
-    for (var i = 0, len = str.length; i < len; i += 2) {
-        binaryStr += parseInt(str.substr(i, 2), 16).toString(2);
+    for (var i = 0, len = str.length; i < len; i++) {
+        var bin = parseInt(str.substr(i, 1), 16).toString(2);
+        for (var j = bin.length; j < 4; j++) {
+            bin = '0' + bin;
+        }
+        binaryStr += bin;
     }
 
     return binaryStr;
@@ -7242,8 +7250,9 @@ Exonum.merklePatriciaProof = function(rootHash, proofNode, key, type) {
      * @returns {Boolean}
      */
     function isPartOfSearchKey(prefix, suffix) {
+        // remove prefix from searched binary key
         var diff = keyBinary.substr(prefix.length);
-        return diff[0] === suffix[0];
+        return diff.indexOf(suffix) === 0;
     }
 
     /**
