@@ -1,4 +1,4 @@
-# Exonum core library
+# Exonum Core Library
 
 [![Build Status](https://travis-ci.com/exonum/exonum-core.svg?token=XsvDzZa3zu2eW4sVWuqN&branch=master)](https://travis-ci.com/exonum/exonum-core)
 
@@ -6,3 +6,6 @@
 
 * [Installation guide](INSTALL.md)
 * [Contributing guide](CONTRIBUTING.md)
+
+# LICENSE
+Exonum Core Library is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
