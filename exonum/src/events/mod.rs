@@ -229,17 +229,13 @@ impl<H: EventHandler> MioAdapter<H> {
                           event_loop: &mut EventLoop<H>,
                           timeout: H::Timeout,
                           time: SystemTime) {
-        let now = SystemTime::now();
-        match time.cmp(&now) {
-            Ordering::Less | Ordering::Equal => self.handler.handle_timeout(timeout),
-            Ordering::Greater => {
-                let duration = time.duration_since(now).unwrap();
-                // TODO: use mio::Timeout
+        match time.duration_since(SystemTime::now()) {
+            Ok(duration) =>
                 event_loop.timeout_ms(Timeout::Node(timeout), num_milliseconds(&duration))
                     .map(|_| ())
                     .map_err(|x| format!("{:?}", x))
-                    .log_error("Unable to add timeout to event loop");
-            }
+                    .log_error("Unable to add timeout to event loop"),
+            Err(_) => self.handler.handle_timeout(timeout),
         }
     }
 }
