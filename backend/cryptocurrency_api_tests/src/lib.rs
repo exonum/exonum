@@ -132,6 +132,7 @@ mod tests {
         fn new() -> CurrencySandbox {
             let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
             let sandbox = sandbox_with_services(services);
+            info!("Sandbox validators list: {}", serde_json::to_string(&sandbox.validators()).unwrap());
             let state = SandboxState::new();
             CurrencySandbox {
                 sandbox: sandbox,
@@ -396,12 +397,12 @@ mod tests {
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/wallet1_query.json");
-        assert_eq!(body1, expected_body1, "wallet1_query");
+        assert_eq!(body1, expected_body1, "wallet1_query.json");
 
         let resp_wallet2 = sandbox.request_wallet_info(&p2).unwrap();
         let body2 = response_body(resp_wallet2);
         let expected_body2 = from_file("test_data/wallet2_query.json");
-        assert_eq!(body2, expected_body2, "wallet2_query");
+        assert_eq!(body2, expected_body2, "wallet2_query.json");
     }
 
     #[test]
@@ -442,7 +443,7 @@ mod tests {
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/wallet1_query.json");
-        assert_eq!(body1, expected_body1, "wallet1_query");
+        assert_eq!(body1, expected_body1, "wallet1_query.json");
 
         sandbox.post_transaction(CurrencyTx::from(TxCreateWallet::new(&p1,
                                                                    "Change name of existing \
@@ -453,8 +454,8 @@ mod tests {
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
-        let expected_body1 = from_file("test_data/no_state_change1.json");
-        assert_eq!(body1, expected_body1, "no_state_change1");
+        let expected_body1 = from_file("test_data/tx_create_wallet_false_execution_status.json");
+        assert_eq!(body1, expected_body1, "tx_create_wallet_false_execution_status.json");
 
         let (p_absent, s_absent) = gen_keypair_from_seed(&Seed::new([27; 32]));
         sandbox.post_transaction(CurrencyTx::from(TxIssue::new(&p_absent, 6000, 329832, &s_absent)))
@@ -464,7 +465,7 @@ mod tests {
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/no_state_change2.json");
-        assert_eq!(body1, expected_body1, "no_state_change2");
+        assert_eq!(body1, expected_body1, "no_state_change2.json");
 
         sandbox.post_transaction(CurrencyTx::from(TxTransfer::new(&p1, &p2, 1_000_000, 329832, &s1)))
             .unwrap();
@@ -472,8 +473,8 @@ mod tests {
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
-        let expected_body1 = from_file("test_data/no_state_change3.json");
-        assert_eq!(body1, expected_body1, "no_state_change3");
+        let expected_body1 = from_file("test_data/commit_new_transfer_not_sufficient_funds.json");
+        assert_eq!(body1, expected_body1, "commit_new_transfer_not_sufficient_funds.json");
     }
 
     #[test]
@@ -506,7 +507,7 @@ mod tests {
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/wallet1_query1.json");
-        assert_eq!(body1, expected_body1, "wallet1_query1");
+        assert_eq!(body1, expected_body1, "wallet1_query1.json");
 
         sandbox.post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1))).unwrap();
         sandbox.commit();
@@ -514,7 +515,7 @@ mod tests {
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/no_txs_committed_no_state_change.json");
-        assert_eq!(body1, expected_body1, "no_txs_committed_no_state_change");
+        assert_eq!(body1, expected_body1, "no_txs_committed_no_state_change.json");
     }
 
 
