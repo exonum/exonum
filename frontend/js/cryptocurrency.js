@@ -13,7 +13,9 @@ function CryptocurrencyService(params) {
         size: 88,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            login: {type: Exonum.String, size: 8, from: 32, to: 40},
+            // TODO revert later
+            // login: {type: Exonum.String, size: 8, from: 32, to: 40},
+            name: {type: Exonum.String, size: 8, from: 32, to: 40},
             balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
             history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
             history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
@@ -32,14 +34,18 @@ function CryptocurrencyService(params) {
     };
 
     this.CreateWalletTransactionParams = {
-        size: 144,
+        // TODO revert later
+        // size: 144,
+        size: 40,
         service_id: params.id,
         message_id: 130,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            login: {type: Exonum.String, size: 8, from: 32, to: 40},
-            sec_key_enc: {type: Exonum.String, size: 80, from: 40, to: 120},
-            nonce: {type: Exonum.Nonce, size: 24, from: 120, to: 144}
+            name: {type: Exonum.String, size: 8, from: 32, to: 40}
+            // TODO revert later
+            // login: {type: Exonum.String, size: 8, from: 32, to: 40},
+            // sec_key_enc: {type: Exonum.String, size: 80, from: 40, to: 120},
+            // nonce: {type: Exonum.Nonce, size: 24, from: 120, to: 144}
         }
     };
 
@@ -176,14 +182,14 @@ function CryptocurrencyService(params) {
         }
 
         // find hashes of all transactions
-        var Transaction = Exonum.newType({
+        var TransactionHash = Exonum.newType({
             size: 33,
             fields: {
                 tx_hash: {type: Exonum.Hash, size: 32, from: 0, to: 32},
                 execution_status: {type: Exonum.Bool, size: 1, from: 32, to: 33}
             }
         });
-        var hashes = Exonum.merkleProof(wallet.history_hash, wallet.history_len, data.wallet_history.mt_proof, [0, wallet.history_len], Transaction);
+        var hashes = Exonum.merkleProof(wallet.history_hash, wallet.history_len, data.wallet_history.mt_proof, [0, wallet.history_len], TransactionHash);
 
         if (data.wallet_history.values.length !== hashes.length) {
             console.error('Number of transaction hashes is not equal to transactions number.');
@@ -242,18 +248,28 @@ CryptocurrencyService.prototype.addFunds = function(amount, publicKey, secretKey
     this.submitTransaction(this.AddFundsTransactionParams, data, publicKey, secretKey, callback);
 };
 
-CryptocurrencyService.prototype.createWallet = function(login, password, callback) {
-    var pair = Exonum.keyPair();
-    var nonce = Exonum.randomNonce();
-    var secretKeyEncrypted = Exonum.encryptDigest(pair.secretKey, nonce, password);
+// TODO revert later
+// CryptocurrencyService.prototype.createWallet = function(login, password, callback) {
+//     var pair = Exonum.keyPair();
+//     var nonce = Exonum.randomNonce();
+//     var secretKeyEncrypted = Exonum.encryptDigest(pair.secretKey, nonce, password);
+//     var data = {
+//         login: login,
+//         pub_key: pair.publicKey,
+//         sec_key_enc: secretKeyEncrypted,
+//         nonce: nonce
+//     };
+//
+//     this.submitTransaction(this.CreateWalletTransactionParams, data, pair.publicKey, pair.secretKey, callback);
+// };
+
+CryptocurrencyService.prototype.createWallet = function(publicKey, name, secretKey, callback) {
     var data = {
-        login: login,
-        pub_key: pair.publicKey,
-        sec_key_enc: secretKeyEncrypted,
-        nonce: nonce
+        pub_key: publicKey,
+        name: name
     };
-    
-    this.submitTransaction(this.CreateWalletTransactionParams, data, pair.publicKey, pair.secretKey, callback);
+
+    this.submitTransaction(this.CreateWalletTransactionParams, data, publicKey, secretKey, callback);
 };
 
 CryptocurrencyService.prototype.transfer = function(amount, from, to, secretKey, callback) {

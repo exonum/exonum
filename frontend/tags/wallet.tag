@@ -25,7 +25,9 @@
 
             <div class="form-group">
                 <p class="text-center">Add more finds to your account:</p>
-                <a href="#user/{ publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
+                <!-- TODO revert later -->
+                <!--<a href="#user/{ publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>-->
+                <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
             </div>
         </virtual>
 
@@ -48,10 +50,17 @@
                     <div class="col-xs-4 custom-table-column" if={ message_id === 129 }>
                         Add <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to your wallet
                     </div>
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.from === parent.publicKey }>
+                    <!-- TODO revert later -->
+                    <!--<div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.from === parent.publicKey }>
                         Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
                     <div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.to === parent.publicKey }>
+                        Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
+                    </div>-->
+                    <div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
+                        Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
+                    </div>
+                    <div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
                         Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
                     </div>
                     <div class="col-xs-4 custom-table-column">
@@ -68,13 +77,34 @@
     </div>
 
     <script>
-        var self = this;
-        var user = self.storage.getUser();
+        // TODO revert later
+//        var self = this;
+//        var user = self.storage.getUser();
+//
+//        this.publicKey = user.publicKey;
+//
+//        this.toggleLoading(true);
+//        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
+//            self.block = block;
+//            self.wallet = wallet;
+//            self.transactions = transactions;
+//            self.update();
+//            self.toggleLoading(false);
+//
+//            if (wallet.balance == 0) {
+//                self.notify('warning', 'You have not any money yet. Add some funds.');
+//            }
+//        });
+//
+//        transfer(e) {
+//            e.preventDefault();
+//            route('/user/transfer');
+//        }
 
-        this.publicKey = user.publicKey;
+        var self = this;
 
         this.toggleLoading(true);
-        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
+        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
             self.block = block;
             self.wallet = wallet;
             self.transactions = transactions;
@@ -88,7 +118,7 @@
 
         transfer(e) {
             e.preventDefault();
-            route('/user/transfer');
+            route('/user/' + self.opts.publicKey + '/transfer');
         }
 
         refresh(e) {
@@ -98,7 +128,8 @@
 
         logout(e) {
             e.preventDefault();
-            self.deleteUser();
+            // TODO revert later
+//            self.deleteUser();
             route('/dashboard');
         }
     </script>

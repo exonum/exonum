@@ -25,21 +25,23 @@
 
         // global mixin with common functions and constants
         riot.mixin({
+
             service: service,
 
-            storage: {
-                addUser: function(user) {
-                    window.localStorage.setItem('user', JSON.stringify(user));
-                },
-
-                getUser: function() {
-                    return JSON.parse(window.localStorage.getItem('user'));
-                },
-
-                deleteUser: function() {
-                    window.localStorage.removeItem('user');
-                }
-            },
+            // TODO revert later
+//            storage: {
+//                addUser: function(user) {
+//                    window.localStorage.setItem('user', JSON.stringify(user));
+//                },
+//
+//                getUser: function() {
+//                    return JSON.parse(window.localStorage.getItem('user'));
+//                },
+//
+//                deleteUser: function() {
+//                    window.localStorage.removeItem('user');
+//                }
+//            },
 
             notify: function(type, text) {
                 noty({
@@ -48,6 +50,26 @@
                     type: type || 'information',
                     text: text
                 });
+            },
+
+            core: Exonum,
+            storage: {
+                getUsers: function() {
+                    return JSON.parse(window.localStorage.getItem('cc_users')) || [];
+                },
+                addUser: function(user) {
+                    var users = JSON.parse(window.localStorage.getItem('cc_users')) || [];
+                    users.push(user);
+                    window.localStorage.setItem('cc_users', JSON.stringify(users));
+                },
+                getUser: function(publicKey) {
+                    var users = JSON.parse(window.localStorage.getItem('cc_users')) || [];
+                    for (var i = 0; i < users.length; i++) {
+                        if (users[i].publicKey === publicKey) {
+                            return users[i];
+                        }
+                    }
+                }
             },
 
             toggleLoading: function(state) {
@@ -75,16 +97,29 @@
                 riot.mount('#content', 'register');
             });
 
-            route('/user', function() {
-                riot.mount('#content', 'wallet');
+            // TODO revert later
+//            route('/user', function() {
+//                riot.mount('#content', 'wallet');
+//            });
+//
+//            route('/user/transfer', function() {
+//                riot.mount('#content', 'transfer');
+//            });
+//
+//            route('/user/add-funds', function() {
+//                riot.mount('#content', 'add-funds');
+//            });
+
+            route('/user/*', function(publicKey) {
+                riot.mount('#content', 'wallet', {publicKey: publicKey});
             });
 
-            route('/user/transfer', function() {
-                riot.mount('#content', 'transfer');
+            route('/user/*/transfer', function(publicKey) {
+                riot.mount('#content', 'transfer', {publicKey: publicKey});
             });
 
-            route('/user/add-funds', function() {
-                riot.mount('#content', 'add-funds');
+            route('/user/*/add-funds', function(publicKey) {
+                riot.mount('#content', 'add-funds', {publicKey: publicKey});
             });
 
             route('/blockchain', function(height) {
