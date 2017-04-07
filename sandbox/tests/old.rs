@@ -1,8 +1,7 @@
 extern crate exonum;
 extern crate sandbox;
-extern crate time;
 
-use time::Duration;
+use std::time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit};
 use exonum::blockchain::Block;
@@ -20,8 +19,8 @@ fn test_send_propose_and_prevote() {
     sandbox.recv(tx.clone());
 
     // round happens
-    sandbox.add_time(Duration::milliseconds(1000));
-    sandbox.add_time(Duration::milliseconds(1999));
+    sandbox.add_time(Duration::from_millis(1000));
+    sandbox.add_time(Duration::from_millis(1999));
 
     sandbox.assert_state(1, 3);
 

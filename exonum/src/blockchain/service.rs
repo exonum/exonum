@@ -95,11 +95,11 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.update_config(new_config)
     }
 
-    pub fn propose_timeout(&self) -> i64 {
+    pub fn propose_timeout(&self) -> u64 {
         self.state.propose_timeout()
     }
 
-    pub fn set_propose_timeout(&mut self, timeout: i64) {
+    pub fn set_propose_timeout(&mut self, timeout: u64) {
         self.state.set_propose_timeout(timeout)
     }
 

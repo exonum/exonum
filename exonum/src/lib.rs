@@ -15,7 +15,6 @@ extern crate profiler;
 
 #[macro_use]
 extern crate log;
-extern crate time;
 extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
