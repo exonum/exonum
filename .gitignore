@@ -7,6 +7,7 @@
 target
 */target
 *.rs.bk
+Cargo.lock
 
 # IDE files
 .idea
