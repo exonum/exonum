@@ -9,7 +9,7 @@ The crate uses these system libraries:
 
 Below you can find instructions on how to obtain them for the different operating systems:
 
-## Macos 
+## macOS 
 If you use `homebrew` you can simple install needed libraries with the command:
 ```shell
 brew install libsodium leveldb openssl
@@ -25,7 +25,7 @@ Other linux users may find the packages with similar names in their package mana
 ## Windows
 Workability is not yet guaranteed.
 
-# Installing rust
+# Installing Rust
 The project uses a nightly rust version that can be installed by using the [rustup](https://www.rustup.rs) utility.
 
 ```shell
@@ -46,5 +46,4 @@ You may want to launch extended tests suite which named `sandbox`.
 ```shell
 cargo test --manifest-path sandbox/Cargo.toml
 ```
-
 After all this you can learn how the create your own blockchain solution.
