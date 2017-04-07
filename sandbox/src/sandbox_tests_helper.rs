@@ -39,7 +39,7 @@ pub const INCORRECT_VALIDATOR_ID: u32 = 999_999;
 pub struct BlockBuilder<'a> {
     height: Option<u64>,
     round: Option<u32>,
-    duration_science_sandbox_time: Option<Milliseconds>,
+    duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
     state_hash: Option<Hash>,
@@ -52,7 +52,7 @@ impl<'a> BlockBuilder<'a> {
         BlockBuilder {
             height: None,
             round: None,
-            duration_science_sandbox_time: None,
+            duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hash: None,
             state_hash: None,
@@ -71,10 +71,10 @@ impl<'a> BlockBuilder<'a> {
         self
     }
 
-    pub fn with_duration_science_sandbox_time(mut self,
-                                              duration_science_sandbox_time: Milliseconds)
-                                              -> Self {
-        self.duration_science_sandbox_time = Some(duration_science_sandbox_time);
+    pub fn with_duration_since_sandbox_time(mut self,
+                                            duration_since_sandbox_time: Milliseconds)
+                                            -> Self {
+        self.duration_since_sandbox_time = Some(duration_since_sandbox_time);
         self
     }
 
@@ -122,7 +122,7 @@ pub struct ProposeBuilder<'a> {
     validator_id: Option<u32>,
     height: Option<u64>,
     round: Option<u32>,
-    duration_science_sandbox_time: Option<Milliseconds>,
+    duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<&'a Hash>,
     tx_hashes: Option<&'a [Hash]>,
 
@@ -135,7 +135,7 @@ impl<'a> ProposeBuilder<'a> {
             validator_id: None,
             height: None,
             round: None,
-            duration_science_sandbox_time: None,
+            duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hashes: None,
             sandbox: sandbox,
@@ -157,10 +157,10 @@ impl<'a> ProposeBuilder<'a> {
         self
     }
 
-    pub fn with_duration_science_sandbox_time(mut self,
-                                              duration_science_sandbox_time: Milliseconds)
-                                              -> Self {
-        self.duration_science_sandbox_time = Some(duration_science_sandbox_time);
+    pub fn with_duration_since_sandbox_time(mut self,
+                                            duration_since_sandbox_time: Milliseconds)
+                                            -> Self {
+        self.duration_since_sandbox_time = Some(duration_since_sandbox_time);
         self
     }
 
@@ -192,7 +192,7 @@ pub struct SandboxState {
     pub accepted_propose_hash: RefCell<Hash>,
     pub accepted_block_hash: RefCell<Hash>,
     pub committed_transaction_hashes: RefCell<Vec<Hash>>,
-    pub time_millis_science_round_start: RefCell<Milliseconds>,
+    pub time_millis_since_round_start: RefCell<Milliseconds>,
 }
 
 impl SandboxState {
@@ -201,7 +201,7 @@ impl SandboxState {
             accepted_block_hash: RefCell::new(empty_hash()),
             accepted_propose_hash: RefCell::new(empty_hash()),
             committed_transaction_hashes: RefCell::new(Vec::new()),
-            time_millis_science_round_start: RefCell::new(0),
+            time_millis_since_round_start: RefCell::new(0),
         }
     }
 }
@@ -238,7 +238,7 @@ pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
 
     // how much time left till next round_timeout
     let time_till_next_round: Milliseconds =
-        round_timeout - *sandbox_state.time_millis_science_round_start.borrow() % round_timeout;
+        round_timeout - *sandbox_state.time_millis_since_round_start.borrow() % round_timeout;
 
     trace!("going to add {:?} millis", time_till_next_round);
     sandbox.add_time(Duration::from_millis(time_till_next_round)); //here next round begins
@@ -249,7 +249,7 @@ pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
 
     trace!("is_leader after time adding: {:?}", sandbox.is_leader());
     {
-        *sandbox_state.time_millis_science_round_start.borrow_mut() = 0;
+        *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
     }
 
 
@@ -366,7 +366,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
 
             sandbox.assert_state(initial_height + 1, ROUND_ONE);
             {
-                *sandbox_state.time_millis_science_round_start.borrow_mut() = 0;
+                *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             }
             return;
         }
@@ -396,24 +396,24 @@ fn check_and_broadcast_propose_and_prevote(sandbox: &TimestampingSandbox,
                                            sandbox_state: &SandboxState,
                                            transactions: &[Hash])
                                            -> Option<Propose> {
-    if *sandbox_state.time_millis_science_round_start.borrow() > sandbox.propose_timeout() {
+    if *sandbox_state.time_millis_since_round_start.borrow() > sandbox.propose_timeout() {
         return None;
     }
 
-    let time_millis_science_round_start_copy = {
-        *sandbox_state.time_millis_science_round_start.borrow()
+    let time_millis_since_round_start_copy = {
+        *sandbox_state.time_millis_since_round_start.borrow()
     };
-    let time_increment_millis = sandbox.propose_timeout() - time_millis_science_round_start_copy +
+    let time_increment_millis = sandbox.propose_timeout() - time_millis_since_round_start_copy +
                                 1;
 
     trace!("time elapsed in current round: {:?}",
-           sandbox_state.time_millis_science_round_start);
+           sandbox_state.time_millis_since_round_start);
     //    trace!("going to add {:?} millis", round_timeout - 1);
     trace!("going to add {:?} millis", time_increment_millis);
     sandbox.add_time(Duration::from_millis(time_increment_millis));
     {
-        *sandbox_state.time_millis_science_round_start.borrow_mut() =
-            time_millis_science_round_start_copy + time_increment_millis;
+        *sandbox_state.time_millis_since_round_start.borrow_mut() =
+            time_millis_since_round_start_copy + time_increment_millis;
     }
     trace!("sandbox_time after adding: {:?}", sandbox.time());
 
