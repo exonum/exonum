@@ -35,15 +35,12 @@
             <div class="custom-table">
                 <div class="row">
                     <div class="col-xs-4 custom-table-header-column">Hash</div>
-                    <div class="col-xs-4 custom-table-header-column">Status</div>
                     <div class="col-xs-4 custom-table-header-column">Description</div>
+                    <div class="col-xs-4 custom-table-header-column">Status</div>
                 </div>
                 <div class="row" each={ transactions }>
                     <div class="col-xs-4 custom-table-column">
                         <truncate val={ hash } digits=12></truncate>
-                    </div>
-                    <div class="col-xs-4 custom-table-column">
-                        { status }
                     </div>
                     <div class="col-xs-4 custom-table-column" if={ message_id === 130 }>
                         Create wallet
@@ -56,6 +53,9 @@
                     </div>
                     <div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.to === parent.publicKey }>
                         Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
+                    </div>
+                    <div class="col-xs-4 custom-table-column">
+                        { status }
                     </div>
                 </div>
             </div>

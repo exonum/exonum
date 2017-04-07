@@ -297,3 +297,25 @@ for (var i in hashes) {
 ```
 
 The steps from above guarantees all wallet info reliability and consistency.
+
+#### Build
+
+First, install npm dependencies:
+
+```
+npm install
+```
+
+Then install bower dependencies:
+
+```
+bower install
+```
+
+#### Run
+
+To run application:
+
+```
+node frontend/app.js
+```

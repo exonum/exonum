@@ -126,10 +126,30 @@ function CryptocurrencyService(params) {
             }
         }
 
+        function getBlocksMedianTime(precommits) {
+            var values = [];
+            for (var i = 0; i < precommits.length; i++) {
+                values.push(precommits[i].body.time);
+            }
+            values.sort(function(a, b) {
+                return bigInt(a).minus(bigInt(b));
+            });
+            var half = Math.floor(values.length / 2);
+
+            if (values.length % 2) {
+                return values[half];
+            } else {
+                return bigInt(values[half - 1]).plus(bigInt(values[half])).divide(2);
+            }
+        }
+
         // validate block
         if (!Exonum.verifyBlock(data.block_info, params.validators)) {
             return;
         }
+
+        var block = data.block_info.block;
+        block.time = getBlocksMedianTime(data.block_info.precommits);
 
         // find root hash of table with wallets in the tree of all tables
         var TableKey = Exonum.newType({
@@ -144,7 +164,7 @@ function CryptocurrencyService(params) {
             table_index: 0
         };
         var tableKey = TableKey.hash(tableKeyData);
-        var walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey);
+        var walletsHash = Exonum.merklePatriciaProof(block.state_hash, data.wallet.mpt_proof, tableKey);
         if (walletsHash === null) {
             return;
         }
