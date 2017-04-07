@@ -4,6 +4,7 @@ use ::crypto::{Hash, PublicKey, SecretKey};
 use ::storage::{View, Error as StorageError};
 use ::messages::{Message, RawTransaction, Error as MessageError};
 use ::node::State;
+use ::events::Milliseconds;
 use ::blockchain::{StoredConfiguration, ConsensusConfig};
 
 pub trait Transaction: Message + 'static {
@@ -95,11 +96,11 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.update_config(new_config)
     }
 
-    pub fn propose_timeout(&self) -> i64 {
+    pub fn propose_timeout(&self) -> Milliseconds {
         self.state.propose_timeout()
     }
 
-    pub fn set_propose_timeout(&mut self, timeout: i64) {
+    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
         self.state.set_propose_timeout(timeout)
     }
 

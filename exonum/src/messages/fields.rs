@@ -1,8 +1,8 @@
 use std::mem;
 use std::sync::Arc;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
+use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use time::Timespec;
 use byteorder::{ByteOrder, LittleEndian};
 
 use super::super::crypto::{Hash, PublicKey};
@@ -144,22 +144,23 @@ impl<'a> Field<'a> for &'a PublicKey {
     }
 }
 
-impl<'a> Field<'a> for Timespec {
+impl<'a> Field<'a> for SystemTime {
     fn field_size() -> usize {
-        8
+        mem::size_of::<u64>() + mem::size_of::<u32>()
     }
 
-    fn read(buffer: &'a [u8], from: usize, to: usize) -> Timespec {
-        let nsec = LittleEndian::read_u64(&buffer[from..to]);
-        Timespec {
-            sec: (nsec / 1_000_000_000) as i64,
-            nsec: (nsec % 1_000_000_000) as i32,
-        }
+    fn read(buffer: &'a [u8], from: usize, to: usize) -> SystemTime {
+        let secs = LittleEndian::read_u64(&buffer[from..to]);
+        let nanos = LittleEndian::read_u32(&buffer[from + mem::size_of_val(&secs)..to]);
+        UNIX_EPOCH + Duration::new(secs, nanos)
     }
 
     fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-        let nsec = (self.sec as u64) * 1_000_000_000 + self.nsec as u64;
-        LittleEndian::write_u64(&mut buffer[from..to], nsec)
+        let duration = self.duration_since(UNIX_EPOCH).unwrap();
+        let secs = duration.as_secs();
+        let nanos = duration.subsec_nanos();
+        LittleEndian::write_u64(&mut buffer[from..to - mem::size_of_val(&nanos)], secs);
+        LittleEndian::write_u32(&mut buffer[from + mem::size_of_val(&secs)..to], nanos);
     }
 }
 
