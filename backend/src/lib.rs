@@ -467,13 +467,14 @@ mod tests {
     use rand::{thread_rng, Rng};
     use serde_json;
 
-    use exonum::crypto::{gen_keypair, Hash, hash};
+    use exonum::crypto::{gen_keypair, Hash, hash, PublicKey};
     use exonum::storage::Storage;
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::messages::{FromRaw, Message};
 
     use super::{CurrencyTx, CurrencyService, CurrencySchema, TxCreateWallet, TxIssue, TxTransfer};
     use super::tx_metarecord::TxMetaRecord;
+    use super::wallet::{Wallet, assert_wallet};
 
     #[cfg(feature="memorydb")]
     fn create_db() -> Storage {
@@ -589,7 +590,7 @@ mod tests {
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
         let tx_create_1 = TxCreateWallet::new(&p1, "Василий Васильевич", &s1);
-        let tx_create_2 = TxCreateWallet::new(&p2, "Иван Иващенко", &s2);
+        let tx_create_2 = TxCreateWallet::new(&p2, "Name", &s2);
         let tx_issue_1 = TxIssue::new(&p1, 6000, rng.next_u64(), &s1);
         let tx_transfer_1 = TxTransfer::new(&p1, &p2, 3000, rng.next_u64(), &s1);
         let tx_transfer_2 = TxTransfer::new(&p2, &p1, 1000, rng.next_u64(), &s2);
@@ -633,8 +634,102 @@ mod tests {
         assert_eq!(prefix, vec![10, 0, 16, 0, 0, 0, 0, 0, 0]);
     }
 
+    fn get_wallet_and_history(schema: &CurrencySchema, pub_key: &PublicKey) -> (Option<Wallet>, Hash) {
+        let w = schema.wallet(pub_key).unwrap();
+        let h = schema.wallet_history(pub_key).root_hash().unwrap();
+        (w, h)
+    }
+
     #[test]
-    fn test_wallet_history() {
+    fn test_wallet_history_txtransfer_false_status_absent_receiver_wallet() {
+        let db = create_db();
+        let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
+        let v = b.view();
+        let s = CurrencySchema::new(&v);
+
+        let (p1, s1) = gen_keypair();
+        let (p2, _) = gen_keypair();
+
+        let cw1 = TxCreateWallet::new(&p1, "name_wallet1", &s1);
+        CurrencyTx::from(cw1.clone()).execute(&v).unwrap();
+
+        let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
+        CurrencyTx::from(iw1.clone()).execute(&v).unwrap();
+
+        let tw = TxTransfer::new(&p1, &p2, 300, 3, &s1);
+        CurrencyTx::from(tw.clone()).execute(&v).unwrap();
+
+        let (w1, rh1) = get_wallet_and_history(&s, &p1);
+        let (w2, _) = get_wallet_and_history(&s, &p2);
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1); 
+        assert_eq!(w2, None);
+        let h1 = s.wallet_history(&p1).values().unwrap();
+        let h2 = s.wallet_history(&p2).values().unwrap();
+        let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
+        let meta_issue1 = TxMetaRecord::new(&iw1.hash(), true);
+        let meta_transfer = TxMetaRecord::new(&tw.hash(), false);
+        assert_eq!(h1, vec![meta_create1, meta_issue1, meta_transfer.clone()]);
+        assert_eq!(h2, vec![]);
+    }
+    #[test]
+    fn test_wallet_history_txtransfer_false_status_insufficient_balance() {
+        let db = create_db();
+        let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
+        let v = b.view();
+        let s = CurrencySchema::new(&v);
+
+        let (p1, s1) = gen_keypair();
+        let (p2, s2) = gen_keypair();
+
+        let cw1 = TxCreateWallet::new(&p1, "name_wallet1", &s1);
+        let cw2 = TxCreateWallet::new(&p2, "name_wallet2", &s2);
+        CurrencyTx::from(cw1.clone()).execute(&v).unwrap();
+        CurrencyTx::from(cw2.clone()).execute(&v).unwrap();
+
+        let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
+        CurrencyTx::from(iw1.clone()).execute(&v).unwrap();
+
+        let tw = TxTransfer::new(&p1, &p2, 1018, 3, &s1);
+        CurrencyTx::from(tw.clone()).execute(&v).unwrap();
+
+        let (w1, rh1) = get_wallet_and_history(&s, &p1);
+        let (w2, rh2) = get_wallet_and_history(&s, &p2);
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1); 
+        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2); 
+        let h1 = s.wallet_history(&p1).values().unwrap();
+        let h2 = s.wallet_history(&p2).values().unwrap();
+        let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
+        let meta_create2 = TxMetaRecord::new(&cw2.hash(), true);
+        let meta_issue1 = TxMetaRecord::new(&iw1.hash(), true);
+        let meta_transfer = TxMetaRecord::new(&tw.hash(), false);
+        assert_eq!(h1, vec![meta_create1, meta_issue1, meta_transfer.clone()]);
+        assert_eq!(h2, vec![meta_create2]);
+    }
+    
+    #[test]
+    fn test_wallet_history_txcreate_false_status() {
+        let db = create_db();
+        let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
+        let v = b.view();
+        let s = CurrencySchema::new(&v);
+
+        let (p1, s1) = gen_keypair();
+        let cw1 = TxCreateWallet::new(&p1, "name_wallet1", &s1);
+        let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
+        let cw2 = TxCreateWallet::new(&p1, "name_wallet2", &s1);
+        let meta_create2 = TxMetaRecord::new(&cw2.hash(), false);
+
+        CurrencyTx::from(cw1.clone()).execute(&v).unwrap();
+        CurrencyTx::from(cw2.clone()).execute(&v).unwrap();
+
+        let (w, rh) = get_wallet_and_history(&s, &p1);
+        assert_wallet(w.unwrap(), &p1, "name_wallet1", 0, 2, &rh); 
+        let h1 = s.wallet_history(&p1).values().unwrap();
+        assert_eq!(h1, vec![meta_create1, meta_create2]);
+    }
+
+    #[test]
+    fn test_wallet_history_true_status() {
         let db = create_db();
         let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
 
@@ -644,61 +739,41 @@ mod tests {
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
 
-        let cw1 = TxCreateWallet::new(&p1, "tx1", &s1);
-        let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
-        let cw2 = TxCreateWallet::new(&p2, "tx2", &s2);
-        let meta_create2 = TxMetaRecord::new(&cw2.hash(), true);
+        let cw1 = TxCreateWallet::new(&p1, "name_wallet1", &s1);
+        let cw2 = TxCreateWallet::new(&p2, "name_wallet2", &s2);
         CurrencyTx::from(cw1.clone()).execute(&v).unwrap();
         CurrencyTx::from(cw2.clone()).execute(&v).unwrap();
-        let w1 = s.wallet(&p1).unwrap().unwrap();
-        let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.name(), "tx1");
-        assert_eq!(w1.history_len(), 1);
-        assert_eq!(w1.balance(), 0);
-        assert_eq!(w2.name(), "tx2");
-        assert_eq!(w2.history_len(), 1);
-        assert_eq!(w2.balance(), 0);
-        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
-        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
-        assert_eq!(&rh1, w1.history_hash());
-        assert_eq!(&rh2, w2.history_hash());
+        let (w1, rh1) = get_wallet_and_history(&s, &p1);
+        let (w2, rh2) = get_wallet_and_history(&s, &p2);
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 0, 1, &rh1); 
+        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2); 
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
-        let meta_issue1 = TxMetaRecord::new(&iw1.hash(), true);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
-        let meta_issue2 = TxMetaRecord::new(&iw2.hash(), true);
         CurrencyTx::from(iw1.clone()).execute(&v).unwrap();
         CurrencyTx::from(iw2.clone()).execute(&v).unwrap();
-        let w1 = s.wallet(&p1).unwrap().unwrap();
-        let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.balance(), 1000);
-        assert_eq!(w2.balance(), 100);
-        assert_eq!(w1.history_len(), 2);
-        assert_eq!(w2.history_len(), 2);
-        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
-        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
-        assert_eq!(&rh1, w1.history_hash());
-        assert_eq!(&rh2, w2.history_hash());
+        let (w1, rh1) = get_wallet_and_history(&s, &p1);
+        let (w2, rh2) = get_wallet_and_history(&s, &p2);
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 2, &rh1); 
+        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 100, 2, &rh2); 
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
-        let meta_transfer = TxMetaRecord::new(&tw.hash(), true);
         CurrencyTx::from(tw.clone()).execute(&v).unwrap();
-        let w1 = s.wallet(&p1).unwrap().unwrap();
-        let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.balance(), 600);
-        assert_eq!(w2.balance(), 500);
-        assert_eq!(w1.history_len(), 3);
-        assert_eq!(w2.history_len(), 3);
-        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
-        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
-        assert_eq!(&rh1, w1.history_hash());
-        assert_eq!(&rh2, w2.history_hash());
+        let (w1, rh1) = get_wallet_and_history(&s, &p1);
+        let (w2, rh2) = get_wallet_and_history(&s, &p2);
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 600, 3, &rh1); 
+        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 500, 3, &rh2); 
 
         let h1 = s.wallet_history(&p1).values().unwrap();
         let h2 = s.wallet_history(&p2).values().unwrap();
+        let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
+        let meta_create2 = TxMetaRecord::new(&cw2.hash(), true);
+        let meta_issue1 = TxMetaRecord::new(&iw1.hash(), true);
+        let meta_issue2 = TxMetaRecord::new(&iw2.hash(), true);
+        let meta_transfer = TxMetaRecord::new(&tw.hash(), true);
         assert_eq!(h1, vec![meta_create1, meta_issue1, meta_transfer.clone()]);
         assert_eq!(h2, vec![meta_create2, meta_issue2, meta_transfer]);
     }

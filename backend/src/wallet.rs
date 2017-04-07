@@ -101,6 +101,14 @@ impl WalletTestData {
     }
 }
 
+pub fn assert_wallet(wallet: Wallet, pub_key: &PublicKey, name: &str, balance: u64, history_len: u64, history_hash: &Hash) {
+    assert_eq!(wallet.pub_key(), pub_key);
+    assert_eq!(wallet.name(), name);
+    assert_eq!(wallet.balance(), balance);
+    assert_eq!(wallet.history_hash(), history_hash);
+    assert_eq!(wallet.history_len(), history_len);
+}
+
 #[test]
 fn test_wallet() {
     let hash = Hash::new([2; 32]);
@@ -109,11 +117,7 @@ fn test_wallet() {
     let wallet = Wallet::new(&pub_key, name, 100500, 0, &hash);
 
     let wallet = wallet.clone();
-    assert_eq!(wallet.pub_key(), &pub_key);
-    assert_eq!(wallet.name(), name);
-    assert_eq!(wallet.balance(), 100500);
-    assert_eq!(wallet.history_hash(), &hash);
-    assert_eq!(wallet.history_len(), 0);
+    assert_wallet(wallet, &pub_key, name, 100500, 0, &hash); 
 }
 
 #[test]
