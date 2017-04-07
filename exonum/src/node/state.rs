@@ -10,6 +10,7 @@ use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMess
 
 use super::super::crypto::{PublicKey, SecretKey, Hash};
 use super::super::storage::Patch;
+use super::super::events::Milliseconds;
 use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
 
 // TODO: replace by in disk tx pool
@@ -17,11 +18,11 @@ const TX_POOL_LIMIT: usize = 20000;
 
 // TODO: move request timeouts into node configuration
 
-pub const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
-pub const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
-pub const REQUEST_PREVOTES_WAIT: u64 = 100;
-pub const REQUEST_PRECOMMITS_WAIT: u64 = 100;
-pub const REQUEST_BLOCK_WAIT: u64 = 100;
+pub const REQUEST_PROPOSE_WAIT: Milliseconds = 100;
+pub const REQUEST_TRANSACTIONS_WAIT: Milliseconds = 100;
+pub const REQUEST_PREVOTES_WAIT: Milliseconds = 100;
+pub const REQUEST_PRECOMMITS_WAIT: Milliseconds = 100;
+pub const REQUEST_BLOCK_WAIT: Milliseconds = 100;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -333,11 +334,11 @@ impl State {
         self.config = config;
     }
 
-    pub fn propose_timeout(&self) -> u64 {
+    pub fn propose_timeout(&self) -> Milliseconds {
         self.config.consensus.propose_timeout
     }
 
-    pub fn set_propose_timeout(&mut self, timeout: u64) {
+    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
         debug_assert!(timeout < self.config.consensus.round_timeout);
         self.config.consensus.propose_timeout = timeout;
     }

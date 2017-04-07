@@ -5,7 +5,7 @@ use std::time::{SystemTime, Duration};
 use super::crypto::{PublicKey, SecretKey, Hash};
 use super::events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
                     EventHandler, Result as EventsResult, Error as EventsError};
-use super::events::{MioChannel, Network, EventLoop};
+use super::events::{MioChannel, Network, EventLoop, Milliseconds};
 use super::blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use super::messages::{Connect, RawMessage};
 
@@ -120,19 +120,19 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn propose_timeout(&self) -> u64 {
+    pub fn propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().propose_timeout
     }
 
-    pub fn round_timeout(&self) -> u64 {
+    pub fn round_timeout(&self) -> Milliseconds {
         self.state().consensus_config().round_timeout
     }
 
-    pub fn status_timeout(&self) -> u64 {
+    pub fn status_timeout(&self) -> Milliseconds {
         self.state().consensus_config().status_timeout
     }
 
-    pub fn peers_timeout(&self) -> u64 {
+    pub fn peers_timeout(&self) -> Milliseconds {
         self.state().consensus_config().peers_timeout
     }
 

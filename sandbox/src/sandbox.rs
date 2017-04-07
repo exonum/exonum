@@ -13,7 +13,7 @@ use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, Stor
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
-                     EventHandler, Channel, Result as EventsResult};
+                     EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
@@ -435,17 +435,16 @@ impl Sandbox {
         reactor.following_config().unwrap()
     }
 
-    pub fn propose_timeout(&self) -> u64 {
+    pub fn propose_timeout(&self) -> Milliseconds {
         self.cfg().consensus.propose_timeout
     }
-
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
         debug_assert!(num_validators >= 4);
         num_validators * 2 / 3 + 1
     }
 
-    pub fn round_timeout(&self) -> u64 {
+    pub fn round_timeout(&self) -> Milliseconds {
         self.cfg().consensus.round_timeout
     }
 

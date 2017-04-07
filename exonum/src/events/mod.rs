@@ -2,7 +2,6 @@ use std::io;
 use std::fmt::Display;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
-use std::cmp::Ordering;
 
 use mio;
 
@@ -18,6 +17,8 @@ pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 pub type EventsConfiguration = mio::EventLoopConfig;
 
 pub type EventLoop<H> = mio::EventLoop<MioAdapter<H>>;
+
+pub type Milliseconds = u64;
 
 #[derive(Debug)]
 pub enum Event {
@@ -341,11 +342,11 @@ impl ::std::error::Error for Error {
     }
 }
 
-fn num_milliseconds(duration: &Duration) -> u64 {
+fn num_milliseconds(duration: &Duration) -> Milliseconds {
     const MILLIS_PER_SEC: u64 = 1000;
     const NANOS_PER_MILLI: u32 = 1000_000;
 
     let secs_part = duration.as_secs() * MILLIS_PER_SEC;
     let nanos_part = duration.subsec_nanos() / NANOS_PER_MILLI;
-    secs_part + nanos_part as u64
+    secs_part + nanos_part as Milliseconds
 }
