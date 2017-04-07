@@ -2,8 +2,8 @@ use std::path::Path;
 use std::marker::PhantomData;
 use std::fs;
 use std::env;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use time;
 use clap::{SubCommand, App, Arg, ArgMatches};
 use log::{LogRecord, LogLevel, SetLoggerError};
 use env_logger::LogBuilder;
@@ -149,8 +149,8 @@ fn has_colors() -> bool {
 
 pub fn init_logger() -> Result<(), SetLoggerError> {
     let format = |record: &LogRecord| {
-        let ts = time::now_utc().to_timespec();
-        let now = (ts.sec * 1000 + ts.nsec as i64 / 1000000).to_string();
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let now = (ts.as_secs() * 1000 + ts.subsec_nanos() as u64 / 1000000).to_string();
 
         if has_colors() {
             let level = match record.level() {

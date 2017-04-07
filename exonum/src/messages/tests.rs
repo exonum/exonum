@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
-
-use time;
+use std::time::SystemTime;
 
 use super::super::crypto::{hash, gen_keypair};
 use super::super::blockchain;
@@ -158,7 +157,7 @@ fn test_connect() {
     use std::str::FromStr;
 
     let socket_address = SocketAddr::from_str("18.34.3.4:7777").unwrap();
-    let time = ::time::get_time();
+    let time = SystemTime::now();
     let (public_key, secret_key) = gen_keypair();
 
     // write
@@ -231,7 +230,7 @@ fn test_precommit() {
     let propose_hash = hash(&[1, 2, 3]);
     let block_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
-    let time = time::get_time();
+    let time = SystemTime::now();
 
     // write
     let precommit = Precommit::new(validator,
@@ -273,7 +272,7 @@ fn test_status() {
 #[test]
 fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
-    let ts = time::get_time();
+    let ts = SystemTime::now();
 
     let content = blockchain::Block::new(500,
                                          1,

@@ -1,10 +1,10 @@
 use std::net::SocketAddr;
-use time::Timespec;
+use std::time::SystemTime;
 use super::super::crypto::{Hash, PublicKey, Signature};
 use super::{RawMessage, BitVec};
 use super::super::blockchain;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use ::messages::utils::{U64, TimespecSerdeHelper};
+use ::messages::utils::{U64, SystemTimeSerdeHelper};
 
 pub const CONSENSUS: u16 = 0;
 
@@ -28,11 +28,11 @@ message! {
     Connect {
         const TYPE = CONSENSUS;
         const ID = CONNECT_MESSAGE_ID;
-        const SIZE = 46;
+        const SIZE = 50;
 
         pub_key:        &PublicKey  [00 => 32]
         addr:           SocketAddr  [32 => 38]
-        time:           Timespec    [38 => 46]
+        time:           SystemTime  [38 => 50]
     }
 }
 
@@ -71,14 +71,14 @@ message! {
     Precommit {
         const TYPE = CONSENSUS;
         const ID = PRECOMMIT_MESSAGE_ID;
-        const SIZE = 92;
+        const SIZE = 96;
 
         validator:      u32         [00 => 04]
         height:         u64         [08 => 16]
         round:          u32         [16 => 20]
         propose_hash:   &Hash       [20 => 52]
         block_hash:     &Hash       [52 => 84]
-        time:           Timespec    [84 => 92]
+        time:           SystemTime  [84 => 96]
     }
 }
 
@@ -95,7 +95,7 @@ struct PrecommitBodySerdeHelper {
    round: u32, 
    propose_hash: Hash, 
    block_hash: Hash,
-   time: TimespecSerdeHelper,
+   time: SystemTimeSerdeHelper,
 }
 
 impl Serialize for Precommit {
@@ -108,7 +108,7 @@ impl Serialize for Precommit {
             round: self.round(), 
             propose_hash: *self.propose_hash(), 
             block_hash: *self.block_hash(),
-            time: TimespecSerdeHelper(self.time()),
+            time: SystemTimeSerdeHelper(self.time()),
         }; 
         let helper = PrecommitSerdeHelper {
             body: body, 

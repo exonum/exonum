@@ -3,7 +3,6 @@ pub mod api;
 pub mod helpers;
 pub mod explorer_api;
 
-extern crate time;
 extern crate serde;
 extern crate jsonway;
 extern crate cookie;

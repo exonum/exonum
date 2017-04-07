@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
+use std::time::{SystemTime, Duration};
 
-use time::{Duration, Timespec};
 use serde_json::Value;
 
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
@@ -38,7 +38,7 @@ pub struct State {
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
     height: u64,
-    height_start_time: Timespec,
+    height_start_time: SystemTime,
     round: Round,
     locked_round: Round,
     locked_propose: Option<Hash>,
@@ -177,7 +177,7 @@ impl RequestData {
             RequestData::Precommits(..) => REQUEST_PRECOMMITS_WAIT,
             RequestData::Block(..) => REQUEST_BLOCK_WAIT,
         };
-        Duration::milliseconds(ms as i64)
+        Duration::from_millis(ms)
     }
 }
 
@@ -259,7 +259,7 @@ impl State {
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
-               height_start_time: Timespec)
+               height_start_time: SystemTime)
                -> State {
 
         let validators_len = stored.validators.len();
@@ -333,12 +333,11 @@ impl State {
         self.config = config;
     }
 
-    pub fn propose_timeout(&self) -> i64 {
+    pub fn propose_timeout(&self) -> u64 {
         self.config.consensus.propose_timeout
     }
 
-    pub fn set_propose_timeout(&mut self, timeout: i64) {
-        debug_assert!(timeout > 0);
+    pub fn set_propose_timeout(&mut self, timeout: u64) {
         debug_assert!(timeout < self.config.consensus.round_timeout);
         self.config.consensus.propose_timeout = timeout;
     }
@@ -407,7 +406,7 @@ impl State {
         self.height
     }
 
-    pub fn height_start_time(&self) -> Timespec {
+    pub fn height_start_time(&self) -> SystemTime {
         self.height_start_time
     }
 
@@ -452,7 +451,7 @@ impl State {
     }
 
     // FIXME use block_hash
-    pub fn new_height(&mut self, block_hash: &Hash, height_start_time: Timespec) {
+    pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height += 1;
         self.height_start_time = height_start_time;
         self.round = 1;
