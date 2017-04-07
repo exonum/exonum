@@ -6,7 +6,6 @@ authors = ["Bitfury Inc. <ivan.ivashchenko@xdev.re>"]
 [dependencies]
 log = "0.3.0"
 mio = "0.5.0"
-time = "0.1.0"
 byteorder = "0.5.0"
 hex = "0.2.0"
 num = "0.1.37"

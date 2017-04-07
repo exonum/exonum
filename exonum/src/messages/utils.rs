@@ -1,4 +1,5 @@
-use time::Timespec;
+use std::time::{SystemTime, Duration, UNIX_EPOCH};
+
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 
@@ -6,7 +7,7 @@ use serde::de::{self, Visitor, Deserialize, Deserializer};
 pub struct U64(pub u64);
 pub struct I64(pub i64);
 
-pub struct TimespecSerdeHelper(pub Timespec); 
+pub struct SystemTimeSerdeHelper(pub SystemTime);
 
 impl Serialize for U64 {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
@@ -69,34 +70,29 @@ impl Deserialize for I64 {
     }
 }
 
-impl Serialize for TimespecSerdeHelper {
+impl Serialize for SystemTimeSerdeHelper {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let nsec = (self.0.sec as u64) * 1_000_000_000 + self.0.nsec as u64;
-        U64(nsec).serialize(ser)
+        let duration = self.0.duration_since(UNIX_EPOCH).unwrap();
+        duration.serialize(ser)
     }
 }
 
-impl Deserialize for TimespecSerdeHelper {
+impl Deserialize for SystemTimeSerdeHelper {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
     {
-    	let nsec = <U64>::deserialize(deserializer)?; 
-
-        let spec = Timespec {
-            sec: (nsec.0 / 1_000_000_000) as i64,
-            nsec: (nsec.0 % 1_000_000_000) as i32,
-        }; 
-        Ok(TimespecSerdeHelper(spec))
+        let duration = <Duration>::deserialize(deserializer)?;
+        Ok(SystemTimeSerdeHelper(UNIX_EPOCH + duration))
     }
 }
 
 #[cfg(test)]
 mod tests {
-	use time::{get_time};
+	use std::time::SystemTime;
 	use serde_json; 
-	use super::{U64, I64, TimespecSerdeHelper}; 
+	use super::{U64, I64, SystemTimeSerdeHelper};
 
 	#[test]
 	fn test_serialize() {
@@ -112,9 +108,9 @@ mod tests {
 
 	#[test]
 	fn test_timespce_helper_serialize() {
-		let time = get_time(); 
-		let str_json = serde_json::to_string(&TimespecSerdeHelper(time)).unwrap(); 
-		let time1 = serde_json::from_str::<TimespecSerdeHelper>(&str_json).unwrap().0; 
+		let time = SystemTime::now();
+		let str_json = serde_json::to_string(&SystemTimeSerdeHelper(time)).unwrap();
+		let time1 = serde_json::from_str::<SystemTimeSerdeHelper>(&str_json).unwrap().0;
 		assert_eq!(time, time1);
 	}
 }

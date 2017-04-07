@@ -1,12 +1,11 @@
 use std::io;
 use std::net::SocketAddr;
-
-use time::{Duration, Timespec};
+use std::time::{SystemTime, Duration};
 
 use super::crypto::{PublicKey, SecretKey, Hash};
 use super::events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
                     EventHandler, Result as EventsResult, Error as EventsError};
-use super::events::{MioChannel, Network, EventLoop};
+use super::events::{MioChannel, Network, EventLoop, Milliseconds};
 use super::blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use super::messages::{Connect, RawMessage};
 
@@ -121,19 +120,19 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn propose_timeout(&self) -> i64 {
+    pub fn propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().propose_timeout
     }
 
-    pub fn round_timeout(&self) -> i64 {
+    pub fn round_timeout(&self) -> Milliseconds {
         self.state().consensus_config().round_timeout
     }
 
-    pub fn status_timeout(&self) -> i64 {
+    pub fn status_timeout(&self) -> Milliseconds {
         self.state().consensus_config().status_timeout
     }
 
-    pub fn peers_timeout(&self) -> i64 {
+    pub fn peers_timeout(&self) -> Milliseconds {
         self.state().consensus_config().peers_timeout
     }
 
@@ -205,33 +204,29 @@ impl<S> NodeHandler<S>
 
     pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round() + 1);
-        trace!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
+        trace!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
                time,
                self.state.height(),
-               self.state.round(),
-               (time - self.channel.get_time()).num_milliseconds());
+               self.state.round());
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
 
     pub fn add_propose_timeout(&mut self) {
-        //        let time = self.round_start_time(self.state.round()) +
-        //                   Duration::milliseconds(self.propose_timeout);
         let adjusted_propose_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
-                   Duration::milliseconds(adjusted_propose_timeout);
+                   Duration::from_millis(adjusted_propose_timeout);
 
-        trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
+        trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}",
                time,
                self.state.height(),
-               self.state.round(),
-               (time - self.channel.get_time()).num_milliseconds());
+               self.state.round());
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
 
     pub fn add_status_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout());
+        let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
         self.channel.add_timeout(NodeTimeout::Status, time);
     }
 
@@ -242,7 +237,7 @@ impl<S> NodeHandler<S>
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout());
+        let time = self.channel.get_time() + Duration::from_millis(self.peers_timeout());
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
@@ -253,9 +248,9 @@ impl<S> NodeHandler<S>
             .hash()
     }
 
-    pub fn round_start_time(&self, round: Round) -> Timespec {
-        let ms = (round - 1) as i64 * self.round_timeout();
-        self.state.height_start_time() + Duration::milliseconds(ms)
+    pub fn round_start_time(&self, round: Round) -> SystemTime {
+        let ms = (round - 1) as u64 * self.round_timeout();
+        self.state.height_start_time() + Duration::from_millis(ms)
     }
 }
 

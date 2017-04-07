@@ -5,8 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 use std::ops::Drop;
 use std::collections::HashMap;
-
-use time::{Timespec, Duration};
+use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
@@ -14,7 +13,7 @@ use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, Stor
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
-                     EventHandler, Channel, Result as EventsResult};
+                     EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
@@ -25,7 +24,7 @@ use timestamping::TimestampingService;
 type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
 
 #[derive(PartialEq, Eq)]
-pub struct TimerPair(pub Timespec, pub NodeTimeout);
+pub struct TimerPair(pub SystemTime, pub NodeTimeout);
 
 impl PartialOrd for TimerPair {
     fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
@@ -41,7 +40,7 @@ impl Ord for TimerPair {
 
 pub struct SandboxInner {
     pub address: SocketAddr,
-    pub time: Timespec,
+    pub time: SystemTime,
     pub sended: VecDeque<(SocketAddr, RawMessage)>,
     pub events: VecDeque<SandboxEvent>,
     pub timers: BinaryHeap<TimerPair>,
@@ -70,7 +69,7 @@ impl Channel for SandboxChannel {
         self.inner.lock().unwrap().address
     }
 
-    fn get_time(&self) -> Timespec {
+    fn get_time(&self) -> SystemTime {
         self.inner.lock().unwrap().time
     }
 
@@ -90,8 +89,7 @@ impl Channel for SandboxChannel {
         self.send_event(event);
     }
 
-    fn add_timeout(&mut self, timeout: Self::Timeout, time: Timespec) {
-        // assert!(time < self.inner.borrow().time, "Tring to add timeout for the past");
+    fn add_timeout(&mut self, timeout: Self::Timeout, time: SystemTime) {
         let pair = TimerPair(time, timeout);
         self.inner.lock().unwrap().timers.push(pair);
     }
@@ -130,7 +128,7 @@ impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
         }
         Ok(())
     }
-    fn get_time(&self) -> Timespec {
+    fn get_time(&self) -> SystemTime {
         self.inner.lock().unwrap().time
     }
     fn channel(&self) -> SandboxChannel {
@@ -182,7 +180,7 @@ pub struct Sandbox {
 }
 
 impl Sandbox {
-    pub fn initialize(&self, connect_message_time: Timespec, start_index: usize, end_index: usize) {
+    pub fn initialize(&self, connect_message_time: SystemTime, start_index: usize, end_index: usize) {
         let connect = Connect::new(&self.p(0), self.a(0), connect_message_time, self.s(0));
 
         for validator in start_index..end_index {
@@ -239,8 +237,8 @@ impl Sandbox {
         self.validators().len()
     }
 
-    pub fn time(&self) -> Timespec {
-        self.inner.lock().unwrap().time.clone()
+    pub fn time(&self) -> SystemTime {
+        self.inner.lock().unwrap().time
     }
 
     pub fn blockchain_ref(&self) -> Ref<Blockchain> {
@@ -437,17 +435,16 @@ impl Sandbox {
         reactor.following_config().unwrap()
     }
 
-    pub fn propose_timeout(&self) -> i64 {
+    pub fn propose_timeout(&self) -> Milliseconds {
         self.cfg().consensus.propose_timeout
     }
-
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
         debug_assert!(num_validators >= 4);
         num_validators * 2 / 3 + 1
     }
 
-    pub fn round_timeout(&self) -> i64 {
+    pub fn round_timeout(&self) -> Milliseconds {
         self.cfg().consensus.round_timeout
     }
 
@@ -536,9 +533,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         propose_timeout: 200,
         txs_block_limit: 1000,
     };
-    let mut genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
-    let time = Timespec::new(1486720340, 0);
-    genesis.time = time.sec as u64;
+    let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
@@ -556,7 +551,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let inner = Arc::new(Mutex::new(SandboxInner {
         address: addresses[0].clone(),
-        time: time,
+        time: UNIX_EPOCH + Duration::new(1486720340, 0),
         sended: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
@@ -606,9 +601,9 @@ fn test_sandbox_assert_status() {
     // TODO: remove this?
     let s = timestamping_sandbox();
     s.assert_state(1, 1);
-    s.add_time(Duration::milliseconds(999));
+    s.add_time(Duration::from_millis(999));
     s.assert_state(1, 1);
-    s.add_time(Duration::milliseconds(1));
+    s.add_time(Duration::from_millis(1));
     s.assert_state(1, 2);
 }
 
@@ -652,6 +647,6 @@ fn test_sandbox_unexpected_message_when_time_changed() {
     let s = timestamping_sandbox();
     let (public, secret) = gen_keypair();
     s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.add_time(Duration::milliseconds(1000));
+    s.add_time(Duration::from_millis(1000));
     panic!("Oops! We don't catch unexpected message");
 }

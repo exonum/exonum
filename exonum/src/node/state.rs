@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
+use std::time::{SystemTime, Duration};
 
-use time::{Duration, Timespec};
 use serde_json::Value;
 
 use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
@@ -10,6 +10,7 @@ use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMess
 
 use super::super::crypto::{PublicKey, SecretKey, Hash};
 use super::super::storage::Patch;
+use super::super::events::Milliseconds;
 use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
 
 // TODO: replace by in disk tx pool
@@ -17,11 +18,11 @@ const TX_POOL_LIMIT: usize = 20000;
 
 // TODO: move request timeouts into node configuration
 
-pub const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
-pub const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
-pub const REQUEST_PREVOTES_WAIT: u64 = 100;
-pub const REQUEST_PRECOMMITS_WAIT: u64 = 100;
-pub const REQUEST_BLOCK_WAIT: u64 = 100;
+pub const REQUEST_PROPOSE_WAIT: Milliseconds = 100;
+pub const REQUEST_TRANSACTIONS_WAIT: Milliseconds = 100;
+pub const REQUEST_PREVOTES_WAIT: Milliseconds = 100;
+pub const REQUEST_PRECOMMITS_WAIT: Milliseconds = 100;
+pub const REQUEST_BLOCK_WAIT: Milliseconds = 100;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -38,7 +39,7 @@ pub struct State {
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
     height: u64,
-    height_start_time: Timespec,
+    height_start_time: SystemTime,
     round: Round,
     locked_round: Round,
     locked_propose: Option<Hash>,
@@ -177,7 +178,7 @@ impl RequestData {
             RequestData::Precommits(..) => REQUEST_PRECOMMITS_WAIT,
             RequestData::Block(..) => REQUEST_BLOCK_WAIT,
         };
-        Duration::milliseconds(ms as i64)
+        Duration::from_millis(ms)
     }
 }
 
@@ -259,7 +260,7 @@ impl State {
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
-               height_start_time: Timespec)
+               height_start_time: SystemTime)
                -> State {
 
         let validators_len = stored.validators.len();
@@ -333,12 +334,11 @@ impl State {
         self.config = config;
     }
 
-    pub fn propose_timeout(&self) -> i64 {
+    pub fn propose_timeout(&self) -> Milliseconds {
         self.config.consensus.propose_timeout
     }
 
-    pub fn set_propose_timeout(&mut self, timeout: i64) {
-        debug_assert!(timeout > 0);
+    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
         debug_assert!(timeout < self.config.consensus.round_timeout);
         self.config.consensus.propose_timeout = timeout;
     }
@@ -407,7 +407,7 @@ impl State {
         self.height
     }
 
-    pub fn height_start_time(&self) -> Timespec {
+    pub fn height_start_time(&self) -> SystemTime {
         self.height_start_time
     }
 
@@ -452,7 +452,7 @@ impl State {
     }
 
     // FIXME use block_hash
-    pub fn new_height(&mut self, block_hash: &Hash, height_start_time: Timespec) {
+    pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height += 1;
         self.height_start_time = height_start_time;
         self.round = 1;
