@@ -6635,10 +6635,10 @@ Exonum.verifyBlock = function(data, validators) {
 
         var publicKey = validators[precommit.body.validator];
 
-        // if (Exonum.verifySignature(precommit.body, Precommit, precommit.signature, publicKey) === false) {
-        //     console.error('Wrong signature of precommit.');
-        //     return false;
-        // }
+        if (Exonum.verifySignature(precommit.body, Precommit, precommit.signature, publicKey) === false) {
+            console.error('Wrong signature of precommit.');
+            return false;
+        }
     }
 
     if (uniqueValidators.length <= validatorsTotalNumber * 2 / 3) {

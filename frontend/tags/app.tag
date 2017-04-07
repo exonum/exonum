@@ -15,10 +15,10 @@
         var service = new CryptocurrencyService({
             id: 128,
             validators: [
-                '7e2b6889b2e8b60e0e8d71be55b9cbf6aaa9bf397ef7b1d6b8564d862b120bea',
-                '2f1e58c0752503e3b66a5f68d97ab44cac196c75608b53682c3da1f824f9391f',
-                '8ce8ba0974e10d45d89b48a409015ebfe15a4aa9f9410951b266764b91c9d535',
-                '11110c9c4b06d7cc0df9311aae089771b04b696a8eaa105ba39a186bcceed0c2'
+                '79669c80800ca0162ffe76ee793147adbf7128dc6e75c1b94b4b02d7e4d8a441',
+                '3d8578be65c4e78e01a0a8270f10ba1e809b4d562a17f7803f20da5928ef1db9',
+                '700c733bd8dfd0f3f40f5811bfd681f23e0caada46abb1719fa48d658efa6ef6',
+                'd858eaad05d8036dbd679535880eb408c943a34ee006cfa9ab7bd97fade6b200'
             ],
             baseUrl: 'http://exonum.com/backends/currency/api/v1'
         });
