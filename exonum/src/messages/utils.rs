@@ -75,7 +75,11 @@ impl Serialize for SystemTimeSerdeHelper {
         where S: Serializer
     {
         let duration = self.0.duration_since(UNIX_EPOCH).unwrap();
-        duration.serialize(ser)
+        let helper = DurationSerdeHelper {
+            secs: U64(duration.as_secs()),
+            nanos: duration.subsec_nanos()
+        };
+        helper.serialize(ser)
     }
 }
 
@@ -83,16 +87,23 @@ impl Deserialize for SystemTimeSerdeHelper {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
     {
-        let duration = <Duration>::deserialize(deserializer)?;
+        let helper = <DurationSerdeHelper>::deserialize(deserializer)?;
+        let duration = Duration::new(helper.secs.0, helper.nanos);
         Ok(SystemTimeSerdeHelper(UNIX_EPOCH + duration))
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct DurationSerdeHelper {
+    secs: U64,
+    nanos: u32,
 }
 
 #[cfg(test)]
 mod tests {
 	use std::time::SystemTime;
 	use serde_json; 
-	use super::{U64, I64, SystemTimeSerdeHelper};
+	use super::{U64, I64, SystemTimeSerdeHelper, DurationSerdeHelper};
 
 	#[test]
 	fn test_serialize() {
@@ -113,4 +124,13 @@ mod tests {
 		let time1 = serde_json::from_str::<SystemTimeSerdeHelper>(&str_json).unwrap().0;
 		assert_eq!(time, time1);
 	}
+
+    #[test]
+    fn test_duration_helper_serialize() {
+        let helper = DurationSerdeHelper { secs: U64(10), nanos: 20 };
+        let str_json = serde_json::to_string(&helper).unwrap();
+        let helper1 = serde_json::from_str::<DurationSerdeHelper>(&str_json).unwrap();
+        assert_eq!(helper.secs.0, helper1.secs.0);
+        assert_eq!(helper.nanos, helper1.nanos);
+    }
 }
