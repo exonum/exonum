@@ -9,6 +9,7 @@ use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, Req
 use exonum::blockchain::Block;
 use exonum::crypto::{Hash, HASH_SIZE, hash};
 use exonum::messages::BitVec;
+use exonum::events::Milliseconds;
 
 use super::sandbox::Sandbox;
 use timestamping::{TimestampTx, TimestampingTxGenerator};
@@ -38,7 +39,7 @@ pub const INCORRECT_VALIDATOR_ID: u32 = 999_999;
 pub struct BlockBuilder<'a> {
     height: Option<u64>,
     round: Option<u32>,
-    duration_science_sandbox_time: Option<u64>,
+    duration_science_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
     state_hash: Option<Hash>,
@@ -71,7 +72,7 @@ impl<'a> BlockBuilder<'a> {
     }
 
     pub fn with_duration_science_sandbox_time(mut self,
-                                              duration_science_sandbox_time: u64)
+                                              duration_science_sandbox_time: Milliseconds)
                                               -> Self {
         self.duration_science_sandbox_time = Some(duration_science_sandbox_time);
         self
@@ -121,7 +122,7 @@ pub struct ProposeBuilder<'a> {
     validator_id: Option<u32>,
     height: Option<u64>,
     round: Option<u32>,
-    duration_science_sandbox_time: Option<u64>,
+    duration_science_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<&'a Hash>,
     tx_hashes: Option<&'a [Hash]>,
 
@@ -157,7 +158,7 @@ impl<'a> ProposeBuilder<'a> {
     }
 
     pub fn with_duration_science_sandbox_time(mut self,
-                                              duration_science_sandbox_time: u64)
+                                              duration_science_sandbox_time: Milliseconds)
                                               -> Self {
         self.duration_science_sandbox_time = Some(duration_science_sandbox_time);
         self
@@ -191,7 +192,7 @@ pub struct SandboxState {
     pub accepted_propose_hash: RefCell<Hash>,
     pub accepted_block_hash: RefCell<Hash>,
     pub committed_transaction_hashes: RefCell<Vec<Hash>>,
-    pub time_millis_science_round_start: RefCell<u64>,
+    pub time_millis_science_round_start: RefCell<Milliseconds>,
 }
 
 impl SandboxState {
@@ -236,7 +237,7 @@ pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,
     }
 
     // how much time left till next round_timeout
-    let time_till_next_round: u64 =
+    let time_till_next_round: Milliseconds =
         round_timeout - *sandbox_state.time_millis_science_round_start.borrow() % round_timeout;
 
     trace!("going to add {:?} millis", time_till_next_round);

@@ -2,6 +2,7 @@ use serde_json;
 use ::storage::StorageValue;
 use std::collections::BTreeMap;
 
+use super::super::events::Milliseconds;
 
 use ::crypto::{hash, PublicKey, Hash};
 
@@ -16,10 +17,10 @@ pub struct StoredConfiguration {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
-    pub round_timeout: u64,
-    pub status_timeout: u64,
-    pub peers_timeout: u64,
-    pub propose_timeout: u64,
+    pub round_timeout: Milliseconds,
+    pub status_timeout: Milliseconds,
+    pub peers_timeout: Milliseconds,
+    pub propose_timeout: Milliseconds,
     pub txs_block_limit: u32,
 }
 
