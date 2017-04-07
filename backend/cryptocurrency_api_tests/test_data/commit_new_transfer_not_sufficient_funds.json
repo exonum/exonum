@@ -14,10 +14,13 @@
                                         "height": "7",
                                         "propose_hash": "ae32795afc6448c3d75a5442d45c1eb116148351e9bfd213bc967e8e75569072",
                                         "round": 5,
-                                        "time": "1486720358407000000",
+                                        "time": {
+                                                "nanos": 407000000,
+                                                "secs": "1486720358"
+                                        },
                                         "validator": 0
                                 },
-                                "signature": "407c62a90a60dd56d07a5202733e14f585cf59611fb384adaf7caca46ab9ca3be01c52fba62c1b000868f62213ce57bcf2610406a1d99fd7d6f18ff161587d05"
+                                "signature": "cfde9a98e60df403c399fa6d9e331eacd7d7a663b627b0b78eba6331eeb6583559c201772caa7de536dec1a6af3211f1138ce51352638a714e28973ce041360d"
                         },
                         {
                                 "body": {
@@ -25,10 +28,13 @@
                                         "height": "7",
                                         "propose_hash": "ae32795afc6448c3d75a5442d45c1eb116148351e9bfd213bc967e8e75569072",
                                         "round": 5,
-                                        "time": "1486720358407000000",
+                                        "time": {
+                                                "nanos": 407000000,
+                                                "secs": "1486720358"
+                                        },
                                         "validator": 1
                                 },
-                                "signature": "8097d720ebd721494bf08d37e22877ea2922188d11e82509c342e73eff9ae90e37a2ebac7ab96e40a31a170da3f5b0c56a12a2be7d8c4176cf65c26f77b57f02"
+                                "signature": "85bc543e4b2585511acab794d937e1bd57fca4d48638f53f7ed612a354bd8cd88322d5349db5573256e550afed5693c901c52551ffbc4ca0700116fbf7314e02"
                         },
                         {
                                 "body": {
@@ -36,10 +42,13 @@
                                         "height": "7",
                                         "propose_hash": "ae32795afc6448c3d75a5442d45c1eb116148351e9bfd213bc967e8e75569072",
                                         "round": 5,
-                                        "time": "1486720358407000000",
+                                        "time": {
+                                                "nanos": 407000000,
+                                                "secs": "1486720358"
+                                        },
                                         "validator": 2
                                 },
-                                "signature": "a90c96f4028d4be12451b46cb2055a04c18439b062c4c458c9de15a18666bb828259f38fd30a42606e3e85fc63736acafc11a724fdd0a52dc7382208ace72c05"
+                                "signature": "156678c595e7b0347e7bc2c8136e1e8fac90624f283806b52ddce301a3a475ed8b8f0412d79d2a27354e6e15ab6732634b1bf6a9d4f4311d4036ee8dd70d520d"
                         }
                 ]
         },
