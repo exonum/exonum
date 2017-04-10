@@ -2,24 +2,35 @@
 extern crate exonum;
 extern crate blockchain_explorer;
 extern crate serde;
+extern crate serde_json;
 extern crate time;
+#[macro_use]
+extern crate derive_error;
 
-use std::ops::Deref;
+extern crate iron;
+extern crate params;
+extern crate router;
+
+pub mod api;
 
 use serde::{Serialize, Serializer};
 use time::Timespec;
 
 use exonum::crypto::{Hash, hash, HexValue};
-use exonum::storage::{Database, Fork, Error, MapTable, MerklePatriciaTable, Map};
-use exonum::blockchain::{View, Blockchain};
+use exonum::storage::View;
+use exonum::blockchain::{Transaction, Service, NodeState};
+use exonum::storage::{MapTable, MerklePatriciaTable, Map, Error as StorageError};
+use exonum::messages::{FromRaw, RawTransaction, Error as MessageError};
 
 use blockchain_explorer::TransactionInfo;
 
-pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
+pub const TIMESTAMPING_SERVICE_ID: u16 = 128;
+pub const TIMESTAMPING_TX_ID: u16 = 0;
 
 message! {
     TimestampTx {
-        const ID = TIMESTAMPING_TRANSACTION_MESSAGE_ID;
+        const TYPE = TIMESTAMPING_SERVICE_ID;
+        const ID = TIMESTAMPING_TX_ID;
         const SIZE = 48;
 
         description:    &str        [00 => 08]
@@ -36,6 +47,14 @@ storage_value! {
         time:               Timespec    [08 => 16]
         data_hash:          &Hash       [16 => 48]
     }
+}
+
+pub struct TimestampingSchema<'a> {
+    view: &'a View,
+}
+
+pub struct TimestampingService {
+
 }
 
 impl Serialize for TimestampTx {
@@ -64,75 +83,53 @@ impl Serialize for Content {
 
 impl TransactionInfo for TimestampTx {}
 
-#[derive(Clone)]
-pub struct TimestampingBlockchain<D: Database> {
-    pub db: D,
-}
+impl<'a> TimestampingSchema<'a> {
+    pub fn new(view: &'a View) -> TimestampingSchema {
+        TimestampingSchema { view: view }
+    }
 
-pub struct TimestampingView<F: Fork> {
-    pub fork: F,
-}
+    pub fn contents(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Content> {
+        MerklePatriciaTable::new(MapTable::new(vec![TIMESTAMPING_SERVICE_ID as u8, 0], self.view))
+    }
 
-impl<F> View<F> for TimestampingView<F>
-    where F: Fork
-{
-    type Transaction = TimestampTx;
-
-    fn from_fork(fork: F) -> Self {
-        TimestampingView { fork: fork }
+    pub fn state_hash(&self) -> Result<Vec<Hash>, StorageError> {
+        Ok(vec![self.contents().root_hash()?])
     }
 }
 
-impl<F> Deref for TimestampingView<F>
-    where F: Fork
-{
-    type Target = F;
-
-    fn deref(&self) -> &Self::Target {
-        &self.fork
-    }
-}
-
-impl<D: Database> Deref for TimestampingBlockchain<D> {
-    type Target = D;
-
-    fn deref(&self) -> &D {
-        &self.db
-    }
-}
-
-impl<F> TimestampingView<F>
-    where F: Fork
-{
-    pub fn contents(&self) -> MerklePatriciaTable<MapTable<F, [u8], Vec<u8>>, Hash, Content> {
-        MerklePatriciaTable::new(MapTable::new(vec![21], &self))
-    }
-}
-
-impl<D> Blockchain for TimestampingBlockchain<D>
-    where D: Database
-{
-    type Database = D;
-    type Transaction = TimestampTx;
-    type View = TimestampingView<D::Fork>;
-
-    fn verify_tx(_: &Self::Transaction) -> bool {
+impl Transaction for TimestampTx {
+    fn verify(&self) -> bool {
         true
     }
 
-    fn state_hash(view: &Self::View) -> Result<Hash, Error> {
-        let contents = view.contents();
+    fn execute(&self, view: &View) -> Result<(), StorageError> {
+        let schema = TimestampingSchema::new(view);
+        let content = Content::new(self.description(), self.time(), self.hash());
+        schema.contents().put(self.hash(), content)
+    }
+}
 
-        let mut hashes = Vec::new();
-        hashes.extend_from_slice(contents.root_hash()?.as_ref());
-        Ok(hash(&hashes))
+impl TimestampingService {
+    pub fn new() -> TimestampingService {
+        TimestampingService {}
+    }
+}
+
+impl Service for TimestampingService {
+    fn service_id(&self) -> u16 {
+        TIMESTAMPING_SERVICE_ID
     }
 
-    fn execute(view: &Self::View, tx: &Self::Transaction) -> Result<(), Error> {
-        let content = Content::new(tx.description(),
-                                tx.time(),
-                                tx.hash());
-        view.contents().put(tx.hash(), content)?;
+    fn state_hash(&self, view: &View) -> Result<Vec<Hash>, StorageError> {
+        let schema = TimestampingSchema::new(view);
+        schema.state_hash()
+    }
+
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+        TimestampTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+    }
+
+    fn handle_commit(&self, _: &mut NodeState) -> Result<(), StorageError> {
         Ok(())
     }
 }
