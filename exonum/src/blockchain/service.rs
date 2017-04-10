@@ -5,7 +5,7 @@ use ::storage::{View, Error as StorageError};
 use ::messages::{Message, RawTransaction, Error as MessageError};
 use ::node::State;
 use ::events::Milliseconds;
-use ::node::state::NodeType;
+use ::node::state::ValidatorState;
 use ::blockchain::{StoredConfiguration, ConsensusConfig};
 
 pub trait Transaction: Message + 'static {
@@ -49,8 +49,8 @@ impl<'a, 'b> NodeState<'a, 'b> {
         }
     }
 
-    pub fn node_type(&self) -> NodeType {
-       self.state.node_type()
+    pub fn validator_state(&self) -> &Option<ValidatorState> {
+       self.state.validator_state()
     }
 
     pub fn view(&self) -> &View {

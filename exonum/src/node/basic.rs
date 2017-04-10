@@ -90,12 +90,10 @@ impl<S> NodeHandler<S>
                 return;
             }
             
-            if let Some(id) = self.state.get_validator_id(peer) {
-                // Check validator height info
-                if msg.height() > self.state.validator_height(id) {
-                    // Update validator height
-                    self.state.set_validator_height(id, msg.height());
-                }
+            // Check validator height info
+            if msg.height() > self.state.node_height(peer) {
+                // Update validator height
+                self.state.set_node_height(*peer, msg.height());
             }
 
             // Request block

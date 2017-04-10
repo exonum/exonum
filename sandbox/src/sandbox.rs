@@ -147,7 +147,7 @@ impl SandboxReactor {
     }
 
     pub fn is_validator(&self) -> bool {
-        self.handler.state().node_type().get_validator_id().is_some()
+        self.handler.state().is_validator()
     }    
 
     pub fn last_block(&self) -> Result<Block, StorageError> {
@@ -459,7 +459,6 @@ impl Sandbox {
     }
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
-        debug_assert!(num_validators >= 4);
         num_validators * 2 / 3 + 1
     }
 
