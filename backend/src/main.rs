@@ -25,7 +25,7 @@ use blockchain_explorer::helpers::{GenerateCommand, RunCommand, generate_testnet
 use blockchain_explorer::api::Api;
 
 use timestamping::TimestampingService;
-use timestamping::api::TimestampingApi;
+use timestamping::api::PublicApi;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ServicesConfig {
@@ -42,7 +42,7 @@ fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
             let blockchain_clone = blockchain.clone();
             let thread = thread::spawn(move || {
 
-                let config_api = TimestampingApi::new(blockchain_clone, channel_clone);
+                let config_api = PublicApi::new(blockchain_clone, channel_clone);
                 let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
                 info!("Timestamping service api started on {}", listen_address);
 

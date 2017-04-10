@@ -1,6 +1,4 @@
-use std;
-use std::io;
-use std::collections::BTreeMap;
+mod error;
 
 use serde_json::value::ToJson;
 use router::Router;
@@ -12,106 +10,25 @@ use params::{Params, Value};
 use params;
 use time;
 
-use exonum::crypto::{Hash, HexValue, FromHexError, Signature};
+use exonum::crypto::{Hash, HexValue, Signature};
 use exonum::blockchain::Blockchain;
-use exonum::storage::{Map, Error as StorageError};
-use exonum::events::Error as EventsError;
+use exonum::storage::Map;
 use exonum::node::TransactionSend;
 
 use {TimestampTx, TimestampingSchema, Content};
+pub use self::error::Error as ApiError;
 
 #[derive(Clone)]
-pub struct TimestampingApi<T: TransactionSend + Clone> {
+pub struct PublicApi<T: TransactionSend + Clone> {
     channel: T,
     blockchain: Blockchain,
 }
 
-#[derive(Debug)]
-enum ApiError {
-    Storage(StorageError),
-    Events(EventsError),
-    FromHex(FromHexError),
-    Io(::std::io::Error),
-    FileNotFound(Hash),
-    FileToBig,
-    FileExists(Hash),
-    IncorrectRequest,
-}
-
-impl std::fmt::Display for ApiError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl std::error::Error for ApiError {
-    fn description(&self) -> &str {
-        match *self {
-            ApiError::Storage(_) => "Storage",
-            ApiError::Events(_) => "Events",
-            ApiError::FromHex(_) => "FromHex",
-            ApiError::Io(_) => "Io",
-            ApiError::FileNotFound(_) => "FileNotFound",
-            ApiError::FileToBig => "FileToBig",
-            ApiError::FileExists(_) => "FileExists",
-            ApiError::IncorrectRequest => "IncorrectRequest",
-        }
-    }
-}
-
-impl From<io::Error> for ApiError {
-    fn from(e: io::Error) -> ApiError {
-        ApiError::Io(e)
-    }
-}
-
-impl From<StorageError> for ApiError {
-    fn from(e: StorageError) -> ApiError {
-        ApiError::Storage(e)
-    }
-}
-
-impl From<EventsError> for ApiError {
-    fn from(e: EventsError) -> ApiError {
-        ApiError::Events(e)
-    }
-}
-
-impl From<FromHexError> for ApiError {
-    fn from(e: FromHexError) -> ApiError {
-        ApiError::FromHex(e)
-    }
-}
-
-impl From<ApiError> for IronError {
-    fn from(e: ApiError) -> IronError {
-        use std::error::Error;
-
-        let mut body = BTreeMap::new();
-        body.insert("type", e.description().into());
-        let code = match e {
-            ApiError::FileExists(hash) => {
-                body.insert("hash", hash.to_hex());
-                status::Conflict
-            }
-            ApiError::FileNotFound(hash) => {
-                body.insert("hash", hash.to_hex());
-                status::Conflict
-            }
-            _ => status::Conflict,
-        };
-        IronError {
-            error: Box::new(e),
-            response: Response::with((code, body.to_json().to_string())),
-        }
-    }
-}
-
-impl<T> TimestampingApi<T>
+impl<T> PublicApi<T>
     where T: TransactionSend + Clone
 {
-    pub fn new(blockchain: Blockchain, channel: T) -> TimestampingApi<T> {
-        TimestampingApi {
+    pub fn new(blockchain: Blockchain, channel: T) -> PublicApi<T> {
+        PublicApi {
             blockchain: blockchain,
             channel: channel,
         }
@@ -144,7 +61,7 @@ impl<T> TimestampingApi<T>
     }
 }
 
-impl<T> Api for TimestampingApi<T>
+impl<T> Api for PublicApi<T>
     where T: TransactionSend + Clone + 'static
 {
     fn wire(&self, router: &mut Router) {
