@@ -4,6 +4,7 @@ mod spec;
 mod tests;
 
 use std::fmt;
+use std::time::SystemTime;
 
 mod raw;
 mod error;
@@ -74,6 +75,17 @@ impl RequestMessage {
             RequestMessage::Precommits(ref msg) => msg.to(),
             RequestMessage::Peers(ref msg) => msg.to(),
             RequestMessage::Block(ref msg) => msg.to(),
+        }
+    }
+
+    pub fn time(&self) -> SystemTime {
+        match *self {
+            RequestMessage::Propose(ref msg) => msg.time(),
+            RequestMessage::Transactions(ref msg) => msg.time(),
+            RequestMessage::Prevotes(ref msg) => msg.time(),
+            RequestMessage::Precommits(ref msg) => msg.time(),
+            RequestMessage::Peers(ref msg) => msg.time(),
+            RequestMessage::Block(ref msg) => msg.time(),
         }
     }
 

@@ -219,6 +219,7 @@ pub trait Api {
 
 #[cfg(test)]
 mod tests {
+    use std::time::SystemTime;
     use router::Router;
     use exonum::blockchain::Block;
     use exonum::crypto::Hash;
@@ -232,7 +233,8 @@ mod tests {
                                      2,
                                      &Hash::new([24; 32]),
                                      &Hash::new([34; 32]),
-                                     &Hash::new([38; 32]));
+                                     &Hash::new([38; 32]),
+                                     SystemTime::now());
         struct SampleAPI;
         impl Api for SampleAPI {
             fn wire<'b>(&self, _: &'b mut Router) {

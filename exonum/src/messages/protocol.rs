@@ -4,7 +4,7 @@ use super::super::crypto::{Hash, PublicKey, Signature};
 use super::{RawMessage, BitVec};
 use super::super::blockchain;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use ::messages::utils::{U64, SystemTimeSerdeHelper};
+use ::messages::utils::U64;
 
 pub const CONSENSUS: u16 = 0;
 
@@ -41,13 +41,14 @@ message! {
     Propose {
         const TYPE = CONSENSUS;
         const ID = PROPOSE_MESSAGE_ID;
-        const SIZE = 56;
+        const SIZE = 68;
 
         validator:      u32         [00 => 04]
         height:         u64         [04 => 12]
         round:          u32         [12 => 16]
         prev_hash:      &Hash       [16 => 48]
         transactions:   &[Hash]     [48 => 56]
+        time:           SystemTime  [56 => 68]
     }
 }
 
@@ -71,14 +72,13 @@ message! {
     Precommit {
         const TYPE = CONSENSUS;
         const ID = PRECOMMIT_MESSAGE_ID;
-        const SIZE = 96;
+        const SIZE = 84;
 
         validator:      u32         [00 => 04]
         height:         u64         [08 => 16]
         round:          u32         [16 => 20]
         propose_hash:   &Hash       [20 => 52]
         block_hash:     &Hash       [52 => 84]
-        time:           SystemTime  [84 => 96]
     }
 }
 
@@ -95,7 +95,6 @@ struct PrecommitBodySerdeHelper {
    round: u32, 
    propose_hash: Hash, 
    block_hash: Hash,
-   time: SystemTimeSerdeHelper,
 }
 
 impl Serialize for Precommit {
@@ -108,7 +107,6 @@ impl Serialize for Precommit {
             round: self.round(), 
             propose_hash: *self.propose_hash(), 
             block_hash: *self.block_hash(),
-            time: SystemTimeSerdeHelper(self.time()),
         }; 
         let helper = PrecommitSerdeHelper {
             body: body, 
@@ -124,7 +122,7 @@ impl Deserialize for Precommit {
     {
         let h = <PrecommitSerdeHelper>::deserialize(deserializer)?;
 
-        let precommit = Precommit::new_with_signature(h.body.validator, h.body.height.0, h.body.round, &h.body.propose_hash, &h.body.block_hash, h.body.time.0, &h.signature);
+        let precommit = Precommit::new_with_signature(h.body.validator, h.body.height.0, h.body.round, &h.body.propose_hash, &h.body.block_hash, &h.signature);
         Ok(precommit)
     }
 }
@@ -147,13 +145,14 @@ message! {
     Block {
         const TYPE = CONSENSUS;
         const ID = BLOCK_MESSAGE_ID;
-        const SIZE = 88;
+        const SIZE = 100;
 
         from:           &PublicKey          [00 => 32]
         to:             &PublicKey          [32 => 64]
         block:          blockchain::Block   [64 => 72]
         precommits:     Vec<Precommit>      [72 => 80]
         transactions:   Vec<RawMessage>     [80 => 88]
+        time:           SystemTime          [88 => 100]
     }
 }
 
@@ -168,12 +167,13 @@ message! {
     RequestPropose {
         const TYPE = CONSENSUS;
         const ID = REQUEST_PROPOSE_MESSAGE_ID;
-        const SIZE = 104;
+        const SIZE = 116;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
         height:         u64         [64 => 72]
         propose_hash:   &Hash       [72 => 104]
+        time:           SystemTime  [104 => 116]
     }
 }
 
@@ -182,11 +182,12 @@ message! {
     RequestTransactions {
         const TYPE = CONSENSUS;
         const ID = REQUEST_TRANSACTIONS_MESSAGE_ID;
-        const SIZE = 72;
+        const SIZE = 84;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
         txs:            &[Hash]     [64 => 72]
+        time:           SystemTime  [72 => 84]
     }
 }
 
@@ -195,7 +196,7 @@ message! {
     RequestPrevotes {
         const TYPE = CONSENSUS;
         const ID = REQUEST_PREVOTES_MESSAGE_ID;
-        const SIZE = 116;
+        const SIZE = 128;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
@@ -203,6 +204,7 @@ message! {
         round:          u32         [72 => 76]
         propose_hash:   &Hash       [76 => 108]
         validators:     BitVec      [108 => 116]
+        time:           SystemTime  [116 => 128]
     }
 }
 // запрос прекоммитов
@@ -210,7 +212,7 @@ message! {
     RequestPrecommits {
         const TYPE = CONSENSUS;
         const ID = REQUEST_PRECOMMITS_MESSAGE_ID;
-        const SIZE = 148;
+        const SIZE = 160;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
@@ -219,6 +221,7 @@ message! {
         propose_hash:   &Hash       [76 => 108]
         block_hash:     &Hash       [108 => 140]
         validators:     BitVec      [140 => 148]
+        time:           SystemTime  [148 => 160]
     }
 }
 
@@ -227,10 +230,11 @@ message! {
     RequestPeers {
         const TYPE = CONSENSUS;
         const ID = REQUEST_PEERS_MESSAGE_ID;
-        const SIZE = 64;
+        const SIZE = 76;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
+        time:           SystemTime  [64 => 76]
     }
 }
 // запрос блоков
@@ -238,10 +242,11 @@ message! {
     RequestBlock {
         const TYPE = CONSENSUS;
         const ID = REQUEST_BLOCK_MESSAGE_ID;
-        const SIZE = 72;
+        const SIZE = 84;
 
         from:           &PublicKey  [00 => 32]
         to:             &PublicKey  [32 => 64]
         height:         u64         [64 => 72]
+        time:           SystemTime  [72 => 84]
     }
 }

@@ -30,6 +30,7 @@ fn test_send_propose_and_prevote() {
                                3,
                                &sandbox.last_hash(),
                                &[tx.hash()],
+                               sandbox.time(),
                                sandbox.s(0));
 
     sandbox.broadcast(propose.clone());
@@ -45,6 +46,7 @@ fn test_send_prevote() {
                                1,
                                &sandbox.last_hash(),
                                &[],
+                               sandbox.time() + Duration::from_millis(sandbox.propose_timeout()),
                                sandbox.s(2));
 
     sandbox.recv(propose.clone());
@@ -55,25 +57,28 @@ fn test_send_prevote() {
 fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
 
+    let propose_time = sandbox.time() + Duration::from_millis(sandbox.propose_timeout());
     let propose = Propose::new(2,
                                1,
                                1,
                                &sandbox.last_hash(),
                                &[],
+                               propose_time,
                                sandbox.s(2));
 
     let block = Block::new(1,
                            1,
                            &sandbox.last_hash(),
                            &Hash::zero(),
-                           &sandbox.last_state_hash());
+                           &sandbox.last_state_hash(),
+                           propose_time);
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
     sandbox.recv(Prevote::new(1, 1, 1, &propose.hash(), 0, sandbox.s(1)));
     sandbox.assert_lock(0, None);
     sandbox.recv(Prevote::new(2, 1, 1, &propose.hash(), 0, sandbox.s(2)));
-    sandbox.broadcast(Precommit::new(0, 1, 1, &propose.hash(), &block.hash(), sandbox.time(), sandbox.s(0)));
+    sandbox.broadcast(Precommit::new(0, 1, 1, &propose.hash(), &block.hash(), sandbox.s(0)));
     sandbox.assert_lock(1, Some(propose.hash()));
 }
 
@@ -81,26 +86,29 @@ fn test_get_lock_and_send_precommit() {
 fn test_commit() {
     let sandbox = timestamping_sandbox();
 
+    let propose_time = sandbox.time() + Duration::from_millis(sandbox.propose_timeout());
     let propose = Propose::new(2,
                                1,
                                1,
                                &sandbox.last_hash(),
                                &[],
+                               propose_time,
                                sandbox.s(2));
 
     let block = Block::new(1,
                            1,
                            &sandbox.last_hash(),
                            &Hash::zero(),
-                           &sandbox.last_state_hash());
+                           &sandbox.last_state_hash(),
+                           propose_time);
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
     sandbox.recv(Prevote::new(1, 1, 1, &propose.hash(), 0, sandbox.s(1)));
     sandbox.recv(Prevote::new(2, 1, 1, &propose.hash(), 0, sandbox.s(2)));
-    sandbox.broadcast(Precommit::new(0, 1, 1, &propose.hash(), &block.hash(), sandbox.time(), sandbox.s(0)));
-    sandbox.recv(Precommit::new(2, 1, 1, &propose.hash(), &propose.hash(), sandbox.time(), sandbox.s(2)));
-    sandbox.recv(Precommit::new(3, 1, 1, &propose.hash(), &propose.hash(), sandbox.time(), sandbox.s(3)));
+    sandbox.broadcast(Precommit::new(0, 1, 1, &propose.hash(), &block.hash(), sandbox.s(0)));
+    sandbox.recv(Precommit::new(2, 1, 1, &propose.hash(), &propose.hash(), sandbox.s(2)));
+    sandbox.recv(Precommit::new(3, 1, 1, &propose.hash(), &propose.hash(), sandbox.s(3)));
     sandbox.assert_state(1, 1);
 }
 
@@ -114,6 +122,7 @@ fn received_unexpected_propose() {
                                1,
                                &sandbox.last_hash(),
                                &[],
+                               sandbox.time(),
                                sandbox.s(1));
 
     sandbox.recv(propose.clone());

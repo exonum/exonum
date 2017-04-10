@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::time::{SystemTime, Duration};
 
 use crypto::{Hash, PublicKey, HexValue};
 use blockchain::{Schema, Transaction};
@@ -10,6 +11,7 @@ use events::Channel;
 
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
 
+const BLOCK_ALIVE: u64 = 3_000_000_000; // 3 seconds
 
 // TODO reduce view invokations
 impl<S> NodeHandler<S>
@@ -77,6 +79,17 @@ impl<S> NodeHandler<S>
             return;
         }
 
+        // Check time of the propose
+        let round = msg.round();
+        let start_time = self.round_start_time(round) +
+                         Duration::from_millis(self.state.propose_timeout());
+        let end_time = start_time + Duration::from_millis(self.round_timeout());
+
+        if msg.time() < start_time || msg.time() > end_time {
+            error!("Received propose with wrong time, msg={:?}", msg);
+            return;
+        }
+
         let view = self.blockchain.view();
         // Check that transactions are not commited yet
         for hash in msg.transactions() {
@@ -123,6 +136,24 @@ impl<S> NodeHandler<S>
             return;
         }
 
+        // FIXME: we should use some epsilon for checking lifetime < 0
+        let lifetime = match self.channel.get_time().duration_since(msg.time()) {
+            Ok(duration) => num_nanoseconds(&duration),
+            Err(_) => {
+                // Incorrect time into message
+                error!("Received block with incorrect time msg={:?}", msg);
+                return;
+            }
+        };
+
+        // Check time of the bock
+        if lifetime > BLOCK_ALIVE {
+            error!("Received block with incorrect lifetime={}, msg={:?}",
+                   lifetime,
+                   msg);
+            return;
+        }
+
         trace!("Handle block");
 
         let block = msg.block();
@@ -136,6 +167,16 @@ impl<S> NodeHandler<S>
         // Check block content
         if block.prev_hash() != &self.last_block_hash() {
             error!("Weird block received, block={:?}", msg);
+            return;
+        }
+
+        // Verify propose time
+        let propose_round = block.propose_round();
+        let start_time = self.round_start_time(propose_round) +
+                         Duration::from_millis(self.state.propose_timeout());
+        let end_time = start_time + Duration::from_millis(self.round_timeout());
+        if msg.time() < start_time || block.time() > end_time {
+            error!("Received block with wrong propose time, block={:?}", msg);
             return;
         }
 
@@ -182,6 +223,7 @@ impl<S> NodeHandler<S>
 
             let (block_hash, patch) = self.create_block(block.height(),
                                                         block.propose_round(),
+                                                        block.time(),
                                                         tx_hashes.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
@@ -387,7 +429,8 @@ impl<S> NodeHandler<S>
         let proposer = self.state.leader(propose_round);
 
         // Update state to new height
-        self.state.new_height(&block_hash, self.channel.get_time());
+        let round = self.actual_round();
+        self.state.new_height(&block_hash, round);
 
         info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}, hash={}",
               height,
@@ -539,6 +582,7 @@ impl<S> NodeHandler<S>
                                    round,
                                    self.state.last_hash(),
                                    &txs,
+                                   self.channel.get_time(),
                                    self.state.secret_key());
         trace!("Broadcast propose: {:?}", propose);
         self.broadcast(propose.raw());
@@ -565,6 +609,7 @@ impl<S> NodeHandler<S>
                                         &peer,
                                         self.state.height(),
                                         propose_hash,
+                                        self.channel.get_time(),
                                         self.state.secret_key())
                         .raw()
                         .clone()
@@ -580,6 +625,7 @@ impl<S> NodeHandler<S>
                     RequestTransactions::new(self.state.public_key(),
                                              &peer,
                                              &txs,
+                                             self.channel.get_time(),
                                              self.state.secret_key())
                         .raw()
                         .clone()
@@ -591,6 +637,7 @@ impl<S> NodeHandler<S>
                                          round,
                                          propose_hash,
                                          self.state.known_prevotes(round, propose_hash),
+                                         self.channel.get_time(),
                                          self.state.secret_key())
                         .raw()
                         .clone()
@@ -603,6 +650,7 @@ impl<S> NodeHandler<S>
                                            propose_hash,
                                            block_hash,
                                            self.state.known_precommits(round, propose_hash),
+                                           self.channel.get_time(),
                                            self.state.secret_key())
                         .raw()
                         .clone()
@@ -611,6 +659,7 @@ impl<S> NodeHandler<S>
                     RequestBlock::new(self.state.public_key(),
                                       &peer,
                                       height,
+                                      self.channel.get_time(),
                                       self.state.secret_key())
                         .raw()
                         .clone()
@@ -631,10 +680,11 @@ impl<S> NodeHandler<S>
     pub fn create_block(&mut self,
                         height: Height,
                         round: Round,
+                        time: SystemTime,
                         tx_hashes: &[Hash])
                         -> (Hash, Patch) {
         self.blockchain
-            .create_patch(height, round, tx_hashes, self.state.transactions())
+            .create_patch(height, round, time, tx_hashes, self.state.transactions())
             .unwrap()
     }
 
@@ -650,6 +700,7 @@ impl<S> NodeHandler<S>
         let tx_hashes = propose.transactions().to_vec();
         let (block_hash, patch) = self.create_block(propose.height(),
                                                     propose.round(),
+                                                    propose.time(),
                                                     tx_hashes.as_slice());
         // Save patch
         self.state.add_block(block_hash, patch, tx_hashes, propose.round());
@@ -721,7 +772,6 @@ impl<S> NodeHandler<S>
                                        round,
                                        propose_hash,
                                        block_hash,
-                                       self.channel.get_time(),
                                        self.state.secret_key());
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
@@ -766,4 +816,10 @@ impl<S> NodeHandler<S>
     fn public_key_of(&self, id: ValidatorId) -> PublicKey {
         *self.state.public_key_of(id).unwrap()
     }
+}
+
+pub fn num_nanoseconds(duration: &Duration) -> u64 {
+    const NANOS_PER_SEC: u64 = 1_000_000_000;
+
+    duration.as_secs() * NANOS_PER_SEC + duration.subsec_nanos() as u64
 }

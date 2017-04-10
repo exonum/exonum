@@ -342,7 +342,7 @@ impl ::std::error::Error for Error {
     }
 }
 
-fn num_milliseconds(duration: &Duration) -> Milliseconds {
+pub fn num_milliseconds(duration: &Duration) -> Milliseconds {
     const MILLIS_PER_SEC: u64 = 1000;
     const NANOS_PER_MILLI: u32 = 1000_000;
 
