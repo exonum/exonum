@@ -21,13 +21,11 @@
         <form onsubmit={ submit }>
             <div class="form-group">
                 <label class="control-label">Receiver:</label>
-                <select id="receiver" class="form-control" disabled="{ users.length < 2 }">
-                    <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
-                </select>
+                <input type="text" class="form-control" onkeyup={ editReceiver }>
             </div>
             <div class="form-group">
                 <label class="control-label">Amount, $:</label>
-                <input type="number" class="form-control" onkeyup={ edit }>
+                <input type="number" class="form-control" onkeyup={ editAmount }>
             </div>
             <div class="form-group">
                 <button type="submit" class="btn btn-lg btn-block btn-primary" disabled="{ !amount }">Make a Transfer</button>
@@ -41,7 +39,6 @@
 //        var user = self.storage.getUser();
 //
 //        this.publicKey = user.publicKey;
-//        this.users = [];
 //
 //        this.toggleLoading(true);
 //        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
@@ -51,7 +48,11 @@
 //            self.toggleLoading(false);
 //        });
 //
-//        edit(e) {
+//        editReceiver(e) {
+//            this.receiver = e.target.value;
+//        }
+//
+//        editAmount(e) {
 //            if (e.target.value > 0 && e.target.value.toLowerCase().indexOf('e') === -1) {
 //                this.amount = e.target.value;
 //            } else {
@@ -62,11 +63,10 @@
 //        submit(e) {
 //            e.preventDefault();
 //            var amount = self.amount.toString();
-//            var receiver = $('#receiver').val();
 //            var user = self.storage.getUser();
 //
 //            self.toggleLoading(true);
-//            self.service.transfer(amount, user.publicKey, receiver, user.secretKey, function() {
+//            self.service.transfer(amount, user.publicKey, self.receiver, user.secretKey, function() {
 //                self.toggleLoading(false);
 //                self.notify('success', 'Funds has been transferred.');
 //                route('/user');
@@ -76,8 +76,6 @@
         var self = this;
         var user = this.storage.getUser(this.opts.publicKey);
 
-        this.users = this.storage.getUsers();
-
         this.toggleLoading(true);
         this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
             self.block = block;
@@ -86,7 +84,11 @@
             self.toggleLoading(false);
         });
 
-        edit(e) {
+        editReceiver(e) {
+            this.receiver = e.target.value;
+        }
+
+        editAmount(e) {
             if (e.target.value > 0 && e.target.value.toLowerCase().indexOf('e') === -1) {
                 this.amount = e.target.value;
             } else {
@@ -97,10 +99,9 @@
         submit(e) {
             e.preventDefault();
             var amount = self.amount.toString();
-            var receiver = $('#receiver').val();
 
             self.toggleLoading(true);
-            self.service.transfer(amount, self.opts.publicKey, receiver, user.secretKey, function() {
+            self.service.transfer(amount, self.opts.publicKey, self.receiver, user.secretKey, function() {
                 self.toggleLoading(false);
                 self.notify('success', 'Funds has been transferred.');
                 route('/user/' + self.opts.publicKey);

@@ -6552,8 +6552,15 @@ var Block = Exonum.newType({
         state_hash: {type: Exonum.Hash, size: 32, from: 76, to: 108}
     }
 });
+var SystemTime = Exonum.newType({
+    size: 12,
+    fields: {
+        secs: {type: Exonum.Uint64, size: 8, from: 0, to: 8},
+        nanos: {type: Exonum.Uint32, size: 4, from: 8, to: 12}
+    }
+});
 var Precommit = Exonum.newMessage({
-    size: 92,
+    size: 96,
     service_id: 0,
     message_id: 4,
     fields: {
@@ -6562,7 +6569,7 @@ var Precommit = Exonum.newMessage({
         round: {type: Exonum.Uint32, size: 4, from: 16, to: 20},
         propose_hash: {type: Exonum.Hash, size: 32, from: 20, to: 52},
         block_hash: {type: Exonum.Hash, size: 32, from: 52, to: 84},
-        time: {type: Exonum.Timespec, size: 8, from: 84, to: 92}
+        time: {type: SystemTime, size: 12, from: 84, to: 96}
     }
 });
 
@@ -7990,8 +7997,6 @@ Exonum.Int64 = function(value, buffer, from, to) {
 
     if (val === false) {
         return;
-    } else if (!bigInt.isInstance(val)) {
-        return;
     }
 
     if (val.isNegative()) {
@@ -8038,8 +8043,6 @@ Exonum.Uint64 = function(value, buffer, from, to) {
     var val = Exonum.validateBigInteger(value, 0, MAX_UINT64, from, to, 8);
 
     if (val === false) {
-        return;
-    } else if (!bigInt.isInstance(val)) {
         return;
     }
 
@@ -8117,20 +8120,6 @@ Exonum.PublicKey = function(publicKey, buffer, from, to) {
     return buffer;
 };
 
-Exonum.Timespec = function(nanoseconds, buffer, from, to) {
-    var val = Exonum.validateBigInteger(nanoseconds, 0, MAX_UINT64, from, to, 8);
-
-    if (val === false) {
-        return;
-    } else if (!bigInt.isInstance(val)) {
-        return;
-    }
-
-    insertIntegerToByteArray(val, buffer, from, to);
-
-    return buffer;
-};
-
 Exonum.Bool = function(value, buffer, from, to) {
     if (typeof value !== 'boolean') {
         console.error('Wrong data type is passed as Boolean. Boolean is required');
@@ -8141,6 +8130,18 @@ Exonum.Bool = function(value, buffer, from, to) {
     }
 
     insertIntegerToByteArray(value ? 1 : 0, buffer, from, to);
+
+    return buffer;
+};
+
+Exonum.Timespec = function(nanoseconds, buffer, from, to) {
+    var val = Exonum.validateBigInteger(nanoseconds, 0, MAX_UINT64, from, to, 8);
+
+    if (val === false) {
+        return;
+    }
+
+    insertIntegerToByteArray(val, buffer, from, to);
 
     return buffer;
 };
@@ -8183,7 +8184,9 @@ Exonum.validateBigInteger = function(value, min, max, from, to, length) {
 
     try {
         val = bigInt(value);
-        if (val.lt(min)) {
+        if (!bigInt.isInstance(val)) {
+            return false;
+        } else if (val.lt(min)) {
             console.error('Number should be more or equal to ' + min + '.');
             return false;
         } else if (val.gt(max)) {

@@ -64,7 +64,8 @@
                         Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
                     </div>
                     <div class="col-xs-4 custom-table-column">
-                        { status }
+                        <i if={ status } class="glyphicon glyphicon-ok text-success"></i>
+                        <i if={ !status } class="glyphicon glyphicon-remove text-danger"></i>
                     </div>
                 </div>
             </div>

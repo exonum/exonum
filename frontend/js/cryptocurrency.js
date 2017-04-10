@@ -135,17 +135,17 @@ function CryptocurrencyService(params) {
         function getBlocksMedianTime(precommits) {
             var values = [];
             for (var i = 0; i < precommits.length; i++) {
-                values.push(precommits[i].body.time);
+                values.push(bigInt(precommits[i].body.time.secs).multiply(1000000000).plus(precommits[i].body.time.nanos));
             }
             values.sort(function(a, b) {
-                return bigInt(a).minus(bigInt(b));
+                return a.minus(b).pow(0).toString();
             });
             var half = Math.floor(values.length / 2);
 
             if (values.length % 2) {
-                return values[half];
+                return values[half].toString();
             } else {
-                return bigInt(values[half - 1]).plus(bigInt(values[half])).divide(2);
+                return values[half - 1].plus(values[half]).divide(2).toString();
             }
         }
 
