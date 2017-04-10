@@ -1,5 +1,4 @@
 use serde::{Serialize, Serializer};
-use time::Timespec;
 
 use exonum::crypto::{Hash, hash, HexValue};
 use exonum::storage::View;
@@ -18,7 +17,7 @@ message! {
         const SIZE = 48;
 
         description:    &str        [00 => 08]
-        time:           Timespec    [08 => 16]
+        time:           i64         [08 => 16]
         hash:           &Hash       [16 => 48]
     }
 }
@@ -28,7 +27,7 @@ storage_value! {
         const SIZE = 48;
 
         description:        &str        [00 => 08]
-        time:               Timespec    [08 => 16]
+        time:               i64         [08 => 16]
         data_hash:          &Hash       [16 => 48]
     }
 }
@@ -43,7 +42,7 @@ impl Serialize for TimestampTx {
     {
         let mut state = ser.serialize_struct("transaction", 4)?;
         ser.serialize_struct_elt(&mut state, "description", self.description())?;
-        ser.serialize_struct_elt(&mut state, "time", self.time().sec)?;
+        ser.serialize_struct_elt(&mut state, "time", self.time())?;
         ser.serialize_struct_elt(&mut state, "hash", self.hash().to_hex())?;
         ser.serialize_struct_end(state)
     }
@@ -55,7 +54,7 @@ impl Serialize for Content {
     {
         let mut state = ser.serialize_struct("content", 4)?;
         ser.serialize_struct_elt(&mut state, "description", self.description())?;
-        ser.serialize_struct_elt(&mut state, "time", self.time().sec)?;
+        ser.serialize_struct_elt(&mut state, "time", self.time())?;
         ser.serialize_struct_elt(&mut state, "hash", self.data_hash().to_hex())?;
         ser.serialize_struct_end(state)
     }
@@ -91,7 +90,7 @@ impl Transaction for TimestampTx {
 
 #[cfg(test)]
 mod tests {
-    use time;
+    use chrono::UTC;
 
     use exonum::crypto::{gen_keypair, hash};
 
@@ -100,7 +99,7 @@ mod tests {
     #[test]
     fn test_timestamp_tx() {
         let description = "Test Description";
-        let time = time::now_utc().to_timespec();
+        let time = UTC::now().timestamp();
         let hash = hash(b"js9sdhcsdh32or830ru8043ru-wf9-12u8u3280y8hfwoefnsdljs");
         let (_, sec_key) = gen_keypair();
 
@@ -113,7 +112,7 @@ mod tests {
     #[test]
     fn test_file_content() {
         let description = "Test Description";
-        let time = time::now_utc().to_timespec();
+         let time = UTC::now().timestamp();
         let hash = hash(b"js9sdhcsdh32or830ru8043ru-wf9-12u8u3280y8hfwoefnsdljs");
 
         let content = Content::new(description, time, &hash);

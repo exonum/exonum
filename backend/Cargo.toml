@@ -4,31 +4,31 @@ version = "0.1.0"
 authors = ["Aleksei Sidorov <aleksei.sidorov@xdev.re>"]
 
 [dependencies]
-clap = "2.14"
-env_logger = "0.3"
+clap = "2.22.0"
+env_logger = "0.4.0"
 derive-error = "0.0.3"
 
 params = "0.6.0"
 router = "0.5.1"
 iron = "0.5.1"
 
-time = "0.1"
-rand = "0.3"
-log = "0.3"
-byteorder = "0.5"
+chrono = "0.3.0"
+rand = "0.3.0"
+log = "0.3.0"
+byteorder = "1.0.0"
 
-serde = "0.8"
-serde_derive = "0.8"
-serde_json = "0.8"
-colored = "1.3"
+serde = "0.8.0"
+serde_derive = "0.8.0"
+serde_json = "0.8.0"
+colored = "1.3.0"
 
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+rev = "4450790885c9a954f922dbaa3e97dc9e2e068140"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+rev = "4450790885c9a954f922dbaa3e97dc9e2e068140"
 

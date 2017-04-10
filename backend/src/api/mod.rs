@@ -8,7 +8,7 @@ use iron::status;
 use iron::mime::{Mime, TopLevel, SubLevel};
 use params::{Params, Value};
 use params;
-use time;
+use chrono::UTC;
 
 use exonum::crypto::{Hash, HexValue, Signature};
 use exonum::blockchain::Blockchain;
@@ -45,7 +45,7 @@ impl<T> PublicApi<T>
             return Err(ApiError::FileExists(hash));
         }
         // Create transaction
-        let ts = time::now_utc().to_timespec();
+        let ts = UTC::now().timestamp();
         let tx = TimestampTx::new_with_signature(&description, ts, &hash, &Signature::zero());
         self.channel.send(tx.clone())?;
         Ok(tx)
