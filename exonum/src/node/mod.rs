@@ -5,7 +5,7 @@ use std::time::{SystemTime, Duration};
 use super::crypto::{PublicKey, SecretKey, Hash};
 use super::events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
                     EventHandler, Result as EventsResult, Error as EventsError};
-use super::events::{MioChannel, Network, EventLoop, Milliseconds};
+use super::events::{MioChannel, Network, EventLoop, Milliseconds, num_milliseconds};
 use super::blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use super::messages::{Connect, RawMessage};
 
@@ -109,8 +109,7 @@ impl<S> NodeHandler<S>
                                stored,
                                connect,
                                last_hash,
-                               last_height,
-                               sender.get_time());
+                               last_height);
 
         NodeHandler {
             state: state,
@@ -241,6 +240,13 @@ impl<S> NodeHandler<S>
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
+    pub fn last_block_time(&self) -> SystemTime {
+        self.blockchain
+            .last_block()
+            .unwrap()
+            .time()
+    }
+
     pub fn last_block_hash(&self) -> Hash {
         self.blockchain
             .last_block()
@@ -248,9 +254,24 @@ impl<S> NodeHandler<S>
             .hash()
     }
 
+    pub fn actual_round(&self) -> Round {
+        let now = self.channel.get_time();
+        let propose = self.last_block_time();
+        debug_assert!(now >= propose);
+
+        match now.duration_since(propose + Duration::from_millis(self.state.propose_timeout())) {
+            Ok(duration) => {
+                let round = (num_milliseconds(&duration) / self.round_timeout()) as Round + 1;
+                ::std::cmp::max(1, round)
+            }
+            Err(_) => 1,
+        }
+    }
+
+    // FIXME find more flexible solution
     pub fn round_start_time(&self, round: Round) -> SystemTime {
         let ms = (round - 1) as u64 * self.round_timeout();
-        self.state.height_start_time() + Duration::from_millis(ms)
+        self.last_block_time() + Duration::from_millis(ms)
     }
 }
 

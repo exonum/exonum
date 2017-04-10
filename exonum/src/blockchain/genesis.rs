@@ -1,8 +1,10 @@
+use std::time::{SystemTime, UNIX_EPOCH};
 use ::crypto::PublicKey;
 use super::config::ConsensusConfig;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GenesisConfig {
+    pub time: u64,
     pub consensus: ConsensusConfig,
     pub validators: Vec<PublicKey>,
 }
@@ -16,6 +18,7 @@ impl GenesisConfig {
                                                              validators: I)
                                                              -> GenesisConfig {
         GenesisConfig {
+            time: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
             validators: validators.collect::<Vec<_>>(),
             consensus: consensus,
         }

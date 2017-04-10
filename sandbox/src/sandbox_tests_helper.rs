@@ -3,6 +3,7 @@
 use std::time::Duration;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::time::SystemTime;
 
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
                        RequestPrevotes};
@@ -43,6 +44,7 @@ pub struct BlockBuilder<'a> {
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
     state_hash: Option<Hash>,
+    time: Option<SystemTime>,
 
     sandbox: &'a TimestampingSandbox,
 }
@@ -56,6 +58,7 @@ impl<'a> BlockBuilder<'a> {
             prev_hash: None,
             tx_hash: None,
             state_hash: None,
+            time: None,
 
             sandbox: sandbox,
         }
@@ -68,6 +71,11 @@ impl<'a> BlockBuilder<'a> {
 
     pub fn with_round(mut self, round: u32) -> Self {
         self.round = Some(round);
+        self
+    }
+
+    pub fn with_time(mut self, time: SystemTime) -> Self {
+        self.time = Some(time);
         self
     }
 
@@ -113,7 +121,9 @@ impl<'a> BlockBuilder<'a> {
                    //   &[tx.hash()],
                    //   &[],
                    &self.tx_hash.unwrap_or(Hash::zero()),
-                   &self.state_hash.unwrap_or(self.sandbox.last_state_hash()))
+                   &self.state_hash.unwrap_or(self.sandbox.last_state_hash()),
+                   self.time.unwrap_or(self.sandbox.time() +
+                       Duration::from_millis(self.duration_since_sandbox_time.unwrap_or(0))),)
     }
 }
 
@@ -125,6 +135,7 @@ pub struct ProposeBuilder<'a> {
     duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<&'a Hash>,
     tx_hashes: Option<&'a [Hash]>,
+    time: Option<SystemTime>,
 
     sandbox: &'a TimestampingSandbox,
 }
@@ -138,6 +149,7 @@ impl<'a> ProposeBuilder<'a> {
             duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hashes: None,
+            time: None,
             sandbox: sandbox,
         }
     }
@@ -154,6 +166,11 @@ impl<'a> ProposeBuilder<'a> {
 
     pub fn with_round(mut self, round: u32) -> Self {
         self.round = Some(round);
+        self
+    }
+
+    pub fn with_time(mut self, time: SystemTime) -> Self {
+        self.time = Some(time);
         self
     }
 
@@ -183,6 +200,8 @@ impl<'a> ProposeBuilder<'a> {
                      //   &[tx.hash()],
                      //   &[],
                      self.tx_hashes.unwrap_or(&[]),
+                     self.sandbox.time() +
+                         Duration::from_millis(self.duration_since_sandbox_time.unwrap_or(0)),
                      self.sandbox
                          .s(self.validator_id.unwrap_or(self.sandbox.current_leader()) as usize))
     }
@@ -346,7 +365,6 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                              round,
                                              &propose.hash(),
                                              &block.hash(),
-                                             sandbox.time(),
                                              sandbox.s(VALIDATOR_0 as usize)));
             sandbox.assert_lock(round, Some(propose.hash()));
 
@@ -356,7 +374,6 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                             round,
                                             &propose.hash(),
                                             &block.hash(),
-                                            sandbox.time(),
                                             sandbox.s(val_idx)));
 
                 if val_idx != sandbox.majority_count(n_validators) -1 {
@@ -381,10 +398,8 @@ fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[
                  sandbox.current_height(),
                  sandbox.current_round(),
                  &sandbox.last_hash(),
-                 //   &[tx.hash(), tx2.hash()],
-                 //   &[tx.hash()],
-                 //   &[],
                  transactions,
+                 sandbox.time(),
                  sandbox.s(VALIDATOR_0 as usize))
 }
 
@@ -440,12 +455,13 @@ fn check_and_broadcast_propose_and_prevote(sandbox: &TimestampingSandbox,
 pub fn receive_valid_propose_with_transactions(sandbox: &TimestampingSandbox,
                                                transactions: &[Hash])
                                                -> Propose {
+    let propose_time = sandbox.time() + Duration::from_millis(sandbox.propose_timeout());
     let propose = Propose::new(sandbox.current_leader(),
                                sandbox.current_height(),
                                sandbox.current_round(),
                                &sandbox.last_hash(),
-                               //                               &[],
                                transactions,
+                               propose_time,
                                sandbox.s(sandbox.current_leader() as usize));
     sandbox.recv(propose.clone());
     propose.clone()
@@ -458,6 +474,7 @@ pub fn make_request_propose_from_precommit(sandbox: &TimestampingSandbox,
                         &sandbox.p(precommit.validator() as usize),
                         precommit.height(),
                         precommit.propose_hash(),
+                        sandbox.time(),
                         sandbox.s(VALIDATOR_0 as usize))
 }
 
@@ -472,6 +489,7 @@ pub fn make_request_prevote_from_precommit(sandbox: &TimestampingSandbox,
                          precommit.round(),
                          precommit.propose_hash(),
                          validators,
+                         sandbox.time(),
                          sandbox.s(VALIDATOR_0 as usize))
 }
 

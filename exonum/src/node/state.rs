@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
-use std::time::{SystemTime, Duration};
+use std::time::Duration;
 
 use serde_json::Value;
 
@@ -39,7 +39,6 @@ pub struct State {
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
     height: u64,
-    height_start_time: SystemTime,
     round: Round,
     locked_round: Round,
     locked_propose: Option<Hash>,
@@ -259,8 +258,7 @@ impl State {
                stored: StoredConfiguration,
                connect: Connect,
                last_hash: Hash,
-               last_height: u64,
-               height_start_time: SystemTime)
+               last_height: u64)
                -> State {
 
         let validators_len = stored.validators.len();
@@ -272,7 +270,6 @@ impl State {
             peers: HashMap::new(),
             connections: HashMap::new(),
             height: last_height,
-            height_start_time: height_start_time,
             round: 0,
             locked_round: 0,
             locked_propose: None,
@@ -407,10 +404,6 @@ impl State {
         self.height
     }
 
-    pub fn height_start_time(&self) -> SystemTime {
-        self.height_start_time
-    }
-
     pub fn round(&self) -> Round {
         self.round
     }
@@ -452,10 +445,9 @@ impl State {
     }
 
     // FIXME use block_hash
-    pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
+    pub fn new_height(&mut self, block_hash: &Hash, round: Round) {
         self.height += 1;
-        self.height_start_time = height_start_time;
-        self.round = 1;
+        self.round = round;
         self.locked_round = 0;
         self.locked_propose = None;
         self.last_hash = *block_hash;
