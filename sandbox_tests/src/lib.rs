@@ -60,7 +60,7 @@ mod tests {
     use sandbox::timestamping::TimestampingService;
     use sandbox::sandbox::Sandbox;
     use sandbox::sandbox_with_services;
-    use sandbox::sandbox_tests_helper::{SandboxState, add_one_height_with_transactions, add_one_height_with_transactions_from_other};
+    use sandbox::sandbox_tests_helper::{SandboxState, add_one_height_with_transactions, add_one_height_with_transactions_from_other_validator};
     use configuration_service::{TxConfigPropose, TxConfigVote, ConfigurationService,
                                 ConfigurationSchema};
     use serde_json::Value;
@@ -157,7 +157,7 @@ mod tests {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
                                                   &validator_cfg.clone().serialize(),
                                                   sandbox.s(1));
-            add_one_height_with_transactions_from_other(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
+            add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
         }
         {
             let mut votes = Vec::new();
@@ -168,7 +168,7 @@ mod tests {
                     .raw()
                     .clone());
             }
-            add_one_height_with_transactions_from_other(&sandbox, &sandbox_state, &votes);
+            add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &votes);
         }
         sandbox.assert_state(6, 1);
         assert_eq!(validator_cfg, sandbox.cfg());

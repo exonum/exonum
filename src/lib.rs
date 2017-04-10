@@ -284,7 +284,7 @@ impl Serialize for TxConfigPropose {
         let mut state;
         state = ser.serialize_struct("config_propose", 3)?;
         ser.serialize_struct_elt(&mut state, "from", self.from())?;
-        if let Ok(cfg) = StoredConfiguration::deserialize_err(self.cfg()) {
+        if let Ok(cfg) = StoredConfiguration::try_deserialize(self.cfg()) {
             ser.serialize_struct_elt(&mut state, "cfg", cfg)?;
         } else {
             ser.serialize_struct_elt(&mut state, "cfg", self.cfg())?;
@@ -518,7 +518,7 @@ impl TxConfigPropose {
             return Ok(());
         }
 
-        let config_candidate = StoredConfiguration::deserialize_err(self.cfg());
+        let config_candidate = StoredConfiguration::try_deserialize(self.cfg());
         if config_candidate.is_err() {
             error!("Discarding TxConfigPropose:{} which contains config, which cannot be parsed: \
                     {:?}",
@@ -597,7 +597,7 @@ impl TxConfigVote {
         }
 
         let referenced_tx_propose = propose_option.unwrap();
-        let parsed_config = StoredConfiguration::deserialize_err(referenced_tx_propose.cfg())
+        let parsed_config = StoredConfiguration::try_deserialize(referenced_tx_propose.cfg())
             .unwrap();
         let actual_config_hash = actual_config.hash();
         if parsed_config.previous_cfg_hash != actual_config_hash {
