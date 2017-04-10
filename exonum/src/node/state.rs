@@ -32,8 +32,10 @@ pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
 
 pub struct State {
-    node_type: NodeType,
+    validator_state: Option<ValidatorState>,
+    our_connect_message: Connect,
 
+    public_key: PublicKey,
     secret_key: SecretKey,
     config: StoredConfiguration,
 
@@ -53,6 +55,7 @@ pub struct State {
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
+    // TODO: add hashmap of transactions we wait for
     transactions: TxPool,
 
     queued: Vec<ConsensusMessage>,
@@ -60,26 +63,18 @@ pub struct State {
     unknown_txs: HashMap<Hash, Vec<Hash>>,
     unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
 
-    // TODO: add hashmap of transactions we wait for
-    our_prevotes: HashMap<Round, Prevote>,
-    our_precommits: HashMap<Round, Precommit>,
-    our_connect_message: Connect,
-
     // Информация о состоянии наших запросов
     requests: HashMap<RequestData, RequestState>,
 
-    // Максимальная высота, на которой
-    // "засветились" другие валидаторы
-    validator_heights: Vec<Height>,
+    //maximum of node heigt in consensus messages
+    nodes_max_height: BTreeMap<PublicKey, Height>,
 }
 
-/// Currently node can work in two mode:
-/// 1. As validator that make decisions in consensus.
-/// 2. As auditor full node that can check validity of network.
-#[derive(Debug, Clone, Copy)]
-pub enum NodeType {
-    Validator(ValidatorId),
-    FullNode(PublicKey)
+#[derive(Debug, Clone)]
+pub struct ValidatorState {
+    id: ValidatorId,
+    our_prevotes: HashMap<Round, Prevote>,
+    our_precommits: HashMap<Round, Precommit>,
 }
 
 // Данные, которые нас интересуют,
@@ -145,22 +140,33 @@ pub struct Votes<T: VoteMessage> {
     count: usize,
 }
 
-impl NodeType {
-    pub fn new(validator_id: Option<ValidatorId>, pk: &PublicKey) -> NodeType {
-        if let Some(id)  = validator_id {
-            NodeType::Validator(id)
-        } else {
-            NodeType::FullNode(*pk)
+impl ValidatorState {
+
+    pub fn new(id: ValidatorId) -> ValidatorState {
+        ValidatorState {
+            id: id,
+            our_precommits: HashMap::new(),
+            our_prevotes: HashMap::new()
         }
     }
 
-    pub fn get_validator_id(&self) -> Option<ValidatorId> {
-        if let NodeType::Validator(id) = *self {
-            Some(id)
-        } else {
-            None
-        }
+    pub fn id(&self) -> ValidatorId {
+        self.id
     }
+
+    pub fn set_validator_id(&mut self, id: ValidatorId) {
+        self.id = id;
+    }
+
+    pub fn have_prevote(&self, round: Round) -> bool {
+        self.our_prevotes.get(&round).is_some()
+    }
+
+    pub fn clear(&mut self) {
+        self.our_precommits.clear();
+        self.our_prevotes.clear();
+    }
+
 }
 
 impl<T> Votes<T>
@@ -282,7 +288,9 @@ impl BlockState {
 }
 
 impl State {
-    pub fn new(node_type: NodeType,
+    #![cfg_attr(feature="clippy", allow(too_many_arguments))]
+    pub fn new(validator_id: Option<ValidatorId>,
+               public_key: PublicKey,
                secret_key: SecretKey,
                stored: StoredConfiguration,
                connect: Connect,
@@ -291,11 +299,9 @@ impl State {
                height_start_time: SystemTime)
                -> State {
 
-        let validators_len = stored.validators.len();
-
         State {
-            node_type: node_type,
-
+            validator_state: validator_id.map(ValidatorState::new),
+            public_key: public_key,
             secret_key: secret_key,
             peers: HashMap::new(),
             connections: HashMap::new(),
@@ -318,10 +324,8 @@ impl State {
             unknown_txs: HashMap::new(),
             unknown_proposes_with_precommits: HashMap::new(),
 
-            validator_heights: vec![0; validators_len],
+            nodes_max_height: BTreeMap::new(),
 
-            our_prevotes: HashMap::new(),
-            our_precommits: HashMap::new(),
             our_connect_message: connect,
 
             requests: HashMap::new(),
@@ -330,13 +334,31 @@ impl State {
         }
     }
 
-    pub fn node_type(&self) -> NodeType {
-        self.node_type
+    pub fn validator_state(&self) -> &Option<ValidatorState> {
+        &self.validator_state
+    }
+
+    pub fn renew_validator_id(&mut self, id: Option<ValidatorId>) {
+        let validator_state = self.validator_state.take();
+        self.validator_state = id.map(move |id|{
+            match validator_state {
+                Some(mut state) => {
+                    state.set_validator_id(id);
+                    state
+                },
+                None => ValidatorState::new(id),
+            }
+        });
+    }
+
+    pub fn is_validator(&self) -> bool {
+        self.validator_state().is_some()
     }
 
     pub fn is_leader(&self) -> bool {
-        self.node_type.get_validator_id()
-                      .map(|id| self.leader(self.round()) == id)
+        self.validator_state()
+                      .as_ref()
+                      .map(|validator| self.leader(self.round()) == validator.id)
                       .unwrap_or(false)
     }
 
@@ -348,7 +370,7 @@ impl State {
         &self.config
     }
 
-    pub fn get_validator_id(&self, peer: &PublicKey) -> Option<ValidatorId> {
+    pub fn find_validator(&self, peer: &PublicKey) -> Option<ValidatorId> {
         self.validators()
             .iter()
             .position(|pk| pk == peer)
@@ -365,13 +387,12 @@ impl State {
 
     pub fn update_config(&mut self, config: StoredConfiguration) {
         info!("Updating node config={:#?}", config);
-        let node_type = NodeType::new(config.validators
-            .iter()
-            .position(|pk| pk == self.public_key())
-            .map(|id| id as ValidatorId),
-            self.public_key());
-        info!("NodeType={:#?}", node_type);
-        self.node_type = node_type;
+        let validator_id = config.validators
+                            .iter()
+                            .position(|pk| pk == self.public_key())
+                            .map(|id| id as u32);
+        self.renew_validator_id(validator_id);
+        info!("Validator={:#?}", self.validator_state());
         self.config = config;
     }
 
@@ -406,10 +427,7 @@ impl State {
     }
 
     pub fn public_key(&self) -> &PublicKey {
-        match self.node_type {
-            NodeType::Validator(id) =>  self.public_key_of(id).unwrap(),
-            NodeType::FullNode(ref pk) => pk
-        }
+        &self.public_key
     }
 
     pub fn secret_key(&self) -> &SecretKey {
@@ -420,20 +438,19 @@ impl State {
         ((self.height() + round as u64) % (self.validators().len() as u64)) as ValidatorId
     }
 
-    pub fn validator_height(&self, id: ValidatorId) -> Height {
-        self.validator_heights[id as usize]
+    pub fn node_height(&self, key: &PublicKey) -> Height {
+        *self.nodes_max_height.get(key).unwrap_or(&0)
     }
 
-    pub fn set_validator_height(&mut self, id: ValidatorId, height: Height) {
-        self.validator_heights[id as usize] = height;
+    pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
+        *self.nodes_max_height.entry(key).or_insert(0) = height;
     }
 
-    pub fn validators_with_bigger_height(&self) -> Vec<ValidatorId> {
-        self.validator_heights
+    pub fn nodes_with_bigger_height(&self) -> Vec<&PublicKey> {
+        self.nodes_max_height
             .iter()
-            .enumerate()
             .filter(|&(_, h)| *h > self.height())
-            .map(|(v, _)| v as ValidatorId)
+            .map(|(v, _)| v)
             .collect()
     }
 
@@ -515,8 +532,9 @@ impl State {
         self.proposes.clear();
         self.prevotes.clear();
         self.precommits.clear();
-        self.our_prevotes.clear();
-        self.our_precommits.clear();
+        if let Some(ref mut validator_state) = self.validator_state {
+            validator_state.clear();
+        }
         self.requests.clear(); // FIXME: clear all timeouts
     }
 
@@ -564,9 +582,17 @@ impl State {
             .unwrap_or_else(|| &[])
     }
 
+    pub fn have_prevote(&self, propose_round: Round) -> bool {
+        if let Some(ref validator_state) = *self.validator_state(){
+            validator_state.have_prevote(propose_round)
+        }
+        else {
+            panic!("called have_prevote for auditor node")
+        }
+    }
+
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
-        let id = self.node_type.get_validator_id().expect("called add_self_propose");
-        debug_assert_eq!(msg.validator(), id);
+        debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.hash();
         self.proposes.insert(propose_hash,
                              ProposeState {
@@ -625,16 +651,16 @@ impl State {
 
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
         let majority_count = self.majority_count();
-        match self.node_type() {
-            NodeType::Validator(id) if id == msg.validator() => 
-                    if let Some(other) = self.our_prevotes.insert(msg.round(), msg.clone()) {
-                        if &other != msg {
-                            panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
-                                   other,
-                                   msg);
-                        }
-                    },
-            NodeType::Validator(_) | NodeType::FullNode(_) => {},
+        if let Some(ref mut validator_state) = self.validator_state {
+            if validator_state.id == msg.validator() {
+                if let Some(other) = validator_state.our_prevotes.insert(msg.round(), msg.clone()) {
+                    if &other != msg {
+                        panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
+                                other,
+                                msg);
+                    }
+                }
+            }
         }
 
         let key = (msg.round(), *msg.propose_hash());
@@ -669,17 +695,17 @@ impl State {
 
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
         let majority_count = self.majority_count();
-        match self.node_type() {
-            NodeType::Validator(id) if id == msg.validator() => 
-                        if let Some(other) = self.our_precommits.insert(msg.round(), msg.clone()) {
-                            if other.propose_hash() != msg.propose_hash() {
-                                panic!("Trying to send different precommits for same round, old={:?}, \
-                                        new={:?}",
-                                       other,
-                                       msg);
-                            }
-                        },
-            NodeType::Validator(_) | NodeType::FullNode(_) => {},
+        if let Some(ref mut validator_state) = self.validator_state {
+            if validator_state.id == msg.validator() {
+                if let Some(other) = validator_state.our_precommits.insert(msg.round(), msg.clone()) {
+                    if other.propose_hash() != msg.propose_hash() {
+                        panic!("Trying to send different precommits for same round, old={:?}, \
+                                new={:?}",
+                                other,
+                                msg);
+                    }
+                }
+            }
         }
 
         let key = (msg.round(), *msg.block_hash());
@@ -710,17 +736,18 @@ impl State {
         }
     }
 
-    pub fn have_prevote(&self, round: Round) -> bool {
-        self.our_prevotes.get(&round).is_some()
-    }
-
     pub fn have_incompatible_prevotes(&self) -> bool {
         for round in self.locked_round + 1...self.round {
-            if let Some(msg) = self.our_prevotes.get(&round) {
-                // TODO: unefficient
-                if Some(*msg.propose_hash()) != self.locked_propose {
-                    return true;
+            match self.validator_state {
+                Some(ref validator_state) => {
+                    if let Some(msg) = validator_state.our_prevotes.get(&round) {
+                        // TODO: unefficient
+                        if Some(*msg.propose_hash()) != self.locked_propose {
+                            return true;
+                        }
+                    }
                 }
+                None => unreachable!()
             }
         }
         false

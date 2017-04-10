@@ -15,7 +15,7 @@ mod basic;
 mod consensus;
 mod requests;
 
-pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, NodeType};
+pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 
 
 #[derive(Debug)]
@@ -93,19 +93,19 @@ impl<S> NodeHandler<S>
         let stored = Schema::new(&blockchain.view()).get_actual_configuration().unwrap();
         info!("Create node with config={:#?}", stored);
 
-        let node_type = NodeType::new(stored.validators
+        let validator_id = stored.validators
             .iter()
             .position(|pk| pk == &config.listener.public_key)
-            .map(|id| id as ValidatorId),
-            &config.listener.public_key);
-        info!("NodeType={:#?}", node_type);
+            .map(|id| id as ValidatorId);
+        info!("Validator={:#?}", validator_id);
         let connect = Connect::new(&config.listener.public_key,
                                    sender.address(),
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
 
-        let state = State::new(node_type,
+        let state = State::new(validator_id,
+                               config.listener.public_key,
                                config.listener.secret_key,
                                stored,
                                connect,

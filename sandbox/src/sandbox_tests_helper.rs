@@ -376,7 +376,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
     unreachable!("because at one of loops we should become a leader and return");
 }
 
-pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox,
+pub fn add_one_height_with_transactions_from_other_validator(sandbox: &TimestampingSandbox,
                                         sandbox_state: &SandboxState,
                                         txs: &[RawTransaction]) {
     // sort transaction in order accordingly their hashes
@@ -411,7 +411,7 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
         add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
         let round: u32 = sandbox.current_round();
         if VALIDATOR_1 == sandbox.leader(round) {
-            sandbox.add_time(Duration::milliseconds(sandbox.propose_timeout()));
+            sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
             // ok, we are leader
             trace!("ok, validator 1 leader, round: {:?}", round);
             let propose = get_propose_with_transactions_for_validator(&sandbox, hashes.as_ref(), VALIDATOR_1);
@@ -456,7 +456,7 @@ pub fn add_one_height_with_transactions_from_other(sandbox: &TimestampingSandbox
             sandbox.assert_state(initial_height + 1, ROUND_ONE);
 
             {
-                *sandbox_state.time_millis_science_round_start.borrow_mut() = 0;
+                *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             }
             return;
         }
