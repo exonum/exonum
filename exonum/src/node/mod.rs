@@ -2,21 +2,20 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
-use super::crypto::{PublicKey, SecretKey, Hash};
-use super::events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
-                    EventHandler, Result as EventsResult, Error as EventsError};
-use super::events::{MioChannel, Network, EventLoop, Milliseconds};
-use super::blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
-use super::messages::{Connect, RawMessage};
+use crypto::{PublicKey, SecretKey, Hash};
+use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel, MioChannel,
+             Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
+             Error as EventsError};
+use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
+use messages::{Connect, RawMessage};
 
-pub mod state;//temporary solution to get access to WAIT consts
+pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool};
 
 mod basic;
 mod consensus;
 mod requests;
 
-pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool};
-
+pub mod state;//temporary solution to get access to WAIT consts
 
 #[derive(Debug)]
 pub enum ExternalMessage {

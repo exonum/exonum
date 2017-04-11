@@ -1,30 +1,29 @@
-#[macro_use]
-mod spec;
-mod block;
-mod schema;
-pub mod config;
-mod genesis;
-mod service;
+use vec_map::VecMap;
+use byteorder::{ByteOrder, LittleEndian};
 
 use std::sync::Arc;
 use std::collections::BTreeMap;
-
-use vec_map::VecMap;
-use byteorder::{ByteOrder, LittleEndian};
 use std::mem;
 
-use ::crypto::{Hash, hash};
-use ::messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
-use ::node::{State, TxPool};
-
-use ::storage::{Patch, Database, Fork, Error, Map, List, Storage,
-                View as StorageView};
+use crypto::{Hash, self};
+use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
+use node::{State, TxPool};
+use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
 
 pub use self::block::Block;
 pub use self::schema::Schema;
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, NodeState};
+
+#[macro_use]
+mod spec;
+mod block;
+mod schema;
+mod genesis;
+mod service;
+
+pub mod config;
 
 #[derive(Clone)]
 pub struct Blockchain {
@@ -114,7 +113,7 @@ impl Blockchain {
         let mut vec = vec![0; 2 * size];
         LittleEndian::write_u16(&mut vec[0..size], service_id);
         LittleEndian::write_u16(&mut vec[size..2*size], table_idx as u16);
-        hash(&vec)
+        crypto::hash(&vec)
     }
 
     pub fn create_patch(&self,

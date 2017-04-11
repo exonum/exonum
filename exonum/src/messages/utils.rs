@@ -1,8 +1,7 @@
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
-
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 
+use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 pub struct U64(pub u64);
 pub struct I64(pub i64);

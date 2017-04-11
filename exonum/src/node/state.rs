@@ -1,16 +1,14 @@
+use serde_json::Value;
+
 use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
-use serde_json::Value;
-
-use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
-                             BitVec};
-
-use super::super::crypto::{PublicKey, SecretKey, Hash};
-use super::super::storage::Patch;
-use super::super::events::Milliseconds;
+use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, BitVec};
+use crypto::{PublicKey, SecretKey, Hash};
+use storage::Patch;
+use events::Milliseconds;
 use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
 
 // TODO: replace by in disk tx pool

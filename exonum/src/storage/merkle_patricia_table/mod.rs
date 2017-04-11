@@ -1,14 +1,17 @@
-pub mod proofpathtokey;
 use std::mem;
 use std::cmp::{min, PartialEq};
 use std::marker::PhantomData;
 use std::fmt;
 use std::ops::Not;
-use super::utils::bytes_to_hex;
 
-use ::crypto::{hash, Hash, HASH_SIZE};
+use crypto::{hash, Hash, HASH_SIZE};
+
+use super::utils::bytes_to_hex;
 use super::{Map, Error, StorageValue};
+
 use self::proofpathtokey::{RootProofNode, BranchProofNode, ProofNode, BitVec};
+
+pub mod proofpathtokey;
 
 const BRANCH_KEY_PREFIX: u8 = 00;
 const LEAF_KEY_PREFIX: u8 = 01;
