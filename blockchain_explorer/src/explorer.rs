@@ -1,13 +1,11 @@
+use serde::Serialize;
+use serde_json::Value;
+
 use std::cmp;
 
-use serde::Serialize;
-
-use exonum::storage::{Map, List};
-use exonum::storage::Result as StorageResult;
+use exonum::storage::{Map, List, Result as StorageResult};
 use exonum::crypto::Hash;
-use exonum::blockchain::Schema;
-use exonum::blockchain::Blockchain;
-use serde_json::Value;
+use exonum::blockchain::{Schema, Blockchain};
 
 use api::HexField;
 

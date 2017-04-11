@@ -14,7 +14,6 @@ storage_value! (
     }
 );
 
-
 pub struct Schema<'a> {
     view: &'a View,
 }

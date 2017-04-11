@@ -1,11 +1,11 @@
+use mio;
+
 use std::io;
 use std::fmt::Display;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
-use mio;
-
-use super::messages::RawMessage;
+use messages::RawMessage;
 
 mod network;
 mod connection;

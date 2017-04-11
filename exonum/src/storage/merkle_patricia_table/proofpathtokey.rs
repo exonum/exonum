@@ -1,9 +1,12 @@
-use ::storage::{StorageValue, Error};
-use ::storage::utils::bytes_to_hex;
-use ::crypto::{hash, Hash};
-use std::fmt;
-use super::{BitSlice, ChildKind, KEY_SIZE, DB_KEY_SIZE};
 use serde::{Serialize, Serializer};
+
+use std::fmt;
+
+use storage::{StorageValue, Error};
+use storage::utils::bytes_to_hex;
+use crypto::{hash, Hash};
+
+use super::{BitSlice, ChildKind, KEY_SIZE, DB_KEY_SIZE};
 
 pub struct BitVec {
     pub db_key_data: Vec<u8>,

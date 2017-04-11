@@ -1,11 +1,13 @@
+use serde_json;
+
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
-use super::super::crypto::{hash, gen_keypair};
-use super::super::blockchain;
+use crypto::{hash, gen_keypair};
+use blockchain;
+
 use super::{Field, RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
             Block, BlockProof, RequestBlock, BitVec};
-use serde_json;
 
 #[test]
 fn test_bitvec() {

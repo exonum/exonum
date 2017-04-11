@@ -10,7 +10,6 @@ use events::Channel;
 
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
 
-
 // TODO reduce view invokations
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>

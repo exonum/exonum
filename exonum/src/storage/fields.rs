@@ -1,9 +1,10 @@
-use std::mem;
-use std::sync::Arc;
 use byteorder::{ByteOrder, BigEndian};
 
-use ::crypto::{Hash, hash};
-use ::messages::{RawMessage, MessageBuffer, Message, FromRaw};
+use std::mem;
+use std::sync::Arc;
+
+use crypto::{Hash, hash};
+use messages::{RawMessage, MessageBuffer, Message, FromRaw};
 
 pub trait StorageValue {
     fn serialize(self) -> Vec<u8>;

@@ -1,10 +1,10 @@
 use serde_json;
-use ::storage::StorageValue;
+
 use std::collections::BTreeMap;
 
-use super::super::events::Milliseconds;
-
-use ::crypto::{hash, PublicKey, Hash};
+use storage::StorageValue;
+use events::Milliseconds;
+use crypto::{hash, PublicKey, Hash};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {

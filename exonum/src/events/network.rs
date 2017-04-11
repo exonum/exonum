@@ -1,3 +1,7 @@
+use mio::Timeout as MioTimeout;
+use mio::tcp::{TcpListener, TcpStream};
+use mio::util::Slab;
+
 use std::borrow::Borrow;
 use std::io;
 use std::collections::HashMap;
@@ -5,15 +9,12 @@ use std::net::SocketAddr;
 use std::cmp::min;
 use std::default::Default;
 
-pub use mio::{EventSet, PollOpt, Token};
-use mio::Timeout as MioTimeout;
-use mio::tcp::{TcpListener, TcpStream};
-use mio::util::Slab;
+use messages::RawMessage;
 
 use super::connection::{Connection, IncomingConnection, OutgoingConnection};
 use super::{Timeout, InternalTimeout, EventLoop, EventHandler, Event};
 
-use super::super::messages::RawMessage;
+pub use mio::{EventSet, PollOpt, Token};
 
 pub type PeerId = Token;
 

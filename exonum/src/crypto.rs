@@ -1,11 +1,3 @@
-use std::default::Default;
-
-pub use sodiumoxide::init;
-pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
-                                             SECRETKEYBYTES as SECRET_KEY_LENGTH,
-                                             SIGNATUREBYTES as SIGNATURE_LENGTH,
-                                             SEEDBYTES as SEED_LENGTH};
-pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
                                          Signature as SignatureSodium, sign_detached,
@@ -14,9 +6,19 @@ use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
 use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
+
+use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
-use ::storage::bytes_to_hex;
 use std::fmt;
+
+use storage::bytes_to_hex;
+
+pub use sodiumoxide::init;
+pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
+                                             SECRETKEYBYTES as SECRET_KEY_LENGTH,
+                                             SIGNATUREBYTES as SIGNATURE_LENGTH,
+                                             SEEDBYTES as SEED_LENGTH};
+pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 
 pub use hex::{ToHex, FromHex, FromHexError};
 const BYTES_IN_DEBUG: usize = 4;

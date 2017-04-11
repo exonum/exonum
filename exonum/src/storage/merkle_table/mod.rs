@@ -2,14 +2,13 @@ use num::{Integer, range, ToPrimitive, pow};
 
 use std::marker::PhantomData;
 use std::cell::Cell;
-use ::crypto::Hash;
+
+use crypto::Hash;
+
 use super::{Map, List, Error, StorageValue};
-
-
 use self::proofnode::Proofnode;
 
 pub mod proofnode;
-
 
 type Range<K> = Option<(K, K)>;
 

@@ -1,13 +1,18 @@
-use ::storage::StorageValue;
-use ::crypto::Hash;
-use std::fmt;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::Error;
 use serde_json::{Error as SerdeJsonError, Value, from_value};
+
+use std::fmt;
+
+use storage::StorageValue;
+use crypto::Hash;
+
 use super::hash_rules;
+
 const LEFT_DESC: &'static str = "left";
 const RIGHT_DESC: &'static str = "right";
 const VAL_DESC: &'static str = "val";
+
 #[allow(dead_code)]
 pub fn proof_indices_values<V: StorageValue>(proof: &Proofnode<V>) -> Vec<(usize, &V)> {
     let mut res = Vec::new();

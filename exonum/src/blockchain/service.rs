@@ -1,11 +1,11 @@
 use serde_json::Value;
 
-use ::crypto::{Hash, PublicKey, SecretKey};
-use ::storage::{View, Error as StorageError};
-use ::messages::{Message, RawTransaction, Error as MessageError};
-use ::node::State;
-use ::events::Milliseconds;
-use ::blockchain::{StoredConfiguration, ConsensusConfig};
+use crypto::{Hash, PublicKey, SecretKey};
+use storage::{View, Error as StorageError};
+use messages::{Message, RawTransaction, Error as MessageError};
+use node::State;
+use events::Milliseconds;
+use blockchain::{StoredConfiguration, ConsensusConfig};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
