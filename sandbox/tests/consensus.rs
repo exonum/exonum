@@ -6,12 +6,11 @@ extern crate log;
 use std::time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
-                       RequestPrevotes, RequestPrecommits, CONSENSUS};
+                       RequestPrevotes, CONSENSUS};
 use exonum::crypto::{gen_keypair, Hash};
 use exonum::blockchain::{Block, Blockchain};
 use exonum::messages::BitVec;
-use exonum::node::state::{REQUEST_PRECOMMITS_WAIT, REQUEST_PREVOTES_WAIT, REQUEST_PROPOSE_WAIT,
-                          REQUEST_TRANSACTIONS_WAIT};
+use exonum::node::state::{REQUEST_PREVOTES_WAIT, REQUEST_PROPOSE_WAIT, REQUEST_TRANSACTIONS_WAIT};
 use exonum::node::state::{Round, Height};
 
 use sandbox::timestamping::{TimestampTx, TIMESTAMPING_SERVICE};
@@ -587,29 +586,6 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
                                      &block.hash(),
                                      sandbox.time(),
                                      sandbox.s(VALIDATOR_0 as usize)));
-    {
-        // respond to RequestPrecommits
-        let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
-        validators.set(VALIDATOR_3 as usize, true);
-
-        sandbox.recv(RequestPrecommits::new(&sandbox.p(VALIDATOR_3 as usize),
-                                            &sandbox.p(VALIDATOR_0 as usize),
-                                            HEIGHT_ONE,
-                                            ROUND_THREE,
-                                            &propose.hash(),
-                                            &block.hash(),
-                                            validators,
-                                            sandbox.s(VALIDATOR_3 as usize)));
-
-        sandbox.send(sandbox.a(VALIDATOR_3 as usize),
-                     Precommit::new(VALIDATOR_0,
-                                    HEIGHT_ONE,
-                                    ROUND_THREE,
-                                    &propose.hash(),
-                                    &block.hash(),
-                                    sandbox.time(),
-                                    sandbox.s(VALIDATOR_0 as usize)));
-    }
 
     sandbox.recv(precommit_1.clone());
     sandbox.recv(precommit_2.clone());
@@ -658,27 +634,6 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         //        sandbox.send(
         //            sandbox.a(VALIDATOR_3 as usize),
         //            make_prevote_from_propose(&sandbox, &propose.clone())
-        //        );
-    }
-
-    {
-        // respond to RequestPrecommits
-        let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
-        validators.set(VALIDATOR_3 as usize, true);
-
-        sandbox.recv(RequestPrecommits::new(&sandbox.p(VALIDATOR_3 as usize),
-                                            &sandbox.p(VALIDATOR_0 as usize),
-                                            HEIGHT_ONE,
-                                            ROUND_THREE,
-                                            &propose.hash(),
-                                            &block.hash(),
-                                            validators,
-                                            sandbox.s(VALIDATOR_3 as usize)));
-
-        // todo in fact after commit request old precommits message is ignored (because during commit, precommit mesages are cleared in state.new_height() fn). However, according to code in fn node/requests.rs->handle_request_precommits() requestPrecommits from lower heights should be handled. Need to ask this question to Ivan.
-        //        sandbox.send(
-        //            sandbox.a(VALIDATOR_3 as usize),
-        //            Precommit::new(VALIDATOR_0, HEIGHT_ZERO, ROUND_FOUR, &propose.hash(), &block.hash(), sandbox.s(VALIDATOR_0 as usize))
         //        );
     }
 
@@ -1233,7 +1188,7 @@ fn handle_precommit_we_are_fucked_up() {
                                      sandbox.s(VALIDATOR_3 as usize));
 
     sandbox.recv(precommit_1.clone());
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1286,7 +1241,7 @@ fn handle_precommit_positive_scenario_commit() {
                                      sandbox.s(VALIDATOR_3 as usize));
 
     sandbox.recv(precommit_1.clone());
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1295,7 +1250,7 @@ fn handle_precommit_positive_scenario_commit() {
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -1361,7 +1316,7 @@ fn lock_not_send_prevotes_after_commit() {
 
     {
         sandbox.recv(precommit_1.clone());
-        sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+        sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
         sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                      make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
         sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1372,7 +1327,7 @@ fn lock_not_send_prevotes_after_commit() {
         // !!! if comment this block, then commit during lock will not occur, and last Prevote would have been observed
         sandbox.recv(precommit_2.clone());
         // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-        sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+        sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
         sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                      make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
         sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -1464,7 +1419,7 @@ fn do_not_commit_if_propose_is_unknown() {
                                      sandbox.s(VALIDATOR_3 as usize));
 
     sandbox.recv(precommit_1.clone());
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1473,7 +1428,7 @@ fn do_not_commit_if_propose_is_unknown() {
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -1530,7 +1485,7 @@ fn do_not_commit_if_tx_is_unknown() {
                                      sandbox.s(VALIDATOR_3 as usize));
 
     sandbox.recv(precommit_1.clone());
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1539,7 +1494,7 @@ fn do_not_commit_if_tx_is_unknown() {
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -1603,7 +1558,7 @@ fn commit_using_unknown_propose_with_precommits() {
                                      sandbox.s(VALIDATOR_3 as usize));
 
     sandbox.recv(precommit_1.clone());
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1612,7 +1567,7 @@ fn commit_using_unknown_propose_with_precommits() {
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -1620,7 +1575,7 @@ fn commit_using_unknown_propose_with_precommits() {
 
 
     sandbox.recv(precommit_3.clone());//here consensus.rs->has_majority_precommits()->//Commit is achieved
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_3.clone()));
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
@@ -1693,7 +1648,7 @@ fn has_full_propose_we_are_fucked_up() {
                                      sandbox.s(VALIDATOR_3 as usize));
 
     sandbox.recv(precommit_1.clone());
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1702,7 +1657,7 @@ fn has_full_propose_we_are_fucked_up() {
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -1710,7 +1665,7 @@ fn has_full_propose_we_are_fucked_up() {
 
 
     sandbox.recv(precommit_3.clone());//here consensus.rs->has_majority_precommits()->//Commit is achieved
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_3.clone()));
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
@@ -1875,7 +1830,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     assert_eq!(first_block.hash(), sandbox.last_hash());
 
     //    sandbox.recv(precommit_1.clone());    //this precommit is received at previous height and queued
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1884,7 +1839,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -1971,7 +1926,7 @@ fn commit_as_leader_send_propose_round_timeout() {
                                      sandbox.s(VALIDATOR_3 as usize));
 
     sandbox.recv(precommit_1.clone());
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -1979,7 +1934,7 @@ fn commit_as_leader_send_propose_round_timeout() {
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -2158,7 +2113,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
                                      sandbox.s(VALIDATOR_3 as usize));
 
     sandbox.recv(precommit_1.clone());
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
@@ -2167,7 +2122,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because this condition is checked at node/mod.rs->actual_round()
-    sandbox.add_time(Duration::from_millis(REQUEST_PRECOMMITS_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
                  make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
@@ -2182,7 +2137,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     sandbox.add_time(Duration::from_millis(0));
 
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() -
-                                            2 * REQUEST_PRECOMMITS_WAIT));
+                                            2 * REQUEST_PROPOSE_WAIT));
     // this assert would fail if check for same height is absent in node/consensus.rs->handle_round_timeout()
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 }

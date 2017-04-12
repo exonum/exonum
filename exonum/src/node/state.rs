@@ -21,7 +21,6 @@ const TX_POOL_LIMIT: usize = 20000;
 pub const REQUEST_PROPOSE_WAIT: Milliseconds = 100;
 pub const REQUEST_TRANSACTIONS_WAIT: Milliseconds = 100;
 pub const REQUEST_PREVOTES_WAIT: Milliseconds = 100;
-pub const REQUEST_PRECOMMITS_WAIT: Milliseconds = 100;
 pub const REQUEST_BLOCK_WAIT: Milliseconds = 100;
 
 pub type Round = u32;
@@ -79,7 +78,6 @@ pub enum RequestData {
     Propose(Hash),
     Transactions(Hash),
     Prevotes(Round, Hash),
-    Precommits(Round, Hash, Hash),
     Block(Height),
 }
 
@@ -175,7 +173,6 @@ impl RequestData {
             RequestData::Propose(..) => REQUEST_PROPOSE_WAIT,
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
             RequestData::Prevotes(..) => REQUEST_PREVOTES_WAIT,
-            RequestData::Precommits(..) => REQUEST_PRECOMMITS_WAIT,
             RequestData::Block(..) => REQUEST_BLOCK_WAIT,
         };
         Duration::from_millis(ms)
