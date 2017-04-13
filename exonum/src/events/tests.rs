@@ -8,7 +8,6 @@ use std::time::{SystemTime, Duration};
 
 use messages::{MessageWriter, RawMessage};
 use crypto::gen_keypair;
-
 use super::{Events, Reactor, Event, InternalEvent, Channel};
 use super::{Network, NetworkConfiguration, EventHandler};
 

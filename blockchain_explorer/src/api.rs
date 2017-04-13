@@ -8,7 +8,7 @@ use router::Router;
 use serde_json;
 use serde_json::value::ToJson;
 use serde::{Serialize, Serializer};
-use serde::de::{Visitor, Deserialize, Deserializer, self};
+use serde::de::{self, Visitor, Deserialize, Deserializer};
 
 use std::ops::Deref;
 use std::marker::PhantomData;

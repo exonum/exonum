@@ -4,7 +4,6 @@ use std::{mem, convert, sync};
 use std::fmt::Debug;
 
 use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
-
 use super::{Field, Error};
 
 pub const HEADER_SIZE: usize = 10; // TODO: rename to HEADER_LENGTH?

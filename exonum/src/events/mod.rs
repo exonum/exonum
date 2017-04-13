@@ -7,12 +7,12 @@ use std::time::{SystemTime, Duration};
 
 use messages::RawMessage;
 
+pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
+
 mod network;
 mod connection;
 #[cfg(test)]
 mod tests;
-
-pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 

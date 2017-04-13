@@ -6,7 +6,6 @@ use std::time::SystemTime;
 use messages::utils::{U64, SystemTimeSerdeHelper};
 use crypto::{Hash, PublicKey, Signature};
 use blockchain;
-
 use super::{RawMessage, BitVec};
 
 pub const CONSENSUS: u16 = 0;

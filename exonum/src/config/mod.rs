@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use toml::{Encoder, self};
+use toml::{self, Encoder};
 
 use std::path::Path;
 use std::io;

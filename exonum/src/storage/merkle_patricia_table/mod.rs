@@ -8,7 +8,6 @@ use crypto::{hash, Hash, HASH_SIZE};
 
 use super::utils::bytes_to_hex;
 use super::{Map, Error, StorageValue};
-
 use self::proofpathtokey::{RootProofNode, BranchProofNode, ProofNode, BitVec};
 
 pub mod proofpathtokey;

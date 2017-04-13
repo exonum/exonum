@@ -6,7 +6,6 @@ use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use crypto::{Hash, PublicKey};
-
 use super::{Error, RawMessage, MessageBuffer, BitVec, FromRaw};
 
 pub trait Field<'a> {

@@ -4,17 +4,13 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::cmp::Ordering;
 use std::collections::Bound::{Included, Unbounded};
-// use std::collections::btree_map;
-// use std::iter::Iterator;
 
 use super::{Map, Database, Error, Patch, Change, Fork};
-// use super::{Iterable, Seekable}
 
 #[derive(Default)]
 pub struct MemoryDB {
     map: RwLock<BTreeMap<Vec<u8>, Vec<u8>>>,
 }
-// pub type MemoryDBIterator<'a> = btree_map::Iter<'a, Vec<u8>, Vec<u8>>;
 
 pub struct MemoryDBView {
     map: MemoryDB,

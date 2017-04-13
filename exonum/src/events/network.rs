@@ -10,7 +10,6 @@ use std::cmp::min;
 use std::default::Default;
 
 use messages::RawMessage;
-
 use super::connection::{Connection, IncomingConnection, OutgoingConnection};
 use super::{Timeout, InternalTimeout, EventLoop, EventHandler, Event};
 

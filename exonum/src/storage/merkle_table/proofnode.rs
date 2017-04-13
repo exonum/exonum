@@ -6,7 +6,6 @@ use std::fmt;
 
 use storage::StorageValue;
 use crypto::Hash;
-
 use super::hash_rules;
 
 const LEFT_DESC: &'static str = "left";
