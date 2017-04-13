@@ -220,7 +220,7 @@ impl<S> NodeHandler<S>
             let our_block_hash = self.execute(&hash);
 
             if our_block_hash != block_hash {
-                panic!("We are fucked up...");
+                panic!("Full propose: wrong state hash");
             }
 
             let precommits = self.state
@@ -291,7 +291,7 @@ impl<S> NodeHandler<S>
             let our_block_hash = self.execute(propose_hash);
 
             if &our_block_hash != block_hash {
-                panic!("We are fucked up...");
+                panic!("Precommit: Wrong state hash");
             }
 
             let precommits = self.state
