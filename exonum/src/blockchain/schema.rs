@@ -2,7 +2,6 @@ use crypto::{Hash, hash};
 use messages::{RawMessage, Precommit, BlockProof};
 use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
               List, RootProofNode, View};
-
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 

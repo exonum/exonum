@@ -7,7 +7,6 @@ use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPr
                RawTransaction};
 use storage::{Map, Patch};
 use events::Channel;
-
 use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
 
 // TODO reduce view invokations

@@ -6,7 +6,6 @@ use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, Req
 use blockchain::Schema;
 use storage::{Map, List};
 use events::Channel;
-
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
 // TODO validate_heights нужно обновлять по любым сообщениям, а не только по status (если они корректно подписаны)

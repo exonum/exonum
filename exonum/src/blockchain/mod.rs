@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::collections::BTreeMap;
 use std::mem;
 
-use crypto::{Hash, self};
+use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::{State, TxPool};
 use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};

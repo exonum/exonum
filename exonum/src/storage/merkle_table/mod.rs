@@ -4,7 +4,6 @@ use std::marker::PhantomData;
 use std::cell::Cell;
 
 use crypto::Hash;
-
 use super::{Map, List, Error, StorageValue};
 use self::proofnode::Proofnode;
 

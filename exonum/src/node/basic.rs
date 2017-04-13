@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 
 use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
 use events::Channel;
-
 use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
 
 impl<S> NodeHandler<S>

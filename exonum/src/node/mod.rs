@@ -8,7 +8,6 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
              Error as EventsError};
 use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage};
-
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool};
 
 mod basic;
