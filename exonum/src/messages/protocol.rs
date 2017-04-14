@@ -19,8 +19,8 @@ pub const BLOCK_MESSAGE_ID: u16 = 5;
 pub const REQUEST_PROPOSE_MESSAGE_ID: u16 = 6;
 pub const REQUEST_TRANSACTIONS_MESSAGE_ID: u16 = 7;
 pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
-pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
-pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 11;
+pub const REQUEST_PEERS_MESSAGE_ID: u16 = 9;
+pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
 
 // когда присоединяются узлы
 message! {
