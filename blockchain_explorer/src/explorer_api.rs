@@ -1,12 +1,14 @@
-use exonum::blockchain::Blockchain;
 use serde_json::value::ToJson;
 use serde_json::Value as JValue;
 use params::{Params, Value};
 use router::Router;
-use api::{Api, ApiError};
 use iron::prelude::*;
-use explorer::{BlockInfo, BlockchainExplorer};
+
+use exonum::blockchain::Blockchain;
 use exonum::crypto::{Hash, HexValue};
+
+use explorer::{BlockInfo, BlockchainExplorer};
+use api::{Api, ApiError};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BlocksRequest {

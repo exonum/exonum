@@ -1,10 +1,12 @@
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 use std::net::SocketAddr;
 use std::time::SystemTime;
-use super::super::crypto::{Hash, PublicKey, Signature};
+
+use messages::utils::{U64, SystemTimeSerdeHelper};
+use crypto::{Hash, PublicKey, Signature};
+use blockchain;
 use super::{RawMessage, BitVec};
-use super::super::blockchain;
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use ::messages::utils::{U64, SystemTimeSerdeHelper};
 
 pub const CONSENSUS: u16 = 0;
 

@@ -1,16 +1,15 @@
+use env_logger;
+
 use std::io;
 use std::thread;
 use std::net::SocketAddr;
 use std::collections::VecDeque;
 use std::time::{SystemTime, Duration};
 
-use env_logger;
-
+use messages::{MessageWriter, RawMessage};
+use crypto::gen_keypair;
 use super::{Events, Reactor, Event, InternalEvent, Channel};
 use super::{Network, NetworkConfiguration, EventHandler};
-
-use ::messages::{MessageWriter, RawMessage};
-use ::crypto::gen_keypair;
 
 pub type TestEvent = InternalEvent<(), u32>;
 

@@ -1,13 +1,13 @@
+use clap::{SubCommand, App, Arg, ArgMatches};
+use log::{LogRecord, LogLevel, SetLoggerError};
+use env_logger::LogBuilder;
+use colored::*;
+
 use std::path::Path;
 use std::marker::PhantomData;
 use std::fs;
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
-
-use clap::{SubCommand, App, Arg, ArgMatches};
-use log::{LogRecord, LogLevel, SetLoggerError};
-use env_logger::LogBuilder;
-use colored::*;
 
 use exonum::config::ConfigFile;
 use exonum::blockchain::GenesisConfig;

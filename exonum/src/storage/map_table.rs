@@ -1,9 +1,8 @@
 use std::marker::PhantomData;
-// use std::iter::Iterator;
+
+use profiler;
 
 use super::{Map, Error, StorageValue};
-use profiler;
-// use super::{Iterable, Seekable}
 
 pub struct MapTable<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> {
     prefix: Vec<u8>,
