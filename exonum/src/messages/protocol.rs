@@ -134,11 +134,11 @@ message! {
     Status {
         const TYPE = CONSENSUS;
         const ID = STATUS_MESSAGE_ID;
-        const SIZE = 44;
+        const SIZE = 72;
 
-        validator:      u32         [00 => 04]
-        height:         u64         [04 => 12]
-        last_hash:      &Hash       [12 => 44]
+        from:           &PublicKey          [00 => 32]
+        height:         u64                 [32 => 40]
+        last_hash:      &Hash               [40 => 72]
     }
 }
 
