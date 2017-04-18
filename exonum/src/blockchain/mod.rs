@@ -163,6 +163,7 @@ impl Blockchain {
 
         // Create block
         let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
+        trace!("execute block = {:?}", block );
         // Eval block hash
         let block_hash = block.hash();
         // Update height

@@ -49,7 +49,6 @@ pub enum RequestMessage {
     Propose(RequestPropose),
     Transactions(RequestTransactions),
     Prevotes(RequestPrevotes),
-    Precommits(RequestPrecommits),
     Peers(RequestPeers),
     Block(RequestBlock),
 }
@@ -60,7 +59,6 @@ impl RequestMessage {
             RequestMessage::Propose(ref msg) => msg.from(),
             RequestMessage::Transactions(ref msg) => msg.from(),
             RequestMessage::Prevotes(ref msg) => msg.from(),
-            RequestMessage::Precommits(ref msg) => msg.from(),
             RequestMessage::Peers(ref msg) => msg.from(),
             RequestMessage::Block(ref msg) => msg.from(),
         }
@@ -71,7 +69,6 @@ impl RequestMessage {
             RequestMessage::Propose(ref msg) => msg.to(),
             RequestMessage::Transactions(ref msg) => msg.to(),
             RequestMessage::Prevotes(ref msg) => msg.to(),
-            RequestMessage::Precommits(ref msg) => msg.to(),
             RequestMessage::Peers(ref msg) => msg.to(),
             RequestMessage::Block(ref msg) => msg.to(),
         }
@@ -83,7 +80,6 @@ impl RequestMessage {
             RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),
             RequestMessage::Transactions(ref msg) => msg.verify_signature(public_key),
             RequestMessage::Prevotes(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Precommits(ref msg) => msg.verify_signature(public_key),
             RequestMessage::Peers(ref msg) => msg.verify_signature(public_key),
             RequestMessage::Block(ref msg) => msg.verify_signature(public_key),
         }
@@ -94,7 +90,6 @@ impl RequestMessage {
             RequestMessage::Propose(ref msg) => msg.raw(),
             RequestMessage::Transactions(ref msg) => msg.raw(),
             RequestMessage::Prevotes(ref msg) => msg.raw(),
-            RequestMessage::Precommits(ref msg) => msg.raw(),
             RequestMessage::Peers(ref msg) => msg.raw(),
             RequestMessage::Block(ref msg) => msg.raw(),
         }
@@ -107,7 +102,6 @@ impl fmt::Debug for RequestMessage {
             RequestMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Transactions(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Prevotes(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Precommits(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Peers(ref msg) => write!(fmt, "{:?}", msg),
             RequestMessage::Block(ref msg) => write!(fmt, "{:?}", msg),
         }
@@ -192,9 +186,6 @@ impl Any {
                     REQUEST_TRANSACTIONS_MESSAGE_ID => Any::Request(RequestMessage::Transactions(RequestTransactions::from_raw(raw)?)),
                     REQUEST_PREVOTES_MESSAGE_ID => {
                         Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?))
-                    }
-                    REQUEST_PRECOMMITS_MESSAGE_ID => {
-                        Any::Request(RequestMessage::Precommits(RequestPrecommits::from_raw(raw)?))
                     }
                     REQUEST_PEERS_MESSAGE_ID => {
                         Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))

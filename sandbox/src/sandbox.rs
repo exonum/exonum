@@ -7,7 +7,7 @@ use std::ops::Drop;
 use std::collections::HashMap;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
+use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
@@ -137,9 +137,18 @@ impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
 }
 
 impl SandboxReactor {
+
     pub fn is_leader(&self) -> bool {
-        self.handler.is_leader()
+        self.handler.state().is_leader()
     }
+
+    pub fn leader(&self, round: Round) -> ValidatorId {
+        self.handler.state().leader(round)
+    }
+
+    pub fn is_validator(&self) -> bool {
+        self.handler.state().is_validator()
+    }    
 
     pub fn last_block(&self) -> Result<Block, StorageError> {
         self.handler.blockchain.last_block()
@@ -337,6 +346,16 @@ impl Sandbox {
         reactor.is_leader()
     }
 
+    pub fn leader(&self, round: Round) -> ValidatorId {
+        let reactor = self.reactor.borrow();
+        reactor.leader(round)
+    }
+
+    pub fn is_validator(&self) -> bool {
+        let reactor = self.reactor.borrow();
+        reactor.is_validator()
+    }
+    
     pub fn last_block(&self) -> Block {
         let reactor = self.reactor.borrow();
         reactor.last_block().unwrap()
@@ -440,7 +459,6 @@ impl Sandbox {
     }
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
-        debug_assert!(num_validators >= 4);
         num_validators * 2 / 3 + 1
     }
 

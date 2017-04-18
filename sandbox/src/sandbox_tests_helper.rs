@@ -10,6 +10,7 @@ use exonum::blockchain::Block;
 use exonum::crypto::{Hash, HASH_SIZE, hash};
 use exonum::messages::BitVec;
 use exonum::events::Milliseconds;
+use exonum::node::ValidatorId;
 
 use super::sandbox::Sandbox;
 use timestamping::{TimestampTx, TimestampingTxGenerator};
@@ -375,9 +376,103 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
     unreachable!("because at one of loops we should become a leader and return");
 }
 
+pub fn add_one_height_with_transactions_from_other_validator(sandbox: &TimestampingSandbox,
+                                        sandbox_state: &SandboxState,
+                                        txs: &[RawTransaction]) {
+    // sort transaction in order accordingly their hashes
+    let mut tx_pool = BTreeMap::new();
+    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
+    let raw_txs = tx_pool.values()
+        .cloned()
+        .collect::<Vec<_>>();
+    let txs: &[RawTransaction] = raw_txs.as_ref();
+
+    
+    trace!("=========================add_one_height_with_timeout started=========================");
+    let initial_height = sandbox.current_height();
+    // assert 1st round
+    sandbox.assert_state(initial_height, ROUND_ONE);
+
+    let hashes = {
+        let mut hashes = Vec::new();
+        for tx in txs.iter() {
+            sandbox.recv(tx.clone());
+            hashes.push(tx.hash());
+        }
+        hashes
+    };
+
+    {
+        *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
+    }
+    let n_validators = sandbox.n_validators();
+    for _ in 0..n_validators {
+        //        add_round_with_transactions(&sandbox, &[tx.hash()]);
+        add_round_with_transactions(&sandbox, &sandbox_state, hashes.as_ref());
+        let round: u32 = sandbox.current_round();
+        if VALIDATOR_1 == sandbox.leader(round) {
+            sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
+            // ok, we are leader
+            trace!("ok, validator 1 leader, round: {:?}", round);
+            let propose = get_propose_with_transactions_for_validator(&sandbox, hashes.as_ref(), VALIDATOR_1);
+            trace!("propose.hash: {:?}", propose.hash());
+            trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
+           /* {
+                *sandbox_state.accepted_propose_hash.borrow_mut() = propose.hash();
+            }*/
+            sandbox.recv(propose.clone());
+            for val_idx in 0..sandbox.majority_count(n_validators) {
+                sandbox.recv(Prevote::new(val_idx as u32,
+                                          initial_height,
+                                          round,
+                                          &propose.hash(),
+                                          LOCK_ZERO,
+                                          sandbox.s(val_idx)));
+            }
+            sandbox.assert_lock(round, Some(propose.hash()));
+
+            trace!("last_block: {:?}", sandbox.last_block());
+            let state_hash = sandbox.compute_state_hash(&raw_txs);
+            let block = BlockBuilder::new(sandbox)
+                .with_txs_hashes(&hashes)
+                .with_state_hash(&state_hash)
+                .build();
+            trace!("new_block: {:?}", block);
+            trace!("new_block.hash(): {:?}", block.hash());
+    
+            sandbox.assert_lock(round, Some(propose.hash()));
+            sandbox.assert_state(initial_height, round);            
+
+            for val_idx in 0..sandbox.majority_count(n_validators) {
+                sandbox.recv(Precommit::new(val_idx as u32,
+                                                 initial_height,
+                                                 round,
+                                                 &propose.hash(),
+                                                 &block.hash(),
+                                                 sandbox.time(),
+                                                 sandbox.s(val_idx)));
+            }
+
+            sandbox.assert_state(initial_height + 1, ROUND_ONE);
+
+            {
+                *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
+            }
+            return;
+        }
+    }
+
+    unreachable!("because at one of loops we should become a leader and return");
+}
+
 fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[Hash]) -> Propose {
+
+    get_propose_with_transactions_for_validator(sandbox, transactions, VALIDATOR_0)
+}
+
+fn get_propose_with_transactions_for_validator(sandbox: &TimestampingSandbox, transactions: &[Hash], validator: ValidatorId) -> Propose {
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
-    Propose::new(VALIDATOR_0,
+    Propose::new(validator,
                  sandbox.current_height(),
                  sandbox.current_round(),
                  &sandbox.last_hash(),
@@ -385,7 +480,7 @@ fn get_propose_with_transactions(sandbox: &TimestampingSandbox, transactions: &[
                  //   &[tx.hash()],
                  //   &[],
                  transactions,
-                 sandbox.s(VALIDATOR_0 as usize))
+                 sandbox.s(validator as usize))
 }
 
 /// assumptions:
