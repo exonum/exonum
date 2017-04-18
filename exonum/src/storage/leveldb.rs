@@ -6,19 +6,19 @@ use std::error;
 use std::sync::Arc;
 use std::cell::RefCell;
 use std::collections::Bound::{Included, Unbounded};
+use std::collections::btree_map::Range;
 // use std::iter::Iterator;
 
 use leveldb::database::Database as LevelDatabase;
 use leveldb::error::Error as LevelError;
-use leveldb::database::iterator::Iterable as LevelIterable;
 use leveldb::database::snapshots::Snapshot as LevelSnapshot;
 use leveldb::options::{Options, WriteOptions, ReadOptions};
 use leveldb::database::kv::KV;
 use leveldb::database::batch::Writebatch;
 use leveldb::batch::Batch;
 use leveldb::snapshots::Snapshots;
-// use leveldb::database::iterator::Iterator as LevelIterator;
-use leveldb::iterator::LevelDBIterator;
+use leveldb::database::iterator::{Iterable, LevelDBIterator as LevelDBIteratorTrait};
+use leveldb::database::iterator::{Iterator as LevelIterator, KeyIterator as LevelKeys, ValueIterator as LevelValues};
 
 use super::{Map, Database, Error, Patch, Change, Fork};
 // use super::{Iterable, Seekable}
@@ -69,6 +69,16 @@ impl LevelDBView {
             _db: from.db.clone(),
             snap: unsafe { mem::transmute(from.db.snapshot()) },
             changes: RefCell::default(),
+        }
+    }
+
+    fn iter(&self) -> LevelDBIterator {
+        LevelDBIterator {
+            db: self.snap.iter(LEVELDB_READ_OPTIONS),
+            // FIXME: remove this bullshit!
+            changes: unsafe {
+                self.changes.as_ptr().as_ref().unwrap().range::<Vec<u8>, Vec<u8>>(Unbounded, Unbounded)
+            }
         }
     }
 }
@@ -139,7 +149,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
         };
         if out.is_none() {
             let it = self.snap.keys_iter(LEVELDB_READ_OPTIONS);
-            it.seek(key.to_vec());
+            it.seek(key);
             if it.valid() {
                 let key = it.key();
                 return Ok(Some(key.to_vec()));
@@ -155,6 +165,7 @@ impl Fork for LevelDBView {
     fn changes(&self) -> Patch {
         self.changes.borrow().clone()
     }
+
     fn merge(&self, patch: &Patch) {
         let iter = patch.into_iter().map(|(k, v)| (k.clone(), v.clone()));
         self.changes.borrow_mut().extend(iter);
@@ -167,22 +178,6 @@ impl Database for LevelDB {
     fn fork(&self) -> Self::Fork {
         LevelDBView::new(self)
     }
-
-    // fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-    //     self.db
-    //         .get(LEVELDB_READ_OPTIONS, key)
-    //         .map_err(Into::into)
-    // }
-
-    // fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
-    //     let result = self.db.put(LEVELDB_WRITE_OPTIONS, key, &value);
-    //     result.map_err(Into::into)
-    // }
-
-    // fn delete(&self, key: &[u8]) -> Result<(), Error> {
-    //     let result = self.db.delete(LEVELDB_WRITE_OPTIONS, key);
-    //     result.map_err(Into::into)
-    // }
 
     fn merge(&self, patch: &Patch) -> Result<(), Error> {
         let mut batch = Writebatch::new();
@@ -202,37 +197,40 @@ impl Database for LevelDB {
     }
 }
 
-// pub struct DatabaseIterator<'a> {
-//     iter: LevelIterator<'a, BinaryKey>
+pub struct LevelDBIterator<'a> {
+    db: LevelIterator<'a>,
+    changes: Range<'a, Vec<u8>, Change>
+}
+
+impl<'a> Iterator for LevelDBIterator<'a> {
+    type Item = (&'a[u8], Vec<u8>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.db.next()
+    }
+}
+
+
+// pub struct LevelDBKeys<'a> {
+//     iter: LevelKeys<'a>
 // }
 
-// impl<'a> Iterator for DatabaseIterator<'a> {
-//     type Item = (Vec<u8>, Vec<u8>);
+// impl<'a> Iterator for LevelDBKeys<'a> {
+//     type Item = &'a[u8];
 
 //     fn next(&mut self) -> Option<Self::Item> {
-//         let item = self.iter.next();
-//         item.map(|x| ((x.0).0, x.1))
+//         self.iter.next()
 //     }
 // }
 
-// impl<'a> Iterable for &'a LevelDB {
-//     type Iter = DatabaseIterator<'a>;
-
-//     fn iter(self) -> Self::Iter {
-//         DatabaseIterator {
-//             iter: self.db.iter(LEVELDB_READ_OPTIONS)
-//         }
-//     }
+// pub struct LevelDBValues<'a> {
+//     iter: LevelValues<'a>
 // }
 
-// impl<'a> Seekable<'a> for DatabaseIterator<'a> {
-//     type Key = Vec<u8>;
-//     type Item = (Vec<u8>, Vec<u8>);
+// impl<'a> Iterator for LevelDBValues<'a> {
+//     type Item = Vec<u8>;
 
-//     // TODO I am not sure that optimizer will remove memory allocation here
-//     fn seek(&mut self, key: &Self::Key) -> Option<Self::Item> {
-//         let db_key = BinaryKey(key.to_vec());
-//         self.iter.seek(&db_key);
-//         Some((self.iter.key().0, self.iter.value()))
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.iter.next()
 //     }
 // }
