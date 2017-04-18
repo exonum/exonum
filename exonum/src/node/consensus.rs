@@ -138,20 +138,9 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        // Verify precommits
-        let precommits = msg.precommits();
-        if precommits.len() < self.state.majority_count() ||
-           precommits.len() > self.state.validators().len() {
-            error!("Received block without consensus, block={:?}", msg);
+        if let Err(err) = self.verify_precommits(&msg.precommits(), &block_hash, block.height()) {
+            error!("{}, block={:?}", err, msg);
             return;
-        }
-        let precommit_round = precommits[0].round();
-        for precommit in &precommits {
-            let r = self.verify_precommit(&block_hash, block.height(), precommit_round, precommit);
-            if let Err(e) = r {
-                error!("{}, block={:?}", e, msg);
-                return;
-            }
         }
 
         if self.state.block(&block_hash).is_none() {
@@ -190,7 +179,7 @@ impl<S> NodeHandler<S>
             // Commit block
             self.state.add_block(block_hash, patch, tx_hashes, block.propose_round());
         }
-        self.commit(block_hash, precommits.iter());
+        self.commit(block_hash, msg.precommits().iter());
         self.request_next_block();
     }
 
@@ -716,13 +705,37 @@ impl<S> NodeHandler<S>
         self.broadcast(precommit.raw());
     }
 
-    // TODO reuse where is possible
-    pub fn verify_precommit(&self,
-                            block_hash: &Hash,
-                            block_height: Height,
-                            precommit_round: Round,
-                            precommit: &Precommit)
-                            -> Result<(), String> {
+    fn verify_precommits(&self,
+                         precommits: &[Precommit],
+                         block_hash: &Hash,
+                         block_height: Height)
+                         -> Result<(), String> {
+        if precommits.len() < self.state.majority_count() {
+            return Err("Received block without consensus".to_string());
+        }
+        else if precommits.len() > self.state.validators().len() {
+            return Err("Wrong precommits count in block".to_string());
+        }
+
+        let mut validators = HashSet::with_capacity(precommits.len());
+        let round = precommits[0].round();
+        for precommit in precommits {
+            if !validators.insert(precommit.validator()) {
+                return Err("Several precommits from one validator in block".to_string())
+            }
+
+            self.verify_precommit(block_hash, block_height, round, precommit)?;
+        }
+
+        Ok(())
+    }
+
+    fn verify_precommit(&self,
+                        block_hash: &Hash,
+                        block_height: Height,
+                        precommit_round: Round,
+                        precommit: &Precommit)
+                        -> Result<(), String> {
         if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
             if !precommit.verify_signature(pub_key) {
                 let e = format!("Received wrong signed precommit, precommit={:?}", precommit);
