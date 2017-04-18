@@ -1,14 +1,13 @@
+use byteorder::{ByteOrder, LittleEndian};
+use mio::tcp::TcpStream;
+use mio::{TryWrite, TryRead, EventSet};
+
 use std::io;
 use std::mem::swap;
 use std::net::SocketAddr;
 use std::collections::VecDeque;
 
-use byteorder::{ByteOrder, LittleEndian};
-
-use mio::tcp::TcpStream;
-use mio::{TryWrite, TryRead, EventSet};
-
-use super::super::messages::{RawMessage, MessageBuffer, HEADER_SIZE};
+use messages::{RawMessage, MessageBuffer, HEADER_SIZE};
 
 const MAX_MESSAGE_LEN: usize = 1024 * 1024; //1 MB
 
@@ -95,7 +94,7 @@ impl MessageWriter {
                 }
                 Some(n) => {
                     self.position += n;
-                    if n == message.len() {
+                    if self.position == message.len() {
                         self.queue.pop_front();
                         self.position = 0;
                     }

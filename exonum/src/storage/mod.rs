@@ -1,25 +1,10 @@
-#[cfg(test)]
-mod tests;
-
-use std::fmt;
-use std::error;
-
 use ::crypto::{Hash, HASH_SIZE, hash};
 
-mod db;
-mod leveldb;
-mod memorydb;
+use serde_json;
 
-mod base_table;
-mod map_table;
-mod list_table;
-mod merkle_table;
-mod merkle_patricia_table;
-
-mod keys;
-mod values;
-
-mod utils; 
+use std::fmt;
+use std::error::Error as ErrorTrait;
+use std::convert;
 
 pub use leveldb::options::Options as LevelDBOptions;
 pub use leveldb::database::cache::Cache as LevelDBCache;
@@ -27,13 +12,28 @@ pub use leveldb::database::cache::Cache as LevelDBCache;
 pub use self::leveldb::{LevelDB, LevelDBView};
 pub use self::db::{Database, Patch, Fork, Change};
 pub use self::memorydb::{MemoryDB, MemoryDBView};
+pub use self::base_table::BaseTable;
 pub use self::map_table::MapTable;
 pub use self::list_table::ListTable;
 pub use self::keys::{StorageKey, VoidKey};
 pub use self::values::{StorageValue};
-pub use self::merkle_table::MerkleTable; 
-pub use self::merkle_patricia_table::{MerklePatriciaTable};
-pub use self::utils::bytes_to_hex; 
+pub use self::merkle_table::MerkleTable;
+pub use self::merkle_patricia_table::{MerklePatriciaTable, RootProofNode};
+pub use self::utils::bytes_to_hex;
+
+#[cfg(test)]
+mod tests;
+mod leveldb;
+mod memorydb;
+mod map_table;
+mod list_table;
+mod merkle_table;
+mod keys;
+mod values;
+mod db;
+mod base_table;
+mod merkle_patricia_table;
+mod utils;
 
 #[derive(Debug)]
 pub struct Error {
@@ -85,9 +85,15 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {
+impl ErrorTrait for Error {
     fn description(&self) -> &str {
         &self.message
+    }
+}
+
+impl convert::From<serde_json::error::Error> for Error {
+    fn from(message: serde_json::error::Error) -> Error {
+        Error::new(message.description())
     }
 }
 
@@ -110,7 +116,7 @@ mod details {
 pub type Storage = details::Storage;
 pub type View = details::View;
 
-pub fn merkle_hash(hashes: &[Hash]) -> Hash {    
+pub fn merkle_hash(hashes: &[Hash]) -> Hash {
     match hashes.len() {
         0 => Hash::default(),
         1 => hashes[0],
@@ -122,5 +128,5 @@ pub fn merkle_hash(hashes: &[Hash]) -> Hash {
             v.extend_from_slice(merkle_hash(right).as_ref());
             hash(&v)
         }
-    }    
+    }
 }

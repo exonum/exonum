@@ -2,12 +2,9 @@ use num::{Integer, range, ToPrimitive, pow};
 
 use std::marker::PhantomData;
 use std::cell::Cell;
-use ::crypto::{hash, Hash};
 
-use super::base_table::BaseTable;
-use super::{View, List, Error, VoidKey, StorageValue};
-
-
+use crypto::Hash;
+use super::{BaseTable, View, List, Error, VoidKey, StorageValue};
 use self::proofnode::Proofnode;
 
 const HEIGHT_SHIFT : u64 = 58;
@@ -87,7 +84,7 @@ impl<'a, V: StorageValue> MerkleTable<'a, V> {
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
         self.get_hash(self.height()?, 0)
-            .map(|h| h.unwrap_or_else(|| hash(&[])))
+            .map(|h| h.unwrap_or_else(Hash::zero))
     }
 
     fn construct_proof_subtree(&self,
@@ -116,22 +113,22 @@ impl<'a, V: StorageValue> MerkleTable<'a, V> {
                     let right_proof =
                         self.construct_proof_subtree(subtree_hight, righ_child_index, r_s, r_e)?;
                     Proofnode::Full(Box::new(left_proof), Box::new(right_proof))
-                } 
+                }
                 (Some((l_s, l_e)), None) => {
                     let left_proof =
                         self.construct_proof_subtree(subtree_hight, left_child_index, l_s, l_e)?;
                     let right_hash = self.get_hash(subtree_hight, righ_child_index)?;
                     Proofnode::Left(Box::new(left_proof), right_hash)
-                } 
+                }
                 (None, Some((r_s, r_e))) => {
                     let left_hash = self.get_hash(subtree_hight, left_child_index)?.unwrap();
                     let right_proof =
                         self.construct_proof_subtree(subtree_hight, righ_child_index, r_s, r_e)?;
                     Proofnode::Right(left_hash, Box::new(right_proof))
-                } 
+                }
                 (None, None) => {
                     unreachable!();
-                } 
+                }
             };
         } else {
             unreachable!();
@@ -317,8 +314,7 @@ mod tests {
     use std::collections::HashSet;
 
     use ::crypto::{Hash, hash};
-    use ::storage::{Database, MemoryDB, List, MerkleTable};
-    use ::storage::values::DeserializeFromJson;
+    use storage::{Database, MemoryDB, List, MerkleTable};
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
@@ -405,6 +401,42 @@ mod tests {
     }
 
     #[test]
+    fn generate_proof_in_table_containing_hashes() {
+        let storage = MemoryDB::new().fork();
+        let table = MerkleTable::new(vec![255], &storage);
+        let num_vals = 10u32;
+        let values = generate_fully_random_data_keys(num_vals as usize);
+        let hash_vals: Vec<Hash> = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>();
+        for value in &hash_vals {
+            table.append(*value).unwrap();
+        }
+        let table_root_hash = table.root_hash().unwrap();
+        let table_len = table.len().unwrap() as usize;
+        let st_r = 0;
+        let end_r = 5;
+        let range_proof = table.construct_path_for_range(st_r, end_r).unwrap();
+        assert_eq!(range_proof.compute_proof_root(), table_root_hash);
+        {
+            let (inds, actual_vals): (Vec<_>, Vec<&Hash>) =
+                proof_indices_values(&range_proof).into_iter().unzip();
+            assert_eq!(inds, (st_r as usize..end_r as usize).collect::<Vec<_>>());
+            let expect_vals = &hash_vals[st_r as usize..end_r as usize];
+            let paired = expect_vals.iter().zip(actual_vals);
+            for pair in paired {
+                assert_eq!(*pair.0, *pair.1);
+            }
+        }
+        let proof_info = ProofInfo {
+            root_hash: table_root_hash,
+            list_length: table_len,
+            proof: range_proof,
+            range_st: st_r as usize,
+            range_end: end_r as usize,
+        };
+        println!("{}", serde_json::to_string(&proof_info).unwrap());
+    }
+
+    #[test]
     fn randomly_generate_proofs() {
         let storage = MemoryDB::new().fork();
         let table = MerkleTable::new(vec![255], &storage);
@@ -447,8 +479,7 @@ mod tests {
             println!("{}", serde_json::to_string(&proof_info).unwrap());
 
             // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (end_range - start_range) as usize);
             assert_eq!(deser_proof.compute_proof_root(), table_root_hash);
@@ -460,7 +491,7 @@ mod tests {
     fn test_table_and_proof_roots() {
         let storage = MemoryDB::new().fork();
         let table = MerkleTable::new(vec![255], &storage);
-        assert_eq!(table.root_hash().unwrap(), hash(&[]));
+        assert_eq!(table.root_hash().unwrap(), Hash::zero());
 
         let h1 = hash(&[1, 2]);
         let h2 = hash(&[2, 3]);
@@ -514,8 +545,7 @@ mod tests {
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
             // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(), 1);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
             // println!("{:?}", deser_proof);
@@ -536,8 +566,7 @@ mod tests {
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
             // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (proof_ind + 1) as usize);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
@@ -556,8 +585,7 @@ mod tests {
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
             // println!("{}", json_repre);
-            let data: serde_json::Value = serde_json::from_str(&json_repre).unwrap();
-            let deser_proof = Proofnode::<Vec<u8>>::deserialize(&data).unwrap();
+            let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(), 1);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
             // println!("{:?}", deser_proof);
@@ -627,7 +655,7 @@ mod tests {
     fn test_proof_structure() {
         let storage = MemoryDB::new().fork();
         let table = MerkleTable::new(vec![255], &storage);
-        assert_eq!(table.root_hash().unwrap(), hash(&[]));
+        assert_eq!(table.root_hash().unwrap(), Hash::zero());
 
         let h1 = hash(&vec![0, 1, 2]);
         let h2 = hash(&vec![1, 2, 3]);
@@ -699,6 +727,31 @@ mod tests {
         t.set(0, vec![2]).unwrap();
         assert_eq!(t.root_hash().unwrap(), h2);
     }
+
+    // #[test]
+    // fn test_swap_values() {
+    //     let s1 = MemoryDB::new();
+    //     let t1 = MerkleTable::new(vec![255], s1.fork());
+    //     let values1 = vec![
+    //         vec![1],
+    //         vec![2],
+    //         vec![33],
+    //         vec![44],
+    //     ];
+    //     t1.extend(values1).unwrap();
+    //     t1.swap(2, 3).unwrap();
+
+    //     let s2 = MemoryDB::new();
+    //     let t2 = MerkleTable::new(vec![255], s2.fork());
+    //     let values2 = vec![
+    //         vec![1],
+    //         vec![2],
+    //         vec![44],
+    //         vec![33],
+    //     ];
+    //     t2.extend(values2).unwrap();
+    //     assert_eq!(t1.root_hash().unwrap(), t2.root_hash().unwrap());
+    // }
 
     #[test]
     fn test_hash_set_value() {

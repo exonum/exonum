@@ -1,26 +1,20 @@
 use std::io;
 use std::net::SocketAddr;
+use std::time::{SystemTime, Duration};
 
-use time::{Duration, Timespec};
-
-use super::crypto::{PublicKey, SecretKey, Hash};
-use super::events::{Events, MioChannel, EventLoop, Reactor, Network, NetworkConfiguration, Event,
-                    EventsConfiguration, Channel, EventHandler, Result as EventsResult,
-                    Error as EventsError};
-use super::blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
-use super::messages::{Connect, RawMessage};
-
-pub mod state;//temporary solution to get access to WAIT consts
+use crypto::{PublicKey, SecretKey, Hash};
+use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel, MioChannel,
+             Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
+             Error as EventsError};
+use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
+use messages::{Connect, RawMessage};
+pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 
 mod basic;
 mod consensus;
 mod requests;
-mod adjusted_propose_timeout;
 
-pub use self::state::{State, Round, Height, RequestData, ValidatorId};
-use self::adjusted_propose_timeout::*;
-
-pub type ProposeTimeoutAdjusterType = adjusted_propose_timeout::MovingAverageProposeTimeoutAdjuster;
+pub mod state; // temporary solution to get access to WAIT consts
 
 #[derive(Debug)]
 pub enum ExternalMessage {
@@ -51,7 +45,6 @@ pub struct NodeHandler<S>
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    propose_timeout_adjuster: Box<adjusted_propose_timeout::ProposeTimeoutAdjuster>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -79,6 +72,12 @@ pub struct Configuration {
     pub peer_discovery: Vec<SocketAddr>,
 }
 
+pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
+
+pub struct Node {
+    reactor: Events<NodeHandler<NodeChannel>>,
+}
+
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
@@ -92,50 +91,47 @@ impl<S> NodeHandler<S>
         let stored = Schema::new(&blockchain.view()).get_actual_configuration().unwrap();
         info!("Create node with config={:#?}", stored);
 
-        let id = stored.validators
+        let validator_id = stored.validators
             .iter()
             .position(|pk| pk == &config.listener.public_key)
-            .unwrap();
-
+            .map(|id| id as ValidatorId);
+        info!("Validator={:#?}", validator_id);
         let connect = Connect::new(&config.listener.public_key,
                                    sender.address(),
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-        let propose_timeout_adjuster = Box::new(adjusted_propose_timeout::ConstProposeTimeout {
-            propose_timeout: stored.consensus.propose_timeout as i64,
-        });
 
-        let state = State::new(id as u32,
+        let state = State::new(validator_id,
+                               config.listener.public_key,
                                config.listener.secret_key,
-                               stored.validators,
+                               stored,
                                connect,
                                last_hash,
                                last_height,
-                               stored.consensus);
+                               sender.get_time());
 
         NodeHandler {
             state: state,
             channel: sender,
             blockchain: blockchain,
-            propose_timeout_adjuster: propose_timeout_adjuster,
             peer_discovery: config.peer_discovery,
         }
     }
 
-    pub fn propose_timeout(&self) -> i64 {
+    pub fn propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().propose_timeout
     }
 
-    pub fn round_timeout(&self) -> i64 {
+    pub fn round_timeout(&self) -> Milliseconds {
         self.state().consensus_config().round_timeout
     }
 
-    pub fn status_timeout(&self) -> i64 {
+    pub fn status_timeout(&self) -> Milliseconds {
         self.state().consensus_config().status_timeout
     }
 
-    pub fn peers_timeout(&self) -> i64 {
+    pub fn peers_timeout(&self) -> Milliseconds {
         self.state().consensus_config().peers_timeout
     }
 
@@ -157,9 +153,8 @@ impl<S> NodeHandler<S>
             info!("Try to connect with peer {}", address);
         }
 
-        let round = self.actual_round();
+        let round = 1;
         self.state.jump_round(round);
-
         info!("Jump to round {}", round);
 
         self.add_round_timeout();
@@ -208,39 +203,29 @@ impl<S> NodeHandler<S>
 
     pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round() + 1);
-        trace!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
+        trace!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
                time,
                self.state.height(),
-               self.state.round(),
-               (time - self.channel.get_time()).num_milliseconds());
+               self.state.round());
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
 
-    /// getter for adjusted_propose_timeout
-    pub fn adjusted_propose_timeout(&self) -> i64 {
-        self.propose_timeout_adjuster.adjusted_propose_timeout(&self.blockchain.view())
-    }
-
     pub fn add_propose_timeout(&mut self) {
-        //        let time = self.round_start_time(self.state.round()) +
-        //                   Duration::milliseconds(self.propose_timeout);
-        let adjusted_propose_timeout = self.adjusted_propose_timeout();//cache adjusted_propose_timeout because this value will be used 2 times
+        let adjusted_propose_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
-                   Duration::milliseconds(adjusted_propose_timeout);
-        self.propose_timeout_adjuster.update_last_propose_timeout(adjusted_propose_timeout);
+                   Duration::from_millis(adjusted_propose_timeout);
 
-        trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}, elapsed={}ms",
+        trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}",
                time,
                self.state.height(),
-               self.state.round(),
-               (time - self.channel.get_time()).num_milliseconds());
+               self.state.round());
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
 
     pub fn add_status_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.status_timeout());
+        let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
         self.channel.add_timeout(NodeTimeout::Status, time);
     }
 
@@ -251,15 +236,8 @@ impl<S> NodeHandler<S>
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::milliseconds(self.peers_timeout());
+        let time = self.channel.get_time() + Duration::from_millis(self.peers_timeout());
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
-    }
-
-    pub fn last_block_time(&self) -> Timespec {
-        self.blockchain
-            .last_block()
-            .unwrap()
-            .time()
     }
 
     pub fn last_block_hash(&self) -> Hash {
@@ -269,25 +247,9 @@ impl<S> NodeHandler<S>
             .hash()
     }
 
-    pub fn actual_round(&self) -> Round {
-        let now = self.channel.get_time();
-        let propose = self.last_block_time();
-        debug_assert!(now >= propose);
-
-        let duration = (now - propose - Duration::milliseconds(self.adjusted_propose_timeout()))
-            .num_milliseconds();
-        if duration > 0 {
-            let round = (duration / self.round_timeout()) as Round + 1;
-            ::std::cmp::max(1, round)
-        } else {
-            1
-        }
-    }
-
-    // FIXME find more flexible solution
-    pub fn round_start_time(&self, round: Round) -> Timespec {
-        let ms = (round - 1) as i64 * self.round_timeout();
-        self.last_block_time() + Duration::milliseconds(ms)
+    pub fn round_start_time(&self, round: Round) -> SystemTime {
+        let ms = (round - 1) as u64 * self.round_timeout();
+        self.state.height_start_time() + Duration::from_millis(ms)
     }
 }
 
@@ -325,14 +287,22 @@ impl<S> EventHandler for NodeHandler<S>
     }
 }
 
+pub trait TransactionSend: Send + Sync {
+    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()>;
+}
+
 impl<S> TxSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn new(inner: S) -> TxSender<S> {
         TxSender { inner: inner }
     }
+}
 
-    pub fn send<T: Transaction>(&self, tx: T) -> EventsResult<()> {
+impl<S> TransactionSend for TxSender<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+{
+    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()> {
         // TODO remove double data convertation
         if !tx.verify() {
             return Err(EventsError::new("Unable to verify transaction"));
@@ -340,12 +310,6 @@ impl<S> TxSender<S>
         let msg = ExternalMessage::Transaction(Box::new(tx));
         self.inner.post_event(msg)
     }
-}
-
-pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
-
-pub struct Node {
-    reactor: Events<NodeHandler<NodeChannel>>,
 }
 
 impl Node {
@@ -364,7 +328,7 @@ impl Node {
         };
         let network = Network::with_config(node_cfg.listen_address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
-        let channel = MioChannel::new(node_cfg.listen_address, event_loop.channel());
+        let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);
         Node { reactor: Events::with_event_loop(network, worker, event_loop) }
     }

@@ -60,8 +60,12 @@ class ExonumApi(unittest.TestCase):
         r = self.session.get(url, cookies=cookies)
         return r
 
-    def find_transaction(self, hash):
-        endpoint = "blockchain/transactions/" + hash
+    def find_transaction(self, hash, url = None):
+        if url is None:
+            prefix = "blockchain/transactions/"
+        else:
+            prefix = url
+        endpoint = prefix + hash
         r = self.get(endpoint)
         if r.status_code == 200:
             return r.json()
@@ -89,11 +93,11 @@ class ExonumApi(unittest.TestCase):
             times = times + 1
         return (r.json(), r.cookies)
 
-    def wait_for_transaction(self, hash):
+    def wait_for_transaction(self, hash, url = None, times_to_wait = None):
         times = 0
         r = None
-        while times < self.times:
-            r = self.find_transaction(hash)
+        while (times_to_wait is None and times < self.times) or (times_to_wait is not None and times < times_to_wait):
+            r = self.find_transaction(hash, url)
             if r != None:
                 break
             time.sleep(self.timeout)

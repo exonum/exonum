@@ -1,11 +1,9 @@
+use byteorder::{ByteOrder, LittleEndian};
+
 use std::{mem, convert, sync};
 use std::fmt::Debug;
 
-use byteorder::{ByteOrder, LittleEndian};
-
-use super::super::crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash,
-                           SIGNATURE_LENGTH};
-
+use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
 use super::{Field, Error};
 
 pub const HEADER_SIZE: usize = 10; // TODO: rename to HEADER_LENGTH?
@@ -55,7 +53,7 @@ impl MessageBuffer {
         LittleEndian::read_u16(&self.raw[2..4])
     }
 
-    fn body(&self) -> &[u8] {
+    pub fn body(&self) -> &[u8] {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
@@ -70,14 +68,6 @@ impl MessageBuffer {
     pub fn signature(&self) -> &Signature {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         unsafe { mem::transmute(&self.raw[sign_idx]) }
-    }
-
-    pub fn verify_signature(&self, pub_key: &PublicKey) -> bool {
-        verify(self.signature(), self.body(), pub_key)
-    }
-
-    pub fn hash(&self) -> Hash {
-        hash(self.as_ref())
     }
 }
 
@@ -133,6 +123,14 @@ impl MessageWriter {
         self.raw.extend_from_slice(signature.as_ref());
         MessageBuffer { raw: self.raw }
     }
+
+    pub fn append_signature(mut self, signature: &Signature) -> MessageBuffer {
+        let payload_length = self.raw.len() + SIGNATURE_LENGTH; 
+        self.set_payload_length(payload_length); 
+        self.raw.extend_from_slice(signature.as_ref()); 
+        debug_assert_eq!(self.raw.len(), payload_length); 
+        MessageBuffer {raw: self.raw}
+    }
 }
 
 pub trait Message: Debug + Send {
@@ -149,6 +147,20 @@ pub trait Message: Debug + Send {
 
 pub trait FromRaw: Sized + Send + Message {
     fn from_raw(raw: RawMessage) -> Result<Self, Error>;
+}
+
+impl Message for RawMessage {
+    fn raw(&self) -> &RawMessage {
+        self
+    }
+
+    fn hash(&self) -> Hash {
+        hash(self.as_ref().as_ref())
+    }
+
+    fn verify_signature(&self, pub_key: &PublicKey) -> bool {
+        verify(self.signature(), self.body(), pub_key)
+    }
 }
 
 // #[test]

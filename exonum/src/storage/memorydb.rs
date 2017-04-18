@@ -2,18 +2,15 @@ use std::clone::Clone;
 use std::sync::RwLock;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::cmp::Ordering;
 use std::collections::Bound::{Included, Unbounded};
-// use std::collections::btree_map;
-// use std::iter::Iterator;
 
 use super::{Map, Database, Error, Patch, Change, Fork};
-// use super::{Iterable, Seekable}
 
 #[derive(Default)]
 pub struct MemoryDB {
     map: RwLock<BTreeMap<Vec<u8>, Vec<u8>>>,
 }
-// pub type MemoryDBIterator<'a> = btree_map::Iter<'a, Vec<u8>, Vec<u8>>;
 
 pub struct MemoryDBView {
     map: MemoryDB,
@@ -56,7 +53,7 @@ impl Map<[u8], Vec<u8>> for MemoryDB {
 }
 
 impl MemoryDBView {
-    fn new(from: &MemoryDB) -> MemoryDBView {
+    pub fn new(from: &MemoryDB) -> MemoryDBView {
         MemoryDBView {
             map: from.clone(),
             changes: RefCell::default(),
@@ -89,17 +86,48 @@ impl Map<[u8], Vec<u8>> for MemoryDBView {
     }
 
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        // TODO merge with the same function in memorydb
-        let out = {
-            let map = self.changes.borrow();
-            let mut it = map.range::<[u8], [u8]>(Included(key), Unbounded);
-            it.next().map(|x| x.0.to_vec())
-        };
-        if out.is_none() {
-            self.map.find_key(key)
-        } else {
-            Ok(out)
+        let map_changes = self.changes.borrow();
+        let map_snapshot = self.map.map.read().unwrap();
+        let mut it_changes = map_changes.range::<[u8], [u8]>(Included(key), Unbounded);
+        let mut it_snapshot = map_snapshot.range::<[u8], [u8]>(Included(key), Unbounded);
+
+        let res: Option<Vec<u8>>;
+        let least_put_key: Option<Vec<u8>> = it_changes.find(|entry| {
+                match *entry.1 {
+                    Change::Delete => false,
+                    Change::Put(_) => true, 
+                }
+            })
+            .map(|x| x.0.to_vec());
+
+        loop {
+            let first_snapshot: Option<(&Vec<u8>, &Vec<u8>)> = it_snapshot.next();
+            match first_snapshot {
+                Some((snap_key, _)) => {
+                    let change_for_key: Option<&Change> = map_changes.get(snap_key);
+                    if let Some(&Change::Delete) = change_for_key {
+                        continue;
+                    } else {
+                        let snap_key_vec = snap_key.to_vec();
+
+                        if let Some(put_key) = least_put_key {
+                            let cmp = snap_key_vec.cmp(&put_key);
+                            if let Ordering::Greater = cmp {
+                                res = Some(put_key);
+                                break;
+                            }
+                        }
+                        res = Some(snap_key_vec);
+                        break;
+                    }
+                } 
+                None => {
+                    res = least_put_key;
+                    break;
+                }
+            }
         }
+        Ok(res)
     }
 }
 

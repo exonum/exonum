@@ -1,0 +1,14 @@
+[package]
+name = "profiler_service"
+version = "0.1.0"
+authors = ["Vladimir Motylenko <vladimir.motylenko@xdev.re"]
+
+[dependencies]
+exonum = {version="0.1", path="../../exonum"}
+env_logger = "0.3"
+
+profiler = { version = "^0.1.0", path="../..//3rdparty/profiler/" }
+log = "0.3"
+
+[features]
+flame_profile = ["profiler/nomock"]

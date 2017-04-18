@@ -1,0 +1,24 @@
+language: rust
+cache: cargo
+sudo: required
+dist: trusty
+before_install:
+- rustup override set nightly-2017-01-08
+- rustc --version
+- cargo --version
+- sudo add-apt-repository -y ppa:chris-lea/libsodium
+- sudo apt-get -qq update
+install:
+- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+script:
+- cargo rustc --manifest-path exonum/Cargo.toml --features clippy -- -D warnings
+- cargo rustc --manifest-path blockchain_explorer/Cargo.toml --lib -- -D warnings
+- cargo build --manifest-path sandbox/Cargo.toml
+- cargo build --release --manifest-path blockchain_explorer/Cargo.toml
+- cargo test --manifest-path exonum/Cargo.toml
+- cargo test --manifest-path blockchain_explorer/Cargo.toml
+- cargo test --manifest-path sandbox/Cargo.toml
+notifications:
+  slack:
+    rooms:
+      secure: EyQW22NjyDYiuWelsszt3cYgcZXHbEWiJMzYb7X5ovkAeX1Bm/FMGwaX8d9OGoebfY/NpAho8s1cX05vTxWT4N6sKsLACTcQI5te0fgiy8KVaL8ep1XpDi3JQQEDf/cVZkUlfDHE//gfDmY4boOQlejWXjmeLiYpV6rFW2yk+PDFDTS7J/GCTFxcdpqy+smdccUoJaJNpKH65fXaLSSPdZoWK2cnHb9RYEPIuwa9mCSlV+nfL0TSUUrDvcQu/dOkU92KFVHFSgzXIUm3u/UlN8MZPnrZ4DJ5uXqMzmCj2fSaP6625CvzNQBs/p93pIHC/XAL2MAUnZsiQtBQ7/cLEdQpYK8vXWilVuyZ6GFJ6KTQ7OXLD5Ka+KtkdcvGFMOgu0KfMVpaCvzT8yCOxv9G0Ld9XxZBQM5Ly+gpQPqEiov44zimHUfoaH6OlJI9dNiTnZCAeS7W9rpmuruG3ld23bru4YCgNXK3IfQ98tZESO4YCke36adnKuu1qiLWUOcS7svRojFYBiNJjCh54YZiM95aNMyJ1XYTo/SLWWIZ4RflfSWcc0XR2Qv9iNJjT5uACIeUtmjii492PLSz3NtLq/xoP6VCAbSb7yVbyC4BZuGE2scaduSce+1st8g5rDWFrVmNXBCVdz/au20+OOQR2JAiw1UPSNhwl/JS9GR/4Ck=

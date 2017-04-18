@@ -1,3 +1,17 @@
+use leveldb::database::Database as LevelDatabase;
+use leveldb::error::Error as LevelError;
+use leveldb::database::snapshots::Snapshot as LevelSnapshot;
+use leveldb::options::{Options, WriteOptions, ReadOptions};
+use leveldb::database::kv::KV;
+use leveldb::database::batch::Writebatch;
+use leveldb::batch::Batch;
+use leveldb::snapshots::Snapshots;
+use leveldb::database::iterator::{Iterable,
+                                  LevelDBIterator as LevelDBIteratorTrait,
+                                  Iterator as LevelIterator,
+                                  KeyIterator as LevelKeys,
+                                  ValueIterator as LevelValues};
+
 use std::fs;
 use std::io;
 use std::mem;
@@ -7,21 +21,11 @@ use std::sync::Arc;
 use std::cell::RefCell;
 use std::collections::Bound::{Included, Unbounded};
 use std::collections::btree_map::Range;
-// use std::iter::Iterator;
+use std::cmp::Ordering;
 
-use leveldb::database::Database as LevelDatabase;
-use leveldb::error::Error as LevelError;
-use leveldb::database::snapshots::Snapshot as LevelSnapshot;
-use leveldb::options::{Options, WriteOptions, ReadOptions};
-use leveldb::database::kv::KV;
-use leveldb::database::batch::Writebatch;
-use leveldb::batch::Batch;
-use leveldb::snapshots::Snapshots;
-use leveldb::database::iterator::{Iterable, LevelDBIterator as LevelDBIteratorTrait};
-use leveldb::database::iterator::{Iterator as LevelIterator, KeyIterator as LevelKeys, ValueIterator as LevelValues};
+use profiler;
 
 use super::{Map, Database, Error, Patch, Change, Fork};
-// use super::{Iterable, Seekable}
 
 #[derive(Clone)]
 pub struct LevelDB {
@@ -86,12 +90,14 @@ impl LevelDBView {
 // FIXME: remove this implementation
 impl Map<[u8], Vec<u8>> for LevelDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        let _p = profiler::ProfilerSpan::new("LevelDB::get");
         self.db
             .get(LEVELDB_READ_OPTIONS, key)
             .map_err(Into::into)
     }
 
     fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        let _p = profiler::ProfilerSpan::new("LevelDB::put");
         let result = self.db.put(LEVELDB_WRITE_OPTIONS, key, &value);
         result.map_err(Into::into)
     }
@@ -114,6 +120,7 @@ impl Map<[u8], Vec<u8>> for LevelDB {
 
 impl Map<[u8], Vec<u8>> for LevelDBView {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+        let mut _p = profiler::ProfilerSpan::new("LevelDBView::get");
         match self.changes.borrow().get(key) {
             Some(change) => {
                 let v = match *change {
@@ -131,6 +138,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
     }
 
     fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
+        let _p = profiler::ProfilerSpan::new("LevelDBView::put");
         self.changes.borrow_mut().insert(key.to_vec(), Change::Put(value));
         Ok(())
     }
@@ -142,22 +150,47 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
 
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         // TODO merge with the same function in memorydb
-        let out = {
-            let map = self.changes.borrow();
-            let mut it = map.range::<[u8], [u8]>(Included(key), Unbounded);
-            it.next().map(|x| x.0.to_vec())
-        };
-        if out.is_none() {
-            let it = self.snap.keys_iter(LEVELDB_READ_OPTIONS);
-            it.seek(key);
-            if it.valid() {
-                let key = it.key();
-                return Ok(Some(key.to_vec()));
+        let map_changes = self.changes.borrow();
+        let mut it_changes = map_changes.range::<[u8], [u8]>(Included(key), Unbounded);
+        let mut it_snapshot = self.snap.keys_iter(LEVELDB_READ_OPTIONS).from(key);
+
+        let res: Option<Vec<u8>>;
+        let least_put_key: Option<Vec<u8>> = it_changes.find(|entry| {
+                match *entry.1 {
+                    Change::Delete => false,
+                    Change::Put(_) => true,
+                }
+            })
+            .map(|x| x.0.to_vec());
+
+        loop {
+            let first_snapshot: Option<&[u8]> = it_snapshot.next();
+            match first_snapshot {
+                Some(snap_key) => {
+                    let change_for_key: Option<&Change> = map_changes.get(snap_key);
+                    if let Some(&Change::Delete) = change_for_key {
+                        continue;
+                    } else {
+                        let snap_key_vec = snap_key.to_vec();
+
+                        if let Some(put_key) = least_put_key {
+                            let cmp = snap_key_vec.cmp(&put_key);
+                            if let Ordering::Greater = cmp {
+                                res = Some(put_key);
+                                break;
+                            }
+                        }
+                        res = Some(snap_key_vec);
+                        break;
+                    }
+                }
+                None => {
+                    res = least_put_key;
+                    break;
+                }
             }
-            Ok(None)
-        } else {
-            Ok(out)
         }
+        Ok(res)
     }
 }
 
@@ -167,6 +200,7 @@ impl Fork for LevelDBView {
     }
 
     fn merge(&self, patch: &Patch) {
+        let _p = profiler::ProfilerSpan::new("LevelDBView::merge");
         let iter = patch.into_iter().map(|(k, v)| (k.clone(), v.clone()));
         self.changes.borrow_mut().extend(iter);
     }
@@ -180,6 +214,7 @@ impl Database for LevelDB {
     }
 
     fn merge(&self, patch: &Patch) -> Result<(), Error> {
+        let _p = profiler::ProfilerSpan::new("LevelDB::merge");
         let mut batch = Writebatch::new();
         for (key, change) in patch {
             match *change {

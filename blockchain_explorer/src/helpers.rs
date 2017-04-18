@@ -1,13 +1,13 @@
-use std::path::Path;
-use std::marker::PhantomData;
-use std::fs;
-use std::env;
-
-use time;
 use clap::{SubCommand, App, Arg, ArgMatches};
 use log::{LogRecord, LogLevel, SetLoggerError};
 use env_logger::LogBuilder;
 use colored::*;
+
+use std::path::Path;
+use std::marker::PhantomData;
+use std::fs;
+use std::env;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use exonum::config::ConfigFile;
 use exonum::blockchain::GenesisConfig;
@@ -69,24 +69,8 @@ impl<'a, 'b> GenerateCommand<'a, 'b>
             fs::create_dir_all(&dir).unwrap();
         }
 
-        let validators = (0..count)
-            .map(|_| gen_keypair())
-            .collect::<Vec<_>>();
-        let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
-        let peers = (0..validators.len())
-            .map(|x| format!("127.0.0.1:{}", start_port + x as u16).parse().unwrap())
-            .collect::<Vec<_>>();
-
-        for (idx, validator) in validators.into_iter().enumerate() {
-            let cfg = NodeConfig {
-                listen_address: peers[idx],
-                network: Default::default(),
-                peers: peers.clone(),
-                public_key: validator.0,
-                secret_key: validator.1,
-                genesis: genesis.clone(),
-            };
-
+        let configs = generate_testnet_config(count, start_port);
+        for (idx, cfg) in configs.into_iter().enumerate() {
             let file_name = format!("{}.toml", idx);
             ConfigFile::save(&cfg, &dir.join(file_name)).unwrap();
         }
@@ -120,8 +104,12 @@ impl<'a, 'b> RunCommand<'a, 'b>
                 .takes_value(true))
     }
 
+    pub fn node_config_path(matches: &'a ArgMatches<'a>) -> &'a Path {
+        Path::new(matches.value_of("NODE_CONFIG_PATH").unwrap())
+    }
+
     pub fn node_config(matches: &'a ArgMatches<'a>) -> NodeConfig {
-        let path = Path::new(matches.value_of("NODE_CONFIG_PATH").unwrap());
+        let path = Self::node_config_path(matches);
         ConfigFile::load(path).unwrap()
     }
 
@@ -161,8 +149,8 @@ fn has_colors() -> bool {
 
 pub fn init_logger() -> Result<(), SetLoggerError> {
     let format = |record: &LogRecord| {
-        let ts = time::now_utc().to_timespec();
-        let now = (ts.sec * 1000 + ts.nsec as i64 / 1000000).to_string();
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+        let now = (ts.as_secs() * 1000 + ts.subsec_nanos() as u64 / 1000000).to_string();
 
         if has_colors() {
             let level = match record.level() {
@@ -193,4 +181,28 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
     }
 
     builder.init()
+}
+
+pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
+    let validators = (0..count as usize)
+        .map(|_| gen_keypair())
+        .collect::<Vec<_>>();
+    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
+    let peers = (0..validators.len())
+        .map(|x| format!("127.0.0.1:{}", start_port + x as u16).parse().unwrap())
+        .collect::<Vec<_>>();
+
+    validators.into_iter()
+        .enumerate()
+        .map(|(idx, validator)| {
+            NodeConfig {
+                listen_address: peers[idx],
+                network: Default::default(),
+                peers: peers.clone(),
+                public_key: validator.0,
+                secret_key: validator.1,
+                genesis: genesis.clone(),
+            }
+        })
+        .collect::<Vec<_>>()
 }

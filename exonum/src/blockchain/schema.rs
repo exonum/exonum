@@ -1,21 +1,24 @@
-use ::crypto::Hash;
-use ::messages::{RawMessage, Precommit};
-use ::storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable,
-                Error, Map, List};
-
-use super::Block;
+use crypto::{Hash, hash};
+use messages::{RawMessage, Precommit, BlockProof};
+use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
+              List, RootProofNode, View};
+use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
-pub type ConfigurationData = Vec<u8>;
-
-type StorageView = ::storage::View;
+storage_value! (
+    ConfigReference {
+        const SIZE = 40;
+        actual_from: u64    [00 => 08]
+        cfg_hash:    &Hash  [08 => 40]
+    }
+);
 
 pub struct Schema<'a> {
-    view: &'a StorageView,
+    view: &'a View,
 }
 
 impl<'a> Schema<'a> {
-    pub fn new(view: &'a StorageView) -> Schema {
+    pub fn new(view: &'a View) -> Schema {
         Schema { view: view }
     }
 
@@ -39,16 +42,33 @@ impl<'a> Schema<'a> {
         ListTable::new([&[03], hash.as_ref()].concat(), self.view)
     }
 
-    pub fn configs
-        (&self)
-         -> MerklePatriciaTable<'a, u64, ConfigurationData> {
+    pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
+        let block_hash = match self.heights().get(height)? {
+            None => return Ok(None),
+            Some(block_hash) => block_hash,
+        };
+        let block = self.blocks().get(&block_hash)?.unwrap();
+        let precommits_table = self.precommits(&block_hash);
+        let precommits = precommits_table.values()?;
+        let res = BlockProof {
+            block: block,
+            precommits: precommits,
+        };
+        Ok(Some(res))
+    }
+
+    pub fn configs(&self) -> MerklePatriciaTable<'a, Hash, StoredConfiguration> {
         // configs patricia merkletree <высота блока> json
         MerklePatriciaTable::new(vec![06], self.view)
     }
 
     // TODO: consider List index to reduce storage volume
-    pub fn configs_heights(&self) -> ListTable<'a, u64> {
+    pub fn configs_actual_from(&self) -> ListTable<'a, ConfigReference> {
         ListTable::new(vec![07], self.view)
+    }
+
+    pub fn state_hash_aggregator(&self) -> MerklePatriciaTable<'a, Hash, Hash> {
+        MerklePatriciaTable::new(vec![08], self.view)
     }
 
     pub fn last_block(&self) -> Result<Option<Block>, Error> {
@@ -58,54 +78,96 @@ impl<'a> Schema<'a> {
         })
     }
 
-    pub fn last_height(&self) -> Result<u64, Error> {
-        self.last_block().map(|block| block.unwrap().height())
+    pub fn last_height(&self) -> Result<Option<u64>, Error> {
+        let block_opt = self.last_block()?;
+        Ok(block_opt.map(|block| block.height()))
     }
 
+    pub fn current_height(&self) -> Result<u64, Error> {
+        let last_height = self.last_height()?;
+        let res = match last_height {
+            Some(last_height) => last_height + 1,
+            None => 0,
+        };
+        Ok(res)
+    }
     pub fn commit_actual_configuration(&self,
-                                       actual_from: u64,
-                                       config_data: &[u8])
+                                       config_data: StoredConfiguration)
                                        -> Result<(), Error> {
-        let height_bytecode = actual_from.into();
-        self.configs().put(&height_bytecode, config_data.to_vec())?;
-        self.configs_heights().append(height_bytecode)?;
+        let actual_from = config_data.actual_from;
+        if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
+            let last_actual_from = last_cfg_reference.actual_from();
+            if actual_from <= last_actual_from {
+                return Err(Error::new(format!("Attempting to commit configuration with actual_from {:?} less than \
+                                              the last committed actual_from {:?}",  actual_from, last_actual_from)));
+            }
+        }
+        let cfg_hash = config_data.hash();
+        self.configs().put(&cfg_hash, config_data.clone())?;
+
+        let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
+        self.configs_actual_from().append(cfg_ref)?;
+        warn!("Scheduled the following configuration for acceptance: {:?}", config_data);
         // TODO: clear storages
         Ok(())
     }
 
+    pub fn get_actual_configuration_index_for_height(&self, height: u64) -> Result<u64, Error> {
+        let configs_actual_from = self.configs_actual_from();
+        let cfg_references: Vec<ConfigReference> = configs_actual_from.values()?;
+
+        let idx = cfg_references.into_iter()
+         .rposition(|r| r.actual_from() <= height)
+         .expect(&format!("Couldn't find a config in configs_actual_from table with actual_from height less than \
+                          the height: {:?}", height));
+        Ok(idx as u64)
+    }
+
     pub fn get_actual_configuration(&self) -> Result<StoredConfiguration, Error> {
-        let h = self.last_height()? + 1;
-        let heights = self.configs_heights();
-        let height_values = heights.values().unwrap();
-
-        // TODO improve perfomance
-        let idx = height_values.into_iter()
-            .rposition(|r| u64::from(r) <= h)
-            .unwrap();
-
-        let height = heights.get(idx as u64)?.unwrap();
-        self.get_configuration_at_height(height.into()).map(|x| x.unwrap())
+        let current_height = self.current_height()?;
+        let idx = self.get_actual_configuration_index_for_height(current_height)?;
+        let cfg_ref: ConfigReference = self.configs_actual_from()
+            .get(idx)?
+            .expect(&format!("No element at idx {:?} in configs_actual_from table", idx));
+        let cfg_hash = cfg_ref.cfg_hash();
+        let res = self.get_configuration_by_hash(cfg_hash).map(|x| {
+            x.expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash))
+        });
+        trace!("Retrieved actual_config: {:?}", res);
+        res
     }
 
-    // FIXME Replace by result?
-    pub fn get_configuration_at_height(&self,
-                                       height: u64)
-                                       -> Result<Option<StoredConfiguration>, Error> {
-        let configs = self.configs();
-        if let Some(config) = configs.get(&height.into())? {
-            match StoredConfiguration::deserialize(&config) {
-                Ok(configuration) => {
-                    return Ok(Some(configuration));
-                }
-                Err(_) => {
-                    error!("Can't parse found configuration at height: {}", height);
-                }
+    pub fn get_following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
+        let current_height = self.current_height()?;
+        let idx = self.get_actual_configuration_index_for_height(current_height)?;
+        let res = match self.configs_actual_from().get(idx + 1)? {
+            Some(cfg_ref) => {
+                let cfg_hash = cfg_ref.cfg_hash();
+                let cfg = self.get_configuration_by_hash(cfg_hash)?
+                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+                Some(cfg)
             }
-        }
-        Ok(None)
+            None => None,
+        };
+        Ok(res)
     }
 
-    pub fn state_hash(&self) -> Result<Hash, Error> {
-        self.configs().root_hash()      
+    pub fn get_configuration_by_hash(&self,
+                                     hash: &Hash)
+                                     -> Result<Option<StoredConfiguration>, Error> {
+        self.configs().get(hash)
+    }
+
+    pub fn core_state_hash(&self) -> Result<Vec<Hash>, Error> {
+        Ok(vec![self.configs().root_hash()?])
+    }
+
+    pub fn get_proof_to_service_table(&self,
+                                      service_id: u16,
+                                      table_idx: usize)
+                                      -> Result<RootProofNode<Hash>, Error> {
+        let key = Blockchain::service_table_unique_key(service_id, table_idx);
+        let sum_table = self.state_hash_aggregator();
+        sum_table.construct_path_to_key(key.as_ref())
     }
 }

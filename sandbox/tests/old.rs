@@ -1,27 +1,26 @@
 extern crate exonum;
 extern crate sandbox;
-extern crate time;
 
-use time::Duration;
+use std::time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit};
 use exonum::blockchain::Block;
-use exonum::crypto::hash;
+use exonum::crypto::Hash;
 
 use sandbox::timestamping_sandbox;
-
+use sandbox::sandbox_tests_helper::gen_timestamping_tx;
 
 #[test]
 fn test_send_propose_and_prevote() {
     let sandbox = timestamping_sandbox();
 
     // get some tx
-    let tx = sandbox.gen_tx();
+    let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
     // round happens
-    sandbox.add_time(Duration::milliseconds(1000));
-    sandbox.add_time(Duration::milliseconds(1999));
+    sandbox.add_time(Duration::from_millis(1000));
+    sandbox.add_time(Duration::from_millis(1999));
 
     sandbox.assert_state(1, 3);
 
@@ -29,7 +28,6 @@ fn test_send_propose_and_prevote() {
     let propose = Propose::new(0,
                                1,
                                3,
-                               sandbox.time(),
                                &sandbox.last_hash(),
                                &[tx.hash()],
                                sandbox.s(0));
@@ -45,7 +43,6 @@ fn test_send_prevote() {
     let propose = Propose::new(2,
                                1,
                                1,
-                               sandbox.time() + Duration::milliseconds(sandbox.propose_timeout()),
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(2));
@@ -58,20 +55,17 @@ fn test_send_prevote() {
 fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
 
-    let propose_time = sandbox.time() + Duration::milliseconds(sandbox.propose_timeout());
     let propose = Propose::new(2,
                                1,
                                1,
-                               propose_time,
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(2));
 
     let block = Block::new(1,
                            1,
-                           propose_time,
                            &sandbox.last_hash(),
-                           &hash(&[]),
+                           &Hash::zero(),
                            &sandbox.last_state_hash());
 
     sandbox.recv(propose.clone());
@@ -79,7 +73,7 @@ fn test_get_lock_and_send_precommit() {
     sandbox.recv(Prevote::new(1, 1, 1, &propose.hash(), 0, sandbox.s(1)));
     sandbox.assert_lock(0, None);
     sandbox.recv(Prevote::new(2, 1, 1, &propose.hash(), 0, sandbox.s(2)));
-    sandbox.broadcast(Precommit::new(0, 1, 1, &propose.hash(), &block.hash(), sandbox.s(0)));
+    sandbox.broadcast(Precommit::new(0, 1, 1, &propose.hash(), &block.hash(), sandbox.time(), sandbox.s(0)));
     sandbox.assert_lock(1, Some(propose.hash()));
 }
 
@@ -87,29 +81,26 @@ fn test_get_lock_and_send_precommit() {
 fn test_commit() {
     let sandbox = timestamping_sandbox();
 
-    let propose_time = sandbox.time() + Duration::milliseconds(sandbox.propose_timeout());
     let propose = Propose::new(2,
                                1,
                                1,
-                               propose_time,
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(2));
 
     let block = Block::new(1,
                            1,
-                           propose_time,
                            &sandbox.last_hash(),
-                           &hash(&[]),
+                           &Hash::zero(),
                            &sandbox.last_state_hash());
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
     sandbox.recv(Prevote::new(1, 1, 1, &propose.hash(), 0, sandbox.s(1)));
     sandbox.recv(Prevote::new(2, 1, 1, &propose.hash(), 0, sandbox.s(2)));
-    sandbox.broadcast(Precommit::new(0, 1, 1, &propose.hash(), &block.hash(), sandbox.s(0)));
-    sandbox.recv(Precommit::new(2, 1, 1, &propose.hash(), &propose.hash(), sandbox.s(2)));
-    sandbox.recv(Precommit::new(3, 1, 1, &propose.hash(), &propose.hash(), sandbox.s(3)));
+    sandbox.broadcast(Precommit::new(0, 1, 1, &propose.hash(), &block.hash(), sandbox.time(), sandbox.s(0)));
+    sandbox.recv(Precommit::new(2, 1, 1, &propose.hash(), &propose.hash(), sandbox.time(), sandbox.s(2)));
+    sandbox.recv(Precommit::new(3, 1, 1, &propose.hash(), &propose.hash(), sandbox.time(), sandbox.s(3)));
     sandbox.assert_state(1, 1);
 }
 
@@ -121,7 +112,6 @@ fn received_unexpected_propose() {
     let propose = Propose::new(1,
                                0,
                                1,
-                               sandbox.time(),
                                &sandbox.last_hash(),
                                &[],
                                sandbox.s(1));

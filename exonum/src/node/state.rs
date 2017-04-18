@@ -1,14 +1,14 @@
-use std::collections::{HashMap, HashSet, BTreeSet};
+use serde_json::Value;
+
+use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
+use std::time::{SystemTime, Duration};
 
-use time::Duration;
-
-use super::super::messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect,
-                             BitVec};
-
-use super::super::crypto::{PublicKey, SecretKey, Hash};
-use super::super::storage::Patch;
+use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, BitVec};
+use crypto::{PublicKey, SecretKey, Hash};
+use storage::Patch;
+use events::Milliseconds;
 use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
 
 // TODO: replace by in disk tx pool
@@ -16,27 +16,31 @@ const TX_POOL_LIMIT: usize = 20000;
 
 // TODO: move request timeouts into node configuration
 
-pub const REQUEST_PROPOSE_WAIT: u64 = 100; // milliseconds
-pub const REQUEST_TRANSACTIONS_WAIT: u64 = 100;
-pub const REQUEST_PREVOTES_WAIT: u64 = 100;
-pub const REQUEST_PRECOMMITS_WAIT: u64 = 100;
-pub const REQUEST_BLOCK_WAIT: u64 = 100;
+pub const REQUEST_PROPOSE_WAIT: Milliseconds = 100;
+pub const REQUEST_TRANSACTIONS_WAIT: Milliseconds = 100;
+pub const REQUEST_PREVOTES_WAIT: Milliseconds = 100;
+pub const REQUEST_BLOCK_WAIT: Milliseconds = 100;
 
 pub type Round = u32;
 pub type Height = u64;
 pub type ValidatorId = u32;
-
+// TODO replace by persistent TxPool
+pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
 
 pub struct State {
-    id: u32,
+    validator_state: Option<ValidatorState>,
+    our_connect_message: Connect,
+
+    public_key: PublicKey,
     secret_key: SecretKey,
-    validators: Vec<PublicKey>,
-    consensus_config: ConsensusConfig,
+    config: StoredConfiguration,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
-    height: u64,
+    height_start_time: SystemTime,
+    height: Height,
+
     round: Round,
     locked_round: Round,
     locked_propose: Option<Hash>,
@@ -48,27 +52,27 @@ pub struct State {
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
-    // TODO replace by TxPool
-    transactions: HashMap<Hash, Box<Transaction>>,
+    // TODO: add hashmap of transactions we wait for
+    transactions: TxPool,
 
     queued: Vec<ConsensusMessage>,
 
     unknown_txs: HashMap<Hash, Vec<Hash>>,
     unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
 
-    // TODO: add hashmap of transactions we wait for
-    our_prevotes: HashMap<Round, Prevote>,
-    our_precommits: HashMap<Round, Precommit>,
-    our_connect_message: Connect,
-
     // Информация о состоянии наших запросов
     requests: HashMap<RequestData, RequestState>,
 
-    // Максимальная высота, на которой
-    // "засветились" другие валидаторы
-    validator_heights: Vec<Height>,
+    //maximum of node heigt in consensus messages
+    nodes_max_height: BTreeMap<PublicKey, Height>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ValidatorState {
+    id: ValidatorId,
+    our_prevotes: HashMap<Round, Prevote>,
+    our_precommits: HashMap<Round, Precommit>,
+}
 
 // Данные, которые нас интересуют,
 // специфичны для некоторой высоты
@@ -77,7 +81,6 @@ pub enum RequestData {
     Propose(Hash),
     Transactions(Hash),
     Prevotes(Round, Hash),
-    Precommits(Round, Hash, Hash),
     Block(Height),
 }
 
@@ -133,6 +136,35 @@ pub struct Votes<T: VoteMessage> {
     count: usize,
 }
 
+impl ValidatorState {
+
+    pub fn new(id: ValidatorId) -> ValidatorState {
+        ValidatorState {
+            id: id,
+            our_precommits: HashMap::new(),
+            our_prevotes: HashMap::new()
+        }
+    }
+
+    pub fn id(&self) -> ValidatorId {
+        self.id
+    }
+
+    pub fn set_validator_id(&mut self, id: ValidatorId) {
+        self.id = id;
+    }
+
+    pub fn have_prevote(&self, round: Round) -> bool {
+        self.our_prevotes.get(&round).is_some()
+    }
+
+    pub fn clear(&mut self) {
+        self.our_precommits.clear();
+        self.our_prevotes.clear();
+    }
+
+}
+
 impl<T> Votes<T>
     where T: VoteMessage
 {
@@ -173,10 +205,9 @@ impl RequestData {
             RequestData::Propose(..) => REQUEST_PROPOSE_WAIT,
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
             RequestData::Prevotes(..) => REQUEST_PREVOTES_WAIT,
-            RequestData::Precommits(..) => REQUEST_PRECOMMITS_WAIT,
             RequestData::Block(..) => REQUEST_BLOCK_WAIT,
         };
-        Duration::milliseconds(ms as i64)
+        Duration::from_millis(ms)
     }
 }
 
@@ -252,25 +283,25 @@ impl BlockState {
 }
 
 impl State {
-    pub fn new(id: u32,
+    #![cfg_attr(feature="clippy", allow(too_many_arguments))]
+    pub fn new(validator_id: Option<ValidatorId>,
+               public_key: PublicKey,
                secret_key: SecretKey,
-               validators: Vec<PublicKey>,
+               stored: StoredConfiguration,
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
-               consensus_config: ConsensusConfig)
+               height_start_time: SystemTime)
                -> State {
 
-        let validators_len = validators.len();
-
         State {
-            id: id,
-
+            validator_state: validator_id.map(ValidatorState::new),
+            public_key: public_key,
             secret_key: secret_key,
             peers: HashMap::new(),
             connections: HashMap::new(),
-            validators: validators,
             height: last_height,
+            height_start_time: height_start_time,
             round: 0,
             locked_round: 0,
             locked_propose: None,
@@ -281,47 +312,92 @@ impl State {
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
-            transactions: HashMap::new(),
+            transactions: TxPool::new(),
 
             queued: Vec::new(),
 
             unknown_txs: HashMap::new(),
             unknown_proposes_with_precommits: HashMap::new(),
 
-            validator_heights: vec![0; validators_len],
+            nodes_max_height: BTreeMap::new(),
 
-            our_prevotes: HashMap::new(),
-            our_precommits: HashMap::new(),
             our_connect_message: connect,
 
             requests: HashMap::new(),
 
-            consensus_config: consensus_config,
+            config: stored,
         }
     }
 
-    fn update_config(&mut self, config: StoredConfiguration) {
-        let id = config.validators
-            .iter()
-            .position(|pk| pk == self.public_key())
-            .unwrap();
-
-        self.id = id as u32;
-        self.validators = config.validators;
-        self.consensus_config = config.consensus;
+    pub fn validator_state(&self) -> &Option<ValidatorState> {
+        &self.validator_state
     }
 
-    pub fn consensus_config(&self) -> &ConsensusConfig {
-        &self.consensus_config
+    pub fn renew_validator_id(&mut self, id: Option<ValidatorId>) {
+        let validator_state = self.validator_state.take();
+        self.validator_state = id.map(move |id|{
+            match validator_state {
+                Some(mut state) => {
+                    state.set_validator_id(id);
+                    state
+                },
+                None => ValidatorState::new(id),
+            }
+        });
     }
 
-    pub fn id(&self) -> ValidatorId {
-        self.id
+    pub fn is_validator(&self) -> bool {
+        self.validator_state().is_some()
     }
 
-    // TODO Move to blockchain (and store therein)
+    pub fn is_leader(&self) -> bool {
+        self.validator_state()
+                      .as_ref()
+                      .map(|validator| self.leader(self.round()) == validator.id)
+                      .unwrap_or(false)
+    }
+
     pub fn validators(&self) -> &[PublicKey] {
-        &self.validators
+        &self.config.validators
+    }
+
+    pub fn config(&self) -> &StoredConfiguration {
+        &self.config
+    }
+
+    pub fn find_validator(&self, peer: &PublicKey) -> Option<ValidatorId> {
+        self.validators()
+            .iter()
+            .position(|pk| pk == peer)
+            .map(|id| id as ValidatorId)
+    }
+    
+    pub fn consensus_config(&self) -> &ConsensusConfig {
+        &self.config.consensus
+    }
+
+    pub fn services_config(&self) -> &BTreeMap<String, Value> {
+        &self.config.services
+    }
+
+    pub fn update_config(&mut self, config: StoredConfiguration) {
+        info!("Updating node config={:#?}", config);
+        let validator_id = config.validators
+                            .iter()
+                            .position(|pk| pk == self.public_key())
+                            .map(|id| id as u32);
+        self.renew_validator_id(validator_id);
+        info!("Validator={:#?}", self.validator_state());
+        self.config = config;
+    }
+
+    pub fn propose_timeout(&self) -> Milliseconds {
+        self.config.consensus.propose_timeout
+    }
+
+    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
+        debug_assert!(timeout < self.config.consensus.round_timeout);
+        self.config.consensus.propose_timeout = timeout;
     }
 
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
@@ -332,7 +408,7 @@ impl State {
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
         if let Some(pubkey) = self.connections.remove(addr) {
             self.peers.remove(&pubkey);
-            return self.validators.contains(&pubkey);
+            return self.config.validators.contains(&pubkey);
         }
         false
     }
@@ -342,11 +418,11 @@ impl State {
     }
 
     pub fn public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
-        self.validators.get(id as usize)
+        self.validators().get(id as usize)
     }
 
     pub fn public_key(&self) -> &PublicKey {
-        self.public_key_of(self.id).unwrap()
+        &self.public_key
     }
 
     pub fn secret_key(&self) -> &SecretKey {
@@ -354,33 +430,41 @@ impl State {
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {
-        ((self.height() + round as u64) % (self.validators.len() as u64)) as ValidatorId
+        ((self.height() + round as u64) % (self.validators().len() as u64)) as ValidatorId
     }
 
-    pub fn validator_height(&self, id: ValidatorId) -> Height {
-        self.validator_heights[id as usize]
+    pub fn node_height(&self, key: &PublicKey) -> Height {
+        *self.nodes_max_height.get(key).unwrap_or(&0)
     }
 
-    pub fn set_validator_height(&mut self, id: ValidatorId, height: Height) {
-        self.validator_heights[id as usize] = height;
+    pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
+        *self.nodes_max_height.entry(key).or_insert(0) = height;
     }
 
-    pub fn validator_heights(&self) -> Vec<ValidatorId> {
-        self.validator_heights
+    pub fn nodes_with_bigger_height(&self) -> Vec<&PublicKey> {
+        self.nodes_max_height
             .iter()
-            .enumerate()
             .filter(|&(_, h)| *h > self.height())
-            .map(|(v, _)| v as ValidatorId)
+            .map(|(v, _)| v)
             .collect()
     }
 
     pub fn majority_count(&self) -> usize {
         // FIXME: What if validators count < 4?
-        self.validators.len() * 2 / 3 + 1
+        //self.validators().len() * 2 / 3 + 1
+        State::byzantine_majority_count(self.validators().len())
+    }
+
+    pub fn byzantine_majority_count(total: usize) -> usize {
+        total * 2 / 3 + 1
     }
 
     pub fn height(&self) -> u64 {
         self.height
+    }
+
+    pub fn height_start_time(&self) -> SystemTime {
+        self.height_start_time
     }
 
     pub fn round(&self) -> Round {
@@ -424,12 +508,10 @@ impl State {
     }
 
     // FIXME use block_hash
-    pub fn new_height(&mut self,
-                      block_hash: &Hash,
-                      round: Round,
-                      new_config: Option<StoredConfiguration>) {
+    pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height += 1;
-        self.round = round;
+        self.height_start_time = height_start_time;
+        self.round = 1;
         self.locked_round = 0;
         self.locked_propose = None;
         self.last_hash = *block_hash;
@@ -445,14 +527,10 @@ impl State {
         self.proposes.clear();
         self.prevotes.clear();
         self.precommits.clear();
-        self.our_prevotes.clear();
-        self.our_precommits.clear();
-        self.requests.clear(); // FIXME: clear all timeouts
-
-        if let Some(config) = new_config {
-            self.update_config(config);
+        if let Some(ref mut validator_state) = self.validator_state {
+            validator_state.clear();
         }
-
+        self.requests.clear(); // FIXME: clear all timeouts
     }
 
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
@@ -465,7 +543,7 @@ impl State {
         self.queued.push(msg);
     }
 
-    pub fn transactions(&self) -> &HashMap<Hash, Box<Transaction>> {
+    pub fn transactions(&self) -> &TxPool {
         &self.transactions
     }
 
@@ -499,8 +577,17 @@ impl State {
             .unwrap_or_else(|| &[])
     }
 
+    pub fn have_prevote(&self, propose_round: Round) -> bool {
+        if let Some(ref validator_state) = *self.validator_state(){
+            validator_state.have_prevote(propose_round)
+        }
+        else {
+            panic!("called have_prevote for auditor node")
+        }
+    }
+
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
-        debug_assert_eq!(msg.validator(), self.id);
+        debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.hash();
         self.proposes.insert(propose_hash,
                              ProposeState {
@@ -559,18 +646,20 @@ impl State {
 
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
         let majority_count = self.majority_count();
-        if msg.validator() == self.id() {
-            if let Some(other) = self.our_prevotes.insert(msg.round(), msg.clone()) {
-                if &other != msg {
-                    panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
-                           other,
-                           msg);
+        if let Some(ref mut validator_state) = self.validator_state {
+            if validator_state.id == msg.validator() {
+                if let Some(other) = validator_state.our_prevotes.insert(msg.round(), msg.clone()) {
+                    if &other != msg {
+                        panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
+                                other,
+                                msg);
+                    }
                 }
             }
         }
 
         let key = (msg.round(), *msg.propose_hash());
-        let validators_len = self.validators.len();
+        let validators_len = self.validators().len();
         let mut votes = self.prevotes.entry(key).or_insert_with(|| Votes::new(validators_len));
         votes.insert(msg);
         votes.count() >= majority_count
@@ -584,7 +673,7 @@ impl State {
     }
 
     pub fn known_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        let len = self.validators.len();
+        let len = self.validators().len();
         self.prevotes
             .get(&(round, *propose_hash))
             .map(|x| x.validators().clone())
@@ -592,7 +681,7 @@ impl State {
     }
 
     pub fn known_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
-        let len = self.validators.len();
+        let len = self.validators().len();
         self.precommits
             .get(&(round, *propose_hash))
             .map(|x| x.validators().clone())
@@ -601,19 +690,21 @@ impl State {
 
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
         let majority_count = self.majority_count();
-        if msg.validator() == self.id() {
-            if let Some(other) = self.our_precommits.insert(msg.round(), msg.clone()) {
-                if other.propose_hash() != msg.propose_hash() {
-                    panic!("Trying to send different precommits for same round, old={:?}, \
-                            new={:?}",
-                           other,
-                           msg);
+        if let Some(ref mut validator_state) = self.validator_state {
+            if validator_state.id == msg.validator() {
+                if let Some(other) = validator_state.our_precommits.insert(msg.round(), msg.clone()) {
+                    if other.propose_hash() != msg.propose_hash() {
+                        panic!("Trying to send different precommits for same round, old={:?}, \
+                                new={:?}",
+                                other,
+                                msg);
+                    }
                 }
             }
         }
 
         let key = (msg.round(), *msg.block_hash());
-        let validators_len = self.validators.len();
+        let validators_len = self.validators().len();
         let votes = self.precommits.entry(key).or_insert_with(|| Votes::new(validators_len));
         votes.insert(msg);
         votes.count() >= majority_count
@@ -640,17 +731,18 @@ impl State {
         }
     }
 
-    pub fn have_prevote(&self, round: Round) -> bool {
-        self.our_prevotes.get(&round).is_some()
-    }
-
     pub fn have_incompatible_prevotes(&self) -> bool {
         for round in self.locked_round + 1...self.round {
-            if let Some(msg) = self.our_prevotes.get(&round) {
-                // TODO: unefficient
-                if Some(*msg.propose_hash()) != self.locked_propose {
-                    return true;
+            match self.validator_state {
+                Some(ref validator_state) => {
+                    if let Some(msg) = validator_state.our_prevotes.get(&round) {
+                        // TODO: unefficient
+                        if Some(*msg.propose_hash()) != self.locked_propose {
+                            return true;
+                        }
+                    }
                 }
+                None => unreachable!()
             }
         }
         false

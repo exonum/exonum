@@ -1,11 +1,3 @@
-use std::default::Default;
-
-pub use sodiumoxide::init;
-pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
-                                             SECRETKEYBYTES as SECRET_KEY_LENGTH,
-                                             SIGNATUREBYTES as SIGNATURE_LENGTH,
-                                             SEEDBYTES as SEED_LENGTH};
-pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
                                          Signature as SignatureSodium, sign_detached,
@@ -14,9 +6,19 @@ use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
 use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
+
+use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
-use ::storage::bytes_to_hex;
 use std::fmt;
+
+use storage::bytes_to_hex;
+
+pub use sodiumoxide::init;
+pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
+                                             SECRETKEYBYTES as SECRET_KEY_LENGTH,
+                                             SIGNATUREBYTES as SIGNATURE_LENGTH,
+                                             SEEDBYTES as SEED_LENGTH};
+pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 
 pub use hex::{ToHex, FromHex, FromHexError};
 const BYTES_IN_DEBUG: usize = 4;
@@ -51,6 +53,12 @@ macro_rules! implement_public_sodium_wrapper {
     pub struct $name($name_from); 
 
     impl $name {
+        pub fn zero() -> Self {
+            $name::new([0; $size])
+        }
+    }
+
+    impl $name {
         pub fn new(ba: [u8; $size]) -> $name {
             $name($name_from(ba))
         }
@@ -83,6 +91,12 @@ macro_rules! implement_private_sodium_wrapper {
     pub struct $name($name_from); 
 
     impl $name {
+        pub fn zero() -> Self {
+            $name::new([0; $size])
+        }
+    }
+
+    impl $name {
         pub fn new(ba: [u8; $size]) -> $name {
             $name($name_from(ba))
         }
@@ -108,12 +122,6 @@ implement_public_sodium_wrapper! {Hash, Digest, HASH_SIZE}
 implement_public_sodium_wrapper! {Signature, SignatureSodium, SIGNATURE_LENGTH}
 implement_private_sodium_wrapper! {SecretKey, SecretKeySodium, SECRET_KEY_LENGTH}
 implement_private_sodium_wrapper! {Seed, SeedSodium, SEED_LENGTH}
-
-impl Hash {
-    pub fn zero() -> Self {
-        Hash::new([0; HASH_SIZE])
-    }
-}
 
 pub trait HexValue: Sized {
     fn to_hex(&self) -> String;
@@ -222,7 +230,7 @@ implement_index_traits! {Signature}
 
 impl Default for Hash {
     fn default() -> Hash {
-        Hash::new([0; 32])
+        Hash::zero()
     }
 }
 
@@ -253,36 +261,26 @@ mod tests {
     fn test_ser_deser() {
         let h = Hash::new([207; 32]);
         let json_h = serde_json::to_string(&h).unwrap();
-        println!("{}", json_h);
-        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
 
         let h = PublicKey::new([208; 32]);
         let json_h = serde_json::to_string(&h).unwrap();
-        println!("{}", json_h);
-        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
 
         let h = Signature::new([209; 64]);
         let json_h = serde_json::to_string(&h).unwrap();
-        println!("{}", json_h);
-        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
 
         let h = Seed::new([210; 32]);
         let json_h = serde_json::to_string(&h).unwrap();
-        println!("{}", json_h);
-        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
 
         let h = SecretKey::new([211; 64]);
         let json_h = serde_json::to_string(&h).unwrap();
-        println!("{}", json_h);
-        println!("{:?}", h);
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
     }
@@ -290,9 +288,7 @@ mod tests {
     #[test]
     fn test_range_sodium() {
         let h = hash(&[]);
-        println!(" {:?}", h);
         let sub_range = &h[10..20];
-        println!("{:?}", sub_range);
         assert_eq!(&[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228],
                    sub_range);
     }
