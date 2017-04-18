@@ -20,6 +20,7 @@ use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 use exonum::crypto::gen_keypair;
 
 use timestamping::TimestampingService;
+use config_updater::ConfigUpdateService;
 
 type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
 
@@ -618,7 +619,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
-    sandbox_with_services(vec![Box::new(TimestampingService::new())])
+    sandbox_with_services(vec![Box::new(TimestampingService::new()),
+                               Box::new(ConfigUpdateService::new())])
 }
 
 #[test]
