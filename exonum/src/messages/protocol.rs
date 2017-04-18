@@ -19,9 +19,8 @@ pub const BLOCK_MESSAGE_ID: u16 = 5;
 pub const REQUEST_PROPOSE_MESSAGE_ID: u16 = 6;
 pub const REQUEST_TRANSACTIONS_MESSAGE_ID: u16 = 7;
 pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
-pub const REQUEST_PRECOMMITS_MESSAGE_ID: u16 = 9;
-pub const REQUEST_PEERS_MESSAGE_ID: u16 = 10;
-pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 11;
+pub const REQUEST_PEERS_MESSAGE_ID: u16 = 9;
+pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
 
 // когда присоединяются узлы
 message! {
@@ -203,22 +202,6 @@ message! {
         round:          u32         [72 => 76]
         propose_hash:   &Hash       [76 => 108]
         validators:     BitVec      [108 => 116]
-    }
-}
-// запрос прекоммитов
-message! {
-    RequestPrecommits {
-        const TYPE = CONSENSUS;
-        const ID = REQUEST_PRECOMMITS_MESSAGE_ID;
-        const SIZE = 148;
-
-        from:           &PublicKey  [00 => 32]
-        to:             &PublicKey  [32 => 64]
-        height:         u64         [64 => 72]
-        round:          u32         [72 => 76]
-        propose_hash:   &Hash       [76 => 108]
-        block_hash:     &Hash       [108 => 140]
-        validators:     BitVec      [140 => 148]
     }
 }
 

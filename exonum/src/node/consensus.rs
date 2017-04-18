@@ -3,8 +3,7 @@ use std::collections::HashSet;
 use crypto::{Hash, PublicKey, HexValue};
 use blockchain::{Schema, Transaction};
 use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
-               RequestTransactions, RequestPrevotes, RequestPrecommits, RequestBlock, Block,
-               RawTransaction};
+               RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
 use storage::{Map, Patch};
 use events::Channel;
 
@@ -267,8 +266,6 @@ impl<S> NodeHandler<S>
                                    round: Round,
                                    propose_hash: &Hash,
                                    block_hash: &Hash) {
-        // Remove request info
-        self.remove_request(RequestData::Precommits(round, *propose_hash, *block_hash));
         // Commit
         if self.state.propose(propose_hash).is_some() {
             // Check for unknown txs
@@ -599,18 +596,6 @@ impl<S> NodeHandler<S>
                                          propose_hash,
                                          self.state.known_prevotes(round, propose_hash),
                                          self.state.secret_key())
-                        .raw()
-                        .clone()
-                }
-                RequestData::Precommits(round, ref propose_hash, ref block_hash) => {
-                    RequestPrecommits::new(self.state.public_key(),
-                                           &peer,
-                                           self.state.height(),
-                                           round,
-                                           propose_hash,
-                                           block_hash,
-                                           self.state.known_precommits(round, propose_hash),
-                                           self.state.secret_key())
                         .raw()
                         .clone()
                 }
