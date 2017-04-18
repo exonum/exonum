@@ -1,5 +1,5 @@
 use exonum::crypto::{PublicKey, Hash};
-use exonum::blockchain::{Service, Transaction, Schema, NodeState};
+use exonum::blockchain::{Service, Transaction, Schema};
 use exonum::messages::{RawTransaction, Message, FromRaw, Error as MessageError};
 use exonum::storage::{View, Error as StorageError};
 use exonum::blockchain::StoredConfiguration;
@@ -43,21 +43,6 @@ impl Transaction for TxConfig {
 impl Service for ConfigUpdateService {
     fn service_id(&self) -> u16 {
         CONFIG_SERVICE
-    }
-
-    fn handle_commit(&self, state: &mut NodeState) -> Result<(), StorageError> {
-        let old_cfg = state.actual_config().clone();
-
-        let new_cfg = {
-            let schema = Schema::new(state.view());
-            schema.get_actual_configuration()?
-        };
-
-        if new_cfg != old_cfg {
-            info!("Updated node config={:#?}", new_cfg);
-            state.update_config(new_cfg);
-        }
-        Ok(())
     }
 
     fn state_hash(&self, _: &View) -> Result<Vec<Hash>, StorageError> {
