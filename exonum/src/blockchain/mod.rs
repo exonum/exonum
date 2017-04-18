@@ -193,7 +193,17 @@ impl Blockchain {
             for precommit in precommits {
                 schema.precommits(&block_hash).append(precommit.clone())?;
             }
-            
+                        
+            let blockchain_cfg = schema.get_actual_configuration()?;
+            let is_cfg_different = {
+                let node_cfg = state.config();
+                node_cfg != &blockchain_cfg
+            };
+            if is_cfg_different {
+                info!("Update node config={:#?}", blockchain_cfg);
+                state.update_config(blockchain_cfg);
+            }
+
             let mut node_state = NodeState::new(state, &view);
             for service in self.service_map.values() {
                 service.handle_commit(&mut node_state)?;
