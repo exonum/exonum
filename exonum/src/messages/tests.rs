@@ -103,12 +103,12 @@ fn test_segments_of_segments() {
 
 #[test]
 fn test_segments_of_raw_messages() {
-    let (_, sec_key) = gen_keypair();
+    let (pub_key, sec_key) = gen_keypair();
 
     let mut buf = vec![255; 8];
-    let m1 = Status::new(1, 2, &hash(&[]), &sec_key);
-    let m2 = Status::new(2, 4, &hash(&[1]), &sec_key);
-    let m3 = Status::new(6, 5, &hash(&[3]), &sec_key);
+    let m1 = Status::new(&pub_key, 2, &hash(&[]), &sec_key);
+    let m2 = Status::new(&pub_key, 4, &hash(&[1]), &sec_key);
+    let m3 = Status::new(&pub_key, 5, &hash(&[3]), &sec_key);
 
     let dat = vec![m1.raw().clone(), m2.raw().clone(), m3.raw().clone()];
     Field::write(&dat, &mut buf, 0, 8);
@@ -135,12 +135,12 @@ fn test_empty_segments() {
 
 #[test]
 fn test_segments_of_status_messages() {
-    let (_, sec_key) = gen_keypair();
+    let (pub_key, sec_key) = gen_keypair();
 
     let mut buf = vec![255; 8];
-    let m1 = Status::new(1, 2, &hash(&[]), &sec_key);
-    let m2 = Status::new(2, 4, &hash(&[1]), &sec_key);
-    let m3 = Status::new(6, 5, &hash(&[3]), &sec_key);
+    let m1 = Status::new(&pub_key, 2, &hash(&[]), &sec_key);
+    let m2 = Status::new(&pub_key, 4, &hash(&[1]), &sec_key);
+    let m3 = Status::new(&pub_key, 5, &hash(&[3]), &sec_key);
 
     let dat = vec![m1, m2, m3];
     Field::write(&dat, &mut buf, 0, 8);
@@ -255,15 +255,14 @@ fn test_precommit() {
 
 #[test]
 fn test_status() {
-    let validator = 123_123;
     let height = 123_123_123;
     let last_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let commit = Status::new(validator, height, &last_hash, &secret_key);
+    let commit = Status::new(&public_key, height, &last_hash, &secret_key);
     // read
-    assert_eq!(commit.validator(), validator);
+    assert_eq!(commit.from(), &public_key);
     assert_eq!(commit.height(), height);
     assert_eq!(commit.last_hash(), &last_hash);
     assert!(commit.verify_signature(&public_key));
@@ -301,9 +300,9 @@ fn test_block() {
                                          &hash(&[5, 2, 1]),
                                          ts,
                                          &secret_key)];
-    let transactions = vec![Status::new(1, 2, &hash(&[]), &secret_key).raw().clone(),
-                            Status::new(2, 4, &hash(&[2]), &secret_key).raw().clone(),
-                            Status::new(4, 7, &hash(&[3]), &secret_key).raw().clone()];
+    let transactions = vec![Status::new(&pub_key, 2, &hash(&[]), &secret_key).raw().clone(),
+                            Status::new(&pub_key, 4, &hash(&[2]), &secret_key).raw().clone(),
+                            Status::new(&pub_key, 7, &hash(&[3]), &secret_key).raw().clone()];
     let block = Block::new(&pub_key,
                            &pub_key,
                            content.clone(),

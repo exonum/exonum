@@ -2,7 +2,7 @@
 #![cfg_attr(feature="clippy", allow(map_clone))]
 
 use ::messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
-                 RequestPrecommits, RequestBlock, Block};
+                 RequestBlock, Block};
 use ::blockchain::Schema;
 use ::storage::{Map, List};
 use ::events::Channel;
@@ -29,7 +29,6 @@ impl<S> NodeHandler<S>
             RequestMessage::Propose(msg) => self.handle_request_propose(msg),
             RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
             RequestMessage::Prevotes(msg) => self.handle_request_prevotes(msg),
-            RequestMessage::Precommits(msg) => self.handle_request_precommits(msg),
             RequestMessage::Peers(msg) => self.handle_request_peers(msg),
             RequestMessage::Block(msg) => self.handle_request_block(msg),
         }
@@ -86,35 +85,6 @@ impl<S> NodeHandler<S>
 
         for prevote in &prevotes {
             self.send_to_peer(*msg.from(), prevote);
-        }
-    }
-
-    pub fn handle_request_precommits(&mut self, msg: RequestPrecommits) {
-        trace!("HANDLE PRECOMMITS REQUEST!!!");
-        if msg.height() > self.state.height() {
-            return;
-        }
-
-        let has_precommits = msg.validators();
-        let precommits = self.state
-            .precommits(msg.round(), *msg.block_hash())
-            .iter()
-            .filter(|p| !has_precommits[p.validator() as usize])
-            .map(|p| p.raw().clone())
-            .collect::<Vec<_>>();
-
-        // FIXME what about msg.height < state.height ?
-        // self.blockchain
-        //     .view()
-        //     .precommits(msg.block_hash())
-        //     .values()
-        //     .unwrap()
-        //     .iter()
-        //     .map(|p| p.raw().clone())
-        //     .collect()
-
-        for precommit in precommits {
-            self.send_to_peer(*msg.from(), &precommit);
         }
     }
 
