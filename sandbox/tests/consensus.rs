@@ -15,6 +15,7 @@ use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPO
 use sandbox::timestamping::{TimestampTx, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox_tests_helper::*;
+use sandbox::config_updater::TxConfig;
 
 // HANDLE CONSENSUS BASIC
 
@@ -2328,10 +2329,40 @@ fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
 
     // trigger round_timeout
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-    //        trigger request_propose_timeout
-    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
+    // trigger request_propose_timeout
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
     // oberve requestPropose request
     sandbox.add_time(Duration::from_millis(0));
+}
+
+// - exclude validator from consensus
+/// - idea of test is to exclude sandbox validator from consensus
+/// - node continues as `fullnode`
+#[test]
+fn test_exclude_validator_from_consensus() {
+    use exonum::storage::StorageValue; 
+
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    add_one_height(&sandbox, &sandbox_state);
+
+    let tx_cfg = {
+        let mut consensus_cfg = sandbox.cfg();
+        consensus_cfg.validators.swap_remove(0);
+        consensus_cfg.actual_from = sandbox.current_height() + 2;
+
+        TxConfig::new(&sandbox.p(VALIDATOR_0 as usize), 
+                      &consensus_cfg.clone().serialize(), 
+                      consensus_cfg.actual_from, 
+                      &sandbox.s(VALIDATOR_0 as usize)
+                      )
+    };
+
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height(&sandbox, &sandbox_state);
+    // node loses validator status
+    add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
 }
 
 
