@@ -491,8 +491,8 @@ impl State {
         self.locked_propose
     }
 
-    pub fn propose(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
-        self.proposes.get_mut(hash)
+    pub fn propose(&self, hash: &Hash) -> Option<&ProposeState> {
+        self.proposes.get(hash)
     }
 
     pub fn block(&self, hash: &Hash) -> Option<&BlockState> {

@@ -100,7 +100,14 @@ impl<S> NodeHandler<S>
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS!!!");
-            let key = self.public_key_of(msg.validator());
+            let key = match self.state.public_key_of(msg.validator()) {
+                Some(key) => *key,
+                None => {
+                    error!("Received message from wrong validator: {:?}", msg);
+                    return;
+                }
+            };
+
             self.request(RequestData::Transactions(hash), key);
             for node in known_nodes {
                 self.request(RequestData::Transactions(hash), node);
@@ -220,16 +227,23 @@ impl<S> NodeHandler<S>
 
     pub fn handle_prevote(&mut self, prevote: Prevote) {
         trace!("Handle prevote");
+
+        let key = match self.state.public_key_of(prevote.validator()) {
+            Some(key) => *key,
+            None => {
+                error!("Incorrect prevote validator: {:?}", prevote);
+                return;
+            }
+        };
+
         // Add prevote
         let has_consensus = self.state.add_prevote(&prevote);
 
         // Request propose or transactions
-        let has_propose_with_txs =
-            self.request_propose_or_txs(prevote.propose_hash(), prevote.validator());
+        let has_propose_with_txs = self.request_propose_or_txs(prevote.propose_hash(), &key);
 
         // Request prevotes
         if prevote.locked_round() > self.state.locked_round() {
-            let key = self.public_key_of(prevote.validator());
             self.request(RequestData::Prevotes(prevote.locked_round(), *prevote.propose_hash()),
                          key);
         }
@@ -253,38 +267,45 @@ impl<S> NodeHandler<S>
                                    round: Round,
                                    propose_hash: &Hash,
                                    block_hash: &Hash) {
-        // Commit
-        if self.state.propose(propose_hash).is_some() {
-            // Check for unknown txs
-            let has_unknown_txs = {
-                let state = self.state.propose(propose_hash).unwrap();
-                if state.has_unknown_txs() {
-                    Some(state.message().validator())
-                } else {
-                    None
-                }
-            };
-            if let Some(validator) = has_unknown_txs {
-                let data = RequestData::Transactions(*propose_hash);
-                let key = self.public_key_of(validator);
-                self.request(data, key);
-                return;
-            }
-
-            // Execute block and get state hash
-            let our_block_hash = self.execute(propose_hash);
-
-            assert_eq!(&our_block_hash, block_hash, "Our block_hash different from precommits one.");
-
-            let precommits = self.state
-                .precommits(round, our_block_hash)
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
-            self.commit(our_block_hash, precommits.iter());
-        } else {
+        // Check if propose is known.
+        if self.state.propose(propose_hash).is_none() {
             self.state.add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
+            return;
         }
+
+        // Request transactions if needed.
+        if let Some(key) = {
+            // Unwrap here is OK because of the check above.
+            let state = self.state.propose(propose_hash).unwrap();
+
+            if state.has_unknown_txs() {
+                let validator = state.message().validator();
+                match self.state.public_key_of(validator) {
+                    Some(key) => Some(*key),
+                    None => {
+                        error!("Invalid validator id: propose = {:?}", state.message());
+                        return;
+                    }
+                }
+            } else {
+                None
+            }
+        } {
+            self.request(RequestData::Transactions(*propose_hash), key);
+            return;
+        }
+
+        // Execute block and get state hash
+        let our_block_hash = self.execute(propose_hash);
+        assert_eq!(&our_block_hash, block_hash, "Our block_hash different from precommits one.");
+
+        // Commit.
+        let precommits = self.state
+            .precommits(round, our_block_hash)
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        self.commit(our_block_hash, precommits.iter());
     }
 
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
@@ -320,7 +341,14 @@ impl<S> NodeHandler<S>
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
 
-        let peer = self.public_key_of(msg.validator());
+        let peer = match self.state.public_key_of(msg.validator()) {
+            Some(key) => *key,
+            None => {
+                error!("Invalid validator id: precommit = {:?}", msg);
+                return;
+            }
+        };
+
         // Request propose
         if self.state.propose(msg.propose_hash()).is_none() {
             self.request(RequestData::Propose(*msg.propose_hash()), peer);
@@ -631,7 +659,7 @@ impl<S> NodeHandler<S>
         block_hash
     }
 
-    pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) -> bool {
+    pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, key: &PublicKey) -> bool {
         let requested_data = match self.state.propose(propose_hash) {
             Some(state) => {
                 // Request transactions
@@ -648,8 +676,7 @@ impl<S> NodeHandler<S>
         };
 
         if let Some(data) = requested_data.clone() {
-            let key = self.public_key_of(validator);
-            self.request(data, key);
+            self.request(data, *key);
             false
         } else {
             true
@@ -761,9 +788,5 @@ impl<S> NodeHandler<S>
             return Err(e);
         }
         Ok(())
-    }
-
-    fn public_key_of(&self, id: ValidatorId) -> PublicKey {
-        *self.state.public_key_of(id).unwrap()
     }
 }
