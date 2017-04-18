@@ -1601,13 +1601,13 @@ fn commit_using_unknown_propose_with_precommits() {
 ///         - purpose of the test is to check add_unknown_propose_with_precommits()
 ///         - scenario:
 ///             - get 3 precommits (!! with block with wrong state hash) => majority precommits are observed => add_unknown_propose_with_precommits() is called
-///             - then receive valid tx and Propose in order to call has_full_propose() => fall with "We are fucked up..."
+///             - then receive valid tx and Propose in order to call has_full_propose() => fall with "Full propose: wrong state hash"
 ///         - it appeared that this test is almost same as handle_precommit_positive_scenario_commit
 ///         the only difference that is in handle_precommit_positive_scenario_commit propose and tx are received after second precommit
 ///         and here propose and tx are received after third precommit
 #[test]
-#[should_panic(expected = "We are fucked up...")]
-fn has_full_propose_we_are_fucked_up() {
+#[should_panic(expected = "Full propose: wrong state hash")]
+fn has_full_propose_wrong_state_hash() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
