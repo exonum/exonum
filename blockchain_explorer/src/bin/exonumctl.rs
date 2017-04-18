@@ -3,14 +3,13 @@ extern crate env_logger;
 extern crate clap;
 extern crate blockchain_explorer;
 
+use clap::{App, SubCommand, Arg, ArgMatches};
+
 use std::marker::PhantomData;
 use std::path::Path;
 
-use clap::{App, SubCommand, Arg, ArgMatches};
-
 use exonum::storage::{LevelDB, LevelDBOptions, Map, MapTable};
 use exonum::crypto::{HexValue, Hash};
-
 use blockchain_explorer::helpers::GenerateCommand;
 
 pub enum BlockchainAction {

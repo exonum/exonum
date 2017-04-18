@@ -1,11 +1,8 @@
-use super::{Map, List, MapTable, MerkleTable};
-use super::{Database, StorageValue, Error};
-use super::{MemoryDB, LevelDB};
-// use super::{Iterable, Seekable};
-
 use tempdir::TempDir;
 use leveldb::options::Options;
 use storage::db::Fork;
+
+use super::{Map, List, MapTable, MerkleTable, Database, StorageValue, Error, MemoryDB, LevelDB};
 
 fn leveldb_database() -> LevelDB {
     let mut options = Options::new();

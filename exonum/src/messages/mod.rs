@@ -1,24 +1,24 @@
-#[macro_use]
-mod spec;
-#[cfg(test)]
-mod tests;
+use bit_vec;
 
 use std::fmt;
 
-mod raw;
-mod error;
-mod fields;
-mod protocol;
-pub mod utils;
-
-use bit_vec;
-
-use ::crypto::PublicKey;
+use crypto::PublicKey;
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_SIZE};
 pub use self::error::Error;
 pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;
+
+#[macro_use]
+mod spec;
+#[cfg(test)]
+mod tests;
+mod raw;
+mod error;
+mod fields;
+mod protocol;
+
+pub mod utils;
 
 pub type BitVec = bit_vec::BitVec;
 

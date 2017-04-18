@@ -1,28 +1,23 @@
-use std::ops::Deref;
-use std::marker::PhantomData;
-use std::io;
-use std::collections::BTreeMap;
 use iron::IronError;
 use iron::prelude::*;
 use iron::status;
 use iron::headers::Cookie;
 use hyper::header::{ContentType, SetCookie};
-
-use serde_json;
 use cookie::Cookie as CookiePair;
-use serde_json::value::ToJson;
-use exonum::crypto::PublicKey;
-use exonum::crypto::SecretKey;
 use router::Router;
-
+use serde_json;
+use serde_json::value::ToJson;
 use serde::{Serialize, Serializer};
-use serde::de;
-use serde::de::{Visitor, Deserialize, Deserializer};
+use serde::de::{self, Visitor, Deserialize, Deserializer};
+
+use std::ops::Deref;
+use std::marker::PhantomData;
+use std::io;
+use std::collections::BTreeMap;
 
 use exonum::events::Error as EventsError;
-use exonum::crypto::{HexValue, FromHexError, Hash, ToHex};
+use exonum::crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash, ToHex};
 use exonum::storage::{Result as StorageResult, Error as StorageError};
-
 
 #[derive(Debug)]
 pub enum ApiError {
@@ -220,10 +215,12 @@ pub trait Api {
 #[cfg(test)]
 mod tests {
     use router::Router;
+    use serde_json;
+
     use exonum::blockchain::Block;
     use exonum::crypto::Hash;
-    use serde_json;
-    use super::Api;
+
+    use super::*;
 
     #[test]
     fn test_json_response_for_complex_val() {

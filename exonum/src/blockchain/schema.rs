@@ -2,7 +2,6 @@ use crypto::{Hash, hash};
 use messages::{RawMessage, Precommit, BlockProof};
 use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
               List, RootProofNode, View};
-
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
@@ -13,7 +12,6 @@ storage_value! (
         cfg_hash:    &Hash  [08 => 40]
     }
 );
-
 
 pub struct Schema<'a> {
     view: &'a View,

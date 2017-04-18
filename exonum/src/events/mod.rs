@@ -1,18 +1,18 @@
+use mio;
+
 use std::io;
 use std::fmt::Display;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
-use mio;
+use messages::RawMessage;
 
-use super::messages::RawMessage;
+pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 
 mod network;
 mod connection;
 #[cfg(test)]
 mod tests;
-
-pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 

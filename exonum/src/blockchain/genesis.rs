@@ -1,4 +1,5 @@
-use ::crypto::PublicKey;
+use crypto::PublicKey;
+
 use super::config::ConsensusConfig;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]

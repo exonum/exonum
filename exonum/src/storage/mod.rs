@@ -1,22 +1,9 @@
-#[cfg(test)]
-mod tests;
-
 use num::{Integer, ToPrimitive};
+use serde_json;
 
 use std::fmt;
 use std::error::Error as ErrorTrait;
 use std::convert;
-use serde_json;
-
-mod leveldb;
-mod memorydb;
-mod map_table;
-mod list_table;
-mod merkle_table;
-mod fields;
-mod db;
-mod merkle_patricia_table;
-mod utils;
 
 pub use leveldb::options::Options as LevelDBOptions;
 pub use leveldb::database::cache::Cache as LevelDBCache;
@@ -32,6 +19,18 @@ pub use self::merkle_table::proofnode::Proofnode;
 pub use self::merkle_patricia_table::MerklePatriciaTable;
 pub use self::merkle_patricia_table::proofpathtokey::RootProofNode;
 pub use self::utils::bytes_to_hex;
+
+#[cfg(test)]
+mod tests;
+mod leveldb;
+mod memorydb;
+mod map_table;
+mod list_table;
+mod merkle_table;
+mod fields;
+mod db;
+mod merkle_patricia_table;
+mod utils;
 
 #[derive(Debug)]
 pub struct Error {

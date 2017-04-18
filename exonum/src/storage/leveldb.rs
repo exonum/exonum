@@ -1,14 +1,3 @@
-use std::fs;
-use std::io;
-use std::mem;
-use std::path::Path;
-use std::error;
-use std::sync::Arc;
-use std::cell::RefCell;
-use std::collections::Bound::{Included, Unbounded};
-use std::cmp::Ordering;
-// use std::iter::Iterator;
-
 use leveldb::database::Database as LevelDatabase;
 use leveldb::error::Error as LevelError;
 use leveldb::database::iterator::Iterable as LevelIterable;
@@ -18,12 +7,21 @@ use leveldb::database::kv::KV;
 use leveldb::database::batch::Writebatch;
 use leveldb::batch::Batch;
 use leveldb::snapshots::Snapshots;
-// use leveldb::database::iterator::Iterator as LevelIterator;
 use leveldb::iterator::LevelDBIterator;
 
-use super::{Map, Database, Error, Patch, Change, Fork};
+use std::fs;
+use std::io;
+use std::mem;
+use std::path::Path;
+use std::error;
+use std::sync::Arc;
+use std::cell::RefCell;
+use std::collections::Bound::{Included, Unbounded};
+use std::cmp::Ordering;
+
 use profiler;
-// use super::{Iterable, Seekable}
+
+use super::{Map, Database, Error, Patch, Change, Fork};
 
 #[derive(Clone)]
 pub struct LevelDB {
