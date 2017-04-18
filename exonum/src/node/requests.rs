@@ -1,17 +1,15 @@
 // FIXME avoiding a bug in clippy.
 #![cfg_attr(feature="clippy", allow(map_clone))]
 
-use super::super::messages::{RequestMessage, Message, RequestPropose, RequestTransactions,
-                             RequestPrevotes, RequestPrecommits, RequestBlock, Block};
-use super::super::blockchain::Schema;
-use super::super::storage::{Map, List};
-use super::super::events::Channel;
+use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
+               RequestBlock, Block};
+use blockchain::Schema;
+use storage::{Map, List};
+use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
 // TODO validate_heights нужно обновлять по любым сообщениям, а не только по status (если они корректно подписаны)
 // TODO propose имеет смысл запрашивать только тогда, когда мы знаем, что узел находится на нашей высоте
-
-const REQUEST_ALIVE: i64 = 3_000_000_000; // 3 seconds
 
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
@@ -19,20 +17,6 @@ impl<S> NodeHandler<S>
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
         if msg.to() != self.state.public_key() {
-            return;
-        }
-
-        // FIXME: we should use some epsilon for checking lifetime < 0
-        let lifetime = match (self.channel.get_time() - msg.time()).num_nanoseconds() {
-            Some(nanos) => nanos,
-            None => {
-                // Incorrect time into message
-                return;
-            }
-        };
-
-        // Incorrect time of the request
-        if lifetime < 0 || lifetime > REQUEST_ALIVE {
             return;
         }
 
@@ -44,7 +28,6 @@ impl<S> NodeHandler<S>
             RequestMessage::Propose(msg) => self.handle_request_propose(msg),
             RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
             RequestMessage::Prevotes(msg) => self.handle_request_prevotes(msg),
-            RequestMessage::Precommits(msg) => self.handle_request_precommits(msg),
             RequestMessage::Peers(msg) => self.handle_request_peers(msg),
             RequestMessage::Block(msg) => self.handle_request_block(msg),
         }
@@ -104,35 +87,6 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn handle_request_precommits(&mut self, msg: RequestPrecommits) {
-        trace!("HANDLE PRECOMMITS REQUEST!!!");
-        if msg.height() > self.state.height() {
-            return;
-        }
-
-        let has_precommits = msg.validators();
-        let precommits = self.state
-            .precommits(msg.round(), *msg.block_hash())
-            .iter()
-            .filter(|p| !has_precommits[p.validator() as usize])
-            .map(|p| p.raw().clone())
-            .collect::<Vec<_>>();
-
-        // FIXME what about msg.height < state.height ?
-        // self.blockchain
-        //     .view()
-        //     .precommits(msg.block_hash())
-        //     .values()
-        //     .unwrap()
-        //     .iter()
-        //     .map(|p| p.raw().clone())
-        //     .collect()
-
-        for precommit in precommits {
-            self.send_to_peer(*msg.from(), &precommit);
-        }
-    }
-
     pub fn handle_request_block(&mut self, msg: RequestBlock) {
         trace!("Handle block request with height:{}, our height: {}",
                msg.height(),
@@ -163,7 +117,6 @@ impl<S> NodeHandler<S>
 
         let block_msg = Block::new(self.state.public_key(),
                                    msg.from(),
-                                   self.channel.get_time(),
                                    block,
                                    precommits,
                                    transactions,

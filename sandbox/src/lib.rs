@@ -1,18 +1,16 @@
 extern crate rand;
-extern crate time;
 extern crate serde;
 #[macro_use]
 extern crate log;
 
 extern crate clap;
 
+#[macro_use]
 extern crate exonum;
-extern crate timestamping;
-extern crate cryptocurrency;
 
+pub mod timestamping;
 pub mod sandbox;
 pub mod sandbox_tests_helper;
-mod tx_generator;
+pub mod config_updater;
 
-pub use tx_generator::TimestampingTxGenerator;
-pub use self::sandbox::timestamping_sandbox;
+pub use self::sandbox::{timestamping_sandbox, sandbox_with_services};

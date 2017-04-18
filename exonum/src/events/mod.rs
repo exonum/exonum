@@ -1,22 +1,24 @@
+use mio;
+
 use std::io;
 use std::fmt::Display;
 use std::net::SocketAddr;
-use time::{get_time, Timespec};
+use std::time::{SystemTime, Duration};
 
-use mio;
+use messages::RawMessage;
 
-use super::messages::RawMessage;
+pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 
 mod network;
 mod connection;
 #[cfg(test)]
 mod tests;
 
-pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
-
 pub type EventsConfiguration = mio::EventLoopConfig;
 
 pub type EventLoop<H> = mio::EventLoop<MioAdapter<H>>;
+
+pub type Milliseconds = u64;
 
 #[derive(Debug)]
 pub enum Event {
@@ -48,7 +50,7 @@ pub enum Timeout<N: Send> {
 pub enum Invoke<T: Send> {
     SendTo(SocketAddr, RawMessage),
     Connect(SocketAddr),
-    AddTimeout(T, Timespec),
+    AddTimeout(T, SystemTime),
 }
 
 pub trait EventHandler {
@@ -60,17 +62,17 @@ pub trait EventHandler {
     fn handle_application_event(&mut self, event: Self::ApplicationEvent);
 }
 
-pub trait Channel: Send + Clone {
+pub trait Channel: Sync + Send + Clone {
     type ApplicationEvent: Send;
     type Timeout: Send;
 
-    fn get_time(&self) -> Timespec;
+    fn get_time(&self) -> SystemTime;
     fn address(&self) -> SocketAddr;
 
     fn post_event(&self, msg: Self::ApplicationEvent) -> Result<()>;
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage);
     fn connect(&mut self, address: &SocketAddr);
-    fn add_timeout(&mut self, timeout: Self::Timeout, time: Timespec);
+    fn add_timeout(&mut self, timeout: Self::Timeout, time: SystemTime);
 }
 
 pub trait Reactor<H: EventHandler> {
@@ -79,7 +81,7 @@ pub trait Reactor<H: EventHandler> {
     fn bind(&mut self) -> ::std::io::Result<()>;
     fn run(&mut self) -> ::std::io::Result<()>;
     fn run_once(&mut self, timeout: Option<usize>) -> ::std::io::Result<()>;
-    fn get_time(&self) -> Timespec;
+    fn get_time(&self) -> SystemTime;
     fn channel(&self) -> Self::Channel;
 }
 
@@ -124,8 +126,8 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
         self.address
     }
 
-    fn get_time(&self) -> Timespec {
-        get_time()
+    fn get_time(&self) -> SystemTime {
+        SystemTime::now()
     }
 
     fn post_event(&self, event: Self::ApplicationEvent) -> Result<()> {
@@ -150,7 +152,7 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
             .log_error("Unable to connect");
     }
 
-    fn add_timeout(&mut self, timeout: Self::Timeout, time: Timespec) {
+    fn add_timeout(&mut self, timeout: Self::Timeout, time: SystemTime) {
         self.inner
             .send(InternalEvent::Invoke(Invoke::AddTimeout(timeout, time)))
             .log_error("Unable to add timeout");
@@ -227,16 +229,14 @@ impl<H: EventHandler> MioAdapter<H> {
     fn handle_add_timeout(&mut self,
                           event_loop: &mut EventLoop<H>,
                           timeout: H::Timeout,
-                          time: Timespec) {
-        let ms = (time - get_time()).num_milliseconds();
-        if ms < 0 {
-            self.handler.handle_timeout(timeout);
-        } else {
-            // TODO: use mio::Timeout
-            event_loop.timeout_ms(Timeout::Node(timeout), ms as u64)
-                .map(|_| ())
-                .map_err(|x| format!("{:?}", x))
-                .log_error("Unable to add timeout to event loop");
+                          time: SystemTime) {
+        match time.duration_since(SystemTime::now()) {
+            Ok(duration) =>
+                event_loop.timeout_ms(Timeout::Node(timeout), num_milliseconds(&duration))
+                    .map(|_| ())
+                    .map_err(|x| format!("{:?}", x))
+                    .log_error("Unable to add timeout to event loop"),
+            Err(_) => self.handler.handle_timeout(timeout),
         }
     }
 }
@@ -292,8 +292,8 @@ impl<H: EventHandler> Reactor<H> for Events<H> {
     fn run_once(&mut self, timeout: Option<usize>) -> ::std::io::Result<()> {
         self.event_loop.run_once(&mut self.inner, timeout)
     }
-    fn get_time(&self) -> Timespec {
-        get_time()
+    fn get_time(&self) -> SystemTime {
+        SystemTime::now()
     }
     fn channel(&self) -> MioChannel<H::ApplicationEvent, H::Timeout> {
         MioChannel {
@@ -340,4 +340,13 @@ impl ::std::error::Error for Error {
     fn description(&self) -> &str {
         &self.message
     }
+}
+
+fn num_milliseconds(duration: &Duration) -> Milliseconds {
+    const MILLIS_PER_SEC: u64 = 1000;
+    const NANOS_PER_MILLI: u32 = 1000_000;
+
+    let secs_part = duration.as_secs() * MILLIS_PER_SEC;
+    let nanos_part = duration.subsec_nanos() / NANOS_PER_MILLI;
+    secs_part + nanos_part as Milliseconds
 }

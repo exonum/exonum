@@ -1,28 +1,29 @@
+use vec_map::VecMap;
+use byteorder::{ByteOrder, LittleEndian};
+
+use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::mem;
+
+use crypto::{self, Hash};
+use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
+use node::{State, TxPool};
+use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
+
+pub use self::block::Block;
+pub use self::schema::Schema;
+pub use self::genesis::GenesisConfig;
+pub use self::config::{StoredConfiguration, ConsensusConfig};
+pub use self::service::{Service, Transaction, NodeState};
+
 #[macro_use]
 mod spec;
 mod block;
 mod schema;
-pub mod config;
 mod genesis;
 mod service;
 
-use std::sync::Arc;
-use std::collections::HashMap;
-
-use time::Timespec;
-use vec_map::VecMap;
-
-use ::crypto::Hash;
-use ::messages::{RawMessage, Precommit};
-use ::node::State;
-
-use ::storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView, merkle_hash};
-
-pub use self::block::Block;
-pub use self::schema::{ConfigurationData, Schema};
-pub use self::genesis::GenesisConfig;
-pub use self::config::{StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction};
+pub mod config;
 
 #[derive(Clone)]
 pub struct Blockchain {
@@ -73,21 +74,20 @@ impl Blockchain {
     }
 
     pub fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
-        let config_propose = StoredConfiguration {
+        let mut config_propose = StoredConfiguration {
+            previous_cfg_hash: Hash::zero(),
             actual_from: 0,
             validators: cfg.validators,
             consensus: cfg.consensus,
-        };
-        let time = Timespec {
-            sec: cfg.time as i64,
-            nsec: 0,
+            services: BTreeMap::new(),
         };
 
         let patch = {
             let view = self.view();
             // Update service tables
-            for service in self.service_map.values() {
-                service.handle_genesis_block(&view)?;
+            for (id, service) in self.service_map.iter() {
+                let cfg = service.handle_genesis_block(&view)?;
+                config_propose.services.insert(format!("{}", id), cfg);
             }
             // Commit actual configuration
             {
@@ -98,25 +98,33 @@ impl Blockchain {
                     let _ = block_hash;
                     return Ok(());
                 }
-                schema.commit_actual_configuration(0, config_propose.serialize().as_ref())?;
+                schema.commit_actual_configuration(config_propose)?;
             };
             self.merge(&view.changes())?;
-            self.create_patch(0, 0, time, &[], &HashMap::new())?.1
+            self.create_patch(0, 0, &[], &BTreeMap::new())?.1
         };
         self.merge(&patch)?;
         Ok(())
     }
 
+    pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
+        debug_assert!(table_idx <= u16::max_value() as usize);
+        let size = mem::size_of::<u16>();
+        let mut vec = vec![0; 2 * size];
+        LittleEndian::write_u16(&mut vec[0..size], service_id);
+        LittleEndian::write_u16(&mut vec[size..2*size], table_idx as u16);
+        crypto::hash(&vec)
+    }
+
     pub fn create_patch(&self,
                         height: u64,
                         round: u32,
-                        time: Timespec,
                         tx_hashes: &[Hash],
-                        pool: &HashMap<Hash, Box<Transaction>>)
+                        pool: &TxPool)
                         -> Result<(Hash, Patch), Error> {
         // Create fork
         let fork = self.view();
-        // Create databa schema
+        // Create database schema
         let schema = Schema::new(&fork);
         // Get last hash
         let last_hash = self.last_hash()?;
@@ -135,21 +143,26 @@ impl Blockchain {
         let tx_hash = schema.block_txs(height).root_hash()?;
         // Get state hash
         let state_hash = {
-            let mut hashes = Vec::new();
-
-            // Add core state hashes
-            hashes.push(schema.state_hash()?);
-            // Add state hashes from extensions
-            for service in self.service_map.values() {
-                if let Some(hash) = service.state_hash(&fork) {
-                    hashes.push(hash?);
+            let sum_table = schema.state_hash_aggregator();
+            let vec_core_state = schema.core_state_hash()?;
+            for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
+                let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
+                sum_table.put(&key, core_table_hash)?;
+            }
+            for service in self.service_map.values(){
+                let service_id = service.service_id();
+                let vec_service_state = service.state_hash(&fork)?;
+                for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
+                    let key = Blockchain::service_table_unique_key(service_id, idx);
+                    sum_table.put(&key, service_table_hash)?;
                 }
             }
-            merkle_hash(&hashes)
+            sum_table.root_hash()?
         };
 
         // Create block
-        let block = Block::new(height, round, time, &last_hash, &tx_hash, &state_hash);
+        let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
+        trace!("execute block = {:?}", block );
         // Eval block hash
         let block_hash = block.hash();
         // Update height
@@ -160,6 +173,7 @@ impl Blockchain {
         Ok((block_hash, fork.changes()))
     }
 
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I>(&self,
                          state: &mut State,
                          block_hash: Hash,
@@ -180,14 +194,11 @@ impl Blockchain {
                 schema.precommits(&block_hash).append(precommit.clone())?;
             }
 
-            // create special txs like anchoring or fee
-            let mut txs = Vec::new();
+            let mut node_state = NodeState::new(state, &view);
             for service in self.service_map.values() {
-                let t = service.handle_commit(&view, state)?;
-                txs.extend(t.into_iter());
+                service.handle_commit(&mut node_state)?;
             }
-
-            (view.changes(), txs)
+            (view.changes(), node_state.transactions())
         };
         self.merge(&patch)?;
         Ok(txs)

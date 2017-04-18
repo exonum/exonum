@@ -1,11 +1,9 @@
-use time;
+use crypto::PublicKey;
 
-use ::crypto::PublicKey;
 use super::config::ConsensusConfig;
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GenesisConfig {
-    pub time: u64,
     pub consensus: ConsensusConfig,
     pub validators: Vec<PublicKey>,
 }
@@ -19,7 +17,6 @@ impl GenesisConfig {
                                                              validators: I)
                                                              -> GenesisConfig {
         GenesisConfig {
-            time: time::now_utc().to_timespec().sec as u64,
             validators: validators.collect::<Vec<_>>(),
             consensus: consensus,
         }

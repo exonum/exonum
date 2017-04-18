@@ -3,7 +3,6 @@
 extern crate test;
 extern crate rand;
 extern crate tempdir;
-
 extern crate exonum;
 
 #[cfg(test)]
@@ -11,10 +10,8 @@ mod tests {
     use test::Bencher;
     use tempdir::TempDir;
     use rand::{SeedableRng, XorShiftRng, Rng};
-
-    use exonum::storage::{MerkleTable, MerklePatriciaTable};
-    use exonum::storage::{Database, Map, List, MapTable, Fork};
-    use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
+    use exonum::storage::{MerkleTable, MerklePatriciaTable, Database, Map, List, MapTable, Fork,
+                          MemoryDB, LevelDB, LevelDBOptions};
 
     fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
         let kv_generator = |_| {

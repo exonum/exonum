@@ -1,14 +1,12 @@
 extern crate rand;
 
-use std::net::SocketAddr;
-
 use rand::Rng;
 
-use super::super::messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
-use super::{NodeHandler, RequestData};
+use std::net::SocketAddr;
 
-use super::super::events::Channel;
-use super::{ExternalMessage, NodeTimeout};
+use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
+use events::Channel;
+use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
 
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
@@ -19,7 +17,9 @@ impl<S> NodeHandler<S>
         //     if !raw.verify() {
         //         return;
         //     }
-
+        
+        //FIXME: add whitelist verify public_key
+        
         let msg = Any::from_raw(raw).unwrap();
         match msg {
             Any::Connect(msg) => self.handle_connect(msg),
@@ -78,28 +78,25 @@ impl<S> NodeHandler<S>
 
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
+
+        let peer = msg.from();
+
         // Handle message from future height
         if msg.height() > height {
-            // Check validator height info
-            // FIXME: make sure that validator id < validator count
-            if msg.height() > self.state.validator_height(msg.validator()) {
-                // Update validator height
-                self.state.set_validator_height(msg.validator(), msg.height());
+
+            //verify message
+            if !msg.verify_signature(peer) {
+                return;
             }
-            // Verify validator if and signature
-            let peer = match self.state.public_key_of(msg.validator()) {
-                // Incorrect signature of message
-                Some(public_key) => {
-                    if !msg.verify_signature(public_key) {
-                        return;
-                    }
-                    *public_key
-                }
-                // Incorrect validator id
-                None => return,
-            };
+            
+            // Check validator height info
+            if msg.height() > self.state.node_height(peer) {
+                // Update validator height
+                self.state.set_node_height(*peer, msg.height());
+            }
+
             // Request block
-            self.request(RequestData::Block(height), peer);
+            self.request(RequestData::Block(height), *peer);
         }
     }
 
@@ -113,7 +110,7 @@ impl<S> NodeHandler<S>
     pub fn handle_status_timeout(&mut self) {
         let hash = self.blockchain.last_hash().unwrap();
         // Send status
-        let status = Status::new(self.state.id(),
+        let status = Status::new(self.state.public_key(),
                                  self.state.height(),
                                  &hash,
                                  self.state.secret_key());
@@ -140,7 +137,6 @@ impl<S> NodeHandler<S>
             let peer = peer.clone();
             let msg = RequestPeers::new(self.state.public_key(),
                                         peer.pub_key(),
-                                        self.channel.get_time(),
                                         self.state.secret_key());
             trace!("Request peers from peer with addr {:?}", peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());

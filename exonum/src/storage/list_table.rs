@@ -127,6 +127,11 @@ mod tests {
         list_table.extend(extended_by_again).unwrap();
         assert_eq!(7, list_table.len().unwrap());
         assert_eq!(Some(1001u64), list_table.last().unwrap());
+        // let _ = list_table.swap(3, 4).unwrap();
+        // assert_eq!(Some(999u64), list_table.get(3).unwrap());
+        // assert_eq!(Some(666u64), list_table.get(4).unwrap());
+        // let res = list_table.swap(5, 10);
+        // assert!(res.is_err());
     }
 
 }

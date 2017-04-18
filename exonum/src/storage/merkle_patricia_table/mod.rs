@@ -1,17 +1,18 @@
-mod proofpathtokey;
 use std::mem;
 use std::cmp::{min, PartialEq};
 use std::marker::PhantomData;
 use std::fmt;
 use std::ops::Not;
+
+use crypto::{hash, Hash, HASH_SIZE};
+
 use super::utils::bytes_to_hex;
-
-use ::crypto::{hash, Hash, HASH_SIZE};
-
 use super::base_table::BaseTable;
 use super::{Map, Error, View, StorageKey, StorageValue};
 
-use self::proofpathtokey::{RootProofNode, BranchProofNode, ProofNode, BitVec};
+pub use self::proofpathtokey::{RootProofNode, BranchProofNode, ProofNode, BitVec};
+
+pub mod proofpathtokey;
 
 const BRANCH_KEY_PREFIX: u8 = 00;
 const LEAF_KEY_PREFIX: u8 = 01;
@@ -581,7 +582,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
                                                                  (KEY_SIZE * 8) as u16),
                                                      root_value.hash())
                 }
-            } 
+            }
             Some((root_db_key, Node::Branch(branch))) => {
                 let root_slice = BitSlice::from_db_key(&root_db_key);
                 let l_s = branch.child_slice(ChildKind::Left);
@@ -606,7 +607,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
                                     left_key: BitVec::new(l_s_db_key, suff_from, l_s.to),
                                     right_key: BitVec::new(r_s_db_key, suff_from, r_s.to),
                                 })
-                            } 
+                            }
                             ChildKind::Right => {
                                 RootProofNode::Branch(BranchProofNode::RightBranch {
                                     left_hash: neighbour_child_hash,
@@ -639,7 +640,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
                     })
                     // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
-            } 
+            }
             None => return Ok(RootProofNode::Empty),
         };
         Ok(res)
@@ -660,7 +661,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
         }
 
         let res: ProofNode<V> = match self.read_node(child_slice.to_db_key())? {
-            Node::Leaf(child_value) => ProofNode::Leaf(child_value), 
+            Node::Leaf(child_value) => ProofNode::Leaf(child_value),
             Node::Branch(child_branch) => {
                 let l_s = child_branch.child_slice(ChildKind::Left);
                 let r_s = child_branch.child_slice(ChildKind::Right);
@@ -689,7 +690,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
                                 left_key: BitVec::new(l_s_db_key, suff_from, l_s.to),
                                 right_key: BitVec::new(r_s_db_key, suff_from, r_s.to),
                             })
-                        } 
+                        }
                     }
                 } else {
                     let l_h = *child_branch.child_hash(ChildKind::Left); //copy
@@ -777,7 +778,7 @@ impl<'a, K, V> Map<K, V> for MerklePatriciaTable<'a, K, V>
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
         // FIXME: temporary hack, avoid reallocation here
         let mut v = Vec::new();
-        key.write(&mut v);        
+        key.write(&mut v);
         let db_key = BitSlice::from_bytes(&v).to_db_key();
         let v = self.base.get(&db_key)?;
         Ok(v.map(StorageValue::deserialize))
@@ -793,7 +794,7 @@ impl<'a, K, V> Map<K, V> for MerklePatriciaTable<'a, K, V>
     fn delete(&self, key: &K) -> Result<(), Error> {
         // FIXME: temporary hack, avoid reallocation here
         let mut v = Vec::new();
-        key.write(&mut v);        
+        key.write(&mut v);
 
         self.remove(BitSlice::from_bytes(&v))
     }
@@ -869,6 +870,8 @@ mod tests {
     use ::storage::utils::bytes_to_hex;
     use serde_json;
     use serde::{Serialize, Serializer};
+
+    use super::super::MapTable;
 
     use super::{BitSlice, BranchNode, MerklePatriciaTable, LEAF_KEY_PREFIX};
     use super::proofpathtokey::RootProofNode;
@@ -1372,7 +1375,7 @@ mod tests {
 
         let search_res = table.construct_path_to_key(&vec![244; 32]).unwrap();
         match search_res {
-            RootProofNode::Empty => {} 
+            RootProofNode::Empty => {}
             _ => assert!(false),
         }
         {
@@ -1448,9 +1451,42 @@ mod tests {
             RootProofNode::LeafRootInclusive(key, val) => {
                 assert_eq!(key.db_key_data, BitSlice::from_bytes(&root_key).to_db_key());
                 assert_eq!(val, root_val);
-            } 
+            }
             _ => assert!(false),
         }
+    }
+
+    #[test]
+    fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
+        let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(100).into_iter().map(|el| {
+            let (key, val) = el;
+            (hash(&key), hash(&val))
+        }).collect::<Vec<_>>();
+
+        let storage = MemoryDB::new().fork();
+        let table = MerklePatriciaTable::new(vec![255], &storage);
+        for item in &data {
+            table.put(&item.0, item.1.clone()).unwrap();
+        }
+
+        let table_root_hash = table.root_hash().unwrap();
+        let item = data[0];
+        let proof_path_to_key = table.construct_path_to_key(&item.0.as_ref()).unwrap();
+        assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
+        let check_res =
+        proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
+        let proved_value: Option<&Hash> = check_res.unwrap();
+        assert_eq!(*proved_value.unwrap(), item.1);
+
+        let proof_info = ProofInfo {
+            root_hash: table_root_hash,
+            searched_key: item.0,
+            proof: &proof_path_to_key,
+            key_found: true,
+        };
+
+        let json_repre = serde_json::to_string(&proof_info).unwrap();
+        println!("{}", json_repre);
     }
 
     #[test]

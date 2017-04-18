@@ -1,16 +1,15 @@
+use env_logger;
+
 use std::io;
 use std::thread;
 use std::net::SocketAddr;
 use std::collections::VecDeque;
+use std::time::{SystemTime, Duration};
 
-use time::{get_time, Duration};
-use env_logger;
-
+use messages::{MessageWriter, RawMessage};
+use crypto::gen_keypair;
 use super::{Events, Reactor, Event, InternalEvent, Channel};
 use super::{Network, NetworkConfiguration, EventHandler};
-
-use ::messages::{MessageWriter, RawMessage};
-use ::crypto::gen_keypair;
 
 pub type TestEvent = InternalEvent<(), u32>;
 
@@ -87,11 +86,11 @@ impl TestEvents {
     pub fn wait_for_connect(&mut self, addr: &SocketAddr) -> Option<()> {
         self.0.channel().connect(addr);
 
-        let start = get_time();
+        let start = SystemTime::now();
         loop {
             self.process_events().unwrap();
 
-            if start + Duration::milliseconds(10000) < get_time() {
+            if start + Duration::from_millis(10000) < SystemTime::now() {
                 return None;
             }
             while let Some(e) = self.0.inner.handler.event() {
@@ -104,11 +103,11 @@ impl TestEvents {
     }
 
     pub fn wait_for_message(&mut self, duration: Duration) -> Option<RawMessage> {
-        let start = get_time();
+        let start = SystemTime::now();
         loop {
             self.process_events().unwrap();
 
-            if start + duration < get_time() {
+            if start + duration < SystemTime::now() {
                 return None;
             }
 
@@ -132,11 +131,11 @@ impl TestEvents {
                              duration: Duration)
                              -> Result<Vec<RawMessage>, String> {
         let mut v = Vec::new();
-        let start = get_time();
+        let start = SystemTime::now();
         loop {
             self.process_events().unwrap();
 
-            if start + duration < get_time() {
+            if start + duration < SystemTime::now() {
                 return Err(format!("Timeout exceeded, {} messages is not received", count));
             }
 
@@ -151,11 +150,11 @@ impl TestEvents {
     }
 
     pub fn wait_for_disconnect(&mut self, max_duration: Duration) -> Option<()> {
-        let start = get_time();
+        let start = SystemTime::now();
         loop {
             self.process_events().unwrap();
 
-            if start + max_duration < get_time() {
+            if start + max_duration < SystemTime::now() {
                 return None;
             }
             while let Some(e) = self.0.inner.handler.event() {
@@ -208,7 +207,7 @@ fn big_message() {
             e.send_to(&addrs[1], m2.clone());
             e.send_to(&addrs[1], m1.clone());
 
-            let msgs = e.wait_for_messages(3, Duration::milliseconds(10000)).unwrap();
+            let msgs = e.wait_for_messages(3, Duration::from_millis(10000)).unwrap();
             assert_eq!(msgs[0], m2);
             assert_eq!(msgs[1], m1);
             assert_eq!(msgs[2], m2);
@@ -226,11 +225,11 @@ fn big_message() {
             e.send_to(&addrs[0], m2.clone());
             e.send_to(&addrs[0], m1.clone());
             e.send_to(&addrs[0], m2.clone());
-            let msgs = e.wait_for_messages(3, Duration::milliseconds(10000)).unwrap();
+            let msgs = e.wait_for_messages(3, Duration::from_millis(10000)).unwrap();
             assert_eq!(msgs[0], m1);
             assert_eq!(msgs[1], m2);
             assert_eq!(msgs[2], m1);
-            e.wait_for_disconnect(Duration::milliseconds(10000)).unwrap();
+            e.wait_for_disconnect(Duration::from_millis(10000)).unwrap();
         });
     }
 
@@ -267,7 +266,7 @@ fn reconnect() {
                 debug!("t1: send m1 to t2");
                 e.send_to(&addrs[1], m1);
                 debug!("t1: wait for m2");
-                assert_eq!(e.wait_for_message(Duration::milliseconds(5000)), Some(m2));
+                assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m2));
                 debug!("t1: received m2 from t2");
             }
             debug!("t1: connection closed");
@@ -279,7 +278,7 @@ fn reconnect() {
                 debug!("t1: send m3 to t2");
                 e.send_to(&addrs[1], m3.clone());
                 debug!("t1: wait for m3");
-                assert_eq!(e.wait_for_message(Duration::milliseconds(5000)), Some(m3));
+                assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m3));
                 debug!("t1: received m3 from t2");
                 e.process_events().unwrap();
             }
@@ -301,10 +300,10 @@ fn reconnect() {
                 debug!("t2: send m2 to t1");
                 e.send_to(&addrs[0], m2);
                 debug!("t2: wait for m1");
-                assert_eq!(e.wait_for_message(Duration::milliseconds(5000)), Some(m1));
+                assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m1));
                 debug!("t2: received m1 from t1");
                 debug!("t2: wait for m3");
-                assert_eq!(e.wait_for_message(Duration::milliseconds(5000)),
+                assert_eq!(e.wait_for_message(Duration::from_millis(5000)),
                            Some(m3.clone()));
                 debug!("t2: received m3 from t1");
             }
@@ -316,7 +315,7 @@ fn reconnect() {
 
                 debug!("t2: send m3 to t1");
                 e.send_to(&addrs[0], m3.clone());
-                e.wait_for_disconnect(Duration::milliseconds(5000)).unwrap();
+                e.wait_for_disconnect(Duration::from_millis(5000)).unwrap();
             }
             debug!("t2: finished");
         });
@@ -379,7 +378,7 @@ mod benches {
                     e1.send_to(&addrs[1], msg);
                     e1.wait_for_messages(1, timeout).unwrap();
                 }
-                e1.wait_for_disconnect(Duration::milliseconds(1000)).unwrap();
+                e1.wait_for_disconnect(Duration::from_millis(1000)).unwrap();
             });
             let t2 = thread::spawn(move || {
                 e2.wait_for_connect(&addrs[0]).unwrap();

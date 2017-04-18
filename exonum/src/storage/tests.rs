@@ -1,13 +1,8 @@
-// use super::{Map, List, MapTable, MerkleTable};
-// use super::{Database, StorageValue, Error};
-// use super::{MemoryDB, LevelDB};
-// // use super::{Iterable, Seekable};
-
 // use tempdir::TempDir;
 // use leveldb::options::Options;
 // use storage::db::Fork;
 
-// TODO: reimplement this kind of tests
+// use super::{Map, List, MapTable, MerkleTable, Database, StorageValue, Error, MemoryDB, LevelDB};
 
 // fn leveldb_database() -> LevelDB {
 //     let mut options = Options::new();
@@ -37,12 +32,26 @@
 //     let patch;
 //     {
 //         let fork = db.fork();
+
+//         fork.put(b"aba", vec![14, 22, 3])?;
+//         assert_eq!(b"ab", &fork.find_key(b"").unwrap().unwrap() as &[u8]);
+
 //         fork.delete(b"ab")?;
+//         assert_eq!(b"aba", &fork.find_key(b"").unwrap().unwrap() as &[u8]);
+
+//         fork.put(b"aaa", vec![21])?;
+//         assert_eq!(b"aaa", &fork.find_key(b"").unwrap().unwrap() as &[u8]);
+
+//         assert_eq!(b"abacaba",
+//                    &fork.find_key(b"abac").unwrap().unwrap() as &[u8]);
 //         fork.put(b"abacaba", vec![18, 34])?;
 //         fork.put(b"caba", vec![10])?;
 //         fork.put(b"abac", vec![117, 32, 64])?;
 //         fork.put(b"abac", vec![14, 12])?;
+//         assert_eq!(b"abac", &fork.find_key(b"abac").unwrap().unwrap() as &[u8]);
 //         fork.delete(b"abacaba")?;
+//         assert_eq!(b"caba", &fork.find_key(b"abaca").unwrap().unwrap() as &[u8]);
+
 
 //         assert_eq!(fork.get(b"ab")?, None);
 //         assert_eq!(fork.get(b"caba")?, Some(vec![10]));
@@ -219,6 +228,7 @@
 //     let db = MemoryDB::new();
 //     test_map_table_different_prefixes(&db);
 // }
+
 
 // #[test]
 // fn memorydb_iter() {
