@@ -74,11 +74,11 @@ fn main() {
         .about("Demo cryptocurrency validator node")
         .subcommand(GenerateCommand::new())
         .subcommand(RunCommand::new().arg(Arg::with_name("HTTP_PORT")
-            .short("p")
-            .long("port")
-            .value_name("HTTP_PORT")
-            .help("Run http server on given port")
-            .takes_value(true)));
+                                              .short("p")
+                                              .long("port")
+                                              .value_name("HTTP_PORT")
+                                              .help("Run http server on given port")
+                                              .takes_value(true)));
     let matches = app.get_matches();
 
     match matches.subcommand() {

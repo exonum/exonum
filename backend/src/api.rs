@@ -57,22 +57,27 @@ impl<T> CryptocurrencyApi<T>
         let currency_schema = CurrencySchema::new(&view);
 
         let max_height = general_schema.heights().len()? - 1;
-        let block_proof = general_schema.block_and_precommits(max_height)?.unwrap();
+        let block_proof = general_schema
+            .block_and_precommits(max_height)?
+            .unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
         let wallet_path: HashMPTproofLinker<RootProofNode<Wallet>>;
         let wallet_history: Option<HashMTproofLinker<CurrencyTx>>;
 
         let to_wallets_table: RootProofNode<Hash> =
-            general_schema.get_proof_to_service_table(CRYPTOCURRENCY, 0)?;
+            general_schema
+                .get_proof_to_service_table(CRYPTOCURRENCY, 0)?;
 
         {
             let wallets_root_hash = currency_schema.wallets().root_hash()?; //debug code
-            let check_result = to_wallets_table.verify_root_proof_consistency(Blockchain::service_table_unique_key(CRYPTOCURRENCY, 0), state_hash); //debug code
+            let check_result = to_wallets_table.verify_root_proof_consistency(
+                Blockchain::service_table_unique_key(CRYPTOCURRENCY, 0), state_hash); //debug code
             debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());
         }
 
-        let to_specific_wallet: RootProofNode<Wallet> = currency_schema.wallets()
+        let to_specific_wallet: RootProofNode<Wallet> = currency_schema
+            .wallets()
             .construct_path_to_key(pub_key)?;
         wallet_path = HashMPTproofLinker {
             mpt_proof: to_wallets_table,
@@ -129,8 +134,8 @@ impl<T> Api for CryptocurrencyApi<T>
             let map = req.get_ref::<Params>().unwrap();
             match map.find(&["pubkey"]) {
                 Some(&Value::String(ref pub_key_string)) => {
-                    let public_key =
-                        PublicKey::from_hex(pub_key_string).map_err(ApiError::FromHex)?;
+                    let public_key = PublicKey::from_hex(pub_key_string)
+                        .map_err(ApiError::FromHex)?;
                     let info = _self.wallet_info(&public_key)?;
                     _self.ok_response(&info.to_json())
                 }

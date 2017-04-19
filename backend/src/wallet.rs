@@ -101,7 +101,12 @@ impl WalletTestData {
     }
 }
 
-pub fn assert_wallet(wallet: Wallet, pub_key: &PublicKey, name: &str, balance: u64, history_len: u64, history_hash: &Hash) {
+pub fn assert_wallet(wallet: Wallet,
+                     pub_key: &PublicKey,
+                     name: &str,
+                     balance: u64,
+                     history_len: u64,
+                     history_hash: &Hash) {
     assert_eq!(wallet.pub_key(), pub_key);
     assert_eq!(wallet.name(), name);
     assert_eq!(wallet.balance(), balance);
@@ -117,7 +122,7 @@ fn test_wallet() {
     let wallet = Wallet::new(&pub_key, name, 100500, 0, &hash);
 
     let wallet = wallet.clone();
-    assert_wallet(wallet, &pub_key, name, 100500, 0, &hash); 
+    assert_wallet(wallet, &pub_key, name, 100500, 0, &hash);
 }
 
 #[test]
@@ -132,7 +137,9 @@ fn test_wallet_serde() {
         let mut hash_bytes = [0; HASH_SIZE];
 
         let (pub_key, _) = gen_keypair();
-        let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+        let name: String = rng.gen_ascii_chars()
+            .take(string_len as usize)
+            .collect();
         let balance = rng.next_u64();
         let history_len = rng.next_u64();
         rng.fill_bytes(&mut hash_bytes);
@@ -144,9 +151,7 @@ fn test_wallet_serde() {
                                        100500,
                                        0,
                                        &Hash::new([2; HASH_SIZE]));
-    let mut wallets = (0..50)
-        .map(generator)
-        .collect::<Vec<_>>();
+    let mut wallets = (0..50).map(generator).collect::<Vec<_>>();
     wallets.push(wallet_non_ascii);
     for wallet in wallets {
         let json_str = serde_json::to_string(&wallet).unwrap();
