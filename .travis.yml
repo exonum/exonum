@@ -10,7 +10,12 @@ before_install:
 - sudo apt-get -qq update
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+before_script:
+- export PATH="$PATH:$HOME/.cargo/bin"
+- which rustfmt || cargo install rustfmt
 script:
+- cargo fmt -p backend -- --write-mode=diff
+- cargo fmt -p cryptocurrency_api_tests -- --write-mode=diff
 - cargo check --features clippy --manifest-path backend/Cargo.toml
 - cargo build --release --manifest-path backend/Cargo.toml
 - cargo test --release --manifest-path backend/Cargo.toml
