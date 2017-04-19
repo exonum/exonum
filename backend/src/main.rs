@@ -12,24 +12,22 @@ extern crate log;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate bodyparser;
-
 extern crate exonum;
 extern crate blockchain_explorer;
 extern crate cryptocurrency;
 extern crate router;
 extern crate cookie;
 
-use std::net::SocketAddr;
-use std::thread;
 use clap::{Arg, App};
 use router::Router;
 
+use std::net::SocketAddr;
+use std::thread;
+
 use exonum::blockchain::{Blockchain, Service};
 use exonum::node::{Node, NodeConfig};
-
 use cryptocurrency::CurrencyService;
 use cryptocurrency::api::CryptocurrencyApi;
-
 use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
 use blockchain_explorer::api::Api;
 use blockchain_explorer::explorer_api::ExplorerApi;

@@ -14,7 +14,6 @@ extern crate log;
 #[cfg(test)]
 extern crate tempdir;
 extern crate serde_json;
-
 #[macro_use(message, storage_value)]
 extern crate exonum;
 extern crate blockchain_explorer;
@@ -26,23 +25,24 @@ extern crate bodyparser;
 
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer};
-use exonum::messages::utils::U64;
-use exonum::crypto::{PUBLIC_KEY_LENGTH, Signature};
-use blockchain_explorer::TransactionInfo;
 use serde_json::value::ToJson;
 use serde_json::{Value, from_value};
 
-pub mod api;
-pub mod wallet;
-mod tx_metarecord;
-
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
-use exonum::crypto::{PublicKey, Hash};
+use exonum::messages::utils::U64;
+use exonum::crypto::{PublicKey, Hash, Signature, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
+use blockchain_explorer::TransactionInfo;
+
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
+
+mod tx_metarecord;
+
+pub mod api;
+pub mod wallet;
 
 pub const CRYPTOCURRENCY: u16 = 128;
 

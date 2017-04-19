@@ -1,5 +1,6 @@
-use exonum::crypto::{Hash, hash};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
+use exonum::crypto::{Hash, hash};
 use exonum::storage::StorageValue;
 
 storage_value! {

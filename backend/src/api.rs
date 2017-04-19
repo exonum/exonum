@@ -1,22 +1,16 @@
 use serde::Serialize;
 use serde_json::value::ToJson;
-
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
 use jsonway;
 use params::{Params, Value};
-use blockchain_explorer::api::{Api, ApiError};
 
+use blockchain_explorer::api::{Api, ApiError};
 use exonum::node::TransactionSend;
 use exonum::messages::BlockProof;
 use exonum::crypto::{HexValue, PublicKey, Hash};
-use exonum::storage::{StorageValue, List, Map};
-/// Merkle tree Proof
-use exonum::storage::Proofnode;
-/// Merkle Patricia tree Proof
-use exonum::storage::RootProofNode;
-
+use exonum::storage::{StorageValue, List, Map, Proofnode, RootProofNode};
 use exonum::blockchain::{self, Blockchain};
 
 use super::tx_metarecord::TxMetaRecord;

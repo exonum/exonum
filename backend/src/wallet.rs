@@ -1,8 +1,8 @@
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use exonum::messages::Field;
-use exonum::crypto::{PublicKey, Hash, hash};
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use exonum::messages::utils::U64;
+use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::StorageValue;
 
 

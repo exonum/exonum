@@ -16,12 +16,6 @@ extern crate rand;
 mod tests {
     extern crate iron_test;
 
-    use std::collections::VecDeque;
-    use std::sync::{Arc, Mutex};
-    use std::path::Path;
-    use std::fs::File;
-    use std::io::Read;
-
     use rand::{thread_rng, Rng};
     use router::Router;
     use iron::Headers;
@@ -31,27 +25,27 @@ mod tests {
     use serde::Serialize;
     use serde_json;
 
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+    use std::path::Path;
+    use std::fs::File;
+    use std::io::Read;
+
     use exonum::node::TransactionSend;
     use exonum::crypto::{Seed, Hash, PublicKey, gen_keypair, gen_keypair_from_seed};
     use exonum::blockchain::{Service, Transaction};
     use exonum::events::Error as EventsError;
     use exonum::messages::{FromRaw, Message, RawMessage};
-
     use blockchain_explorer::api::Api;
     use blockchain_explorer::helpers::init_logger;
-
     use cryptocurrency::{CurrencyService, CurrencyTx, TxCreateWallet, TxIssue, TxTransfer};
     use cryptocurrency::api::CryptocurrencyApi;
-
     use sandbox::sandbox::{sandbox_with_services, Sandbox};
     use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 
 
     fn logger() {
-        match init_logger() {
-            Ok(_) => {}
-            Err(_) => {}
-        }
+        let _ = init_logger();
     }
 
     fn response_body(response: Response) -> serde_json::Value {
