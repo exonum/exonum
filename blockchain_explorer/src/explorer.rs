@@ -105,7 +105,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     pub fn block_info_with_height(&self, height: u64) -> StorageResult<Option<BlockInfo>> {
-        if let Some(block_hash) = Schema::new(&self.blockchain.view()).block_by_height().get(height)? {
+        if let Some(block_hash) = Schema::new(&self.blockchain.view()).block_hashes_by_height().get(height)? {
             self.block_info(&block_hash, true)
         } else {
             Ok(None)
@@ -116,7 +116,7 @@ impl<'a> BlockchainExplorer<'a> {
         let b = self.blockchain.clone();
         let view = b.view();
         let schema = Schema::new(&view);
-        let heights = schema.block_by_height();
+        let heights = schema.block_hashes_by_height();
 
         let max_len = heights.len()?;
         let to = from.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
