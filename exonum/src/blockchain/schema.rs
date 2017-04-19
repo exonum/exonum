@@ -30,7 +30,7 @@ impl<'a> Schema<'a> {
         MapTable::new(vec![01], self.view)
     }
 
-    pub fn block_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
+    pub fn block_hashes_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
         ListTable::new(MapTable::new(vec![02], self.view))
     }
 
@@ -45,7 +45,7 @@ impl<'a> Schema<'a> {
     }
 
     pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
-        let block_hash = match self.block_by_height().get(height)? {
+        let block_hash = match self.block_hashes_by_height().get(height)? {
             None => return Ok(None),
             Some(block_hash) => block_hash,
         };
@@ -80,7 +80,7 @@ impl<'a> Schema<'a> {
     }
 
     pub fn last_block(&self) -> Result<Option<Block>, Error> {
-        Ok(match self.block_by_height().last()? {
+        Ok(match self.block_hashes_by_height().last()? {
             Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
             None => None,
         })
