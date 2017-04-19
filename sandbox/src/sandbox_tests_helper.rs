@@ -11,7 +11,6 @@ use exonum::crypto::{Hash, HASH_SIZE, hash};
 use exonum::events::Milliseconds;
 use exonum::node::ValidatorId;
 
-//use super::sandbox::Sandbox;
 use sandbox::Sandbox;
 use timestamping::{TimestampTx, TimestampingTxGenerator};
 
