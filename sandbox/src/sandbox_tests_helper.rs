@@ -5,14 +5,14 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
-                       RequestPrevotes};
+                       RequestPrevotes, BitVec};
 use exonum::blockchain::Block;
 use exonum::crypto::{Hash, HASH_SIZE, hash};
-use exonum::messages::BitVec;
 use exonum::events::Milliseconds;
 use exonum::node::ValidatorId;
 
-use super::sandbox::Sandbox;
+//use super::sandbox::Sandbox;
+use sandbox::Sandbox;
 use timestamping::{TimestampTx, TimestampingTxGenerator};
 
 pub type TimestampingSandbox = Sandbox;
