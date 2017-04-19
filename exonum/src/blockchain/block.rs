@@ -27,7 +27,7 @@ struct BlockSerdeHelper {
 }
 
 impl Serialize for Block {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         let helper = BlockSerdeHelper{
@@ -41,7 +41,7 @@ impl Serialize for Block {
     }
 }
 impl Deserialize for Block {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
         let helper = <BlockSerdeHelper>::deserialize(deserializer)?; 

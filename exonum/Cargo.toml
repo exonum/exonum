@@ -14,10 +14,10 @@ vec_map = "0.6.0"
 sodiumoxide = "0.0.13"
 rand = "0.3.0"
 leveldb = {version="0.9", path="../3rdparty/leveldb"}
-serde = "0.8.0"
-serde_derive = "0.8.0"
-serde_json = "0.8"
-toml = {version="0.2.0", default-features=false, features=["serde"]}
+serde = "0.9.0"
+serde_derive = "0.9.0"
+serde_json = "0.9"
+toml = {version="0.3.0", default-features=false, features=["serde"]}
 clap = "2.14"
 term = "0.4"
 colored = "1.3"

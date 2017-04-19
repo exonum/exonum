@@ -1,5 +1,5 @@
 use serde::{Serialize, Deserialize};
-use toml::{self, Encoder};
+use toml;
 
 use std::path::Path;
 use std::io;
@@ -15,7 +15,7 @@ impl ConfigFile {
         let mut file = File::open(path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
-        toml::decode_str(&toml).ok_or_else(|| {
+        toml::de::from_str(&toml).map_err(|_| {
             let e = io::Error::new(io::ErrorKind::InvalidData, "Unable to decode toml file");
             Box::new(e) as Box<Error>
         })
@@ -26,10 +26,8 @@ impl ConfigFile {
             fs::create_dir_all(dir)?;
         }
 
-        let mut e = Encoder::new();
-        value.serialize(&mut e)?;
         let mut file = File::create(path)?;
-        file.write_all(toml::encode_str(&e.toml).as_bytes())?;
+        file.write_all(&toml::ser::to_vec(&value)?)?;
 
         Ok(())
     }

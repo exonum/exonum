@@ -171,7 +171,7 @@ struct PrecommitBodySerdeHelper {
 }
 
 impl Serialize for Precommit {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         let body = PrecommitBodySerdeHelper{
@@ -191,7 +191,7 @@ impl Serialize for Precommit {
 }
 
 impl Deserialize for Precommit {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
         let h = <PrecommitSerdeHelper>::deserialize(deserializer)?;
