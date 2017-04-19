@@ -99,7 +99,7 @@ impl<S> NodeHandler<S>
         let schema = Schema::new(&view);
 
         let height = msg.height();
-        let block_hash = schema.heights().get(height).unwrap().unwrap();
+        let block_hash = schema.block_by_height().get(height).unwrap().unwrap();
 
         let block = schema.blocks().get(&block_hash).unwrap().unwrap();
         let precommits = schema.precommits(&block_hash)
