@@ -147,7 +147,7 @@ macro_rules! implement_serde {
 
     impl Serialize for $name
     {
-        fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+        fn serialize<S>(&self, ser:S) -> Result<S::Ok, S::Error>
         where S: Serializer
         {
             ser.serialize_str(&HexValue::to_hex(self))
@@ -156,7 +156,7 @@ macro_rules! implement_serde {
 
     impl Deserialize for $name
     {
-        fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
         {
             struct HexVisitor;
@@ -164,8 +164,10 @@ macro_rules! implement_serde {
             impl Visitor for HexVisitor
             {
                 type Value = $name;
-
-                fn visit_str<E>(&mut self, s: &str) -> Result<Self::Value, E>
+                fn expecting (&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+                    write!(fmt, "expecting str.")
+                }
+                fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
                 where E: de::Error
                 {
                     $name::from_hex(s).map_err(|_| de::Error::custom("Invalid hex"))
