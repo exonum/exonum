@@ -14,7 +14,7 @@ before_script:
 - export PATH="$PATH:$HOME/.cargo/bin"
 - which rustfmt || cargo install rustfmt
 script:
-- cargo fmt -p cryptocurrency -- --write-mode=diff
+- cargo fmt -p blockchain_explorer -- --write-mode=diff
 - cargo rustc --manifest-path exonum/Cargo.toml --features clippy -- -D warnings
 - cargo rustc --manifest-path blockchain_explorer/Cargo.toml --lib -- -D warnings
 - cargo build --manifest-path sandbox/Cargo.toml
