@@ -34,6 +34,10 @@ impl<'a> Schema<'a> {
         ListTable::new(MapTable::new(vec![02], self.view))
     }
 
+    pub fn block_hash_by_height(&self, height: u64) -> Result<Option<Hash>, Error> {
+        self.block_hashes_by_height().get(height)
+    }
+
     pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u32, Hash> {
         MerkleTable::new(MapTable::new([&[03u8] as &[u8], &height.serialize()].concat(), self.view))
     }
@@ -45,7 +49,7 @@ impl<'a> Schema<'a> {
     }
 
     pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
-        let block_hash = match self.block_hashes_by_height().get(height)? {
+        let block_hash = match self.block_hash_by_height(height)? {
             None => return Ok(None),
             Some(block_hash) => block_hash,
         };

@@ -105,7 +105,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     pub fn block_info_with_height(&self, height: u64) -> StorageResult<Option<BlockInfo>> {
-        if let Some(block_hash) = Schema::new(&self.blockchain.view()).block_hashes_by_height().get(height)? {
+        if let Some(block_hash) = Schema::new(&self.blockchain.view()).block_hash_by_height(height)? {
             self.block_info(&block_hash, true)
         } else {
             Ok(None)
