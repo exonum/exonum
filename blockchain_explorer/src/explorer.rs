@@ -34,9 +34,15 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     pub fn tx_info(&self, tx_hash: &Hash) -> StorageResult<Option<Value>> {
-        let tx = Schema::new(&self.blockchain.view()).transactions().get(tx_hash)?;
+        let tx = Schema::new(&self.blockchain.view())
+            .transactions()
+            .get(tx_hash)?;
         match tx {
-            Some(raw_tx) => Ok(self.blockchain.tx_from_raw(raw_tx).and_then(|t| Some(t.info()))),
+            Some(raw_tx) => {
+                Ok(self.blockchain
+                       .tx_from_raw(raw_tx)
+                       .and_then(|t| Some(t.info())))
+            }
             None => Ok(None),
         }
 
@@ -105,7 +111,9 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     pub fn block_info_with_height(&self, height: u64) -> StorageResult<Option<BlockInfo>> {
-        if let Some(block_hash) = Schema::new(&self.blockchain.view()).heights().get(height)? {
+        if let Some(block_hash) = Schema::new(&self.blockchain.view())
+               .heights()
+               .get(height)? {
             self.block_info(&block_hash, true)
         } else {
             Ok(None)
