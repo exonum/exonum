@@ -14,7 +14,7 @@
                 <strong>Public key</strong>
             </div>
             <div class="col-xs-6 custom-dd-column">
-                <truncate val={ opts.wallet.pub_key } digits=12></truncate>
+                <truncate class="truncate" val={ opts.wallet.pub_key }></truncate>
             </div>
         </div>
         <div class="row">

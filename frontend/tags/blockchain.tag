@@ -24,7 +24,7 @@
             </div>
             <div class="row" each={ blocks } onclick={ rowClick.bind(this, height) }>
                 <div class="col-xs-4 custom-table-column">
-                    <truncate val={ hash } digits=8></truncate>
+                    <truncate val={ hash }></truncate>
                 </div>
                 <div class="col-xs-4 custom-table-column">
                     { height }

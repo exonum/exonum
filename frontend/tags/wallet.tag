@@ -37,33 +37,33 @@
             <div class="custom-table">
                 <div class="row">
                     <div class="col-xs-4 custom-table-header-column">Hash</div>
-                    <div class="col-xs-4 custom-table-header-column">Description</div>
-                    <div class="col-xs-4 custom-table-header-column">Status</div>
+                    <div class="col-xs-5 custom-table-header-column">Description</div>
+                    <div class="col-xs-3 custom-table-header-column text-center">Status</div>
                 </div>
                 <div class="row" each={ transactions }>
                     <div class="col-xs-4 custom-table-column">
-                        <truncate val={ hash } digits=12></truncate>
+                        <truncate val={ hash }></truncate>
                     </div>
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 130 }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 130 }>
                         Create wallet
                     </div>
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 129 }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 129 }>
                         Add <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to your wallet
                     </div>
                     <!-- TODO revert later -->
-                    <!--<div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.from === parent.publicKey }>
+                    <!--<div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.from === parent.publicKey }>
                         Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.to === parent.publicKey }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.to === parent.publicKey }>
                         Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
                     </div>-->
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
                         Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
                         Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
                     </div>
-                    <div class="col-xs-4 custom-table-column">
+                    <div class="col-xs-3 custom-table-column text-center">
                         <i if={ status } class="glyphicon glyphicon-ok text-success"></i>
                         <i if={ !status } class="glyphicon glyphicon-remove text-danger"></i>
                     </div>

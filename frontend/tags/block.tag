@@ -27,7 +27,7 @@
                         <strong>Hash</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        <truncate val={ block.hash } digits=12></truncate>
+                        <truncate class="truncate" val={ block.hash }></truncate>
                     </div>
                 </div>
                 <div class="row">
@@ -43,7 +43,7 @@
                         <strong>Tx hash</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        <truncate val={ block.tx_hash } digits=12></truncate>
+                        <truncate class="truncate" val={ block.tx_hash }></truncate>
                     </div>
                 </div>
                 <div class="row">
@@ -51,7 +51,7 @@
                         <strong>State hash</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        <truncate val={ block.state_hash } digits=12></truncate>
+                        <truncate class="truncate" val={ block.state_hash }></truncate>
                     </div>
                 </div>
                 <div class="row">
@@ -69,23 +69,23 @@
             <div class="custom-table">
                 <div class="row">
                     <div class="col-xs-4 custom-table-header-column">Hash</div>
-                    <div class="col-xs-4 custom-table-header-column">Description</div>
-                    <div class="col-xs-4 custom-table-header-column">Status</div>
+                    <div class="col-xs-5 custom-table-header-column">Description</div>
+                    <div class="col-xs-3 custom-table-header-column text-center">Status</div>
                 </div>
                 <div class="row" each={ block.txs }>
                     <div class="col-xs-4 custom-table-column">
-                        <truncate val={ hash } digits=12></truncate>
+                        <truncate val={ hash }></truncate>
                     </div>
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 130 }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 130 }>
                         Create { body.name } wallet
                     </div>
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 129 }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 129 }>
                         <truncate val={ body.wallet }></truncate> add funds of <strong>{ numeral(body.amount).format('$0,0.00') }</strong>
                     </div>
-                    <div class="col-xs-4 custom-table-column" if={ message_id === 128 }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 }>
                         <truncate val={ body.from }></truncate> send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
-                    <div class="col-xs-4 custom-table-column">
+                    <div class="col-xs-3 custom-table-column text-center">
                         <i if={ status } class="glyphicon glyphicon-ok text-success"></i>
                         <i if={ !status } class="glyphicon glyphicon-remove text-danger"></i>
                     </div>
