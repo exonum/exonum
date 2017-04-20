@@ -24,7 +24,7 @@
             </div>
 
             <div class="form-group">
-                <p class="text-center">Add more finds to your account:</p>
+                <p class="text-center">Add more funds to your account:</p>
                 <!-- TODO revert later -->
                 <!--<a href="#user/{ publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>-->
                 <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
