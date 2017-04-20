@@ -116,15 +116,15 @@ impl<'a> BlockchainExplorer<'a> {
         let b = self.blockchain.clone();
         let view = b.view();
         let schema = Schema::new(&view);
-        let heights = schema.block_hashes_by_height();
+        let hashes = schema.block_hashes_by_height();
 
-        let max_len = heights.len()?;
+        let max_len = hashes.len()?;
         let to = from.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
         let from = to.checked_sub(count).unwrap_or(0);
 
         let mut v = Vec::new();
         for height in (from..to).rev() {
-            if let Some(ref h) = heights.get(height)? {
+            if let Some(ref h) = hashes.get(height)? {
                 if let Some(block_info) = self.block_info(h, false)? {
                     v.push(block_info);
                 }
