@@ -4,7 +4,7 @@
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
                RequestBlock, Block};
 use blockchain::Schema;
-use storage::{Map, List};
+use storage::Map;
 use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
@@ -99,7 +99,7 @@ impl<S> NodeHandler<S>
         let schema = Schema::new(&view);
 
         let height = msg.height();
-        let block_hash = schema.block_hashes_by_height().get(height).unwrap().unwrap();
+        let block_hash = schema.block_hash_by_height(height).unwrap().unwrap();
 
         let block = schema.blocks().get(&block_hash).unwrap().unwrap();
         let precommits = schema.precommits(&block_hash)
