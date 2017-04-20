@@ -18,7 +18,6 @@ extern crate blockchain_explorer;
 extern crate cryptocurrency;
 extern crate router;
 extern crate cookie;
-extern crate configuration_service;
 
 use std::net::SocketAddr;
 use std::thread;
@@ -27,13 +26,13 @@ use router::Router;
 
 use exonum::blockchain::{Blockchain, Service};
 use exonum::node::{Node, NodeConfig};
-use configuration_service::ConfigurationService;
 
 use cryptocurrency::CurrencyService;
 use cryptocurrency::api::CryptocurrencyApi;
 
 use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
 use blockchain_explorer::api::Api;
+use blockchain_explorer::explorer_api::ExplorerApi;
 
 fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
     if let Some(port) = port {
@@ -46,11 +45,13 @@ fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
                 channel: channel.clone(),
                 blockchain: blockchain.clone(),
             };
+            let explorer_api = ExplorerApi { blockchain: blockchain.clone() };
             let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
             println!("Cryptocurrency node server started on {}", listen_address);
 
             let mut router = Router::new();
             cryptocurrency_api.wire(&mut router);
+            explorer_api.wire(&mut router);
             let chain = iron::Chain::new(router);
             iron::Iron::new(chain).http(listen_address).unwrap();
 
@@ -87,8 +88,7 @@ fn main() {
             let node_cfg = RunCommand::node_config(matches);
             let db = RunCommand::db(matches);
 
-            let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new()),
-                                                   Box::new(ConfigurationService::new())];
+            let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
             let blockchain = Blockchain::new(db, services);
             run_node(blockchain, node_cfg, port)
         }

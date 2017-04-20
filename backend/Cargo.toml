@@ -11,7 +11,7 @@ time = "0.1"
 rand = "0.3"
 log = "0.3"
 byteorder = "0.5"
-serde = "0.8"
+serde = "0.8.23"
 serde_derive = "0.8"
 jsonway = "1.0"
 iron = "0.5.1"
@@ -21,17 +21,16 @@ headers = "0.1.0"
 hyper = "0.10.4"
 serde_json = "0.8"
 cookie = "0.6.0"
+tempdir = "0.3.5"
+params = "0.6.0"
+clippy = {version = "0.0.107", optional = true}
 
 [dependencies.exonum]
-git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "270ede3ed567643d468c1b0d9dbd918c079edcf2"
+git = "ssh://git@github.com/exonum/exonum-core.git"
+version = "0.1.0"
+rev = "5c7c349c829a254e176be9409620b95f55140643"
 
 [dependencies.blockchain_explorer]
-git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "270ede3ed567643d468c1b0d9dbd918c079edcf2"
-
-[dependencies.configuration_service]
-git = "ssh://git@gitlab.xdev.re/digital-assets/digital-assets.git"
-rev = "270ede3ed567643d468c1b0d9dbd918c079edcf2"
-
-
+git = "ssh://git@github.com/exonum/exonum-core.git"
+version = "0.1.0"
+rev = "5c7c349c829a254e176be9409620b95f55140643"

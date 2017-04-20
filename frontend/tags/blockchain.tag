@@ -15,26 +15,22 @@
     <div class="panel-body">
         <div class="custom-table custom-table-hover">
             <div class="row">
-                <div class="col-xs-4 col-sm-3 custom-table-header-column">Hash</div>
-                <div class="col-xs-3 custom-table-header-column">Height</div>
-                <div class="col-xs-2 col-sm-3 custom-table-header-column">
+                <div class="col-xs-4 custom-table-header-column">Hash</div>
+                <div class="col-xs-4 custom-table-header-column">Height</div>
+                <div class="col-xs-4 custom-table-header-column">
                     <span class="hidden-xs">Transactions</span>
                     <span class="visible-xs">Txs</span>
                 </div>
-                <div class="col-xs-3 custom-table-header-column">Date</div>
             </div>
             <div class="row" each={ blocks } onclick={ rowClick.bind(this, height) }>
-                <div class="col-xs-4 col-sm-3 custom-table-column">
-                    <truncate val={ hash } digits=8></truncate>
+                <div class="col-xs-4 custom-table-column">
+                    <truncate val={ hash }></truncate>
                 </div>
-                <div class="col-xs-3 custom-table-column">
+                <div class="col-xs-4 custom-table-column">
                     { height }
                 </div>
-                <div class="col-xs-2 col-sm-3 custom-table-column">
+                <div class="col-xs-4 custom-table-column">
                     { tx_count }
-                </div>
-                <div class="col-xs-3 custom-table-column">
-                    { moment(propose_time * 1000).fromNow() }
                 </div>
             </div>
         </div>
@@ -50,8 +46,8 @@
         var self = this;
 
         this.toggleLoading(true);
-        this.api.loadBlockchain(self.height + 1, function(data) {
-            self.blocks = data;
+        this.service.getBlocks(self.height + 1, function(blocks) {
+            self.blocks = blocks;
             self.update();
             self.toggleLoading(false);
         });
@@ -64,8 +60,8 @@
         more(e) {
             e.preventDefault();
             self.toggleLoading(true);
-            this.api.loadBlockchain(self.blocks[self.blocks.length - 1].height, function(data) {
-                self.blocks = self.blocks.concat(data);
+            this.service.getBlocks(self.blocks[self.blocks.length - 1].height, function(blocks) {
+                self.blocks = self.blocks.concat(blocks);
                 self.update();
                 self.toggleLoading(false);
             });

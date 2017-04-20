@@ -22,13 +22,133 @@ Frontend is a lightweight single page application implemented on [riotjs](https:
 
 Application is served by Node.js and communicates directly with backends REST api and uses Exonum client to convert data into appropriate format and parse it into JSON.
 
+All business logic is can be found in the file `cryptocurrency.js`.
+
 #### Submit transaction
 
-To create transaction the new entity of `newMessage` type should be declared.
+To create transaction of each type you need to declare the new entity of `newMessage` type.
 
-Here is example of how transfer transaction is declared:
+##### Create a new wallet transaction
+
+Here is an example of how `create a new wallet` transaction is declared:
+
+```javascript
+var CreateWalletTransaction = {
+    size: 144,
+    service_id: 128,
+    message_id: 130,
+    fields: {
+        pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+        login: {type: Exonum.String, size: 8, from: 32, to: 40},
+        sec_key_enc: {type: Exonum.String, size: 80, from: 40, to: 120},
+        nonce: {type: Exonum.Nonce, size: 24, from: 120, to: 144}
+    }
+};
+```
+
+Then new random pair of publicKey and secretKey is generated:
+
+```javascript
+var pair = Exonum.keyPair(); 
+```
+
+Then random nonce is generated:
+
+```javascript
+var nonce = Exonum.randomNonce();
+```
+
+Then secretKey is encrypted using password as key:
 
 ```
+var secretKeyEncrypted = Exonum.encryptDigest(pair.secretKey, nonce, password);
+```
+
+Then transaction data can be signed:
+
+```javascript
+var data = {
+    pub_key: pair.publicKey,
+    login: ...,
+    sec_key_enc: secretKeyEncrypted,
+    nonce: nonce
+};
+
+var signature = CreateWalletTransaction.sign(data, pair.secretKey);
+```
+
+Finally, signed data and signature can be submitted to server:
+
+```javascript
+$.ajax({
+    method: 'POST',
+    url: '...',
+    contentType: 'application/json',
+    data: JSON.stringify({
+        service_id: 128,
+        message_id: 130,
+        body: data,
+        signature: signature
+    }),
+    success: ...,
+    error: ...
+});
+```
+
+##### Add funds transaction
+
+Here is an example of how `add funds` transaction is declared:
+
+```javascript
+var AddFundsTransaction = {
+    size: 48,
+    service_id: 128,
+    message_id: 129,
+    fields: {
+        wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+        amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
+        seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
+    }
+};
+```
+
+Then transaction data can be signed:
+
+```javascript
+var seed = Exonum.randomUint64();
+
+var data = {
+    wallet: ...,
+    amount: ...,
+    seed: seed
+};
+
+var signature = TransferTransaction.sign(data, secretKey);
+```
+
+Finally, signed data and signature can be submitted to server:
+
+```javascript
+$.ajax({
+    method: 'POST',
+    url: '...',
+    contentType: 'application/json',
+    data: JSON.stringify({
+        service_id: 128,
+        message_id: 129,
+        body: data,
+        signature: signature
+    }),
+    success: ...,
+    error: ...
+});
+```
+
+##### Transfer transaction
+
+Here is an example of how `transfer` transaction is declared:
+
+```javascript
 var TransferTransaction = {
     size: 80,
     service_id: 128,
@@ -42,9 +162,9 @@ var TransferTransaction = {
 };
 ```
 
-Then transaction data is signed:
+Then transaction data can be signed:
 
-```
+```javascript
 var seed = Exonum.randomUint64();
 
 var data = {
@@ -57,24 +177,48 @@ var data = {
 var signature = TransferTransaction.sign(data, secretKey);
 ```
 
-Finally, signed data and signature are submitted to server:
+Finally, signed data and signature can be submitted to server:
 
-```
-{
-    service_id: 128,
-    message_id: 128,
-    body: data,
-    signature: signature
-}
+```javascript
+$.ajax({
+    method: 'POST',
+    url: '...',
+    contentType: 'application/json',
+    data: JSON.stringify({
+        service_id: 128,
+        message_id: 128,
+        body: data,
+        signature: signature
+    }),
+    success: ...,
+    error: ...
+});
 ```
 
 #### Get wallet
 
-Backend returns wallet info in block with precommits.
+Wallet data is encoded inside next structure:
 
-Here the list of necessary steps:
+```json
+{
+    "block_info": {
+        "block": {...},
+        "precommits": [...]
+    },
+    "wallet": {
+        "mpt_proof": {...},
+        "value": {...}
+    },
+    "wallet_history": {
+        "mt_proof": {...},
+        "values": [...]
+    }
+}
+```
 
-1) Block can be verified with Exonum client:
+Here the list of a necessary steps to get wallet data:
+
+1) Verify block:
 
 ```javascript
 Exonum.verifyBlock(data.block_info, validators);
@@ -82,7 +226,7 @@ Exonum.verifyBlock(data.block_info, validators);
 
 `validators` is the array of validators.
 
-2) Wallets table hash can be found at `wallet.mpt_proof` Merkle Patricia tree. Key for value is generated using `service_id` and `table_index`:
+2) Find wallets table hash at Merkle Patricia tree stored in `wallet.mpt_proof`. Key of this value is generated using `service_id` and `table_index`:
 
 ```javascript
 var TableKey = Exonum.newType({
@@ -103,9 +247,9 @@ var tableKey = TableKey.hash(tableKeyData);
 var walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey);
 ```
 
-3) Wallet's data can be found at `wallet.value` Merkle Patricia tree. Wallets table hash from previous step is used as key.
+3) Find wallet's data at Merkle Patricia tree stored in `wallet.value`. Wallets table hash from previous step is used as key.
 
-```
+```javascript
 var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
 ```
 
@@ -126,6 +270,52 @@ var Wallet = Exonum.newType({
 });
 ```
 
-4) Hashes of all transactions can be found at `wallet_history.mt_proof` Merkle tree.
+4) Find hashes of all transactions at Merkle tree in `wallet_history.mt_proof`.
 
-5) List of all transactions can be found at  `wallet.values`. Each transaction can be compared with hash from previous step.
+```javascript
+var hashes = Exonum.merkleProof(wallet.history_hash, wallet.history_len, data.wallet_history.mt_proof, [0, wallet.history_len]);
+```
+
+5) Validate each transaction and its hash, append hash to transaction data.
+
+```javascript
+var transactions = [];
+for (var i in hashes) {
+    if (!hashes.hasOwnProperty(i)) {
+        continue;
+    }
+
+    if (!validateTransaction(data.wallet_history.values[i], hashes[i])) {
+        return undefined;
+    }
+
+    var transaction = data.wallet_history.values[i];
+    transaction.hash = hashes[i];
+
+    transactions.push(transaction);
+}
+```
+
+The steps from above guarantees all wallet info reliability and consistency.
+
+#### Build
+
+First, install npm dependencies:
+
+```
+npm install
+```
+
+Then install bower dependencies:
+
+```
+bower install
+```
+
+#### Run
+
+To run application:
+
+```
+node frontend/app.js
+```

@@ -6,15 +6,19 @@
     </div>
     <div class="panel-body text-center">
         <div class="form-group">
-            <p>Create new wallet:</p>
+            <p>Create a new wallet:</p>
             <a href="#register" class="btn btn-lg btn-block btn-success">Register</a>
         </div>
 
         <div class="form-group" if={ users.length > 0 }>
             <p>Login into existed wallet:</p>
-            <!--<a href="#login" class="btn btn-lg btn-block btn-primary">Login</a>-->
             <a href="#user/{ publicKey }" class="btn btn-lg btn-block btn-primary" each={ users }>{name}</a>
         </div>
+
+        <!--<div class="form-group">
+            <p>Login into existed wallet:</p>
+            <a href="#login" class="btn btn-lg btn-block btn-primary">Login</a>
+        </div>-->
 
         <div class="form-group">
             <p>Explore blockchain:</p>
@@ -23,6 +27,6 @@
     </div>
 
     <script>
-        this.users = this.localStorage.getUsers();
+        this.users = this.storage.getUsers();
     </script>
 </dashboard>

@@ -1,5 +1,10 @@
 <add-funds>
     <div class="panel-heading">
+        <!-- TODO revert later -->
+        <!--<a class="btn btn-default pull-left page-nav" href="#user">
+            <i class="glyphicon glyphicon-arrow-left"></i>
+            <span class="hidden-xs">Back</span>
+        </a>-->
         <a class="btn btn-default pull-left page-nav" href="#user/{ opts.publicKey }">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
@@ -27,11 +32,36 @@
 
     <script>
         var self = this;
+        // TODO revert later
+//        var user = self.storage.getUser();
+//
+//        this.publicKey = user.publicKey;
+//
+//        this.toggleLoading(true);
+//        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
+//            self.block = block;
+//            self.wallet = wallet;
+//            self.update();
+//            self.toggleLoading(false);
+//        });
+//
+//        addFunds(e) {
+//            e.preventDefault();
+//            var amount = $(e.target).data('amount').toString();
+//            var user = self.storage.getUser();
+//
+//            self.toggleLoading(true);
+//            self.service.addFunds(amount, user.publicKey, user.secretKey, function() {
+//                self.toggleLoading(false);
+//                self.notify('success', 'Funds has been added into your account.');
+//                route('/user');
+//            });
+//        }
 
         this.toggleLoading(true);
-        this.api.getWallet(self.opts.publicKey, function(data) {
-            self.block = data.block;
-            self.wallet = data.wallet;
+        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+            self.block = block;
+            self.wallet = wallet;
             self.update();
             self.toggleLoading(false);
         });
@@ -39,10 +69,11 @@
         addFunds(e) {
             e.preventDefault();
             var amount = $(e.target).data('amount').toString();
-            var user = self.localStorage.getUser(self.opts.publicKey);
-            var transaction = self.api.cryptocurrency.addFundsTransaction(amount, self.opts.publicKey, user.secretKey);
+            var user = self.storage.getUser(self.opts.publicKey);
 
-            self.api.submitTransaction.call(self, transaction, self.opts.publicKey, function() {
+            self.toggleLoading(true);
+            self.service.addFunds(amount, self.opts.publicKey, user.secretKey, function() {
+                self.toggleLoading(false);
                 self.notify('success', 'Funds has been added into your account.');
                 route('/user/' + self.opts.publicKey);
             });

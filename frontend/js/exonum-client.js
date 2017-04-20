@@ -584,6 +584,7 @@ var bigInt = (function (undefined) {
             guess, xlen, highx, highy, check;
         while (a_l) {
             part.unshift(a[--a_l]);
+            trim(part);
             if (compareAbs(part, b) < 0) {
                 result.push(0);
                 continue;
@@ -954,6 +955,9 @@ var bigInt = (function (undefined) {
         if (t.compare(0) === -1) {
         	t = t.add(n);
         }
+        if (this.isNegative()) {
+            return t.negate();
+        }
         return t;
     }
     SmallInteger.prototype.modInv = BigInteger.prototype.modInv;
@@ -1094,7 +1098,7 @@ var bigInt = (function (undefined) {
         b = parseValue(b);
         return a.greater(b) ? a : b;
     }
-    function min(a,b) {
+    function min(a, b) {
         a = parseValue(a);
         b = parseValue(b);
         return a.lesser(b) ? a : b;
@@ -6539,18 +6543,24 @@ require('../src/data-management');
 require('../src/validators');
 
 var Block = Exonum.newType({
-    size: 116,
+    size: 108,
     fields: {
         height: {type: Exonum.Uint64, size: 8, from: 0, to: 8},
         propose_round: {type: Exonum.Uint32, size: 4, from: 8, to: 12},
-        time: {type: Exonum.Timespec, size: 8, from: 12, to: 20},
-        prev_hash: {type: Exonum.Hash, size: 32, from: 20, to: 52},
-        tx_hash: {type: Exonum.Hash, size: 32, from: 52, to: 84},
-        state_hash: {type: Exonum.Hash, size: 32, from: 84, to: 116}
+        prev_hash: {type: Exonum.Hash, size: 32, from: 12, to: 44},
+        tx_hash: {type: Exonum.Hash, size: 32, from: 44, to: 76},
+        state_hash: {type: Exonum.Hash, size: 32, from: 76, to: 108}
+    }
+});
+var SystemTime = Exonum.newType({
+    size: 12,
+    fields: {
+        secs: {type: Exonum.Uint64, size: 8, from: 0, to: 8},
+        nanos: {type: Exonum.Uint32, size: 4, from: 8, to: 12}
     }
 });
 var Precommit = Exonum.newMessage({
-    size: 84,
+    size: 96,
     service_id: 0,
     message_id: 4,
     fields: {
@@ -6558,7 +6568,8 @@ var Precommit = Exonum.newMessage({
         height: {type: Exonum.Uint64, size: 8, from: 8, to: 16},
         round: {type: Exonum.Uint32, size: 4, from: 16, to: 20},
         propose_hash: {type: Exonum.Hash, size: 32, from: 20, to: 52},
-        block_hash: {type: Exonum.Hash, size: 32, from: 52, to: 84}
+        block_hash: {type: Exonum.Hash, size: 32, from: 52, to: 84},
+        time: {type: SystemTime, size: 12, from: 84, to: 96}
     }
 });
 
@@ -6645,7 +6656,7 @@ Exonum.verifyBlock = function(data, validators) {
     return true;
 };
 
-},{"../src/core":21,"../src/data-management":23,"../src/validators":28}],19:[function(require,module,exports){
+},{"../src/core":21,"../src/data-management":23,"../src/validators":29}],19:[function(require,module,exports){
 var Exonum = require('./index.js');
 
 window.Exonum = window.Exonum || Exonum;
@@ -6654,13 +6665,16 @@ window.Exonum = window.Exonum || Exonum;
 'use strict';
 var Exonum = require('../src/core');
 
+require('../src/types');
+
 Exonum.hexadecimalToUint8Array = function(str) {
+    var array = [];
+
     if (typeof str !== 'string') {
         console.error('Wrong data type of hexadecimal string');
         return new Uint8Array([]);
     }
 
-    var array = [];
     for (var i = 0, len = str.length; i < len; i += 2) {
         array.push(parseInt(str.substr(i, 2), 16));
     }
@@ -6668,21 +6682,59 @@ Exonum.hexadecimalToUint8Array = function(str) {
     return new Uint8Array(array);
 };
 
-Exonum.hexadecimalToBinaryString = function(str) {
-    var binaryStr = '';
-    for (var i = 0, len = str.length; i < len; i += 2) {
-        binaryStr += parseInt(str.substr(i, 2), 16).toString(2);
+Exonum.stringToUint8Array = function(str, len) {
+    var array = [];
+    var from = 0;
+
+    if (len > 0) {
+        for (var i = 0; i < len; i++) {
+            array.push(0);
+        }
     }
-    return binaryStr;
+
+    for (var i = 0; i < str.length; i++) {
+        var c = str.charCodeAt(i);
+
+        if (c < 128) {
+            array[from++] = c;
+        } else if (c < 2048) {
+            array[from++] = (c >> 6) | 192;
+            array[from++] = (c & 63) | 128;
+        } else if (((c & 0xFC00) == 0xD800) && (i + 1) < str.length && ((str.charCodeAt(i + 1) & 0xFC00) == 0xDC00)) {
+            // surrogate pair
+            c = 0x10000 + ((c & 0x03FF) << 10) + (str.charCodeAt(++i) & 0x03FF);
+            array[from++] = (c >> 18) | 240;
+            array[from++] = ((c >> 12) & 63) | 128;
+            array[from++] = ((c >> 6) & 63) | 128;
+            array[from++] = (c & 63) | 128;
+        } else {
+            array[from++] = (c >> 12) | 224;
+            array[from++] = ((c >> 6) & 63) | 128;
+            array[from++] = (c & 63) | 128;
+        }
+    }
+
+    return new Uint8Array(array);
+};
+
+Exonum.binaryStringToUint8Array = function(binaryStr) {
+    var array = [];
+
+    for (var i = 0, len = binaryStr.length; i < len; i += 8) {
+        array.push(parseInt(binaryStr.substr(i, 8), 2));
+    }
+
+    return new Uint8Array(array);
 };
 
 Exonum.uint8ArrayToHexadecimal = function(uint8arr) {
+    var str = '';
+
     if (!(uint8arr instanceof Uint8Array)) {
         console.error('Wrong data type of array of 8-bit integers');
         return '';
     }
 
-    var str = '';
     for (var i = 0, len = uint8arr.length; i < len; i++) {
         var hex = (uint8arr[i]).toString(16);
         hex = (hex.length === 1) ? '0' + hex : hex;
@@ -6692,17 +6744,9 @@ Exonum.uint8ArrayToHexadecimal = function(uint8arr) {
     return str.toLowerCase();
 };
 
-Exonum.binaryStringToUint8Array = function(binaryStr) {
-    var array = [];
-    for (var i = 0, len = binaryStr.length; i < len; i += 8) {
-        array.push(parseInt(binaryStr.substr(i, 8), 2));
-    }
-
-    return new Uint8Array(array);
-};
-
 Exonum.binaryStringToHexadecimal = function(binaryStr) {
     var str = '';
+
     for (var i = 0, len = binaryStr.length; i < len; i += 8) {
         var hex = (parseInt(binaryStr.substr(i, 8), 2)).toString(16);
         hex = (hex.length === 1) ? '0' + hex : hex;
@@ -6712,8 +6756,21 @@ Exonum.binaryStringToHexadecimal = function(binaryStr) {
     return str.toLowerCase();
 };
 
+Exonum.hexadecimalToBinaryString = function(str) {
+    var binaryStr = '';
 
-},{"../src/core":21}],21:[function(require,module,exports){
+    for (var i = 0, len = str.length; i < len; i++) {
+        var bin = parseInt(str.substr(i, 1), 16).toString(2);
+        for (var j = bin.length; j < 4; j++) {
+            bin = '0' + bin;
+        }
+        binaryStr += bin;
+    }
+
+    return binaryStr;
+};
+
+},{"../src/core":21,"../src/types":28}],21:[function(require,module,exports){
 'use strict';
 
 var Exonum = {
@@ -6752,10 +6809,12 @@ var Exonum = require('../src/core');
 
 require('../src/convertors');
 require('../src/data-management');
+require('../src/serialization');
 require('../src/validators');
 
 var sha = require('sha.js');
 var nacl = require('tweetnacl');
+var bigInt = require('big-integer');
 
 /**
  * Get SHA256 hash
@@ -6920,11 +6979,56 @@ Exonum.keyPair = function() {
     };
 };
 
-},{"../src/convertors":20,"../src/core":21,"../src/data-management":23,"../src/validators":28,"sha.js":10,"tweetnacl":17}],23:[function(require,module,exports){
+Exonum.randomNonce = function() {
+    var buffer = nacl.randomBytes(24);
+    return Exonum.uint8ArrayToHexadecimal(buffer);
+};
+
+Exonum.randomUint64 = function() {
+    var buffer = nacl.randomBytes(8);
+    var hex = Exonum.uint8ArrayToHexadecimal(buffer);
+
+    return bigInt(hex, 16).toString();
+};
+
+/**
+ * Encrypt data of type Digest
+ * @param {String} digest
+ * @param {Number} nonce
+ * @param {String} key
+ * @return {String}
+ */
+Exonum.encryptDigest = function(digest, nonce, key) {
+    var digestUint8Array = Exonum.hexadecimalToUint8Array(digest);
+    var nonceUint8Array = Exonum.hexadecimalToUint8Array(nonce);
+    var keyUint8Array = Exonum.stringToUint8Array(key, 32);
+    var box = nacl.secretbox(digestUint8Array, nonceUint8Array, keyUint8Array);
+
+    return Exonum.uint8ArrayToHexadecimal(box);
+};
+
+/**
+ * Decrypt data of type Digest
+ * @param {String} box
+ * @param {Number} nonce
+ * @param {String} key
+ * @return {String}
+ */
+Exonum.decryptDigest = function(box, nonce, key) {
+    var messageUint8Array = Exonum.hexadecimalToUint8Array(box);
+    var nonceUint8Array = Exonum.hexadecimalToUint8Array(nonce);
+    var keyUint8Array = Exonum.stringToUint8Array(key, 32);
+    var digest = nacl.secretbox.open(messageUint8Array, nonceUint8Array, keyUint8Array);
+
+    return Exonum.uint8ArrayToHexadecimal(digest);
+};
+
+},{"../src/convertors":20,"../src/core":21,"../src/data-management":23,"../src/serialization":27,"../src/validators":29,"big-integer":2,"sha.js":10,"tweetnacl":17}],23:[function(require,module,exports){
 'use strict';
 var Exonum = require('../src/core');
 
 require('../src/cryptography');
+require('../src/serialization');
 require('../src/types');
 
 const SIGNATURE_LENGTH = 64;
@@ -7051,7 +7155,7 @@ Exonum.isInstanceofOfMessage = function(type) {
 };
 
 
-},{"../src/core":21,"../src/cryptography":22,"../src/types":27}],24:[function(require,module,exports){
+},{"../src/core":21,"../src/cryptography":22,"../src/serialization":27,"../src/types":28}],24:[function(require,module,exports){
 'use strict';
 var Exonum = require('../src/core');
 
@@ -7153,8 +7257,9 @@ Exonum.merklePatriciaProof = function(rootHash, proofNode, key, type) {
      * @returns {Boolean}
      */
     function isPartOfSearchKey(prefix, suffix) {
+        // remove prefix from searched binary key
         var diff = keyBinary.substr(prefix.length);
-        return diff[0] === suffix[0];
+        return diff.indexOf(suffix) === 0;
     }
 
     /**
@@ -7437,7 +7542,7 @@ Exonum.merklePatriciaProof = function(rootHash, proofNode, key, type) {
     }
 };
 
-},{"../src/convertors":20,"../src/core":21,"../src/data-management":23,"../src/validators":28,"object-assign":8}],26:[function(require,module,exports){
+},{"../src/convertors":20,"../src/core":21,"../src/data-management":23,"../src/validators":29,"object-assign":8}],26:[function(require,module,exports){
 'use strict';
 var Exonum = require('../src/core');
 
@@ -7694,7 +7799,77 @@ Exonum.merkleProof = function(rootHash, count, proofNode, range, type) {
     return elements;
 };
 
-},{"../src/convertors":20,"../src/core":21,"../src/data-management":23,"../src/validators":28,"big-integer":2,"object-assign":8}],27:[function(require,module,exports){
+},{"../src/convertors":20,"../src/core":21,"../src/data-management":23,"../src/validators":29,"big-integer":2,"object-assign":8}],27:[function(require,module,exports){
+'use strict';
+var Exonum = require('../src/core');
+
+require('../src/types');
+
+/**
+ * Serialize data into array of 8-bit integers and insert into buffer
+ * @param {Array} buffer
+ * @param {Number} shift - the index to start write into buffer
+ * @param {Object} data
+ * @param type - can be {NewType} or one of built-in types
+ */
+Exonum.serialize = function(buffer, shift, data, type) {
+    function checkIfIsFixed(fields) {
+        for (var fieldName in fields) {
+            if (!fields.hasOwnProperty(fieldName)) {
+                continue;
+            }
+
+            if (Exonum.isInstanceofOfNewType(fields[fieldName].type)) {
+                checkIfIsFixed(fields[fieldName].type.fields);
+            } else if (fields[fieldName].type === String) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    for (var i = 0, len = type.size; i < len; i++) {
+        buffer[shift + i] = 0;
+    }
+
+    for (var fieldName in data) {
+        if (!data.hasOwnProperty(fieldName)) {
+            continue;
+        }
+
+        var fieldType = type.fields[fieldName];
+
+        if (typeof fieldType === 'undefined') {
+            console.error(fieldName + ' field was not found in configuration of type.');
+            return;
+        }
+
+        var fieldData = data[fieldName];
+        var from = shift + fieldType.from;
+
+        if (Exonum.isInstanceofOfNewType(fieldType.type)) {
+            var isFixed = checkIfIsFixed(fieldType.type.fields);
+
+            if (isFixed === true) {
+                Exonum.serialize(buffer, from, fieldData, fieldType.type);
+            } else {
+                var end = buffer.length;
+                Exonum.Uint32(end, buffer, from, from + 4);
+                Exonum.serialize(buffer, end, fieldData, fieldType.type);
+                Exonum.Uint32(buffer.length - end, buffer, from + 4, from + 8);
+            }
+        } else {
+            buffer = fieldType.type(fieldData, buffer, from, shift + fieldType.to);
+            if (typeof buffer === 'undefined') {
+                return;
+            }
+        }
+    }
+
+    return buffer;
+};
+
+},{"../src/core":21,"../src/types":28}],28:[function(require,module,exports){
 'use strict';
 var Exonum = require('../src/core');
 
@@ -7715,7 +7890,7 @@ const MAX_UINT64 = '18446744073709551615';
 
 var bigInt = require('big-integer');
 
-function insertHexadecimalToArray(str, buffer, from, to) {
+function insertHexadecimalToByteArray(str, buffer, from, to) {
     for (var i = 0, len = str.length; i < len; i += 2) {
         buffer[from] = parseInt(str.substr(i, 2), 16);
         from++;
@@ -7726,30 +7901,20 @@ function insertHexadecimalToArray(str, buffer, from, to) {
     }
 }
 
+// store Number as little-endian
 function insertIntegerToByteArray(number, buffer, from, to) {
     var str = number.toString(16);
 
-    insertNumberInHexToByteArray(str, buffer, from, to);
-}
-
-function insertBigIntegerToByteArray(number, buffer, from, to) {
-    var str = number.toString(16);
-
-    insertNumberInHexToByteArray(str, buffer, from, to);
-}
-
-function insertNumberInHexToByteArray(number, buffer, from, to) {
-    // store Number as little-endian
-    if (number.length < 3) {
-        buffer[from] = parseInt(number, 16);
+    if (str.length < 3) {
+        buffer[from] = parseInt(str, 16);
         return true;
     }
 
-    for (var i = number.length; i > 0; i -= 2) {
+    for (var i = str.length; i > 0; i -= 2) {
         if (i > 1) {
-            buffer[from] = parseInt(number.substr(i - 2, 2), 16);
+            buffer[from] = parseInt(str.substr(i - 2, 2), 16);
         } else {
-            buffer[from] = parseInt(number.substr(0, 1), 16);
+            buffer[from] = parseInt(str.substr(0, 1), 16);
         }
 
         from++;
@@ -7832,15 +7997,13 @@ Exonum.Int64 = function(value, buffer, from, to) {
 
     if (val === false) {
         return;
-    } else if (!bigInt.isInstance(val)) {
-        return;
     }
 
     if (val.isNegative()) {
         val = bigInt(MAX_UINT64).plus(1).plus(val);
     }
 
-    insertBigIntegerToByteArray(val, buffer, from, to);
+    insertIntegerToByteArray(val, buffer, from, to);
 
     return buffer;
 };
@@ -7881,17 +8044,24 @@ Exonum.Uint64 = function(value, buffer, from, to) {
 
     if (val === false) {
         return;
-    } else if (!bigInt.isInstance(val)) {
-        return;
     }
 
-    insertBigIntegerToByteArray(val, buffer, from, to);
+    insertIntegerToByteArray(val, buffer, from, to);
 
     return buffer;
 };
 
-Exonum.randomUint64 = function() {
-    return bigInt.randBetween(0, MAX_UINT64).toString();
+Exonum.Nonce = function(nonce, buffer, from, to) {
+    if (Exonum.validateHexHash(nonce, 24) === false) {
+        return;
+    } else if ((to - from) !== 24) {
+        console.error('Nonce segment is of wrong length. 24 bytes long is required to store transmitted value.');
+        return;
+    }
+
+    insertHexadecimalToByteArray(nonce, buffer, from, to);
+
+    return buffer;
 };
 
 Exonum.String = function(string, buffer, from, to) {
@@ -7919,7 +8089,7 @@ Exonum.Hash = function(hash, buffer, from, to) {
         return;
     }
 
-    insertHexadecimalToArray(hash, buffer, from, to);
+    insertHexadecimalToByteArray(hash, buffer, from, to);
 
     return buffer;
 };
@@ -7932,7 +8102,7 @@ Exonum.Digest = function(digest, buffer, from, to) {
         return;
     }
 
-    insertHexadecimalToArray(digest, buffer, from, to);
+    insertHexadecimalToByteArray(digest, buffer, from, to);
 
     return buffer;
 };
@@ -7945,21 +8115,7 @@ Exonum.PublicKey = function(publicKey, buffer, from, to) {
         return;
     }
 
-    insertHexadecimalToArray(publicKey, buffer, from, to);
-
-    return buffer;
-};
-
-Exonum.Timespec = function(nanoseconds, buffer, from, to) {
-    var val = Exonum.validateBigInteger(nanoseconds, 0, MAX_UINT64, from, to, 8);
-
-    if (val === false) {
-        return;
-    } else if (!bigInt.isInstance(val)) {
-        return;
-    }
-
-    insertBigIntegerToByteArray(val, buffer, from, to);
+    insertHexadecimalToByteArray(publicKey, buffer, from, to);
 
     return buffer;
 };
@@ -7978,71 +8134,19 @@ Exonum.Bool = function(value, buffer, from, to) {
     return buffer;
 };
 
-/**
- * Serialize data into array of 8-bit integers and insert into buffer
- * @param {Array} buffer
- * @param {Number} shift - the index to start write into buffer
- * @param {Object} data
- * @param type - can be {NewType} or one of built-in types
- */
-Exonum.serialize = function(buffer, shift, data, type) {
-    function checkIfIsFixed(fields) {
-        for (var fieldName in fields) {
-            if (!fields.hasOwnProperty(fieldName)) {
-                continue;
-            }
+Exonum.Timespec = function(nanoseconds, buffer, from, to) {
+    var val = Exonum.validateBigInteger(nanoseconds, 0, MAX_UINT64, from, to, 8);
 
-            if (Exonum.isInstanceofOfNewType(fields[fieldName].type)) {
-                checkIfIsFixed(fields[fieldName].type.fields);
-            } else if (fields[fieldName].type === String) {
-                return false;
-            }
-        }
-        return true;
+    if (val === false) {
+        return;
     }
 
-    for (var i = 0, len = type.size; i < len; i++) {
-        buffer[shift + i] = 0;
-    }
-
-    for (var fieldName in data) {
-        if (!data.hasOwnProperty(fieldName)) {
-            continue;
-        }
-
-        var fieldType = type.fields[fieldName];
-
-        if (typeof fieldType === 'undefined') {
-            console.error(fieldName + ' field was not found in configuration of type.');
-            return;
-        }
-
-        var fieldData = data[fieldName];
-        var from = shift + fieldType.from;
-
-        if (Exonum.isInstanceofOfNewType(fieldType.type)) {
-            var isFixed = checkIfIsFixed(fieldType.type.fields);
-
-            if (isFixed === true) {
-                Exonum.serialize(buffer, from, fieldData, fieldType.type);
-            } else {
-                var end = buffer.length;
-                Exonum.Uint32(end, buffer, from, from + 4);
-                Exonum.serialize(buffer, end, fieldData, fieldType.type);
-                Exonum.Uint32(buffer.length - end, buffer, from + 4, from + 8);
-            }
-        } else {
-            buffer = fieldType.type(fieldData, buffer, from, shift + fieldType.to);
-            if (typeof buffer === 'undefined') {
-                return;
-            }
-        }
-    }
+    insertIntegerToByteArray(val, buffer, from, to);
 
     return buffer;
 };
 
-},{"../src/core":21,"../src/validators":28,"big-integer":2}],28:[function(require,module,exports){
+},{"../src/core":21,"../src/validators":29,"big-integer":2}],29:[function(require,module,exports){
 'use strict';
 var Exonum = require('../src/core');
 
@@ -8080,7 +8184,9 @@ Exonum.validateBigInteger = function(value, min, max, from, to, length) {
 
     try {
         val = bigInt(value);
-        if (val.lt(min)) {
+        if (!bigInt.isInstance(val)) {
+            return false;
+        } else if (val.lt(min)) {
             console.error('Number should be more or equal to ' + min + '.');
             return false;
         } else if (val.gt(max)) {

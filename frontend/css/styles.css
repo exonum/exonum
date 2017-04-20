@@ -65,6 +65,16 @@ body {
     padding-top: 10px;
 }
 
+@media (min-width: 372px) {
+    .truncate .truncate-item {
+        display: inline;
+    }
+    .truncate .truncate-item:nth-child(2n):after {
+        display: block;
+        content: '';
+    }
+}
+
 .monospace {
     font-family: "Lucida Console", Monaco, Courier, monospace;
     font-size: 0.875em;

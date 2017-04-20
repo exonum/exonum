@@ -4,10 +4,10 @@
             <i class="glyphicon glyphicon-refresh"></i>
             <span class="hidden-xs">Refresh</span>
         </button>
-        <a class="btn btn-default pull-left page-nav" href="#dashboard">
+        <button class="btn btn-default pull-left page-nav" onclick={ logout }>
             <i class="glyphicon glyphicon-log-out"></i>
             <span class="hidden-xs">Logout</span>
-        </a>
+        </button>
         <div class="panel-title page-title text-center">
             <div class="h4">Wallet</div>
         </div>
@@ -24,7 +24,9 @@
             </div>
 
             <div class="form-group">
-                <p class="text-center">Add more finds to your account:</p>
+                <p class="text-center">Add more funds to your account:</p>
+                <!-- TODO revert later -->
+                <!--<a href="#user/{ publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>-->
                 <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
             </div>
         </virtual>
@@ -34,24 +36,36 @@
 
             <div class="custom-table">
                 <div class="row">
-                    <div class="col-xs-6 custom-table-header-column">Hash</div>
-                    <div class="col-xs-6 custom-table-header-column">Description</div>
+                    <div class="col-xs-4 custom-table-header-column">Hash</div>
+                    <div class="col-xs-5 custom-table-header-column">Description</div>
+                    <div class="col-xs-3 custom-table-header-column text-center">Status</div>
                 </div>
                 <div class="row" each={ transactions }>
-                    <div class="col-xs-6 custom-table-column">
-                        <truncate val={ hash } digits=12></truncate>
+                    <div class="col-xs-4 custom-table-column">
+                        <truncate val={ hash }></truncate>
                     </div>
-                    <div class="col-xs-6 custom-table-column" if={ message_id === 130 }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 130 }>
                         Create wallet
                     </div>
-                    <div class="col-xs-6 custom-table-column" if={ message_id === 129 }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 129 }>
                         Add <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to your wallet
                     </div>
-                    <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
+                    <!-- TODO revert later -->
+                    <!--<div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.from === parent.publicKey }>
                         Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
-                    <div class="col-xs-6 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.to === parent.publicKey }>
                         Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
+                    </div>-->
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
+                        Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
+                    </div>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
+                        Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
+                    </div>
+                    <div class="col-xs-3 custom-table-column text-center">
+                        <i if={ status } class="glyphicon glyphicon-ok text-success"></i>
+                        <i if={ !status } class="glyphicon glyphicon-remove text-danger"></i>
                     </div>
                 </div>
             </div>
@@ -64,18 +78,42 @@
     </div>
 
     <script>
+        // TODO revert later
+//        var self = this;
+//        var user = self.storage.getUser();
+//
+//        this.publicKey = user.publicKey;
+//
+//        this.toggleLoading(true);
+//        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
+//            self.block = block;
+//            self.wallet = wallet;
+//            self.transactions = transactions;
+//            self.update();
+//            self.toggleLoading(false);
+//
+//            if (wallet.balance == 0) {
+//                self.notify('warning', 'You have not any money yet. Add some funds.');
+//            }
+//        });
+//
+//        transfer(e) {
+//            e.preventDefault();
+//            route('/user/transfer');
+//        }
+
         var self = this;
 
         this.toggleLoading(true);
-        this.api.getWallet(self.opts.publicKey, function(data) {
-            self.block = data.block;
-            self.wallet = data.wallet;
-            self.transactions = data.transactions;
+        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+            self.block = block;
+            self.wallet = wallet;
+            self.transactions = transactions;
             self.update();
             self.toggleLoading(false);
 
-            if (self.wallet.balance == 0) {
-                self.notify('warning', 'You haven\'t any money yet. Add some funds.');
+            if (wallet.balance == 0) {
+                self.notify('warning', 'You have not any money yet. Add some funds.');
             }
         });
 
@@ -87,6 +125,13 @@
         refresh(e) {
             e.preventDefault();
             window.location.reload();
+        }
+
+        logout(e) {
+            e.preventDefault();
+            // TODO revert later
+//            self.deleteUser();
+            route('/dashboard');
         }
     </script>
 </wallet>

@@ -6,6 +6,7 @@
   ],
   "private": true,
   "dependencies": {
+    "big-integer": "^1.6.17",
     "bootstrap": "^3.3.7",
     "jquery": "^3.1.1",
     "riot": "^3.3.1",

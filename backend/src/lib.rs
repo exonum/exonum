@@ -1,3 +1,6 @@
+#![cfg_attr(feature="clippy", feature(plugin))]
+#![cfg_attr(feature="clippy", plugin(clippy))]
+
 extern crate rand;
 extern crate time;
 extern crate serde;
@@ -15,37 +18,35 @@ extern crate serde_json;
 #[macro_use(message, storage_value)]
 extern crate exonum;
 extern crate blockchain_explorer;
+extern crate params;
 extern crate router;
 extern crate iron;
 extern crate hyper;
 extern crate bodyparser;
-extern crate configuration_service;
 
 use serde::{Serialize, Serializer};
-use exonum::crypto::HexValue;
+use serde::de::{self, Deserialize, Deserializer};
+use exonum::messages::utils::U64;
+use exonum::crypto::{PUBLIC_KEY_LENGTH, Signature};
 use blockchain_explorer::TransactionInfo;
+use serde_json::value::ToJson;
+use serde_json::{Value, from_value};
 
 pub mod api;
 pub mod wallet;
 
-use byteorder::{ByteOrder, LittleEndian};
-
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
-                      MemoryDB, Result as StorageResult};
+                      Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
-
-use wallet::{Wallet, WalletId};
+use wallet::Wallet;
 
 pub const CRYPTOCURRENCY: u16 = 128;
 
 pub const TX_TRANSFER_ID: u16 = 128;
 pub const TX_ISSUE_ID: u16 = 129;
 pub const TX_WALLET_ID: u16 = 130;
-
-use exonum::node::{TxSender, NodeChannel};
-pub type CurrencyTxSender = TxSender<NodeChannel>;
 
 message! {
     TxTransfer {
@@ -55,7 +56,7 @@ message! {
 
         from:        &PublicKey  [00 => 32]
         to:          &PublicKey  [32 => 64]
-        amount:      i64         [64 => 72]
+        amount:      u64         [64 => 72]
         seed:        u64         [72 => 80]
     }
 }
@@ -67,7 +68,7 @@ message! {
         const SIZE = 48;
 
         wallet:      &PublicKey  [00 => 32]
-        amount:      i64         [32 => 40]
+        amount:      u64         [32 => 40]
         seed:        u64         [40 => 48]
     }
 }
@@ -81,6 +82,35 @@ message! {
         pub_key:     &PublicKey  [00 => 32]
         name:        &str        [32 => 40]
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct TxSerdeHelper {
+    service_id: u16,
+    message_id: u16,
+    body: serde_json::Value,
+    signature: Signature,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TxIssueSerdeHelper {
+    wallet: PublicKey,
+    amount: U64,
+    seed: U64,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TxCreateSerdeHelper {
+    pub_key: PublicKey,
+    name: String,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TxTransferSerdeHelper {
+    from: PublicKey,
+    to: PublicKey,
+    amount: U64,
+    seed: U64,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -104,31 +134,111 @@ impl Serialize for CurrencyTx {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let mut state;
+        let id: u16;
+        let signature = *self.raw().signature();
+        let body;
         match *self {
             CurrencyTx::Issue(ref issue) => {
-                state = ser.serialize_struct("transaction", 4)?;
-                ser.serialize_struct_elt(&mut state, "type", "issue")?;
-                ser.serialize_struct_elt(&mut state, "wallet", issue.wallet().to_hex())?;
-                ser.serialize_struct_elt(&mut state, "amount", issue.amount())?;
-                ser.serialize_struct_elt(&mut state, "seed", issue.seed())?;
+                id = TX_ISSUE_ID;
+                let issue_body = TxIssueSerdeHelper {
+                    wallet: *issue.wallet(),
+                    amount: U64(issue.amount()),
+                    seed: U64(issue.seed()),
+                };
+                body = issue_body.to_json();
             }
             CurrencyTx::Transfer(ref transfer) => {
-                state = ser.serialize_struct("transaction", 5)?;
-                ser.serialize_struct_elt(&mut state, "type", "transfer")?;
-                ser.serialize_struct_elt(&mut state, "from", transfer.from().to_hex())?;
-                ser.serialize_struct_elt(&mut state, "to", transfer.to().to_hex())?;
-                ser.serialize_struct_elt(&mut state, "amount", transfer.amount())?;
-                ser.serialize_struct_elt(&mut state, "seed", transfer.seed())?;
+                id = TX_TRANSFER_ID;
+                let transfer_body = TxTransferSerdeHelper {
+                    from: *transfer.from(),
+                    to: *transfer.to(),
+                    amount: U64(transfer.amount()),
+                    seed: U64(transfer.seed()),
+                };
+                body = transfer_body.to_json();
             }
             CurrencyTx::CreateWallet(ref wallet) => {
-                state = ser.serialize_struct("transaction", 3)?;
-                ser.serialize_struct_elt(&mut state, "type", "create_wallet")?;
-                ser.serialize_struct_elt(&mut state, "pub_key", wallet.pub_key().to_hex())?;
-                ser.serialize_struct_elt(&mut state, "name", wallet.name())?;
+                id = TX_WALLET_ID;
+                let create_body = TxCreateSerdeHelper {
+                    pub_key: *wallet.pub_key(),
+                    name: wallet.name().to_string(),
+                };
+                body = create_body.to_json();
             }
         }
-        ser.serialize_struct_end(state)
+        let h = TxSerdeHelper {
+            service_id: CRYPTOCURRENCY,
+            message_id: id,
+            body: body,
+            signature: signature,
+        };
+        h.serialize(ser)
+    }
+}
+
+impl Deserialize for CurrencyTx {
+    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+        where D: Deserializer
+    {
+        let h = <TxSerdeHelper>::deserialize(deserializer)?;
+        match h.service_id {
+            CRYPTOCURRENCY => {} 
+            other => {
+                return Err(de::Error::custom(format!("service_id doesn't match the expected. \
+                                                       actual: {}, expected: {}",
+                                                      other,
+                                                      CRYPTOCURRENCY)))
+            }
+        }
+        let res = match h.message_id {
+            TX_ISSUE_ID => {
+                let body_type = "Tx_ISSUE";
+                let body = from_value::<TxIssueSerdeHelper>(h.body).map_err(|e| {
+                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
+                                                   json. serde_json::error: {}",
+                                                  body_type,
+                                                  e))
+                    })?;
+                let tx = TxIssue::new_with_signature(&body.wallet,
+                                                     body.amount.0,
+                                                     body.seed.0,
+                                                     &h.signature);
+                CurrencyTx::Issue(tx)
+            }
+            TX_WALLET_ID => {
+                let body_type = "Tx_CREATE";
+                let body = from_value::<TxCreateSerdeHelper>(h.body).map_err(|e| {
+                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
+                                                   json. serde_json::error: {}",
+                                                  body_type,
+                                                  e))
+                    })?;
+                let tx =
+                    TxCreateWallet::new_with_signature(&body.pub_key, &body.name, &h.signature);
+                CurrencyTx::CreateWallet(tx)
+            }
+            TX_TRANSFER_ID => {
+                let body_type = "Tx_TRANSFER";
+                let body = from_value::<TxTransferSerdeHelper>(h.body).map_err(|e| {
+                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
+                                                   json. serde_json::error: {}",
+                                                  body_type,
+                                                  e))
+                    })?;
+                let tx = TxTransfer::new_with_signature(&body.from,
+                                                        &body.to,
+                                                        body.amount.0,
+                                                        body.seed.0,
+                                                        &h.signature);
+                CurrencyTx::Transfer(tx)
+            }
+            other => {
+                return Err(de::Error::custom(format!("Unknown transaction id for \
+                                                      Cryptocurrency Service: {}",
+                                                     other)));
+            }
+        };
+        Ok(res)
     }
 }
 
@@ -201,43 +311,28 @@ impl<'a> CurrencySchema<'a> {
         CurrencySchema { view: view }
     }
 
-    pub fn wallets(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, Wallet> {
-        MerkleTable::new(MapTable::new(vec![20], self.view))
+    pub fn wallets(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, Wallet> {
+        MerklePatriciaTable::new(MapTable::new(vec![20], self.view))
     }
 
-    pub fn wallet_ids(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, u64> {
-        MerklePatriciaTable::new(MapTable::new(vec![21], self.view))
-    }
-
-    pub fn wallet(&self, pub_key: &PublicKey) -> StorageResult<Option<(WalletId, Wallet)>> {
-        if let Some(id) = self.wallet_ids().get(pub_key)? {
-            let wallet_pair = self.wallets().get(id)?.map(|wallet| (id, wallet));
-            return Ok(wallet_pair);
-        }
-        Ok(None)
+    pub fn wallet(&self, pub_key: &PublicKey) -> StorageResult<Option<Wallet>> {
+        self.wallets().get(pub_key)
     }
 
     pub fn wallet_history(&self,
-                          id: WalletId)
+                          public_key: &PublicKey)
                           -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
-        let mut prefix = vec![22; 9];
-        LittleEndian::write_u64(&mut prefix[1..], id);
+        let mut prefix = vec![19; 1 + PUBLIC_KEY_LENGTH];
+        prefix[1..].copy_from_slice(public_key.as_ref());
         MerkleTable::new(MapTable::new(prefix, self.view))
     }
 
-    pub fn state_hash(&self) -> StorageResult<Hash> {
-        let db = MemoryDB::new();
-        let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
-
-        let wallets = self.wallets();
-        let wallet_ids = self.wallet_ids();
-
-        hashes.append(wallets.root_hash()?)?;
-        hashes.append(wallet_ids.root_hash()?)?;
-        hashes.root_hash()
+    pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
+        Ok(vec![self.wallets().root_hash()?])
     }
 }
 
+#[derive(Default)]
 pub struct CurrencyService {}
 
 impl CurrencyService {
@@ -247,8 +342,17 @@ impl CurrencyService {
 }
 
 impl Transaction for CurrencyTx {
+    fn info(&self) -> Value {
+        self.to_json()
+    }
+
     fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
+        let res = self.verify_signature(self.pub_key());
+        let res1 = match *self {
+            CurrencyTx::Transfer(ref msg) => *msg.from() != *msg.to(), 
+            _ => true,  
+        };
+        res && res1
     }
 
     fn execute(&self, view: &View) -> Result<(), Error> {
@@ -257,50 +361,58 @@ impl Transaction for CurrencyTx {
         let schema = CurrencySchema::new(view);
         match *self {
             CurrencyTx::Transfer(ref msg) => {
-                let from = schema.wallet(msg.from())?;
-                let to = schema.wallet(msg.to())?;
-                if let (Some(mut from), Some(mut to)) = (from, to) {
-                    if from.1.balance() < msg.amount() {
+                let sender_pub_key = msg.from();
+                let receiver_pub_key = msg.to();
+
+                let sender_w = schema.wallet(sender_pub_key)?;
+                let receiver_w = schema.wallet(receiver_pub_key)?;
+                if let (Some(mut sender), Some(mut receiver)) = (sender_w, receiver_w) {
+                    if sender.balance() < msg.amount() {
                         return Ok(());
                     }
-                    let from_history = schema.wallet_history(from.0);
-                    let to_history = schema.wallet_history(to.0);
-                    from_history.append(tx_hash)?;
-                    to_history.append(tx_hash)?;
+                    let sender_history = schema.wallet_history(sender_pub_key);
+                    let receiver_history = schema.wallet_history(receiver_pub_key);
+                    sender_history.append(tx_hash)?;
+                    receiver_history.append(tx_hash)?;
 
-                    from.1.transfer_to(&mut to.1, msg.amount());
-                    from.1.set_history_hash(&from_history.root_hash()?);
-                    to.1.set_history_hash(&to_history.root_hash()?);
+                    sender.transfer_to(&mut receiver, msg.amount());
+                    sender.set_history_hash(&sender_history.root_hash()?);
+                    sender.increase_history_len();
+                    receiver.set_history_hash(&receiver_history.root_hash()?);
+                    receiver.increase_history_len();
 
-                    schema.wallets().set(from.0, from.1)?;
-                    schema.wallets().set(to.0, to.1)?;
+                    schema.wallets().put(sender_pub_key, sender)?;
+                    schema.wallets().put(receiver_pub_key, receiver)?;
                 }
             }
             CurrencyTx::Issue(ref msg) => {
-                if let Some((id, mut wallet)) = schema.wallet(msg.wallet())? {
-                    let history = schema.wallet_history(id);
+                let pub_key = msg.wallet();
+                if let Some(mut wallet) = schema.wallet(pub_key)? {
+                    let history = schema.wallet_history(pub_key);
                     history.append(tx_hash)?;
 
                     let new_amount = wallet.balance() + msg.amount();
                     wallet.set_balance(new_amount);
                     wallet.set_history_hash(&history.root_hash()?);
-                    schema.wallets().set(id, wallet)?;
+                    wallet.increase_history_len();
+                    schema.wallets().put(pub_key, wallet)?;
                 }
             }
             CurrencyTx::CreateWallet(ref msg) => {
-                if let Some(_) = schema.wallet_ids().get(msg.pub_key())? {
+                let pub_key = msg.pub_key();
+                if schema.wallet(pub_key)?.is_some() {
                     return Ok(());
                 }
 
-                let id = schema.wallets().len()?;
-                schema.wallet_history(id).append(tx_hash)?;
+                let history = schema.wallet_history(pub_key);
+                history.append(tx_hash)?;
 
                 let wallet = Wallet::new(msg.pub_key(),
                                          msg.name(),
                                          0,
-                                         &schema.wallet_history(id).root_hash()?);
-                schema.wallets().append(wallet)?;
-                schema.wallet_ids().put(msg.pub_key(), id)?;
+                                         1, // history_len
+                                         &history.root_hash()?);
+                schema.wallets().put(pub_key, wallet)?;
             }
         };
         Ok(())
@@ -312,9 +424,9 @@ impl Service for CurrencyService {
         CRYPTOCURRENCY
     }
 
-    fn state_hash(&self, view: &View) -> Option<StorageResult<Hash>> {
+    fn state_hash(&self, view: &View) -> StorageResult<Vec<Hash>> {
         let schema = CurrencySchema::new(view);
-        Some(schema.state_hash())
+        schema.state_hash()
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
@@ -325,8 +437,10 @@ impl Service for CurrencyService {
 #[cfg(test)]
 mod tests {
     use byteorder::{ByteOrder, LittleEndian};
+    use rand::{thread_rng, Rng};
+    use serde_json;
 
-    use exonum::crypto::gen_keypair;
+    use exonum::crypto::{gen_keypair, Hash};
     use exonum::storage::Storage;
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::messages::{FromRaw, Message};
@@ -349,6 +463,118 @@ mod tests {
         options.create_if_missing = true;
         let dir = TempDir::new("cryptocurrency").unwrap();
         LevelDB::new(dir.path(), options).unwrap()
+    }
+
+    #[derive(Serialize)]
+    struct TransactionTestData {
+        transaction: CurrencyTx,
+        hash: Hash,
+        raw: Vec<u8>,
+    }
+
+    impl TransactionTestData {
+        fn new(transaction: CurrencyTx) -> TransactionTestData {
+            let hash = transaction.hash();
+            let raw = transaction.raw().as_ref().as_ref().to_vec();
+            TransactionTestData {
+                transaction: transaction,
+                hash: hash,
+                raw: raw,
+            }
+        }
+    }
+
+    #[test]
+    fn test_tx_transfer_serde() {
+        let mut rng = thread_rng();
+        let generator = move |_| {
+            let (p_from, s) = gen_keypair();
+            let (p_to, _) = gen_keypair();
+            let amount = rng.next_u64();
+            let seed = rng.next_u64();
+            TxTransfer::new(&p_from, &p_to, amount, seed, &s)
+        };
+        let create_txs = (0..50)
+            .map(generator)
+            .collect::<Vec<_>>();
+        for tx in create_txs {
+            let wrapped_tx = CurrencyTx::Transfer(tx);
+            let json_str = serde_json::to_string(&wrapped_tx).unwrap();
+            let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
+            assert_eq!(wrapped_tx, parsed_json);
+            println!("tx issue test_data: {}",
+                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_tx_issue_serde() {
+        let mut rng = thread_rng();
+        let generator = move |_| {
+            let (p, s) = gen_keypair();
+            let amount = rng.next_u64();
+            let seed = rng.next_u64();
+            TxIssue::new(&p, amount, seed, &s)
+        };
+        let create_txs = (0..50)
+            .map(generator)
+            .collect::<Vec<_>>();
+        for tx in create_txs {
+            let wrapped_tx = CurrencyTx::Issue(tx);
+            let json_str = serde_json::to_string(&wrapped_tx).unwrap();
+            let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
+            assert_eq!(wrapped_tx, parsed_json);
+            println!("tx issue test_data: {}",
+                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+        }
+    }
+
+    #[test]
+    fn test_tx_create_wallet_serde() {
+        let mut rng = thread_rng();
+        let generator = move |_| {
+            let (p, s) = gen_keypair();
+            let string_len = rng.gen_range(20u8, 255u8);
+            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+            TxCreateWallet::new(&p, &name, &s)
+        };
+        let (p, s) = gen_keypair();
+        let non_ascii_create =
+            TxCreateWallet::new(&p, "babd, Юникод еще работает", &s);
+        let mut create_txs = (0..50)
+            .map(generator)
+            .collect::<Vec<_>>();
+        create_txs.push(non_ascii_create);
+        for tx in create_txs {
+            let wrapped_tx = CurrencyTx::CreateWallet(tx);
+            let json_str = serde_json::to_string(&wrapped_tx).unwrap();
+            let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
+            assert_eq!(wrapped_tx, parsed_json);
+            println!("tx issue test_data: {}",
+                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+        }
+    }
+
+    #[test]
+    fn generate_simple_scenario_transactions() {
+        let mut rng = thread_rng();
+        let (p1, s1) = gen_keypair();
+        let (p2, s2) = gen_keypair();
+        let tx_create_1 = TxCreateWallet::new(&p1, "Василий Васильевич", &s1);
+        let tx_create_2 = TxCreateWallet::new(&p2, "Иван Иващенко", &s2);
+        let tx_issue_1 = TxIssue::new(&p1, 6000, rng.next_u64(), &s1);
+        let tx_transfer_1 = TxTransfer::new(&p1, &p2, 3000, rng.next_u64(), &s1);
+        let tx_transfer_2 = TxTransfer::new(&p2, &p1, 1000, rng.next_u64(), &s2);
+        let txs: Vec<CurrencyTx> = vec![tx_create_1.into(),
+                                        tx_create_2.into(),
+                                        tx_issue_1.into(),
+                                        tx_transfer_1.into(),
+                                        tx_transfer_2.into()];
+        for (idx, tx) in txs.iter().enumerate() {
+            println!("transaction #{}: {}",
+                     idx,
+                     serde_json::to_string(tx).unwrap());
+        }
     }
 
     #[test]
@@ -391,16 +617,16 @@ mod tests {
         let w1 = s.wallet(&p1).unwrap().unwrap();
         let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.0, 0);
-        assert_eq!(w2.0, 1);
-        assert_eq!(w1.1.name(), "tx1");
-        assert_eq!(w1.1.balance(), 0);
-        assert_eq!(w2.1.name(), "tx2");
-        assert_eq!(w2.1.balance(), 0);
-        let rh1 = s.wallet_history(w1.0).root_hash().unwrap();
-        let rh2 = s.wallet_history(w2.0).root_hash().unwrap();
-        assert_eq!(&rh1, w1.1.history_hash());
-        assert_eq!(&rh2, w2.1.history_hash());
+        assert_eq!(w1.name(), "tx1");
+        assert_eq!(w1.history_len(), 1);
+        assert_eq!(w1.balance(), 0);
+        assert_eq!(w2.name(), "tx2");
+        assert_eq!(w2.history_len(), 1);
+        assert_eq!(w2.balance(), 0);
+        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
+        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
+        assert_eq!(&rh1, w1.history_hash());
+        assert_eq!(&rh2, w2.history_hash());
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
@@ -409,27 +635,31 @@ mod tests {
         let w1 = s.wallet(&p1).unwrap().unwrap();
         let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.1.balance(), 1000);
-        assert_eq!(w2.1.balance(), 100);
-        let rh1 = s.wallet_history(w1.0).root_hash().unwrap();
-        let rh2 = s.wallet_history(w2.0).root_hash().unwrap();
-        assert_eq!(&rh1, w1.1.history_hash());
-        assert_eq!(&rh2, w2.1.history_hash());
+        assert_eq!(w1.balance(), 1000);
+        assert_eq!(w2.balance(), 100);
+        assert_eq!(w1.history_len(), 2);
+        assert_eq!(w2.history_len(), 2);
+        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
+        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
+        assert_eq!(&rh1, w1.history_hash());
+        assert_eq!(&rh2, w2.history_hash());
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
         CurrencyTx::from(tw.clone()).execute(&v).unwrap();
         let w1 = s.wallet(&p1).unwrap().unwrap();
         let w2 = s.wallet(&p2).unwrap().unwrap();
 
-        assert_eq!(w1.1.balance(), 600);
-        assert_eq!(w2.1.balance(), 500);
-        let rh1 = s.wallet_history(w1.0).root_hash().unwrap();
-        let rh2 = s.wallet_history(w2.0).root_hash().unwrap();
-        assert_eq!(&rh1, w1.1.history_hash());
-        assert_eq!(&rh2, w2.1.history_hash());
+        assert_eq!(w1.balance(), 600);
+        assert_eq!(w2.balance(), 500);
+        assert_eq!(w1.history_len(), 3);
+        assert_eq!(w2.history_len(), 3);
+        let rh1 = s.wallet_history(&p1).root_hash().unwrap();
+        let rh2 = s.wallet_history(&p2).root_hash().unwrap();
+        assert_eq!(&rh1, w1.history_hash());
+        assert_eq!(&rh2, w2.history_hash());
 
-        let h1 = s.wallet_history(w1.0).values().unwrap();
-        let h2 = s.wallet_history(w2.0).values().unwrap();
+        let h1 = s.wallet_history(&p1).values().unwrap();
+        let h2 = s.wallet_history(&p2).values().unwrap();
         assert_eq!(h1, vec![cw1.hash(), iw1.hash(), tw.hash()]);
         assert_eq!(h2, vec![cw2.hash(), iw2.hash(), tw.hash()]);
     }

@@ -1,5 +1,10 @@
 <transfer>
     <div class="panel-heading">
+        <!-- TODO revert later -->
+        <!--<a class="btn btn-default pull-left page-nav" href="#user">
+            <i class="glyphicon glyphicon-arrow-left"></i>
+            <span class="hidden-xs">Back</span>
+        </a>-->
         <a class="btn btn-default pull-left page-nav" href="#user/{ opts.publicKey }">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
@@ -16,13 +21,11 @@
         <form onsubmit={ submit }>
             <div class="form-group">
                 <label class="control-label">Receiver:</label>
-                <select id="receiver" class="form-control">
-                    <option each={ users } if={ publicKey !== opts.publicKey } value="{ publicKey }">{ name }</option>
-                </select>
+                <input type="text" class="form-control" onkeyup={ editReceiver }>
             </div>
             <div class="form-group">
                 <label class="control-label">Amount, $:</label>
-                <input type="number" class="form-control" onkeyup={ edit }>
+                <input type="number" class="form-control" onkeyup={ editAmount }>
             </div>
             <div class="form-group">
                 <button type="submit" class="btn btn-lg btn-block btn-primary" disabled="{ !amount }">Make a Transfer</button>
@@ -31,18 +34,61 @@
     </div>
 
     <script>
-        var self = this;
+        // TODO revert
+//        var self = this;
+//        var user = self.storage.getUser();
+//
+//        this.publicKey = user.publicKey;
+//
+//        this.toggleLoading(true);
+//        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
+//            self.block = block;
+//            self.wallet = wallet;
+//            self.update();
+//            self.toggleLoading(false);
+//        });
+//
+//        editReceiver(e) {
+//            this.receiver = e.target.value;
+//        }
+//
+//        editAmount(e) {
+//            if (e.target.value > 0 && e.target.value.toLowerCase().indexOf('e') === -1) {
+//                this.amount = e.target.value;
+//            } else {
+//                this.amount = 0;
+//            }
+//        }
+//
+//        submit(e) {
+//            e.preventDefault();
+//            var amount = self.amount.toString();
+//            var user = self.storage.getUser();
+//
+//            self.toggleLoading(true);
+//            self.service.transfer(amount, user.publicKey, self.receiver, user.secretKey, function() {
+//                self.toggleLoading(false);
+//                self.notify('success', 'Funds has been transferred.');
+//                route('/user');
+//            });
+//        }
 
-        this.users = this.localStorage.getUsers();
+        var self = this;
+        var user = this.storage.getUser(this.opts.publicKey);
+
         this.toggleLoading(true);
-        this.api.getWallet(self.opts.publicKey, function(data) {
-            self.block = data.block;
-            self.wallet = data.wallet;
+        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
+            self.block = block;
+            self.wallet = wallet;
             self.update();
             self.toggleLoading(false);
         });
 
-        edit(e) {
+        editReceiver(e) {
+            this.receiver = e.target.value;
+        }
+
+        editAmount(e) {
             if (e.target.value > 0 && e.target.value.toLowerCase().indexOf('e') === -1) {
                 this.amount = e.target.value;
             } else {
@@ -52,13 +98,11 @@
 
         submit(e) {
             e.preventDefault();
-
             var amount = self.amount.toString();
-            var receiver = $('#receiver').val();
-            var user = self.localStorage.getUser(self.opts.publicKey);
-            var transaction = self.api.cryptocurrency.transferTransaction(amount, self.opts.publicKey, receiver, user.secretKey);
 
-            self.api.submitTransaction.call(self, transaction, self.opts.publicKey, function() {
+            self.toggleLoading(true);
+            self.service.transfer(amount, self.opts.publicKey, self.receiver, user.secretKey, function() {
+                self.toggleLoading(false);
                 self.notify('success', 'Funds has been transferred.');
                 route('/user/' + self.opts.publicKey);
             });

@@ -11,15 +11,15 @@
     <div class="panel-body">
         <form onsubmit={ login }>
             <div class="form-group">
-                <label class="control-label">Public key:</label>
-                <input type="text" class="form-control" onkeyup="{ editPublicKey }">
+                <label class="control-label">Login:</label>
+                <input type="text" class="form-control" onkeyup="{ editLogin }">
             </div>
             <div class="form-group">
                 <label class="control-label">Password:</label>
                 <input type="text" class="form-control" onkeyup="{ editPassword }">
             </div>
             <div class="form-group">
-                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !name }>Login</button>
+                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !login || !password }>Login</button>
             </div>
         </form>
     </div>
@@ -27,8 +27,8 @@
     <script>
         var self = this;
 
-        editPublicKey(e) {
-            this.publicKey = e.target.value;
+        editLogin(e) {
+            this.login = e.target.value;
         }
 
         editPassword(e) {
@@ -37,18 +37,20 @@
 
         login(e) {
             e.preventDefault();
-//            var pair = self.api.cryptocurrency.keyPair();
-//            var transaction = self.api.cryptocurrency.createWalletTransaction(pair.publicKey, self.name, pair.secretKey);
-//
-//            self.api.submitTransaction.call(self, transaction, pair.publicKey, function() {
-//                self.localStorage.addUser({
-//                    name: self.name,
-//                    publicKey: pair.publicKey,
-//                    secretKey: pair.secretKey
-//                });
-//                self.notify('success', 'Wallet has been created. Login and manage the wallet.');
-//                route('/');
-//            });
+
+            self.toggleLoading(true);
+            self.service.login(self.login, self.password, function(publicKey, secretKey) {
+                self.addUser({
+                    publicKey: publicKey,
+                    secretKey: secretKey
+                });
+                self.toggleLoading(false);
+                self.notify('success', 'Wallet has been created. Login and manage the wallet.');
+                route('/user/' + publicKey);
+            }, function() {
+                self.toggleLoading(false);
+                self.notify('error', 'Wrong password has been passed.');
+            });
         }
     </script>
 </login>
