@@ -1,0 +1,12 @@
+{
+  "name": "cryptocurrency-demo",
+  "version": "1.0.0",
+  "main": "app.js",
+  "description": "Cryptocurrency solution on Exonum private blockchain",
+  "license": "",
+  "author": "BitFury Group Limited",
+  "dependencies": {
+    "bower": "^1.8.0",
+    "express": "^4.14.1"
+  }
+}
