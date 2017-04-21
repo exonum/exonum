@@ -24,7 +24,7 @@ pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
 
-// когда присоединяются узлы
+// Node connection.
 message! {
     Connect {
         const TYPE = CONSENSUS;
@@ -37,7 +37,7 @@ message! {
     }
 }
 
-// консенсус
+// Consensus.
 message! {
     Propose {
         const TYPE = CONSENSUS;
@@ -52,7 +52,7 @@ message! {
     }
 }
 
-// консенсус
+// Consensus.
 message! {
     Prevote {
         const TYPE = CONSENSUS;
@@ -67,7 +67,7 @@ message! {
     }
 }
 
-// консенсус
+// Consensus.
 message! {
     Precommit {
         const TYPE = CONSENSUS;
@@ -130,7 +130,7 @@ impl Deserialize for Precommit {
     }
 }
 
-// сообщение о текущем состоянии
+// Message with current state.
 message! {
     Status {
         const TYPE = CONSENSUS;
@@ -143,7 +143,7 @@ message! {
     }
 }
 
-// ответ на requestblock
+// Response to `RequestBlock`.
 message! {
     Block {
         const TYPE = CONSENSUS;
@@ -164,7 +164,7 @@ pub struct BlockProof {
     pub precommits: Vec<Precommit>,
 }
 
-// запрос на получение предложения
+// `Propose` request.
 message! {
     RequestPropose {
         const TYPE = CONSENSUS;
@@ -178,7 +178,7 @@ message! {
     }
 }
 
-// запрос транзакций по списку hash
+// Request for transactions by hash.
 message! {
     RequestTransactions {
         const TYPE = CONSENSUS;
@@ -191,7 +191,7 @@ message! {
     }
 }
 
-// запрос prevotes
+// Prevotes request.
 message! {
     RequestPrevotes {
         const TYPE = CONSENSUS;
@@ -207,7 +207,7 @@ message! {
     }
 }
 
-// запрос узлов с которыми соединён
+// Peers request.
 message! {
     RequestPeers {
         const TYPE = CONSENSUS;
@@ -218,7 +218,8 @@ message! {
         to:             &PublicKey  [32 => 64]
     }
 }
-// запрос блоков
+
+// `Block` request.
 message! {
     RequestBlock {
         const TYPE = CONSENSUS;

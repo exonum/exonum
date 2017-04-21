@@ -60,10 +60,10 @@ pub struct State {
     unknown_txs: HashMap<Hash, Vec<Hash>>,
     unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
 
-    // Информация о состоянии наших запросов
+    // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    //maximum of node heigt in consensus messages
+    // maximum of node heigt in consensus messages
     nodes_max_height: BTreeMap<PublicKey, Height>,
 }
 
@@ -74,8 +74,7 @@ pub struct ValidatorState {
     our_precommits: HashMap<Round, Precommit>,
 }
 
-// Данные, которые нас интересуют,
-// специфичны для некоторой высоты
+// Required data specific for some height.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RequestData {
     Propose(Hash),
@@ -84,33 +83,26 @@ pub enum RequestData {
     Block(Height),
 }
 
-// Состояние запроса
 struct RequestState {
-    // К-во попыток, которые уже произошли
+    // Number of attempts made.
     retries: u16,
-    // Узлы, которые имеют интересующую нас информацию
+    // Nodes that have the required information.
     known_nodes: HashSet<PublicKey>,
 }
 
 pub struct ProposeState {
-    /// Хеш предложения
     hash: Hash,
-    // Тело предложения
     propose: Propose,
-    // Множество неизвестных транзакций из этого предложения
     // FIXME: use HashSet here
     unknown_txs: BTreeSet<Hash>,
 }
 
 #[derive(Clone)]
 pub struct BlockState {
-    // Хэш блока
     hash: Hash,
-    // Набор изменений, которые нужно внести в состояние для применения блока
+    // Changes that should be made for block committing.
     patch: Patch,
-    // Хэши транзакций, закомиченных в этот блок
     txs: Vec<Hash>,
-    // Раунд на котором был создан Propose
     propose_round: Round,
 }
 
