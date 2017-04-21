@@ -50,13 +50,11 @@ mod hash_rules {
         hash(left.as_ref())
     }
 }
-/// Merkle tree over list.
-/// Данные в таблице хранятся в строчках,
-/// высота определяется количеством записаных значений H = len / 2 +1
-/// H  | Элементы
-/// 0  | Записанные данные
-/// 1  | Хэши от исходных данных
-/// 2..| Дерево хешей, где каждая новая высота считает Hash(Hash(h - 1, i), Hash(h - 1, i + 1))
+/// Merkle tree over list. Data in table is stored in rows.
+/// Height is determined by amount of values: `H = len / 2 +1`
+/// H  | Values
+/// 0  | Value hashes
+/// 1..| Hashes tree, where each height calculates Hash(Hash(h - 1, i), Hash(h - 1, i + 1))
 pub struct MerkleTable<T: Map<[u8], Vec<u8>>, K, V> {
     map: T,
     count: Cell<Option<K>>,

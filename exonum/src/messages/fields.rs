@@ -423,9 +423,8 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 }
 
-// TODO как-то это все обобщить, чтобы не было магических констант
-// и можно было хранить что-то серъезнее &[u8]
-// во вторых нужно как-то избавиться от лишних выделений памяти
+// TODO: Make this more generic and support storing not only &[u8].
+// TODO: Remove magic constants and additional allocations.
 impl<'a> Field<'a> for Vec<&'a [u8]> {
     fn field_size() -> usize {
         1
@@ -472,7 +471,7 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
         }
     }
 
-    // TODO Тут вызов функции по сути рекурсивный, нужно написать некий хэлпер для check
+    // TODO: Remove recursive check?
     fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
         let pos = LittleEndian::read_u32(&buffer[from..from + 4]) as usize;
         let count = LittleEndian::read_u32(&buffer[from + 4..to]) as usize;
