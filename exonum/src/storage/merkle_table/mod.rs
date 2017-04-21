@@ -54,11 +54,11 @@ mod hash_rules {
 /// Merkle tree over list. Data in table is stored in rows.
 /// Height is determined by amount of values: `H = log2(values_length) + 1`
 ///
-/// 0  | Values, stored in the structure by index. A datum is stored at `(0, index)`.
-///
-/// 1  | Hash of value datum, stored at level 0. `(1, index) = Hash((0, index))`
-///
-/// 2..| Merkle tree node, where at position `(h, i) = Hash((h - 1, 2i) + (h - 1, 2i + 1))`.
+/// | Height | Stored data                                                                  |
+/// |-------:|------------------------------------------------------------------------------|
+/// |0 | Values, stored in the structure by index. A datum is stored at `(0, index)`        |
+/// |1 | Hash of value datum, stored at level 0. `(1, index) = Hash((0, index))`            |
+/// |>1| Merkle tree node, where at position `(h, i) = Hash((h - 1, 2i) + (h - 1, 2i + 1))` |
 ///
 /// `+` operation is concatenation of byte arrays.
 pub struct MerkleTable<T: Map<[u8], Vec<u8>>, K, V> {
