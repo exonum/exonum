@@ -24,7 +24,7 @@ pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
 
-// Node connection.
+// Node connection
 message! {
     Connect {
         const TYPE = CONSENSUS;
@@ -37,7 +37,7 @@ message! {
     }
 }
 
-// Consensus.
+// Consensus
 message! {
     Propose {
         const TYPE = CONSENSUS;
@@ -52,7 +52,7 @@ message! {
     }
 }
 
-// Consensus.
+// Consensus
 message! {
     Prevote {
         const TYPE = CONSENSUS;
@@ -67,7 +67,7 @@ message! {
     }
 }
 
-// Consensus.
+// Consensus
 message! {
     Precommit {
         const TYPE = CONSENSUS;
