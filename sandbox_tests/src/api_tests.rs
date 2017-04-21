@@ -23,12 +23,11 @@ use exonum::crypto::Hash;
 use exonum::blockchain::{Service, Transaction};
 use exonum::events::Error as EventsError;
 use exonum::messages::{FromRaw, Message, RawMessage};
-use configuration_service::{StorageValueConfigProposeData, ConfigTx, TxConfigPropose, TxConfigVote,
-                            ConfigurationService, ZEROVOTE};
-use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, 
-                                        ApiResponseConfigInfo, ApiResponseConfigHashInfo,
-                                        ApiResponseVotesInfo, ApiResponseProposePost,
-                                        ApiResponseVotePost};
+use configuration_service::{StorageValueConfigProposeData, ConfigTx, TxConfigPropose,
+                            TxConfigVote, ConfigurationService, ZEROVOTE};
+use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, ApiResponseConfigInfo,
+                                        ApiResponseConfigHashInfo, ApiResponseVotesInfo,
+                                        ApiResponseProposePost, ApiResponseVotePost};
 
 use blockchain_explorer::api::Api;
 use blockchain_explorer::helpers::init_logger;
@@ -127,9 +126,7 @@ impl ConfigurationApiSandbox {
         let channel = TestTxSender { transactions: self.transactions.clone() };
         let blockchain = self.sandbox.blockchain_ref().clone();
         let keypair = (self.sandbox.p(validator_id), self.sandbox.s(validator_id).clone());
-        let pub_api = PublicConfigApi {
-            blockchain: blockchain.clone(),
-        };
+        let pub_api = PublicConfigApi { blockchain: blockchain.clone() };
         let priv_api = PrivateConfigApi {
             channel: channel,
             config: keypair,
@@ -146,9 +143,9 @@ impl ConfigurationApiSandbox {
         debug!("Sandbox commits a sequence of {} transactions", txs.len());
         txs.iter()
             .inspect(|elem| {
-                trace!("Message hash: {:?}", Message::hash(*elem));
-                trace!("{:?}", ConfigTx::from_raw((*elem).clone()));
-            })
+                         trace!("Message hash: {:?}", Message::hash(*elem));
+                         trace!("{:?}", ConfigTx::from_raw((*elem).clone()));
+                     })
             .collect::<Vec<_>>();
         add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());
     }
@@ -164,7 +161,9 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_config_by_hash(&self, config_hash: Hash) -> IronResult<Response> {
-        let hash_str = serde_json::to_string(&config_hash).unwrap().replace("\"", "");
+        let hash_str = serde_json::to_string(&config_hash)
+            .unwrap()
+            .replace("\"", "");
         self.get_config_by_hash_str(hash_str)
     }
 
@@ -174,7 +173,9 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_config_votes(&self, config_hash: Hash) -> IronResult<Response> {
-        let hash_str = serde_json::to_string(&config_hash).unwrap().replace("\"", "");
+        let hash_str = serde_json::to_string(&config_hash)
+            .unwrap()
+            .replace("\"", "");
         self.get_config_votes_by_str(hash_str)
     }
 
@@ -196,7 +197,9 @@ impl ConfigurationApiSandbox {
                                       config_hash: Hash,
                                       body: T)
                                       -> IronResult<Response> {
-        let hash_str = serde_json::to_string(&config_hash).unwrap().replace("\"", "");
+        let hash_str = serde_json::to_string(&config_hash)
+            .unwrap()
+            .replace("\"", "");
         self.post_config_vote_by_str(validator_id, hash_str, body)
     }
 
@@ -246,21 +249,28 @@ fn test_get_following_config() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let cfg_name: String = rng.gen_ascii_chars()
+        .take(string_len as usize)
+        .collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
     {
-        api_sandbox.post_config_propose(0, following_cfg.clone()).unwrap();
+        api_sandbox
+            .post_config_propose(0, following_cfg.clone())
+            .unwrap();
         api_sandbox.commit();
     }
     {
         let n_validators = api_sandbox.sandbox.n_validators();
         (0..api_sandbox.sandbox.majority_count(n_validators))
             .inspect(|validator_id| {
-                api_sandbox.post_config_vote(*validator_id, following_cfg.hash(), validator_id)
-                    .unwrap();
-            })
+                         api_sandbox
+                             .post_config_vote(*validator_id,
+                                               following_cfg.hash(),
+                                               validator_id)
+                             .unwrap();
+                     })
             .collect::<Vec<_>>();
         api_sandbox.commit();
     }
@@ -286,7 +296,9 @@ fn test_get_config_by_hash1() {
         propose: None,
     };
 
-    let resp_config_by_hash = api_sandbox.get_config_by_hash(initial_cfg.hash()).unwrap();
+    let resp_config_by_hash = api_sandbox
+        .get_config_by_hash(initial_cfg.hash())
+        .unwrap();
     let actual_body = response_body(resp_config_by_hash);
     assert_eq!(actual_body, expected_body.to_json());
 }
@@ -299,13 +311,17 @@ fn test_get_config_by_hash2() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let cfg_name: String = rng.gen_ascii_chars()
+        .take(string_len as usize)
+        .collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
     let proposer = 0;
     {
-        api_sandbox.post_config_propose(proposer, following_cfg.clone()).unwrap();
+        api_sandbox
+            .post_config_propose(proposer, following_cfg.clone())
+            .unwrap();
         api_sandbox.commit();
     }
 
@@ -324,15 +340,17 @@ fn test_get_config_by_hash2() {
             TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
         let expected_voting_data =
             StorageValueConfigProposeData::new(expected_propose,
-                                          &expected_hash,
-                                          api_sandbox.sandbox.n_validators() as u64);
+                                               &expected_hash,
+                                               api_sandbox.sandbox.n_validators() as u64);
         ApiResponseConfigInfo {
             committed_config: None,
             propose: Some(expected_voting_data),
         }
     };
 
-    let resp_config_by_hash = api_sandbox.get_config_by_hash(following_cfg.hash()).unwrap();
+    let resp_config_by_hash = api_sandbox
+        .get_config_by_hash(following_cfg.hash())
+        .unwrap();
     let actual_body = response_body(resp_config_by_hash);
     assert_eq!(actual_body, expected_body.to_json());
 }
@@ -345,34 +363,37 @@ fn test_get_config_by_hash3() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let cfg_name: String = rng.gen_ascii_chars()
+        .take(string_len as usize)
+        .collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
     let proposer = 0;
     {
-        api_sandbox.post_config_propose(proposer, following_cfg.clone()).unwrap();
+        api_sandbox
+            .post_config_propose(proposer, following_cfg.clone())
+            .unwrap();
         api_sandbox.commit();
     }
     let votes = {
         let n_validators = api_sandbox.sandbox.n_validators();
         let excluded_validator = 2;
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
-            .inspect(|validator_id| {
-                if *validator_id != excluded_validator {
-                    api_sandbox.post_config_vote(*validator_id, following_cfg.hash(), validator_id)
-                        .unwrap();
-                }
-            })
-            .map(|validator_id| {
-                if validator_id == excluded_validator {
-                    ZEROVOTE.clone()
-                } else {
-                    let (pub_key, sec_key) = (api_sandbox.sandbox.p(validator_id),
-                                              api_sandbox.sandbox.s(validator_id).clone());
-                    TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key)
-                }
-            })
+            .inspect(|validator_id| if *validator_id != excluded_validator {
+                         api_sandbox
+                             .post_config_vote(*validator_id,
+                                               following_cfg.hash(),
+                                               validator_id)
+                             .unwrap();
+                     })
+            .map(|validator_id| if validator_id == excluded_validator {
+                     ZEROVOTE.clone()
+                 } else {
+                     let (pub_key, sec_key) = (api_sandbox.sandbox.p(validator_id),
+                                               api_sandbox.sandbox.s(validator_id).clone());
+                     TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key)
+                 })
             .collect::<Vec<_>>();
         api_sandbox.commit();
         votes
@@ -390,15 +411,17 @@ fn test_get_config_by_hash3() {
             TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
         let expected_voting_data =
             StorageValueConfigProposeData::new(expected_propose,
-                                          &expected_hash,
-                                          api_sandbox.sandbox.n_validators() as u64);
+                                               &expected_hash,
+                                               api_sandbox.sandbox.n_validators() as u64);
         ApiResponseConfigInfo {
             committed_config: Some(following_cfg.clone()),
             propose: Some(expected_voting_data),
         }
     };
 
-    let resp_config_by_hash = api_sandbox.get_config_by_hash(following_cfg.hash()).unwrap();
+    let resp_config_by_hash = api_sandbox
+        .get_config_by_hash(following_cfg.hash())
+        .unwrap();
     let actual_body = response_body(resp_config_by_hash);
     assert_eq!(actual_body, expected_body.to_json());
 }
@@ -411,46 +434,53 @@ fn test_get_config_votes() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let cfg_name: String = rng.gen_ascii_chars()
+        .take(string_len as usize)
+        .collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
     let expected_body = ApiResponseVotesInfo::ProposeAbsent(None);
-    let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
+    let resp_config_votes = api_sandbox
+        .get_config_votes(following_cfg.hash())
+        .unwrap();
     let actual_body = response_body(resp_config_votes);
     assert_eq!(actual_body, expected_body.to_json());
 
     let proposer = 0;
     {
-        api_sandbox.post_config_propose(proposer, following_cfg.clone()).unwrap();
+        api_sandbox
+            .post_config_propose(proposer, following_cfg.clone())
+            .unwrap();
         api_sandbox.commit();
     }
     let votes = {
         let n_validators = api_sandbox.sandbox.n_validators();
         let excluded_validator = 2;
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
-            .inspect(|validator_id| {
-                if *validator_id != excluded_validator {
-                    api_sandbox.post_config_vote(*validator_id, following_cfg.hash(), validator_id)
-                        .unwrap();
-                }
-            })
-            .map(|validator_id| {
-                if validator_id == excluded_validator {
-                    None
-                } else {
-                    let (pub_key, sec_key) = (api_sandbox.sandbox.p(validator_id),
-                                              api_sandbox.sandbox.s(validator_id).clone());
-                    Some(TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key))
-                }
-            })
+            .inspect(|validator_id| if *validator_id != excluded_validator {
+                         api_sandbox
+                             .post_config_vote(*validator_id,
+                                               following_cfg.hash(),
+                                               validator_id)
+                             .unwrap();
+                     })
+            .map(|validator_id| if validator_id == excluded_validator {
+                     None
+                 } else {
+                     let (pub_key, sec_key) = (api_sandbox.sandbox.p(validator_id),
+                                               api_sandbox.sandbox.s(validator_id).clone());
+                     Some(TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key))
+                 })
             .collect::<Vec<_>>();
         api_sandbox.commit();
         votes
     };
     let expected_body = ApiResponseVotesInfo::Votes(votes);
 
-    let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
+    let resp_config_votes = api_sandbox
+        .get_config_votes(following_cfg.hash())
+        .unwrap();
     let actual_body = response_body(resp_config_votes);
     assert_eq!(actual_body, expected_body.to_json());
 }
@@ -463,7 +493,9 @@ fn test_post_propose_response() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+    let cfg_name: String = rng.gen_ascii_chars()
+        .take(string_len as usize)
+        .collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
     let proposer = 0;
@@ -478,7 +510,8 @@ fn test_post_propose_response() {
         }
     };
 
-    let resp_config_post = api_sandbox.post_config_propose(proposer, following_cfg.clone())
+    let resp_config_post = api_sandbox
+        .post_config_propose(proposer, following_cfg.clone())
         .unwrap();
     let actual_body = response_body(resp_config_post);
     assert_eq!(actual_body, expected_body.to_json());
@@ -501,7 +534,8 @@ fn test_post_vote_response() {
         ApiResponseVotePost { tx_hash: Message::hash(&vote_tx) }
     };
 
-    let resp_config_post = api_sandbox.post_config_vote(voter, following_cfg.hash(), voter)
+    let resp_config_post = api_sandbox
+        .post_config_vote(voter, following_cfg.hash(), voter)
         .unwrap();
     let actual_body = response_body(resp_config_post);
     assert_eq!(actual_body, expected_body.to_json());
@@ -519,7 +553,7 @@ fn assert_response_status(response: IronResult<Response>,
             let body = response_body(resp);
             let error_body = serde_json::from_value::<ErrorResponse>(body).unwrap();
             assert_eq!(&error_body.type_str, expected_message);
-        } 
-        _ => unreachable!(), 
+        }
+        _ => unreachable!(),
     }
 }
