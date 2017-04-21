@@ -19,14 +19,14 @@ configuration_service = {version="0.1.0", path="../"}
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "5c7c349c829a254e176be9409620b95f55140643"
+rev = "6804712b34210a9643132d12c34c34cc18eb0384"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "5c7c349c829a254e176be9409620b95f55140643"
+rev = "6804712b34210a9643132d12c34c34cc18eb0384"
 
 [dependencies.sandbox]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "5c7c349c829a254e176be9409620b95f55140643"
+rev = "6804712b34210a9643132d12c34c34cc18eb0384"
