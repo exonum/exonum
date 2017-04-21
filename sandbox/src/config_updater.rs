@@ -35,7 +35,8 @@ impl Transaction for TxConfig {
 
     fn execute(&self, view: &View) -> Result<(), StorageError> {
         let schema = Schema::new(view);
-        schema.commit_actual_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap())
+        schema.commit_actual_configuration(StoredConfiguration::try_deserialize(self.config())
+                                               .unwrap())
     }
 }
 
