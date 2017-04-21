@@ -7,6 +7,7 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re",
 
 [dependencies]
 clap = "2.14"
+tempdir = "0.3.5"
 env_logger = "0.3"
 log = "0.3"
 serde = "0.8"
