@@ -14,7 +14,6 @@ extern crate log;
 #[cfg(test)]
 extern crate tempdir;
 extern crate serde_json;
-
 #[macro_use(message, storage_value)]
 extern crate exonum;
 extern crate blockchain_explorer;
@@ -26,23 +25,24 @@ extern crate bodyparser;
 
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer};
-use exonum::messages::utils::U64;
-use exonum::crypto::{PUBLIC_KEY_LENGTH, Signature};
-use blockchain_explorer::TransactionInfo;
 use serde_json::value::ToJson;
 use serde_json::{Value, from_value};
 
-pub mod api;
-pub mod wallet;
-mod tx_metarecord;
-
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
-use exonum::crypto::{PublicKey, Hash};
+use exonum::messages::utils::U64;
+use exonum::crypto::{PublicKey, Hash, Signature, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
+use blockchain_explorer::TransactionInfo;
+
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
+
+mod tx_metarecord;
+
+pub mod api;
+pub mod wallet;
 
 pub const CRYPTOCURRENCY: u16 = 128;
 
@@ -184,7 +184,7 @@ impl Deserialize for CurrencyTx {
     {
         let h = <TxSerdeHelper>::deserialize(deserializer)?;
         match h.service_id {
-            CRYPTOCURRENCY => {} 
+            CRYPTOCURRENCY => {}
             other => {
                 return Err(de::Error::custom(format!("service_id doesn't match the expected. \
                                                        actual: {}, expected: {}",
@@ -342,19 +342,15 @@ impl TxTransfer {
                     execution_status = true;
                     sender.transfer_to(&mut receiver, self.amount());
                 }
-                let modify_receiver= if execution_status {
+                let modify_receiver = if execution_status {
                     Some(receiver)
                 } else {
                     None
                 };
                 (Some(sender), modify_receiver)
-            }, 
-            (Some(sender), None) => {
-                (Some(sender), None)
-            }, 
-            _ => {
-                (None, None)
             }
+            (Some(sender), None) => (Some(sender), None),
+            _ => (None, None),
         };
 
         let meta = TxMetaRecord::new(&tx_hash, execution_status);
@@ -428,8 +424,8 @@ impl Transaction for CurrencyTx {
     fn verify(&self) -> bool {
         let res = self.verify_signature(self.pub_key());
         let res1 = match *self {
-            CurrencyTx::Transfer(ref msg) => *msg.from() != *msg.to(), 
-            _ => true,  
+            CurrencyTx::Transfer(ref msg) => *msg.from() != *msg.to(),
+            _ => true,
         };
         res && res1
     }
@@ -523,9 +519,7 @@ mod tests {
             let seed = rng.next_u64();
             TxTransfer::new(&p_from, &p_to, amount, seed, &s)
         };
-        let create_txs = (0..50)
-            .map(generator)
-            .collect::<Vec<_>>();
+        let create_txs = (0..50).map(generator).collect::<Vec<_>>();
         for tx in create_txs {
             let wrapped_tx = CurrencyTx::Transfer(tx);
             let json_str = serde_json::to_string(&wrapped_tx).unwrap();
@@ -545,9 +539,7 @@ mod tests {
             let seed = rng.next_u64();
             TxIssue::new(&p, amount, seed, &s)
         };
-        let create_txs = (0..50)
-            .map(generator)
-            .collect::<Vec<_>>();
+        let create_txs = (0..50).map(generator).collect::<Vec<_>>();
         for tx in create_txs {
             let wrapped_tx = CurrencyTx::Issue(tx);
             let json_str = serde_json::to_string(&wrapped_tx).unwrap();
@@ -564,15 +556,15 @@ mod tests {
         let generator = move |_| {
             let (p, s) = gen_keypair();
             let string_len = rng.gen_range(20u8, 255u8);
-            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+            let name: String = rng.gen_ascii_chars()
+                .take(string_len as usize)
+                .collect();
             TxCreateWallet::new(&p, &name, &s)
         };
         let (p, s) = gen_keypair();
         let non_ascii_create =
             TxCreateWallet::new(&p, "babd, Юникод еще работает", &s);
-        let mut create_txs = (0..50)
-            .map(generator)
-            .collect::<Vec<_>>();
+        let mut create_txs = (0..50).map(generator).collect::<Vec<_>>();
         create_txs.push(non_ascii_create);
         for tx in create_txs {
             let wrapped_tx = CurrencyTx::CreateWallet(tx);
@@ -634,7 +626,9 @@ mod tests {
         assert_eq!(prefix, vec![10, 0, 16, 0, 0, 0, 0, 0, 0]);
     }
 
-    fn get_wallet_and_history(schema: &CurrencySchema, pub_key: &PublicKey) -> (Option<Wallet>, Hash) {
+    fn get_wallet_and_history(schema: &CurrencySchema,
+                              pub_key: &PublicKey)
+                              -> (Option<Wallet>, Hash) {
         let w = schema.wallet(pub_key).unwrap();
         let h = schema.wallet_history(pub_key).root_hash().unwrap();
         (w, h)
@@ -661,7 +655,7 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, _) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1); 
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1);
         assert_eq!(w2, None);
         let h1 = s.wallet_history(&p1).values().unwrap();
         let h2 = s.wallet_history(&p2).values().unwrap();
@@ -694,8 +688,8 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, rh2) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1); 
-        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2); 
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1);
+        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2);
         let h1 = s.wallet_history(&p1).values().unwrap();
         let h2 = s.wallet_history(&p2).values().unwrap();
         let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
@@ -705,7 +699,7 @@ mod tests {
         assert_eq!(h1, vec![meta_create1, meta_issue1, meta_transfer.clone()]);
         assert_eq!(h2, vec![meta_create2]);
     }
-    
+
     #[test]
     fn test_wallet_history_txcreate_false_status() {
         let db = create_db();
@@ -723,7 +717,7 @@ mod tests {
         CurrencyTx::from(cw2.clone()).execute(&v).unwrap();
 
         let (w, rh) = get_wallet_and_history(&s, &p1);
-        assert_wallet(w.unwrap(), &p1, "name_wallet1", 0, 2, &rh); 
+        assert_wallet(w.unwrap(), &p1, "name_wallet1", 0, 2, &rh);
         let h1 = s.wallet_history(&p1).values().unwrap();
         assert_eq!(h1, vec![meta_create1, meta_create2]);
     }
@@ -746,8 +740,8 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, rh2) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 0, 1, &rh1); 
-        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2); 
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 0, 1, &rh1);
+        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2);
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
@@ -756,16 +750,16 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, rh2) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 2, &rh1); 
-        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 100, 2, &rh2); 
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 2, &rh1);
+        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 100, 2, &rh2);
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
         CurrencyTx::from(tw.clone()).execute(&v).unwrap();
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, rh2) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 600, 3, &rh1); 
-        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 500, 3, &rh2); 
+        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 600, 3, &rh1);
+        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 500, 3, &rh2);
 
         let h1 = s.wallet_history(&p1).values().unwrap();
         let h2 = s.wallet_history(&p2).values().unwrap();

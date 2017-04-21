@@ -12,24 +12,22 @@ extern crate log;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate bodyparser;
-
 extern crate exonum;
 extern crate blockchain_explorer;
 extern crate cryptocurrency;
 extern crate router;
 extern crate cookie;
 
-use std::net::SocketAddr;
-use std::thread;
 use clap::{Arg, App};
 use router::Router;
 
+use std::net::SocketAddr;
+use std::thread;
+
 use exonum::blockchain::{Blockchain, Service};
 use exonum::node::{Node, NodeConfig};
-
 use cryptocurrency::CurrencyService;
 use cryptocurrency::api::CryptocurrencyApi;
-
 use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
 use blockchain_explorer::api::Api;
 use blockchain_explorer::explorer_api::ExplorerApi;
@@ -74,11 +72,11 @@ fn main() {
         .about("Demo cryptocurrency validator node")
         .subcommand(GenerateCommand::new())
         .subcommand(RunCommand::new().arg(Arg::with_name("HTTP_PORT")
-            .short("p")
-            .long("port")
-            .value_name("HTTP_PORT")
-            .help("Run http server on given port")
-            .takes_value(true)));
+                                              .short("p")
+                                              .long("port")
+                                              .value_name("HTTP_PORT")
+                                              .help("Run http server on given port")
+                                              .takes_value(true)));
     let matches = app.get_matches();
 
     match matches.subcommand() {

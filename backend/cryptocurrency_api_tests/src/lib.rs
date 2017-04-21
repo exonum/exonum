@@ -16,12 +16,6 @@ extern crate rand;
 mod tests {
     extern crate iron_test;
 
-    use std::collections::VecDeque;
-    use std::sync::{Arc, Mutex};
-    use std::path::Path;
-    use std::fs::File;
-    use std::io::Read;
-
     use rand::{thread_rng, Rng};
     use router::Router;
     use iron::Headers;
@@ -31,27 +25,27 @@ mod tests {
     use serde::Serialize;
     use serde_json;
 
+    use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
+    use std::path::Path;
+    use std::fs::File;
+    use std::io::Read;
+
     use exonum::node::TransactionSend;
     use exonum::crypto::{Seed, Hash, PublicKey, gen_keypair, gen_keypair_from_seed};
     use exonum::blockchain::{Service, Transaction};
     use exonum::events::Error as EventsError;
     use exonum::messages::{FromRaw, Message, RawMessage};
-
     use blockchain_explorer::api::Api;
     use blockchain_explorer::helpers::init_logger;
-
     use cryptocurrency::{CurrencyService, CurrencyTx, TxCreateWallet, TxIssue, TxTransfer};
     use cryptocurrency::api::CryptocurrencyApi;
-
     use sandbox::sandbox::{sandbox_with_services, Sandbox};
     use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 
 
     fn logger() {
-        match init_logger() {
-            Ok(_) => {} 
-            Err(_) => {} 
-        }
+        let _ = init_logger();
     }
 
     fn response_body(response: Response) -> serde_json::Value {
@@ -132,7 +126,8 @@ mod tests {
         fn new() -> CurrencySandbox {
             let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
             let sandbox = sandbox_with_services(services);
-            info!("Sandbox validators list: {}", serde_json::to_string(&sandbox.validators()).unwrap());
+            info!("Sandbox validators list: {}",
+                  serde_json::to_string(&sandbox.validators()).unwrap());
             let state = SandboxState::new();
             CurrencySandbox {
                 sandbox: sandbox,
@@ -159,9 +154,9 @@ mod tests {
             debug!("Sandbox commits a sequence of {} transactions", txs.len());
             txs.iter()
                 .inspect(|elem| {
-                    trace!("Message hash: {:?}", (*elem).hash());
-                    trace!("{:?}", CurrencyTx::from_raw((*elem).clone()));
-                })
+                             trace!("Message hash: {:?}", (*elem).hash());
+                             trace!("{:?}", CurrencyTx::from_raw((*elem).clone()));
+                         })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());
         }
@@ -175,7 +170,9 @@ mod tests {
         }
 
         fn request_wallet_info(&self, pulic_key: &PublicKey) -> IronResult<Response> {
-            let pubkey_str = serde_json::to_string(&pulic_key).unwrap().replace("\"", "");
+            let pubkey_str = serde_json::to_string(&pulic_key)
+                .unwrap()
+                .replace("\"", "");
             self.request_wallet_info_str(pubkey_str)
         }
 
@@ -207,11 +204,13 @@ mod tests {
             if ind == 0 {
                 let (p, s) = gen_keypair_from_seed(&Seed::new([255; 32]));
                 return TxCreateWallet::new(&p, "babd, Юникод еще работает", &s)
-                    .into();
+                           .into();
             }
             let (p, s) = gen_keypair();
             let string_len = rng.gen_range(20u8, 255u8);
-            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+            let name: String = rng.gen_ascii_chars()
+                .take(string_len as usize)
+                .collect();
             TxCreateWallet::new(&p, &name, &s).into()
         };
 
@@ -347,9 +346,7 @@ mod tests {
                                         TxCreateWallet::new(&p5, "wallet5", &s5).into(),
                                         TxCreateWallet::new(&p6, "wallet6", &s6).into()];
         txs.iter()
-            .inspect(|tx| {
-                sandbox.post_transaction((*tx).clone()).unwrap();
-            })
+            .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
         sandbox.commit();
         let (p_absent, _) = gen_keypair_from_seed(&Seed::new([27; 32]));
@@ -377,20 +374,22 @@ mod tests {
                                         TxCreateWallet::new(&p5, "wallet5", &s5).into(),
                                         TxCreateWallet::new(&p6, "wallet6", &s6).into()];
         txs.iter()
-            .inspect(|tx| {
-                sandbox.post_transaction((*tx).clone()).unwrap();
-            })
+            .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
         sandbox.commit();
 
-        sandbox.post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1))).unwrap();
-        sandbox.commit();
-
-        sandbox.post_transaction(CurrencyTx::from(TxTransfer::new(&p1, &p2, 3000, 2000, &s1)))
+        sandbox
+            .post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1)))
             .unwrap();
         sandbox.commit();
 
-        sandbox.post_transaction(CurrencyTx::from(TxTransfer::new(&p2, &p1, 1000, 3000, &s2)))
+        sandbox
+            .post_transaction(CurrencyTx::from(TxTransfer::new(&p1, &p2, 3000, 2000, &s1)))
+            .unwrap();
+        sandbox.commit();
+
+        sandbox
+            .post_transaction(CurrencyTx::from(TxTransfer::new(&p2, &p1, 1000, 3000, &s2)))
             .unwrap();
         sandbox.commit();
 
@@ -423,20 +422,22 @@ mod tests {
                                         TxCreateWallet::new(&p5, "wallet5", &s5).into(),
                                         TxCreateWallet::new(&p6, "wallet6", &s6).into()];
         txs.iter()
-            .inspect(|tx| {
-                sandbox.post_transaction((*tx).clone()).unwrap();
-            })
+            .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
         sandbox.commit();
 
-        sandbox.post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1))).unwrap();
-        sandbox.commit();
-
-        sandbox.post_transaction(CurrencyTx::from(TxTransfer::new(&p1, &p2, 3000, 2000, &s1)))
+        sandbox
+            .post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1)))
             .unwrap();
         sandbox.commit();
 
-        sandbox.post_transaction(CurrencyTx::from(TxTransfer::new(&p2, &p1, 1000, 3000, &s2)))
+        sandbox
+            .post_transaction(CurrencyTx::from(TxTransfer::new(&p1, &p2, 3000, 2000, &s1)))
+            .unwrap();
+        sandbox.commit();
+
+        sandbox
+            .post_transaction(CurrencyTx::from(TxTransfer::new(&p2, &p1, 1000, 3000, &s2)))
             .unwrap();
         sandbox.commit();
 
@@ -445,7 +446,8 @@ mod tests {
         let expected_body1 = from_file("test_data/wallet1_query.json");
         assert_eq!(body1, expected_body1, "wallet1_query.json");
 
-        sandbox.post_transaction(CurrencyTx::from(TxCreateWallet::new(&p1,
+        sandbox
+            .post_transaction(CurrencyTx::from(TxCreateWallet::new(&p1,
                                                                    "Change name of existing \
                                                                     wallet",
                                                                    &s1)))
@@ -455,10 +457,13 @@ mod tests {
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/tx_create_wallet_false_execution_status.json");
-        assert_eq!(body1, expected_body1, "tx_create_wallet_false_execution_status.json");
+        assert_eq!(body1,
+                   expected_body1,
+                   "tx_create_wallet_false_execution_status.json");
 
         let (p_absent, s_absent) = gen_keypair_from_seed(&Seed::new([27; 32]));
-        sandbox.post_transaction(CurrencyTx::from(TxIssue::new(&p_absent, 6000, 329832, &s_absent)))
+        sandbox
+            .post_transaction(CurrencyTx::from(TxIssue::new(&p_absent, 6000, 329832, &s_absent)))
             .unwrap();
         sandbox.commit();
 
@@ -467,14 +472,17 @@ mod tests {
         let expected_body1 = from_file("test_data/no_state_change2.json");
         assert_eq!(body1, expected_body1, "no_state_change2.json");
 
-        sandbox.post_transaction(CurrencyTx::from(TxTransfer::new(&p1, &p2, 1_000_000, 329832, &s1)))
+        sandbox
+            .post_transaction(CurrencyTx::from(TxTransfer::new(&p1, &p2, 1_000_000, 329832, &s1)))
             .unwrap();
         sandbox.commit();
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/commit_new_transfer_not_sufficient_funds.json");
-        assert_eq!(body1, expected_body1, "commit_new_transfer_not_sufficient_funds.json");
+        assert_eq!(body1,
+                   expected_body1,
+                   "commit_new_transfer_not_sufficient_funds.json");
     }
 
     #[test]
@@ -495,13 +503,13 @@ mod tests {
                                         TxCreateWallet::new(&p5, "wallet5", &s5).into(),
                                         TxCreateWallet::new(&p6, "wallet6", &s6).into()];
         txs.iter()
-            .inspect(|tx| {
-                sandbox.post_transaction((*tx).clone()).unwrap();
-            })
+            .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
         sandbox.commit();
 
-        sandbox.post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1))).unwrap();
+        sandbox
+            .post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1)))
+            .unwrap();
         sandbox.commit();
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
@@ -509,13 +517,17 @@ mod tests {
         let expected_body1 = from_file("test_data/wallet1_query1.json");
         assert_eq!(body1, expected_body1, "wallet1_query1.json");
 
-        sandbox.post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1))).unwrap();
+        sandbox
+            .post_transaction(CurrencyTx::from(TxIssue::new(&p1, 6000, 1000, &s1)))
+            .unwrap();
         sandbox.commit();
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/no_txs_committed_no_state_change.json");
-        assert_eq!(body1, expected_body1, "no_txs_committed_no_state_change.json");
+        assert_eq!(body1,
+                   expected_body1,
+                   "no_txs_committed_no_state_change.json");
     }
 
 
@@ -532,8 +544,8 @@ mod tests {
                 let body = response_body(resp);
                 let error_body = serde_json::from_value::<ErrorResponse>(body).unwrap();
                 assert_eq!(&error_body.type_str, expected_message);
-            } 
-            _ => unreachable!(), 
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -543,12 +555,12 @@ mod tests {
         (0..50)
             .map(generator)
             .inspect(|tx| {
-                let expected_tx_hash = tx.hash();
-                let resp = sandbox.post_transaction(tx.clone()).unwrap();
-                let body = response_body(resp);
-                let tx_response_res = serde_json::from_value::<TxResponse>(body).unwrap();
-                assert_eq!(expected_tx_hash, tx_response_res.tx_hash);
-            })
+                         let expected_tx_hash = tx.hash();
+                         let resp = sandbox.post_transaction(tx.clone()).unwrap();
+                         let body = response_body(resp);
+                         let tx_response_res = serde_json::from_value::<TxResponse>(body).unwrap();
+                         assert_eq!(expected_tx_hash, tx_response_res.tx_hash);
+                     })
             .collect::<Vec<CurrencyTx>>();
     }
 }

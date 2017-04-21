@@ -1,5 +1,6 @@
-use exonum::crypto::{Hash, hash};
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
+use exonum::crypto::{Hash, hash};
 use exonum::storage::StorageValue;
 
 storage_value! {
@@ -86,9 +87,7 @@ fn test_tx_meta_record_serde() {
         let status = rng.gen_weighted_bool(2);
         TxMetaRecord::new(&hash, status)
     };
-    let data = (0..50)
-        .map(generator)
-        .collect::<Vec<_>>();
+    let data = (0..50).map(generator).collect::<Vec<_>>();
     for datum in data {
         let json_str = serde_json::to_string(&datum).unwrap();
         let datum_round_trip: TxMetaRecord = serde_json::from_str(&json_str).unwrap();
