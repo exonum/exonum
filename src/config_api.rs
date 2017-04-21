@@ -5,7 +5,7 @@ use iron::prelude::*;
 use bodyparser;
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
-use ::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
+use {StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use exonum::storage::{Map, StorageValue};
 
 use exonum::node::{TxSender, NodeChannel, TransactionSend};
@@ -53,7 +53,8 @@ pub struct PublicConfigApi {
 
 impl PublicConfigApi {
     fn get_actual_config(&self) -> Result<ApiResponseConfigHashInfo, ApiError> {
-        let actual_cfg = Schema::new(&self.blockchain.view()).get_actual_configuration()?;
+        let actual_cfg = Schema::new(&self.blockchain.view())
+            .get_actual_configuration()?;
         let res = ApiResponseConfigHashInfo {
             hash: actual_cfg.hash(),
             config: actual_cfg,
@@ -62,13 +63,14 @@ impl PublicConfigApi {
     }
 
     fn get_following_config(&self) -> Result<Option<ApiResponseConfigHashInfo>, ApiError> {
-        let following_cfg = Schema::new(&self.blockchain.view()).get_following_configuration()?;
+        let following_cfg = Schema::new(&self.blockchain.view())
+            .get_following_configuration()?;
         let res = following_cfg.map(|cfg| {
-            ApiResponseConfigHashInfo {
-                hash: cfg.hash(),
-                config: cfg,
-            }
-        });
+                                        ApiResponseConfigHashInfo {
+                                            hash: cfg.hash(),
+                                            config: cfg,
+                                        }
+                                    });
         Ok(res)
     }
 
@@ -91,7 +93,7 @@ impl PublicConfigApi {
         let view = self.blockchain.view();
         let configuration_schema = ConfigurationSchema::new(&view);
         let res = match configuration_schema.config_data().get(cfg_hash)? {
-            None => ApiResponseVotesInfo::ProposeAbsent(None), 
+            None => ApiResponseVotesInfo::ProposeAbsent(None),
             Some(_) => ApiResponseVotesInfo::Votes(configuration_schema.get_votes(cfg_hash)?),
         };
         Ok(res)
@@ -149,8 +151,8 @@ impl Api for PublicConfigApi {
                     let hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
                     let info = _self.get_config_by_hash(&hash)?;
                     _self.ok_response(&info.to_json())
-                } 
-                None => Err(ApiError::IncorrectRequest)?, 
+                }
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
 
@@ -162,8 +164,8 @@ impl Api for PublicConfigApi {
                     let propose_cfg_hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
                     let info = _self.get_votes_for_propose(&propose_cfg_hash)?;
                     _self.ok_response(&info.to_json())
-                } 
-                None => Err(ApiError::IncorrectRequest)?, 
+                }
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
         router.get("/api/v1/config/actual", config_actual, "config_actual");
@@ -205,8 +207,8 @@ impl<T> Api for PrivateConfigApi<T>
                     let propose_cfg_hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
                     let info = _self.put_config_vote(&propose_cfg_hash)?;
                     _self.ok_response(&info.to_json())
-                } 
-                None => Err(ApiError::IncorrectRequest)?, 
+                }
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
         router.post("/api/v1/configs/postpropose",

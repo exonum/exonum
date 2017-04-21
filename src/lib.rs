@@ -1,11 +1,13 @@
 //! # Introduction
-//! This crate implements the standalone configuration service of `Exonum` blockchain, which, upon being plugged in, allows modifying
-//! `Exonum` blockchain configuration by means of [propose config](struct.TxConfigPropose.html) and [vote for proposed config](struct.TxConfigVote.html) transactions, signed by validators - actual blockchain
-//! participants.
+//! This crate implements the standalone configuration service of `Exonum` blockchain,
+//! which, upon being plugged in, allows modifying
+//! `Exonum` blockchain configuration by means of [propose config](struct.TxConfigPropose.html)
+//! and [vote for proposed config](struct.TxConfigVote.html) transactions, signed by validators
+//! - actual blockchain participants.
 //!
 //! It also contains http api implementation for public queries (get actual/following
-//! configuration, etc.) and private queries, intended for use only by validator nodes' maintainers (post configuration propose, post vote for a
-//! configuration propose).
+//! configuration, etc.) and private queries, intended for use only by validator nodes' maintainers
+//! (post configuration propose, post vote for a configuration propose).
 //!
 //! `Exonum` blockchain configuration is composed of:
 //!
@@ -19,23 +21,31 @@
 //! - `previous_cfg_hash` - hash of previous configuration, which validators' set is allowed to cast
 //! votes for current config.
 //!
-//! See [StoredConfiguration](../exonum/blockchain/config/struct.StoredConfiguration.html) in exonum.
+//! See [StoredConfiguration](../exonum/blockchain/config/struct.StoredConfiguration.html)
+//! in exonum.
 //!
-//! While using the service's transactions and/or api, it's important to understand, how [hash of a configuration](../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is calculated. It's calculated as a hash of normalized `String` bytes, containing configuration json representation.
+//! While using the service's transactions and/or api, it's important to understand, how [hash of a
+//! configuration](../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is
+//! calculated. It's calculated as a hash of normalized `String` bytes, containing
+//! configuration json representation.
 //! When a new propose is put via `TxConfigPropose`:
 //!
-//! 1. [bytes](struct.TxConfigPropose.html#method.cfg) of a `String`, containing configuration json ->
+//! 1. [bytes](struct.TxConfigPropose.html#method.cfg) of a `String`, containing configuration
+//! json ->
 //! 2. `String` ->
 //! 3. `StoredConfiguration` ->
 //! 4. unique normalized `String` for a unique configuration ->
 //! 5. bytes ->
 //! 6. [hash](../exonum/crypto/fn.hash.html)(bytes)
 //!
-//! The same [hash of a configuration](../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is referenced in `TxConfigVote` in [cfg_hash](struct.TxConfigVote.html#method.cfg_hash).
+//! The same [hash of a configuration]
+//! (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is referenced in
+//! `TxConfigVote` in [cfg_hash](struct.TxConfigVote.html#method.cfg_hash).
 //!
 //! # Examples
 //!
-//! Run `Exonum` blockchain testnet with single configuration service turned on for it in a single process (2 threads per node: 1 - for exonum node and 1 - for http api listener)
+//! Run `Exonum` blockchain testnet with single configuration service turned on for it in a
+//! single process (2 threads per node: 1 - for exonum node and 1 - for http api listener)
 //!
 //! ```rust,no_run
 //! extern crate iron;
@@ -169,6 +179,7 @@ use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, Merk
                       Result as StorageResult};
 use exonum::blockchain::StoredConfiguration;
 
+type ProposeData = StorageValueConfigProposeData;
 /// Value of [service_id](struct.ConfigurationService.html#method.service_id) of
 /// `ConfigurationService`
 pub const CONFIG_SERVICE: u16 = 1;
@@ -183,7 +194,8 @@ lazy_static! {
 #[doc="
 Specific [TxConfigVote](TxConfigVote.t.html) with all bytes in message set to 0.
 It is used as placeholder in database for votes of validators, which didn't cast votes."]
-    pub static ref ZEROVOTE: TxConfigVote = TxConfigVote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero());
+    pub static ref ZEROVOTE: TxConfigVote = TxConfigVote::new_with_signature(&PublicKey::zero(),
+    &Hash::zero(), &Signature::zero());
 }
 
 storage_value! {
@@ -212,7 +224,8 @@ storage_value! {
 /// Table's root hash - in `votes_history_hash` field, which is
 /// modified after a vote from validator is added.
 impl StorageValueConfigProposeData {
-    /// Method to mutate `votes_history_hash` field containing root hash of [config_votes](struct.ConfigurationSchema.html#method.config_votes) after replacing [empty
+    /// Method to mutate `votes_history_hash` field containing root hash of
+    /// [config_votes](struct.ConfigurationSchema.html#method.config_votes) after replacing [empty
     /// vote](struct.ZEROVOTE.html) with a real `TxConfigVote` cast by a validator.
     pub fn set_history_hash(&mut self, hash: &Hash) {
         Field::write(&hash, &mut self.raw, 8, 40);
@@ -258,7 +271,7 @@ message! {
         const SIZE = 40;
 
         from:           &PublicKey  [00 => 32]
-        cfg:            &[u8]       [32 => 40] 
+        cfg:            &[u8]       [32 => 40]
     }
 }
 
@@ -273,7 +286,8 @@ message! {
     }
 }
 
-/// Helper enum to aggregate `TxConfigPropose` and `TxConfigVote` within. This enum implements `Exonum` traits, necessary for messages and transactions: `Message`, `FromRaw`, `Transaction`
+/// Helper enum to aggregate `TxConfigPropose` and `TxConfigVote` within. This enum implements
+/// `Exonum` traits, necessary for messages and transactions: `Message`, `FromRaw`, `Transaction`
 #[derive(Clone, PartialEq)]
 pub enum ConfigTx {
     ConfigPropose(TxConfigPropose),
@@ -317,10 +331,10 @@ impl Deserialize for TxConfigPropose {
     {
         let h = <TxConfigProposeSerdeHelper>::deserialize(deserializer)?;
 
-        let precommit = TxConfigPropose::new_with_signature(&h.from,
-                                                            &StorageValue::serialize(h.cfg
-                                                                .clone()),
-                                                            &h.signature);
+        let precommit =
+            TxConfigPropose::new_with_signature(&h.from,
+                                                &StorageValue::serialize(h.cfg.clone()),
+                                                &h.signature);
         Ok(precommit)
     }
 }
@@ -362,7 +376,8 @@ impl Serialize for ConfigTx {
 
 /// Struct, implementing [Service](../exonum/blockchain/service/trait.Service.html) trait template.
 /// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
-/// [TxConfigPropose](struct.TxConfigPropose.html#method.execute) and [TxConfigVote](struct.TxConfigVote.html#method.execute).
+/// [TxConfigPropose](struct.TxConfigPropose.html#method.execute) and
+/// [TxConfigVote](struct.TxConfigVote.html#method.execute).
 pub struct ConfigurationService {}
 
 /// `ConfigurationService` database schema: tables and logically atomic mutation methods.
@@ -428,30 +443,44 @@ impl<'a> ConfigurationSchema<'a> {
         ConfigurationSchema { view: view }
     }
 
-    /// Returns a table of all config proposes `TxConfigPropose`, which are stored within
+    /// Returns a table of all config proposes `TxConfigPropose`, which are stored
+    /// within
     /// `StorageValueConfigProposeData` along with votes' data.
     ///
-    /// - Table **key** is [hash of a configuration](../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash). This hash is normalized when a new propose is put via `put_propose`:
-    ///   1. [bytes](struct.TxConfigPropose.html#method.cfg) of a `String`, containing configuration json ->
+    /// - Table **key** is [hash of a configuration]
+    /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash).
+    /// This hash is normalized when a new propose is put via `put_propose`:
+    ///   1. [bytes](struct.TxConfigPropose.html#method.cfg) of a `String`,
+    ///   containing configuration json ->
     ///   2. `String` ->
-    ///   3. [StoredConfiguration](../exonum/blockchain/config/struct.StoredConfiguration.html) ->
+    ///   3. [StoredConfiguration]
+    ///   (../exonum/blockchain/config/struct.StoredConfiguration.html) ->
     ///   4. unique normalized `String` for a unique configuration ->
     ///   5. bytes ->
     ///   6. [hash](../exonum/crypto/fn.hash.html)(bytes)
-    /// - Table **value** is `StorageValueConfigProposeData`, containing `TxConfigPropose`, which contains
-    /// [bytes](struct.TxConfigPropose.html#method.cfg), corresponding to **key**.
-    pub fn config_data
-        (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StorageValueConfigProposeData> {
+    /// - Table **value** is `StorageValueConfigProposeData`, containing
+    /// `TxConfigPropose`,
+    /// which contains
+    /// [bytes](struct.TxConfigPropose.html#method.cfg), corresponding to
+    /// **key**.
+    pub fn config_data(&self)
+                       -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, ProposeData> {
         MerklePatriciaTable::new(MapTable::new(vec![4], self.view))
     }
 
-    /// Returns a table of votes of validators for config, referenced by the queried `config_hash` - [hash of a configuration](../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash).
+    /// Returns a table of votes of validators for config, referenced by the
+    /// queried
+    /// `config_hash` - [hash of a configuration]
+    /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash).
     ///
-    /// 1. The list of validators, who can vote for a config, is determined by `validators` of previous [StoredConfiguration](../exonum/blockchain/config/struct.StoredConfiguration.html).
-    /// 2. Config, previous to a `StoredConfiguration` is referenced by `previous_cfg_hash` in `StoredConfiguration`.
+    /// 1. The list of validators, who can vote for a config, is determined by
+    /// `validators` of previous [StoredConfiguration]
+    /// (../exonum/blockchain/config/struct.StoredConfiguration.html).
+    /// 2. Config, previous to a `StoredConfiguration` is referenced by
+    /// `previous_cfg_hash` in `StoredConfiguration`.
     ///
-    /// - Table **index** is validator_id - position of a validator's `PublicKey` in validator list of config,
+    /// - Table **index** is validator_id - position of a validator's `PublicKey`
+    /// in validator list of config,
     /// previous to config, referenced by the queried `config_hash`.
     /// - Table **value** is `TxConfigVote`, cast by validator with
     /// [PublicKey](struct.TxConfigVote.html#method.from), corresponding to **index**.
@@ -463,14 +492,19 @@ impl<'a> ConfigurationSchema<'a> {
         MerkleTable::new(MapTable::new(prefix, self.view))
     }
 
-    /// Put a new `StorageValueConfigProposeData` into `config_data` table with following fields:
+    /// Put a new `StorageValueConfigProposeData` into `config_data` table with
+    /// following fields:
     ///
     /// - **tx_propose** - `tx_propose` argument
-    /// - **num_votes** - `validators.len()` of [StoredConfiguration](../exonum/blockchain/config/struct.StoredConfiguration.html), referenced by `previous_cfg_hash` of config, stored in `tx_propose`.
+    /// - **num_votes** - `validators.len()` of [StoredConfiguration]
+    /// (../exonum/blockchain/config/struct.StoredConfiguration.html),
+    /// referenced by `previous_cfg_hash` of config, stored in `tx_propose`.
     /// - **votes_history_hash** - root_hash of corresponding `config_votes` table in a
     /// state right after initialization (all indices contain [empty vote](struct.ZEROVOTE.html)).
     ///
-    /// If an entry with the same [hash of a configuration](../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is present in `config_data`, as in config inside of `tx_propose`, nothing is done.
+    /// If an entry with the same [hash of a configuration]
+    /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is present
+    /// in `config_data`, as in config inside of `tx_propose`, nothing is done.
     pub fn put_propose(&self, tx_propose: TxConfigPropose) -> StorageResult<()> {
         let cfg = <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec());
         let cfg_hash = &StorageValue::hash(&cfg);
@@ -484,7 +518,8 @@ impl<'a> ConfigurationSchema<'a> {
         }
 
         let general_schema = Schema::new(self.view);
-        let prev_cfg = general_schema.configs()
+        let prev_cfg = general_schema
+            .configs()
             .get(&cfg.previous_cfg_hash)?
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigPropose:{:?}",
                              &cfg.previous_cfg_hash,
@@ -512,21 +547,26 @@ impl<'a> ConfigurationSchema<'a> {
     pub fn put_vote(&self, tx_vote: TxConfigVote) -> StorageResult<()> {
         let cfg_hash = tx_vote.cfg_hash();
         let config_data_table = self.config_data();
-        let mut propose_config_data = config_data_table.get(cfg_hash)?
+        let mut propose_config_data = config_data_table
+            .get(cfg_hash)?
             .expect(&format!("Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
                              &tx_vote));
 
         let tx_propose = propose_config_data.tx_propose();
-        let prev_cfg_hash = <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec())
-            .previous_cfg_hash;
+        let prev_cfg_hash = <StoredConfiguration as StorageValue>::deserialize(tx_propose
+                                                                                   .cfg()
+                                                                                   .to_vec())
+                .previous_cfg_hash;
         let general_schema = Schema::new(self.view);
-        let prev_cfg = general_schema.configs()
+        let prev_cfg = general_schema
+            .configs()
             .get(&prev_cfg_hash)?
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigVote:{:?}",
                              prev_cfg_hash,
                              &tx_vote));
         let from: &PublicKey = tx_vote.from();
-        let validator_id = prev_cfg.validators
+        let validator_id = prev_cfg
+            .validators
             .iter()
             .position(|pk| pk == from)
             .expect(&format!("See !prev_cfg.validators.contains(self.from()) for \
@@ -534,7 +574,8 @@ impl<'a> ConfigurationSchema<'a> {
                              &tx_vote));
 
         let votes_for_cfg_table = self.config_votes(cfg_hash);
-        votes_for_cfg_table.set(validator_id as u64, tx_vote.clone())?;
+        votes_for_cfg_table
+            .set(validator_id as u64, tx_vote.clone())?;
         propose_config_data.set_history_hash(&votes_for_cfg_table.root_hash()?);
         config_data_table.put(cfg_hash, propose_config_data)
     }
@@ -542,14 +583,13 @@ impl<'a> ConfigurationSchema<'a> {
     pub fn get_votes(&self, cfg_hash: &Hash) -> StorageResult<Vec<Option<TxConfigVote>>> {
         let votes_table = self.config_votes(cfg_hash);
         let votes_values = votes_table.values()?;
-        let votes_options = votes_values.into_iter()
-            .map(|vote| {
-                if vote == ZEROVOTE.clone() {
-                    None
-                } else {
-                    Some(vote)
-                }
-            })
+        let votes_options = votes_values
+            .into_iter()
+            .map(|vote| if vote == ZEROVOTE.clone() {
+                     None
+                 } else {
+                     Some(vote)
+                 })
             .collect::<Vec<_>>();
         Ok(votes_options)
     }
@@ -564,8 +604,8 @@ impl TxConfigPropose {
         let blockchain_schema = Schema::new(view);
         let config_schema = ConfigurationSchema::new(view);
 
-        let following_config: Option<StoredConfiguration> =
-            blockchain_schema.get_following_configuration()?;
+        let following_config: Option<StoredConfiguration> = blockchain_schema
+            .get_following_configuration()?;
         if let Some(foll_cfg) = following_config {
             error!("Discarding TxConfigPropose: {} as there is an already scheduled next config: \
                     {:?} ",
@@ -630,8 +670,8 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        let following_config: Option<StoredConfiguration> =
-            blockchain_schema.get_following_configuration()?;
+        let following_config: Option<StoredConfiguration> = blockchain_schema
+            .get_following_configuration()?;
         if let Some(foll_cfg) = following_config {
             error!("Discarding TxConfigVote: {:?} as there is an already scheduled next config: \
                     {:?} ",
@@ -685,7 +725,8 @@ impl TxConfigVote {
         }
 
         if votes_count >= State::byzantine_majority_count(actual_config.validators.len()) {
-            blockchain_schema.commit_actual_configuration(parsed_config)?;
+            blockchain_schema
+                .commit_actual_configuration(parsed_config)?;
         }
         Ok(())
     }
@@ -715,11 +756,18 @@ impl Service for ConfigurationService {
         CONFIG_SERVICE
     }
 
-    /// `ConfigurationService` returns a vector, containing the single [root_hash](../exonum/storage/struct.MerklePatriciaTable.html#method.root_hash) of [all config proposes table](struct.ConfigurationSchema.html#method.config_data).
+    /// `ConfigurationService` returns a vector, containing the single [root_hash]
+    /// (../exonum/storage/struct.MerklePatriciaTable.html#method.root_hash)
+    /// of [all config proposes table](struct.ConfigurationSchema.html#method.config_data).
     ///
-    /// Thus, `state_hash` is affected by any new valid propose and indirectly by any new vote for a propose.
+    /// Thus, `state_hash` is affected by any new valid propose and indirectly by
+    /// any new vote for a propose.
     ///
-    /// When a new vote for a config propose is added the [root_hash](../exonum/storage/struct.MerkleTable.html#method.root_hash) of corresponding [votes for a propose table](struct.ConfigurationSchema.html#method.config_votes) is modified. Such hash is stored in each entry of [all config proposes table](struct.ConfigurationSchema.html#method.config_data) - `StorageValueConfigProposeData`.
+    /// When a new vote for a config propose is added the [root_hash]
+    /// (../exonum/storage/struct.MerkleTable.html#method.root_hash) of corresponding
+    /// [votes for a propose table](struct.ConfigurationSchema.html#method.config_votes)
+    /// is modified. Such hash is stored in each entry of [all config proposes table]
+    /// (struct.ConfigurationSchema.html#method.config_data) - `StorageValueConfigProposeData`.
     fn state_hash(&self, view: &View) -> StorageResult<Vec<Hash>> {
         let schema = ConfigurationSchema::new(view);
         schema.state_hash()
