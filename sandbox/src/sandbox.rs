@@ -1,13 +1,14 @@
-use std::collections::{VecDeque, BinaryHeap, HashSet};
+use std::collections::{VecDeque, BinaryHeap, HashSet, HashMap};
 use std::iter::FromIterator;
 use std::cell::{RefCell, Ref};
 use std::sync::{Arc, Mutex};
 use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 use std::ops::Drop;
-use std::collections::HashMap;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig};
+use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage,
+                   ListenerConfig};
+use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
@@ -17,7 +18,6 @@ use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, 
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::node::state::{Round, Height, TxPool};
 
 use timestamping::TimestampingService;
 
