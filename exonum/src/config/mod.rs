@@ -11,7 +11,9 @@ use std::fs::File;
 pub struct ConfigFile {}
 
 impl ConfigFile {
-    pub fn load<T: Deserialize>(path: &Path) -> Result<T, Box<Error>> {
+    pub fn load<T>(path: &Path) -> Result<T, Box<Error>> 
+        where T: for<'r> Deserialize<'r>
+    {
         let mut file = File::open(path)?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;

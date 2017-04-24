@@ -1,5 +1,9 @@
 #[macro_export]
 macro_rules! storage_value {
+    (@count ) => {0};
+    (@count $first:ident $($tail:ident)*) => {
+        1usize + message!(@count $($tail)*)
+    };
     ($name:ident {
         const SIZE = $body:expr;
 
@@ -82,5 +86,48 @@ macro_rules! storage_value {
                    .finish()
             }
         }
+
+        impl $crate::serialize::json::ExonumJsonSerialize for $name {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ::serde::Serializer {
+                    use ::serde::ser::SerializeStruct;
+                    let mut strukt = serializer.serialize_struct(stringify!($name), storage_value!(@count $($field_name)*))?;
+                    $(strukt.serialize_field(stringify!($field_name), &$crate::serialize::json::wrap(&self.$field_name()))?;)*
+                    strukt.end()               
+                }
+        }
+
+        impl $crate::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize_default(value: &::serde_json::Value) -> Option<Self> {
+                let to = $body;
+                let from = 0;
+                use $crate::serialize::json::ExonumJsonDeserialize;
+
+                let mut buf = vec![0; $body];
+                
+
+                if <Self as ExonumJsonDeserialize>::deserialize(value, &mut buf, from, to) {
+                    Some($name { raw: buf })
+                }
+                else {
+                    None
+                }
+            }
+            fn deserialize<B: $crate::serialize::json::WriteBufferWrapper> (value: &::serde_json::Value, buffer: & mut B, from: usize, _to: usize ) -> bool {
+                if let Some(obj) = value.as_object() {
+                    let mut error = false;
+                    $(
+                    error = error |
+                        obj.get(stringify!($name))
+                        .map_or(true, |val| 
+                                <$field_type as $crate::serialize::json::ExonumJsonDeserialize>::deserialize(val, buffer, from + $from , from + $to )
+                        );
+                    )*
+                    error
+                } else {
+                    true
+                }
+            }
+        }
+
     )
 }
