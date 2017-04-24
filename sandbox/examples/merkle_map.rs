@@ -4,9 +4,9 @@ extern crate rand;
 #[macro_use]
 extern crate clap;
 
-use std::path::Path;
-
 use rand::{SeedableRng, XorShiftRng, Rng};
+
+use std::path::Path;
 
 use exonum::storage::{LevelDB, LevelDBOptions};
 use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Fork};

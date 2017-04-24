@@ -6,13 +6,11 @@ extern crate log;
 use std::time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
-                       RequestPrevotes, CONSENSUS};
-use exonum::crypto::{gen_keypair, Hash};
+                       RequestPrevotes, BitVec, CONSENSUS};
+use exonum::crypto::{Hash, gen_keypair};
 use exonum::blockchain::{Block, Blockchain};
-use exonum::messages::BitVec;
-use exonum::node::state::{REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
+use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
                           REQUEST_TRANSACTIONS_TIMEOUT};
-use exonum::node::state::{Round, Height};
 
 use sandbox::timestamping::{TimestampTx, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
