@@ -37,7 +37,7 @@ impl<V: Serialize> Serialize for Proofnode<V> {
                 state = ser.serialize_struct("Full", 2)?;
                 ser.serialize_struct_elt(&mut state, LEFT_DESC, left_proof)?;
                 ser.serialize_struct_elt(&mut state, RIGHT_DESC, right_proof)?;
-            } 
+            }
             Left(ref left_proof, ref option_hash) => {
                 if let Some(ref hash) = *option_hash {
                     state = ser.serialize_struct("Left", 2)?;
@@ -47,12 +47,12 @@ impl<V: Serialize> Serialize for Proofnode<V> {
                     state = ser.serialize_struct("Left", 1)?;
                     ser.serialize_struct_elt(&mut state, LEFT_DESC, left_proof)?;
                 }
-            } 
+            }
             Right(ref hash, ref right_proof) => {
                 state = ser.serialize_struct("Right", 2)?;
                 ser.serialize_struct_elt(&mut state, LEFT_DESC, hash)?;
                 ser.serialize_struct_elt(&mut state, RIGHT_DESC, right_proof)?;
-            } 
+            }
             Leaf(ref val) => {
                 state = ser.serialize_struct("Leaf", 1)?;
                 ser.serialize_struct_elt(&mut state, VAL_DESC, val)?;
@@ -87,8 +87,8 @@ impl<V: Deserialize> Deserialize for Proofnode<V> {
                                                              Value: {:?}",
                                                             LEFT_DESC,
                                                             json)))
-                    } 
-                    Some(left) => left, 
+                    }
+                    Some(left) => left,
                 };
                 let right_value: &Value = match map_key_value.get(RIGHT_DESC) {
                     None => {
@@ -96,43 +96,53 @@ impl<V: Deserialize> Deserialize for Proofnode<V> {
                                                           Value: {:?}",
                                                             RIGHT_DESC,
                                                             json)))
-                    } 
-                    Some(right) => right, 
+                    }
+                    Some(right) => right,
                 };
                 if right_value.is_string() {
-                    let left_proof: Proofnode<V> = from_value(left_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Proofnode",
-                                                               left_value.clone(),
-                                                               err))
-                        })?;
-                    let right_hash: Hash = from_value(right_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Hash", right_value.clone(), err))
-                        })?;
+                    let left_proof: Proofnode<V> = from_value(left_value.clone())
+                        .map_err(|err| {
+                                     D::Error::custom(format_err_string("Proofnode",
+                                                                        left_value.clone(),
+                                                                        err))
+                                 })?;
+                    let right_hash: Hash = from_value(right_value.clone())
+                        .map_err(|err| {
+                                     D::Error::custom(format_err_string("Hash",
+                                                                        right_value.clone(),
+                                                                        err))
+                                 })?;
                     Proofnode::Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
-                    let right_proof: Proofnode<V> = from_value(right_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Proofnode",
-                                                               right_value.clone(),
-                                                               err))
-                        })?;
-                    let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Hash", left_value.clone(), err))
-                        })?;
+                    let right_proof: Proofnode<V> = from_value(right_value.clone())
+                        .map_err(|err| {
+                                     D::Error::custom(format_err_string("Proofnode",
+                                                                        right_value.clone(),
+                                                                        err))
+                                 })?;
+                    let left_hash: Hash = from_value(left_value.clone())
+                        .map_err(|err| {
+                                     D::Error::custom(format_err_string("Hash",
+                                                                        left_value.clone(),
+                                                                        err))
+                                 })?;
                     Proofnode::Right(left_hash, Box::new(right_proof))
                 } else {
-                    let left_proof = from_value(left_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Proofnode",
-                                                               left_value.clone(),
-                                                               err))
-                        })?;
-                    let right_proof = from_value(right_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Proofnode",
-                                                               right_value.clone(),
-                                                               err))
-                        })?;
+                    let left_proof = from_value(left_value.clone())
+                        .map_err(|err| {
+                                     D::Error::custom(format_err_string("Proofnode",
+                                                                        left_value.clone(),
+                                                                        err))
+                                 })?;
+                    let right_proof = from_value(right_value.clone())
+                        .map_err(|err| {
+                                     D::Error::custom(format_err_string("Proofnode",
+                                                                        right_value.clone(),
+                                                                        err))
+                                 })?;
                     Proofnode::Full(Box::new(left_proof), Box::new(right_proof))
                 }
-            } 
+            }
             1 => {
                 if map_key_value.get(VAL_DESC).is_none() && map_key_value.get(LEFT_DESC).is_none() {
                     return Err(D::Error::custom(format!("Invalid json: unknown key met. \
@@ -142,26 +152,30 @@ impl<V: Deserialize> Deserialize for Proofnode<V> {
                                                         json)));
                 }
                 if let Some(leaf_value) = map_key_value.get(VAL_DESC) {
-                    let val: V = from_value(leaf_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("V", leaf_value.clone(), err))
-                        })?;
+                    let val: V = from_value(leaf_value.clone())
+                        .map_err(|err| {
+                                     D::Error::custom(format_err_string("V",
+                                                                        leaf_value.clone(),
+                                                                        err))
+                                 })?;
                     Proofnode::Leaf(val)
                 } else {
                     // LEFT_DESC is present
                     let left_value = map_key_value.get(LEFT_DESC).unwrap();
-                    let left_proof: Proofnode<V> = from_value(left_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Proofnode",
-                                                               left_value.clone(),
-                                                               err))
-                        })?;
+                    let left_proof: Proofnode<V> = from_value(left_value.clone())
+                        .map_err(|err| {
+                                     D::Error::custom(format_err_string("Proofnode",
+                                                                        left_value.clone(),
+                                                                        err))
+                                 })?;
                     Proofnode::Left(Box::new(left_proof), None)
                 }
-            } 
+            }
             _ => {
                 return Err(D::Error::custom(format!("Invalid json: Number of keys should be \
                                                      either 1 or 2. json: {:?}",
                                                     json)))
-            } 
+            }
         };
         Ok(res)
     }
@@ -179,11 +193,11 @@ impl<V: StorageValue> Proofnode<V> {
                 } else {
                     hash_rules::hash_single_branch(left_proof.compute_proof_root())
                 }
-            } 
+            }
             Proofnode::Right(ref left_hash, ref right_proof) => {
                 hash_rules::hash_branch(*left_hash, right_proof.compute_proof_root())
             }
-            Proofnode::Leaf(ref val) => hash_rules::hash_leaf(val), 
+            Proofnode::Leaf(ref val) => hash_rules::hash_leaf(val),
         }
     }
 
@@ -197,7 +211,7 @@ impl<V: StorageValue> Proofnode<V> {
             }
             Proofnode::Left(ref left_proof, _) => {
                 left_proof.indices_and_values(left_ch_ind, collect);
-            } 
+            }
             Proofnode::Right(_, ref right_proof) => {
                 right_proof.indices_and_values(right_ch_ind, collect);
             }
@@ -217,11 +231,11 @@ impl<V: fmt::Debug> fmt::Debug for Proofnode<V> {
                 } else {
                     write!(f, "{{\"left\":{:?}}}", left_proof)
                 }
-            } 
+            }
             Right(ref left_hash, ref right) => {
                 write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_hash, right)
             }
-            Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val), 
+            Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val),
         }
     }
 }

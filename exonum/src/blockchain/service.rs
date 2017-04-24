@@ -50,7 +50,7 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 
     pub fn validator_state(&self) -> &Option<ValidatorState> {
-       self.state.validator_state()
+        self.state.validator_state()
     }
 
     pub fn view(&self) -> &View {

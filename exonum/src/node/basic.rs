@@ -17,9 +17,9 @@ impl<S> NodeHandler<S>
         //     if !raw.verify() {
         //         return;
         //     }
-        
+
         //FIXME: add whitelist verify public_key
-        
+
         let msg = Any::from_raw(raw).unwrap();
         match msg {
             Any::Connect(msg) => self.handle_connect(msg),
@@ -88,7 +88,7 @@ impl<S> NodeHandler<S>
             if !msg.verify_signature(peer) {
                 return;
             }
-            
+
             // Check validator height info
             if msg.height() > self.state.node_height(peer) {
                 // Update validator height
@@ -104,6 +104,8 @@ impl<S> NodeHandler<S>
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!("HANDLE REQUEST PEERS: Sending {:?} peers to {:?}", peers, msg.from());
 
+            .map(|(_, b)| b.clone())
+            .collect();
         for peer in peers {
             self.send_to_peer(*msg.from(), peer.raw());
         }

@@ -123,12 +123,16 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
 
     fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
         let _p = profiler::ProfilerSpan::new("LevelDBView::put");
-        self.changes.borrow_mut().insert(key.to_vec(), Change::Put(value));
+        self.changes
+            .borrow_mut()
+            .insert(key.to_vec(), Change::Put(value));
         Ok(())
     }
 
     fn delete(&self, key: &[u8]) -> Result<(), Error> {
-        self.changes.borrow_mut().insert(key.to_vec(), Change::Delete);
+        self.changes
+            .borrow_mut()
+            .insert(key.to_vec(), Change::Delete);
         Ok(())
     }
 
@@ -138,12 +142,11 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
         let mut it_snapshot = self.snap.keys_iter(LEVELDB_READ_OPTIONS).from(key);
 
         let res: Option<Vec<u8>>;
-        let least_put_key: Option<Vec<u8>> = it_changes.find(|entry| {
-                match *entry.1 {
-                    Change::Delete => false,
-                    Change::Put(_) => true, 
-                }
-            })
+        let least_put_key: Option<Vec<u8>> = it_changes
+            .find(|entry| match *entry.1 {
+                      Change::Delete => false,
+                      Change::Put(_) => true,
+                  })
             .map(|x| x.0.to_vec());
 
         loop {
@@ -166,7 +169,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
                         res = Some(snap_key_vec);
                         break;
                     }
-                } 
+                }
                 None => {
                     res = least_put_key;
                     break;

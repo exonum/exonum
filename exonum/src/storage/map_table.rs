@@ -29,16 +29,19 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
         let _profiler = profiler::ProfilerSpan::new("MapTable::get");
-        let v = self.storage.get(&[&self.prefix, key.as_ref()].concat())?;
+        let v = self.storage
+            .get(&[&self.prefix, key.as_ref()].concat())?;
         Ok(v.map(StorageValue::deserialize))
     }
 
     fn put(&self, key: &K, value: V) -> Result<(), Error> {
-        self.storage.put(&[&self.prefix, key.as_ref()].concat(), value.serialize())
+        self.storage
+            .put(&[&self.prefix, key.as_ref()].concat(), value.serialize())
     }
 
     fn delete(&self, key: &K) -> Result<(), Error> {
-        self.storage.delete(&[&self.prefix, key.as_ref()].concat())
+        self.storage
+            .delete(&[&self.prefix, key.as_ref()].concat())
     }
     fn find_key(&self, origin_key: &K) -> Result<Option<Vec<u8>>, Error> {
         let key = [&self.prefix, origin_key.as_ref()].concat();
@@ -85,7 +88,8 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
 //           K: AsRef<[u8]>,
 //           V: StorageValue,
 //           &'a T: Iterable,
-//           <&'a T as Iterable>::Iter: Iterator<Item = (Vec<u8>, Vec<u8>)> + Seekable<'a, Key = Vec<u8>>
+//           <&'a T as Iterable>::Iter: Iterator<Item = (Vec<u8>, Vec<u8>)>
+//              + Seekable<'a, Key = Vec<u8>>
 // {
 //     type Item = (Vec<u8>, Vec<u8>);
 //     type IntoIter = MapTableIterator<'a, <&'a T as Iterable>::Iter>;
@@ -105,7 +109,8 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
 //           K: AsRef<[u8]>,
 //           V: StorageValue,
 //           &'a T: Iterable,
-//           <&'a T as Iterable>::Iter: Iterator<Item = (Vec<u8>, Vec<u8>)> + Seekable<'a, Key = Vec<u8>>,
+//           <&'a T as Iterable>::Iter: Iterator<Item = (Vec<u8>, Vec<u8>)>
+//               + Seekable<'a, Key = Vec<u8>>,
 
 // {
 //     type Iter = MapTableIterator<'a, <&'a T as Iterable>::Iter>;
@@ -121,7 +126,8 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
 // }
 
 // impl<'a, T> Seekable<'a> for MapTableIterator<'a, T>
-//     where T: Iterator<Item = (Vec<u8>, Vec<u8>)> + Seekable<'a, Key=Vec<u8>, Item=(Vec<u8>, Vec<u8>)>
+//     where T: Iterator<Item = (Vec<u8>, Vec<u8>)>
+//          + Seekable<'a, Key=Vec<u8>, Item=(Vec<u8>, Vec<u8>)>
 // {
 //     type Key = Vec<u8>;
 //     type Item = (Vec<u8>, Vec<u8>);

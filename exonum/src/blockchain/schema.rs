@@ -98,8 +98,8 @@ impl<'a> Schema<'a> {
     pub fn current_height(&self) -> Result<u64, Error> {
         let last_height = self.last_height()?;
         let res = match last_height {
-            Some(last_height) => last_height + 1, 
-            None => 0, 
+            Some(last_height) => last_height + 1,
+            None => 0,
         };
         Ok(res)
     }
@@ -109,8 +109,9 @@ impl<'a> Schema<'a> {
         if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
             let last_actual_from = last_cfg_reference.actual_from();
             if actual_from <= last_actual_from {
-                return Err(Error::new(format!("Attempting to commit configuration with actual_from {:?} less than \
-                                              the last committed actual_from {:?}",  actual_from, last_actual_from)));
+                return Err(Error::new(format!(
+                    "Attempting to commit configuration with actual_from {:?} less than \
+                    the last committed actual_from {:?}",  actual_from, last_actual_from)));
             }
         }
         let cfg_hash = config_data.hash();

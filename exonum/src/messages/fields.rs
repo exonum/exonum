@@ -37,9 +37,9 @@ impl<'a> Field<'a> for bool {
     fn check(buffer: &'a [u8], from: usize, _: usize) -> Result<(), Error> {
         if buffer[from] != 0 && buffer[from] != 1 {
             Err(Error::IncorrectBoolean {
-                position: from as u32,
-                value: buffer[from],
-            })
+                    position: from as u32,
+                    value: buffer[from],
+                })
         } else {
             Ok(())
         }
@@ -239,18 +239,18 @@ impl<'a, T> Field<'a> for T
 
         if start < from + 8 {
             return Err(Error::IncorrectSegmentReference {
-                position: from as u32,
-                value: pos,
-            });
+                           position: from as u32,
+                           value: pos,
+                       });
         }
 
         let end = start + Self::item_size() * (count as usize);
 
         if end > buffer.len() {
             return Err(Error::IncorrectSegmentSize {
-                position: (from + 4) as u32,
-                value: count,
-            });
+                           position: (from + 4) as u32,
+                           value: count,
+                       });
         }
 
         unsafe {
@@ -415,9 +415,9 @@ impl<'a> SegmentField<'a> for &'a str {
     fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
         if let Err(e) = ::std::str::from_utf8(slice) {
             return Err(Error::Utf8 {
-                position: pos,
-                error: e,
-            });
+                           position: pos,
+                           error: e,
+                       });
         }
         Ok(())
     }
@@ -482,17 +482,17 @@ impl<'a> Field<'a> for Vec<&'a [u8]> {
 
         if pos < from + 8 {
             return Err(Error::IncorrectSegmentReference {
-                position: from as u32,
-                value: pos as u32,
-            });
+                           position: from as u32,
+                           value: pos as u32,
+                       });
         }
 
         let end = pos + 8 * count;
         if end > buffer.len() {
             return Err(Error::IncorrectSegmentSize {
-                position: (from + 4) as u32,
-                value: count as u32,
-            });
+                           position: (from + 4) as u32,
+                           value: count as u32,
+                       });
         }
 
         for i in 0..count {
@@ -624,11 +624,13 @@ impl<'a> Field<'a> for BitVec {
 //     }
 
 //     fn from_slice(slice: &'a [u8]) -> Self {
-//         unsafe { ::std::slice::from_raw_parts(slice.as_ptr() as *const T, slice.len() / Self::item_size()) }
+//         unsafe { ::std::slice::from_raw_parts(slice.as_ptr() as *const T, slice.len() /
+//             Self::item_size()) }
 //     }
 
 //     fn as_slice(&self) -> &'a [u8] {
-//         unsafe { ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size()) }
+//         unsafe { ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() *
+//             Self::item_size()) }
 //     }
 
 //     fn count(&self) -> u32 {

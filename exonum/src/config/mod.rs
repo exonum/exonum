@@ -16,9 +16,10 @@ impl ConfigFile {
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
         toml::decode_str(&toml).ok_or_else(|| {
-            let e = io::Error::new(io::ErrorKind::InvalidData, "Unable to decode toml file");
-            Box::new(e) as Box<Error>
-        })
+                                               let e = io::Error::new(io::ErrorKind::InvalidData,
+                                                                      "Unable to decode toml file");
+                                               Box::new(e) as Box<Error>
+                                           })
     }
 
     pub fn save<T: Serialize>(value: &T, path: &Path) -> Result<(), Box<Error>> {

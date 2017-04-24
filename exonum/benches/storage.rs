@@ -22,9 +22,7 @@ mod tests {
             rng.fill_bytes(&mut k);
             (k, v)
         };
-        (0..len)
-            .map(kv_generator)
-            .collect::<Vec<_>>()
+        (0..len).map(kv_generator).collect::<Vec<_>>()
     }
 
     fn merkle_table_insertion<T: Database>(b: &mut Bencher, mut db: T) {
@@ -51,11 +49,9 @@ mod tests {
 
         let map = MapTable::new(vec![234], &mut db);
         let table = MerklePatriciaTable::new(map);
-        b.iter(|| {
-            for item in &data {
-                table.put(&item.0, item.1.clone()).unwrap();
-            }
-        });
+        b.iter(|| for item in &data {
+                   table.put(&item.0, item.1.clone()).unwrap();
+               });
     }
 
     fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: T) {
@@ -97,11 +93,9 @@ mod tests {
             table.put(&item.0, item.1.clone()).unwrap();
         }
 
-        b.iter(|| {
-            for item in &data {
-                table.put(&item.0, item.1.clone()).unwrap();
-            }
-        });
+        b.iter(|| for item in &data {
+                   table.put(&item.0, item.1.clone()).unwrap();
+               });
     }
 
     #[cfg(feature = "long_benchmarks")]

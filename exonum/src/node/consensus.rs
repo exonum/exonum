@@ -78,7 +78,11 @@ impl<S> NodeHandler<S>
         let view = self.blockchain.view();
         // Check that transactions are not commited yet
         for hash in msg.transactions() {
-            if Schema::new(&view).transactions().get(hash).unwrap().is_some() {
+            if Schema::new(&view)
+                   .transactions()
+                   .get(hash)
+                   .unwrap()
+                   .is_some() {
                 error!("Received propose with already commited transaction, msg={:?}",
                        msg);
                 return;
@@ -167,16 +171,16 @@ impl<S> NodeHandler<S>
                 }
             }
 
-            let (block_hash, patch) = self.create_block(block.height(),
-                                                        block.propose_round(),
-                                                        tx_hashes.as_slice());
+            let (block_hash, patch) =
+                self.create_block(block.height(), block.propose_round(), tx_hashes.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
                 panic!("Block_hash incorrect in received block={:?}", msg);
             }
 
             // Commit block
-            self.state.add_block(block_hash, patch, tx_hashes, block.propose_round());
+            self.state
+                .add_block(block_hash, patch, tx_hashes, block.propose_round());
         }
         self.commit(block_hash, msg.precommits().iter());
         self.request_next_block();
@@ -293,9 +297,9 @@ impl<S> NodeHandler<S>
         for round in prevote_round...self.state.round() {
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
-                    self.broadcast_prevote(round, &propose_hash);
+                self.broadcast_prevote(round, &propose_hash);
             }
-            
+
             // Change lock
             if self.state.has_majority_prevotes(round, propose_hash) {
                 self.state.lock(round, propose_hash);
@@ -372,7 +376,8 @@ impl<S> NodeHandler<S>
         let proposer = self.state.leader(propose_round);
 
         // Update state to new height
-        self.state.new_height(&block_hash, self.channel.get_time());
+        self.state
+            .new_height(&block_hash, self.channel.get_time());
 
         info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}, hash={}",
               height,
@@ -421,7 +426,11 @@ impl<S> NodeHandler<S>
         }
 
         let view = self.blockchain.view();
-        if Schema::new(&view).transactions().get(&hash).unwrap().is_some() {
+        if Schema::new(&view)
+               .transactions()
+               .get(&hash)
+               .unwrap()
+               .is_some() {
             return;
         }
 
@@ -447,7 +456,11 @@ impl<S> NodeHandler<S>
         }
 
         let view = self.blockchain.view();
-        if Schema::new(&view).transactions().get(&hash).unwrap().is_some() {
+        if Schema::new(&view)
+               .transactions()
+               .get(&hash)
+               .unwrap()
+               .is_some() {
             return;
         }
 
@@ -478,7 +491,7 @@ impl<S> NodeHandler<S>
 
         // Add timeout for this round
         self.add_round_timeout();
-        
+
         if !self.state.is_validator() {
             return;
         }
@@ -512,10 +525,11 @@ impl<S> NodeHandler<S>
         if self.state.locked_propose().is_some() {
             return;
         }
-        let validator_id = self.state.validator_state().as_ref().map(|validator_state| {
-            validator_state.id()
-        });
-        if let Some(validator_id) = validator_id { 
+        let validator_id = self.state
+            .validator_state()
+            .as_ref()
+            .map(|validator_state| validator_state.id());
+        if let Some(validator_id) = validator_id {
             if self.state.have_prevote(round) {
                 return;
             }
@@ -532,11 +546,11 @@ impl<S> NodeHandler<S>
                 .cloned()
                 .collect();
             let propose = Propose::new(validator_id,
-                                    self.state.height(),
-                                    round,
-                                    self.state.last_hash(),
-                                    &txs,
-                                    self.state.secret_key());
+                                       self.state.height(),
+                                       round,
+                                       self.state.last_hash(),
+                                       &txs,
+                                       self.state.secret_key());
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
 
@@ -564,8 +578,8 @@ impl<S> NodeHandler<S>
                                         self.state.height(),
                                         propose_hash,
                                         self.state.secret_key())
-                        .raw()
-                        .clone()
+                            .raw()
+                            .clone()
                 }
                 RequestData::Transactions(ref propose_hash) => {
                     let txs: Vec<_> = self.state
@@ -579,8 +593,8 @@ impl<S> NodeHandler<S>
                                              &peer,
                                              &txs,
                                              self.state.secret_key())
-                        .raw()
-                        .clone()
+                            .raw()
+                            .clone()
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
                     RequestPrevotes::new(self.state.public_key(),
@@ -590,16 +604,16 @@ impl<S> NodeHandler<S>
                                          propose_hash,
                                          self.state.known_prevotes(round, propose_hash),
                                          self.state.secret_key())
-                        .raw()
-                        .clone()
+                            .raw()
+                            .clone()
                 }
                 RequestData::Block(height) => {
                     RequestBlock::new(self.state.public_key(),
                                       &peer,
                                       height,
                                       self.state.secret_key())
-                        .raw()
-                        .clone()
+                            .raw()
+                            .clone()
                 }
             };
             trace!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}",
@@ -629,11 +643,11 @@ impl<S> NodeHandler<S>
             .clone();
 
         let tx_hashes = propose.transactions().to_vec();
-        let (block_hash, patch) = self.create_block(propose.height(),
-                                                    propose.round(),
-                                                    tx_hashes.as_slice());
+        let (block_hash, patch) =
+            self.create_block(propose.height(), propose.round(), tx_hashes.as_slice());
         // Save patch
-        self.state.add_block(block_hash, patch, tx_hashes, propose.round());
+        self.state
+            .add_block(block_hash, patch, tx_hashes, propose.round());
         block_hash
     }
 
@@ -663,7 +677,11 @@ impl<S> NodeHandler<S>
 
     pub fn request_next_block(&mut self) {
         // TODO randomize next peer
-        let heights:Vec<_> = self.state.nodes_with_bigger_height().into_iter().cloned().collect();
+        let heights: Vec<_> = self.state
+            .nodes_with_bigger_height()
+            .into_iter()
+            .cloned()
+            .collect();
         if !heights.is_empty() {
             for peer in heights {
                 if self.state.peers().contains_key(&peer) {
@@ -681,14 +699,18 @@ impl<S> NodeHandler<S>
     }
 
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
-        let validator_id = self.state.validator_state().as_ref().map(|s|s.id()).expect("called broadcast_prevote in Auditor node.");
+        let validator_id = self.state
+            .validator_state()
+            .as_ref()
+            .map(|s| s.id())
+            .expect("called broadcast_prevote in Auditor node.");
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(validator_id,
-                                self.state.height(),
-                                round,
-                                propose_hash,
-                                locked_round,
-                                self.state.secret_key());
+                                   self.state.height(),
+                                   round,
+                                   propose_hash,
+                                   locked_round,
+                                   self.state.secret_key());
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
@@ -696,14 +718,18 @@ impl<S> NodeHandler<S>
     }
 
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
-        let validator_id = self.state.validator_state().as_ref().map(|s|s.id()).expect("called broadcast_prevote in Auditor node.");
+        let validator_id = self.state
+            .validator_state()
+            .as_ref()
+            .map(|s| s.id())
+            .expect("called broadcast_prevote in Auditor node.");
         let precommit = Precommit::new(validator_id,
-                                        self.state.height(),
-                                        round,
-                                        propose_hash,
-                                        block_hash,
-                                        self.channel.get_time(),
-                                        self.state.secret_key());
+                                       self.state.height(),
+                                       round,
+                                       propose_hash,
+                                       block_hash,
+                                       self.channel.get_time(),
+                                       self.state.secret_key());
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
@@ -716,8 +742,7 @@ impl<S> NodeHandler<S>
                          -> Result<(), String> {
         if precommits.len() < self.state.majority_count() {
             return Err("Received block without consensus".to_string());
-        }
-        else if precommits.len() > self.state.validators().len() {
+        } else if precommits.len() > self.state.validators().len() {
             return Err("Wrong precommits count in block".to_string());
         }
 
@@ -725,7 +750,7 @@ impl<S> NodeHandler<S>
         let round = precommits[0].round();
         for precommit in precommits {
             if !validators.insert(precommit.validator()) {
-                return Err("Several precommits from one validator in block".to_string())
+                return Err("Several precommits from one validator in block".to_string());
             }
 
             self.verify_precommit(block_hash, block_height, round, precommit)?;

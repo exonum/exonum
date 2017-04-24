@@ -30,7 +30,7 @@ impl BitVec {
             match bslice.at(ind as usize) {
                 ChildKind::Left => {
                     repr.push('0');
-                } 
+                }
                 ChildKind::Right => {
                     repr.push('1');
                 }
@@ -99,23 +99,24 @@ pub enum BranchProofNode<V> {
 impl<V: StorageValue> RootProofNode<V> {
     pub fn compute_proof_root(&self) -> Hash {
         use self::RootProofNode::*;
-        match *self { 
+        match *self {
             Empty => Hash::zero(),
             LeafRootInclusive(ref root_key, ref root_val) => {
                 hash(&[root_key.db_key_data.as_slice(), root_val.hash().as_ref()].concat())
-            } 
+            }
             LeafRootExclusive(ref root_key, ref root_val_hash) => {
                 hash(&[root_key.db_key_data.as_slice(), root_val_hash.as_ref()].concat())
-            } 
+            }
             Branch(ref branch) => branch.compute_proof_root(),
         }
     }
 }
+
 impl<V: StorageValue> ProofNode<V> {
     pub fn compute_proof_root(&self) -> Hash {
         use self::ProofNode::*;
-        match *self { 
-            Leaf(ref val) => val.hash(),            
+        match *self {
+            Leaf(ref val) => val.hash(),
             Branch(ref branch) => branch.compute_proof_root(),
         }
     }
@@ -124,31 +125,46 @@ impl<V: StorageValue> ProofNode<V> {
 impl<V: StorageValue> BranchProofNode<V> {
     pub fn compute_proof_root(&self) -> Hash {
         use self::BranchProofNode::*;
-        match *self { 
-            BranchKeyNotFound { ref left_hash, ref right_hash, ref left_key, ref right_key } => {
+        match *self {
+            BranchKeyNotFound {
+                ref left_hash,
+                ref right_hash,
+                ref left_key,
+                ref right_key,
+            } => {
                 let full_slice = &[left_hash.as_ref(),
                                    right_hash.as_ref(),
                                    left_key.db_key_data.as_slice(),
                                    right_key.db_key_data.as_slice()]
-                    .concat();
+                                          .concat();
                 hash(full_slice)
-            }  
-            LeftBranch { ref left_hash, ref right_hash, ref left_key, ref right_key } => {
+            }
+            LeftBranch {
+                ref left_hash,
+                ref right_hash,
+                ref left_key,
+                ref right_key,
+            } => {
                 let full_slice = &[left_hash.compute_proof_root().as_ref(),
                                    right_hash.as_ref(),
                                    left_key.db_key_data.as_slice(),
                                    right_key.db_key_data.as_slice()]
-                    .concat();
+                                          .concat();
                 hash(full_slice)
-            } 
-            RightBranch { ref left_hash, ref right_hash, ref left_key, ref right_key } => {
+            }
+            RightBranch {
+                ref left_hash,
+                ref right_hash,
+                ref left_key,
+                ref right_key,
+            } => {
                 let full_slice = &[left_hash.as_ref(),
                                    right_hash.compute_proof_root().as_ref(),
                                    left_key.db_key_data.as_slice(),
                                    right_key.db_key_data.as_slice()]
-                    .concat();
+                                          .concat();
                 hash(full_slice)
-            } 
+            }
         }
     }
 }
@@ -193,30 +209,36 @@ impl<V: Serialize> Serialize for BranchProofNode<V> {
         use self::BranchProofNode::*;
         let mut state;
         match *self {
-            BranchKeyNotFound { left_hash: ref lhash,
-                                right_hash: ref rhash,
-                                left_key: ref lkey,
-                                right_key: ref rkey } => {
+            BranchKeyNotFound {
+                left_hash: ref lhash,
+                right_hash: ref rhash,
+                left_key: ref lkey,
+                right_key: ref rkey,
+            } => {
                 state = serializer.serialize_map(Some(2))?;
                 serializer.serialize_map_key(&mut state, lkey)?;
                 serializer.serialize_map_value(&mut state, lhash)?;
                 serializer.serialize_map_key(&mut state, rkey)?;
                 serializer.serialize_map_value(&mut state, rhash)?;
             }
-            LeftBranch { left_hash: ref proof,
-                         right_hash: ref rhash,
-                         left_key: ref lkey,
-                         right_key: ref rkey } => {
+            LeftBranch {
+                left_hash: ref proof,
+                right_hash: ref rhash,
+                left_key: ref lkey,
+                right_key: ref rkey,
+            } => {
                 state = serializer.serialize_map(Some(2))?;
                 serializer.serialize_map_key(&mut state, lkey)?;
                 serializer.serialize_map_value(&mut state, proof)?;
                 serializer.serialize_map_key(&mut state, rkey)?;
                 serializer.serialize_map_value(&mut state, rhash)?;
             }
-            RightBranch { left_hash: ref lhash,
-                          right_hash: ref proof,
-                          left_key: ref lkey,
-                          right_key: ref rkey } => {
+            RightBranch {
+                left_hash: ref lhash,
+                right_hash: ref proof,
+                left_key: ref lkey,
+                right_key: ref rkey,
+            } => {
                 state = serializer.serialize_map(Some(2))?;
                 serializer.serialize_map_key(&mut state, lkey)?;
                 serializer.serialize_map_value(&mut state, lhash)?;
@@ -286,7 +308,7 @@ impl<V: fmt::Debug + StorageValue> RootProofNode<V> {
                                                   self)));
                 }
                 Some(val)
-            } 
+            }
             LeafRootExclusive(ref root_db_key, _) => {
                 let root_slice = BitSlice::from_db_key(&root_db_key.db_key_data);
                 if root_slice == *searched_slice {
@@ -296,7 +318,7 @@ impl<V: fmt::Debug + StorageValue> RootProofNode<V> {
                                                   self)));
                 }
                 None
-            } 
+            }
             Branch(ref branch) => branch.verify_root_proof_consistency(searched_slice)?,
         };
         let proof_hash = self.compute_proof_root();
@@ -318,7 +340,11 @@ impl<V: fmt::Debug> BranchProofNode<V> {
 
         // if we inspect the topmost level of a proof
         let res: Option<&V> = match *self {
-            LeftBranch { left_hash: ref proof, left_key: ref left_slice_key, .. } => {
+            LeftBranch {
+                left_hash: ref proof,
+                left_key: ref left_slice_key,
+                ..
+            } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 if !searched_slice.starts_with(&left_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with searched_key: \
@@ -326,9 +352,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                proof.verify_proof_consistency(left_slice, searched_slice)?
-            } 
-            RightBranch { right_hash: ref proof, right_key: ref right_slice_key, .. } => {
+                proof
+                    .verify_proof_consistency(left_slice, searched_slice)?
+            }
+            RightBranch {
+                right_hash: ref proof,
+                right_key: ref right_slice_key,
+                ..
+            } => {
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if !searched_slice.starts_with(&right_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with searched_key: \
@@ -336,11 +367,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                proof.verify_proof_consistency(right_slice, searched_slice)?
-            } 
-            BranchKeyNotFound { left_key: ref left_slice_key,
-                                right_key: ref right_slice_key,
-                                .. } => {
+                proof
+                    .verify_proof_consistency(right_slice, searched_slice)?
+            }
+            BranchKeyNotFound {
+                left_key: ref left_slice_key,
+                right_key: ref right_slice_key,
+                ..
+            } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if searched_slice.starts_with(&left_slice) ||
@@ -351,7 +385,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   self)));
                 }
                 None
-            } 
+            }
         };
         Ok(res)
     }
@@ -364,10 +398,12 @@ impl<V: fmt::Debug> BranchProofNode<V> {
 
         // if we inspect sub-proofs of a proof
         let res: Option<&V> = match *self {
-            LeftBranch { left_hash: ref proof,
-                         left_key: ref left_slice_key,
-                         right_key: ref right_slice_key,
-                         .. } => {
+            LeftBranch {
+                left_hash: ref proof,
+                left_key: ref left_slice_key,
+                right_key: ref right_slice_key,
+                ..
+            } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if !left_slice.starts_with(&parent_slice) ||
@@ -383,12 +419,15 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                proof.verify_proof_consistency(left_slice, searched_slice)?
-            } 
-            RightBranch { right_hash: ref proof,
-                          left_key: ref left_slice_key,
-                          right_key: ref right_slice_key,
-                          .. } => {
+                proof
+                    .verify_proof_consistency(left_slice, searched_slice)?
+            }
+            RightBranch {
+                right_hash: ref proof,
+                left_key: ref left_slice_key,
+                right_key: ref right_slice_key,
+                ..
+            } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if !left_slice.starts_with(&parent_slice) ||
@@ -404,11 +443,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                proof.verify_proof_consistency(right_slice, searched_slice)?
-            } 
-            BranchKeyNotFound { left_key: ref left_slice_key,
-                                right_key: ref right_slice_key,
-                                .. } => {
+                proof
+                    .verify_proof_consistency(right_slice, searched_slice)?
+            }
+            BranchKeyNotFound {
+                left_key: ref left_slice_key,
+                right_key: ref right_slice_key,
+                ..
+            } => {
                 let left_slice = BitSlice::from_db_key(&left_slice_key.db_key_data);
                 let right_slice = BitSlice::from_db_key(&right_slice_key.db_key_data);
                 if !left_slice.starts_with(&parent_slice) ||
@@ -426,7 +468,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   self)));
                 }
                 None
-            } 
+            }
         };
         Ok(res)
     }
@@ -448,8 +490,11 @@ impl<V: fmt::Debug> ProofNode<V> {
                                                   parent_slice)));
                 }
                 Some(val)
-            } 
-            Branch(ref branch) => branch.verify_proof_consistency(parent_slice, searched_slice)?,
+            }
+            Branch(ref branch) => {
+                branch
+                    .verify_proof_consistency(parent_slice, searched_slice)?
+            }
         };
         Ok(res)
     }
@@ -461,7 +506,7 @@ impl<V: fmt::Debug> fmt::Debug for RootProofNode<V> {
         match *self {
             LeafRootInclusive(ref db_key, ref val) => {
                 write!(f, "{{\"slice\":{:?},{:?}}}", db_key, val)
-            } 
+            }
             LeafRootExclusive(ref db_key, ref val_hash) => {
                 write!(f, "{{\"slice\":{:?},\"val_hash\":{:?}}}", db_key, val_hash)
             }
@@ -474,8 +519,8 @@ impl<V: fmt::Debug> fmt::Debug for ProofNode<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::ProofNode::*;
         match *self {
-            Branch(ref branch) => write!(f, "{:?}", branch), 
-            Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val), 
+            Branch(ref branch) => write!(f, "{:?}", branch),
+            Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val),
         }
     }
 }
@@ -484,23 +529,38 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use self::BranchProofNode::*;
         match *self {
-            LeftBranch { ref left_hash, ref right_hash, ref left_key, ref right_key } => {
+            LeftBranch {
+                ref left_hash,
+                ref right_hash,
+                ref left_key,
+                ref right_key,
+            } => {
                 write!(f,
                        "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
                        left_hash,
                        right_hash,
                        left_key,
                        right_key)
-            } 
-            RightBranch { ref left_hash, ref right_hash, ref left_key, ref right_key } => {
+            }
+            RightBranch {
+                ref left_hash,
+                ref right_hash,
+                ref left_key,
+                ref right_key,
+            } => {
                 write!(f,
                        "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
                        left_hash,
                        right_hash,
                        left_key,
                        right_key)
-            } 
-            BranchKeyNotFound { ref left_hash, ref right_hash, ref left_key, ref right_key } => {
+            }
+            BranchKeyNotFound {
+                ref left_hash,
+                ref right_hash,
+                ref left_key,
+                ref right_key,
+            } => {
                 write!(f,
                        "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
                        left_hash,
@@ -515,7 +575,7 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
 #[cfg(test)]
 mod tests {
     use super::BitVec;
-    use ::storage::merkle_patricia_table::BitSlice;
+    use storage::merkle_patricia_table::BitSlice;
 
     #[test]
     fn test_bitvec_repr() {
@@ -527,7 +587,10 @@ mod tests {
             to: 256,
         };
         assert_eq!(&bit_vec.repr(),
-                   "1111110111111101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
+                   "111111011111110100000000000000000000000000000000000000000000000000000000000000\
+                   0000000000000000000000000000000000000000000000000000000000000000000000000000000\
+                   0000000000000000000000000000000000000000000000000000000000000000000000000000000\
+                   00000000000000000000");
         bit_vec.from = 6;
         bit_vec.to = 16;
         assert_eq!(&bit_vec.repr(), "0111111101");

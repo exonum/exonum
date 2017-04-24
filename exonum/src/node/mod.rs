@@ -3,8 +3,8 @@ use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
 use crypto::{PublicKey, SecretKey, Hash};
-use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel, MioChannel,
-             Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
+use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
+             MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
 use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage};
@@ -91,7 +91,8 @@ impl<S> NodeHandler<S>
         let stored = Schema::new(&blockchain.view()).actual_configuration().unwrap();
         info!("Create node with config={:#?}", stored);
 
-        let validator_id = stored.validators
+        let validator_id = stored
+            .validators
             .iter()
             .position(|pk| pk == &config.listener.public_key)
             .map(|id| id as ValidatorId);
@@ -232,7 +233,8 @@ impl<S> NodeHandler<S>
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
-        self.channel.add_timeout(NodeTimeout::Request(data, peer), time);
+        self.channel
+            .add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
@@ -241,10 +243,7 @@ impl<S> NodeHandler<S>
     }
 
     pub fn last_block_hash(&self) -> Hash {
-        self.blockchain
-            .last_block()
-            .unwrap()
-            .hash()
+        self.blockchain.last_block().unwrap().hash()
     }
 
     pub fn round_start_time(&self, round: Round) -> SystemTime {
@@ -314,7 +313,9 @@ impl<S> TransactionSend for TxSender<S>
 
 impl Node {
     pub fn new(blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
-        blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
+        blockchain
+            .create_genesis_block(node_cfg.genesis.clone())
+            .unwrap();
 
         let config = Configuration {
             listener: ListenerConfig {

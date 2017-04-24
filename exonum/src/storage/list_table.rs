@@ -27,10 +27,12 @@ impl<'a, T, K, V> ListTable<T, K, V>
     // TODO: implement iterator for List
     pub fn values(&self) -> Result<Vec<V>, Error> {
         Ok(if self.is_empty()? {
-            Vec::new()
-        } else {
-            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
-        })
+               Vec::new()
+           } else {
+               range(K::zero(), self.len()?)
+                   .map(|i| self.get(i).unwrap().unwrap())
+                   .collect()
+           })
     }
 }
 
@@ -99,7 +101,7 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
 
 #[cfg(test)]
 mod tests {
-    use ::storage::{MemoryDB, List, ListTable, MapTable};
+    use storage::{MemoryDB, List, ListTable, MapTable};
 
     #[test]
     fn test_list_table_methods() {
