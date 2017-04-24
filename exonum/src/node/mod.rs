@@ -14,7 +14,7 @@ mod basic;
 mod consensus;
 mod requests;
 
-pub mod state; // temporary solution to get access to WAIT consts
+pub mod state; // TODO: temporary solution to get access to WAIT consts
 
 #[derive(Debug)]
 pub enum ExternalMessage {
