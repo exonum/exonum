@@ -6,6 +6,7 @@ use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
 use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
+use hex::{ToHex, FromHex};
 
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
@@ -20,7 +21,9 @@ pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH
                                              SEEDBYTES as SEED_LENGTH};
 pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 
-pub use hex::{ToHex, FromHex, FromHexError};
+pub use serialize::{FromHexError, HexValue};
+
+
 const BYTES_IN_DEBUG: usize = 4;
 
 pub fn sign(m: &[u8], secret_key: &SecretKey) -> Signature {
@@ -123,10 +126,7 @@ implement_public_sodium_wrapper! {Signature, SignatureSodium, SIGNATURE_LENGTH}
 implement_private_sodium_wrapper! {SecretKey, SecretKeySodium, SECRET_KEY_LENGTH}
 implement_private_sodium_wrapper! {Seed, SeedSodium, SEED_LENGTH}
 
-pub trait HexValue: Sized {
-    fn to_hex(&self) -> String;
-    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError>;
-}
+
 
 macro_rules! implement_serde {
 ($name:ident) => (
@@ -154,14 +154,14 @@ macro_rules! implement_serde {
         }
     }
 
-    impl Deserialize for $name
+    impl<'de> Deserialize<'de> for $name
     {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
+        where D: Deserializer<'de>
         {
             struct HexVisitor;
 
-            impl Visitor for HexVisitor
+            impl<'v> Visitor<'v> for HexVisitor
             {
                 type Value = $name;
                 fn expecting (&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {

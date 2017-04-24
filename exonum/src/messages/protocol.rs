@@ -17,9 +17,9 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
-use messages::utils::{U64, SystemTimeSerdeHelper};
-use crypto::{Hash, PublicKey, Signature};
+use crypto::{Hash, PublicKey};
 use blockchain;
+use serialize::json::ExonumJsonSerialize;
 use super::{RawMessage, BitVec};
 
 pub const CONSENSUS: u16 = 0;
@@ -154,52 +154,6 @@ message! {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct PrecommitSerdeHelper {
-    body: PrecommitBodySerdeHelper,
-    signature: Signature,
-}
-
-#[derive(Serialize, Deserialize)]
-struct PrecommitBodySerdeHelper {
-   validator: u32,
-   height: U64,
-   round: u32,
-   propose_hash: Hash,
-   block_hash: Hash,
-   time: SystemTimeSerdeHelper,
-}
-
-impl Serialize for Precommit {
-    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        let body = PrecommitBodySerdeHelper{
-            validator: self.validator(),
-            height: U64(self.height()),
-            round: self.round(),
-            propose_hash: *self.propose_hash(),
-            block_hash: *self.block_hash(),
-            time: SystemTimeSerdeHelper(self.time()),
-        };
-        let helper = PrecommitSerdeHelper {
-            body: body,
-            signature: *self.raw.signature(),
-        };
-        helper.serialize(ser)
-    }
-}
-
-impl Deserialize for Precommit {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let h = <PrecommitSerdeHelper>::deserialize(deserializer)?;
-
-        let precommit = Precommit::new_with_signature(h.body.validator, h.body.height.0, h.body.round, &h.body.propose_hash, &h.body.block_hash, h.body.time.0, &h.signature);
-        Ok(precommit)
-    }
-}
 
 /// Current node status.
 ///
@@ -253,10 +207,19 @@ message! {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BlockProof {
     pub block: blockchain::Block,
     pub precommits: Vec<Precommit>,
+}
+impl ExonumJsonSerialize for BlockProof {
+    fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error> {
+        use ::serde::ser::SerializeStruct;
+        let mut strukt = serializer.serialize_struct("BlockProof", 2 )?;
+        strukt.serialize_field("block", &$crate::serialize::json::wrap(&self.block))?;
+        strukt.serialize_field("precommits", &$crate::serialize::json::wrap(&self.precommits))?;
+        strukt.end()
+    }
 }
 
 /// Request for the `Propose`.

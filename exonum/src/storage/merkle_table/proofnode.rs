@@ -61,9 +61,11 @@ impl<V: Serialize> Serialize for Proofnode<V> {
         state.end()
     }
 }
-impl<V: Deserialize> Deserialize for Proofnode<V> {
+impl<'de, V> Deserialize<'de> for Proofnode<V> 
+where  for<'r> V: Deserialize<'r> 
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer
+        where D: Deserializer<'de>
     {
         fn format_err_string(type_str: &str, value: &Value, err: &SerdeJsonError) -> String {
             format!("Couldn't deserialize {} from serde_json::Value: {}, error: {}",

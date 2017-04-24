@@ -17,7 +17,6 @@ mod raw;
 mod error;
 mod fields;
 mod protocol;
-mod json;
 
 pub mod utils;
 
