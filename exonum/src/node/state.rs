@@ -16,10 +16,10 @@ const TX_POOL_LIMIT: usize = 20000;
 
 // TODO: move request timeouts into node configuration
 
-pub const REQUEST_PROPOSE_WAIT: Milliseconds = 100;
-pub const REQUEST_TRANSACTIONS_WAIT: Milliseconds = 100;
-pub const REQUEST_PREVOTES_WAIT: Milliseconds = 100;
-pub const REQUEST_BLOCK_WAIT: Milliseconds = 100;
+pub const REQUEST_PROPOSE_TIMEOUT: Milliseconds = 100;
+pub const REQUEST_TRANSACTIONS_TIMEOUT: Milliseconds = 100;
+pub const REQUEST_PREVOTES_TIMEOUT: Milliseconds = 100;
+pub const REQUEST_BLOCK_TIMEOUT: Milliseconds = 100;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -202,10 +202,10 @@ impl RequestData {
     pub fn timeout(&self) -> Duration {
         #![cfg_attr(feature="clippy", allow(match_same_arms))]
         let ms = match *self {
-            RequestData::Propose(..) => REQUEST_PROPOSE_WAIT,
-            RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
-            RequestData::Prevotes(..) => REQUEST_PREVOTES_WAIT,
-            RequestData::Block(..) => REQUEST_BLOCK_WAIT,
+            RequestData::Propose(..) => REQUEST_PROPOSE_TIMEOUT,
+            RequestData::Transactions(..) => REQUEST_TRANSACTIONS_TIMEOUT,
+            RequestData::Prevotes(..) => REQUEST_PREVOTES_TIMEOUT,
+            RequestData::Block(..) => REQUEST_BLOCK_TIMEOUT,
         };
         Duration::from_millis(ms)
     }
