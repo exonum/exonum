@@ -30,21 +30,21 @@ impl<'a, 'b> GenerateCommand<'a, 'b>
         SubCommand::with_name("generate")
             .about("Generates genesis configuration")
             .arg(Arg::with_name("OUTPUT_DIR")
-                .short("o")
-                .long("output-dir")
-                .value_name("OUTPUT_DIR")
-                .required(true)
-                .takes_value(true))
+                     .short("o")
+                     .long("output-dir")
+                     .value_name("OUTPUT_DIR")
+                     .required(true)
+                     .takes_value(true))
             .arg(Arg::with_name("START_PORT")
-                .short("p")
-                .long("start-port")
-                .value_name("START_PORT")
-                .required(false)
-                .takes_value(true))
+                     .short("p")
+                     .long("start-port")
+                     .value_name("START_PORT")
+                     .required(false)
+                     .takes_value(true))
             .arg(Arg::with_name("COUNT")
-                .help("Validators count")
-                .required(true)
-                .index(1))
+                     .help("Validators count")
+                     .required(true)
+                     .index(1))
     }
 
     pub fn output_dir(matches: &'a ArgMatches<'a>) -> &'a Path {
@@ -56,7 +56,9 @@ impl<'a, 'b> GenerateCommand<'a, 'b>
     }
 
     pub fn start_port(matches: &'a ArgMatches<'a>) -> Option<u16> {
-        matches.value_of("START_PORT").map(|p| p.parse().unwrap())
+        matches
+            .value_of("START_PORT")
+            .map(|p| p.parse().unwrap())
     }
 
     pub fn execute(matches: &'a ArgMatches<'a>) {
@@ -89,19 +91,19 @@ impl<'a, 'b> RunCommand<'a, 'b>
     pub fn new() -> App<'a, 'b> {
         SubCommand::with_name("run")
             .arg(Arg::with_name("NODE_CONFIG_PATH")
-                .short("c")
-                .long("node-config")
-                .value_name("NODE_CONFIG_PATH")
-                .help("Path to node configuration file")
-                .required(true)
-                .takes_value(true))
+                     .short("c")
+                     .long("node-config")
+                     .value_name("NODE_CONFIG_PATH")
+                     .help("Path to node configuration file")
+                     .required(true)
+                     .takes_value(true))
             .arg(Arg::with_name("LEVELDB_PATH")
-                .short("d")
-                .long("leveldb-path")
-                .value_name("LEVELDB_PATH")
-                .help("Use leveldb database with the given path")
-                .required(false)
-                .takes_value(true))
+                     .short("d")
+                     .long("leveldb-path")
+                     .value_name("LEVELDB_PATH")
+                     .help("Use leveldb database with the given path")
+                     .required(false)
+                     .takes_value(true))
     }
 
     pub fn node_config_path(matches: &'a ArgMatches<'a>) -> &'a Path {
@@ -189,10 +191,15 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         .collect::<Vec<_>>();
     let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
     let peers = (0..validators.len())
-        .map(|x| format!("127.0.0.1:{}", start_port + x as u16).parse().unwrap())
+        .map(|x| {
+                 format!("127.0.0.1:{}", start_port + x as u16)
+                     .parse()
+                     .unwrap()
+             })
         .collect::<Vec<_>>();
 
-    validators.into_iter()
+    validators
+        .into_iter()
         .enumerate()
         .map(|(idx, validator)| {
             NodeConfig {

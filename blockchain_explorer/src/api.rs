@@ -141,7 +141,8 @@ impl<T> Visitor for HexVisitor<T>
     fn visit_str<E>(&mut self, s: &str) -> Result<HexField<T>, E>
         where E: de::Error
     {
-        let v = T::from_hex(s).map_err(|_| de::Error::custom("Invalid hex"))?;
+        let v = T::from_hex(s)
+            .map_err(|_| de::Error::custom("Invalid hex"))?;
         Ok(HexField(v))
     }
 }
@@ -181,12 +182,12 @@ pub trait Api {
     fn load_keypair_from_cookies(&self,
                                  request: &Request)
                                  -> Result<(PublicKey, SecretKey), ApiError> {
-        let public_key =
-            PublicKey::from_slice(self.load_hex_value_from_cookie(&request, "public_key")?
-                .as_ref());
-        let secret_key =
-            SecretKey::from_slice(self.load_hex_value_from_cookie(&request, "secret_key")?
-                .as_ref());
+        let public_key = PublicKey::from_slice(self.load_hex_value_from_cookie(&request,
+                                                                               "public_key")?
+                                                   .as_ref());
+        let secret_key = SecretKey::from_slice(self.load_hex_value_from_cookie(&request,
+                                                                               "secret_key")?
+                                                   .as_ref());
 
         let public_key = public_key.ok_or(ApiError::Unauthorized)?;
         let secret_key = secret_key.ok_or(ApiError::Unauthorized)?;
