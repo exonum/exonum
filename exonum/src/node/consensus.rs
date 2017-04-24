@@ -327,9 +327,8 @@ impl<S> NodeHandler<S>
         }
 
         // Request prevotes
-        // FIXME: если отправитель precommit находится на бОльшей высоте,
-        // у него уже нет +2/3 prevote. Можем ли мы избавится от бесполезной
-        // отправки RequestPrevotes?
+        // TODO: If Precommit sender in on a greater height, then it cannot have +2/3 prevotes.
+        // So can we get rid of useless sending RequestPrevotes message?
         if msg.round() > self.state.locked_round() {
             self.request(RequestData::Prevotes(msg.round(), *msg.propose_hash()),
                          peer);
