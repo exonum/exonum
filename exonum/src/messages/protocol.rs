@@ -223,16 +223,16 @@ impl ExonumJsonSerialize for BlockProof {
     }
 }
 impl ExonumJsonDeserialize for BlockProof{
-    fn deserialize_default(value: &Value) -> Option<Self> where Self: Sized {
+    fn deserialize_owned(value: &Value) -> Option<Self> where Self: Sized {
         let obj = chain_option!(value.as_object());
         let block = chain_option!(obj.get("block"));
-        let block = chain_option!(<blockchain::Block as ExonumJsonDeserialize>::deserialize_default(block ));
+        let block = chain_option!(<blockchain::Block as ExonumJsonDeserialize>::deserialize_owned(block ));
 
         let precommits = chain_option!(obj.get("precommits"));
         let precommits_vec = chain_option!(precommits.as_array());
 
         let precommits = precommits_vec.iter().fold(Some(Vec::new()), |mut acc, precommit|{
-            let val = chain_option!(<Precommit as ExonumJsonDeserialize>::deserialize_default(precommit ));
+            let val = chain_option!(<Precommit as ExonumJsonDeserialize>::deserialize_owned(precommit ));
             acc.map(|mut acc| {
                 acc.push(val);
                 acc
@@ -245,10 +245,6 @@ impl ExonumJsonDeserialize for BlockProof{
 
         )
         
-    }
-
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-        unimplemented!()
     }
 }
 

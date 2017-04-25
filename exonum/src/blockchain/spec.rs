@@ -96,22 +96,7 @@ macro_rules! storage_value {
                 }
         }
 
-        impl $crate::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize_default(value: &::serde_json::Value) -> Option<Self> {
-                let to = $body;
-                let from = 0;
-                use $crate::serialize::json::ExonumJsonDeserialize;
-
-                let mut buf = vec![0; $body];
-                
-
-                if <Self as ExonumJsonDeserialize>::deserialize(value, &mut buf, from, to) {
-                    Some($name { raw: buf })
-                }
-                else {
-                    None
-                }
-            }
+        impl $crate::serialize::json::ExonumJsonDeserializeField for $name {
             fn deserialize<B: $crate::serialize::json::WriteBufferWrapper> (value: &::serde_json::Value, buffer: & mut B, from: usize, _to: usize ) -> bool {
                 macro_rules! unwrap_option {
                     ($val:expr) => {if let Some(v) = $val {
@@ -125,12 +110,29 @@ macro_rules! storage_value {
                 $(
                 let val = unwrap_option!(obj.get(stringify!($field_name)));
 
-                if !<$field_type as $crate::serialize::json::ExonumJsonDeserialize>::deserialize(val, buffer, from + $from, from + $to )
+                if !<$field_type as $crate::serialize::json::ExonumJsonDeserializeField>::deserialize(val, buffer, from + $from, from + $to )
                 {
                     return false;
                 }
                 )*
                 return true;
+            }
+        }
+        impl $crate::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize_owned(value: &::serde_json::Value) -> Option<Self> {
+                let to = $body;
+                let from = 0;
+                use $crate::serialize::json::ExonumJsonDeserializeField;
+
+                let mut buf = vec![0; $body];
+                
+
+                if <Self as ExonumJsonDeserializeField>::deserialize(value, &mut buf, from, to) {
+                    Some($name { raw: buf })
+                }
+                else {
+                    None
+                }
             }
         }
 
