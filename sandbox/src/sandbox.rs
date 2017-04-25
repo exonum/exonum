@@ -165,13 +165,13 @@ impl SandboxReactor {
     pub fn actual_config(&self) -> Result<StoredConfiguration, StorageError> {
         let view = self.handler.blockchain.view();
         let schema = Schema::new(&view);
-        schema.get_actual_configuration()
+        schema.actual_configuration()
     }
 
     pub fn following_config(&self) -> Result<Option<StoredConfiguration>, StorageError> {
         let view = self.handler.blockchain.view();
         let schema = Schema::new(&view);
-        schema.get_following_configuration()
+        schema.following_configuration()
     }
 
     pub fn handle_message(&mut self, msg: RawMessage) {
