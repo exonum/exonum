@@ -52,14 +52,14 @@ impl<S> NodeHandler<S>
 
         trace!("Handle message={:?}", msg);
         match msg {
-            ConsensusMessage::Propose(msg) => self.handle_propose(msg, key),
-            ConsensusMessage::Prevote(msg) => self.handle_prevote(msg, key),
-            ConsensusMessage::Precommit(msg) => self.handle_precommit(msg, key),
+            ConsensusMessage::Propose(msg) => self.handle_propose(key, msg),
+            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, msg),
+            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, msg),
         }
     }
 
-    pub fn handle_propose(&mut self, msg: Propose, key: PublicKey) {
-        debug_assert_eq!(Some(&key), self.state.public_key_of(msg.validator()));
+    pub fn handle_propose(&mut self, from: PublicKey, msg: Propose) {
+        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
 
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
@@ -101,7 +101,7 @@ impl<S> NodeHandler<S>
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS!!!");
-            self.request(RequestData::Transactions(hash), key);
+            self.request(RequestData::Transactions(hash), from);
 
             for node in known_nodes {
                 self.request(RequestData::Transactions(hash), node);
@@ -219,26 +219,26 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn handle_prevote(&mut self, prevote: Prevote, key: PublicKey) {
+    pub fn handle_prevote(&mut self, from: PublicKey, msg: Prevote) {
         trace!("Handle prevote");
 
-        debug_assert_eq!(Some(&key), self.state.public_key_of(prevote.validator()));
+        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
 
         // Add prevote
-        let has_consensus = self.state.add_prevote(&prevote);
+        let has_consensus = self.state.add_prevote(&msg);
 
         // Request propose or transactions
-        let has_propose_with_txs = self.request_propose_or_txs(prevote.propose_hash(), key);
+        let has_propose_with_txs = self.request_propose_or_txs(msg.propose_hash(), from);
 
         // Request prevotes
-        if prevote.locked_round() > self.state.locked_round() {
-            self.request(RequestData::Prevotes(prevote.locked_round(), *prevote.propose_hash()),
-                         key);
+        if msg.locked_round() > self.state.locked_round() {
+            self.request(RequestData::Prevotes(msg.locked_round(), *msg.propose_hash()),
+                         from);
         }
 
         // Lock to propose
         if has_consensus && has_propose_with_txs {
-            self.has_majority_prevotes(prevote.round(), prevote.propose_hash());
+            self.has_majority_prevotes(msg.round(), msg.propose_hash());
         }
     }
 
@@ -324,17 +324,17 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn handle_precommit(&mut self, msg: Precommit, key: PublicKey) {
+    pub fn handle_precommit(&mut self, from: PublicKey, msg: Precommit) {
         trace!("Handle precommit");
 
-        debug_assert_eq!(Some(&key), self.state.public_key_of(msg.validator()));
+        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
 
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
 
         // Request propose
         if self.state.propose(msg.propose_hash()).is_none() {
-            self.request(RequestData::Propose(*msg.propose_hash()), key);
+            self.request(RequestData::Propose(*msg.propose_hash()), from);
         }
 
         // Request prevotes
@@ -343,7 +343,7 @@ impl<S> NodeHandler<S>
         // отправки RequestPrevotes?
         if msg.round() > self.state.locked_round() {
             self.request(RequestData::Prevotes(msg.round(), *msg.propose_hash()),
-                         key);
+                         from);
         }
 
         // Has majority precommits
