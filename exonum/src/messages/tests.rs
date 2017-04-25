@@ -251,6 +251,7 @@ fn test_precommit() {
     assert!(precommit.verify_signature(&public_key));
     assert_eq!(precommit.time(), time);
     let json_str = ::serialize::json::to_string(&precommit).unwrap();
+    println!("{}", json_str);
     let precommit1 : Precommit = ::serialize::json::from_str(&json_str).unwrap(); 
     assert_eq!(precommit, precommit1);
 }

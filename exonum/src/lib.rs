@@ -38,9 +38,9 @@ extern crate params;
 extern crate cookie;
 
 #[macro_use]
-pub mod messages;
-#[macro_use]
 pub mod serialize;
+#[macro_use]
+pub mod messages;
 pub mod events;
 pub mod crypto;
 pub mod node;
