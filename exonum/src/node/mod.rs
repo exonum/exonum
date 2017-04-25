@@ -8,11 +8,14 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
              Error as EventsError};
 use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage};
+
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
+pub use self::timeout_adjuster::{TimeoutAdjuster, ConstantTimeout, DynamicTimeout};
 
 mod basic;
 mod consensus;
 mod requests;
+mod timeout_adjuster;
 
 pub mod state; // TODO: temporary solution to get access to WAIT consts
 
@@ -45,6 +48,7 @@ pub struct NodeHandler<S>
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
+    timeout_adjuster: Box<TimeoutAdjuster>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -81,7 +85,16 @@ pub struct Node {
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> NodeHandler<S> {
+    pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> Self {
+        let timeout_adjuster = Box::new(timeout_adjuster::ConstantTimeout::default());
+        Self::with_timeout_adjuster(blockchain, sender, config, timeout_adjuster)
+    }
+
+    pub fn with_timeout_adjuster(blockchain: Blockchain,
+                                 sender: S,
+                                 config: Configuration,
+                                 mut timeout_adjuster: Box<TimeoutAdjuster>)
+                                 -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block().unwrap();
@@ -102,20 +115,24 @@ impl<S> NodeHandler<S>
                                    &config.listener.secret_key);
 
 
-        let state = State::new(validator_id,
-                               config.listener.public_key,
-                               config.listener.secret_key,
-                               stored,
-                               connect,
-                               last_hash,
-                               last_height,
-                               sender.get_time());
+        let mut state = State::new(validator_id,
+                                   config.listener.public_key,
+                                   config.listener.secret_key,
+                                   stored,
+                                   connect,
+                                   last_hash,
+                                   last_height,
+                                   sender.get_time());
+
+        let timeout = timeout_adjuster.init(&state);
+        state.set_propose_timeout(timeout);
 
         NodeHandler {
             state: state,
             channel: sender,
             blockchain: blockchain,
             peer_discovery: config.peer_discovery,
+            timeout_adjuster: timeout_adjuster,
         }
     }
 

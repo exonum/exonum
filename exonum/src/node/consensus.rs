@@ -380,6 +380,9 @@ impl<S> NodeHandler<S>
               block_hash.to_hex(),
               );
 
+        let timeout = self.timeout_adjuster.adjust_timeout(&self.state);
+        self.state.set_propose_timeout(timeout);
+
         // Add timeout for first round
         self.add_round_timeout();
         // Send propose we is leader
