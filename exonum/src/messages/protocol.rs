@@ -12,14 +12,15 @@
 //!     * processing - how message is processed and result of the processing
 //!     * generation - in which cases message is generated
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::Serializer;
+use serde_json::Value;
 
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use crypto::{Hash, PublicKey};
 use blockchain;
-use serialize::json::ExonumJsonSerialize;
+use serialize::json::{WriteBufferWrapper, ExonumJsonSerialize, ExonumJsonDeserialize};
 use super::{RawMessage, BitVec};
 
 pub const CONSENSUS: u16 = 0;
@@ -216,9 +217,38 @@ impl ExonumJsonSerialize for BlockProof {
     fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error> {
         use ::serde::ser::SerializeStruct;
         let mut strukt = serializer.serialize_struct("BlockProof", 2 )?;
-        strukt.serialize_field("block", &$crate::serialize::json::wrap(&self.block))?;
-        strukt.serialize_field("precommits", &$crate::serialize::json::wrap(&self.precommits))?;
+        strukt.serialize_field("block", &::serialize::json::wrap(&self.block))?;
+        strukt.serialize_field("precommits", &::serialize::json::wrap(&self.precommits))?;
         strukt.end()
+    }
+}
+impl ExonumJsonDeserialize for BlockProof{
+    fn deserialize_default(value: &Value) -> Option<Self> where Self: Sized {
+        let obj = chain_option!(value.as_object());
+        let block = chain_option!(obj.get("block"));
+        let block = chain_option!(<blockchain::Block as ExonumJsonDeserialize>::deserialize_default(block ));
+
+        let precommits = chain_option!(obj.get("precommits"));
+        let precommits_vec = chain_option!(precommits.as_array());
+
+        let precommits = precommits_vec.iter().fold(Some(Vec::new()), |mut acc, precommit|{
+            let val = chain_option!(<Precommit as ExonumJsonDeserialize>::deserialize_default(precommit ));
+            acc.map(|mut acc| {
+                acc.push(val);
+                acc
+            })
+        });
+        Some(BlockProof{
+            block: block,
+            precommits: chain_option!(precommits)
+        }
+
+        )
+        
+    }
+
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
+        unimplemented!()
     }
 }
 

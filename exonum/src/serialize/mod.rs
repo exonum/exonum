@@ -32,3 +32,5 @@ pub trait HexValue: Sized {
     fn to_hex(&self) -> String;
     fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError>;
 }
+#[macro_use]
+mod utils;

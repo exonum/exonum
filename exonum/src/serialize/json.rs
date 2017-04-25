@@ -4,7 +4,7 @@
 
 //\TODO refer to difference between json serialization and exonum_json 
 //\TODO implement Field for float, signed integers
-//\TODO implement Field for crypto structures
+//\TODO implement Field for crypto structures 
 //\TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage
 //\TODO split deserialization for `in-place` and regular
 use serde::{Serializer, Serialize, Deserializer, Deserialize};
@@ -143,7 +143,10 @@ macro_rules! impl_deserialize_int {
         impl ExonumJsonDeserialize for $typename {
             fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
                     value.as_i64()
-                         .map(|v| v as $typename)
+                         .map(|v| {
+                             println!("parsed int = {}", v);
+                             v as $typename
+                         })
                          .map(|val| buffer.write(from, to, val))
                          .is_some()
             }
@@ -328,8 +331,10 @@ impl ExonumJsonDeserialize for BitVec  {
 pub fn to_string<T: ExonumJsonSerialize>(value: &T) -> Option<String> {    
     let mut buf = Vec::new();
     
-    let mut ser = ::serde_json::Serializer::new(&mut buf);
-    let ret = value.serialize(&mut ser).ok();
+    let ret = {
+        let mut ser = ::serde_json::Serializer::new(&mut buf);
+        value.serialize(&mut ser).ok()
+    };
     ret.and_then(move |_| String::from_utf8(buf).ok())
 }
 
