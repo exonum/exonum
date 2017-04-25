@@ -541,17 +541,27 @@ impl State {
 
     pub fn add_transaction(&mut self, tx_hash: Hash, msg: Box<Transaction>) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
+        // if tx is in some of propose, we should add it, or we can stuck on some state
+        let mut high_priority_tx = false;
         for (propose_hash, propose_state) in &mut self.proposes {
-            propose_state.unknown_txs.remove(&tx_hash);
+            high_priority_tx |= propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
                 full_proposes.push((*propose_hash, propose_state.message().round()));
             }
         }
-        self.transactions.insert(tx_hash, msg);
+
         if self.transactions.len() >= TX_POOL_LIMIT {
-            panic!("Too many transactions in pool, txs={}",
-                   self.transactions.len());
+            // but make warn about pool exceeded, even if we should add tx
+            warn!("Too many transactions in pool, txs={}, high_priority={}",
+                  self.transactions.len(),
+                  high_priority_tx);
+            if !high_priority_tx {
+                return full_proposes;
+            }
         }
+
+        self.transactions.insert(tx_hash, msg);
+
         full_proposes
     }
 
