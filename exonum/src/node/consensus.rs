@@ -6,7 +6,7 @@ use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPr
                RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
 use storage::{Map, Patch};
 use events::Channel;
-use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout, State};
 
 // TODO reduce view invokations
 impl<S> NodeHandler<S>
@@ -262,25 +262,16 @@ impl<S> NodeHandler<S>
         }
 
         // Request transactions if needed.
-        if let Some(key) = {
-            // Unwrap here is OK because of the check above.
-            let state = self.state.propose(propose_hash).unwrap();
-
-            if state.has_unknown_txs() {
-                let validator = state.message().validator();
-                match self.state.public_key_of(validator) {
-                    Some(key) => Some(*key),
-                    None => {
-                        error!("Invalid validator id: propose = {:?}", state.message());
-                        return;
-                    }
-                }
-            } else {
-                None
+        match key_for_unkwnown_txs(&self.state, propose_hash) {
+            Err(err) => {
+                error!("{}", err);
+                return;
             }
-        } {
-            self.request(RequestData::Transactions(*propose_hash), key);
-            return;
+            Ok(Some(key)) => {
+                self.request(RequestData::Transactions(*propose_hash), key);
+                return;
+            },
+            _ => (),
         }
 
         // Execute block and get state hash
@@ -771,5 +762,21 @@ impl<S> NodeHandler<S>
             return Err(e);
         }
         Ok(())
+    }
+}
+
+fn key_for_unkwnown_txs(state: &State, propose_hash: &Hash) -> Result<Option<PublicKey>, String> {
+    let propose_state = state.propose(propose_hash).unwrap();
+
+    if propose_state.has_unknown_txs() {
+        let validator = propose_state.message().validator();
+        match state.public_key_of(validator) {
+            Some(key) => Ok(Some(*key)),
+            None => {
+                Err(format!("Invalid validator id: propose = {:?}", propose_state.message()))
+            }
+        }
+    } else {
+        Ok(None)
     }
 }
