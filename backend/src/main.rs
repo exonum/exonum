@@ -28,7 +28,7 @@ use exonum::config::ConfigFile;
 use blockchain_explorer::helpers::{GenerateCommand, RunCommand, generate_testnet_config};
 use blockchain_explorer::api::Api;
 use configuration_service::ConfigurationService;
-use configuration_service::config_api::PrivateConfigApi;
+use configuration_service::config_api::{PrivateConfigApi, PublicConfigApi};
 use anchoring_btc_service::AnchoringService;
 use anchoring_btc_service::AnchoringRpc;
 use anchoring_btc_service::{AnchoringNodeConfig, AnchoringConfig, AnchoringRpcConfig,
@@ -49,32 +49,54 @@ pub struct ServicesConfig {
     pub btc_anchoring: AnchoringServiceConfig,
 }
 
-fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
+fn run_node(blockchain: Blockchain,
+            node_cfg: NodeConfig,
+            public_port: Option<u16>,
+            private_port: Option<u16>) {
 
     let mut node = Node::new(blockchain.clone(), node_cfg.clone());
 
-    let api_thread = match port {
-        Some(port) => {
-            let channel = node.channel().clone();
-            let blockchain_clone = blockchain.clone();
+    let private_config_api_thread = match private_port {
+        Some(private_port) => {
+            let node_cfg = node_cfg.clone();
+            let blockchain = blockchain.clone();
+            let clannel = node.channel().clone();
             let thread = thread::spawn(move || {
-                let keys = (node_cfg.public_key, node_cfg.secret_key);
-                let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
+
+                let config_api = PrivateConfigApi {
+                    channel: clannel,
+                    config: (node_cfg.public_key, node_cfg.secret_key),
+                };
+                let public_config_api = PublicConfigApi {
+                    blockchain: blockchain,
+                };
+
+                let listen_address: SocketAddr =
+                    format!("127.0.0.1:{}", private_port).parse().unwrap();
+                info!("Private config service api started on {}", listen_address);
 
                 let mut router = Router::new();
-                {
-                    let timestamping_api = PublicApi::new(blockchain_clone, channel.clone());
-                    info!("Timestamping service api started on {}", listen_address);
-                    timestamping_api.wire(&mut router);
-                }
-                {
-                    let config_api = PrivateConfigApi {
-                        channel: channel.clone(),
-                        config: keys.clone(),
-                    };
-                    info!("Configuration service api started on {}", listen_address);
-                    config_api.wire(&mut router);
-                }
+                config_api.wire(&mut router);
+                public_config_api.wire(&mut router);
+                let chain = iron::Chain::new(router);
+                iron::Iron::new(chain).http(listen_address).unwrap();
+            });
+            Some(thread)
+        } 
+        None => None, 
+    };
+
+    let public_api_thread = match public_port {
+        Some(port) => {
+            let channel = node.channel().clone();
+            let blockchain = blockchain.clone();
+            let thread = thread::spawn(move || {
+                let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
+                info!("Timestamping service api started on {}", listen_address);
+
+                let mut router = Router::new();
+                let timestamping_api = PublicApi::new(blockchain, channel.clone());
+                timestamping_api.wire(&mut router);
                 let chain = iron::Chain::new(router);
                 iron::Iron::new(chain).http(listen_address).unwrap();
             });
@@ -84,8 +106,11 @@ fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
     };
 
     node.run().unwrap();
-    if let Some(api_thread) = api_thread {
-        api_thread.join().unwrap();
+    if let Some(thread) = public_api_thread {
+        thread.join().unwrap();
+    }
+    if let Some(thread) = private_config_api_thread {
+        thread.join().unwrap();
     }
 }
 
@@ -115,17 +140,27 @@ fn main() {
                                  .long("anchoring-funds")
                                  .value_name("ANCHORING_FUNDS")
                                  .takes_value(true))
+                        .arg(Arg::with_name("ANCHORING_FEE")
+                                 .long("anchoring-fee")
+                                 .value_name("ANCHORING_FEE")
+                                 .takes_value(true))
                         .arg(Arg::with_name("ANCHORING_NETWORK")
                                  .help("Bitcoin network")
                                  .long("anchoring-network")
                                  .takes_value(true)
                                  .required(true)))
-        .subcommand(RunCommand::new().arg(Arg::with_name("HTTP_PORT")
-                                              .short("p")
-                                              .long("port")
-                                              .value_name("HTTP_PORT")
-                                              .help("Run http server on given port")
-                                              .takes_value(true)));
+        .subcommand(RunCommand::new()
+                        .arg(Arg::with_name("PUBLIC_PORT")
+                                 .short("p")
+                                 .long("port")
+                                 .value_name("PUBLIC_PORT")
+                                 .help("Run http server on given port")
+                                 .takes_value(true))
+                        .arg(Arg::with_name("PRIVATE_PORT")
+                                 .long("maintainer-port")
+                                 .value_name("PRIVATE_PORT")
+                                 .help("Run http server on given port")
+                                 .takes_value(true)));
     let matches = app.get_matches();
 
     match matches.subcommand() {
@@ -149,6 +184,11 @@ fn main() {
                 .unwrap()
                 .parse()
                 .unwrap();
+            let fee: u64 = matches
+                .value_of("ANCHORING_FEE")
+                .unwrap()
+                .parse()
+                .unwrap();
             let network = match matches.value_of("ANCHORING_NETWORK").unwrap() {
                 "testnet" => Network::Testnet,
                 "bitcoin" => Network::Bitcoin,
@@ -160,11 +200,12 @@ fn main() {
                 username: user,
                 password: passwd,
             };
-            let (anchoring_common, anchoring_nodes) =
+            let (mut anchoring_common, anchoring_nodes) =
                 gen_anchoring_testnet_config(&AnchoringRpc::new(rpc.clone()),
                                              network,
                                              count,
                                              total_funds);
+            anchoring_common.fee = fee;
 
             let node_cfgs = generate_testnet_config(count, start_port);
             let dir = dir.join("validators");
@@ -181,7 +222,12 @@ fn main() {
             }
         }
         ("run", Some(matches)) => {
-            let port: Option<u16> = matches.value_of("HTTP_PORT").map(|x| x.parse().unwrap());
+            let public_port: Option<u16> = matches
+                .value_of("PUBLIC_PORT")
+                .map(|x| x.parse().unwrap());
+            let private_port: Option<u16> = matches
+                .value_of("PRIVATE_PORT")
+                .map(|x| x.parse().unwrap());
             let path = RunCommand::node_config_path(matches);
             let db = RunCommand::db(matches);
             let cfg: ServicesConfig = ConfigFile::load(&path).unwrap();
@@ -196,7 +242,7 @@ fn main() {
                                                     anchoring_cfg.common,
                                                     anchoring_cfg.node))];
             let blockchain = Blockchain::new(db, services);
-            run_node(blockchain, cfg.node, port);
+            run_node(blockchain, cfg.node, public_port, private_port);
         }
         _ => {
             panic!("Wrong subcommand");
