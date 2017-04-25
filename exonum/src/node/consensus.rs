@@ -36,30 +36,31 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        match self.state.public_key_of(msg.validator()) {
-            // incorrect signature of message
+        let key = match self.state.public_key_of(msg.validator()) {
             Some(public_key) => {
                 if !msg.verify(public_key) {
-                    error!("Received message with incorrect signature msg={:?}", msg);
+                    error!("Received message with incorrect signature, msg={:?}", msg);
                     return;
                 }
+                *public_key
             }
-            // incorrect validator id
             None => {
-                error!("Received message from incorrect msg={:?}", msg);
+                error!("Received message from incorrect validator, msg={:?}", msg);
                 return;
             }
-        }
+        };
 
         trace!("Handle message={:?}", msg);
         match msg {
-            ConsensusMessage::Propose(msg) => self.handle_propose(msg),
-            ConsensusMessage::Prevote(msg) => self.handle_prevote(msg),
-            ConsensusMessage::Precommit(msg) => self.handle_precommit(msg),
+            ConsensusMessage::Propose(msg) => self.handle_propose(msg, &key),
+            ConsensusMessage::Prevote(msg) => self.handle_prevote(msg, &key),
+            ConsensusMessage::Precommit(msg) => self.handle_precommit(msg, &key),
         }
     }
 
-    pub fn handle_propose(&mut self, msg: Propose) {
+    pub fn handle_propose(&mut self, msg: Propose, key: &PublicKey) {
+        debug_assert_eq!(key, self.state.public_key_of(msg.validator()).unwrap());
+
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
             error!("Received propose with wrong last_block_hash msg={:?}", msg);
@@ -100,15 +101,8 @@ impl<S> NodeHandler<S>
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS!!!");
-            let key = match self.state.public_key_of(msg.validator()) {
-                Some(key) => *key,
-                None => {
-                    error!("Received message from wrong validator: {:?}", msg);
-                    return;
-                }
-            };
-
             self.request(RequestData::Transactions(hash), key);
+
             for node in known_nodes {
                 self.request(RequestData::Transactions(hash), node);
             }
@@ -225,27 +219,21 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn handle_prevote(&mut self, prevote: Prevote) {
+    pub fn handle_prevote(&mut self, prevote: Prevote, key: &PublicKey) {
         trace!("Handle prevote");
 
-        let key = match self.state.public_key_of(prevote.validator()) {
-            Some(key) => *key,
-            None => {
-                error!("Incorrect prevote validator: {:?}", prevote);
-                return;
-            }
-        };
+        debug_assert_eq!(key, self.state.public_key_of(prevote.validator()).unwrap());
 
         // Add prevote
         let has_consensus = self.state.add_prevote(&prevote);
 
         // Request propose or transactions
-        let has_propose_with_txs = self.request_propose_or_txs(prevote.propose_hash(), &key);
+        let has_propose_with_txs = self.request_propose_or_txs(prevote.propose_hash(), key);
 
         // Request prevotes
         if prevote.locked_round() > self.state.locked_round() {
             self.request(RequestData::Prevotes(prevote.locked_round(), *prevote.propose_hash()),
-                         key);
+                         *key);
         }
 
         // Lock to propose
@@ -336,22 +324,17 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn handle_precommit(&mut self, msg: Precommit) {
+    pub fn handle_precommit(&mut self, msg: Precommit, key: &PublicKey) {
         trace!("Handle precommit");
+
+        debug_assert_eq!(key, self.state.public_key_of(msg.validator()).unwrap());
+
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
 
-        let peer = match self.state.public_key_of(msg.validator()) {
-            Some(key) => *key,
-            None => {
-                error!("Invalid validator id: precommit = {:?}", msg);
-                return;
-            }
-        };
-
         // Request propose
         if self.state.propose(msg.propose_hash()).is_none() {
-            self.request(RequestData::Propose(*msg.propose_hash()), peer);
+            self.request(RequestData::Propose(*msg.propose_hash()), *key);
         }
 
         // Request prevotes
@@ -360,7 +343,7 @@ impl<S> NodeHandler<S>
         // отправки RequestPrevotes?
         if msg.round() > self.state.locked_round() {
             self.request(RequestData::Prevotes(msg.round(), *msg.propose_hash()),
-                         peer);
+                         *key);
         }
 
         // Has majority precommits
