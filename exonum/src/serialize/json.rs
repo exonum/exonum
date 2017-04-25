@@ -20,17 +20,53 @@ use crypto::{Hash, PublicKey, SecretKey, Seed, Signature};
 use messages::Field;
 use super::HexValue;
 
+/// `ExonumJsonDeserializeField` is trait for object that can be serialized "in-place" of storage structure.
+pub trait ExonumJsonDeserializeField {
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool;
+}
+
+/// `ExonumJsonDeserialize` is trait for objects that can be constructed from exonum json.
+pub trait ExonumJsonDeserialize {
+    fn deserialize_owned(value: &Value) -> Option<Self> where Self: Sized;
+}
+
+/// `ExonumJsonSerialize` is trait for object that could be serialized as json with exonum protocol specific aspects.
 pub trait ExonumJsonSerialize {
     fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error>;
 }
 
-/// helper function, fro wrapping value that should be serialized as `ExonumJsonSerialize`
+/// `WriteBufferWrapper` is a trait specific for writing fields in place.
+pub trait WriteBufferWrapper {
+    fn write<'a, T: Field<'a> >(&'a mut self, from: usize, to: usize, val:T);
+}
+
+impl WriteBufferWrapper for ::messages::MessageWriter {
+    fn write<'a, T: Field<'a> >(&'a mut self, from: usize, to: usize, val:T){
+        self.write(val, from, to)
+    }
+}
+
+impl WriteBufferWrapper for Vec<u8> {
+    fn write<'a, T: Field<'a>>(&'a mut self, from: usize, to: usize, val:T){
+        val.write(self, from, to)
+    }
+}
+
+/// Helper function, for wrapping value that should be serialized as `ExonumJsonSerialize`
 pub fn wrap<'a, T: ExonumJsonSerialize>(val: &'a T) ->  ExonumJsonSerializeWrapper<'a, T> {
     ExonumJsonSerializeWrapper(val)
 }
 
 /// Wrapping struct that allows implementing custom serializing aspects in json.
 pub struct ExonumJsonSerializeWrapper<'a, T: ExonumJsonSerialize + 'a>( &'a T);
+
+
+#[derive(Serialize, Deserialize)]
+struct DurationHelper {
+    secs: u64,
+    nanos: u32
+}
+
 
 impl<'a, T: ExonumJsonSerialize + 'a > Serialize for ExonumJsonSerializeWrapper<'a, T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
@@ -96,12 +132,6 @@ where T: ExonumJsonSerialize
     }   
 }
 
-#[derive(Serialize, Deserialize)]
-struct DurationHelper {
-    secs: u64,
-    nanos: u32
-}
-
 impl ExonumJsonSerialize for SystemTime {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use ::serde::ser::Error;
@@ -114,33 +144,11 @@ impl ExonumJsonSerialize for SystemTime {
     }
 }
 
-pub trait WriteBufferWrapper {
-    fn write<'a, T: Field<'a> >(&'a mut self, from: usize, to: usize, val:T);
-}
-
-impl WriteBufferWrapper for ::messages::MessageWriter {
-    fn write<'a, T: Field<'a> >(&'a mut self, from: usize, to: usize, val:T){
-        self.write(val, from, to)
-    }
-}
-
-impl WriteBufferWrapper for Vec<u8> {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: usize, to: usize, val:T){
-        val.write(self, from, to)
-    }
-}
-
-pub trait ExonumJsonDeserialize {
-    fn deserialize_default(value: &Value) -> Option<Self> where Self: Sized{
-            None
-    }
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool;
-}
-
+// implementation of deserialization
 
 macro_rules! impl_deserialize_int {
     (@impl $typename:ty) => {
-        impl ExonumJsonDeserialize for $typename {
+        impl ExonumJsonDeserializeField for $typename {
             fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
                     value.as_i64()
                          .map(|v| {
@@ -154,12 +162,10 @@ macro_rules! impl_deserialize_int {
     };
     ($($name:ty);*) => ($(impl_deserialize_int!{@impl $name})*);
 }
-impl_deserialize_int!{
-    u8; u16; u32 /*i8; i16; i32;*/ }
 
 macro_rules! impl_deserialize_bigint {
     (@impl $typename:ty) => {
-        impl ExonumJsonDeserialize for $typename {
+        impl ExonumJsonDeserializeField for $typename {
             fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
                     value.as_str()
                          .and_then(|v| v.parse().ok() )
@@ -170,7 +176,7 @@ macro_rules! impl_deserialize_bigint {
     };
     ($($name:ty);*) => ($(impl_deserialize_bigint!{@impl $name})*);
 }
-impl_deserialize_bigint!{u64; i64}
+
 /*
 macro_rules! impl_deserialize_float {
     (@impl $traitname:ident $typename:ty) => {
@@ -190,7 +196,7 @@ impl_deserialize_int!{ f32; f64 }
 
 macro_rules! impl_deserialize_hex_segment {
     (@impl $typename:ty) => {
-        impl<'a> ExonumJsonDeserialize for &'a $typename {
+        impl<'a> ExonumJsonDeserializeField for &'a $typename {
             fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
                     value.as_str()
                          .and_then(|v| <$typename as HexValue>:: from_hex(v).ok() )
@@ -202,11 +208,14 @@ macro_rules! impl_deserialize_hex_segment {
     ($($name:ty);*) => ($(impl_deserialize_hex_segment!{@impl $name})*);
 }
 
+impl_deserialize_int!{
+    u8; u16; u32 /*i8; i16; i32;*/ }
+impl_deserialize_bigint!{u64; i64}
 
 impl_deserialize_hex_segment!{
     Hash; PublicKey; Signature /*;  Seed; */}
 
-impl ExonumJsonDeserialize for bool  {
+impl ExonumJsonDeserializeField for bool  {
     fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
         value.as_bool()
              .map(|val| buffer.write(from, to, val))
@@ -214,7 +223,7 @@ impl ExonumJsonDeserialize for bool  {
     }
 }
 
-impl ExonumJsonDeserialize for SystemTime  {
+impl ExonumJsonDeserializeField for SystemTime  {
     fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
         let helper: Option<DurationHelper> = ::serde_json::from_value(value.clone()).ok();
         helper.map(|helper|{
@@ -226,7 +235,7 @@ impl ExonumJsonDeserialize for SystemTime  {
     }
 }
 
-impl ExonumJsonDeserialize for SocketAddr {
+impl ExonumJsonDeserializeField for SocketAddr {
     fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
         let helper: Option<SocketAddr> = ::serde_json::from_value(value.clone()).ok();
         helper.map(|addr|{
@@ -236,7 +245,7 @@ impl ExonumJsonDeserialize for SocketAddr {
     }
 }
 
-impl<'a> ExonumJsonDeserialize for &'a [Hash]  {
+impl<'a> ExonumJsonDeserializeField for &'a [Hash]  {
     fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
         value.as_array()
              .and_then(|arr| {
@@ -256,7 +265,7 @@ impl<'a> ExonumJsonDeserialize for &'a [Hash]  {
     }
 }
 
-impl ExonumJsonDeserialize for Vec<Arc<::messages::MessageBuffer>>
+impl ExonumJsonDeserializeField for Vec<Arc<::messages::MessageBuffer>>
 {
     fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
         use ::messages::MessageBuffer;
@@ -277,7 +286,7 @@ impl ExonumJsonDeserialize for Vec<Arc<::messages::MessageBuffer>>
     }
 }
 
-impl<T> ExonumJsonDeserialize for Vec<T>
+impl<T> ExonumJsonDeserializeField for Vec<T>
 where T: ExonumJsonDeserialize,
     for<'a> Vec<T>: Field<'a>
 {
@@ -286,7 +295,7 @@ where T: ExonumJsonDeserialize,
              .and_then(|arr| {
                 let mut vec: Vec<_>= Vec::new();
                 for el in arr {
-                    let obj = T::deserialize_default(el);
+                    let obj = T::deserialize_owned(el);
                     if let Some(ob) = obj {
                         vec.push(ob);
                     } else {
@@ -299,7 +308,7 @@ where T: ExonumJsonDeserialize,
     }    
 }
 
-impl ExonumJsonDeserialize for BitVec  {
+impl ExonumJsonDeserializeField for BitVec  {
     fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
         value.as_str()
              .and_then(|val| {
@@ -326,7 +335,7 @@ impl ExonumJsonDeserialize for BitVec  {
 
 
 
-//api 
+//api
 
 pub fn to_string<T: ExonumJsonSerialize>(value: &T) -> Option<String> {    
     let mut buf = Vec::new();
@@ -341,5 +350,5 @@ pub fn to_string<T: ExonumJsonSerialize>(value: &T) -> Option<String> {
 pub fn from_str<T: ExonumJsonDeserialize>(value: &str) -> Option<T> {    
     let value: Option<Value> = ::serde_json::from_str(value).ok();
     value.and_then(| val|
-        T::deserialize_default(&val))
+        T::deserialize_owned(&val))
 }
