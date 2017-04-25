@@ -88,7 +88,7 @@ impl<S> NodeHandler<S>
             (block.hash(), block.height() + 1)
         };
 
-        let stored = Schema::new(&blockchain.view()).get_actual_configuration().unwrap();
+        let stored = Schema::new(&blockchain.view()).actual_configuration().unwrap();
         info!("Create node with config={:#?}", stored);
 
         let validator_id = stored.validators

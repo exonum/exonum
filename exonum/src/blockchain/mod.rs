@@ -98,7 +98,7 @@ impl Blockchain {
                     let _ = block_hash;
                     return Ok(());
                 }
-                schema.commit_actual_configuration(config_propose)?;
+                schema.commit_configuration(config_propose)?;
             };
             self.merge(&view.changes())?;
             self.create_patch(0, 0, &[], &BTreeMap::new())?.1
