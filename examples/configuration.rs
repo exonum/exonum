@@ -54,17 +54,15 @@ fn run_node(blockchain: Blockchain,
                 iron::Iron::new(chain).http(listen_address).unwrap();
             });
             Some(thread)
-        } 
-        None => None, 
+        }
+        None => None,
     };
 
     let public_config_api_thread = match public_port {
         Some(public_port) => {
             let thread = thread::spawn(move || {
 
-                let config_api = PublicConfigApi {
-                    blockchain: blockchain,
-                };
+                let config_api = PublicConfigApi { blockchain: blockchain };
 
                 let listen_address: SocketAddr =
                     format!("127.0.0.1:{}", public_port).parse().unwrap();
@@ -76,8 +74,8 @@ fn run_node(blockchain: Blockchain,
                 iron::Iron::new(chain).http(listen_address).unwrap();
             });
             Some(thread)
-        } 
-        None => None, 
+        }
+        None => None,
     };
     node.run().unwrap();
     if let Some(private_config_api_thread) = private_config_api_thread {
@@ -98,26 +96,28 @@ fn main() {
         .about("Demo validator node")
         .subcommand(GenerateCommand::new())
         .subcommand(RunCommand::new()
-            .arg(Arg::with_name("CFG_PUB_HTTP_PORT")
-                .short("p")
-                .long("public-port")
-                .value_name("CFG_PUB_HTTP_PORT")
-                .help("Run public config api http server on given port")
-                .takes_value(true))
-            .arg(Arg::with_name("CFG_PRIV_HTTP_PORT")
-                .short("s")
-                .long("private-port")
-                .value_name("CFG_PRIV_HTTP_PORT")
-                .help("Run config api http server on given port")
-                .takes_value(true)));
+                        .arg(Arg::with_name("CFG_PUB_HTTP_PORT")
+                                 .short("p")
+                                 .long("public-port")
+                                 .value_name("CFG_PUB_HTTP_PORT")
+                                 .help("Run public config api http server on given port")
+                                 .takes_value(true))
+                        .arg(Arg::with_name("CFG_PRIV_HTTP_PORT")
+                                 .short("s")
+                                 .long("private-port")
+                                 .value_name("CFG_PRIV_HTTP_PORT")
+                                 .help("Run config api http server on given port")
+                                 .takes_value(true)));
     let matches = app.get_matches();
 
     match matches.subcommand() {
         ("generate", Some(matches)) => GenerateCommand::execute(matches),
         ("run", Some(matches)) => {
-            let pub_port: Option<u16> = matches.value_of("CFG_PUB_HTTP_PORT")
+            let pub_port: Option<u16> = matches
+                .value_of("CFG_PUB_HTTP_PORT")
                 .map(|x| x.parse().unwrap());
-            let priv_port: Option<u16> = matches.value_of("CFG_PRIV_HTTP_PORT")
+            let priv_port: Option<u16> = matches
+                .value_of("CFG_PRIV_HTTP_PORT")
                 .map(|x| x.parse().unwrap());
             let node_cfg = RunCommand::node_config(matches);
             let db = RunCommand::db(matches);
