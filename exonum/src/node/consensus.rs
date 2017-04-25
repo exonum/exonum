@@ -6,7 +6,7 @@ use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPr
                RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
 use storage::{Map, Patch};
 use events::Channel;
-use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout, State};
+use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout};
 
 // TODO reduce view invokations
 impl<S> NodeHandler<S>
@@ -262,16 +262,17 @@ impl<S> NodeHandler<S>
         }
 
         // Request transactions if needed.
-        match key_for_unkwnown_txs(&self.state, propose_hash) {
-            Err(err) => {
-                error!("{}", err);
-                return;
+        let proposer = {
+            let propose_state = self.state.propose(propose_hash).unwrap();
+            if propose_state.has_unknown_txs() {
+                Some(*self.state.public_key_of(propose_state.message().validator()).unwrap())
+            } else {
+                None
             }
-            Ok(Some(key)) => {
-                self.request(RequestData::Transactions(*propose_hash), key);
-                return;
-            },
-            _ => (),
+        };
+        if let Some(proposer) = proposer {
+            self.request(RequestData::Transactions(*propose_hash), proposer);
+            return;
         }
 
         // Execute block and get state hash
@@ -762,21 +763,5 @@ impl<S> NodeHandler<S>
             return Err(e);
         }
         Ok(())
-    }
-}
-
-fn key_for_unkwnown_txs(state: &State, propose_hash: &Hash) -> Result<Option<PublicKey>, String> {
-    let propose_state = state.propose(propose_hash).unwrap();
-
-    if propose_state.has_unknown_txs() {
-        let validator = propose_state.message().validator();
-        match state.public_key_of(validator) {
-            Some(key) => Ok(Some(*key)),
-            None => {
-                Err(format!("Invalid validator id: propose = {:?}", propose_state.message()))
-            }
-        }
-    } else {
-        Ok(None)
     }
 }
