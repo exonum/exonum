@@ -26,7 +26,7 @@
             <div class="form-group">
                 <p class="text-center">Add more funds to your account:</p>
                 <!-- TODO revert later -->
-                <!--<a href="#user/{ publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>-->
+                <!--<a href="#user/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>-->
                 <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
             </div>
         </virtual>
@@ -80,7 +80,7 @@
     <script>
         // TODO revert later
 //        var self = this;
-//        var user = self.storage.getUser();
+//        var user = self.auth.getUser();
 //
 //        this.publicKey = user.publicKey;
 //
@@ -130,7 +130,7 @@
         logout(e) {
             e.preventDefault();
             // TODO revert later
-//            self.deleteUser();
+//            self.auth.logout();
             route('/dashboard');
         }
     </script>

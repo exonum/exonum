@@ -1,6 +1,6 @@
-# Crypto currency demo
+# Cryptocurrency demo
 
-This is demo of crypto currency implemented on Exonum blockchain.
+This is demo of cryptocurrency implemented on Exonum blockchain.
 
 It demonstrates the very basic operations:
 
