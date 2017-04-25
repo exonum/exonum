@@ -13,6 +13,7 @@ install:
 - cargo install rustfmt --force
 script:
 - cargo fmt -p blockchain_explorer -- --write-mode=diff
+- cargo fmt -p sandbox -- --write-mode=diff
 - cargo rustc --manifest-path exonum/Cargo.toml --features clippy -- -D warnings
 - cargo rustc --manifest-path blockchain_explorer/Cargo.toml --lib -- -D warnings
 - cargo build --manifest-path sandbox/Cargo.toml
