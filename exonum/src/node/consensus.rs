@@ -59,7 +59,7 @@ impl<S> NodeHandler<S>
     }
 
     pub fn handle_propose(&mut self, msg: Propose, key: &PublicKey) {
-        debug_assert_eq!(key, self.state.public_key_of(msg.validator()).unwrap());
+        debug_assert_eq!(Some(key), self.state.public_key_of(msg.validator()));
 
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
@@ -222,7 +222,7 @@ impl<S> NodeHandler<S>
     pub fn handle_prevote(&mut self, prevote: Prevote, key: &PublicKey) {
         trace!("Handle prevote");
 
-        debug_assert_eq!(key, self.state.public_key_of(prevote.validator()).unwrap());
+        debug_assert_eq!(Some(key), self.state.public_key_of(prevote.validator()));
 
         // Add prevote
         let has_consensus = self.state.add_prevote(&prevote);
@@ -327,7 +327,7 @@ impl<S> NodeHandler<S>
     pub fn handle_precommit(&mut self, msg: Precommit, key: &PublicKey) {
         trace!("Handle precommit");
 
-        debug_assert_eq!(key, self.state.public_key_of(msg.validator()).unwrap());
+        debug_assert_eq!(Some(key), self.state.public_key_of(msg.validator()));
 
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
