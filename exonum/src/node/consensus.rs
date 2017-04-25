@@ -101,7 +101,7 @@ impl<S> NodeHandler<S>
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS!!!");
-            self.request(RequestData::Transactions(hash), key);
+            self.request(RequestData::Transactions(hash), *key);
 
             for node in known_nodes {
                 self.request(RequestData::Transactions(hash), node);
