@@ -2330,7 +2330,7 @@ fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
     // trigger round_timeout
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     // trigger request_propose_timeout
-    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_WAIT));
+    sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     // oberve requestPropose request
     sandbox.add_time(Duration::from_millis(0));
 }
@@ -2340,7 +2340,7 @@ fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
 /// - node continues as `fullnode`
 #[test]
 fn test_exclude_validator_from_consensus() {
-    use exonum::storage::StorageValue; 
+    use exonum::storage::StorageValue;
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -2352,11 +2352,10 @@ fn test_exclude_validator_from_consensus() {
         consensus_cfg.validators.swap_remove(0);
         consensus_cfg.actual_from = sandbox.current_height() + 2;
 
-        TxConfig::new(&sandbox.p(VALIDATOR_0 as usize), 
-                      &consensus_cfg.clone().serialize(), 
-                      consensus_cfg.actual_from, 
-                      &sandbox.s(VALIDATOR_0 as usize)
-                      )
+        TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
+                      &consensus_cfg.clone().serialize(),
+                      consensus_cfg.actual_from,
+                      &sandbox.s(VALIDATOR_0 as usize))
     };
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
