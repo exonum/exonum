@@ -22,3 +22,4 @@ __pycache__/
 .python-version
 .cs_files
 .cs_workspaces
+Cargo.lock
