@@ -6,7 +6,6 @@ use hyper::header::{ContentType, SetCookie};
 use cookie::Cookie as CookiePair;
 use router::Router;
 use serde_json;
-use serde_json::value::ToJson;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 
@@ -14,10 +13,13 @@ use std::ops::Deref;
 use std::marker::PhantomData;
 use std::io;
 use std::collections::BTreeMap;
+use std::fmt;
 
 use events::Error as EventsError;
-use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash, ToHex};
+use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
+use serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
+
 
 #[derive(Debug)]
 pub enum ApiError {
@@ -96,7 +98,7 @@ impl From<ApiError> for IronError {
         };
         IronError {
             error: Box::new(e),
-            response: Response::with((code, body.to_json().to_string())),
+            response: Response::with((code, ::serde_json::to_string_pretty(&body).unwrap())),
         }
     }
 }
@@ -117,7 +119,7 @@ impl<T> Deref for HexField<T>
 impl<T> Serialize for HexField<T>
     where T: AsRef<[u8]> + Clone
 {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         ser.serialize_str(&self.0.as_ref().to_hex())
@@ -130,12 +132,16 @@ struct HexVisitor<T>
     _p: PhantomData<T>,
 }
 
-impl<T> Visitor for HexVisitor<T>
+impl<'a, T> Visitor<'a> for HexVisitor<T>
     where T: AsRef<[u8]> + HexValue + Clone
 {
     type Value = HexField<T>;
 
-    fn visit_str<E>(&mut self, s: &str) -> Result<HexField<T>, E>
+    fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "expected hex represented string")
+    }
+
+    fn visit_str<E>(self, s: &str) -> Result<HexField<T>, E>
         where E: de::Error
     {
         let v = T::from_hex(s)
@@ -144,11 +150,11 @@ impl<T> Visitor for HexVisitor<T>
     }
 }
 
-impl<T> Deserialize for HexField<T>
+impl<'de, T> Deserialize<'de> for HexField<T>
     where T: AsRef<[u8]> + HexValue + Clone
 {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
     {
         deserializer.deserialize_str(HexVisitor { _p: PhantomData })
     }
@@ -214,6 +220,7 @@ mod tests {
 
     use blockchain::Block;
     use crypto::Hash;
+    use serialize::json;
 
     use super::*;
 
@@ -232,9 +239,9 @@ mod tests {
             }
         }
         let stub = SampleAPI;
-        let result = stub.ok_response(&serde_json::to_value(str_val));
+        let result = stub.ok_response(&serde_json::to_value(str_val).unwrap());
         assert!(result.is_ok());
-        let result = stub.ok_response(&serde_json::to_value(complex_val));
+        let result = stub.ok_response(&json::to_value(&complex_val).unwrap());
         assert!(result.is_ok());
         print!("{:?}", result);
     }

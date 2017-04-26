@@ -1,5 +1,3 @@
-use serde_json;
-
 use std::net::SocketAddr;
 use std::time::SystemTime;
 

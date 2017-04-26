@@ -7,7 +7,8 @@
 //\TODO implement Field for crypto structures 
 //\TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage
 //\TODO split deserialization for `in-place` and regular
-use serde::{Serializer, Serialize, Deserializer, Deserialize};
+use serde::{Serializer, Serialize};
+
 use serde_json::value::Value;
 use bit_vec::BitVec;
 use hex::ToHex;
@@ -90,6 +91,12 @@ impl ExonumJsonSerialize for u64 {
 impl ExonumJsonSerialize for i64 {
     fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&format!("{}", self))
+    }
+}
+
+impl<'a> ExonumJsonSerialize for &'a [u8] {
+    fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(& self.to_hex())
     }
 }
 
@@ -264,6 +271,14 @@ impl<'a> ExonumJsonDeserializeField for &'a [Hash]  {
              .is_some()
     }
 }
+impl<'a> ExonumJsonDeserializeField for &'a [u8]  {
+            fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
+                    value.as_str()
+                         .and_then(|v| <Vec<u8> as HexValue>:: from_hex(v).ok() )
+                         .map(|ref val| buffer.write(from, to, val.as_slice()))
+                         .is_some()
+            }
+}
 
 impl ExonumJsonDeserializeField for Vec<Arc<::messages::MessageBuffer>>
 {
@@ -333,22 +348,28 @@ impl ExonumJsonDeserializeField for BitVec  {
     }
 }
 
+/// reexport some of serde function to use in macros
+pub mod reexport {
+    pub use serde_json::{Value, to_value, from_value};
+    pub use serde::Serializer;
+    pub use serde::ser::SerializeStruct;
 
-
+}
 //api
+pub fn to_value<T: ExonumJsonSerialize>(value: &T) -> Option<Value> {       
+    ::serde_json::to_value(&wrap(value)).ok()
+}
+
+pub fn from_value<T: ExonumJsonDeserialize>(value: &Value) -> Option<T> {    
+    T::deserialize_owned(&value)
+}
 
 pub fn to_string<T: ExonumJsonSerialize>(value: &T) -> Option<String> {    
-    let mut buf = Vec::new();
-    
-    let ret = {
-        let mut ser = ::serde_json::Serializer::new(&mut buf);
-        value.serialize(&mut ser).ok()
-    };
-    ret.and_then(move |_| String::from_utf8(buf).ok())
+    ::serde_json::to_string(&wrap(value)).ok()
 }
 
 pub fn from_str<T: ExonumJsonDeserialize>(value: &str) -> Option<T> {    
     let value: Option<Value> = ::serde_json::from_str(value).ok();
     value.and_then(| val|
-        T::deserialize_owned(&val))
+        from_value(&val))
 }
