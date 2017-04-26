@@ -2370,8 +2370,6 @@ fn test_exclude_validator_from_consensus() {
     sandbox.check_status_message();
     // node loses validator status
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
-    sandbox.check_broadcast_status_message();
-    sandbox.check_status_message();
 }
 
 
