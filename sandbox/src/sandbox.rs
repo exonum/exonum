@@ -13,7 +13,7 @@ use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, Stor
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof,
-                       STATUS_MESSAGE_ID};
+                       STATUS_MESSAGE_ID, REQUEST_PEERS_MESSAGE_ID};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
@@ -220,12 +220,13 @@ impl Sandbox {
         self.validators_map.extend(validators);
     }
 
-    // Filters all `Status` messages. Returns `None` if there are no messages.
+    // Filters all `Status` and `RequestPeers` messages. Returns `None` if there are no messages.
     fn get_sent_exclude_status(&self) -> Option<(SocketAddr, RawMessage)> {
         let mut sended = self.inner.lock().unwrap().sended.pop_front();
 
         while let Some((_, msg)) = sended.clone() {
-            if msg.message_type() != STATUS_MESSAGE_ID {
+            if msg.message_type() != STATUS_MESSAGE_ID &&
+                msg.message_type() != REQUEST_PEERS_MESSAGE_ID {
                 break;
             }
 
