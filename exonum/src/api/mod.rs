@@ -135,7 +135,7 @@ struct HexVisitor<T>
     _p: PhantomData<T>,
 }
 
-impl<'v, T> Visitor<'v> for HexVisitor<T>
+impl<'a, T> Visitor<'a> for HexVisitor<T>
     where T: AsRef<[u8]> + HexValue + Clone
 {
     type Value = HexField<T>;
