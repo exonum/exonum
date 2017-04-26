@@ -13,7 +13,7 @@ use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, Stor
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof,
-                       STATUS_MESSAGE_ID, REQUEST_PEERS_MESSAGE_ID};
+                       STATUS_MESSAGE_ID};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
@@ -220,24 +220,25 @@ impl Sandbox {
         self.validators_map.extend(validators);
     }
 
-    // Filters all `Status` and `RequestPeers` messages. Returns `None` if there are no messages.
-    fn get_sent_exclude_status(&self) -> Option<(SocketAddr, RawMessage)> {
-        let mut sended = self.inner.lock().unwrap().sent.pop_front();
-
-        while let Some((_, msg)) = sended.clone() {
-            if msg.message_type() != STATUS_MESSAGE_ID &&
-                msg.message_type() != REQUEST_PEERS_MESSAGE_ID {
-                break;
+    pub fn check_status_message(&self) {
+        if let Some((_, msg)) = self.inner.lock().unwrap().sent.pop_front() {
+            if msg.message_type() != STATUS_MESSAGE_ID {
+                let any_msg = Any::from_raw(msg).expect("Send incorrect message");
+                panic!("Expected to send Status message, but send {:?}", any_msg);
             }
-
-            sended = self.inner.lock().unwrap().sent.pop_front();
+        } else {
+            panic!("Expected to send `Status` message");
         }
+    }
 
-        sended
+    pub fn check_broadcast_status_message(&self) {
+        for _ in 1..self.n_validators() {
+            self.check_status_message();
+        }
     }
 
     fn check_unexpected_message(&self) {
-        if let Some((addr, msg)) = self.get_sent_exclude_status() {
+        if let Some((addr, msg)) = self.inner.lock().unwrap().sent.pop_front() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
@@ -312,7 +313,7 @@ impl Sandbox {
         let mut set: HashSet<SocketAddr> =
             HashSet::from_iter(self.addresses.iter().skip(1).cloned());
         for _ in 0..self.n_validators() - 1 {
-            let sended = self.get_sent_exclude_status();
+            let sended = self.inner.lock().unwrap().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
