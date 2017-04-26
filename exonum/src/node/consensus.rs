@@ -380,6 +380,9 @@ impl<S> NodeHandler<S>
               block_hash.to_hex(),
               );
 
+        // TODO: reset status timeout.
+        self.broadcast_status();
+
         // Add timeout for first round
         self.add_round_timeout();
         // Send propose we is leader

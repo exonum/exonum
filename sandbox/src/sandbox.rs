@@ -12,7 +12,8 @@ use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof,
+                       STATUS_MESSAGE_ID};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
@@ -219,9 +220,23 @@ impl Sandbox {
         self.validators_map.extend(validators);
     }
 
+    // Filters all `Status` messages. Returns `None` if there are no messages.
+    fn get_sended_exclude_status(&self) -> Option<(SocketAddr, RawMessage)> {
+        let mut sended = self.inner.lock().unwrap().sended.pop_front();
+
+        while let Some((_, msg)) = sended.clone() {
+            if msg.message_type() != STATUS_MESSAGE_ID {
+                break;
+            }
+
+            sended = self.inner.lock().unwrap().sended.pop_front();
+        }
+
+        sended
+    }
+
     fn check_unexpected_message(&self) {
-        let sended = self.inner.lock().unwrap().sended.pop_front();
-        if let Some((addr, msg)) = sended {
+        if let Some((addr, msg)) = self.get_sended_exclude_status() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
@@ -296,7 +311,7 @@ impl Sandbox {
         let mut set: HashSet<SocketAddr> =
             HashSet::from_iter(self.addresses.iter().skip(1).cloned());
         for _ in 0..self.n_validators() - 1 {
-            let sended = self.inner.lock().unwrap().sended.pop_front();
+            let sended = self.get_sended_exclude_status();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
