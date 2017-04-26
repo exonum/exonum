@@ -221,7 +221,7 @@ impl Sandbox {
     }
 
     // Filters all `Status` messages. Returns `None` if there are no messages.
-    fn get_sended_exclude_status(&self) -> Option<(SocketAddr, RawMessage)> {
+    fn get_sent_exclude_status(&self) -> Option<(SocketAddr, RawMessage)> {
         let mut sended = self.inner.lock().unwrap().sended.pop_front();
 
         while let Some((_, msg)) = sended.clone() {
@@ -236,7 +236,7 @@ impl Sandbox {
     }
 
     fn check_unexpected_message(&self) {
-        if let Some((addr, msg)) = self.get_sended_exclude_status() {
+        if let Some((addr, msg)) = self.get_sent_exclude_status() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
@@ -311,7 +311,7 @@ impl Sandbox {
         let mut set: HashSet<SocketAddr> =
             HashSet::from_iter(self.addresses.iter().skip(1).cloned());
         for _ in 0..self.n_validators() - 1 {
-            let sended = self.get_sended_exclude_status();
+            let sended = self.get_sent_exclude_status();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
