@@ -373,6 +373,8 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             }
+            sandbox.check_broadcast_status_message();
+
             return;
         }
     }
