@@ -1,5 +1,3 @@
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-
 use crypto::{Hash, hash};
 
 
@@ -40,7 +38,6 @@ mod tests {
         assert_eq!(block.tx_hash(), &tx_hash);
         assert_eq!(block.state_hash(), &state_hash);
         assert_eq!(block.propose_round(), round);
-        use serde_json;
         let json_str = ::serialize::json::to_string(&block).unwrap();
         let block1: Block = ::serialize::json::from_str(&json_str).unwrap();
         assert_eq!(block1, block);

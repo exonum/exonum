@@ -84,8 +84,8 @@ macro_rules! message {
         }
 
         impl $crate::serialize::json::ExonumJsonSerialize for $name {
-                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: ::serde::Serializer {
-                    use ::serde::ser::SerializeStruct;
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: $crate::serialize::json::reexport::Serializer {
+                    use $crate::serialize::json::reexport::SerializeStruct;
                     let mut strukt = serializer.serialize_struct(stringify!($name), message!(@count $($field_name)*) + 1)?;
                     $(strukt.serialize_field(stringify!($field_name), &$crate::serialize::json::wrap(&self.$field_name()))?;)*
                     strukt.serialize_field("signature", &$crate::serialize::json::wrap(self.raw.signature()))?;
@@ -94,7 +94,7 @@ macro_rules! message {
         }
 
         impl $crate::serialize::json::ExonumJsonDeserializeField for $name {
-            fn deserialize<B: $crate::serialize::json::WriteBufferWrapper> (value: &::serde_json::Value, buffer: & mut B, from: usize, _to: usize ) -> bool {
+            fn deserialize<B: $crate::serialize::json::WriteBufferWrapper> (value: &$crate::serialize::json::reexport::Value, buffer: & mut B, from: usize, _to: usize ) -> bool {
                 // moved into body of function allows us to omit macro exporting
                 macro_rules! unwrap_option {
                     ($val:expr) => {if let Some(v) = $val {
@@ -106,19 +106,19 @@ macro_rules! message {
                 }
                 let obj = unwrap_option!(value.as_object());
                 $(
-                let val = unwrap_option!(obj.get(stringify!($field_name)));
+                    let val = unwrap_option!(obj.get(stringify!($field_name)));
 
-                if !<$field_type as $crate::serialize::json::ExonumJsonDeserializeField>::deserialize(val, buffer, from + $from, from + $to )
-                {
-                    return false;
-                }
+                    if !<$field_type as $crate::serialize::json::ExonumJsonDeserializeField>::deserialize(val, buffer, from + $from, from + $to )
+                    {
+                        return false;
+                    }
                 )*
                 return true;
             }
         }
 
         impl $crate::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize_owned(value: &::serde_json::Value) -> Option<Self> {
+            fn deserialize_owned(value: &$crate::serialize::json::reexport::Value) -> Option<Self> {
                 let to = $body;
                 let from = 0;
                 use $crate::serialize::json::ExonumJsonDeserializeField;
@@ -130,7 +130,7 @@ macro_rules! message {
                         .and_then(|obj| {
                             obj.get("signature")
                                .and_then(|sign| {
-                                    let sign = ::serde_json::from_value(sign.clone()).ok();
+                                    let sign = $crate::serialize::json::reexport::from_value(sign.clone()).ok();
                                     sign.map(|ref sign|$name { raw: RawMessage::new(writer.append_signature(sign)) })
                                })
                                

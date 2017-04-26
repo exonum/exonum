@@ -20,7 +20,7 @@ use std::time::SystemTime;
 
 use crypto::{Hash, PublicKey};
 use blockchain;
-use serialize::json::{WriteBufferWrapper, ExonumJsonSerialize, ExonumJsonDeserialize};
+use serialize::json::{ExonumJsonSerialize, ExonumJsonDeserialize};
 use super::{RawMessage, BitVec};
 
 pub const CONSENSUS: u16 = 0;
@@ -231,7 +231,7 @@ impl ExonumJsonDeserialize for BlockProof{
         let precommits = chain_option!(obj.get("precommits"));
         let precommits_vec = chain_option!(precommits.as_array());
 
-        let precommits = precommits_vec.iter().fold(Some(Vec::new()), |mut acc, precommit|{
+        let precommits = precommits_vec.iter().fold(Some(Vec::new()), |acc, precommit|{
             let val = chain_option!(<Precommit as ExonumJsonDeserialize>::deserialize_owned(precommit ));
             acc.map(|mut acc| {
                 acc.push(val);

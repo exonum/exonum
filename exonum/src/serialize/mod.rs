@@ -1,4 +1,4 @@
-pub use hex::FromHexError;
+pub use hex::{FromHexError, ToHex, FromHex};
 // for all internal serializers, implement default realization
 macro_rules! impl_default_serialize {
     (@impl $traitname:ident $typename:ty) => {
@@ -32,5 +32,6 @@ pub trait HexValue: Sized {
     fn to_hex(&self) -> String;
     fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError>;
 }
+
 #[macro_use]
 mod utils;
