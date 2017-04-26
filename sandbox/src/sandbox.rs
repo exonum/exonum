@@ -43,7 +43,7 @@ impl Ord for TimerPair {
 pub struct SandboxInner {
     pub address: SocketAddr,
     pub time: SystemTime,
-    pub sended: VecDeque<(SocketAddr, RawMessage)>,
+    pub sent: VecDeque<(SocketAddr, RawMessage)>,
     pub events: VecDeque<SandboxEvent>,
     pub timers: BinaryHeap<TimerPair>,
 }
@@ -62,7 +62,7 @@ impl SandboxChannel {
         self.inner
             .lock()
             .unwrap()
-            .sended
+            .sent
             .push_back((address.clone(), message));
     }
 }
@@ -222,7 +222,7 @@ impl Sandbox {
 
     // Filters all `Status` and `RequestPeers` messages. Returns `None` if there are no messages.
     fn get_sent_exclude_status(&self) -> Option<(SocketAddr, RawMessage)> {
-        let mut sended = self.inner.lock().unwrap().sended.pop_front();
+        let mut sended = self.inner.lock().unwrap().sent.pop_front();
 
         while let Some((_, msg)) = sended.clone() {
             if msg.message_type() != STATUS_MESSAGE_ID &&
@@ -230,7 +230,7 @@ impl Sandbox {
                 break;
             }
 
-            sended = self.inner.lock().unwrap().sended.pop_front();
+            sended = self.inner.lock().unwrap().sent.pop_front();
         }
 
         sended
@@ -289,7 +289,7 @@ impl Sandbox {
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let sended = self.inner.lock().unwrap().sended.pop_front();
+        let sended = self.inner.lock().unwrap().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
@@ -606,7 +606,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let inner = Arc::new(Mutex::new(SandboxInner {
                                         address: addresses[0].clone(),
                                         time: UNIX_EPOCH + Duration::new(1486720340, 0),
-                                        sended: VecDeque::new(),
+                                        sent: VecDeque::new(),
                                         events: VecDeque::new(),
                                         timers: BinaryHeap::new(),
                                     }));
