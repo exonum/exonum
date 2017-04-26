@@ -2,17 +2,17 @@
 name = "timestamping"
 version = "0.1.0"
 dependencies = [
- "anchoring_btc_service 0.1.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18)",
+ "anchoring_btc_service 0.1.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e)",
  "bitcoin 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "blockchain_explorer 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "blockchain_explorer 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.23.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "colored 1.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "configuration_service 0.1.0 (git+ssh://git@github.com/exonum/exonum-configuration.git?rev=bb30d5706dd9855d49c94e469148a8fe305cf651)",
+ "configuration_service 0.1.0 (git+ssh://git@github.com/exonum/exonum-configuration.git?rev=95cd87fde82f09506261eb006955b55d1989f288)",
  "derive-error 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "params 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -42,16 +42,16 @@ dependencies = [
 [[package]]
 name = "anchoring_btc_service"
 version = "0.1.0"
-source = "git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18#fadc0d9fa980991266735cc843e64c6bc1719e18"
+source = "git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e#5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e"
 dependencies = [
  "bitcoin 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "bitcoinrpc 0.1.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18)",
- "blockchain_explorer 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "bitcoinrpc 0.1.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e)",
+ "blockchain_explorer 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.23.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "configuration_service 0.1.0 (git+ssh://git@github.com/exonum/exonum-configuration.git?rev=bb30d5706dd9855d49c94e469148a8fe305cf651)",
+ "configuration_service 0.1.0 (git+ssh://git@github.com/exonum/exonum-configuration.git?rev=95cd87fde82f09506261eb006955b55d1989f288)",
  "derive-error 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -111,12 +111,12 @@ dependencies = [
 [[package]]
 name = "bitcoinrpc"
 version = "0.1.0"
-source = "git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18#fadc0d9fa980991266735cc843e64c6bc1719e18"
+source = "git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e#5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e"
 dependencies = [
  "bitcoin 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "jsonrpc-v1 0.2.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18)",
+ "jsonrpc-v1 0.2.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -141,14 +141,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "blockchain_explorer"
 version = "0.1.0"
-source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb#fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805#5bd7cdea015e011b635a8ce89945f45b5f3f3805"
 dependencies = [
  "bodyparser 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.23.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "colored 1.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cookie 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "headers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.10.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -160,7 +160,6 @@ dependencies = [
  "serde_derive 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.8.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "term 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "time 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -253,13 +252,13 @@ dependencies = [
 [[package]]
 name = "configuration_service"
 version = "0.1.0"
-source = "git+ssh://git@github.com/exonum/exonum-configuration.git?rev=bb30d5706dd9855d49c94e469148a8fe305cf651#bb30d5706dd9855d49c94e469148a8fe305cf651"
+source = "git+ssh://git@github.com/exonum/exonum-configuration.git?rev=95cd87fde82f09506261eb006955b55d1989f288#95cd87fde82f09506261eb006955b55d1989f288"
 dependencies = [
- "blockchain_explorer 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "blockchain_explorer 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "bodyparser 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.23.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -400,21 +399,21 @@ dependencies = [
 [[package]]
 name = "exonum"
 version = "0.1.0"
-source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb#fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805#5bd7cdea015e011b635a8ce89945f45b5f3f3805"
 dependencies = [
  "bit-vec 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "leveldb 0.9.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "leveldb 0.9.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "log 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
+ "profiler 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.8.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "sodiumoxide 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "time 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -562,7 +561,7 @@ dependencies = [
 [[package]]
 name = "jsonrpc-v1"
 version = "0.2.0"
-source = "git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18#fadc0d9fa980991266735cc843e64c6bc1719e18"
+source = "git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e#5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e"
 dependencies = [
  "hyper 0.9.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -611,16 +610,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "leveldb"
 version = "0.9.0"
-source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb#fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805#5bd7cdea015e011b635a8ce89945f45b5f3f3805"
 dependencies = [
- "leveldb-sys 3.0.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)",
+ "leveldb-sys 3.0.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "leveldb-sys"
 version = "3.0.0"
-source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb#fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805#5bd7cdea015e011b635a8ce89945f45b5f3f3805"
 dependencies = [
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -985,6 +984,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "walkdir 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "profiler"
+version = "0.1.0"
+source = "git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805#5bd7cdea015e011b635a8ce89945f45b5f3f3805"
+dependencies = [
+ "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -1497,17 +1505,17 @@ dependencies = [
 [metadata]
 "checksum aho-corasick 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ca972c2ea5f742bfce5687b9aef75506a764f61d37f8f649047846a9686ddb66"
 "checksum aho-corasick 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "500909c4f87a9e52355b26626d890833e9e1d53ac566db76c36faa984b889699"
-"checksum anchoring_btc_service 0.1.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18)" = "<none>"
+"checksum anchoring_btc_service 0.1.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e)" = "<none>"
 "checksum ansi_term 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "23ac7c30002a5accbf7e8987d0632fa6de155b7c3d39d0067317a391e00a2ef6"
 "checksum arrayvec 0.3.23 (registry+https://github.com/rust-lang/crates.io-index)" = "699e63a93b79d717e8c3b5eb1b28b7780d0d6d9e59a72eb769291c83b0c8dc67"
 "checksum atty 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d912da0db7fa85514874458ca3651fe2cddace8d0b0505571dbdcd41ab490159"
 "checksum bit-vec 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "5b97c2c8e8bbb4251754f559df8af22fb264853c7d009084a576cdf12565089d"
 "checksum bitcoin 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "3b68e140a2248333120aed2c7983dc10c2530b197843d2e63b3218714a35645c"
-"checksum bitcoinrpc 0.1.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18)" = "<none>"
+"checksum bitcoinrpc 0.1.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e)" = "<none>"
 "checksum bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8dead7461c1127cf637931a1e50934eb6eee8bff2f74433ac7909e9afcee04a3"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
 "checksum bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1370e9fc2a6ae53aea8b7a5110edbd08836ed87c88736dfabccade1c2b44bff4"
-"checksum blockchain_explorer 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)" = "<none>"
+"checksum blockchain_explorer 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)" = "<none>"
 "checksum bodyparser 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6928e817538b74a73d1dd6e9a942a2a35c632a597b6bb14fd009480f859a6bf5"
 "checksum buf_redux 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "861b9d19b9f5cb40647242d10d0cb0a13de0a96d5ff8c8a01ea324fa3956eb7d"
 "checksum byteorder 0.3.13 (registry+https://github.com/rust-lang/crates.io-index)" = "29b2aa490a8f546381308d68fc79e6bd753cd3ad839f7a7172897f1feedfa175"
@@ -1520,7 +1528,7 @@ dependencies = [
 "checksum clap 2.23.3 (registry+https://github.com/rust-lang/crates.io-index)" = "f57e9b63057a545ad2ecd773ea61e49422ed1b1d63d74d5da5ecaee55b3396cd"
 "checksum colored 1.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "28ac9262ecb0c06ced80088dad74d813458a909016b554fbf9199177acec697a"
 "checksum conduit-mime-types 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "95ca30253581af809925ef68c2641cc140d6183f43e12e0af4992d53768bd7b8"
-"checksum configuration_service 0.1.0 (git+ssh://git@github.com/exonum/exonum-configuration.git?rev=bb30d5706dd9855d49c94e469148a8fe305cf651)" = "<none>"
+"checksum configuration_service 0.1.0 (git+ssh://git@github.com/exonum/exonum-configuration.git?rev=95cd87fde82f09506261eb006955b55d1989f288)" = "<none>"
 "checksum cookie 0.1.21 (registry+https://github.com/rust-lang/crates.io-index)" = "02443c47d5c80f9b4be9b8f51c0bf307d663fe28b18ccabef44d8b0a4b2a967b"
 "checksum cookie 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "0e3d6405328b6edb412158b3b7710e2634e23f3614b9bb1c412df7952489a626"
 "checksum cookie 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ce776927cd64cbe74ebd1d9b375edb9d1b6bfa808618ddf9548645e019ebdfbb"
@@ -1536,7 +1544,7 @@ dependencies = [
 "checksum env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "15abd780e45b3ea4f76b4e9a26ff4843258dd8a3eed2775a0e7368c2e7936c2f"
 "checksum env_logger 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "e3856f1697098606fc6cb97a93de88ca3f3bc35bb878c725920e6e82ecf05e83"
 "checksum error 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "a6e606f14042bb87cc02ef6a14db6c90ab92ed6f62d87e69377bc759fd7987cc"
-"checksum exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)" = "<none>"
+"checksum exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)" = "<none>"
 "checksum gcc 0.3.45 (registry+https://github.com/rust-lang/crates.io-index)" = "40899336fb50db0c78710f53e87afc54d8c7266fb76262fecc78ca1a7f09deae"
 "checksum gdi32-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "0912515a8ff24ba900422ecda800b52f4016a56251922d397c576bf92c690518"
 "checksum headers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cbedbc6e41e7528e14e81b4e99bf4b2e73af553ab3d96e6bbf24f58255d3a86d"
@@ -1550,15 +1558,15 @@ dependencies = [
 "checksum iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2440ae846e7a8c7f9b401db8f6e31b4ea5e7d3688b91761337da7e054520c75b"
 "checksum itoa 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ae3088ea4baeceb0284ee9eea42f591226e6beaecf65373e41b38d95a1b8e7a1"
 "checksum jsonrpc 0.7.6 (registry+https://github.com/rust-lang/crates.io-index)" = "37c35e15c935999d363ecd6055c65528bec8c9f8a8ce6b959966544504546db6"
-"checksum jsonrpc-v1 0.2.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=fadc0d9fa980991266735cc843e64c6bc1719e18)" = "<none>"
+"checksum jsonrpc-v1 0.2.0 (git+ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git?rev=5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e)" = "<none>"
 "checksum jsonway 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7545b38269e3db1f9bd60f0ee1b64a557c4bdcca790aef6d9ca494a5f24daa60"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum language-tags 0.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "41633f9c0d99840437d1f2073c0a6dadcf1dbd28b87dda956e3d91b65f6e57a7"
 "checksum language-tags 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a91d884b6667cd606bb5a69aa0c99ba811a115fc68915e7056ec08a46e93199a"
 "checksum lazy_static 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)" = "cf186d1a8aa5f5bee5fd662bc9c1b949e0259e1bcc379d1f006847b0080c7417"
 "checksum lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3b37545ab726dd833ec6420aaba8231c5b320814b9029ad585555d2a03e94fbf"
-"checksum leveldb 0.9.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)" = "<none>"
-"checksum leveldb-sys 3.0.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=fc8ca6e7bdfaebe953817c11b57c84289494fecb)" = "<none>"
+"checksum leveldb 0.9.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)" = "<none>"
+"checksum leveldb-sys 3.0.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)" = "<none>"
 "checksum libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)" = "88ee81885f9f04bff991e306fea7c1c60a5f0f9e409e99f6b40e3311a3363135"
 "checksum libressl-pnacl-sys 2.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "cbc058951ab6a3ef35ca16462d7642c4867e6403520811f28537a4e2f2db3e71"
 "checksum libsodium-sys 0.0.13 (registry+https://github.com/rust-lang/crates.io-index)" = "8e92532ef19ec2da77f5a89ae63a5c3dbb5136e8dada4e2c278107c1e1c773d8"
@@ -1599,6 +1607,7 @@ dependencies = [
 "checksum pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "3a8b4c6b8165cd1a1cd4b9b120978131389f64bdaf456435caa41e630edba903"
 "checksum plugin 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "1a6a0dc3910bc8db877ffed8e457763b317cf880df4ae19109b9f77d277cf6e0"
 "checksum pnacl-build-helper 1.4.11 (registry+https://github.com/rust-lang/crates.io-index)" = "dfbe13ee77c06fb633d71c72438bd983286bb3521863a753ade8e951c7efb090"
+"checksum profiler 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git?rev=5bd7cdea015e011b635a8ce89945f45b5f3f3805)" = "<none>"
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 "checksum rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "022e0636ec2519ddae48154b028864bdce4eaf7d35226ab8e65c611be97b189d"
 "checksum redox_syscall 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)" = "29dbdfd4b9df8ab31dec47c6087b7b13cbf4a776f335e4de8efba8288dda075b"

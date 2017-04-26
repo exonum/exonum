@@ -26,19 +26,19 @@ colored = "1.3.0"
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+rev = "5bd7cdea015e011b635a8ce89945f45b5f3f3805"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "fc8ca6e7bdfaebe953817c11b57c84289494fecb"
+rev = "5bd7cdea015e011b635a8ce89945f45b5f3f3805"
 
 [dependencies.anchoring_btc_service]
 git = "ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git"
 version = "0.1.0"
-rev = "fadc0d9fa980991266735cc843e64c6bc1719e18"
+rev = "5d7d3d54adb12cf5f3e7f18f48fa020287c0cc0e"
 
 [dependencies.configuration_service]
 git = "ssh://git@github.com/exonum/exonum-configuration.git"
 version = "0.1.0"
-rev = "bb30d5706dd9855d49c94e469148a8fe305cf651"
+rev = "95cd87fde82f09506261eb006955b55d1989f288"
