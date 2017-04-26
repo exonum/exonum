@@ -34,9 +34,9 @@ version = "0.1.0"
 rev = "fc8ca6e7bdfaebe953817c11b57c84289494fecb"
 
 [dependencies.anchoring_btc_service]
-git = "ssh://git@github.com/exonum/exonum-btc-anchoring.git"
+git = "ssh://git@github.com/alekseysidorov/exonum-btc-anchoring.git"
 version = "0.1.0"
-rev = "2c1d9e99737681c21d45d7426a79974867438c29"
+rev = "431ee3a"
 
 [dependencies.configuration_service]
 git = "ssh://git@github.com/exonum/exonum-configuration.git"
