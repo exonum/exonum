@@ -50,7 +50,7 @@ impl<T> CryptocurrencyApi<T>
         let general_schema = blockchain::Schema::new(&view);
         let currency_schema = CurrencySchema::new(&view);
 
-        let max_height = general_schema.heights().len()? - 1;
+        let max_height = general_schema.block_hashes_by_height().len()? - 1;
         let block_proof = general_schema
             .block_and_precommits(max_height)?
             .unwrap();
