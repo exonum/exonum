@@ -149,6 +149,9 @@ impl<'a> Schema<'a> {
     pub fn configuration_by_height(&self,
                                    height: u64)
                                    -> Result<Option<StoredConfiguration>, Error> {
+        if height > self.block_hashes_by_height().len()? {
+            return Ok(None);
+        }
         let idx = self.find_configurations_index_by_height(height)?;
         let res = match self.configs_actual_from().get(idx)? {
             Some(cfg_ref) => {
