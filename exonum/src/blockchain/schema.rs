@@ -125,8 +125,7 @@ impl<'a> Schema<'a> {
 
     pub fn actual_configuration(&self) -> Result<StoredConfiguration, Error> {
         let current_height = self.current_height()?;
-        let res = self.configuration_by_height(current_height)
-            .map(|cfg| cfg.expect(&format!("No element at height {} in configs_actual_from table", current_height)));
+        let res = self.configuration_by_height(current_height);
         trace!("Retrieved actual_config: {:?}", res);
         res
     }
@@ -146,23 +145,16 @@ impl<'a> Schema<'a> {
         Ok(res)
     }
 
-    pub fn configuration_by_height(&self,
-                                   height: u64)
-                                   -> Result<Option<StoredConfiguration>, Error> {
-        if height > self.block_hashes_by_height().len()? {
-            return Ok(None);
-        }
+    pub fn configuration_by_height(&self, height: u64) -> Result<StoredConfiguration, Error> {
         let idx = self.find_configurations_index_by_height(height)?;
-        let res = match self.configs_actual_from().get(idx)? {
-            Some(cfg_ref) => {
-                let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.configuration_by_hash(cfg_hash)?
-                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
-                Some(cfg)
-            }
-            None => None,
-        };
-        Ok(res)
+        let cfg_ref = self.configs_actual_from()
+            .get(idx)?
+            .expect("Configuration at index {} not found");
+        let cfg_hash = cfg_ref.cfg_hash();
+        let cfg =
+            self.configuration_by_hash(cfg_hash)?
+                .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+        Ok(cfg)
     }
 
     pub fn configuration_by_hash(&self, hash: &Hash) -> Result<Option<StoredConfiguration>, Error> {
@@ -186,10 +178,11 @@ impl<'a> Schema<'a> {
         let configs_actual_from = self.configs_actual_from();
         let cfg_references = configs_actual_from.values()?;
 
-        let idx = cfg_references.into_iter()
-         .rposition(|r| r.actual_from() <= height)
-         .expect(&format!("Couldn't find a config in configs_actual_from table with actual_from height less than \
-                          the height: {:?}", height));
+        let idx = cfg_references
+            .into_iter()
+            .rposition(|r| r.actual_from() <= height)
+            .expect(&format!("Couldn't not find any config for height {},\
+          that means that genesis block was created incorrectly.", height));
         Ok(idx as u64)
     }
 }

@@ -2397,7 +2397,7 @@ fn test_schema_config_changes() {
     assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
                    .configuration_by_height(HEIGHT_FOUR)
                    .unwrap(),
-               None);
+               prev_cfg);
     // Commit a new configuration
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
     // Check that following configuration is visible
@@ -2418,11 +2418,11 @@ fn test_schema_config_changes() {
     assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
                    .configuration_by_height(HEIGHT_ZERO)
                    .unwrap(),
-               Some(prev_cfg));
+               prev_cfg);
     assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
                    .configuration_by_height(sandbox.current_height())
                    .unwrap(),
-               Some(following_cfg));
+               following_cfg);
 }
 
 // - lock to propose when get +2/3 prevote
