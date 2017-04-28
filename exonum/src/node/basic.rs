@@ -102,7 +102,7 @@ impl<S> NodeHandler<S>
 
     pub fn handle_request_peers(&mut self, msg: RequestPeers) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
-        debug!("HANDLE REQUEST PEERS: Sending {:?} peers to {:?}", peers, msg.from());
+        trace!("HANDLE REQUEST PEERS: Sending {:?} peers to {:?}", peers, msg.from());
 
         for peer in peers {
             self.send_to_peer(*msg.from(), peer.raw());
