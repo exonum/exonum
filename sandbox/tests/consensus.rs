@@ -97,7 +97,7 @@ fn test_reach_one_height_repeatable() {
 }
 
 /// idea of the test is to reach some height
-/// /// assumptions: status timeout and request_peers timeout are not handled in thi stest,
+/// assumptions: status timeout and request_peers timeout are not handled in thi stest,
 /// so, according timeouts should be big enough not to occur
 #[test]
 fn test_reach_thirteen_height() {
