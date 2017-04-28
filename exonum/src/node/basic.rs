@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 
 use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
 use events::Channel;
-use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
 
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
@@ -107,9 +107,11 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn handle_status_timeout(&mut self) {
-        self.broadcast_status();
-        self.add_status_timeout();
+    pub fn handle_status_timeout(&mut self, height: Height) {
+        if self.state.height() == height {
+            self.broadcast_status();
+            self.add_status_timeout();
+        }
     }
 
     pub fn handle_peer_exchange_timeout(&mut self) {
