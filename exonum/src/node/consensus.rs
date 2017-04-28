@@ -382,6 +382,7 @@ impl<S> NodeHandler<S>
 
         // TODO: reset status timeout.
         self.broadcast_status();
+        self.add_status_timeout();
 
         // Add timeout for first round
         self.add_round_timeout();
