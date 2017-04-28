@@ -77,11 +77,11 @@ impl<S> NodeHandler<S>
     }
 
     pub fn handle_status(&mut self, msg: Status) {
-        let self_height = self.state.height();
-        trace!("HANDLE STATUS: current height = {}, msg height = {}", self_height, msg.height());
+        let height = self.state.height();
+        trace!("HANDLE STATUS: current height = {}, msg height = {}", height, msg.height());
 
         // Handle message from future height
-        if msg.height() > self_height {
+        if msg.height() > height {
             let peer = msg.from();
 
             //verify message
@@ -96,7 +96,7 @@ impl<S> NodeHandler<S>
             }
 
             // Request block
-            self.request(RequestData::Block(self_height), *peer);
+            self.request(RequestData::Block(height), *peer);
         }
     }
 
