@@ -421,7 +421,7 @@ impl Network {
                                                 addr: &SocketAddr)
                                                 -> bool {
         if let Some(timeout) = self.reconnects.remove(addr) {
-            debug!("{}: Clear reconnect timeout to={}", self.address(), addr);
+            trace!("{}: Clear reconnect timeout to={}", self.address(), addr);
             event_loop.clear_timeout(timeout);
             return true;
         }
