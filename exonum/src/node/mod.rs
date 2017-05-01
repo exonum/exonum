@@ -10,14 +10,13 @@ use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage};
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
-pub use self::timeout_adjuster::{TimeoutAdjuster, ConstantTimeout, DynamicTimeout};
 
 mod basic;
 mod consensus;
 mod requests;
-mod timeout_adjuster;
 
 pub mod state; // TODO: temporary solution to get access to WAIT consts
+pub mod timeout_adjuster;
 
 #[derive(Debug)]
 pub enum ExternalMessage {
@@ -48,7 +47,7 @@ pub struct NodeHandler<S>
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    timeout_adjuster: Box<TimeoutAdjuster>
+    timeout_adjuster: Box<timeout_adjuster::Adjuster>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -86,14 +85,14 @@ impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> Self {
-        let timeout_adjuster = Box::new(timeout_adjuster::ConstantTimeout::default());
+        let timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
         Self::with_timeout_adjuster(blockchain, sender, config, timeout_adjuster)
     }
 
     pub fn with_timeout_adjuster(blockchain: Blockchain,
                                  sender: S,
                                  config: Configuration,
-                                 mut timeout_adjuster: Box<TimeoutAdjuster>)
+                                 mut timeout_adjuster: Box<timeout_adjuster::Adjuster>)
                                  -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {

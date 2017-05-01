@@ -5,20 +5,20 @@ use storage::View;
 const MIN_TIMEOUT: Milliseconds = 50;
 const MAX_TIMEOUT: Milliseconds = 200;
 
-/// `TimeoutAdjuster` trait can be used to dynamically change propose timeout.
+/// `Adjuster` trait can be used to dynamically change propose timeout.
 ///
 /// # Examples
 ///
-/// Implementing `TimeoutAdjuster`:
+/// Implementing `Adjuster`:
 ///
 /// ```
-/// use exonum::node::{State, TimeoutAdjuster};
+/// use exonum::node::{State, Adjuster};
 /// use exonum::events::Milliseconds;
 /// use exonum::storage::View;
 ///
-/// struct Adjuster {}
+/// struct CustomAdjuster {}
 ///
-/// impl TimeoutAdjuster for Adjuster {
+/// impl Adjuster for CustomAdjuster {
 ///     fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
 ///         // Simply increase propose time after empty blocks.
 ///         if state.transactions().is_empty() {
@@ -29,31 +29,31 @@ const MAX_TIMEOUT: Milliseconds = 200;
 ///     }
 /// }
 /// ```
-/// For more examples see `ConstantTimeout` and `DynamicTimeout` implementations.
-pub trait TimeoutAdjuster {
-    /// Called after accepting a new height.
+/// For more examples see `Constant` and `MovingAverage` implementations.
+pub trait Adjuster {
+    /// Called during node initialization and after accepting a new height.
     fn adjust_timeout(&mut self, state: &State, view: View) -> Milliseconds;
 }
 
-/// `TimeoutAdjuster` implementation that always returns the same value.
-pub struct ConstantTimeout {
+/// `Adjuster` implementation that always returns the same value.
+pub struct Constant {
     timeout: Milliseconds,
 }
 
-impl ConstantTimeout {
-    /// Creates `ConstantTimeout` with given timeout value.
+impl Constant {
+    /// Creates `Constant` with given timeout value.
     pub fn new(timeout: Milliseconds) -> Self {
-        ConstantTimeout { timeout: timeout }
+        Constant { timeout: timeout }
     }
 }
 
-impl Default for ConstantTimeout {
+impl Default for Constant {
     fn default() -> Self {
-        ConstantTimeout{ timeout: MAX_TIMEOUT }
+        Constant{ timeout: MAX_TIMEOUT }
     }
 }
 
-impl TimeoutAdjuster for ConstantTimeout {
+impl Adjuster for Constant {
     fn adjust_timeout(&mut self, _: &State, _: View) -> Milliseconds {
         self.timeout
     }
@@ -63,7 +63,7 @@ impl TimeoutAdjuster for ConstantTimeout {
 ///
 /// `target_delta_t =
 ///     DELTA_T_MAX - (DELTA_T_MAX - DELTA_T_MIN) * min(1, block  / (ALPHA * MAX_BLOCK))`
-pub struct DynamicTimeout {
+pub struct MovingAverage {
     min_timeout: Milliseconds,
     max_timeout: Milliseconds,
     adjustment_speed: f64,
@@ -71,16 +71,16 @@ pub struct DynamicTimeout {
     desired_max_block_size: u64,
 }
 
-impl DynamicTimeout {
+impl MovingAverage {
     /// Created `DynamicTimeout` with default values.
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl Default for DynamicTimeout {
+impl Default for MovingAverage {
     fn default() -> Self {
-        DynamicTimeout{
+        MovingAverage{
             min_timeout: MIN_TIMEOUT,
             max_timeout: MAX_TIMEOUT,
             adjustment_speed: 0.7,
@@ -90,7 +90,7 @@ impl Default for DynamicTimeout {
     }
 }
 
-impl TimeoutAdjuster for DynamicTimeout {
+impl Adjuster for MovingAverage {
     fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
         let last_block_size = state.transactions().len() as f64;
 
