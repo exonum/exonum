@@ -124,7 +124,7 @@ impl<S> NodeHandler<S>
                                    last_height,
                                    sender.get_time());
 
-        let timeout = timeout_adjuster.init(&state);
+        let timeout = timeout_adjuster.adjust_timeout(&state);
         state.set_propose_timeout(timeout);
 
         NodeHandler {
