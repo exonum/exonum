@@ -8,6 +8,7 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
              Error as EventsError};
 use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage};
+use self::timeout_adjuster::Adjuster;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 
@@ -47,7 +48,7 @@ pub struct NodeHandler<S>
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    timeout_adjuster: Box<timeout_adjuster::Adjuster>
+    timeout_adjuster: Box<Adjuster>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -85,15 +86,6 @@ impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> Self {
-        let timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
-        Self::with_timeout_adjuster(blockchain, sender, config, timeout_adjuster)
-    }
-
-    pub fn with_timeout_adjuster(blockchain: Blockchain,
-                                 sender: S,
-                                 config: Configuration,
-                                 mut timeout_adjuster: Box<timeout_adjuster::Adjuster>)
-                                 -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block().unwrap();
@@ -123,6 +115,7 @@ impl<S> NodeHandler<S>
                                    last_height,
                                    sender.get_time());
 
+        let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
         let timeout = timeout_adjuster.adjust_timeout(&state, blockchain.view());
         state.set_propose_timeout(timeout);
 
