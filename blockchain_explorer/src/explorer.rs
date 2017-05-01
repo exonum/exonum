@@ -68,7 +68,7 @@ impl<'a> BlockchainExplorer<'a> {
                 }
             };
 
-            let config = schema.get_actual_configuration()?;
+            let config = schema.actual_configuration()?;
             // TODO Find more common solution
             // FIXME this code was copied from state.rs
             let proposer = ((height + block.propose_round() as u64) %

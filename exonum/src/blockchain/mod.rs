@@ -98,7 +98,7 @@ impl Blockchain {
                     let _ = block_hash;
                     return Ok(());
                 }
-                schema.commit_actual_configuration(config_propose)?;
+                schema.commit_configuration(config_propose)?;
             };
             self.merge(&view.changes())?;
             self.create_patch(0, 0, &[], &BTreeMap::new())?.1
@@ -194,7 +194,7 @@ impl Blockchain {
                 schema.precommits(&block_hash).append(precommit.clone())?;
             }
 
-            state.update_config(schema.get_actual_configuration()?);
+            state.update_config(schema.actual_configuration()?);
                         
             let mut node_state = NodeState::new(state, &view);
             for service in self.service_map.values() {
