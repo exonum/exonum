@@ -1,21 +1,27 @@
-# Exonum configuration/[global variables] service &emsp; [![Build Status](https://travis-ci.com/exonum/exonum-configuration.svg?token=ygdqGfZjj1YKhGQQzBzp&branch=master)](https://travis-ci.com/exonum/exonum-configuration) 
-This crate implements functionality of modifying `Exonum` blockchain global configuration via exchanging transactions with 
-- config proposes and 
-- votes for a specific config propose. 
+# Exonum [global variables updater]/configuration service [![Build Status](https://travis-ci.com/exonum/exonum-configuration.svg?token=ygdqGfZjj1YKhGQQzBzp&branch=master)](https://travis-ci.com/exonum/exonum-configuration) 
 
-Configuration is comprised of: 
+This crate implements functionality of modifying `Exonum` blockchain global configuration via 
+exchanging transactions with
 
-1. Consensus algorithm parameters. 
-2. List of validators' public keys. 
-3. Services' configuration. 
+- config proposes and
+- votes for a specific config propose.
 
-## You may be looking for: 
-* [Reference documentation](http://exonum.com/doc/crates/configuration_service/index.html)
-* [Example code](examples/configuration.rs)
-* [Testnet tutorial](doc/testnet_api_tutorial.md)
+Configuration is comprised of:
 
-# Usage
+1. Consensus algorithm parameters.
+1. List of validators' public keys.
+1. Services' configuration.
+
+## You may be looking for
+
+- [Reference documentation](http://exonum.com/doc/crates/configuration_service/index.html)
+- [Example code](examples/configuration.rs)
+- [Testnet tutorial](doc/testnet_api_tutorial.md)
+
+## Usage
+
 See [tutorial](doc/testnet_api_tutorial.md) for details.
 
-# Licence
+## Licence
+
 Configuration service licensed under [Apache License, Version 2.0](LICENSE).
