@@ -8,7 +8,7 @@ use std::time::Duration;
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
                        RequestPrevotes, BitVec, CONSENSUS};
 use exonum::crypto::{Hash, gen_keypair};
-use exonum::blockchain::{Block, Blockchain};
+use exonum::blockchain::{Block, Blockchain, Schema};
 use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
                           REQUEST_TRANSACTIONS_TIMEOUT};
 
@@ -2364,6 +2364,66 @@ fn test_exclude_validator_from_consensus() {
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
 }
 
+// - Check following_configuration method in schema
+/// - idea of the test is check configurations method from schema
+#[test]
+fn test_schema_config_changes() {
+    use exonum::storage::StorageValue;
+
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    add_one_height(&sandbox, &sandbox_state);
+
+    let (tx_cfg, following_cfg) = {
+        let mut consensus_cfg = sandbox.cfg();
+        consensus_cfg.consensus.txs_block_limit = 2000;
+        consensus_cfg.actual_from = sandbox.current_height() + 2;
+
+        let tx = TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
+                               &consensus_cfg.clone().serialize(),
+                               consensus_cfg.actual_from,
+                               &sandbox.s(VALIDATOR_0 as usize));
+        (tx, consensus_cfg)
+    };
+    let prev_cfg = sandbox.cfg();
+
+    // Check configuration from genesis block
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .actual_configuration()
+                   .unwrap(),
+               prev_cfg);
+    // Try to get configuration from non exists height
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .configuration_by_height(HEIGHT_FOUR)
+                   .unwrap(),
+               prev_cfg);
+    // Commit a new configuration
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    // Check that following configuration is visible
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .following_configuration()
+                   .unwrap(),
+               Some(following_cfg.clone()));
+    // Make following configuration actual
+    add_one_height(&sandbox, &sandbox_state);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
+    // Check that following configuration becomes actual
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .actual_configuration()
+                   .unwrap(),
+               following_cfg);
+
+    // Finally check configuration for some heights
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .configuration_by_height(HEIGHT_ZERO)
+                   .unwrap(),
+               prev_cfg);
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .configuration_by_height(sandbox.current_height())
+                   .unwrap(),
+               following_cfg);
+}
 
 // - lock to propose when get +2/3 prevote
 //     - only if propose is known     - covered in request_propose_when_get_prevote()
