@@ -78,11 +78,11 @@ impl<S> NodeHandler<S>
 
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
-
-        let peer = msg.from();
+        trace!("HANDLE STATUS: current height = {}, msg height = {}", height, msg.height());
 
         // Handle message from future height
         if msg.height() > height {
+            let peer = msg.from();
 
             //verify message
             if !msg.verify_signature(peer) {
@@ -102,6 +102,8 @@ impl<S> NodeHandler<S>
 
     pub fn handle_request_peers(&mut self, msg: RequestPeers) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
+        trace!("HANDLE REQUEST PEERS: Sending {:?} peers to {:?}", peers, msg.from());
+
         for peer in peers {
             self.send_to_peer(*msg.from(), peer.raw());
         }
