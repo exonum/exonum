@@ -380,7 +380,7 @@ impl<S> NodeHandler<S>
               block_hash.to_hex(),
               );
 
-        let timeout = self.timeout_adjuster.adjust_timeout(&self.state);
+        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, self.blockchain.view());
         self.state.set_propose_timeout(timeout);
 
         // Add timeout for first round
