@@ -17,10 +17,6 @@ const MAX_TIMEOUT: Milliseconds = 200;
 /// struct Adjuster {}
 ///
 /// impl TimeoutAdjuster for Adjuster {
-///     fn init(&mut self, _: &State) -> Milliseconds {
-///         0
-///     }
-///
 ///     fn adjust_timeout(&mut self, state: &State) -> Milliseconds {
 ///         // Simply increase propose time after empty blocks.
 ///         if state.transactions().is_empty() {
@@ -31,10 +27,8 @@ const MAX_TIMEOUT: Milliseconds = 200;
 ///     }
 /// }
 /// ```
+/// For more examples see `ConstantTimeout` and `DynamicTimeout` implementations.
 pub trait TimeoutAdjuster {
-    /// Called during node initialization.
-    fn init(&mut self, state: &State) -> Milliseconds;
-
     /// Called after accepting a new height.
     fn adjust_timeout(&mut self, state: &State) -> Milliseconds;
 }
@@ -58,10 +52,6 @@ impl Default for ConstantTimeout {
 }
 
 impl TimeoutAdjuster for ConstantTimeout {
-    fn init(&mut self, _: &State) -> Milliseconds {
-        self.timeout
-    }
-
     fn adjust_timeout(&mut self, _: &State) -> Milliseconds {
         self.timeout
     }
@@ -99,10 +89,6 @@ impl Default for DynamicTimeout {
 }
 
 impl TimeoutAdjuster for DynamicTimeout {
-    fn init(&mut self, _: &State) -> Milliseconds {
-        MIN_TIMEOUT
-    }
-
     fn adjust_timeout(&mut self, state: &State) -> Milliseconds {
         let last_block_size = state.transactions().len() as f64;
 
