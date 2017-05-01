@@ -363,7 +363,7 @@ impl State {
             .position(|pk| pk == peer)
             .map(|id| id as ValidatorId)
     }
-    
+
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
     }
@@ -373,13 +373,13 @@ impl State {
     }
 
     pub fn update_config(&mut self, config: StoredConfiguration) {
-        info!("Updating node config={:#?}", config);
+        trace!("Updating node config={:#?}", config);
         let validator_id = config.validators
                             .iter()
                             .position(|pk| pk == self.public_key())
                             .map(|id| id as u32);
         self.renew_validator_id(validator_id);
-        info!("Validator={:#?}", self.validator_state());
+        trace!("Validator={:#?}", self.validator_state());
         self.config = config;
     }
 
@@ -483,8 +483,8 @@ impl State {
         self.locked_propose
     }
 
-    pub fn propose(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
-        self.proposes.get_mut(hash)
+    pub fn propose(&self, hash: &Hash) -> Option<&ProposeState> {
+        self.proposes.get(hash)
     }
 
     pub fn block(&self, hash: &Hash) -> Option<&BlockState> {
