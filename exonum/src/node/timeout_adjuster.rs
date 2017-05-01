@@ -12,7 +12,8 @@ const MAX_TIMEOUT: Milliseconds = 200;
 /// Implementing `Adjuster`:
 ///
 /// ```
-/// use exonum::node::{State, Adjuster};
+/// use exonum::node::State;
+/// use exonum::node::timeout_adjuster::Adjuster;
 /// use exonum::events::Milliseconds;
 /// use exonum::storage::View;
 ///
