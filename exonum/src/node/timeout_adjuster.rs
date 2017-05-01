@@ -1,5 +1,6 @@
 use events::Milliseconds;
 use node::State;
+use storage::View;
 
 const MIN_TIMEOUT: Milliseconds = 50;
 const MAX_TIMEOUT: Milliseconds = 200;
@@ -13,11 +14,12 @@ const MAX_TIMEOUT: Milliseconds = 200;
 /// ```
 /// use exonum::node::{State, TimeoutAdjuster};
 /// use exonum::events::Milliseconds;
+/// use exonum::storage::View;
 ///
 /// struct Adjuster {}
 ///
 /// impl TimeoutAdjuster for Adjuster {
-///     fn adjust_timeout(&mut self, state: &State) -> Milliseconds {
+///     fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
 ///         // Simply increase propose time after empty blocks.
 ///         if state.transactions().is_empty() {
 ///             1000
@@ -30,7 +32,7 @@ const MAX_TIMEOUT: Milliseconds = 200;
 /// For more examples see `ConstantTimeout` and `DynamicTimeout` implementations.
 pub trait TimeoutAdjuster {
     /// Called after accepting a new height.
-    fn adjust_timeout(&mut self, state: &State) -> Milliseconds;
+    fn adjust_timeout(&mut self, state: &State, view: View) -> Milliseconds;
 }
 
 /// `TimeoutAdjuster` implementation that always returns the same value.
@@ -52,7 +54,7 @@ impl Default for ConstantTimeout {
 }
 
 impl TimeoutAdjuster for ConstantTimeout {
-    fn adjust_timeout(&mut self, _: &State) -> Milliseconds {
+    fn adjust_timeout(&mut self, _: &State, _: View) -> Milliseconds {
         self.timeout
     }
 }
@@ -89,7 +91,7 @@ impl Default for DynamicTimeout {
 }
 
 impl TimeoutAdjuster for DynamicTimeout {
-    fn adjust_timeout(&mut self, state: &State) -> Milliseconds {
+    fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
         let last_block_size = state.transactions().len() as f64;
 
         // min(1, block  / (ALPHA * MAX_BLOCK))
