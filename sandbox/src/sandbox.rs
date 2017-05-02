@@ -12,8 +12,7 @@ use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof,
-                       STATUS_MESSAGE_ID};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
@@ -218,23 +217,6 @@ impl Sandbox {
             .map(gen_primitive_socket_addr)
             .collect::<Vec<_>>();
         self.validators_map.extend(validators);
-    }
-
-    pub fn check_status_message(&self) {
-        if let Some((_, msg)) = self.inner.lock().unwrap().sent.pop_front() {
-            if msg.message_type() != STATUS_MESSAGE_ID {
-                let any_msg = Any::from_raw(msg).expect("Send incorrect message");
-                panic!("Expected to send Status message, but send {:?}", any_msg);
-            }
-        } else {
-            panic!("Expected to send `Status` message");
-        }
-    }
-
-    pub fn check_broadcast_status_message(&self) {
-        for _ in 1..self.n_validators() {
-            self.check_status_message();
-        }
     }
 
     fn check_unexpected_message(&self) {

@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
-                       RequestPrevotes, BitVec};
+                       RequestPrevotes, Status, BitVec};
 use exonum::blockchain::Block;
 use exonum::crypto::{Hash, HASH_SIZE, hash};
 use exonum::events::Milliseconds;
@@ -369,11 +369,15 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                 }
             }
 
-            sandbox.assert_state(initial_height + 1, ROUND_ONE);
+            let new_height = initial_height + 1;
+            sandbox.assert_state(new_height, ROUND_ONE);
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             }
-            sandbox.check_broadcast_status_message();
+            sandbox.broadcast(Status::new(&sandbox.p(VALIDATOR_0 as usize),
+                                          new_height,
+                                          &block.hash(),
+                                          &sandbox.s(VALIDATOR_0 as usize)));
 
             return;
         }
@@ -458,9 +462,12 @@ pub fn add_one_height_with_transactions_from_other_validator(sandbox: &Timestamp
                                             sandbox.s(val_idx)));
             }
 
-            sandbox.assert_state(initial_height + 1, ROUND_ONE);
-            sandbox.check_broadcast_status_message();
-            sandbox.check_status_message();
+            let new_height = initial_height + 1;
+            sandbox.assert_state(new_height, ROUND_ONE);
+            sandbox.broadcast(Status::new(&sandbox.p(VALIDATOR_0 as usize),
+                                          new_height,
+                                          &block.hash(),
+                                          &sandbox.s(VALIDATOR_0 as usize)));
 
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
