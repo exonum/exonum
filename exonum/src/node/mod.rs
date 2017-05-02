@@ -128,6 +128,10 @@ impl<S> NodeHandler<S>
         }
     }
 
+    fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
+        self.timeout_adjuster = adjuster;
+    }
+
     pub fn propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().propose_timeout
     }
