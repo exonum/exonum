@@ -128,7 +128,7 @@ impl<S> NodeHandler<S>
         }
     }
 
-    fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
+    pub fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
         self.timeout_adjuster = adjuster;
     }
 
