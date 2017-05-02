@@ -8,7 +8,7 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
              Error as EventsError};
 use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage};
-use self::timeout_adjuster::Adjuster;
+use self::timeout_adjuster::TimeoutAdjuster;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 
@@ -48,7 +48,7 @@ pub struct NodeHandler<S>
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    timeout_adjuster: Box<Adjuster>
+    timeout_adjuster: Box<TimeoutAdjuster>
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
