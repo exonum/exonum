@@ -5,21 +5,21 @@ use storage::View;
 const MIN_TIMEOUT: Milliseconds = 50;
 const MAX_TIMEOUT: Milliseconds = 200;
 
-/// `Adjuster` trait can be used to dynamically change propose timeout.
+/// `TimeoutAdjuster` trait can be used to dynamically change propose timeout.
 ///
 /// # Examples
 ///
-/// Implementing `Adjuster`:
+/// Implementing `TimeoutAdjuster`:
 ///
 /// ```
 /// use exonum::node::State;
-/// use exonum::node::timeout_adjuster::Adjuster;
+/// use exonum::node::timeout_adjuster::TimeoutAdjuster;
 /// use exonum::events::Milliseconds;
 /// use exonum::storage::View;
 ///
 /// struct CustomAdjuster {}
 ///
-/// impl Adjuster for CustomAdjuster {
+/// impl TimeoutAdjuster for CustomAdjuster {
 ///     fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
 ///         // Simply increase propose time after empty blocks.
 ///         if state.transactions().is_empty() {
@@ -31,7 +31,7 @@ const MAX_TIMEOUT: Milliseconds = 200;
 /// }
 /// ```
 /// For more examples see `Constant` and `MovingAverage` implementations.
-pub trait Adjuster {
+pub trait TimeoutAdjuster {
     /// Called during node initialization and after accepting a new height.
     fn adjust_timeout(&mut self, state: &State, view: View) -> Milliseconds;
 }
@@ -54,7 +54,7 @@ impl Default for Constant {
     }
 }
 
-impl Adjuster for Constant {
+impl TimeoutAdjuster for Constant {
     fn adjust_timeout(&mut self, _: &State, _: View) -> Milliseconds {
         self.timeout
     }
@@ -91,7 +91,7 @@ impl Default for MovingAverage {
     }
 }
 
-impl Adjuster for MovingAverage {
+impl TimeoutAdjuster for MovingAverage {
     fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
         let last_block_size = state.transactions().len() as f64;
 
