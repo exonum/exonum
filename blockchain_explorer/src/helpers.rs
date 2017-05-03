@@ -161,8 +161,8 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 
         let source_path;
         let verbose_src_path;
-        if env::var("EXONUM_SRC_PATH").is_ok() {
-            let param_parse = env::var("EXONUM_SRC_PATH").unwrap().parse::<bool>();
+        if env::var("LOG_VERBOSE_SRC_FILE_LINE").is_ok() {
+            let param_parse = env::var("LOG_VERBOSE_SRC_FILE_LINE").unwrap().parse::<bool>();
             if let Ok(flag) = param_parse {
                 verbose_src_path = flag;
             } else {
