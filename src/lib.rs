@@ -673,17 +673,6 @@ impl Service for ConfigurationService {
     }
 
     fn handle_commit(&self, state: &mut NodeState) -> StorageResult<()> {
-        let old_cfg = state.actual_config().clone();
-
-        let new_cfg = {
-            let schema = Schema::new(state.view());
-            schema.get_actual_configuration()?
-        };
-
-        if new_cfg != old_cfg {
-            info!("Updated node config={:#?}", new_cfg);
-            state.update_config(new_cfg);
-        }
         Ok(())
     }
 }
