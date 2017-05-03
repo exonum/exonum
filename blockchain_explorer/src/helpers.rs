@@ -160,20 +160,10 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
         let line = record.location().line();
 
         let source_path;
-        let verbose_src_path;
-        if env::var("LOG_VERBOSE_SRC_FILE_LINE").is_ok() {
-            let param_parse = env::var("LOG_VERBOSE_SRC_FILE_LINE")
-                .unwrap()
-                .parse::<bool>();
-            if let Ok(flag) = param_parse {
-                verbose_src_path = flag;
-            } else {
-                verbose_src_path = false;
-            }
-        } else {
-            verbose_src_path = false;
-        }
-
+        let verbose_src_path = match env::var("LOG_VERBOSE_SRC_FILE_LINE") {
+            Ok(val) => val.parse::<bool>().unwrap_or(false),
+            Err(_) => false,
+        };
         if verbose_src_path {
             source_path = format!("{}:{}:{}", module, file, line);
         } else {
