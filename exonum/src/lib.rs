@@ -44,3 +44,6 @@ pub mod node;
 pub mod storage;
 pub mod blockchain;
 pub mod config;
+
+// TODO: temp module
+pub mod storage2;
