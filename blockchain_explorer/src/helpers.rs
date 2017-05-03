@@ -152,7 +152,31 @@ fn has_colors() -> bool {
 pub fn init_logger() -> Result<(), SetLoggerError> {
     let format = |record: &LogRecord| {
         let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let now = (ts.as_secs() * 1000 + ts.subsec_nanos() as u64 / 1000000).to_string();
+        let secs = ts.as_secs().to_string();
+        let millis = (ts.subsec_nanos() as u64 / 1000000).to_string();
+
+        let module = record.location().module_path();
+        let file = record.location().file();
+        let line = record.location().line();
+
+        let source_path;
+        let verbose_src_path;
+        if env::var("EXONUM_SRC_PATH").is_ok() {
+            let param_parse = env::var("EXONUM_SRC_PATH").unwrap().parse::<bool>();
+            if let Ok(flag) = param_parse {
+                verbose_src_path = flag;
+            } else {
+                verbose_src_path = false;
+            }
+        } else {
+            verbose_src_path = false;
+        }
+
+        if verbose_src_path {
+            source_path = format!("{}:{}:{}", module, file, line);
+        } else {
+            source_path = format!("{}", module);
+        }
 
         if has_colors() {
             let level = match record.level() {
@@ -162,7 +186,12 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
                 LogLevel::Debug => "DEBUG".cyan(),
                 LogLevel::Trace => "TRACE".white(),
             };
-            format!("{} - [ {} ] - {}", now.bold(), level, record.args())
+            format!("[{} : {}] - [ {} ] - {} - {}",
+                    secs.bold(),
+                    millis.bold(),
+                    level,
+                    &source_path,
+                    record.args())
         } else {
             let level = match record.level() {
                 LogLevel::Error => "ERROR",
@@ -171,7 +200,12 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
                 LogLevel::Debug => "DEBUG",
                 LogLevel::Trace => "TRACE",
             };
-            format!("{} - [ {} ] - {}", now, level, record.args())
+            format!("[{} : {}] - [ {} ] - {} - {}",
+                    secs,
+                    millis,
+                    level,
+                    &source_path,
+                    record.args())
         }
     };
 
