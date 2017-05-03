@@ -4,12 +4,12 @@
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
                RequestBlock, Block};
 use blockchain::Schema;
-use storage::{Map, List};
+use storage::Map;
 use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
-// TODO validate_heights нужно обновлять по любым сообщениям, а не только по status (если они корректно подписаны)
-// TODO propose имеет смысл запрашивать только тогда, когда мы знаем, что узел находится на нашей высоте
+// TODO: height should be updated after any message, not only after status (if signature is correct).
+// TODO: Request propose makes sense only if we know that node is on our height.
 
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
@@ -99,7 +99,7 @@ impl<S> NodeHandler<S>
         let schema = Schema::new(&view);
 
         let height = msg.height();
-        let block_hash = schema.heights().get(height).unwrap().unwrap();
+        let block_hash = schema.block_hash_by_height(height).unwrap().unwrap();
 
         let block = schema.blocks().get(&block_hash).unwrap().unwrap();
         let precommits = schema.precommits(&block_hash)

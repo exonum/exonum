@@ -64,7 +64,7 @@ impl Blockchain {
 
     pub fn last_hash(&self) -> Result<Hash, Error> {
         Ok(Schema::new(&self.view())
-            .heights()
+            .block_hashes_by_height()
             .last()?
             .unwrap_or_else(Hash::default))
     }
@@ -92,7 +92,7 @@ impl Blockchain {
             // Commit actual configuration
             {
                 let schema = Schema::new(&view);
-                if let Some(block_hash) = schema.heights().get(0)? {
+                if let Some(block_hash) = schema.block_hash_by_height(0)? {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
                     // panic!("Genesis block is already created");
                     let _ = block_hash;
@@ -167,7 +167,7 @@ impl Blockchain {
         let block_hash = block.hash();
         // Update height
         // TODO: check that height == propose.height
-        schema.heights().append(block_hash).is_ok();
+        schema.block_hashes_by_height().append(block_hash).is_ok();
         // Save block
         schema.blocks().put(&block_hash, block).is_ok();
         Ok((block_hash, fork.changes()))
