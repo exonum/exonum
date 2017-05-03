@@ -12,7 +12,7 @@ use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
@@ -182,6 +182,14 @@ impl SandboxReactor {
     pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
         self.handler.handle_timeout(timeout);
     }
+
+    pub fn public_key(&self) -> &PublicKey {
+        self.handler.state().public_key()
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        self.handler.state().secret_key()
+    }
 }
 
 pub struct Sandbox {
@@ -318,6 +326,13 @@ impl Sandbox {
                        set);
             }
         }
+    }
+
+    pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
+        self.broadcast(Status::new(&self.node_public_key(),
+                                   height,
+                                   block_hash,
+                                   &self.node_secret_key()));
     }
 
     pub fn add_time(&self, duration: Duration) {
@@ -537,6 +552,16 @@ impl Sandbox {
                 "Incorrect hash, actual={:?}, expected={:?}",
                 actual_hash,
                 hash);
+    }
+
+    fn node_public_key(&self) -> PublicKey {
+        let reactor = self.reactor.borrow();
+        *reactor.public_key()
+    }
+
+    fn node_secret_key(&self) -> SecretKey {
+        let reactor = self.reactor.borrow();
+        reactor.secret_key().clone()
     }
 }
 
