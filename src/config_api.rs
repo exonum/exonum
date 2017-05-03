@@ -53,7 +53,7 @@ pub struct PublicConfigApi {
 
 impl PublicConfigApi {
     fn get_actual_config(&self) -> Result<ApiResponseConfigHashInfo, ApiError> {
-        let actual_cfg = Schema::new(&self.blockchain.view()).get_actual_configuration()?;
+        let actual_cfg = Schema::new(&self.blockchain.view()).actual_configuration()?;
         let res = ApiResponseConfigHashInfo {
             hash: actual_cfg.hash(),
             config: actual_cfg,
@@ -62,7 +62,7 @@ impl PublicConfigApi {
     }
 
     fn get_following_config(&self) -> Result<Option<ApiResponseConfigHashInfo>, ApiError> {
-        let following_cfg = Schema::new(&self.blockchain.view()).get_following_configuration()?;
+        let following_cfg = Schema::new(&self.blockchain.view()).following_configuration()?;
         let res = following_cfg.map(|cfg| {
             ApiResponseConfigHashInfo {
                 hash: cfg.hash(),
