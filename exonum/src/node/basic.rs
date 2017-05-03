@@ -18,7 +18,6 @@ impl<S> NodeHandler<S>
         //         return;
         //     }
         
-        //FIXME: add whitelist verify public_key
         
         let msg = Any::from_raw(raw).unwrap();
         match msg {
@@ -49,6 +48,11 @@ impl<S> NodeHandler<S>
         // TODO add spam protection
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
+            return;
+        }
+
+        if !self.state.whitelist().contains(message.pub_key()) {
+            error!("Received connect message from peer = {:?} which not in whitelist.", message.pub_key());
             return;
         }
         // Check if we have another connect message from peer with the given public_key

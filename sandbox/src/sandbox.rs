@@ -599,6 +599,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
             address: addresses[0],
             public_key: validators[0].0,
             secret_key: validators[0].1.clone(),
+            whitelist: Default::default()
         },
         network: NetworkConfiguration::default(),
         events: EventsConfiguration::new(),
