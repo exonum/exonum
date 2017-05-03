@@ -162,7 +162,9 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
         let source_path;
         let verbose_src_path;
         if env::var("LOG_VERBOSE_SRC_FILE_LINE").is_ok() {
-            let param_parse = env::var("LOG_VERBOSE_SRC_FILE_LINE").unwrap().parse::<bool>();
+            let param_parse = env::var("LOG_VERBOSE_SRC_FILE_LINE")
+                .unwrap()
+                .parse::<bool>();
             if let Ok(flag) = param_parse {
                 verbose_src_path = flag;
             } else {
