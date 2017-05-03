@@ -30,7 +30,7 @@ pub trait Snapshot {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
 }
 
-impl Fork {
+impl Snapshot for Fork {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         match self.changes.get(key) {
             Some(change) => Ok(match *change {
@@ -40,12 +40,14 @@ impl Fork {
             None => self.snapshot.get(key)
         }
     }
+}
 
-    fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
+impl Fork {
+    pub fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
         self.changes.insert(key, Change::Put(value));
     }
 
-    fn delete(&mut self, key: Vec<u8>) {
+    pub fn delete(&mut self, key: Vec<u8>) {
         self.changes.insert(key, Change::Delete);
     }
 

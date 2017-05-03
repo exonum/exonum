@@ -1,7 +1,7 @@
 use std::clone::Clone;
 use std::collections::BTreeMap;
 
-use super::{Map, Database, Snapshot, Result, Patch, Change, Fork};
+use super::{Database, Snapshot, Result, Patch, Change, Fork};
 
 #[derive(Default, Clone)]
 pub struct MemoryDB {

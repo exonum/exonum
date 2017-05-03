@@ -3,15 +3,13 @@ use ::crypto::{Hash, PublicKey};
 
 
 pub trait StorageKey {
-    fn size(&self) -> usize;
+    fn size() -> usize;
     fn write(&self, buffer: &mut Vec<u8>);
     fn read(buffer: &[u8]) -> Self;
 }
 
-pub struct VoidKey;
-
-impl StorageKey for VoidKey {
-    fn size(&self) -> usize {
+impl StorageKey for () {
+    fn size() -> usize {
         0
     }
 
@@ -20,12 +18,12 @@ impl StorageKey for VoidKey {
     }
 
     fn read(_buffer: &[u8]) -> Self {
-        VoidKey
+        ()
     }
 }
 
 impl StorageKey for u8 {
-    fn size(&self) -> usize {
+    fn size() -> usize {
         1
     }
 
@@ -39,7 +37,7 @@ impl StorageKey for u8 {
 }
 
 impl StorageKey for u16 {
-    fn size(&self) -> usize {
+    fn size() -> usize {
         2
     }
 
@@ -53,7 +51,7 @@ impl StorageKey for u16 {
 }
 
 impl StorageKey for u32 {
-    fn size(&self) -> usize {
+    fn size() -> usize {
         4
     }
 
@@ -67,7 +65,7 @@ impl StorageKey for u32 {
 }
 
 impl StorageKey for u64 {
-    fn size(&self) -> usize {
+    fn size() -> usize {
         8
     }
 
@@ -80,8 +78,64 @@ impl StorageKey for u64 {
     }
 }
 
+// impl StorageKey for i8 {
+//     fn size() -> usize {
+//         1
+//     }
+
+//     fn write(&self, buffer: &mut Vec<u8>) {
+//         buffer[0] = *self
+//     }
+
+//     fn read(buffer: &[u8]) -> Self {
+//         buffer[0]
+//     }
+// }
+
+impl StorageKey for i16 {
+    fn size() -> usize {
+        2
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>) {
+        buffer.write_i16::<BigEndian>(*self).unwrap()
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        BigEndian::read_i16(buffer)
+    }
+}
+
+impl StorageKey for i32 {
+    fn size() -> usize {
+        4
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>) {
+        buffer.write_i32::<BigEndian>(*self).unwrap()
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        BigEndian::read_i32(buffer)
+    }
+}
+
+impl StorageKey for i64 {
+    fn size() -> usize {
+        8
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>) {
+        buffer.write_i64::<BigEndian>(*self).unwrap()
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        BigEndian::read_i64(buffer)
+    }
+}
+
 impl StorageKey for Hash {
-    fn size(&self) -> usize {
+    fn size() -> usize {
         32
     }
 
@@ -95,7 +149,7 @@ impl StorageKey for Hash {
 }
 
 impl StorageKey for PublicKey {
-    fn size(&self) -> usize {
+    fn size() -> usize {
         32
     }
 
@@ -105,21 +159,5 @@ impl StorageKey for PublicKey {
 
     fn read(buffer: &[u8]) -> Self {
         PublicKey::from_slice(buffer).unwrap()
-    }
-}
-
-
-// FIXME: dirty hack for special for patricia merkle tree db keys, need to remove this implementation
-impl StorageKey for Vec<u8> {
-    fn size(&self) -> usize {
-        self.len()
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>) {
-        buffer.extend_from_slice(self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        buffer.to_vec()
     }
 }
