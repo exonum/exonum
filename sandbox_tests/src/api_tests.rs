@@ -31,12 +31,16 @@ use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi,
                                         ApiResponseVotePost};
 
 use blockchain_explorer::api::Api;
-use blockchain_explorer::helpers::init_logger;
+#[allow(unused_imports)]
+use blockchain_explorer::helpers;
 
 use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 use super::generate_config_with_message;
 
+fn init_logger() {
+    //let _ = helpers::init_logger();
+}
 fn response_body(response: Response) -> serde_json::Value {
     if let Some(mut body) = response.body {
         let mut buf = Vec::new();
