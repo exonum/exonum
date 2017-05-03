@@ -1,7 +1,7 @@
 use rand::{Rng, XorShiftRng, SeedableRng};
 
 use exonum::messages::{FromRaw, Message, RawTransaction, Error as MessageError};
-use exonum::crypto::{PublicKey, SecretKey, gen_keypair, Hash};
+use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
 use exonum::storage::{Error, View as StorageView};
 use exonum::blockchain::{Service, Transaction};
 

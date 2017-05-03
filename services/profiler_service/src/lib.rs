@@ -2,7 +2,6 @@
 extern crate exonum;
 #[macro_use]
 extern crate log;
-
 extern crate profiler;
 
 use std::env;
@@ -13,7 +12,6 @@ use exonum::blockchain::{Service, Transaction};
 
 pub const PROFILER_SERVICE: u16 = 7001;
 pub const PROFILER_TRANSACTION_MESSAGE_ID: u16 = 7002;
-
 
 const PROFILE_ENV_VARIABLE_NAME: &'static str = "PROFILE_FILENAME";
 

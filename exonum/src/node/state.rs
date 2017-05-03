@@ -16,10 +16,10 @@ const TX_POOL_LIMIT: usize = 20000;
 
 // TODO: move request timeouts into node configuration
 
-pub const REQUEST_PROPOSE_WAIT: Milliseconds = 100;
-pub const REQUEST_TRANSACTIONS_WAIT: Milliseconds = 100;
-pub const REQUEST_PREVOTES_WAIT: Milliseconds = 100;
-pub const REQUEST_BLOCK_WAIT: Milliseconds = 100;
+pub const REQUEST_PROPOSE_TIMEOUT: Milliseconds = 100;
+pub const REQUEST_TRANSACTIONS_TIMEOUT: Milliseconds = 100;
+pub const REQUEST_PREVOTES_TIMEOUT: Milliseconds = 100;
+pub const REQUEST_BLOCK_TIMEOUT: Milliseconds = 100;
 
 pub type Round = u32;
 pub type Height = u64;
@@ -60,10 +60,10 @@ pub struct State {
     unknown_txs: HashMap<Hash, Vec<Hash>>,
     unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
 
-    // Информация о состоянии наших запросов
+    // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    //maximum of node heigt in consensus messages
+    // maximum of node heigt in consensus messages
     nodes_max_height: BTreeMap<PublicKey, Height>,
 }
 
@@ -74,8 +74,7 @@ pub struct ValidatorState {
     our_precommits: HashMap<Round, Precommit>,
 }
 
-// Данные, которые нас интересуют,
-// специфичны для некоторой высоты
+// Required data specific for some height.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RequestData {
     Propose(Hash),
@@ -84,33 +83,26 @@ pub enum RequestData {
     Block(Height),
 }
 
-// Состояние запроса
 struct RequestState {
-    // К-во попыток, которые уже произошли
+    // Number of attempts made.
     retries: u16,
-    // Узлы, которые имеют интересующую нас информацию
+    // Nodes that have the required information.
     known_nodes: HashSet<PublicKey>,
 }
 
 pub struct ProposeState {
-    /// Хеш предложения
     hash: Hash,
-    // Тело предложения
     propose: Propose,
-    // Множество неизвестных транзакций из этого предложения
     // FIXME: use HashSet here
     unknown_txs: BTreeSet<Hash>,
 }
 
 #[derive(Clone)]
 pub struct BlockState {
-    // Хэш блока
     hash: Hash,
-    // Набор изменений, которые нужно внести в состояние для применения блока
+    // Changes that should be made for block committing.
     patch: Patch,
-    // Хэши транзакций, закомиченных в этот блок
     txs: Vec<Hash>,
-    // Раунд на котором был создан Propose
     propose_round: Round,
 }
 
@@ -202,10 +194,10 @@ impl RequestData {
     pub fn timeout(&self) -> Duration {
         #![cfg_attr(feature="clippy", allow(match_same_arms))]
         let ms = match *self {
-            RequestData::Propose(..) => REQUEST_PROPOSE_WAIT,
-            RequestData::Transactions(..) => REQUEST_TRANSACTIONS_WAIT,
-            RequestData::Prevotes(..) => REQUEST_PREVOTES_WAIT,
-            RequestData::Block(..) => REQUEST_BLOCK_WAIT,
+            RequestData::Propose(..) => REQUEST_PROPOSE_TIMEOUT,
+            RequestData::Transactions(..) => REQUEST_TRANSACTIONS_TIMEOUT,
+            RequestData::Prevotes(..) => REQUEST_PREVOTES_TIMEOUT,
+            RequestData::Block(..) => REQUEST_BLOCK_TIMEOUT,
         };
         Duration::from_millis(ms)
     }
@@ -371,7 +363,7 @@ impl State {
             .position(|pk| pk == peer)
             .map(|id| id as ValidatorId)
     }
-    
+
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
     }
@@ -381,13 +373,13 @@ impl State {
     }
 
     pub fn update_config(&mut self, config: StoredConfiguration) {
-        info!("Updating node config={:#?}", config);
+        trace!("Updating node config={:#?}", config);
         let validator_id = config.validators
                             .iter()
                             .position(|pk| pk == self.public_key())
                             .map(|id| id as u32);
         self.renew_validator_id(validator_id);
-        info!("Validator={:#?}", self.validator_state());
+        trace!("Validator={:#?}", self.validator_state());
         self.config = config;
     }
 
@@ -491,8 +483,8 @@ impl State {
         self.locked_propose
     }
 
-    pub fn propose(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
-        self.proposes.get_mut(hash)
+    pub fn propose(&self, hash: &Hash) -> Option<&ProposeState> {
+        self.proposes.get(hash)
     }
 
     pub fn block(&self, hash: &Hash) -> Option<&BlockState> {
