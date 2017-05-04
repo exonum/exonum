@@ -47,6 +47,7 @@ impl From<io::Error> for Error {
 }
 
 impl LevelDB {
+    // TODO: configurate LRU cache
     pub fn open(path: &Path, options: Options) -> Result<LevelDB> {
         if options.create_if_missing {
             fs::create_dir_all(path)?;
