@@ -6,7 +6,7 @@ extern crate log;
 use std::time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
-                       RequestPrevotes, BitVec, Status, CONSENSUS};
+                       RequestPrevotes, BitVec, CONSENSUS};
 use exonum::crypto::{Hash, gen_keypair};
 use exonum::blockchain::{Block, Blockchain};
 use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
