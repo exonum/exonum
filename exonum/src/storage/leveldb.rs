@@ -237,13 +237,13 @@ pub struct LevelDBIterator<'a> {
     changes: Range<'a, Vec<u8>, Change>
 }
 
-impl<'a> Iterator for LevelDBIterator<'a> {
-    type Item = (&'a[u8], Vec<u8>);
+// impl<'a> Iterator for LevelDBIterator<'a> {
+//     type Item = (&'a[u8], Vec<u8>);
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.db.next()
-    }
-}
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.db.next()
+//     }
+// }
 
 
 // pub struct LevelDBKeys<'a> {

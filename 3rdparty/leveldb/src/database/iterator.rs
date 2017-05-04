@@ -119,11 +119,11 @@ pub trait LevelDBIterator<'a> {
         }
     }
 
-    fn value(&self) -> Vec<u8> {
+    fn value(&self) -> &'a [u8] {
         unsafe {
             let length: size_t = 0;
             let value = leveldb_iter_value(self.raw_iterator(), &length) as *const u8;
-            from_raw_parts(value, length as usize).to_vec()
+            from_raw_parts(value, length as usize)
         }
     }
 
@@ -161,7 +161,7 @@ impl<'a> Iterator<'a> {
     }
 
     /// return the last element of the iterator
-    pub fn last(self) -> Option<(&'a [u8], Vec<u8>)> {
+    pub fn last(self) -> Option<(&'a [u8], &'a [u8])> {
         self.seek_to_last();
         Some((self.key(), self.value()))
     }
@@ -239,7 +239,7 @@ impl<'a> ValueIterator<'a> {
     }
 
     /// return the last element of the iterator
-    pub fn last(self) -> Option<Vec<u8>> {
+    pub fn last(self) -> Option<&'a [u8]> {
         self.seek_to_last();
         Some(self.value())
     }
@@ -263,7 +263,7 @@ impl<'a> LevelDBIterator<'a> for ValueIterator<'a> {
 }
 
 impl<'a> iter::Iterator for Iterator<'a> {
-    type Item = (&'a [u8], Vec<u8>);
+    type Item = (&'a [u8], &'a [u8]);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.advance() {
@@ -287,9 +287,9 @@ impl<'a> iter::Iterator for KeyIterator<'a> {
 }
 
 impl<'a> iter::Iterator for ValueIterator<'a> {
-    type Item = Vec<u8>;
+    type Item = &'a [u8];
 
-    fn next(&mut self) -> Option<Vec<u8>> {
+    fn next(&mut self) -> Option<Self::Item> {
         if self.advance() {
             Some(self.value())
         } else {
