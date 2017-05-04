@@ -1,4 +1,4 @@
-use super::{Error, StorageKey, StorageValue, Snapshot, Fork};
+use super::{Result, StorageKey, StorageValue, Snapshot, Fork};
 
 pub struct BaseIndex<T> {
     prefix: Vec<u8>,
@@ -22,9 +22,13 @@ impl<T> BaseIndex<T> {
 }
 
 impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
-    pub fn get<K, V>(&self, key: &K) -> Result<Option<V>, Error> where K: StorageKey,
-                                                                       V: StorageValue {
+    pub fn get<K, V>(&self, key: &K) -> Result<Option<V>> where K: StorageKey,
+                                                                V: StorageValue {
         Ok(self.view.as_ref().get(&self.prefixed_key(key))?.map(StorageValue::deserialize))
+    }
+
+    pub fn contains<K>(&self, key: &K) -> Result<bool> where K: StorageKey {
+        self.view.as_ref().contains(&self.prefixed_key(key))
     }
 }
 
