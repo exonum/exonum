@@ -150,6 +150,11 @@ fn has_colors() -> bool {
 }
 
 pub fn init_logger() -> Result<(), SetLoggerError> {
+    // Don't initialize the logger if the corresponding variable is set to `true`.
+    if env::var("EXONUM_SUPPRESS_LOGS").unwrap_or(String::new()).parse().unwrap_or(false) {
+        return Ok(());
+    }
+
     let format = |record: &LogRecord| {
         let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         let now = (ts.as_secs() * 1000 + ts.subsec_nanos() as u64 / 1000000).to_string();
