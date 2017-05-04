@@ -2,7 +2,7 @@ use ::crypto::{Hash, HASH_SIZE, hash};
 
 
 pub use self::error::Error;
-pub use self::db::{Database, Snapshot, Fork, Patch, Change};
+pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iter};
 pub use self::leveldb::LevelDB;
 pub use self::memorydb::MemoryDB;
 

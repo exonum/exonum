@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use super::Result;
 
 pub type Patch = BTreeMap<Vec<u8>, Change>;
-pub type Iter<'a> = Box<Iterator<Item=(&'a [u8], &'a [u8])>>;
+pub type Iter<'a> = Box<Iterator<Item=(&'a [u8], &'a [u8])> + 'a>;
 
 #[derive(Clone)]
 pub enum Change {
@@ -32,7 +32,7 @@ pub trait Snapshot {
     fn contains(&self, key: &[u8]) -> Result<bool> {
         Ok(self.get(key)?.is_some())
     }
-    // fn iter(&self, from: Option<&[u8]>) -> Iter;
+    fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a>;
 }
 
 impl Snapshot for Fork {
@@ -56,10 +56,10 @@ impl Snapshot for Fork {
         })
     }
 
-    // fn iter(&self, from: Option<&[u8]>) -> Iter {
-    //     // FIXME: implement ForkIter
-    //     self.snapshot.iter(from)
-    // }
+    fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a> {
+        // FIXME: implement ForkIter
+        self.snapshot.iter(from)
+    }
 }
 
 impl Fork {

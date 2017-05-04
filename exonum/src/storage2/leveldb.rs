@@ -1,4 +1,5 @@
 use leveldb::database::Database as LevelDatabase;
+use leveldb::iterator::{Iterator, LevelDBIterator, Iterable};
 use leveldb::error::Error as LevelDBError;
 use leveldb::database::snapshots::Snapshot as LevelSnapshot;
 use leveldb::options::{Options, WriteOptions, ReadOptions};
@@ -14,7 +15,7 @@ use std::error;
 use std::sync::Arc;
 
 
-use super::{Database, Snapshot, Error, Result, Patch, Change};
+use super::{Database, Iter, Snapshot, Error, Result, Patch, Change};
 
 const LEVELDB_READ_OPTIONS: ReadOptions<'static> = ReadOptions {
     verify_checksums: false,
@@ -80,5 +81,13 @@ impl Database for LevelDB {
 impl Snapshot for LevelDBSnapshot {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         self.snapshot.get(LEVELDB_READ_OPTIONS, key).map_err(Into::into)
+    }
+
+    fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a> {
+        let iter = self.snapshot.iter(LEVELDB_READ_OPTIONS);
+        if let Some(seek) = from {
+            iter.seek(seek)
+        }
+        Box::new(iter)
     }
 }

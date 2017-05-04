@@ -76,15 +76,15 @@ impl LevelDBView {
         }
     }
 
-    fn iter(&self) -> LevelDBIterator {
-        LevelDBIterator {
-            db: self.snap.iter(LEVELDB_READ_OPTIONS),
-            // FIXME: remove this bullshit!
-            changes: unsafe {
-                self.changes.as_ptr().as_ref().unwrap().range::<Vec<u8>, Vec<u8>>(Unbounded, Unbounded)
-            }
-        }
-    }
+    // fn iter(&self) -> LevelDBIterator {
+    //     LevelDBIterator {
+    //         db: self.snap.iter(LEVELDB_READ_OPTIONS),
+    //         // FIXME: remove this bullshit!
+    //         changes: unsafe {
+    //             self.changes.as_ptr().as_ref().unwrap().range::<Vec<u8>, Vec<u8>>(Unbounded, Unbounded)
+    //         }
+    //     }
+    // }
 }
 
 // FIXME: remove this implementation
@@ -107,13 +107,14 @@ impl Map<[u8], Vec<u8>> for LevelDB {
         result.map_err(Into::into)
     }
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        let it = self.db.keys_iter(LEVELDB_READ_OPTIONS);
-        it.seek(key);
-        if it.valid() {
-            let key = it.key();
-            return Ok(Some(key.to_vec()));
-        }
-        Ok(None)
+        unimplemented!()
+        // let it = self.db.keys_iter(LEVELDB_READ_OPTIONS);
+        // it.seek(key);
+        // if it.valid() {
+        //     let key = it.key();
+        //     return Ok(Some(key.to_vec()));
+        // }
+        // Ok(None)
     }
 }
 
@@ -149,48 +150,49 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
     }
 
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
-        // TODO merge with the same function in memorydb
-        let map_changes = self.changes.borrow();
-        let mut it_changes = map_changes.range::<[u8], [u8]>(Included(key), Unbounded);
-        let mut it_snapshot = self.snap.keys_iter(LEVELDB_READ_OPTIONS);
+        unimplemented!()
+        // // TODO merge with the same function in memorydb
+        // let map_changes = self.changes.borrow();
+        // let mut it_changes = map_changes.range::<[u8], [u8]>(Included(key), Unbounded);
+        // let mut it_snapshot = self.snap.keys_iter(LEVELDB_READ_OPTIONS);
 
-        let res: Option<Vec<u8>>;
-        let least_put_key: Option<Vec<u8>> = it_changes.find(|entry| {
-                match *entry.1 {
-                    Change::Delete => false,
-                    Change::Put(_) => true,
-                }
-            })
-            .map(|x| x.0.to_vec());
+        // let res: Option<Vec<u8>>;
+        // let least_put_key: Option<Vec<u8>> = it_changes.find(|entry| {
+        //         match *entry.1 {
+        //             Change::Delete => false,
+        //             Change::Put(_) => true,
+        //         }
+        //     })
+        //     .map(|x| x.0.to_vec());
 
-        loop {
-            let first_snapshot: Option<&[u8]> = it_snapshot.next();
-            match first_snapshot {
-                Some(snap_key) => {
-                    let change_for_key: Option<&Change> = map_changes.get(snap_key);
-                    if let Some(&Change::Delete) = change_for_key {
-                        continue;
-                    } else {
-                        let snap_key_vec = snap_key.to_vec();
+        // loop {
+        //     let first_snapshot: Option<&[u8]> = it_snapshot.next();
+        //     match first_snapshot {
+        //         Some(snap_key) => {
+        //             let change_for_key: Option<&Change> = map_changes.get(snap_key);
+        //             if let Some(&Change::Delete) = change_for_key {
+        //                 continue;
+        //             } else {
+        //                 let snap_key_vec = snap_key.to_vec();
 
-                        if let Some(put_key) = least_put_key {
-                            let cmp = snap_key_vec.cmp(&put_key);
-                            if let Ordering::Greater = cmp {
-                                res = Some(put_key);
-                                break;
-                            }
-                        }
-                        res = Some(snap_key_vec);
-                        break;
-                    }
-                }
-                None => {
-                    res = least_put_key;
-                    break;
-                }
-            }
-        }
-        Ok(res)
+        //                 if let Some(put_key) = least_put_key {
+        //                     let cmp = snap_key_vec.cmp(&put_key);
+        //                     if let Ordering::Greater = cmp {
+        //                         res = Some(put_key);
+        //                         break;
+        //                     }
+        //                 }
+        //                 res = Some(snap_key_vec);
+        //                 break;
+        //             }
+        //         }
+        //         None => {
+        //             res = least_put_key;
+        //             break;
+        //         }
+        //     }
+        // }
+        // Ok(res)
     }
 }
 
@@ -232,10 +234,10 @@ impl Database for LevelDB {
     }
 }
 
-pub struct LevelDBIterator<'a> {
-    db: LevelIterator<'a>,
-    changes: Range<'a, Vec<u8>, Change>
-}
+// pub struct LevelDBIterator<'a> {
+//     db: LevelIterator<'a>,
+//     changes: Range<'a, Vec<u8>, Change>
+// }
 
 // impl<'a> Iterator for LevelDBIterator<'a> {
 //     type Item = (&'a[u8], Vec<u8>);
