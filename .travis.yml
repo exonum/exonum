@@ -13,7 +13,7 @@ install:
 script:
 - cargo check --features clippy 
 - cargo build --release 
-- cargo test --manifest-path sandbox_tests/Cargo.toml 
+- RUST_LOG=suppress cargo test --manifest-path sandbox_tests/Cargo.toml 
 notifications:
   slack:
     rooms:
