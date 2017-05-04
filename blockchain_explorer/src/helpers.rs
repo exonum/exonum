@@ -151,7 +151,10 @@ fn has_colors() -> bool {
 
 pub fn init_logger() -> Result<(), SetLoggerError> {
     // Don't initialize the logger if the corresponding variable is set to `true`.
-    if env::var("EXONUM_SUPPRESS_LOGS").unwrap_or(String::new()).parse().unwrap_or(false) {
+    if env::var("EXONUM_SUPPRESS_LOGS")
+           .unwrap_or(String::new())
+           .parse()
+           .unwrap_or(false) {
         return Ok(());
     }
 
