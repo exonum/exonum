@@ -223,27 +223,21 @@ impl ExonumJsonSerialize for BlockProof {
     }
 }
 impl ExonumJsonDeserialize for BlockProof{
-    fn deserialize_owned(value: &Value) -> Option<Self> where Self: Sized {
-        let obj = chain_option!(value.as_object());
-        let block = chain_option!(obj.get("block"));
-        let block = chain_option!(<blockchain::Block as ExonumJsonDeserialize>::deserialize_owned(block ));
+    fn deserialize_owned(value: &Value) -> Result<Self, Box<::std::error::Error>> where Self: Sized {
+        let obj = value.as_object().ok_or("Can't cast json as object.")?;
+        let block = obj.get("block").ok_or("Can't get block from json.")?;
+        let block = <blockchain::Block as ExonumJsonDeserialize>::deserialize_owned(block )?;
 
-        let precommits = chain_option!(obj.get("precommits"));
-        let precommits_vec = chain_option!(precommits.as_array());
+        let precommits = obj.get("precommits").ok_or("Can't get precommits from json.")?;
+        let precommits_vec = precommits.as_array().ok_or("Can't cast json as array.")?;
 
-        let precommits = precommits_vec.iter().fold(Some(Vec::new()), |acc, precommit|{
-            let val = chain_option!(<Precommit as ExonumJsonDeserialize>::deserialize_owned(precommit ));
-            acc.map(|mut acc| {
-                acc.push(val);
-                acc
-            })
-        });
-        Some(BlockProof{
+        let precommits:Result<Vec<Precommit>,_> = precommits_vec.iter().map(
+            <Precommit as ExonumJsonDeserialize>::deserialize_owned)
+            .collect();
+        Ok(BlockProof{
             block: block,
-            precommits: chain_option!(precommits)
-        }
-
-        )
+            precommits: precommits?
+        })
         
     }
 }
