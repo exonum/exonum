@@ -309,8 +309,8 @@ impl Sandbox {
             0
         };
 
-        let mut set: HashSet<_> = HashSet::from_iter(self.addresses.iter().skip(skip_validators)
-            .cloned());
+        let mut set: HashSet<_> =
+            HashSet::from_iter(self.addresses.iter().skip(skip_validators).cloned());
 
         for _ in 0..self.n_validators() - skip_validators {
             let sended = self.inner.lock().unwrap().sent.pop_front();
