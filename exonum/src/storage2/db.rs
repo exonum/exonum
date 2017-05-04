@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::iter::Iterator;
+use std::collections::btree_map::{BTreeMap, Range};
 
 use super::Result;
 
@@ -14,6 +15,11 @@ pub enum Change {
 pub struct Fork {
     snapshot: Box<Snapshot>,
     changes: Patch
+}
+
+pub struct ForkIter<'a> {
+    snapshot: Iter<'a>,
+    changes: Range<'a, Vec<u8>, Change>
 }
 
 pub trait Database: Sized + Clone + Send + Sync + 'static {
@@ -57,8 +63,15 @@ impl Snapshot for Fork {
     }
 
     fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a> {
-        // FIXME: implement ForkIter
-        self.snapshot.iter(from)
+        use std::collections::Bound::*;
+        Box::new(ForkIter {
+            snapshot: self.snapshot.iter(from),
+            changes: if let Some(seek) = from {
+                self.changes.range::<[u8], _>((Included(seek), Unbounded))
+            } else {
+                self.changes.range::<[u8], _>(..)
+            }
+        })
     }
 }
 
@@ -77,5 +90,13 @@ impl Fork {
 
     pub fn into_patch(self) -> Patch {
         self.changes
+    }
+}
+
+impl<'a> Iterator for ForkIter<'a> {
+    type Item = (&'a [u8], &'a [u8]);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.snapshot.next()
     }
 }
