@@ -28,6 +28,9 @@ pub trait Database: Sized + Clone + Send + Sync + 'static {
 
 pub trait Snapshot {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
+    fn contains(&self, key: &[u8]) -> Result<bool> {
+        Ok(self.get(key)?.is_some())
+    }
 }
 
 impl Snapshot for Fork {
@@ -39,6 +42,16 @@ impl Snapshot for Fork {
             }),
             None => self.snapshot.get(key)
         }
+    }
+
+    fn contains(&self, key: &[u8]) -> Result<bool> {
+        Ok(match self.changes.get(key) {
+            Some(change) => match *change {
+                Change::Put(..) => true,
+                Change::Delete => false,
+            },
+            None => self.snapshot.get(key)?.is_some()
+        })
     }
 }
 

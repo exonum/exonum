@@ -18,6 +18,10 @@ impl Snapshot for MemoryDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
         Ok(self.map.get(key).map(Clone::clone))
     }
+
+    fn contains(&self, key: &[u8]) -> Result<bool> {
+        Ok(self.map.contains_key(key))
+    }
 }
 
 impl Database for MemoryDB {
