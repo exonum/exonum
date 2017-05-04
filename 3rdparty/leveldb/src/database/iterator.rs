@@ -34,8 +34,6 @@ pub struct Iterator<'a> {
     #[allow(dead_code)]
     database: &'a Database,
     iter: RawIterator,
-    from: Option<&'a [u8]>,
-    to: Option<&'a [u8]>,
 }
 
 /// An iterator over the leveldb keyspace.
@@ -48,8 +46,6 @@ pub struct KeyIterator<'a> {
     #[allow(dead_code)]
     database: &'a Database,
     iter: RawIterator,
-    from: Option<&'a [u8]>,
-    to: Option<&'a [u8]>,
 }
 
 /// An iterator over the leveldb keyspace.
@@ -62,8 +58,6 @@ pub struct ValueIterator<'a> {
     #[allow(dead_code)]
     database: &'a Database,
     iter: RawIterator,
-    from: Option<&'a [u8]>,
-    to: Option<&'a [u8]>,
 }
 
 
@@ -102,12 +96,6 @@ pub trait LevelDBIterator<'a> {
     #[inline]
     fn started(&mut self);
 
-    fn from(self, key: &'a [u8]) -> Self;
-    fn to(self, key: &'a [u8]) -> Self;
-
-    fn from_key(&self) -> Option<&'a [u8]>;
-    fn to_key(&self) -> Option<&'a [u8]>;
-
     fn valid(&self) -> bool {
         unsafe { leveldb_iter_valid(self.raw_iterator()) != 0 }
     }
@@ -115,12 +103,8 @@ pub trait LevelDBIterator<'a> {
     fn advance(&mut self) -> bool {
         unsafe {
             if !self.start() {
-
                 leveldb_iter_next(self.raw_iterator());
             } else {
-                if let Some(k) = self.from_key() {
-                    self.seek(k)
-                }
                 self.started();
             }
         }
@@ -148,17 +132,11 @@ pub trait LevelDBIterator<'a> {
     }
 
     fn seek_to_last(&self) {
-        if let Some(k) = self.to_key() {
-            self.seek(k);
-        } else {
-            unsafe {
-                leveldb_iter_seek_to_last(self.raw_iterator());
-            }
-        }
+        unsafe { leveldb_iter_seek_to_last(self.raw_iterator()); }
     }
 
     fn seek(&self, key: &[u8]) {
-        unsafe {            
+        unsafe {
             leveldb_iter_seek(self.raw_iterator(),
                               key.as_ptr() as *mut c_char,
                               key.len() as size_t);
@@ -178,8 +156,6 @@ impl<'a> Iterator<'a> {
                 start: true,
                 iter: RawIterator { ptr: ptr },
                 database: database,
-                from: None,
-                to: None,
             }
         }
     }
@@ -206,24 +182,6 @@ impl<'a> LevelDBIterator<'a> for Iterator<'a> {
     fn started(&mut self) {
         self.start = false
     }
-
-    fn from(mut self, key: &'a [u8]) -> Self {
-        self.from = Some(key);
-        self
-    }
-
-    fn to(mut self, key: &'a [u8]) -> Self {
-        self.to = Some(key);
-        self
-    }
-
-    fn from_key(&self) -> Option<&'a [u8]> {
-        self.from
-    }
-
-    fn to_key(&self) -> Option<&'a [u8]> {
-        self.to
-    }
 }
 
 impl<'a> KeyIterator<'a> {
@@ -237,8 +195,6 @@ impl<'a> KeyIterator<'a> {
                 start: true,
                 iter: RawIterator { ptr: ptr },
                 database: database,
-                from: None,
-                to: None,
             }
         }
     }
@@ -265,24 +221,6 @@ impl<'a> LevelDBIterator<'a> for KeyIterator<'a> {
     fn started(&mut self) {
         self.start = false
     }
-
-    fn from(mut self, key: &'a [u8]) -> Self {
-        self.from = Some(key);
-        self
-    }
-
-    fn to(mut self, key: &'a [u8]) -> Self {
-        self.to = Some(key);
-        self
-    }
-
-    fn from_key(&self) -> Option<&'a [u8]> {
-        self.from
-    }
-
-    fn to_key(&self) -> Option<&'a [u8]> {
-        self.to
-    }
 }
 
 impl<'a> ValueIterator<'a> {
@@ -296,8 +234,6 @@ impl<'a> ValueIterator<'a> {
                 start: true,
                 iter: RawIterator { ptr: ptr },
                 database: database,
-                from: None,
-                to: None,
             }
         }
     }
@@ -323,24 +259,6 @@ impl<'a> LevelDBIterator<'a> for ValueIterator<'a> {
     #[inline]
     fn started(&mut self) {
         self.start = false
-    }
-
-    fn from(mut self, key: &'a [u8]) -> Self {
-        self.from = Some(key);
-        self
-    }
-
-    fn to(mut self, key: &'a [u8]) -> Self {
-        self.to = Some(key);
-        self
-    }
-
-    fn from_key(&self) -> Option<&'a [u8]> {
-        self.from
-    }
-
-    fn to_key(&self) -> Option<&'a [u8]> {
-        self.to
     }
 }
 

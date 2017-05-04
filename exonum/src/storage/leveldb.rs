@@ -152,7 +152,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
         // TODO merge with the same function in memorydb
         let map_changes = self.changes.borrow();
         let mut it_changes = map_changes.range::<[u8], [u8]>(Included(key), Unbounded);
-        let mut it_snapshot = self.snap.keys_iter(LEVELDB_READ_OPTIONS).from(key);
+        let mut it_snapshot = self.snap.keys_iter(LEVELDB_READ_OPTIONS);
 
         let res: Option<Vec<u8>>;
         let least_put_key: Option<Vec<u8>> = it_changes.find(|entry| {
