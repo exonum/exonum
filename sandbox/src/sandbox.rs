@@ -300,9 +300,19 @@ impl Sandbox {
     // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let mut set: HashSet<SocketAddr> =
-            HashSet::from_iter(self.addresses.iter().skip(1).cloned());
-        for _ in 0..self.n_validators() - 1 {
+
+        // If node is excluded from validators, then it still will broadcast messages.
+        // So in that case we should not skip addresses and validators count.
+        let skip_validators = if self.validators().contains(&self.node_public_key()) {
+            1
+        } else {
+            0
+        };
+
+        let mut set: HashSet<_> = HashSet::from_iter(self.addresses.iter().skip(skip_validators)
+            .cloned());
+
+        for _ in 0..self.n_validators() - skip_validators {
             let sended = self.inner.lock().unwrap().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
