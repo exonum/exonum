@@ -12,9 +12,11 @@ use serde::{Serializer, Serialize};
 use serde_json::value::Value;
 use bit_vec::BitVec;
 use hex::ToHex;
+
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use std::sync::Arc;
 use std::net::SocketAddr;
+use std::error::Error;
 
 use crypto::{Hash, PublicKey, SecretKey, Seed, Signature};
 
@@ -22,13 +24,14 @@ use messages::Field;
 use super::HexValue;
 
 /// `ExonumJsonDeserializeField` is trait for object that can be serialized "in-place" of storage structure.
+/// This trait important for field types that could not be deserialized directly, for example: borrowed array.
 pub trait ExonumJsonDeserializeField {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool;
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>>;
 }
 
 /// `ExonumJsonDeserialize` is trait for objects that can be constructed from exonum json.
 pub trait ExonumJsonDeserialize {
-    fn deserialize_owned(value: &Value) -> Option<Self> where Self: Sized;
+    fn deserialize_owned(value: &Value) -> Result<Self, Box<Error>> where Self: Sized;
 }
 
 /// `ExonumJsonSerialize` is trait for object that could be serialized as json with exonum protocol specific aspects.
@@ -156,14 +159,10 @@ impl ExonumJsonSerialize for SystemTime {
 macro_rules! impl_deserialize_int {
     (@impl $typename:ty) => {
         impl ExonumJsonDeserializeField for $typename {
-            fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-                    value.as_i64()
-                         .map(|v| {
-                             println!("parsed int = {}", v);
-                             v as $typename
-                         })
-                         .map(|val| buffer.write(from, to, val))
-                         .is_some()
+            fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+                let number = value.as_i64().ok_or("Can't cast json as integer")?;
+                buffer.write(from, to, number as $typename);
+                Ok(())
             }
         }
     };
@@ -173,11 +172,11 @@ macro_rules! impl_deserialize_int {
 macro_rules! impl_deserialize_bigint {
     (@impl $typename:ty) => {
         impl ExonumJsonDeserializeField for $typename {
-            fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-                    value.as_str()
-                         .and_then(|v| v.parse().ok() )
-                         .map(|val: $typename| buffer.write(from, to, val))
-                         .is_some()
+            fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+                let stri = value.as_str().ok_or("Can't cast json as string")?;
+                let val: $typename =  stri.parse()?;
+                buffer.write(from, to, val);
+                Ok(())
             }
         }
     };
@@ -204,11 +203,11 @@ impl_deserialize_int!{ f32; f64 }
 macro_rules! impl_deserialize_hex_segment {
     (@impl $typename:ty) => {
         impl<'a> ExonumJsonDeserializeField for &'a $typename {
-            fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-                    value.as_str()
-                         .and_then(|v| <$typename as HexValue>:: from_hex(v).ok() )
-                         .map(|ref val| buffer.write(from, to, val))
-                         .is_some()
+            fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+                let stri = value.as_str().ok_or("Can't cast json as string")?;
+                let val = <$typename as HexValue>:: from_hex(stri)?;
+                buffer.write(from, to, &val);
+                Ok(())
             }
         }
     };
@@ -223,81 +222,67 @@ impl_deserialize_hex_segment!{
     Hash; PublicKey; Signature /*;  Seed; */}
 
 impl ExonumJsonDeserializeField for bool  {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-        value.as_bool()
-             .map(|val| buffer.write(from, to, val))
-             .is_some()
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+        let val = value.as_bool().ok_or("Can't cast json as bool")?;
+        buffer.write(from, to, val);
+        Ok(())
     }
 }
 
 impl ExonumJsonDeserializeField for SystemTime  {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-        let helper: Option<DurationHelper> = ::serde_json::from_value(value.clone()).ok();
-        helper.map(|helper|{
-            let duration = Duration::new(helper.secs, helper.nanos);
-            let system_time = UNIX_EPOCH + duration;
-            buffer.write(from, to, system_time)
-        }).is_some()
-        
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+        let helper: DurationHelper = ::serde_json::from_value(value.clone())?;
+        let duration = Duration::new(helper.secs, helper.nanos);
+        let system_time = UNIX_EPOCH + duration;
+        buffer.write(from, to, system_time);
+        Ok(())
     }
 }
 
 impl ExonumJsonDeserializeField for SocketAddr {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-        let helper: Option<SocketAddr> = ::serde_json::from_value(value.clone()).ok();
-        helper.map(|addr|{
-            buffer.write(from, to, addr)
-        }).is_some()
-        
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+        let addr: SocketAddr = ::serde_json::from_value(value.clone())?;
+        buffer.write(from, to, addr);
+        Ok(())
     }
 }
 
 impl<'a> ExonumJsonDeserializeField for &'a [Hash]  {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-        value.as_array()
-             .and_then(|arr| {
-                let mut vec: Vec<Hash>= Vec::new();
-                for el in arr {
-                    let hash = el.as_str().and_then(|v| <Hash as HexValue>:: from_hex(v).ok());
-                    if let Some(hash) = hash {
-                        vec.push(hash)
-                    } else {
-                        return None;
-                    }
-                }
-                    Some(buffer.write(from, to, vec.as_slice()))
-                
-             })
-             .is_some()
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+        let arr = value.as_array().ok_or("Can't cast json as array")?;
+        let mut vec: Vec<Hash>= Vec::new();
+        for el in arr {
+            let stri = el.as_str().ok_or("Can't cast json as string")?;
+            let hash = <Hash as HexValue>:: from_hex(stri)?;
+            vec.push(hash)
+        }
+        buffer.write(from, to, vec.as_slice());
+        Ok(())
+             
     }
 }
 impl<'a> ExonumJsonDeserializeField for &'a [u8]  {
-            fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-                    value.as_str()
-                         .and_then(|v| <Vec<u8> as HexValue>:: from_hex(v).ok() )
-                         .map(|ref val| buffer.write(from, to, val.as_slice()))
-                         .is_some()
-            }
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+        let bytes = value.as_str().ok_or("Can't cast json as string")?;
+        let arr = <Vec<u8> as HexValue>:: from_hex(bytes)?;
+        buffer.write(from, to, arr.as_slice());
+        Ok(())
+    }
 }
 
 impl ExonumJsonDeserializeField for Vec<Arc<::messages::MessageBuffer>>
 {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
         use ::messages::MessageBuffer;
-        value.as_array()
-             .and_then(|arr| {
-                let mut vec: Vec<_>= Vec::new();
-                for el in arr {
-                    let str_hex = el.as_str().and_then(|v| <Vec<u8> as HexValue>:: from_hex(v).ok());;
-                    if let Some(ob) = str_hex {
-                        vec.push(Arc::new(MessageBuffer::from_vec(ob)));
-                    } else {
-                        return None;
-                    }
-                }
-                    Some(buffer.write(from, to, vec))
-             })
-             .is_some()
+        let bytes = value.as_array().ok_or("Can't cast json as array")?;
+        let mut vec: Vec<_>= Vec::new();
+        for el in bytes {
+            let stri = el.as_str().ok_or("Can't cast json as string")?;
+            let str_hex = <Vec<u8> as HexValue>:: from_hex(stri)?;
+            vec.push(Arc::new(MessageBuffer::from_vec(str_hex)));
+        }
+        buffer.write(from, to, vec);
+        Ok(())
     }
 }
 
@@ -305,46 +290,36 @@ impl<T> ExonumJsonDeserializeField for Vec<T>
 where T: ExonumJsonDeserialize,
     for<'a> Vec<T>: Field<'a>
 {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-        value.as_array()
-             .and_then(|arr| {
-                let mut vec: Vec<_>= Vec::new();
-                for el in arr {
-                    let obj = T::deserialize_owned(el);
-                    if let Some(ob) = obj {
-                        vec.push(ob);
-                    } else {
-                        return None;
-                    }
-                }
-                    Some(buffer.write(from, to, vec))
-             })
-             .is_some()
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+        let bytes = value.as_array().ok_or("Can't cast json as array")?;
+        let mut vec: Vec<_>= Vec::new();
+        for el in bytes {
+            let obj = T::deserialize_owned(el)?;
+            vec.push(obj);
+        }
+        buffer.write(from, to, vec);
+        Ok(())
     }    
 }
 
 impl ExonumJsonDeserializeField for BitVec  {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> bool {
-        value.as_str()
-             .and_then(|val| {
-                let mut vec = BitVec::new();
-                for (i, ch) in val.chars().enumerate() {
-                    let val = if ch == '1' {
-                        true
-                    }
-                    else if ch == '0' {
-                        false
-                    }
-                    else {
-                        return None
-                    };
-                    vec.set(i, val);
-                }
-
-                buffer.write(from, to, vec);
-                Some(())
-             })
-             .is_some()
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+        let stri = value.as_str().ok_or("Can't cast json as string")?;
+        let mut vec = BitVec::new();
+        for (i, ch) in stri.chars().enumerate() {
+            let val = if ch == '1' {
+                true
+            }
+            else if ch == '0' {
+                false
+            }
+            else {
+                Err(format!("BitVec should contain only 0 or 1, not {}", ch))?
+            };
+            vec.set(i, val);
+        }
+        buffer.write(from, to, vec);
+        Ok(())
     }
 }
 
@@ -356,20 +331,19 @@ pub mod reexport {
 
 }
 //api
-pub fn to_value<T: ExonumJsonSerialize>(value: &T) -> Option<Value> {       
-    ::serde_json::to_value(&wrap(value)).ok()
+pub fn to_value<T: ExonumJsonSerialize>(value: &T) -> Result<Value, Box<Error>> {       
+    Ok(::serde_json::to_value(&wrap(value))?)
 }
 
-pub fn from_value<T: ExonumJsonDeserialize>(value: &Value) -> Option<T> {    
+pub fn from_value<T: ExonumJsonDeserialize>(value: &Value) -> Result<T, Box<Error>> {    
     T::deserialize_owned(&value)
 }
 
-pub fn to_string<T: ExonumJsonSerialize>(value: &T) -> Option<String> {    
-    ::serde_json::to_string(&wrap(value)).ok()
+pub fn to_string<T: ExonumJsonSerialize>(value: &T) -> Result<String, Box<Error>> {    
+   Ok(::serde_json::to_string(&wrap(value))?)
 }
 
-pub fn from_str<T: ExonumJsonDeserialize>(value: &str) -> Option<T> {    
-    let value: Option<Value> = ::serde_json::from_str(value).ok();
-    value.and_then(| val|
-        from_value(&val))
+pub fn from_str<T: ExonumJsonDeserialize>(value: &str) -> Result<T, Box<Error>> {    
+    let value: Value = ::serde_json::from_str(value)?;
+    from_value(&value)
 }

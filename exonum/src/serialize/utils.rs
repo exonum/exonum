@@ -1,8 +1,5 @@
-macro_rules! chain_option {
-    ($val:expr) => {if let Some(v) = $val {
-        v
-    } else {
-        return None;
-    }
-    }
+#[macro_export]
+macro_rules! counter {
+    () => (0usize);
+    ($head:ident $($tail:ident)*) => (1usize + counter!($($tail)*))
 }
