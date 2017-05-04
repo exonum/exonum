@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{BaseIndex, Error, Snapshot, Fork, StorageKey, StorageValue};
+use super::{BaseIndex, Result, Snapshot, Fork, StorageKey, StorageValue};
 
 pub struct MapIndex<T, K, V> {
     base: BaseIndex<T>,
@@ -21,8 +21,12 @@ impl<T, K, V> MapIndex<T, K, V> {
 impl<T, K, V> MapIndex<T, K, V> where T: AsRef<Snapshot>,
                                       K: StorageKey,
                                       V: StorageValue {
-    pub fn get(&self, key: &K) -> Result<Option<V>, Error> {
+    pub fn get(&self, key: &K) -> Result<Option<V>> {
         self.base.get(key)
+    }
+
+    pub fn contains(&self, key: &K) -> Result<bool> {
+        self.base.contains(key)
     }
 }
 
