@@ -12,7 +12,7 @@ use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
@@ -42,7 +42,7 @@ impl Ord for TimerPair {
 pub struct SandboxInner {
     pub address: SocketAddr,
     pub time: SystemTime,
-    pub sended: VecDeque<(SocketAddr, RawMessage)>,
+    pub sent: VecDeque<(SocketAddr, RawMessage)>,
     pub events: VecDeque<SandboxEvent>,
     pub timers: BinaryHeap<TimerPair>,
 }
@@ -61,7 +61,7 @@ impl SandboxChannel {
         self.inner
             .lock()
             .unwrap()
-            .sended
+            .sent
             .push_back((address.clone(), message));
     }
 }
@@ -182,6 +182,14 @@ impl SandboxReactor {
     pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
         self.handler.handle_timeout(timeout);
     }
+
+    pub fn public_key(&self) -> &PublicKey {
+        self.handler.state().public_key()
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        self.handler.state().secret_key()
+    }
 }
 
 pub struct Sandbox {
@@ -220,8 +228,7 @@ impl Sandbox {
     }
 
     fn check_unexpected_message(&self) {
-        let sended = self.inner.lock().unwrap().sended.pop_front();
-        if let Some((addr, msg)) = sended {
+        if let Some((addr, msg)) = self.inner.lock().unwrap().sent.pop_front() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
@@ -273,7 +280,7 @@ impl Sandbox {
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let sended = self.inner.lock().unwrap().sended.pop_front();
+        let sended = self.inner.lock().unwrap().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
@@ -293,10 +300,20 @@ impl Sandbox {
     // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let mut set: HashSet<SocketAddr> =
-            HashSet::from_iter(self.addresses.iter().skip(1).cloned());
-        for _ in 0..self.n_validators() - 1 {
-            let sended = self.inner.lock().unwrap().sended.pop_front();
+
+        // If node is excluded from validators, then it still will broadcast messages.
+        // So in that case we should not skip addresses and validators count.
+        let skip_validators = if self.validators().contains(&self.node_public_key()) {
+            1
+        } else {
+            0
+        };
+
+        let mut set: HashSet<_> =
+            HashSet::from_iter(self.addresses.iter().skip(skip_validators).cloned());
+
+        for _ in 0..self.n_validators() - skip_validators {
+            let sended = self.inner.lock().unwrap().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
@@ -319,6 +336,13 @@ impl Sandbox {
                        set);
             }
         }
+    }
+
+    pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
+        self.broadcast(Status::new(&self.node_public_key(),
+                                   height,
+                                   block_hash,
+                                   &self.node_secret_key()));
     }
 
     pub fn add_time(&self, duration: Duration) {
@@ -539,6 +563,16 @@ impl Sandbox {
                 actual_hash,
                 hash);
     }
+
+    fn node_public_key(&self) -> PublicKey {
+        let reactor = self.reactor.borrow();
+        *reactor.public_key()
+    }
+
+    fn node_secret_key(&self) -> SecretKey {
+        let reactor = self.reactor.borrow();
+        reactor.secret_key().clone()
+    }
 }
 
 impl Drop for Sandbox {
@@ -590,7 +624,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let inner = Arc::new(Mutex::new(SandboxInner {
                                         address: addresses[0].clone(),
                                         time: UNIX_EPOCH + Duration::new(1486720340, 0),
-                                        sended: VecDeque::new(),
+                                        sent: VecDeque::new(),
                                         events: VecDeque::new(),
                                         timers: BinaryHeap::new(),
                                     }));

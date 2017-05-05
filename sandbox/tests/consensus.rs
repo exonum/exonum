@@ -607,6 +607,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
     sandbox.recv(precommit_2.clone());
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
 
     {
         // respond to RequestTransactions
@@ -1284,6 +1285,7 @@ fn handle_precommit_positive_scenario_commit() {
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
     sandbox.add_time(Duration::from_millis(0));
 }
 
@@ -1389,6 +1391,7 @@ fn lock_not_send_prevotes_after_commit() {
                                          &block.hash(),
                                          sandbox.time(),
                                          sandbox.s(VALIDATOR_0 as usize)));
+        sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
     }
 
 
@@ -1634,7 +1637,7 @@ fn commit_using_unknown_propose_with_precommits() {
                                    &propose.hash(),
                                    LOCK_ZERO,
                                    sandbox.s(VALIDATOR_0 as usize)));
-
+    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
 
     sandbox.add_time(Duration::from_millis(0));
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
@@ -1910,6 +1913,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
     sandbox.assert_state(HEIGHT_THREE, ROUND_ONE);
+    sandbox.check_broadcast_status(HEIGHT_THREE, &second_block.hash());
     sandbox.add_time(Duration::from_millis(0));
 
     // update blockchain with new block
@@ -2010,7 +2014,11 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.assert_state(current_height, current_round);
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
-    sandbox.assert_state(current_height + 1, ROUND_ONE);
+
+    let new_height = current_height + 1;
+    sandbox.assert_state(new_height, ROUND_ONE);
+    sandbox.check_broadcast_status(new_height, &block.hash());
+
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         //        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
@@ -2195,6 +2203,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
     sandbox.add_time(Duration::from_millis(0));
 
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 2 * REQUEST_PROPOSE_TIMEOUT));
