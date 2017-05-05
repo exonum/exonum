@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 
 use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
 use events::Channel;
-use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
 
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
@@ -109,17 +109,11 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn handle_status_timeout(&mut self) {
-        let hash = self.blockchain.last_hash().unwrap();
-        // Send status
-        let status = Status::new(self.state.public_key(),
-                                 self.state.height(),
-                                 &hash,
-                                 self.state.secret_key());
-        trace!("Broadcast status: {:?}", status);
-        self.broadcast(status.raw());
-
-        self.add_status_timeout();
+    pub fn handle_status_timeout(&mut self, height: Height) {
+        if self.state.height() == height {
+            self.broadcast_status();
+            self.add_status_timeout();
+        }
     }
 
     pub fn handle_peer_exchange_timeout(&mut self) {
@@ -144,5 +138,15 @@ impl<S> NodeHandler<S>
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
         self.add_peer_exchange_timeout();
+    }
+
+    pub fn broadcast_status(&mut self) {
+        let hash = self.blockchain.last_hash().unwrap();
+        let status = Status::new(self.state.public_key(),
+                                 self.state.height(),
+                                 &hash,
+                                 self.state.secret_key());
+        trace!("Broadcast status: {:?}", status);
+        self.broadcast(status.raw());
     }
 }
