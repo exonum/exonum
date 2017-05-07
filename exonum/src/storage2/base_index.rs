@@ -1,9 +1,14 @@
-use super::{Result, StorageKey, StorageValue, Snapshot, Fork};
+use super::{Result, StorageKey, StorageValue, Snapshot, Fork, Iter};
 
 pub struct BaseIndex<T> {
     prefix: Vec<u8>,
     view: T,
 }
+
+// pub struct BaseIndexIter<'a> {
+//     prefix: &'a [u8],
+//     iter: Iter<'a>,
+// }
 
 impl<T> BaseIndex<T> {
     pub fn new(prefix: Vec<u8>, view: T) -> Self {

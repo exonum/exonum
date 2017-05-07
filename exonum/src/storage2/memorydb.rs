@@ -41,7 +41,6 @@ impl Snapshot for MemoryDB {
 
     fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a> {
         use std::collections::Bound::*;
-
         let range = if let Some(seek) = from {
             (Included(seek), Unbounded)
         } else {
