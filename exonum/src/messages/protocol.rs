@@ -207,7 +207,15 @@ message! {
     }
 }
 
-// Peers request.
+/// Request connected peers from the node `to`.
+///
+/// ### Processing
+///   * The message is authenticated by the pubkey `from`.
+///     It must be in the receiver's full node list
+///   * If the message is properly authorized, the node responds with...
+///
+/// ### Generation
+/// A node generates `RequestPeers` under such and such conditions...
 message! {
     RequestPeers {
         const TYPE = CONSENSUS;
