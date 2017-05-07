@@ -11,6 +11,7 @@ pub use self::values::StorageValue;
 
 pub use self::base_index::{BaseIndex, BaseIndexIter};
 pub use self::map_index::MapIndex;
+pub use self::list_index::ListIndex;
 
 
 pub type Result<T> = ::std::result::Result<T, Error>;
@@ -26,6 +27,7 @@ mod values;
 
 mod base_index;
 mod map_index;
+mod list_index;
 
 pub fn merkle_hash(hashes: &[Hash]) -> Hash {
     match hashes.len() {
