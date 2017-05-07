@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use super::{Result, StorageKey, StorageValue, Snapshot, Fork, Iter};
 
 pub struct BaseIndex<T> {
@@ -5,10 +7,13 @@ pub struct BaseIndex<T> {
     view: T,
 }
 
-// pub struct BaseIndexIter<'a> {
-//     prefix: &'a [u8],
-//     iter: Iter<'a>,
-// }
+pub struct BaseIndexIter<'a, K, V> {
+    prefix: &'a [u8],
+    iter: Iter<'a>,
+    stopped: bool,
+    _k: PhantomData<K>,
+    _v: PhantomData<V>,
+}
 
 impl<T> BaseIndex<T> {
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
@@ -35,6 +40,17 @@ impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
     pub fn contains<K>(&self, key: &K) -> Result<bool> where K: StorageKey {
         self.view.as_ref().contains(&self.prefixed_key(key))
     }
+
+    pub fn iter<K, V>(&self) -> BaseIndexIter<K, V> where K: StorageKey,
+                                                          V: StorageValue {
+        BaseIndexIter {
+            prefix: &self.prefix,
+            iter: self.view.as_ref().iter(&self.prefix),
+            stopped: false,
+            _k: PhantomData,
+            _v: PhantomData
+        }
+    }
 }
 
 impl<T> BaseIndex<T> where T: AsMut<Fork> {
@@ -47,5 +63,24 @@ impl<T> BaseIndex<T> where T: AsMut<Fork> {
     pub fn delete<K>(&mut self, key: &K) where K: StorageKey {
         let key = self.prefixed_key(key);
         self.view.as_mut().delete(key);
+    }
+}
+
+impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,
+                                                          V: StorageValue, {
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.stopped {
+            return None
+        }
+        if let Some((ref k, ref v)) = self.iter.next() {
+            if k.starts_with(self.prefix) {
+                // FIXME: possible unneeded coping here (v.to_vec)
+                return Some((K::read(k), V::deserialize(v.to_vec())))
+            }
+        }
+        self.stopped = true;
+        None
     }
 }
