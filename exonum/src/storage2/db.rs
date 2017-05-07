@@ -102,6 +102,27 @@ impl Fork {
     }
 }
 
+// TODO: Does we needed this AsRef / AsMut impls?
+
+impl AsRef<Snapshot> for Snapshot {
+    fn as_ref<'a>(&'a self) -> &'a (Snapshot + 'static) {
+        self
+    }
+}
+
+impl AsRef<Snapshot + 'static> for Fork {
+    fn as_ref<'a>(&'a self) -> &'a (Snapshot + 'static) {
+        &*self.snapshot
+    }
+}
+
+impl AsMut<Fork> for Fork {
+    fn as_mut<'a>(&'a mut self) -> &'a mut Fork {
+        self
+    }
+}
+
+
 impl<'a> NextIterValue<'a> {
     fn skip_changes(&self) -> bool {
         match *self {
