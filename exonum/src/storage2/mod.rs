@@ -9,7 +9,7 @@ pub use self::memorydb::MemoryDB;
 pub use self::keys::StorageKey;
 pub use self::values::StorageValue;
 
-pub use self::base_index::BaseIndex;
+pub use self::base_index::{BaseIndex, BaseIndexIter};
 pub use self::map_index::MapIndex;
 
 

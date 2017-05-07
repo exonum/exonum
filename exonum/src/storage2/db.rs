@@ -26,6 +26,14 @@ pub struct ForkIter<'a> {
     changes: Peekable<Range<'a, Vec<u8>, Change>>
 }
 
+enum NextIterValue<'a> {
+    Stored(&'a [u8], &'a [u8]),
+    Replaced(&'a [u8], &'a [u8]),
+    Inserted(&'a [u8], &'a [u8]),
+    Deleted,
+    MissDeleted
+}
+
 pub trait Database: Sized + Clone + Send + Sync + 'static {
     fn snapshot(&self) -> Box<Snapshot>;
     fn fork(&self) -> Fork {
@@ -92,14 +100,6 @@ impl Fork {
     pub fn into_patch(self) -> Patch {
         self.changes
     }
-}
-
-enum NextIterValue<'a> {
-    Stored(&'a [u8], &'a [u8]),
-    Replaced(&'a [u8], &'a [u8]),
-    Inserted(&'a [u8], &'a [u8]),
-    Deleted,
-    MissDeleted
 }
 
 impl<'a> NextIterValue<'a> {
