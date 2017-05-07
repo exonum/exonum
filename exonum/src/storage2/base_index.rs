@@ -8,9 +8,9 @@ pub struct BaseIndex<T> {
 }
 
 pub struct BaseIndexIter<'a, K, V> {
-    prefix: &'a [u8],
     base_iter: Iter<'a>,
-    stopped: bool,
+    prefix: &'a [u8],
+    ended: bool,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -44,9 +44,21 @@ impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
     pub fn iter<K, V>(&self) -> BaseIndexIter<K, V> where K: StorageKey,
                                                           V: StorageValue {
         BaseIndexIter {
-            prefix: &self.prefix,
             base_iter: self.view.as_ref().iter(&self.prefix),
-            stopped: false,
+            prefix: &self.prefix,
+            ended: false,
+            _k: PhantomData,
+            _v: PhantomData
+        }
+    }
+
+    pub fn iter_from<F, K, V>(&self, from: &F) -> BaseIndexIter<K, V> where F: StorageKey,
+                                                                            K: StorageKey,
+                                                                            V: StorageValue {
+        BaseIndexIter {
+            base_iter: self.view.as_ref().iter(&self.prefixed_key(from)),
+            prefix: &self.prefix,
+            ended: false,
             _k: PhantomData,
             _v: PhantomData
         }
@@ -71,15 +83,15 @@ impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.stopped {
+        if self.ended {
             return None
         }
         if let Some((ref k, ref v)) = self.base_iter.next() {
             if k.starts_with(self.prefix) {
-                return Some((K::read(k), V::from_slice(v)))
+                return Some((K::read(&k[self.prefix.len()..]), V::from_slice(v)))
             }
         }
-        self.stopped = true;
+        self.ended = true;
         None
     }
 }

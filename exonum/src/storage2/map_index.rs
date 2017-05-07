@@ -52,6 +52,18 @@ impl<T, K, V> MapIndex<T, K, V> where T: AsRef<Snapshot>,
     pub fn values(&self) -> MapIndexValues<V> {
         MapIndexValues { base_iter: self.base.iter() }
     }
+
+    pub fn iter_from(&self, from: &K) -> MapIndexIter<K, V> {
+        MapIndexIter { base_iter: self.base.iter_from(from) }
+    }
+
+    pub fn keys_from(&self, from: &K) -> MapIndexKeys<K> {
+        MapIndexKeys { base_iter: self.base.iter_from(from) }
+    }
+
+    pub fn values_from(&self, from: &K) -> MapIndexValues<V> {
+        MapIndexValues { base_iter: self.base.iter_from(from) }
+    }
 }
 
 impl<T, K, V> MapIndex<T, K, V> where T: AsMut<Fork>,
