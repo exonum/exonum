@@ -9,7 +9,7 @@ pub struct BaseIndex<T> {
 
 pub struct BaseIndexIter<'a, K, V> {
     prefix: &'a [u8],
-    iter: Iter<'a>,
+    base_iter: Iter<'a>,
     stopped: bool,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
@@ -34,7 +34,7 @@ impl<T> BaseIndex<T> {
 impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
     pub fn get<K, V>(&self, key: &K) -> Result<Option<V>> where K: StorageKey,
                                                                 V: StorageValue {
-        Ok(self.view.as_ref().get(&self.prefixed_key(key))?.map(StorageValue::deserialize))
+        Ok(self.view.as_ref().get(&self.prefixed_key(key))?.map(StorageValue::from_vec))
     }
 
     pub fn contains<K>(&self, key: &K) -> Result<bool> where K: StorageKey {
@@ -45,7 +45,7 @@ impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
                                                           V: StorageValue {
         BaseIndexIter {
             prefix: &self.prefix,
-            iter: self.view.as_ref().iter(&self.prefix),
+            base_iter: self.view.as_ref().iter(&self.prefix),
             stopped: false,
             _k: PhantomData,
             _v: PhantomData
@@ -74,10 +74,9 @@ impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,
         if self.stopped {
             return None
         }
-        if let Some((ref k, ref v)) = self.iter.next() {
+        if let Some((ref k, ref v)) = self.base_iter.next() {
             if k.starts_with(self.prefix) {
-                // FIXME: possible unneeded coping here (v.to_vec)
-                return Some((K::read(k), V::deserialize(v.to_vec())))
+                return Some((K::read(k), V::from_slice(v)))
             }
         }
         self.stopped = true;

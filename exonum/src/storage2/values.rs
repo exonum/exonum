@@ -9,10 +9,13 @@ use messages::{RawMessage, MessageBuffer, Message, FromRaw};
 // TODO: add implementations for other primitives
 // TODO: review signature
 
-pub trait StorageValue {
-    fn serialize(self) -> Vec<u8>;
-    fn deserialize(value: Vec<u8>) -> Self;
+pub trait StorageValue : Sized {
     fn hash(&self) -> Hash;
+    fn serialize(self) -> Vec<u8>;
+    fn from_slice(value: &[u8]) -> Self;
+    fn from_vec(value: Vec<u8>) -> Self {
+        Self::from_slice(&value)
+    }
 }
 
 impl StorageValue for () {
@@ -20,7 +23,7 @@ impl StorageValue for () {
         Vec::new()
     }
 
-    fn deserialize(value: Vec<u8>) -> Self {
+    fn from_slice(value: &[u8]) -> Self {
         ()
     }
 
@@ -36,8 +39,8 @@ impl StorageValue for u16 {
         v
     }
 
-    fn deserialize(value: Vec<u8>) -> Self {
-        LittleEndian::read_u16(&value)
+    fn from_slice(value: &[u8]) -> Self {
+        LittleEndian::read_u16(value)
     }
 
     fn hash(&self) -> Hash {
@@ -54,8 +57,8 @@ impl StorageValue for u32 {
         v
     }
 
-    fn deserialize(value: Vec<u8>) -> Self {
-        LittleEndian::read_u32(&value)
+    fn from_slice(value: &[u8]) -> Self {
+        LittleEndian::read_u32(value)
     }
 
     fn hash(&self) -> Hash {
@@ -72,8 +75,8 @@ impl StorageValue for u64 {
         v
     }
 
-    fn deserialize(value: Vec<u8>) -> Self {
-        LittleEndian::read_u64(&value)
+    fn from_slice(value: &[u8]) -> Self {
+        LittleEndian::read_u64(value)
     }
 
     fn hash(&self) -> Hash {
@@ -90,8 +93,8 @@ impl StorageValue for i64 {
         v
     }
 
-    fn deserialize(value: Vec<u8>) -> Self {
-        LittleEndian::read_i64(&value)
+    fn from_slice(value: &[u8]) -> Self {
+        LittleEndian::read_i64(value)
     }
 
     fn hash(&self) -> Hash {
@@ -106,8 +109,8 @@ impl StorageValue for Hash {
         self.as_ref().to_vec()
     }
 
-    fn deserialize(value: Vec<u8>) -> Self {
-        Hash::from_slice(&value).unwrap()
+    fn from_slice(value: &[u8]) -> Self {
+        Hash::from_slice(value).unwrap()
     }
 
     fn hash(&self) -> Hash {
@@ -120,7 +123,11 @@ impl StorageValue for RawMessage {
         self.as_ref().as_ref().to_vec()
     }
 
-    fn deserialize(value: Vec<u8>) -> Self {
+    fn from_slice(value: &[u8]) -> Self {
+        Self::from_vec(value.to_vec())
+    }
+
+    fn from_vec(value: Vec<u8>) -> Self {
         Arc::new(MessageBuffer::from_vec(value))
     }
 
@@ -134,7 +141,11 @@ impl StorageValue for Vec<u8> {
         self
     }
 
-    fn deserialize(value: Vec<u8>) -> Self {
+    fn from_slice(value: &[u8]) -> Self {
+        value.to_vec()
+    }
+
+    fn from_vec(value: Vec<u8>) -> Self {
         value
     }
 
