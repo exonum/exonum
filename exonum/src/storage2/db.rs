@@ -42,7 +42,7 @@ pub trait Snapshot {
     fn contains(&self, key: &[u8]) -> Result<bool> {
         Ok(self.get(key)?.is_some())
     }
-    fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a>;
+    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
 }
 
 impl Snapshot for Fork {
@@ -66,13 +66,9 @@ impl Snapshot for Fork {
         })
     }
 
-    fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a> {
+    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         use std::collections::Bound::*;
-        let range = if let Some(seek) = from {
-            (Included(seek), Unbounded)
-        } else {
-            (Unbounded, Unbounded)
-        };
+        let range = (Included(from), Unbounded);
         Box::new(ForkIter {
             snapshot: self.snapshot.iter(from).peekable(),
             changes: self.changes.range::<[u8], _>(range).peekable()

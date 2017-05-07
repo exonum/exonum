@@ -83,11 +83,9 @@ impl Snapshot for LevelDBSnapshot {
         self.snapshot.get(LEVELDB_READ_OPTIONS, key).map_err(Into::into)
     }
 
-    fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a> {
+    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         let iter = self.snapshot.iter(LEVELDB_READ_OPTIONS);
-        if let Some(seek) = from {
-            iter.seek(seek)
-        }
+        iter.seek(from);
         Box::new(iter)
     }
 }

@@ -39,13 +39,9 @@ impl Snapshot for MemoryDB {
         Ok(self.map.contains_key(key))
     }
 
-    fn iter<'a>(&'a self, from: Option<&[u8]>) -> Iter<'a> {
+    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         use std::collections::Bound::*;
-        let range = if let Some(seek) = from {
-            (Included(seek), Unbounded)
-        } else {
-            (Unbounded, Unbounded)
-        };
+        let range = (Included(from), Unbounded);
         Box::new(self.map.range::<[u8], _>(range).map(|(k, v)| (k.as_slice(), v.as_slice())))
     }
 }
