@@ -12,6 +12,7 @@ pub use self::values::StorageValue;
 pub use self::base_index::{BaseIndex, BaseIndexIter};
 pub use self::entry::Entry;
 pub use self::map_index::MapIndex;
+pub use self::set_index::SetIndex;
 pub use self::list_index::ListIndex;
 
 
@@ -29,6 +30,7 @@ mod values;
 mod base_index;
 mod entry;
 mod map_index;
+mod set_index;
 mod list_index;
 
 pub fn merkle_hash(hashes: &[Hash]) -> Hash {
