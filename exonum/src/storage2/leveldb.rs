@@ -1,5 +1,5 @@
 use leveldb::database::Database as LevelDatabase;
-use leveldb::iterator::{Iterator, LevelDBIterator, Iterable};
+use leveldb::iterator::{LevelDBIterator, Iterable};
 use leveldb::error::Error as LevelDBError;
 use leveldb::database::snapshots::Snapshot as LevelSnapshot;
 use leveldb::options::{Options, WriteOptions, ReadOptions};

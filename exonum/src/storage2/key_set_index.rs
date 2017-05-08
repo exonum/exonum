@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageKey, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageKey};
 
 pub struct KeySetIndex<T, K> {
     base: BaseIndex<T>,

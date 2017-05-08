@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageKey, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageValue};
 
 pub struct ListIndex<T, V> {
     base: BaseIndex<T>,

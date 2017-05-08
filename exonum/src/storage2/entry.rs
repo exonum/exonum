@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crypto::Hash;
 
-use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageKey, StorageValue};
+use super::{BaseIndex, Result, Snapshot, Fork, StorageValue};
 
 pub struct Entry<T, V> {
     base: BaseIndex<T>,
