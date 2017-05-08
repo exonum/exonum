@@ -155,7 +155,6 @@ message! {
     }
 }
 
-
 /// Current node status.
 ///
 /// ### Validation

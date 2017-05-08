@@ -20,7 +20,7 @@ use std::error::Error;
 
 use crypto::{Hash, PublicKey, SecretKey, Seed, Signature};
 
-use messages::Field;
+use messages::{Field, MessageWriter};
 use super::HexValue;
 
 /// `ExonumJsonDeserializeField` is trait for object that can be serialized "in-place" of storage structure.
@@ -44,7 +44,7 @@ pub trait WriteBufferWrapper {
     fn write<'a, T: Field<'a> >(&'a mut self, from: usize, to: usize, val:T);
 }
 
-impl WriteBufferWrapper for ::messages::MessageWriter {
+impl WriteBufferWrapper for MessageWriter {
     fn write<'a, T: Field<'a> >(&'a mut self, from: usize, to: usize, val:T){
         self.write(val, from, to)
     }
@@ -57,7 +57,7 @@ impl WriteBufferWrapper for Vec<u8> {
 }
 
 /// Helper function, for wrapping value that should be serialized as `ExonumJsonSerialize`
-pub fn wrap<'a, T: ExonumJsonSerialize>(val: &'a T) ->  ExonumJsonSerializeWrapper<'a, T> {
+pub fn wrap<T: ExonumJsonSerialize>(val: &T) ->  ExonumJsonSerializeWrapper<T> {
     ExonumJsonSerializeWrapper(val)
 }
 
@@ -336,7 +336,7 @@ pub fn to_value<T: ExonumJsonSerialize>(value: &T) -> Result<Value, Box<Error>> 
 }
 
 pub fn from_value<T: ExonumJsonDeserialize>(value: &Value) -> Result<T, Box<Error>> {    
-    T::deserialize_owned(&value)
+    T::deserialize_owned(value)
 }
 
 pub fn to_string<T: ExonumJsonSerialize>(value: &T) -> Result<String, Box<Error>> {    
