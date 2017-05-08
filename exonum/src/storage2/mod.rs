@@ -10,6 +10,7 @@ pub use self::keys::StorageKey;
 pub use self::values::StorageValue;
 
 pub use self::base_index::{BaseIndex, BaseIndexIter};
+pub use self::entry::Entry;
 pub use self::map_index::MapIndex;
 pub use self::list_index::ListIndex;
 
@@ -26,6 +27,7 @@ mod keys;
 mod values;
 
 mod base_index;
+mod entry;
 mod map_index;
 mod list_index;
 
