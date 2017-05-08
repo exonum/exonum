@@ -69,7 +69,7 @@ impl<T> BaseIndex<T> where T: AsMut<Fork> {
     pub fn put<K, V>(&mut self, key: &K, value: V) where K: StorageKey,
                                                          V: StorageValue {
         let key = self.prefixed_key(key);
-        self.view.as_mut().put(key, value.serialize());
+        self.view.as_mut().put(key, value.into_vec());
     }
 
     pub fn delete<K>(&mut self, key: &K) where K: StorageKey {
@@ -92,7 +92,7 @@ impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,
         }
         if let Some((ref k, ref v)) = self.base_iter.next() {
             if k.starts_with(self.prefix) {
-                return Some((K::read(&k[self.prefix.len()..]), V::from_slice(v)))
+                return Some((K::from_slice(&k[self.prefix.len()..]), V::from_slice(v)))
             }
         }
         self.ended = true;
