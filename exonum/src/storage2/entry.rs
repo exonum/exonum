@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use crypto::Hash;
+
 use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageKey, StorageValue};
 
 pub struct Entry<T, V> {
@@ -24,6 +26,10 @@ impl<T, V> Entry<T, V> where T: AsRef<Snapshot>,
 
     pub fn exists(&self) -> Result<bool> {
         self.base.contains(&())
+    }
+
+    pub fn hash(&self) -> Result<Hash> {
+        Ok(self.base.get::<(), V>(&())?.map(|v| v.hash()).unwrap_or_default())
     }
 }
 
