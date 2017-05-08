@@ -1,10 +1,10 @@
-# Exonum [global variables updater]/configuration service [![Build Status](https://travis-ci.com/exonum/exonum-configuration.svg?token=ygdqGfZjj1YKhGQQzBzp&branch=master)](https://travis-ci.com/exonum/exonum-configuration) 
+## Exonum global variables updater service [![Build Status](https://travis-ci.com/exonum/exonum-configuration.svg?token=ygdqGfZjj1YKhGQQzBzp&branch=master)](https://travis-ci.com/exonum/exonum-configuration) 
 
-This crate implements functionality of modifying `Exonum` blockchain global configuration via 
+This crate implements functionality of modifying `exonum` blockchain global configuration via 
 exchanging transactions with
 
-- config proposes and
-- votes for a specific config propose.
+- a config propose
+- a vote for a specific config propose
 
 Configuration is comprised of:
 
@@ -16,7 +16,7 @@ Configuration is comprised of:
 
 - [Reference documentation](http://exonum.com/doc/crates/configuration_service/index.html)
 - [Example code](examples/configuration.rs)
-- [Testnet tutorial](doc/testnet_api_tutorial.md)
+- [Testnet deploy and api usage tutorial](doc/testnet_api_tutorial.md)
 
 ## Usage
 
