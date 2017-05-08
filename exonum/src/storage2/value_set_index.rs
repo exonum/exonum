@@ -66,6 +66,10 @@ impl<T, V> ValueSetIndex<T, V> where T: AsMut<Fork>,
     pub fn delete_by_hash(&mut self, hash: &Hash) {
         self.base.delete(hash)
     }
+
+    pub fn clear(&mut self) {
+        self.base.clear()
+    }
 }
 
 impl<'a, V> Iterator for ValueSetIndexIter<'a, V> where V: StorageValue {

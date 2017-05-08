@@ -44,6 +44,10 @@ impl<T, K> KeySetIndex<T, K> where T: AsMut<Fork>,
     pub fn delete(&mut self, item: &K) {
         self.base.delete(item)
     }
+
+    pub fn clear(&mut self) {
+        self.base.clear()
+    }
 }
 
 impl<'a, K> Iterator for KeySetIndexIter<'a, K> where K: StorageKey {

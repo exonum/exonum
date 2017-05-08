@@ -106,6 +106,10 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
         }
         Ok(())
     }
+
+    pub fn clear(&mut self) {
+        self.base.clear()
+    }
 }
 
 impl<'a, V> Iterator for ListIndexIter<'a, V> where V: StorageValue {

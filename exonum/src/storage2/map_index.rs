@@ -76,6 +76,10 @@ impl<T, K, V> MapIndex<T, K, V> where T: AsMut<Fork>,
     pub fn delete(&mut self, key: &K) {
         self.base.delete(key)
     }
+
+    pub fn clear(&mut self) {
+        self.base.clear()
+    }
 }
 
 impl<'a, K, V> Iterator for MapIndexIter<'a, K, V> where K: StorageKey,
