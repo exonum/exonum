@@ -4,13 +4,9 @@
 
 #![cfg_attr(feature="clippy", allow(zero_prefixed_literal))]
 
-#![feature(inclusive_range_syntax)]
-#![feature(btree_range, collections_bound)]
-
 #![cfg_attr(feature="flame_profile",feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_profile",plugin(flamer))]
 
-#[macro_use]
 extern crate profiler;
 #[macro_use]
 extern crate log;

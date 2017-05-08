@@ -1,6 +1,5 @@
 extern crate exonum;
 extern crate sandbox;
-#[macro_use]
 extern crate log;
 
 use std::time::Duration;

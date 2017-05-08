@@ -3,7 +3,6 @@ use std::sync::RwLock;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::cmp::Ordering;
-use std::collections::Bound::{Included, Unbounded};
 
 use super::{Map, Database, Error, Patch, Change, Fork};
 
@@ -46,7 +45,7 @@ impl Map<[u8], Vec<u8>> for MemoryDB {
     // TODO optimize me
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let map = self.map.read().unwrap();
-        let mut it = map.range::<[u8], [u8]>(Included(key), Unbounded);
+        let mut it = map.range(key.to_vec()..);
         Ok(it.next().map(|x| x.0.to_vec()))
     }
 }
@@ -87,8 +86,8 @@ impl Map<[u8], Vec<u8>> for MemoryDBView {
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let map_changes = self.changes.borrow();
         let map_snapshot = self.map.map.read().unwrap();
-        let mut it_changes = map_changes.range::<[u8], [u8]>(Included(key), Unbounded);
-        let mut it_snapshot = map_snapshot.range::<[u8], [u8]>(Included(key), Unbounded);
+        let mut it_changes = map_changes.range(key.to_vec()..);
+        let mut it_snapshot = map_snapshot.range(key.to_vec()..);
 
         let res: Option<Vec<u8>>;
         let least_put_key: Option<Vec<u8>> = it_changes.find(|entry| {
