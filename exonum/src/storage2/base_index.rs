@@ -76,6 +76,10 @@ impl<T> BaseIndex<T> where T: AsMut<Fork> {
         let key = self.prefixed_key(key);
         self.view.as_mut().delete(key);
     }
+
+    pub fn clear(&mut self) {
+        self.view.as_mut().delete_by_prefix(&self.prefix)
+    }
 }
 
 impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,

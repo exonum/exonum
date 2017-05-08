@@ -93,6 +93,15 @@ impl Fork {
         self.changes.insert(key, Change::Delete);
     }
 
+    pub fn delete_by_prefix(&mut self, prefix: &[u8]) {
+        for (k, _) in self.snapshot.iter(prefix) {
+            if !k.starts_with(prefix) {
+                return
+            }
+            self.changes.insert(k.to_vec(), Change::Delete);
+        }
+    }
+
     pub fn as_snapshot(&self) -> &Snapshot {
         &*self.snapshot
     }
