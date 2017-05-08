@@ -151,7 +151,7 @@ impl<S> NodeHandler<S>
                 if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                     let hash = tx.hash();
                     if schema.transactions().get(&hash).unwrap().is_some() {
-                        error!("Received block with already commited transaction, block={:?}",
+                        error!("Received block with already committed transaction, block={:?}",
                                msg);
                         return;
                     }
