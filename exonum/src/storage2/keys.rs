@@ -78,19 +78,19 @@ impl StorageKey for u64 {
     }
 }
 
-// impl StorageKey for i8 {
-//     fn size() -> usize {
-//         1
-//     }
+impl StorageKey for i8 {
+    fn size() -> usize {
+        1
+    }
 
-//     fn write(&self, buffer: &mut Vec<u8>) {
-//         buffer[0] = *self
-//     }
+    fn write(&self, buffer: &mut Vec<u8>) {
+        buffer[0] = *self as u8
+    }
 
-//     fn read(buffer: &[u8]) -> Self {
-//         buffer[0]
-//     }
-// }
+    fn read(buffer: &[u8]) -> Self {
+        buffer[0] as i8
+    }
+}
 
 impl StorageKey for i16 {
     fn size() -> usize {
