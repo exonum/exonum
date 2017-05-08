@@ -604,8 +604,10 @@ impl TxConfigPropose {
         let blockchain_schema = Schema::new(view);
         let config_schema = ConfigurationSchema::new(view);
 
-        let following_config: Option<StoredConfiguration> = blockchain_schema
-            .get_following_configuration()?;
+
+        let following_config: Option<StoredConfiguration> =
+            blockchain_schema.following_configuration()?;
+
         if let Some(foll_cfg) = following_config {
             error!("Discarding TxConfigPropose: {} as there is an already scheduled next config: \
                     {:?} ",
@@ -614,7 +616,7 @@ impl TxConfigPropose {
             return Ok(());
         }
 
-        let actual_config: StoredConfiguration = blockchain_schema.get_actual_configuration()?;
+        let actual_config: StoredConfiguration = blockchain_schema.actual_configuration()?;
 
         if !actual_config.validators.contains(self.from()) {
             error!("Discarding TxConfigPropose:{} from unknown validator. ",
@@ -670,8 +672,10 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        let following_config: Option<StoredConfiguration> = blockchain_schema
-            .get_following_configuration()?;
+
+        let following_config: Option<StoredConfiguration> =
+            blockchain_schema.following_configuration()?;
+
         if let Some(foll_cfg) = following_config {
             error!("Discarding TxConfigVote: {:?} as there is an already scheduled next config: \
                     {:?} ",
@@ -680,7 +684,7 @@ impl TxConfigVote {
             return Ok(());
         }
 
-        let actual_config: StoredConfiguration = blockchain_schema.get_actual_configuration()?;
+        let actual_config: StoredConfiguration = blockchain_schema.actual_configuration()?;
 
         if !actual_config.validators.contains(self.from()) {
             error!("Discarding TxConfigVote:{:?} from unknown validator. ",
@@ -725,8 +729,7 @@ impl TxConfigVote {
         }
 
         if votes_count >= State::byzantine_majority_count(actual_config.validators.len()) {
-            blockchain_schema
-                .commit_actual_configuration(parsed_config)?;
+            blockchain_schema.commit_configuration(parsed_config)?;
         }
         Ok(())
     }
@@ -778,19 +781,9 @@ impl Service for ConfigurationService {
         ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
+
     /// Update config in `NodeState` upon reaching the height, when a new config is actual from.
-    fn handle_commit(&self, state: &mut NodeState) -> StorageResult<()> {
-        let old_cfg = state.actual_config().clone();
-
-        let new_cfg = {
-            let schema = Schema::new(state.view());
-            schema.get_actual_configuration()?
-        };
-
-        if new_cfg != old_cfg {
-            info!("Updated node config={:#?}", new_cfg);
-            state.update_config(new_cfg);
-        }
+    fn handle_commit(&self, _: &mut NodeState) -> StorageResult<()> {
         Ok(())
     }
 }

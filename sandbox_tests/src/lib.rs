@@ -65,6 +65,7 @@ mod tests {
     use configuration_service::{TxConfigPropose, TxConfigVote, ConfigurationService,
                                 ConfigurationSchema};
     use serde_json::Value;
+
     use blockchain_explorer;
 
     pub fn configuration_sandbox() -> (Sandbox, SandboxState, StoredConfiguration) {
@@ -98,8 +99,8 @@ mod tests {
         use exonum::blockchain::Service;
         use serde_json::Value;
         use serde_json::value::ToJson;
-        let _ = blockchain_explorer::helpers::init_logger();
-        let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
+        let (sandbox, sandbox_state, initial_cfg)  = configuration_sandbox();
+
         sandbox.assert_state(1, 1);
         add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
         sandbox.assert_state(2, 1);

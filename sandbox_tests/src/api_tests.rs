@@ -36,6 +36,7 @@ use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 use super::generate_config_with_message;
 
+
 fn response_body(response: Response) -> serde_json::Value {
     if let Some(mut body) = response.body {
         let mut buf = Vec::new();

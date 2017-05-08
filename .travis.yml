@@ -15,9 +15,9 @@ script:
 - cargo fmt -p configuration_service -- --write-mode=diff
 - cd sandbox_tests && cargo fmt -p sandbox_tests -- --write-mode=diff
 - cd ..
-- cargo check --features clippy --verbose
-- cargo build --release --verbose
-- cargo test --manifest-path sandbox_tests/Cargo.toml --verbose
+- cargo check --features clippy 
+- cargo build --release 
+- RUST_LOG=off cargo test --manifest-path sandbox_tests/Cargo.toml 
 notifications:
   slack:
     rooms:

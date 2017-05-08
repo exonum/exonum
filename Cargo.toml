@@ -24,9 +24,9 @@ clippy = {version = "0.0.107", optional = true}
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "6804712b34210a9643132d12c34c34cc18eb0384"
+rev = "0668f2e9708b3b391225af13c571dc37c13434e0"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "6804712b34210a9643132d12c34c34cc18eb0384"
+rev = "0668f2e9708b3b391225af13c571dc37c13434e0"
