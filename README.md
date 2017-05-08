@@ -16,7 +16,7 @@ Configuration is comprised of:
 
 - [Reference documentation](http://exonum.com/doc/crates/configuration_service/index.html)
 - [Example code](examples/configuration.rs)
-- [Testnet deploy and api usage tutorial](doc/testnet_api_tutorial.md)
+- [Testnet deploy and api usage tutorial](doc/testnet-api-tutorial.md)
 
 ## Usage
 
