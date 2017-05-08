@@ -20,7 +20,7 @@ Configuration is comprised of:
 
 ## Usage
 
-See [tutorial](doc/testnet_api_tutorial.md) for details.
+See [tutorial](doc/testnet-api-tutorial.md) for details.
 
 ## Licence
 
