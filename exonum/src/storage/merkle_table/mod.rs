@@ -682,7 +682,7 @@ mod tests {
         let h5upup = hash(h5up.as_ref());
         let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
-        for i in 0u8...4 {
+        for i in 0u8..5 {
             table.append(vec![i, i + 1, i + 2]).unwrap();
         }
 

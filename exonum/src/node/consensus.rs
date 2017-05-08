@@ -195,7 +195,7 @@ impl<S> NodeHandler<S>
         // Lock to propose
         // TODO: avoid loop here
         let start_round = ::std::cmp::max(self.state.locked_round() + 1, propose_round);
-        for round in start_round...self.state.round() {
+        for round in start_round..self.state.round() + 1 {
             if self.state.has_majority_prevotes(round, hash) {
                 self.has_majority_prevotes(round, &hash);
             }
@@ -290,7 +290,7 @@ impl<S> NodeHandler<S>
 
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
-        for round in prevote_round...self.state.round() {
+        for round in prevote_round..self.state.round() + 1 {
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
                     self.broadcast_prevote(round, &propose_hash);

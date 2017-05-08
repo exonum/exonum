@@ -734,7 +734,7 @@ impl State {
     }
 
     pub fn have_incompatible_prevotes(&self) -> bool {
-        for round in self.locked_round + 1...self.round {
+        for round in self.locked_round + 1..self.round + 1 {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
