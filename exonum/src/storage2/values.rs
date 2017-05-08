@@ -4,7 +4,7 @@ use std::mem;
 use std::sync::Arc;
 
 use crypto::{Hash, hash, PublicKey};
-use messages::{RawMessage, MessageBuffer, Message, FromRaw};
+use messages::{RawMessage, MessageBuffer, Message};
 
 pub trait StorageValue : Sized {
     fn hash(&self) -> Hash;
@@ -20,7 +20,7 @@ impl StorageValue for () {
         Vec::new()
     }
 
-    fn from_slice(value: &[u8]) -> Self {
+    fn from_slice(_value: &[u8]) -> Self {
         ()
     }
 

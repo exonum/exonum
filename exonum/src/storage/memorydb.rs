@@ -2,7 +2,6 @@ use std::clone::Clone;
 use std::sync::RwLock;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::cmp::Ordering;
 
 use super::{Map, Database, Error, Patch, Change, Fork};
 
@@ -44,7 +43,7 @@ impl Map<[u8], Vec<u8>> for MemoryDB {
         Ok(())
     }
     // TODO optimize me
-    fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    fn find_key(&self, _key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         unimplemented!()
         // let map = self.map.read().unwrap();
         // let mut it = map.range::<[u8], [u8]>(Included(key), Unbounded);
@@ -85,7 +84,7 @@ impl Map<[u8], Vec<u8>> for MemoryDBView {
         Ok(())
     }
 
-    fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    fn find_key(&self, _key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         unimplemented!()
         // let map_changes = self.changes.borrow();
         // let map_snapshot = self.map.map.read().unwrap();

@@ -1,6 +1,6 @@
 use std::iter::{Iterator, Peekable};
 use std::collections::btree_map::{BTreeMap, Range};
-use std::cmp::Ordering;
+use std::cmp::Ordering::*;
 
 use super::Result;
 

@@ -6,11 +6,6 @@ use leveldb::database::kv::KV;
 use leveldb::database::batch::Writebatch;
 use leveldb::batch::Batch;
 use leveldb::snapshots::Snapshots;
-use leveldb::database::iterator::{Iterable,
-                                  LevelDBIterator as LevelDBIteratorTrait,
-                                  Iterator as LevelIterator,
-                                  KeyIterator as LevelKeys,
-                                  ValueIterator as LevelValues};
 
 use std::fs;
 use std::io;
@@ -19,9 +14,6 @@ use std::path::Path;
 use std::error;
 use std::sync::Arc;
 use std::cell::RefCell;
-use std::collections::Bound::{Included, Unbounded};
-use std::collections::btree_map::Range;
-use std::cmp::Ordering;
 
 use profiler;
 
@@ -106,7 +98,7 @@ impl Map<[u8], Vec<u8>> for LevelDB {
         let result = self.db.delete(LEVELDB_WRITE_OPTIONS, key);
         result.map_err(Into::into)
     }
-    fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    fn find_key(&self, _key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         unimplemented!()
         // let it = self.db.keys_iter(LEVELDB_READ_OPTIONS);
         // it.seek(key);
@@ -149,7 +141,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
         Ok(())
     }
 
-    fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
+    fn find_key(&self, _key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         unimplemented!()
         // // TODO merge with the same function in memorydb
         // let map_changes = self.changes.borrow();
