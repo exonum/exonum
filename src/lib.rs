@@ -605,8 +605,8 @@ impl TxConfigPropose {
         let config_schema = ConfigurationSchema::new(view);
 
 
-        let following_config: Option<StoredConfiguration> =
-            blockchain_schema.following_configuration()?;
+        let following_config: Option<StoredConfiguration> = blockchain_schema
+            .following_configuration()?;
 
         if let Some(foll_cfg) = following_config {
             error!("Discarding TxConfigPropose: {} as there is an already scheduled next config: \
@@ -673,8 +673,8 @@ impl TxConfigVote {
         }
 
 
-        let following_config: Option<StoredConfiguration> =
-            blockchain_schema.following_configuration()?;
+        let following_config: Option<StoredConfiguration> = blockchain_schema
+            .following_configuration()?;
 
         if let Some(foll_cfg) = following_config {
             error!("Discarding TxConfigVote: {:?} as there is an already scheduled next config: \
