@@ -99,7 +99,7 @@ mod tests {
         use exonum::blockchain::Service;
         use serde_json::Value;
         use serde_json::value::ToJson;
-        let (sandbox, sandbox_state, initial_cfg)  = configuration_sandbox();
+        let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
 
         sandbox.assert_state(1, 1);
         add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
