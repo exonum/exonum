@@ -1,3 +1,17 @@
+//! Consensus messages.
+//!
+//! Every message, unless stated otherwise, is checked by the same set of rules. The message is
+//! ignored if it
+//!     * is sent from a lower height than the current one
+//!     * contains incorrect validator id
+//!     * is signed with incorrect signature
+//!
+//! Specific nuances are described in each message documentation and typically consist of three
+//! parts:
+//!     * validation - additional checks before processing
+//!     * processing - how message is processed and result of the processing
+//!     * generation - in which cases message is generated
+
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use std::net::SocketAddr;
@@ -59,10 +73,10 @@ message! {
 ///
 /// ### Processing
 /// If the message contains unknown transactions, then `RequestTransactions` is sent. Otherwise
-/// `Prevote` is sent.
+/// `Prevote` is broadcast.
 ///
 /// ### Generation
-/// A node sends `Propose` if it is a leader and is not locked for a different proposal. Also
+/// A node broadcasts `Propose` if it is a leader and is not locked for a different proposal. Also
 /// `Propose` can be sent as response to `RequestPropose`.
 message! {
     Propose {
@@ -81,18 +95,19 @@ message! {
 /// Pre-vote for a new block.
 ///
 /// ### Validation
-/// A node panics if there already is a different `Prevote` for the same round.
+/// A node panics if it has already sent a different `Prevote` for the same round.
 ///
 /// ### Processing
 /// Pre-vote is added to the list of known votes for the same proposal.
 /// If `locked_round` number from the message is bigger than in a node state, then
 /// `RequestPrevotes` is sent.
-/// If there are unknown transactions, `RequestTransactions` is sent.
+/// If there are unknown transactions in the propose specified by `propose_hash`,
+/// `RequestTransactions` is sent.
 /// Otherwise if all transactions are known and there are +2/3 pre-votes, then a node is locked
-/// to that proposal and `Precommit` is sent.
+/// to that proposal and `Precommit` is broadcast.
 ///
 /// ### Generation
-/// A node sends `Prevote` as response for `Propose` if it doesn't contain unknown transactions.
+/// A node broadcasts `Prevote` in response to `Propose` when it has received all the transactions.
 message! {
     Prevote {
         const TYPE = CONSENSUS;
@@ -110,7 +125,7 @@ message! {
 /// Pre-commit for a proposal.
 ///
 /// ### Validation
-/// A node panics if there already is a different `Precommit` for the same round.
+/// A node panics if it  has already sent a different `Precommit` for the same round.
 ///
 /// ### Processing
 /// Pre-commit is added to the list of known pre-commits.
@@ -118,11 +133,12 @@ message! {
 /// If `round` number from the message is bigger than a node's "locked round", then
 /// `RequestPrevotes` is sent.
 /// If there are unknown transactions, then `RequestTransactions` is sent.
-/// If the consensus is achieved, then block is executed and `Status` is broadcast.
+/// If a validator receives +2/3 precommits for the same proposal with the same block_hash, then
+/// block is executed and `Status` is broadcast.
 ///
 /// ### Generation
-/// A node sends `Precommit` in response to `Prevote` if there are +2/3 pre-votes and no unknown
-/// transactions.
+/// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3 pre-votes and no
+/// unknown transactions.
 message! {
     Precommit {
         const TYPE = CONSENSUS;
@@ -192,11 +208,12 @@ impl Deserialize for Precommit {
 /// height.
 ///
 /// ### Processing
-/// If the message's `height` number is bigger than a node's one, then `RequestBlock` is sent.
+/// If the message's `height` number is bigger than a node's one, then `RequestBlock` with current
+/// node's height is sent.
 ///
 /// ### Generation
-/// `Status` message is sent regularly with the timeout controlled by
-/// `blockchain::ConsensusConfig::status_timeout`. Also, it is sent after accepting a new block.
+/// `Status` message is broadcast regularly with the timeout controlled by
+/// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast after accepting a new block.
 message! {
     Status {
         const TYPE = CONSENSUS;
@@ -212,8 +229,9 @@ message! {
 /// Information about a block.
 ///
 /// ### Validation
-/// The message is ignored if its `to` field corresponds to the different node or it's content is
-/// invalid.
+/// The message is ignored if
+///     * its `to` field corresponds to a different node
+///     * the `block`, `transaction` and `precommits` fields cannot be parsed or verified
 ///
 /// ### Processing
 /// The block is added to the blockchain.
