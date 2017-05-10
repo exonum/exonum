@@ -170,9 +170,7 @@ mod tests {
         }
 
         fn request_wallet_info(&self, pulic_key: &PublicKey) -> IronResult<Response> {
-            let pubkey_str = serde_json::to_string(&pulic_key)
-                .unwrap()
-                .replace("\"", "");
+            let pubkey_str = serde_json::to_string(&pulic_key).unwrap().replace("\"", "");
             self.request_wallet_info_str(pubkey_str)
         }
 
@@ -208,9 +206,7 @@ mod tests {
             }
             let (p, s) = gen_keypair();
             let string_len = rng.gen_range(20u8, 255u8);
-            let name: String = rng.gen_ascii_chars()
-                .take(string_len as usize)
-                .collect();
+            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
             TxCreateWallet::new(&p, &name, &s).into()
         };
 
