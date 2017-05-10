@@ -3,7 +3,7 @@ cache: cargo
 sudo: required
 dist: trusty
 before_install:
-- cargo install rustfmt --force
+- cargo install rustfmt --vers 0.8.4 --force
 - rustup override set nightly-2017-01-08
 - rustc --version
 - cargo --version
