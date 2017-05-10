@@ -102,9 +102,7 @@ impl<S> NodeHandler<S>
         let precommits = schema.precommits(&block_hash)
             .values()
             .unwrap()
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+            .to_vec();
         let transactions = schema.block_txs(height)
             .values()
             .unwrap()

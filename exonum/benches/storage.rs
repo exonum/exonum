@@ -5,16 +5,17 @@ extern crate rand;
 extern crate tempdir;
 extern crate exonum;
 
-#[cfg(test)]
+#[cfg(all(feature = "nightly", test))]
 mod tests {
     use test::Bencher;
     use rand::{SeedableRng, XorShiftRng, Rng};
-    use exonum::storage::{MerkleTable, MerklePatriciaTable, Database, Map, List, MapTable, Fork};
     #[cfg(feature = "long_benchmarks")]
     use tempdir::TempDir;
     #[cfg(feature = "long_benchmarks")]
-    use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
+    use exonum::storage::{MerkleTable, MerklePatriciaTable, Database, Map, List, MapTable, Fork,
+                          MemoryDB, LevelDB, LevelDBOptions};
 
+    #[cfg(feature = "long_benchmarks")]
     fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
         let kv_generator = |_| {
             let mut v = vec![0; 8];
@@ -27,9 +28,10 @@ mod tests {
         (0..len).map(kv_generator).collect::<Vec<_>>()
     }
 
-    fn merkle_table_insertion<T: Database>(b: &mut Bencher, mut db: T) {
+    #[cfg(feature = "long_benchmarks")]
+    fn merkle_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
-        let map = MapTable::new(vec![123], &mut db);
+        let map = MapTable::new(vec![123], db);
         let table = MerkleTable::new(map);
         table.get(0u32).unwrap();
         b.iter(|| {
@@ -45,27 +47,29 @@ mod tests {
         });
     }
 
-    fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, mut db: T) {
+    #[cfg(feature = "long_benchmarks")]
+    fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
         let data = generate_random_kv(&mut rng, 200);
 
-        let map = MapTable::new(vec![234], &mut db);
+        let map = MapTable::new(vec![234], db);
         let table = MerklePatriciaTable::new(map);
         b.iter(|| for item in &data {
                    table.put(&item.0, item.1.clone()).unwrap();
                });
     }
 
-    fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: T) {
+    #[cfg(feature = "long_benchmarks")]
+    fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
         let data = generate_random_kv(&mut rng, 200);
 
         b.iter(|| {
             let patch;
             {
-                let mut fork = db.fork();
+                let fork = db.fork();
                 {
-                    let map = MapTable::new(vec![234], &mut fork);
+                    let map = MapTable::new(vec![234], &fork);
                     let table = MerklePatriciaTable::new(map);
                     for item in &data {
                         table.put(&item.0, item.1.clone()).unwrap();
@@ -77,7 +81,8 @@ mod tests {
         });
     }
 
-    fn merkle_patricia_table_insertion_large_map<T: Database>(b: &mut Bencher, mut db: T) {
+    #[cfg(feature = "long_benchmarks")]
+    fn merkle_patricia_table_insertion_large_map<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 140, 52]);
         let data = generate_random_kv(&mut rng, 200);
         let kv_generator = |_| {
@@ -89,7 +94,7 @@ mod tests {
             (k, v)
         };
 
-        let map = MapTable::new(vec![134], &mut db);
+        let map = MapTable::new(vec![134], db);
         let table = MerklePatriciaTable::new(map);
         for item in (0..10000).map(kv_generator) {
             table.put(&item.0, item.1.clone()).unwrap();

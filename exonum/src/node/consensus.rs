@@ -212,9 +212,7 @@ impl<S> NodeHandler<S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
+                .to_vec();
             self.commit(our_block_hash, precommits.iter());
         }
     }
@@ -282,9 +280,7 @@ impl<S> NodeHandler<S>
         // Commit.
         let precommits = self.state
             .precommits(round, our_block_hash)
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+            .to_vec();
         self.commit(our_block_hash, precommits.iter());
     }
 
