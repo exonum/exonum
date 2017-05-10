@@ -1,4 +1,4 @@
-#![cfg_attr(feature="nightly", feature(test))]
+#![cfg_attr(all(feature = "nightly", test), feature(test))]
 
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 

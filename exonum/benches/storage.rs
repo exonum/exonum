@@ -8,10 +8,12 @@ extern crate exonum;
 #[cfg(test)]
 mod tests {
     use test::Bencher;
-    use tempdir::TempDir;
     use rand::{SeedableRng, XorShiftRng, Rng};
-    use exonum::storage::{MerkleTable, MerklePatriciaTable, Database, Map, List, MapTable, Fork,
-                          MemoryDB, LevelDB, LevelDBOptions};
+    use exonum::storage::{MerkleTable, MerklePatriciaTable, Database, Map, List, MapTable, Fork};
+    #[cfg(feature = "long_benchmarks")]
+    use tempdir::TempDir;
+    #[cfg(feature = "long_benchmarks")]
+    use exonum::storage::{MemoryDB, LevelDB, LevelDBOptions};
 
     fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
         let kv_generator = |_| {
@@ -22,9 +24,7 @@ mod tests {
             rng.fill_bytes(&mut k);
             (k, v)
         };
-        (0..len)
-            .map(kv_generator)
-            .collect::<Vec<_>>()
+        (0..len).map(kv_generator).collect::<Vec<_>>()
     }
 
     fn merkle_table_insertion<T: Database>(b: &mut Bencher, mut db: T) {
@@ -51,11 +51,9 @@ mod tests {
 
         let map = MapTable::new(vec![234], &mut db);
         let table = MerklePatriciaTable::new(map);
-        b.iter(|| {
-            for item in &data {
-                table.put(&item.0, item.1.clone()).unwrap();
-            }
-        });
+        b.iter(|| for item in &data {
+                   table.put(&item.0, item.1.clone()).unwrap();
+               });
     }
 
     fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: T) {
@@ -97,11 +95,9 @@ mod tests {
             table.put(&item.0, item.1.clone()).unwrap();
         }
 
-        b.iter(|| {
-            for item in &data {
-                table.put(&item.0, item.1.clone()).unwrap();
-            }
-        });
+        b.iter(|| for item in &data {
+                   table.put(&item.0, item.1.clone()).unwrap();
+               });
     }
 
     #[cfg(feature = "long_benchmarks")]
