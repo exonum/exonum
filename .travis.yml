@@ -3,6 +3,7 @@ cache: cargo
 sudo: required
 dist: trusty
 before_install:
+- cargo install rustfmt --force
 - rustup override set nightly-2017-01-08
 - rustc --version
 - cargo --version
@@ -11,7 +12,7 @@ before_install:
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 script:
-- cargo check --manifest-path backend/Cargo.toml --verbose
+- cargo fmt -p timestamping -- --write-mode=diff
 - cargo test  --manifest-path backend/Cargo.toml --verbose
 notifications:
   slack:
