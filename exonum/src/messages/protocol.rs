@@ -72,8 +72,8 @@ message! {
 ///     * is already known
 ///
 /// ### Processing
-/// If the message contains unknown transactions, then `RequestTransactions` is sent. Otherwise
-/// `Prevote` is broadcast.
+/// If the message contains unknown transactions, then `RequestTransactions` is sent in reply.
+/// Otherwise `Prevote` is broadcast.
 ///
 /// ### Generation
 /// A node broadcasts `Propose` if it is a leader and is not locked for a different proposal. Also
@@ -99,10 +99,10 @@ message! {
 ///
 /// ### Processing
 /// Pre-vote is added to the list of known votes for the same proposal.
-/// If `locked_round` number from the message is bigger than in a node state, then
-/// `RequestPrevotes` is sent.
+/// If `locked_round` number from the message is bigger than in a node state, then a node replies
+/// with `RequestPrevotes`.
 /// If there are unknown transactions in the propose specified by `propose_hash`,
-/// `RequestTransactions` is sent.
+/// `RequestTransactions` is sent in reply.
 /// Otherwise if all transactions are known and there are +2/3 pre-votes, then a node is locked
 /// to that proposal and `Precommit` is broadcast.
 ///
@@ -129,10 +129,10 @@ message! {
 ///
 /// ### Processing
 /// Pre-commit is added to the list of known pre-commits.
-/// If a proposal is unknown to the node, `RequestPropose` is sent.
-/// If `round` number from the message is bigger than a node's "locked round", then
-/// `RequestPrevotes` is sent.
-/// If there are unknown transactions, then `RequestTransactions` is sent.
+/// If a proposal is unknown to the node, `RequestPropose` is sent in reply.
+/// If `round` number from the message is bigger than a node's "locked round", then a node replies
+/// with `RequestPrevotes`.
+/// If there are unknown transactions, then `RequestTransactions` is sent in reply.
 /// If a validator receives +2/3 precommits for the same proposal with the same block_hash, then
 /// block is executed and `Status` is broadcast.
 ///
@@ -209,11 +209,12 @@ impl Deserialize for Precommit {
 ///
 /// ### Processing
 /// If the message's `height` number is bigger than a node's one, then `RequestBlock` with current
-/// node's height is sent.
+/// node's height is sent in reply.
 ///
 /// ### Generation
 /// `Status` message is broadcast regularly with the timeout controlled by
-/// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast after accepting a new block.
+/// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast after accepting a new
+/// block.
 message! {
     Status {
         const TYPE = CONSENSUS;
@@ -328,7 +329,8 @@ message! {
 /// Request connected peers from a node.
 ///
 /// ### Validation
-/// Response is sent only if the node is connected to the sender.
+/// Request is considered valid if the sender of the message on the network level corresponds to
+/// the `from` field.
 ///
 /// ### Processing
 /// Peer `Connect` messages are sent to the recipient.
