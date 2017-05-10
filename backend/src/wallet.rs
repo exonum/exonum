@@ -137,9 +137,7 @@ fn test_wallet_serde() {
         let mut hash_bytes = [0; HASH_SIZE];
 
         let (pub_key, _) = gen_keypair();
-        let name: String = rng.gen_ascii_chars()
-            .take(string_len as usize)
-            .collect();
+        let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
         let balance = rng.next_u64();
         let history_len = rng.next_u64();
         rng.fill_bytes(&mut hash_bytes);

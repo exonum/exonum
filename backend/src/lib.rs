@@ -195,7 +195,8 @@ impl Deserialize for CurrencyTx {
         let res = match h.message_id {
             TX_ISSUE_ID => {
                 let body_type = "Tx_ISSUE";
-                let body = from_value::<TxIssueSerdeHelper>(h.body).map_err(|e| {
+                let body = from_value::<TxIssueSerdeHelper>(h.body)
+                    .map_err(|e| {
                         de::Error::custom(format!("Coudn't parse '{}' transaction body from \
                                                    json. serde_json::error: {}",
                                                   body_type,
@@ -209,7 +210,8 @@ impl Deserialize for CurrencyTx {
             }
             TX_WALLET_ID => {
                 let body_type = "Tx_CREATE";
-                let body = from_value::<TxCreateSerdeHelper>(h.body).map_err(|e| {
+                let body = from_value::<TxCreateSerdeHelper>(h.body)
+                    .map_err(|e| {
                         de::Error::custom(format!("Coudn't parse '{}' transaction body from \
                                                    json. serde_json::error: {}",
                                                   body_type,
@@ -221,7 +223,8 @@ impl Deserialize for CurrencyTx {
             }
             TX_TRANSFER_ID => {
                 let body_type = "Tx_TRANSFER";
-                let body = from_value::<TxTransferSerdeHelper>(h.body).map_err(|e| {
+                let body = from_value::<TxTransferSerdeHelper>(h.body)
+                    .map_err(|e| {
                         de::Error::custom(format!("Coudn't parse '{}' transaction body from \
                                                    json. serde_json::error: {}",
                                                   body_type,
@@ -556,9 +559,7 @@ mod tests {
         let generator = move |_| {
             let (p, s) = gen_keypair();
             let string_len = rng.gen_range(20u8, 255u8);
-            let name: String = rng.gen_ascii_chars()
-                .take(string_len as usize)
-                .collect();
+            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
             TxCreateWallet::new(&p, &name, &s)
         };
         let (p, s) = gen_keypair();
