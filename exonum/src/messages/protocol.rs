@@ -1,4 +1,4 @@
-//! Consensus messages.
+//! Messages used in the Exonum consensus algorithm.
 //!
 //! Every message, unless stated otherwise, is checked by the same set of rules. The message is
 //! ignored if it
@@ -41,8 +41,8 @@ pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
 /// Connect to a node.
 ///
 /// ### Validation
-/// The message is ignored if the peer is already known and `time` is earlier than in the previous
-/// message.
+/// The message is ignored if its time is earlier than in the previous `Connect` message received
+/// from the same peer.
 ///
 /// ### Processing
 /// Connect to the peer.
