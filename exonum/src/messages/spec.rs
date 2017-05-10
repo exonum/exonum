@@ -94,18 +94,18 @@ macro_rules! message {
             }
         }
 
-        impl $crate::serialize::json::ExonumJsonSerialize for $name {
+        impl $crate::stream_struct::serialize::json::ExonumJsonSerialize for $name {
                 fn serialize<S>(&self, serializer: S) ->
                     Result<S::Ok, S::Error>
-                where S: $crate::serialize::json::reexport::Serializer
+                where S: $crate::stream_struct::serialize::json::reexport::Serializer
                 {
-                    use $crate::serialize::json::reexport::SerializeStruct;
-                    use $crate::serialize::json;
+                    use $crate::stream_struct::serialize::json::reexport::SerializeStruct;
+                    use $crate::stream_struct::serialize::json;
 
                     pub struct Body<'a>{_self: &'a $name};
-                    impl<'a> $crate::serialize::json::reexport::Serialize for Body<'a> {
+                    impl<'a> $crate::stream_struct::serialize::json::reexport::Serialize for Body<'a> {
                         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                            where S: $crate::serialize::json::reexport::Serializer
+                            where S: $crate::stream_struct::serialize::json::reexport::Serializer
                         {
                             let mut structure = serializer.serialize_struct(stringify!($name),
                                                             counter!($($field_name)*) )?;
@@ -127,13 +127,13 @@ macro_rules! message {
                 }
         }
 
-        impl $crate::serialize::json::ExonumJsonDeserializeField for $name {
-            fn deserialize_field<B> (value: &$crate::serialize::json::reexport::Value,
+        impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
+            fn deserialize_field<B> (value: &$crate::stream_struct::serialize::json::reexport::Value,
                                         buffer: & mut B, from: usize, to: usize )
                 -> Result<(), Box<::std::error::Error>>
-            where B: $crate::serialize::json::WriteBufferWrapper
+            where B: $crate::stream_struct::serialize::json::WriteBufferWrapper
             {
-                use $crate::serialize::json::ExonumJsonDeserialize;
+                use $crate::stream_struct::serialize::json::ExonumJsonDeserialize;
                 // deserialize full field
                 let structure = <Self as ExonumJsonDeserialize>::deserialize(value)?;
                 // then write it
@@ -142,12 +142,12 @@ macro_rules! message {
             }
         }
 
-        impl $crate::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::serialize::json::reexport::Value)
+        impl $crate::stream_struct::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &$crate::stream_struct::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>>
             {
-                use $crate::serialize::json::ExonumJsonDeserializeField;
-                use $crate::serialize::json::reexport::from_value;
+                use $crate::stream_struct::serialize::json::ExonumJsonDeserializeField;
+                use $crate::stream_struct::serialize::json::reexport::from_value;
                 use $crate::messages::{RawMessage, MessageWriter};
 
                 // if we could deserialize values, try append signature
@@ -190,22 +190,22 @@ macro_rules! message {
         }
 
         //\TODO: Rewrite Deserialize and Serializa implementation
-        impl<'de> $crate::serialize::json::reexport::Deserialize<'de> for $name {
+        impl<'de> $crate::stream_struct::serialize::json::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where D: $crate::serialize::json::reexport::Deserializer<'de>
+                where D: $crate::stream_struct::serialize::json::reexport::Deserializer<'de>
             {
-                use $crate::serialize::json::reexport::{Error, Deserialize, Value};
+                use $crate::stream_struct::serialize::json::reexport::{Error, Deserialize, Value};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
+                <Self as $crate::stream_struct::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
                 .map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 
-        impl $crate::serialize::json::reexport::Serialize for $name {
+        impl $crate::stream_struct::serialize::json::reexport::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: $crate::serialize::json::reexport::Serializer
+                where S: $crate::stream_struct::serialize::json::reexport::Serializer
                 {
-                    $crate::serialize::json::wrap(self).serialize(serializer)
+                    $crate::stream_struct::serialize::json::wrap(self).serialize(serializer)
                 }
         }
 

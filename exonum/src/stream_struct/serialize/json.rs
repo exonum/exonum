@@ -20,7 +20,7 @@ use std::error::Error;
 
 use crypto::{Hash, PublicKey, SecretKey, Seed, Signature};
 
-use messages::{Field, MessageWriter};
+use messages::MessageWriter;
 use super::HexValue;
 
 /// `ExonumJsonDeserializeField` is trait for object

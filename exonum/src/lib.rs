@@ -44,7 +44,7 @@ extern crate cookie;
 extern crate mount;
 
 #[macro_use]
-pub mod serialize;
+pub mod stream_struct;
 #[macro_use]
 pub mod messages;
 pub mod events;

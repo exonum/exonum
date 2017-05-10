@@ -4,7 +4,8 @@ use std::time::SystemTime;
 use crypto::{hash, gen_keypair};
 use blockchain;
 
-use super::{Field, RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
+use super::Field;
+use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
             Block, BlockProof, RequestBlock, BitVec};
 
 #[test]

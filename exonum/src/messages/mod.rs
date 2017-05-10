@@ -3,23 +3,16 @@ use bit_vec;
 use std::fmt;
 
 use crypto::PublicKey;
+use stream_struct::Error;
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw,
-                     HEADER_SIZE, TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
-pub use self::error::Error;
-pub use self::fields::{Field, SegmentField};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_SIZE};
 pub use self::protocol::*;
+
 
 #[macro_use]
 mod spec;
-#[cfg(test)]
-mod tests;
 mod raw;
-mod error;
-mod fields;
 mod protocol;
-
-pub mod utils;
 
 pub type BitVec = bit_vec::BitVec;
 
