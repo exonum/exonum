@@ -3,6 +3,7 @@ cache: cargo
 sudo: required
 dist: trusty
 before_install:
+- cargo install rustfmt --vers 0.8.4 --force
 - rustup override set nightly-2017-01-08
 - rustc --version
 - cargo --version
@@ -10,7 +11,6 @@ before_install:
 - sudo apt-get -qq update
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
-- cargo install rustfmt --force
 script:
 - cargo fmt -p configuration_service -- --write-mode=diff
 - cd sandbox_tests && cargo fmt -p sandbox_tests -- --write-mode=diff
