@@ -287,7 +287,7 @@ impl BranchNode {
         }
     }
     fn write_slice(&mut self, from: usize, slice: &BitSlice) -> usize {
-        debug_assert!(slice.data.len() == KEY_SIZE);
+        debug_assert_eq!(slice.data.len(), KEY_SIZE);
 
         let db_key = slice.to_db_key();
 
