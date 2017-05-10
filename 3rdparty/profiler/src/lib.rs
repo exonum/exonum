@@ -1,34 +1,15 @@
-#![allow(unused)]
-
-#![cfg_attr(feature="json", feature(custom_derive, plugin))]
-#![cfg_attr(feature="json", plugin(serde_macros))]
-#![feature(test)]
-
-#[macro_use]
-extern crate lazy_static;
 extern crate thread_id;
-#[cfg(feature = "json")]
-extern crate serde;
-#[cfg(feature = "json")]
-extern crate serde_json;
 
-
-extern crate test;
 
 mod html;
 
-use std::cell::{RefCell, Cell};
-use std::rc::{Rc, Weak};
-use std::iter::Peekable;
-use std::borrow::Cow;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::cell::{RefCell};
+use std::rc::Rc;
+use std::time::{Instant};
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 
 pub type SpanPtr = RefCell<Span>;
-//lazy_static!(static ref ALL_THREADS: Mutex<Vec<(usize, Option<String>, PrivateFrame)>> = Mutex::new(Vec::new()););
-
 thread_local!(static THREAD_FRAME: RefCell<ThreadFrame> = RefCell::new(ThreadFrame::new()));
 
 
@@ -114,7 +95,7 @@ impl Span {
 
     fn sub_span(this: &Rc<SpanPtr>, name: &'static str) -> Rc<SpanPtr> {
         let mut parent = this.borrow_mut();
-        let mut aspan = parent.children.entry(name)
+        let  aspan = parent.children.entry(name)
                                      .or_insert_with(|| Span::new());
         aspan.clone()
     }
