@@ -58,9 +58,7 @@ impl Api for ExplorerApi {
             let from: Option<u64>;
             count = match map.find(&["count"]) {
                 Some(&Value::String(ref count_str)) => {
-                    count_str
-                        .parse()
-                        .map_err(|_| ApiError::IncorrectRequest)?
+                    count_str.parse().map_err(|_| ApiError::IncorrectRequest)?
                 }
                 _ => {
                     return Err(ApiError::IncorrectRequest)?;
@@ -68,9 +66,7 @@ impl Api for ExplorerApi {
             };
             from = match map.find(&["from"]) {
                 Some(&Value::String(ref from_str)) => {
-                    Some(from_str
-                             .parse()
-                             .map_err(|_| ApiError::IncorrectRequest)?)
+                    Some(from_str.parse().map_err(|_| ApiError::IncorrectRequest)?)
                 }
                 _ => None,
             };
@@ -87,9 +83,7 @@ impl Api for ExplorerApi {
             let params = req.extensions.get::<Router>().unwrap();
             match params.find("height") {
                 Some(height_str) => {
-                    let height: u64 = height_str
-                        .parse()
-                        .map_err(|_| ApiError::IncorrectRequest)?;
+                    let height: u64 = height_str.parse().map_err(|_| ApiError::IncorrectRequest)?;
                     let info = _self.get_block(height)?;
                     _self.ok_response(&info.to_json())
                 }
