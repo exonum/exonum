@@ -49,7 +49,7 @@ macro_rules! message {
         }
 
         impl $name {
-            #![cfg_attr(feature="clippy", allow(too_many_arguments))]
+            #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
