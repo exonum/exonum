@@ -192,7 +192,7 @@ impl<T> Votes<T>
 
 impl RequestData {
     pub fn timeout(&self) -> Duration {
-        #![cfg_attr(feature="clippy", allow(match_same_arms))]
+        #![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => REQUEST_PROPOSE_TIMEOUT,
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_TIMEOUT,
@@ -275,7 +275,7 @@ impl BlockState {
 }
 
 impl State {
-    #![cfg_attr(feature="clippy", allow(too_many_arguments))]
+    #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     pub fn new(validator_id: Option<ValidatorId>,
                public_key: PublicKey,
                secret_key: SecretKey,
