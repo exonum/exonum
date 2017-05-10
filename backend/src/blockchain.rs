@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn test_file_content() {
         let description = "Test Description";
-         let time = UTC::now().timestamp();
+        let time = UTC::now().timestamp();
         let hash = hash(b"js9sdhcsdh32or830ru8043ru-wf9-12u8u3280y8hfwoefnsdljs");
 
         let content = Content::new(description, time, &hash);

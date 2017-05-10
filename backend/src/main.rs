@@ -67,9 +67,7 @@ fn run_node(blockchain: Blockchain,
                     channel: clannel,
                     config: (node_cfg.public_key, node_cfg.secret_key),
                 };
-                let public_config_api = PublicConfigApi {
-                    blockchain: blockchain,
-                };
+                let public_config_api = PublicConfigApi { blockchain: blockchain };
 
                 let listen_address: SocketAddr =
                     format!("127.0.0.1:{}", private_port).parse().unwrap();
@@ -82,8 +80,8 @@ fn run_node(blockchain: Blockchain,
                 iron::Iron::new(chain).http(listen_address).unwrap();
             });
             Some(thread)
-        } 
-        None => None, 
+        }
+        None => None,
     };
 
     let public_api_thread = match public_port {
@@ -101,8 +99,8 @@ fn run_node(blockchain: Blockchain,
                 iron::Iron::new(chain).http(listen_address).unwrap();
             });
             Some(thread)
-        } 
-        None => None, 
+        }
+        None => None,
     };
 
     node.run().unwrap();
@@ -169,10 +167,7 @@ fn main() {
             let dir = GenerateCommand::output_dir(matches);
             let start_port = GenerateCommand::start_port(matches).unwrap_or(9000);
 
-            let host = matches
-                .value_of("ANCHORING_RPC_HOST")
-                .unwrap()
-                .to_string();
+            let host = matches.value_of("ANCHORING_RPC_HOST").unwrap().to_string();
             let user = matches
                 .value_of("ANCHORING_RPC_USER")
                 .map(|x| x.to_string());
@@ -184,11 +179,7 @@ fn main() {
                 .unwrap()
                 .parse()
                 .unwrap();
-            let fee: u64 = matches
-                .value_of("ANCHORING_FEE")
-                .unwrap()
-                .parse()
-                .unwrap();
+            let fee: u64 = matches.value_of("ANCHORING_FEE").unwrap().parse().unwrap();
             let network = match matches.value_of("ANCHORING_NETWORK").unwrap() {
                 "testnet" => Network::Testnet,
                 "bitcoin" => Network::Bitcoin,
@@ -222,12 +213,10 @@ fn main() {
             }
         }
         ("run", Some(matches)) => {
-            let public_port: Option<u16> = matches
-                .value_of("PUBLIC_PORT")
-                .map(|x| x.parse().unwrap());
-            let private_port: Option<u16> = matches
-                .value_of("PRIVATE_PORT")
-                .map(|x| x.parse().unwrap());
+            let public_port: Option<u16> =
+                matches.value_of("PUBLIC_PORT").map(|x| x.parse().unwrap());
+            let private_port: Option<u16> =
+                matches.value_of("PRIVATE_PORT").map(|x| x.parse().unwrap());
             let path = RunCommand::node_config_path(matches);
             let db = RunCommand::db(matches);
             let cfg: ServicesConfig = ConfigFile::load(&path).unwrap();
