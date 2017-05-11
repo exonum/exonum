@@ -255,7 +255,7 @@ impl BranchNode {
         self.set_child_hash(kind, hash);
     }
 
-    // Think about truncate keys
+    // TODO: Think about truncate keys
     // fn child_db_key(&self, kind: ChildKind) -> &[u8] {
     //     let from = match kind {
     //         ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
@@ -466,10 +466,6 @@ impl<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V: StorageValue> MerklePatriciaT
             Ok((Some(i), hash))
         }
     }
-
-    // fn hash_leaf(value: &V) -> Hash {
-    //     value.hash()
-    // }
 
     fn remove(&self, key_slice: BitSlice) -> Result<(), Error> {
         match self.root_node()? {
@@ -805,14 +801,6 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MerklePatriciaTable<T, K, V>
     }
 }
 
-// fn bytes_to_binary<T: AsRef<[u8]>>(bytes: &T) -> String {
-//     let strs: Vec<String> = bytes.as_ref()
-//         .iter()
-//         .map(|b| format!("{:b}", b))
-//         .collect();
-//     strs.join("")
-// }
-
 impl<'a> fmt::Debug for BitSlice<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let bytes_hex = bytes_to_hex(&self.data);
@@ -1133,8 +1121,6 @@ mod tests {
         assert_eq!(node.child_slice(Left).to, lp.to);
         assert_eq!(node.child_slice(Right).to_db_key(), rp.to_db_key());
         assert_eq!(node.child_slice(Right).to, rp.to);
-        // assert_eq!(node.child_db_key(Left), lp.to_db_key().as_slice());
-        // assert_eq!(node.child_db_key(Right), rp.to_db_key().as_slice());
     }
 
     #[test]
@@ -1157,7 +1143,8 @@ mod tests {
         assert_eq!(table2.get(&vec![255; 32]).unwrap(), Some(vec![1]));
         assert_eq!(table2.get(&vec![254; 32]).unwrap(), Some(vec![2]));
 
-        // assert_eq!(table1.find_key(&vec![]).unwrap(), Some(vec![254; 32])); //FIXME
+        // TODO: FIXME.
+        // assert_eq!(table1.find_key(&vec![]).unwrap(), Some(vec![254; 32]));
         assert_eq!(table1.find_key(&vec![254; 32]).unwrap(),
                    Some(vec![254; 32]));
         assert_eq!(table1.find_key(&vec![255; 32]).unwrap(),
@@ -1376,7 +1363,8 @@ mod tests {
         let map = MapTable::new(vec![255], &storage);
         let table = MerklePatriciaTable::new(map);
 
-        table.put(&vec![230;32], vec![1]).unwrap(); //just to notify the compiler of the types used; same key is added and then removed from tree
+        // Just to notify the compiler of the types used. Same key is added and then removed.
+        table.put(&vec![230;32], vec![1]).unwrap();
         table.delete(&vec![230;32]).unwrap();
 
         let search_res = table.construct_path_to_key(&vec![244; 32]).unwrap();

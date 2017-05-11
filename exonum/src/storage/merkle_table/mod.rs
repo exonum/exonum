@@ -34,9 +34,6 @@ fn index_of_first_element_in_subtree<K>(subtree_root_height: K, subtree_root_ind
 mod hash_rules {
     use ::crypto::{hash, Hash};
     use ::storage::fields::StorageValue;
-    // pub const LEAF_DOMAIN: u8 = 00;
-    // pub const BRANCH_DOMAIN: u8 = 01;
-    // pub const SINGLE_BRANCH_DOMAIN: u8 = 02;
 
     pub fn hash_leaf<V: StorageValue>(value: &V) -> Hash {
         value.hash()
@@ -491,12 +488,10 @@ mod tests {
             };
             println!("{}", serde_json::to_string(&proof_info).unwrap());
 
-            // println!("{}", json_repre);
             let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (end_range - start_range) as usize);
             assert_eq!(deser_proof.compute_proof_root(), table_root_hash);
-            // println!("{:?}", deser_proof);
         }
     }
 
@@ -557,11 +552,9 @@ mod tests {
             assert_eq!(proof_indices_values(&range_proof).len(), 1);
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
-            // println!("{}", json_repre);
             let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(), 1);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
-            // println!("{:?}", deser_proof);
 
             let proof_info = ProofInfo {
                 root_hash: exp_root,
@@ -578,7 +571,6 @@ mod tests {
                        (proof_ind + 1) as usize);
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
-            // println!("{}", json_repre);
             let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(),
                        (proof_ind + 1) as usize);
@@ -591,17 +583,14 @@ mod tests {
                 range_end: (proof_ind + 1) as usize,
             };
             println!("{}", serde_json::to_string(&proof_info).unwrap());
-            // println!("{:?}", deser_proof);
             let range_proof = table.construct_path_for_range(0, 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(), 1);
 
             let json_repre = serde_json::to_string(&range_proof).unwrap();
-            // println!("{}", json_repre);
             let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(), 1);
             assert_eq!(deser_proof.compute_proof_root(), exp_root);
-            // println!("{:?}", deser_proof);
 
             let proof_info = ProofInfo {
                 root_hash: exp_root,
@@ -710,10 +699,6 @@ mod tests {
             assert!(false);
         }
         table.append(vec![5, 6, 7]).unwrap();
-        // let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
-        // println!("{:?}", range_proof);
-        // let json_repre = serde_json::to_string(&range_proof).unwrap();
-        // println!("{}", json_repre );
     }
 
     #[test]

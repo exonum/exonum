@@ -229,6 +229,7 @@ fn memorydb_map_table_different_prefixes() {
     test_map_table_different_prefixes(&db);
 }
 
+// TODO: uncomment/update tests when iteratos are implemented.
 // #[test]
 // fn memorydb_iter() {
 //     let mut db = MemoryDB::new();

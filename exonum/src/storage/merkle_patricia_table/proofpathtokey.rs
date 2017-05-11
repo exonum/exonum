@@ -247,23 +247,6 @@ impl<V: Serialize> Serialize for ProofNode<V> {
     }
 }
 
-// impl<V> ProofPathToKey<V> {
-//     pub fn compute_height(&self, start_height: u16) -> u16 {
-//         use self::ProofPathToKey::*;
-//         match *self {
-//             LeafRootInclusive(..) |
-//             LeafRootExclusive(..) |
-//             BranchKeyNotFound(..) |
-//             Leaf(..) |
-//             Empty => start_height,
-
-//             LeftBranch(ref l_proof, _, _, _) => l_proof.compute_height(start_height + 1),
-
-//             RightBranch(_, ref r_proof, _, _) => r_proof.compute_height(start_height + 1),
-//         }
-//     }
-// }
-
 impl<V: fmt::Debug + StorageValue> RootProofNode<V> {
     pub fn verify_root_proof_consistency<A: AsRef<[u8]>>(&self,
                                                          searched_key: A,

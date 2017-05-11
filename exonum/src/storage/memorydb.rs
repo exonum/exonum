@@ -162,36 +162,3 @@ impl Database for MemoryDB {
         Ok(())
     }
 }
-
-// pub struct DatabaseIterator<'a> {
-//     iter: MemoryDBIterator<'a>
-// }
-
-// impl<'a> Iterator for DatabaseIterator<'a> {
-//     type Item = (Vec<u8>, Vec<u8>);
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let item = self.iter.next();
-//         item.map(|x| ((x.0.to_vec(), x.1.to_vec())))
-//     }
-// }
-
-// impl<'a> Iterable for &'a MemoryDB {
-//     type Iter = DatabaseIterator<'a>;
-
-//     fn iter(self) -> Self::Iter {
-//         DatabaseIterator {
-//             iter: self.map.iter()
-//         }
-//     }
-// }
-
-// impl<'a> Seekable<'a> for DatabaseIterator<'a> {
-//     type Key = Vec<u8>;
-//     type Item = (Vec<u8>, Vec<u8>);
-
-//     fn seek(&mut self, key: &Self::Key) -> Option<Self::Item> {
-//         let opt = self.iter.find(|item| item.0 == key);
-//         opt.map(|x| (x.0.to_vec(), x.1.to_vec()))
-//     }
-// }
