@@ -63,7 +63,7 @@ pub struct State {
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    // maximum of node heigt in consensus messages
+    // maximum of node height in consensus messages
     nodes_max_height: BTreeMap<PublicKey, Height>,
 }
 

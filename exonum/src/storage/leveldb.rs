@@ -213,38 +213,3 @@ impl Database for LevelDB {
         result.map_err(Into::into)
     }
 }
-
-// pub struct DatabaseIterator<'a> {
-//     iter: LevelIterator<'a, BinaryKey>
-// }
-
-// impl<'a> Iterator for DatabaseIterator<'a> {
-//     type Item = (Vec<u8>, Vec<u8>);
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let item = self.iter.next();
-//         item.map(|x| ((x.0).0, x.1))
-//     }
-// }
-
-// impl<'a> Iterable for &'a LevelDB {
-//     type Iter = DatabaseIterator<'a>;
-
-//     fn iter(self) -> Self::Iter {
-//         DatabaseIterator {
-//             iter: self.db.iter(LEVELDB_READ_OPTIONS)
-//         }
-//     }
-// }
-
-// impl<'a> Seekable<'a> for DatabaseIterator<'a> {
-//     type Key = Vec<u8>;
-//     type Item = (Vec<u8>, Vec<u8>);
-
-//     // TODO I am not sure that optimizer will remove memory allocation here
-//     fn seek(&mut self, key: &Self::Key) -> Option<Self::Item> {
-//         let db_key = BinaryKey(key.to_vec());
-//         self.iter.seek(&db_key);
-//         Some((self.iter.key().0, self.iter.value()))
-//     }
-// }

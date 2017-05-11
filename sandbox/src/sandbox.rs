@@ -195,7 +195,6 @@ impl SandboxReactor {
 pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
-    // pub validators: Vec<(PublicKey, SecretKey)>,
     pub validators_map: HashMap<PublicKey, SecretKey>,
     addresses: Vec<SocketAddr>,
 }
@@ -241,13 +240,11 @@ impl Sandbox {
 
     pub fn p(&self, id: usize) -> PublicKey {
         self.validators()[id]
-        // &self.validators[id].0
     }
 
     pub fn s(&self, id: usize) -> &SecretKey {
         let p = self.p(id);
         &self.validators_map[&p]
-        // &self.validators[id].1
     }
 
     pub fn a(&self, id: usize) -> SocketAddr {
