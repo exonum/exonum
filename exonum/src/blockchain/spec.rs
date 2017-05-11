@@ -22,7 +22,7 @@ macro_rules! storage_value {
                 $crate::storage::StorageValue::deserialize(vec)
             }
 
-            fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+            fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
                 $crate::stream_struct::Field::write(&self.raw, buffer, from, to);
             }
 
@@ -33,11 +33,11 @@ macro_rules! storage_value {
                 let vec: Vec<u8> = $crate::stream_struct::Field::read(buffer, from_st_val, to_st_val);
                 $( <$field_type as $crate::stream_struct::Field>::check(&vec, $from, $to)?;)*
                 //$(raw_message.check::<$field_type>($from, $to)?;)*
-                Ok(())
+                Ok(None)
             }
 
             fn field_size() -> usize {
-                1
+                $body
             }
         }
 
@@ -52,7 +52,7 @@ macro_rules! storage_value {
                 }
             }
 
-            fn hash(&self) -> $crate::crypto::Hash {
+            fn hash(&self) -> Hash {
                 $name::hash(self)
             }
         }

@@ -31,8 +31,8 @@ macro_rules! message {
                 $crate::messages::FromRaw::from_raw(raw_message).unwrap()
             }
 
-            fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-                $crate::messages::Field::write(&self.raw, buffer, from, to);
+            fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
+                $crate::stream_struct::Field::write(&self.raw, buffer, from, to);
             }
 
             fn check(buffer: &'a [u8], from: usize, to: usize)
@@ -42,11 +42,11 @@ macro_rules! message {
                 let raw_message: $crate::messages::RawMessage =
                                     $crate::messages::Field::read(buffer, from, to);
                 $(raw_message.check::<$field_type>($from, $to)?;)*
-                Ok(())
+                Ok(None)
             }
 
             fn field_size() -> usize {
-                1
+                $body
             }
         }
 

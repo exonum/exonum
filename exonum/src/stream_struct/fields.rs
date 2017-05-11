@@ -6,19 +6,25 @@ use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use crypto::{Hash, PublicKey, Signature};
-use super::Error;
+use super::{Error, Offset, SegmentReference};
 use messages::{RawMessage, MessageBuffer, BitVec, FromRaw};
+
+
 
 pub trait Field<'a> {
     // TODO: use Read and Cursor
     // TODO: debug_assert_eq!(to-from == size of Self)
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Self;
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize);
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize);
     fn field_size() -> usize;
 
+    /// check if data in buffer could be deserialized.
+    /// return optional segment reference, if it should consume some. 
     #[allow(unused_variables)]
-    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
-        Ok(())
+    fn check(buffer: &'a [u8], from: usize, to: usize)
+         -> Result<Option<SegmentReference>, Error>
+    {
+        Ok(None)
     }
 }
 
@@ -31,18 +37,20 @@ impl<'a> Field<'a> for bool {
         buffer[from] == 1
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, _: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, _: usize) {
         buffer[from] = if *self { 1 } else { 0 }
     }
 
-    fn check(buffer: &'a [u8], from: usize, _: usize) -> Result<(), Error> {
+    fn check(buffer: &'a [u8], from: usize, to: usize)
+         -> Result<Option<SegmentReference>, Error>
+    {
         if buffer[from] != 0 && buffer[from] != 1 {
             Err(Error::IncorrectBoolean {
                 position: from as u32,
                 value: buffer[from],
             })
         } else {
-            Ok(())
+            Ok(None)
         }
     }
 }
@@ -56,7 +64,7 @@ impl<'a> Field<'a> for u8 {
         buffer[from]
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, _: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, _: usize) {
         buffer[from] = *self;
     }
 }
@@ -70,7 +78,7 @@ impl<'a> Field<'a> for u16 {
         LittleEndian::read_u16(&buffer[from..to])
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         LittleEndian::write_u16(&mut buffer[from..to], *self)
     }
 }
@@ -84,7 +92,7 @@ impl<'a> Field<'a> for u32 {
         LittleEndian::read_u32(&buffer[from..to])
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         LittleEndian::write_u32(&mut buffer[from..to], *self)
     }
 }
@@ -98,7 +106,7 @@ impl<'a> Field<'a> for u64 {
         LittleEndian::read_u64(&buffer[from..to])
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         LittleEndian::write_u64(&mut buffer[from..to], *self)
     }
 }
@@ -112,7 +120,7 @@ impl<'a> Field<'a> for i64 {
         LittleEndian::read_i64(&buffer[from..to])
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         LittleEndian::write_i64(&mut buffer[from..to], *self)
     }
 }
@@ -126,7 +134,7 @@ impl<'a> Field<'a> for &'a Hash {
         unsafe { mem::transmute(&buffer[from]) }
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         buffer[from..to].copy_from_slice(self.as_ref());
     }
 }
@@ -140,7 +148,7 @@ impl<'a> Field<'a> for &'a Signature {
         unsafe { mem::transmute(&buffer[from]) }
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         buffer[from..to].copy_from_slice(self.as_ref());
     }
 }
@@ -154,7 +162,7 @@ impl<'a> Field<'a> for &'a PublicKey {
         unsafe { mem::transmute(&buffer[from]) }
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         buffer[from..to].copy_from_slice(self.as_ref());
     }
 }
@@ -170,7 +178,7 @@ impl<'a> Field<'a> for SystemTime {
         UNIX_EPOCH + Duration::new(secs, nanos)
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         let duration = self.duration_since(UNIX_EPOCH).unwrap();
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
@@ -192,7 +200,7 @@ impl<'a> Field<'a> for SocketAddr {
         SocketAddr::V4(SocketAddrV4::new(ip, port))
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         match *self {
             SocketAddr::V4(addr) => {
                 buffer[from..to - 2].copy_from_slice(&addr.ip().octets());
