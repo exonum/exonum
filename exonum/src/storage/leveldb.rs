@@ -66,9 +66,7 @@ impl LevelDB {
 impl Map<[u8], Vec<u8>> for LevelDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let _p = profiler::ProfilerSpan::new("LevelDB::get");
-        self.db
-            .get(LEVELDB_READ_OPTIONS, key)
-            .map_err(Into::into)
+        self.db.get(LEVELDB_READ_OPTIONS, key).map_err(Into::into)
     }
 
     fn put(&self, key: &[u8], value: Vec<u8>) -> Result<(), Error> {
@@ -113,11 +111,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
                 };
                 Ok(v)
             }
-            None => {
-                self.snap
-                    .get(LEVELDB_READ_OPTIONS, key)
-                    .map_err(Into::into)
-            }
+            None => self.snap.get(LEVELDB_READ_OPTIONS, key).map_err(Into::into),
         }
     }
 

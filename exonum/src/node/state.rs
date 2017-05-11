@@ -327,9 +327,9 @@ impl State {
         let validator_state = self.validator_state.take();
         self.validator_state = id.map(move |id| match validator_state {
                                           Some(mut state) => {
-            state.set_validator_id(id);
-            state
-        }
+                                              state.set_validator_id(id);
+                                              state
+                                          }
                                           None => ValidatorState::new(id),
                                       });
     }
@@ -759,9 +759,7 @@ impl State {
     }
 
     pub fn request(&mut self, data: RequestData, peer: PublicKey) -> bool {
-        let mut state = self.requests
-            .entry(data)
-            .or_insert_with(RequestState::new);
+        let mut state = self.requests.entry(data).or_insert_with(RequestState::new);
         let is_new = state.is_empty();
         state.insert(peer);
         is_new

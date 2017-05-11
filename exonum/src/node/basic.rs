@@ -104,8 +104,6 @@ impl<S> NodeHandler<S>
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!("HANDLE REQUEST PEERS: Sending {:?} peers to {:?}", peers, msg.from());
 
-            .map(|(_, b)| b.clone())
-            .collect();
         for peer in peers {
             self.send_to_peer(*msg.from(), peer.raw());
         }

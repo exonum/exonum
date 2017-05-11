@@ -29,8 +29,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
 {
     fn get(&self, key: &K) -> Result<Option<V>, Error> {
         let _profiler = profiler::ProfilerSpan::new("MapTable::get");
-        let v = self.storage
-            .get(&[&self.prefix, key.as_ref()].concat())?;
+        let v = self.storage.get(&[&self.prefix, key.as_ref()].concat())?;
         Ok(v.map(StorageValue::deserialize))
     }
 
@@ -40,8 +39,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
     }
 
     fn delete(&self, key: &K) -> Result<(), Error> {
-        self.storage
-            .delete(&[&self.prefix, key.as_ref()].concat())
+        self.storage.delete(&[&self.prefix, key.as_ref()].concat())
     }
     fn find_key(&self, origin_key: &K) -> Result<Option<Vec<u8>>, Error> {
         let key = [&self.prefix, origin_key.as_ref()].concat();

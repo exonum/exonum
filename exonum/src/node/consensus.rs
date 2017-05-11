@@ -261,7 +261,8 @@ impl<S> NodeHandler<S>
                                    block_hash: &Hash) {
         // Check if propose is known.
         if self.state.propose(propose_hash).is_none() {
-            self.state.add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
+            self.state
+                .add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
             return;
         }
 
@@ -269,7 +270,9 @@ impl<S> NodeHandler<S>
         let proposer = {
             let propose_state = self.state.propose(propose_hash).unwrap();
             if propose_state.has_unknown_txs() {
-                Some(*self.state.public_key_of(propose_state.message().validator()).unwrap())
+                Some(*self.state
+                          .public_key_of(propose_state.message().validator())
+                          .unwrap())
             } else {
                 None
             }
@@ -376,8 +379,7 @@ impl<S> NodeHandler<S>
         let proposer = self.state.leader(propose_round);
 
         // Update state to new height
-        self.state
-            .new_height(&block_hash, self.channel.get_time());
+        self.state.new_height(&block_hash, self.channel.get_time());
 
         info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}, hash={}",
               height,
@@ -636,11 +638,7 @@ impl<S> NodeHandler<S>
     // FIXME: remove this bull shit
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
-        let propose = self.state
-            .propose(propose_hash)
-            .unwrap()
-            .message()
-            .clone();
+        let propose = self.state.propose(propose_hash).unwrap().message().clone();
 
         let tx_hashes = propose.transactions().to_vec();
         let (block_hash, patch) =

@@ -134,10 +134,7 @@ impl Blockchain {
         for hash in tx_hashes {
             let tx = &pool[hash];
             tx.execute(&fork)?;
-            schema
-                .transactions()
-                .put(hash, tx.raw().clone())
-                .unwrap();
+            schema.transactions().put(hash, tx.raw().clone()).unwrap();
             schema.block_txs(height).append(*hash).unwrap();
         }
         // Get tx hash
@@ -168,10 +165,7 @@ impl Blockchain {
         let block_hash = block.hash();
         // Update height
         // TODO: check that height == propose.height
-        schema
-            .block_hashes_by_height()
-            .append(block_hash)
-            .is_ok();
+        schema.block_hashes_by_height().append(block_hash).is_ok();
         // Save block
         schema.blocks().put(&block_hash, block).is_ok();
         Ok((block_hash, fork.changes()))
@@ -195,13 +189,11 @@ impl Blockchain {
 
             let schema = Schema::new(&view);
             for precommit in precommits {
-                schema
-                    .precommits(&block_hash)
-                    .append(precommit.clone())?;
+                schema.precommits(&block_hash).append(precommit.clone())?;
             }
 
             state.update_config(schema.actual_configuration()?);
-                        
+
             let mut node_state = NodeState::new(state, &view);
             for service in self.service_map.values() {
                 service.handle_commit(&mut node_state)?;

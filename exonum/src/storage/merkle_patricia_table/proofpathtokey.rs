@@ -352,8 +352,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                proof
-                    .verify_proof_consistency(left_slice, searched_slice)?
+                proof.verify_proof_consistency(left_slice, searched_slice)?
             }
             RightBranch {
                 right_hash: ref proof,
@@ -367,8 +366,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                proof
-                    .verify_proof_consistency(right_slice, searched_slice)?
+                proof.verify_proof_consistency(right_slice, searched_slice)?
             }
             BranchKeyNotFound {
                 left_key: ref left_slice_key,
@@ -419,8 +417,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                proof
-                    .verify_proof_consistency(left_slice, searched_slice)?
+                proof.verify_proof_consistency(left_slice, searched_slice)?
             }
             RightBranch {
                 right_hash: ref proof,
@@ -443,8 +440,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   searched_slice,
                                                   self)));
                 }
-                proof
-                    .verify_proof_consistency(right_slice, searched_slice)?
+                proof.verify_proof_consistency(right_slice, searched_slice)?
             }
             BranchKeyNotFound {
                 left_key: ref left_slice_key,

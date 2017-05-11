@@ -1536,8 +1536,8 @@ mod tests {
         for item in &data {
             let proof_path_to_key = table.construct_path_to_key(&item.0).unwrap();
             assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
-            let check_res =
-                proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
+            let check_res = proof_path_to_key
+                .verify_root_proof_consistency(&item.0, table_root_hash);
             let proved_value: Option<&Vec<u8>> = check_res.unwrap();
             assert_eq!(*proved_value.unwrap(), item.1);
 

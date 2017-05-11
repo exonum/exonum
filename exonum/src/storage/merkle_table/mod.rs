@@ -192,9 +192,9 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
         let v = self.map.get(&Self::db_key(height, index))?;
         let hash = v.map(|x| {
-                             debug_assert_eq!(x.len(), 32);
-                             Hash::from_slice(&x).unwrap()
-                         });
+            debug_assert_eq!(x.len(), 32);
+            Hash::from_slice(&x).unwrap()
+        });
         Ok(hash)
     }
 
@@ -217,8 +217,7 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
 
             } else {
                 // Right leaf
-                let h1 = self.get_hash(current_height, index - K::one())?
-                    .unwrap();
+                let h1 = self.get_hash(current_height, index - K::one())?.unwrap();
                 let h2 = self.get_hash(current_height, index)?.unwrap();
                 hash_rules::hash_branch(h1, h2)
             };

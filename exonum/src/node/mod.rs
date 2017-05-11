@@ -88,7 +88,9 @@ impl<S> NodeHandler<S>
             (block.hash(), block.height() + 1)
         };
 
-        let stored = Schema::new(&blockchain.view()).actual_configuration().unwrap();
+        let stored = Schema::new(&blockchain.view())
+            .actual_configuration()
+            .unwrap();
         info!("Create node with config={:#?}", stored);
 
         let validator_id = stored
@@ -227,7 +229,8 @@ impl<S> NodeHandler<S>
 
     pub fn add_status_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
-        self.channel.add_timeout(NodeTimeout::Status(self.state.height()), time);
+        self.channel
+            .add_timeout(NodeTimeout::Status(self.state.height()), time);
     }
 
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {

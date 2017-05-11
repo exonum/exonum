@@ -231,8 +231,7 @@ fn big_message() {
             assert_eq!(msgs[0], m1);
             assert_eq!(msgs[1], m2);
             assert_eq!(msgs[2], m1);
-            e.wait_for_disconnect(Duration::from_millis(10000))
-                .unwrap();
+            e.wait_for_disconnect(Duration::from_millis(10000)).unwrap();
         });
     }
 
@@ -318,8 +317,7 @@ fn reconnect() {
 
                 trace!("t2: send m3 to t1");
                 e.send_to(&addrs[0], m3.clone());
-                e.wait_for_disconnect(Duration::from_millis(5000))
-                    .unwrap();
+                e.wait_for_disconnect(Duration::from_millis(5000)).unwrap();
             }
             trace!("t2: finished");
         });
@@ -382,8 +380,7 @@ mod benches {
                     e1.send_to(&addrs[1], msg);
                     e1.wait_for_messages(1, timeout).unwrap();
                 }
-                e1.wait_for_disconnect(Duration::from_millis(1000))
-                    .unwrap();
+                e1.wait_for_disconnect(Duration::from_millis(1000)).unwrap();
             });
             let t2 = thread::spawn(move || {
                                        e2.wait_for_connect(&addrs[0]).unwrap();
