@@ -24,6 +24,8 @@ mod block;
 mod schema;
 mod genesis;
 mod service;
+#[cfg(test)]
+mod tests;
 
 pub mod config;
 

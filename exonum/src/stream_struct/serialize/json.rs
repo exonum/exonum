@@ -311,12 +311,18 @@ impl<'a> ExonumJsonDeserializeField for &'a [Hash] {
 
     }
 }
+<<<<<<< HEAD
 impl<'a> ExonumJsonDeserializeField for &'a [u8] {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: usize,
                                                 to: usize)
                                                 -> Result<(), Box<Error>> {
+=======
+
+impl<'a> ExonumJsonDeserializeField for &'a [u8]  {
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+>>>>>>> add check for spaces between segments, add some tests
         let bytes = value.as_str().ok_or("Can't cast json as string")?;
         let arr = <Vec<u8> as HexValue>::from_hex(bytes)?;
         buffer.write(from, to, arr.as_slice());

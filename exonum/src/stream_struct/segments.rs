@@ -38,7 +38,6 @@ impl<'a, T> Field<'a> for T
         self.extend_buffer(buffer);
         let count = buffer.len() - pos;
         LittleEndian::write_u32(&mut buffer[from + 4..to], count as u32);
-        println!("buffer after write = {:?}", buffer)
     }
 
     fn check(buffer: &'a [u8], from: usize, to: usize)
@@ -134,11 +133,16 @@ impl<'a> SegmentField<'a> for RawMessage {
 
 impl<'a, T> SegmentField<'a> for Vec<T> where T: Field<'a> {
 
-    //FIXME: reduce memory allocation
+    // FIXME: reduce memory allocation
+    // TODO: For now we need adittional header, to know what in slice is
+    // sized types, and what is not, may be we can split implementation
+    // for Vec<T> where T: FixedSize; Vec<T> where T: SegmentField,
+    // for Vec<T> where T = u8
+    // but this is possible only after specialization land
     fn from_chunk(slice: &'a [u8]) -> Self {
         // read vector len
         let count = u32::read(slice, 0, 4) as usize;
-
+        
         let mut vec = Vec::with_capacity(count as usize);
         let mut start = 4usize;
         for _ in 0..count {
@@ -193,7 +197,6 @@ impl<'a> SegmentField<'a> for &'a [u8] {
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-        println!("extend_buffer slice = {:?}, buffer = {:?}", self, buffer);
         buffer.extend_from_slice(self)
     }
 

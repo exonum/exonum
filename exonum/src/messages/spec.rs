@@ -24,10 +24,9 @@ macro_rules! message {
             }
         }
 
-        impl<'a> $crate::messages::Field<'a> for $name {
+        impl<'a> $crate::stream_struct::Field<'a> for $name {
             fn read(buffer: &'a [u8], from: usize, to: usize) -> Self {
-                let raw_message: $crate::messages::RawMessage =
-                                    $crate::messages::Field::read(buffer, from, to);
+                let raw_message: $crate::messages::RawMessage = $crate::stream_struct::Field::read(buffer, from, to);
                 $crate::messages::FromRaw::from_raw(raw_message).unwrap()
             }
 
@@ -35,13 +34,14 @@ macro_rules! message {
                 $crate::stream_struct::Field::write(&self.raw, buffer, from, to);
             }
 
-            fn check(buffer: &'a [u8], from: usize, to: usize)
-                -> Result<(), $crate::messages::Error>
-            {
-
-                let raw_message: $crate::messages::RawMessage =
-                                    $crate::messages::Field::read(buffer, from, to);
-                $(raw_message.check::<$field_type>($from, $to)?;)*
+            fn check(buffer: &'a [u8], from: usize, to: usize) -> $crate::stream_struct::Result {
+                let raw_message: $crate::messages::RawMessage = $crate::stream_struct::Field::read(buffer, from, to);
+                 
+                let mut last_data = $body as u32;
+                $(  
+                    raw_message.check::<$field_type>($from, $to)?
+                        .map_or(Ok(()), |mut e| e.check_segment($body, &mut last_data))?;
+                )*
                 Ok(None)
             }
 
@@ -52,7 +52,7 @@ macro_rules! message {
 
         impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
-                -> Result<$name, $crate::messages::Error> {
+                -> Result<$name, $crate::stream_struct::Error> {
                 $(raw.check::<$field_type>($from, $to)?;)*
                 Ok($name { raw: raw })
             }

@@ -27,6 +27,7 @@ pub struct SegmentReference {
     pub from: Offset,
     pub size: Offset
 }
+
 impl SegmentReference {
     pub fn new(from: Offset, size: Offset) -> SegmentReference {
         SegmentReference {
@@ -34,4 +35,22 @@ impl SegmentReference {
             size: size
         }
     }
+
+    pub fn check_segment(&mut self, header_size: u32, last_data: &mut u32)
+        -> ::std::result::Result<(), Error>
+    {
+        if self.from < header_size {
+            Err(Error::SementInHeader{header_size: header_size, start: self.from})
+        }
+        else if self.from < *last_data {
+            Err(Error::OverlappingSegment{last_end: *last_data, start: self.from})
+        }
+        else if self.from > *last_data {
+            Err(Error::SpaceBetweenSegments{last_end: *last_data, start: self.from})
+        } else {
+            *last_data = self.from + self.size;
+            Ok(())
+        }
+    }
 }
+
