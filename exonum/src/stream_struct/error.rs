@@ -11,6 +11,9 @@ pub enum Error {
     UnexpectedlyShortRawMessage { position: Offset, size: u32 },
     IncorrectSizeOfRawMessage { position: Offset, actual_size: u32, declared_size: u32 },
     IncorrectMessageType { position: Offset, actual_message_type: u16, declared_message_type: u16 },
+    OverlappingSegment { last_end: u32, start: u32 },
+    SementInHeader { header_size: u32, start: u32},
+    SpaceBetweenSegments { last_end: u32, start: u32},
     Utf8 {
         position: Offset,
         error: ::std::str::Utf8Error,
@@ -34,6 +37,9 @@ impl StdError for Error {
             Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage.",
             Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage.",
             Error::IncorrectMessageType { .. } => "Incorrect message type.",
+            Error::OverlappingSegment {..} => "Overlapping segment.",
+            Error::SementInHeader {..} => "Sement in header.",
+            Error::SpaceBetweenSegments {..} => "Space between segments.",
             Error::Utf8 { .. } => "Utf8 error in parsing string.",
             Error::Other(_) => "Other error.",
         }

@@ -31,7 +31,10 @@ macro_rules! storage_value {
             {
                 <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, to_st_val)?;
                 let vec: Vec<u8> = $crate::stream_struct::Field::read(buffer, from_st_val, to_st_val);
-                $( <$field_type as $crate::stream_struct::Field>::check(&vec, $from, $to)?;)*
+                let mut last_data = $body as u32;
+                $( <$field_type as $crate::stream_struct::Field>::check(&vec, $from, $to)?
+                        .map_or(Ok(()), |mut e| e.check_segment($body as u32, &mut last_data))?;
+                )*
                 //$(raw_message.check::<$field_type>($from, $to)?;)*
                 Ok(None)
             }
@@ -52,7 +55,7 @@ macro_rules! storage_value {
                 }
             }
 
-            fn hash(&self) -> Hash {
+            fn hash(&self) -> $crate::crypto::Hash {
                 $name::hash(self)
             }
         }

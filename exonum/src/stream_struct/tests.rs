@@ -10,32 +10,6 @@ use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommi
 
 
 #[test]
-fn test_bitvec_partial() {
-    // TODO Think about BitVec len
-    // now if the size of the BitVec is not a multiple of eight
-    // then trailing bits will be filled-in with false.
-
-    let mut b = BitVec::from_elem(14, false);
-    b.set(11, true);
-    b.set(4, true);
-    b.push(true);
-    b.push(true);
-
-    let mut buf = vec![0; 8];
-    Field::write(&b, &mut buf, 0, 8);
-    <BitVec as Field>::check(&buf, 0, 8).unwrap();
-    let buf2 = buf.clone();
-    <BitVec as Field>::check(&buf2, 0, 8).unwrap();
-    let b2: BitVec = Field::read(&buf2, 0, 8);
-
-    for i in 0..b.len() {
-        assert_eq!(b2.get(i), b.get(i));
-    }
-    
-}
-
-
-#[test]
 fn test_bitvec() {
 
     let mut b = BitVec::from_elem(14, false);
@@ -125,6 +99,7 @@ fn assert_write_check_read<T>(input: T, header_size: usize)
     //clear buffer
     let len = buffer.len();
     buffer.clear();
+    //and fill old buffer with zeros
     buffer.resize(len, 0);
     
     <T as Field>::check(&new_buffer, 0, 8).unwrap();
