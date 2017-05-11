@@ -51,9 +51,7 @@ impl<T> CryptocurrencyApi<T>
         let currency_schema = CurrencySchema::new(&view);
 
         let max_height = general_schema.block_hashes_by_height().len()? - 1;
-        let block_proof = general_schema
-            .block_and_precommits(max_height)?
-            .unwrap();
+        let block_proof = general_schema.block_and_precommits(max_height)?.unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
         let wallet_path: HashMPTproofLinker<RootProofNode<Wallet>>;
@@ -70,9 +68,8 @@ impl<T> CryptocurrencyApi<T>
             debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());
         }
 
-        let to_specific_wallet: RootProofNode<Wallet> = currency_schema
-            .wallets()
-            .construct_path_to_key(pub_key)?;
+        let to_specific_wallet: RootProofNode<Wallet> =
+            currency_schema.wallets().construct_path_to_key(pub_key)?;
         wallet_path = HashMPTproofLinker {
             mpt_proof: to_wallets_table,
             value: to_specific_wallet,
