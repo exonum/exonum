@@ -7,7 +7,7 @@
     <script>
         this.collapsed = true;
         this.digits = this.opts.digits || 8;
-        this.truncated = this.opts.val.substring(0, this.digits);
+        this.truncated = this.opts.val.substring(0, this.digits) + '…';
         this.lines = [];
 
         for (var i = 0, len = opts.val.length; i < len; i += this.digits) {

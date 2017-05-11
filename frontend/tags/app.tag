@@ -29,17 +29,17 @@
             service: service,
 
             // TODO revert later
-//            storage: {
-//                addUser: function(user) {
+//            auth: {
+//                setUser: function(user) {
 //                    window.localStorage.setItem('user', JSON.stringify(user));
 //                },
 //
 //                getUser: function() {
-//                    return JSON.parse(window.localStorage.getItem('user'));
+//                    return JSON.parse(window.localStorage.getItem('user')); // TODO rework?
 //                },
 //
-//                deleteUser: function() {
-//                    window.localStorage.removeItem('user');
+//                logout: function() {
+//                    window.localStorage.removeItem('user'); // TODO rework?
 //                }
 //            },
 
@@ -122,7 +122,7 @@
                 riot.mount('#content', 'add-funds', {publicKey: publicKey});
             });
 
-            route('/blockchain', function(height) {
+            route('/blockchain', function() {
                 riot.mount('#content', 'blockchain');
             });
 
