@@ -142,5 +142,3 @@ impl StorageValue for Vec<u8> {
         hash(self)
     }
 }
-
-

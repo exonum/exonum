@@ -32,8 +32,8 @@ fn index_of_first_element_in_subtree<K>(subtree_root_height: K, subtree_root_ind
         (subtree_root_height - K::one()).to_usize().unwrap()) * subtree_root_index
 }
 mod hash_rules {
-    use ::crypto::{hash, Hash};
-    use ::storage::fields::StorageValue;
+    use crypto::{hash, Hash};
+    use storage::fields::StorageValue;
     // pub const LEAF_DOMAIN: u8 = 00;
     // pub const BRANCH_DOMAIN: u8 = 01;
     // pub const SINGLE_BRANCH_DOMAIN: u8 = 02;
@@ -83,10 +83,12 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     // TODO: implement iterator for List
     pub fn values(&self) -> Result<Vec<V>, Error> {
         Ok(if self.is_empty()? {
-            Vec::new()
-        } else {
-            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
-        })
+               Vec::new()
+           } else {
+               range(K::zero(), self.len()?)
+                   .map(|i| self.get(i).unwrap().unwrap())
+                   .collect()
+           })
     }
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
@@ -263,7 +265,8 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
         let len = self.len()?;
         self.append_hash(len, hash_rules::hash_leaf(&value))?;
 
-        self.map.put(&Self::db_key(K::zero(), len), value.serialize())?;
+        self.map
+            .put(&Self::db_key(K::zero(), len), value.serialize())?;
         self.set_len(len + K::one())?;
         Ok(())
     }
@@ -288,7 +291,8 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
         }
 
         self.update_hash_subtree(index, hash_rules::hash_leaf(&value))?;
-        self.map.put(&Self::db_key(K::zero(), index), value.serialize())
+        self.map
+            .put(&Self::db_key(K::zero(), index), value.serialize())
     }
 
 
@@ -325,8 +329,8 @@ mod tests {
     use rand::{thread_rng, Rng};
     use std::collections::HashSet;
 
-    use ::crypto::{Hash, hash};
-    use ::storage::{MemoryDB, List, MapTable, MerkleTable};
+    use crypto::{Hash, hash};
+    use storage::{MemoryDB, List, MapTable, MerkleTable};
     use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
@@ -358,9 +362,7 @@ mod tests {
             new_val
         };
 
-        (0..len)
-            .map(kv_generator)
-            .collect::<Vec<_>>()
+        (0..len).map(kv_generator).collect::<Vec<_>>()
     }
 
     #[test]
@@ -419,7 +421,10 @@ mod tests {
             MerkleTable::new(MapTable::new(vec![255], &storage));
         let num_vals = 10u32;
         let values = generate_fully_random_data_keys(num_vals as usize);
-        let hash_vals: Vec<Hash> = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>();
+        let hash_vals: Vec<Hash> = values
+            .into_iter()
+            .map(|el| hash(&el))
+            .collect::<Vec<Hash>>();
         for value in &hash_vals {
             table.append(*value).unwrap();
         }
@@ -466,7 +471,9 @@ mod tests {
         for _ in 0..50 {
             let start_range = rng.gen_range(0u32, num_vals);
             let end_range = rng.gen_range(start_range + 1, num_vals + 1);
-            let range_proof = table.construct_path_for_range(start_range, end_range).unwrap();
+            let range_proof = table
+                .construct_path_for_range(start_range, end_range)
+                .unwrap();
             assert_eq!(range_proof.compute_proof_root(), table_root_hash);
 
             {
@@ -538,7 +545,8 @@ mod tests {
         let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
         let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
-        let expected_hash_comb: Vec<(Vec<u8>, Hash, u32)> = vec![(vec![1, 2], h1, 0),
+        let expected_hash_comb: Vec<(Vec<u8>, Hash, u32)> =
+            vec![(vec![1, 2], h1, 0),
                                                                  (vec![2, 3], h12, 1),
                                                                  (vec![3, 4], h123, 2),
                                                                  (vec![4, 5], h1234, 3),
@@ -552,7 +560,9 @@ mod tests {
             let table_len = table.len().unwrap() as usize;
 
             assert_eq!(table.root_hash().unwrap(), exp_root);
-            let range_proof = table.construct_path_for_range(proof_ind, proof_ind + 1).unwrap();
+            let range_proof = table
+                .construct_path_for_range(proof_ind, proof_ind + 1)
+                .unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(), 1);
 

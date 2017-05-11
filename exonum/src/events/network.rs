@@ -95,7 +95,8 @@ impl Network {
             return Err(make_io_error("Already binded"));
         }
         let listener = TcpListener::bind(&self.listen_address)?;
-        event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge())?;
+        event_loop
+            .register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge())?;
         self.listener = Some(listener);
         Ok(())
     }
@@ -183,7 +184,8 @@ impl Network {
                     let r = {
                         // Write data into socket
                         self.outgoing[id].try_write()?;
-                        event_loop.reregister(self.outgoing[id].socket(),
+                        event_loop
+                            .reregister(self.outgoing[id].socket(),
                                         id,
                                         self.outgoing[id].interest(),
                                         PollOpt::edge())?;
@@ -217,7 +219,8 @@ impl Network {
                 self.outgoing[id]
                     .send(message)
                     .and_then(|_| {
-                        event_loop.reregister(self.outgoing[id].socket(),
+                        event_loop
+                            .reregister(self.outgoing[id].socket(),
                                         id,
                                         self.outgoing[id].interest(),
                                         PollOpt::edge())?;
@@ -225,9 +228,9 @@ impl Network {
                         Ok(())
                     })
                     .or_else(|e| {
-                        self.remove_outgoing_connection(event_loop, id);
-                        Err(e)
-                    })
+                                 self.remove_outgoing_connection(event_loop, id);
+                                 Err(e)
+                             })
             }
             Err(e) => Err(e),
         }
@@ -402,7 +405,8 @@ impl Network {
                address,
                delay);
         let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
-        let timeout = event_loop.timeout_ms(reconnect, delay)
+        let timeout = event_loop
+            .timeout_ms(reconnect, delay)
             .map_err(|e| make_io_error(format!("A mio error occured {:?}", e)))?;
         self.reconnects.insert(address, timeout);
         Ok(())

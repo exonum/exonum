@@ -181,12 +181,7 @@ fn test_propose() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let propose = Propose::new(validator,
-                               height,
-                               round,
-                               &prev_hash,
-                               &txs,
-                               &secret_key);
+    let propose = Propose::new(validator, height, round, &prev_hash, &txs, &secret_key);
     // read
     assert_eq!(propose.validator(), validator);
     assert_eq!(propose.height(), height);
@@ -251,7 +246,7 @@ fn test_precommit() {
     assert!(precommit.verify_signature(&public_key));
     assert_eq!(precommit.time(), time);
     let json_str = serde_json::to_string(&precommit).unwrap();
-    let precommit1 : Precommit = serde_json::from_str(&json_str).unwrap(); 
+    let precommit1: Precommit = serde_json::from_str(&json_str).unwrap();
     assert_eq!(precommit, precommit1);
 }
 
@@ -275,11 +270,7 @@ fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
     let ts = SystemTime::now();
 
-    let content = blockchain::Block::new(500,
-                                         1,
-                                         &hash(&[1]),
-                                         &hash(&[2]),
-                                         &hash(&[3]));
+    let content = blockchain::Block::new(500, 1, &hash(&[1]), &hash(&[2]), &hash(&[3]));
 
     let precommits = vec![Precommit::new(123,
                                          15,
@@ -302,7 +293,8 @@ fn test_block() {
                                          &hash(&[5, 2, 1]),
                                          ts,
                                          &secret_key)];
-    let transactions = vec![Status::new(&pub_key, 2, &hash(&[]), &secret_key).raw().clone(),
+    let transactions =
+        vec![Status::new(&pub_key, 2, &hash(&[]), &secret_key).raw().clone(),
                             Status::new(&pub_key, 4, &hash(&[2]), &secret_key).raw().clone(),
                             Status::new(&pub_key, 7, &hash(&[3]), &secret_key).raw().clone()];
     let block = Block::new(&pub_key,
@@ -329,7 +321,7 @@ fn test_block() {
         precommits: precommits.clone(),
     };
     let json_str = serde_json::to_string(&block_proof).unwrap();
-    let  block_proof_1: BlockProof = serde_json::from_str(&json_str).unwrap(); 
+    let block_proof_1: BlockProof = serde_json::from_str(&json_str).unwrap();
     assert_eq!(block_proof, block_proof_1);
 }
 

@@ -8,7 +8,8 @@ use storage::Map;
 use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
-// TODO: height should be updated after any message, not only after status (if signature is correct).
+// TODO: height should be updated after any message, not only after status
+// (if signature is correct).
 // TODO: Request propose makes sense only if we know that node is on our height.
 
 impl<S> NodeHandler<S>
@@ -40,7 +41,9 @@ impl<S> NodeHandler<S>
         }
 
         let propose = if msg.height() == self.state.height() {
-            self.state.propose(msg.propose_hash()).map(|p| p.message().raw().clone())
+            self.state
+                .propose(msg.propose_hash())
+                .map(|p| p.message().raw().clone())
         } else {
             return;
         };
@@ -102,13 +105,15 @@ impl<S> NodeHandler<S>
         let block_hash = schema.block_hash_by_height(height).unwrap().unwrap();
 
         let block = schema.blocks().get(&block_hash).unwrap().unwrap();
-        let precommits = schema.precommits(&block_hash)
+        let precommits = schema
+            .precommits(&block_hash)
             .values()
             .unwrap()
             .iter()
             .cloned()
             .collect::<Vec<_>>();
-        let transactions = schema.block_txs(height)
+        let transactions = schema
+            .block_txs(height)
             .values()
             .unwrap()
             .iter()

@@ -76,7 +76,7 @@ impl Serialize for SystemTimeSerdeHelper {
         let duration = self.0.duration_since(UNIX_EPOCH).unwrap();
         let helper = DurationSerdeHelper {
             secs: U64(duration.as_secs()),
-            nanos: duration.subsec_nanos()
+            nanos: duration.subsec_nanos(),
         };
         helper.serialize(ser)
     }
@@ -100,33 +100,38 @@ struct DurationSerdeHelper {
 
 #[cfg(test)]
 mod tests {
-	use std::time::SystemTime;
-	use serde_json; 
-	use super::{U64, I64, SystemTimeSerdeHelper, DurationSerdeHelper};
+    use std::time::SystemTime;
+    use serde_json;
+    use super::{U64, I64, SystemTimeSerdeHelper, DurationSerdeHelper};
 
-	#[test]
-	fn test_serialize() {
-		let var = 1486750447235849000; 
-		let str_json = serde_json::to_string(&U64(var)).unwrap(); 
-		let var1 = serde_json::from_str::<U64>(&str_json).unwrap().0; 
-		assert_eq!(var, var1);
-		let var_i = -1486750447235849000; 
-		let str_json = serde_json::to_string(&I64(var_i)).unwrap(); 
-		let var1_i = serde_json::from_str::<I64>(&str_json).unwrap().0; 
-		assert_eq!(var_i, var1_i);
-	}
+    #[test]
+    fn test_serialize() {
+        let var = 1486750447235849000;
+        let str_json = serde_json::to_string(&U64(var)).unwrap();
+        let var1 = serde_json::from_str::<U64>(&str_json).unwrap().0;
+        assert_eq!(var, var1);
+        let var_i = -1486750447235849000;
+        let str_json = serde_json::to_string(&I64(var_i)).unwrap();
+        let var1_i = serde_json::from_str::<I64>(&str_json).unwrap().0;
+        assert_eq!(var_i, var1_i);
+    }
 
-	#[test]
-	fn test_timespce_helper_serialize() {
-		let time = SystemTime::now();
-		let str_json = serde_json::to_string(&SystemTimeSerdeHelper(time)).unwrap();
-		let time1 = serde_json::from_str::<SystemTimeSerdeHelper>(&str_json).unwrap().0;
-		assert_eq!(time, time1);
-	}
+    #[test]
+    fn test_timespce_helper_serialize() {
+        let time = SystemTime::now();
+        let str_json = serde_json::to_string(&SystemTimeSerdeHelper(time)).unwrap();
+        let time1 = serde_json::from_str::<SystemTimeSerdeHelper>(&str_json)
+            .unwrap()
+            .0;
+        assert_eq!(time, time1);
+    }
 
     #[test]
     fn test_duration_helper_serialize() {
-        let helper = DurationSerdeHelper { secs: U64(10), nanos: 20 };
+        let helper = DurationSerdeHelper {
+            secs: U64(10),
+            nanos: 20,
+        };
         let str_json = serde_json::to_string(&helper).unwrap();
         let helper1 = serde_json::from_str::<DurationSerdeHelper>(&str_json).unwrap();
         assert_eq!(helper.secs.0, helper1.secs.0);

@@ -1168,7 +1168,7 @@ fn lock_remove_request_prevotes() {
 /// scenario: // HANDLE PRECOMMIT positive scenario
 ///         - Our block_hash different from precommits one.
 #[test]
-#[should_panic(expected = "Our block_hash different from precommits one.")]
+#[should_panic(expected = "Our block_hash different from precommits one")]
 fn handle_precommit_different_block_hash() {
     let sandbox = timestamping_sandbox();
 

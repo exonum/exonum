@@ -12,6 +12,7 @@ install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 - cargo install rustfmt --force
 script:
+- cargo fmt -p exonum -- --write-mode=diff
 - cargo fmt -p blockchain_explorer -- --write-mode=diff
 - cargo fmt -p sandbox -- --write-mode=diff
 - cargo rustc --manifest-path exonum/Cargo.toml --features clippy -- -D warnings

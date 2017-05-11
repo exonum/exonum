@@ -85,36 +85,36 @@ message! {
 
 #[derive(Serialize, Deserialize)]
 struct PrecommitSerdeHelper {
-    body: PrecommitBodySerdeHelper, 
-    signature: Signature, 
+    body: PrecommitBodySerdeHelper,
+    signature: Signature,
 }
 
 #[derive(Serialize, Deserialize)]
 struct PrecommitBodySerdeHelper {
-   validator: u32,  
-   height: U64, 
-   round: u32, 
-   propose_hash: Hash, 
-   block_hash: Hash,
-   time: SystemTimeSerdeHelper,
+    validator: u32,
+    height: U64,
+    round: u32,
+    propose_hash: Hash,
+    block_hash: Hash,
+    time: SystemTimeSerdeHelper,
 }
 
 impl Serialize for Precommit {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let body = PrecommitBodySerdeHelper{ 
-            validator: self.validator(), 
-            height: U64(self.height()), 
-            round: self.round(), 
-            propose_hash: *self.propose_hash(), 
+        let body = PrecommitBodySerdeHelper {
+            validator: self.validator(),
+            height: U64(self.height()),
+            round: self.round(),
+            propose_hash: *self.propose_hash(),
             block_hash: *self.block_hash(),
             time: SystemTimeSerdeHelper(self.time()),
-        }; 
+        };
         let helper = PrecommitSerdeHelper {
-            body: body, 
-            signature: *self.raw.signature(), 
-        }; 
+            body: body,
+            signature: *self.raw.signature(),
+        };
         helper.serialize(ser)
     }
 }
@@ -125,7 +125,13 @@ impl Deserialize for Precommit {
     {
         let h = <PrecommitSerdeHelper>::deserialize(deserializer)?;
 
-        let precommit = Precommit::new_with_signature(h.body.validator, h.body.height.0, h.body.round, &h.body.propose_hash, &h.body.block_hash, h.body.time.0, &h.signature);
+        let precommit = Precommit::new_with_signature(h.body.validator,
+                                                      h.body.height.0,
+                                                      h.body.round,
+                                                      &h.body.propose_hash,
+                                                      &h.body.block_hash,
+                                                      h.body.time.0,
+                                                      &h.signature);
         Ok(precommit)
     }
 }

@@ -207,7 +207,8 @@ fn big_message() {
             e.send_to(&addrs[1], m2.clone());
             e.send_to(&addrs[1], m1.clone());
 
-            let msgs = e.wait_for_messages(3, Duration::from_millis(10000)).unwrap();
+            let msgs = e.wait_for_messages(3, Duration::from_millis(10000))
+                .unwrap();
             assert_eq!(msgs[0], m2);
             assert_eq!(msgs[1], m1);
             assert_eq!(msgs[2], m2);
@@ -225,7 +226,8 @@ fn big_message() {
             e.send_to(&addrs[0], m2.clone());
             e.send_to(&addrs[0], m1.clone());
             e.send_to(&addrs[0], m2.clone());
-            let msgs = e.wait_for_messages(3, Duration::from_millis(10000)).unwrap();
+            let msgs = e.wait_for_messages(3, Duration::from_millis(10000))
+                .unwrap();
             assert_eq!(msgs[0], m1);
             assert_eq!(msgs[1], m2);
             assert_eq!(msgs[2], m1);
@@ -333,7 +335,7 @@ mod benches {
 
     use time::Duration;
 
-    use ::events::{Network, NetworkConfiguration, Events, Reactor};
+    use events::{Network, NetworkConfiguration, Events, Reactor};
     use super::{gen_message, TestEvents, TestHandler};
 
     use test::Bencher;
@@ -381,13 +383,13 @@ mod benches {
                 e1.wait_for_disconnect(Duration::from_millis(1000)).unwrap();
             });
             let t2 = thread::spawn(move || {
-                e2.wait_for_connect(&addrs[0]).unwrap();
-                for _ in 0..times {
-                    let msg = gen_message(1, len);
-                    e2.send_to(&addrs[0], msg);
-                    e2.wait_for_messages(1, timeout).unwrap();
-                }
-            });
+                                       e2.wait_for_connect(&addrs[0]).unwrap();
+                                       for _ in 0..times {
+                                           let msg = gen_message(1, len);
+                                           e2.send_to(&addrs[0], msg);
+                                           e2.wait_for_messages(1, timeout).unwrap();
+                                       }
+                                   });
             t1.join().unwrap();
             t2.join().unwrap();
         })
@@ -400,7 +402,8 @@ mod benches {
             len: 100,
             times: 100,
         };
-        let addrs = ["127.0.0.1:6990".parse().unwrap(), "127.0.0.1:6991".parse().unwrap()];
+        let addrs = ["127.0.0.1:6990".parse().unwrap(),
+                     "127.0.0.1:6991".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -411,7 +414,8 @@ mod benches {
             len: 100,
             times: 1000,
         };
-        let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
+        let addrs = ["127.0.0.1:9792".parse().unwrap(),
+                     "127.0.0.1:9793".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -422,7 +426,8 @@ mod benches {
             len: 100,
             times: 10000,
         };
-        let addrs = ["127.0.0.1:9982".parse().unwrap(), "127.0.0.1:9983".parse().unwrap()];
+        let addrs = ["127.0.0.1:9982".parse().unwrap(),
+                     "127.0.0.1:9983".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -433,7 +438,8 @@ mod benches {
             len: 100,
             times: 100,
         };
-        let addrs = ["127.0.0.1:4990".parse().unwrap(), "127.0.0.1:4991".parse().unwrap()];
+        let addrs = ["127.0.0.1:4990".parse().unwrap(),
+                     "127.0.0.1:4991".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -444,7 +450,8 @@ mod benches {
             len: 100,
             times: 10000,
         };
-        let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
+        let addrs = ["127.0.0.1:5990".parse().unwrap(),
+                     "127.0.0.1:5991".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -455,7 +462,8 @@ mod benches {
             len: 100000,
             times: 10,
         };
-        let addrs = ["127.0.0.1:9984".parse().unwrap(), "127.0.0.1:9985".parse().unwrap()];
+        let addrs = ["127.0.0.1:9984".parse().unwrap(),
+                     "127.0.0.1:9985".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -466,7 +474,8 @@ mod benches {
             len: 100000,
             times: 100,
         };
-        let addrs = ["127.0.0.1:9946".parse().unwrap(), "127.0.0.1:9947".parse().unwrap()];
+        let addrs = ["127.0.0.1:9946".parse().unwrap(),
+                     "127.0.0.1:9947".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -477,7 +486,8 @@ mod benches {
             len: 100000,
             times: 100,
         };
-        let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
+        let addrs = ["127.0.0.1:9198".parse().unwrap(),
+                     "127.0.0.1:9199".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 }

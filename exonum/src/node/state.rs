@@ -129,12 +129,11 @@ pub struct Votes<T: VoteMessage> {
 }
 
 impl ValidatorState {
-
     pub fn new(id: ValidatorId) -> ValidatorState {
         ValidatorState {
             id: id,
             our_precommits: HashMap::new(),
-            our_prevotes: HashMap::new()
+            our_prevotes: HashMap::new(),
         }
     }
 
@@ -154,7 +153,6 @@ impl ValidatorState {
         self.our_precommits.clear();
         self.our_prevotes.clear();
     }
-
 }
 
 impl<T> Votes<T>
@@ -327,15 +325,13 @@ impl State {
 
     pub fn renew_validator_id(&mut self, id: Option<ValidatorId>) {
         let validator_state = self.validator_state.take();
-        self.validator_state = id.map(move |id|{
-            match validator_state {
-                Some(mut state) => {
-                    state.set_validator_id(id);
-                    state
-                },
-                None => ValidatorState::new(id),
-            }
-        });
+        self.validator_state = id.map(move |id| match validator_state {
+                                          Some(mut state) => {
+                                              state.set_validator_id(id);
+                                              state
+                                          }
+                                          None => ValidatorState::new(id),
+                                      });
     }
 
     pub fn is_validator(&self) -> bool {
@@ -344,9 +340,9 @@ impl State {
 
     pub fn is_leader(&self) -> bool {
         self.validator_state()
-                      .as_ref()
-                      .map(|validator| self.leader(self.round()) == validator.id)
-                      .unwrap_or(false)
+            .as_ref()
+            .map(|validator| self.leader(self.round()) == validator.id)
+            .unwrap_or(false)
     }
 
     pub fn validators(&self) -> &[PublicKey] {
@@ -374,10 +370,11 @@ impl State {
 
     pub fn update_config(&mut self, config: StoredConfiguration) {
         trace!("Updating node config={:#?}", config);
-        let validator_id = config.validators
-                            .iter()
-                            .position(|pk| pk == self.public_key())
-                            .map(|id| id as u32);
+        let validator_id = config
+            .validators
+            .iter()
+            .position(|pk| pk == self.public_key())
+            .map(|id| id as u32);
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
         self.config = config;
@@ -580,10 +577,9 @@ impl State {
     }
 
     pub fn have_prevote(&self, propose_round: Round) -> bool {
-        if let Some(ref validator_state) = *self.validator_state(){
+        if let Some(ref validator_state) = *self.validator_state() {
             validator_state.have_prevote(propose_round)
-        }
-        else {
+        } else {
             panic!("called have_prevote for auditor node")
         }
     }
@@ -591,12 +587,13 @@ impl State {
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
         debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.hash();
-        self.proposes.insert(propose_hash,
-                             ProposeState {
-                                 hash: propose_hash,
-                                 propose: msg,
-                                 unknown_txs: BTreeSet::new(),
-                             });
+        self.proposes
+            .insert(propose_hash,
+                    ProposeState {
+                        hash: propose_hash,
+                        propose: msg,
+                        unknown_txs: BTreeSet::new(),
+                    });
 
         propose_hash
     }
@@ -619,10 +616,10 @@ impl State {
                         .push(propose_hash);
                 }
                 Some(e.insert(ProposeState {
-                    hash: propose_hash,
-                    propose: msg.clone(),
-                    unknown_txs: unknown_txs,
-                }))
+                                  hash: propose_hash,
+                                  propose: msg.clone(),
+                                  unknown_txs: unknown_txs,
+                              }))
             }
         }
     }
@@ -637,11 +634,11 @@ impl State {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => {
                 Some(e.insert(BlockState {
-                    hash: block_hash,
-                    patch: patch,
-                    txs: txs,
-                    propose_round: propose_round,
-                }))
+                                  hash: block_hash,
+                                  patch: patch,
+                                  txs: txs,
+                                  propose_round: propose_round,
+                              }))
             }
         }
     }
@@ -650,9 +647,12 @@ impl State {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
-                if let Some(other) = validator_state.our_prevotes.insert(msg.round(), msg.clone()) {
+                if let Some(other) = validator_state
+                       .our_prevotes
+                       .insert(msg.round(), msg.clone()) {
                     if &other != msg {
-                        panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
+                        panic!("Trying to send different prevotes for same round, old={:?}, \
+                                new={:?}",
                                 other,
                                 msg);
                     }
@@ -662,7 +662,9 @@ impl State {
 
         let key = (msg.round(), *msg.propose_hash());
         let validators_len = self.validators().len();
-        let mut votes = self.prevotes.entry(key).or_insert_with(|| Votes::new(validators_len));
+        let mut votes = self.prevotes
+            .entry(key)
+            .or_insert_with(|| Votes::new(validators_len));
         votes.insert(msg);
         votes.count() >= majority_count
     }
@@ -694,7 +696,9 @@ impl State {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
-                if let Some(other) = validator_state.our_precommits.insert(msg.round(), msg.clone()) {
+                if let Some(other) = validator_state
+                       .our_precommits
+                       .insert(msg.round(), msg.clone()) {
                     if other.propose_hash() != msg.propose_hash() {
                         panic!("Trying to send different precommits for same round, old={:?}, \
                                 new={:?}",
@@ -707,7 +711,9 @@ impl State {
 
         let key = (msg.round(), *msg.block_hash());
         let validators_len = self.validators().len();
-        let votes = self.precommits.entry(key).or_insert_with(|| Votes::new(validators_len));
+        let votes = self.precommits
+            .entry(key)
+            .or_insert_with(|| Votes::new(validators_len));
         votes.insert(msg);
         votes.count() >= majority_count
     }
@@ -723,7 +729,9 @@ impl State {
     }
 
     pub fn unknown_propose_with_precommits(&mut self, propose_hash: &Hash) -> Vec<(Round, Hash)> {
-        self.unknown_proposes_with_precommits.remove(propose_hash).unwrap_or_default()
+        self.unknown_proposes_with_precommits
+            .remove(propose_hash)
+            .unwrap_or_default()
     }
 
     pub fn has_majority_precommits(&self, round: Round, block_hash: Hash) -> bool {
@@ -744,16 +752,14 @@ impl State {
                         }
                     }
                 }
-                None => unreachable!()
+                None => unreachable!(),
             }
         }
         false
     }
 
     pub fn request(&mut self, data: RequestData, peer: PublicKey) -> bool {
-        let mut state = self.requests
-            .entry(data)
-            .or_insert_with(RequestState::new);
+        let mut state = self.requests.entry(data).or_insert_with(RequestState::new);
         let is_new = state.is_empty();
         state.insert(peer);
         is_new

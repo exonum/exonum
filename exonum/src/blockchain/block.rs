@@ -19,24 +19,24 @@ storage_value!(
 
 #[derive(Serialize, Deserialize)]
 struct BlockSerdeHelper {
-   height: U64,  
-   propose_round: u32,
-   prev_hash: Hash, 
-   tx_hash: Hash, 
-   state_hash: Hash, 
+    height: U64,
+    propose_round: u32,
+    prev_hash: Hash,
+    tx_hash: Hash,
+    state_hash: Hash,
 }
 
 impl Serialize for Block {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let helper = BlockSerdeHelper{
-            height: U64(self.height()), 
+        let helper = BlockSerdeHelper {
+            height: U64(self.height()),
             propose_round: self.propose_round(),
-            prev_hash: *self.prev_hash(), 
-            tx_hash: *self.tx_hash(), 
-            state_hash: *self.state_hash(), 
-        }; 
+            prev_hash: *self.prev_hash(),
+            tx_hash: *self.tx_hash(),
+            state_hash: *self.state_hash(),
+        };
         helper.serialize(ser)
     }
 }
@@ -44,9 +44,13 @@ impl Deserialize for Block {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
     {
-        let helper = <BlockSerdeHelper>::deserialize(deserializer)?; 
+        let helper = <BlockSerdeHelper>::deserialize(deserializer)?;
 
-        let block = Block::new(helper.height.0, helper.propose_round, &helper.prev_hash, &helper.tx_hash, &helper.state_hash);
+        let block = Block::new(helper.height.0,
+                               helper.propose_round,
+                               &helper.prev_hash,
+                               &helper.tx_hash,
+                               &helper.state_hash);
         Ok(block)
     }
 }

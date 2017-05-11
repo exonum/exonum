@@ -77,9 +77,7 @@ pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
                 self.set(i, j_val)?;
                 Ok(())
             }
-            _ => {
-                Err(Error::new("One of swap indexes is not present in list"))
-            }
+            _ => Err(Error::new("One of swap indexes is not present in list")),
         }
     }
 }

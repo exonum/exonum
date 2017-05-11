@@ -231,11 +231,13 @@ impl<H: EventHandler> MioAdapter<H> {
                           timeout: H::Timeout,
                           time: SystemTime) {
         match time.duration_since(SystemTime::now()) {
-            Ok(duration) =>
-                event_loop.timeout_ms(Timeout::Node(timeout), num_milliseconds(&duration))
+            Ok(duration) => {
+                event_loop
+                    .timeout_ms(Timeout::Node(timeout), num_milliseconds(&duration))
                     .map(|_| ())
                     .map_err(|x| format!("{:?}", x))
-                    .log_error("Unable to add timeout to event loop"),
+                    .log_error("Unable to add timeout to event loop")
+            }
             Err(_) => self.handler.handle_timeout(timeout),
         }
     }

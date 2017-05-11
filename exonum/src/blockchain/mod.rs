@@ -55,7 +55,9 @@ impl Blockchain {
 
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
         let id = raw.service_id() as usize;
-        self.service_map.get(id).and_then(|service| service.tx_from_raw(raw).ok())
+        self.service_map
+            .get(id)
+            .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
     pub fn merge(&self, patch: &Patch) -> Result<(), Error> {
@@ -64,9 +66,9 @@ impl Blockchain {
 
     pub fn last_hash(&self) -> Result<Hash, Error> {
         Ok(Schema::new(&self.view())
-            .block_hashes_by_height()
-            .last()?
-            .unwrap_or_else(Hash::default))
+               .block_hashes_by_height()
+               .last()?
+               .unwrap_or_else(Hash::default))
     }
 
     pub fn last_block(&self) -> Result<Block, Error> {
@@ -112,7 +114,7 @@ impl Blockchain {
         let size = mem::size_of::<u16>();
         let mut vec = vec![0; 2 * size];
         LittleEndian::write_u16(&mut vec[0..size], service_id);
-        LittleEndian::write_u16(&mut vec[size..2*size], table_idx as u16);
+        LittleEndian::write_u16(&mut vec[size..2 * size], table_idx as u16);
         crypto::hash(&vec)
     }
 
@@ -132,12 +134,8 @@ impl Blockchain {
         for hash in tx_hashes {
             let tx = &pool[hash];
             tx.execute(&fork)?;
-            schema.transactions()
-                .put(hash, tx.raw().clone())
-                .unwrap();
-            schema.block_txs(height)
-                .append(*hash)
-                .unwrap();
+            schema.transactions().put(hash, tx.raw().clone()).unwrap();
+            schema.block_txs(height).append(*hash).unwrap();
         }
         // Get tx hash
         let tx_hash = schema.block_txs(height).root_hash()?;
@@ -149,7 +147,7 @@ impl Blockchain {
                 let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
                 sum_table.put(&key, core_table_hash)?;
             }
-            for service in self.service_map.values(){
+            for service in self.service_map.values() {
                 let service_id = service.service_id();
                 let vec_service_state = service.state_hash(&fork)?;
                 for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
@@ -195,7 +193,7 @@ impl Blockchain {
             }
 
             state.update_config(schema.actual_configuration()?);
-                        
+
             let mut node_state = NodeState::new(state, &view);
             for service in self.service_map.values() {
                 service.handle_commit(&mut node_state)?;

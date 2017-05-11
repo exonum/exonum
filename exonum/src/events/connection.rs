@@ -166,17 +166,17 @@ impl OutgoingConnection {
 
     pub fn try_write(&mut self) -> io::Result<()> {
         // TODO: reregister
-        self.writer.write(&mut self.socket).or_else(|e| {
-            match e.kind() {
-                io::ErrorKind::WouldBlock |
-                io::ErrorKind::WriteZero => {
-                    warn!("Unable to write to socket {}, socket is blocked",
+        self.writer
+            .write(&mut self.socket)
+            .or_else(|e| match e.kind() {
+                         io::ErrorKind::WouldBlock |
+                         io::ErrorKind::WriteZero => {
+                warn!("Unable to write to socket {}, socket is blocked",
                           self.address);
-                    Ok(())
-                }
-                _ => Err(e),
+                Ok(())
             }
-        })
+                         _ => Err(e),
+                     })
     }
 
     pub fn send(&mut self, message: RawMessage) -> io::Result<()> {

@@ -8,7 +8,7 @@ use crypto::{hash, PublicKey, Hash};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
-    pub previous_cfg_hash: Hash, 
+    pub previous_cfg_hash: Hash,
     pub actual_from: u64,
     pub validators: Vec<PublicKey>,
     pub consensus: ConsensusConfig,
@@ -41,7 +41,8 @@ impl StoredConfiguration {
         serde_json::to_vec(&self)
     }
 
-    pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, serde_json::error::Error> {
+    pub fn try_deserialize(serialized: &[u8])
+                           -> Result<StoredConfiguration, serde_json::error::Error> {
         serde_json::from_slice(serialized)
     }
 }
@@ -59,5 +60,4 @@ impl StorageValue for StoredConfiguration {
         let vec_bytes = self.try_serialize().unwrap();
         hash(&vec_bytes)
     }
-
 }
