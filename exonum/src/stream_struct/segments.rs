@@ -3,18 +3,15 @@ use byteorder::{ByteOrder, LittleEndian};
 use messages::{BitVec, RawMessage, HEADER_SIZE, MessageBuffer, Message};
 use crypto::Hash;
 
-use super::{Error, Field};
+use super::{Error, Field, SegmentReference};
 
-pub trait SegmentField<'a> {
-    fn from_slice(slice: &'a [u8]) -> Self;
+pub trait SegmentField<'a>: Sized {
+    fn from_chunk(chunk: &'a [u8]) -> Self;
     fn extend_buffer(&self, buffer: &mut Vec<u8>);
-    fn count(&self) -> u32;
-    fn item_size() -> usize;
 
     #[allow(unused_variables)]
-    fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
-        Ok(())
-    }
+    fn check_data(slice: &'a [u8], pos: u32) 
+        -> Result<(), Error>;
 }
 
 impl<'a, T> Field<'a> for T
@@ -28,25 +25,30 @@ impl<'a, T> Field<'a> for T
         unsafe {
             let pos = LittleEndian::read_u32(&buffer[from..from + 4]);
             let count = LittleEndian::read_u32(&buffer[from + 4..to]);
-            let ptr = buffer.as_ptr().offset(pos as isize);
-            let len = (count as usize) * Self::item_size();
-            Self::from_slice(::std::slice::from_raw_parts(ptr as *const u8, len))
+            let start = pos as usize;
+            let end = start + count as usize;
+            let chunk = &buffer[start..end];
+            Self::from_chunk(chunk)
         }
     }
 
-    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
         let pos = buffer.len();
         LittleEndian::write_u32(&mut buffer[from..from + 4], pos as u32);
-        LittleEndian::write_u32(&mut buffer[from + 4..to], self.count());
         self.extend_buffer(buffer);
+        let count = buffer.len() - pos;
+        LittleEndian::write_u32(&mut buffer[from + 4..to], count as u32);
+        println!("buffer after write = {:?}", buffer)
     }
 
-    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<(), Error> {
+    fn check(buffer: &'a [u8], from: usize, to: usize)
+         -> Result<Option<SegmentReference>, Error>
+    {
         let pos = LittleEndian::read_u32(&buffer[from..from + 4]);
         let count = LittleEndian::read_u32(&buffer[from + 4..to]);
 
         if count == 0 {
-            return Ok(());
+            return Ok(None);
         }
 
         let start = pos as usize;
@@ -58,8 +60,7 @@ impl<'a, T> Field<'a> for T
             });
         }
 
-        let end = start + Self::item_size() * (count as usize);
-
+        let end = start + count as usize;
         if end > buffer.len() {
             return Err(Error::IncorrectSegmentSize {
                 position: (from + 4) as u32,
@@ -68,29 +69,21 @@ impl<'a, T> Field<'a> for T
         }
 
         unsafe {
-            let ptr = buffer.as_ptr().offset(pos as isize);
-            let len = (count as usize) * Self::item_size();
-            Self::check_data(::std::slice::from_raw_parts(ptr as *const u8, len),
-                             from as u32)
+            let chunk = &buffer[start..end];
+            Self::check_data(chunk, from as u32)
+                    .map(|_| Some(SegmentReference::new(pos, chunk.len() as u32)))
         }
     }
 }
 
 impl<'a> SegmentField<'a> for &'a str {
-    fn item_size() -> usize {
-        1
-    }
 
-    fn from_slice(slice: &'a [u8]) -> Self {
+    fn from_chunk(slice: &'a [u8]) -> Self {
         unsafe { ::std::str::from_utf8_unchecked(slice) }
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
         buffer.extend_from_slice(self.as_bytes())
-    }
-
-    fn count(&self) -> u32 {
-        self.as_bytes().len() as u32
     }
 
     fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
@@ -102,23 +95,16 @@ impl<'a> SegmentField<'a> for &'a str {
         }
         Ok(())
     }
+     
 }
 
 impl<'a> SegmentField<'a> for RawMessage {
-    fn item_size() -> usize {
-        1
-    }
-
-    fn from_slice(slice: &'a [u8]) -> Self {
+    fn from_chunk(slice: &'a [u8]) -> Self {
         RawMessage::new(MessageBuffer::from_vec(Vec::from(slice)))
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
         buffer.extend_from_slice(self.as_ref().as_ref())
-    }
-
-    fn count(&self) -> u32 {
-        self.len() as u32
     }
 
     fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
@@ -142,68 +128,98 @@ impl<'a> SegmentField<'a> for RawMessage {
 }
 
 
-// FIXME before merge:
-// 1. iteratively read items into Vec
+// FIXME: before merge:
 // 2. iteratively сheck items
-// 3. iteratively write items
 
-impl<'a, T> SegmentField<'a> for Vec<T> where T: Clone + Field<'a> {
-    fn item_size() -> usize {
-        T::field_size()
-    }
 
-    fn from_slice(slice: &'a [u8]) -> Self {
-        let slice:&[T] = unsafe { ::std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len() / Self::item_size()) };
-        Vec::from(slice)
+impl<'a, T> SegmentField<'a> for Vec<T> where T: Field<'a> {
+
+    //FIXME: reduce memory allocation
+    fn from_chunk(slice: &'a [u8]) -> Self {
+        // read vector len
+        let count = u32::read(slice, 0, 4) as usize;
+
+        let mut vec = Vec::with_capacity(count as usize);
+        let mut start = 4usize;
+        for _ in 0..count {
+            vec.push(T::read(slice, start, start + T::field_size()));
+            start += T::field_size();
+        }
+        vec
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-        let slice = unsafe { ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size()) };
-        buffer.extend_from_slice(slice);
-    }
+        let count = self.len() as u32;
+        // \TODO: avoid reallocation there, by implementing new buffer type
+        // that can lock buffer pervios data;
+        let mut tmpbuff = vec![0; 4 + T::field_size() * count as usize];
+        // write vector len
+        count.write(&mut tmpbuff, 0, 4);
+        let mut start = 4;
+        // write rest of fields
+        for i in self.iter() {
+            i.write(&mut tmpbuff, start, start + T::field_size());
+            start += T::field_size();
+        }
 
-    fn count(&self) -> u32 {
-        self.len() as u32
+        buffer.extend_from_slice(&tmpbuff)
+    }
+    
+    fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
+        Ok(())
     }
 }
 
 impl<'a> SegmentField<'a> for BitVec {
-    fn from_slice(slice: &'a [u8]) -> Self {
+    fn from_chunk(slice: &'a [u8]) -> Self {
         BitVec::from_bytes(slice)
     }
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
         // TODO: avoid reallocation here using normal implementation of bitvec
-        buffer.extend_from_slice(&self.to_bytes())
+        let slice = &self.to_bytes();
+        buffer.extend_from_slice(slice);
     }
-    fn count(&self) -> u32 {
-        self.blocks().len() as u32
-    }
-    fn item_size() -> usize {
-        32 / 8 // BitBlock = u32
+
+    fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
+        Ok(())
     }
 }
 
-impl<'a> SegmentField<'a> for &'a [Hash] {
-    fn item_size() -> usize {
-        32
+
+
+impl<'a> SegmentField<'a> for &'a [u8] {
+    fn from_chunk(slice: &'a [u8]) -> Self {
+        slice
     }
 
-    fn from_slice(slice: &'a [u8]) -> Self {
+    fn extend_buffer(&self, buffer: &mut Vec<u8>) {
+        println!("extend_buffer slice = {:?}, buffer = {:?}", self, buffer);
+        buffer.extend_from_slice(self)
+    }
+
+    fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+const HASH_ITEM_SIZE: usize = 32;
+impl<'a> SegmentField<'a> for &'a [Hash] {
+    fn from_chunk(slice: &'a [u8]) -> Self {
         unsafe {
             ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
-                                         slice.len() / Self::item_size())
+                                         slice.len() / HASH_ITEM_SIZE)
         }
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
         let slice = unsafe {
-            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size())
+            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * HASH_ITEM_SIZE)
         };
-        // TODO: avoid reallocation here using normal implementation of bitvec
         buffer.extend_from_slice(&slice)
     }
 
-    fn count(&self) -> u32 {
-        self.len() as u32
+    fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
+        Ok(())
     }
 }
+
