@@ -5,9 +5,8 @@ cache: cargo
 sudo: required
 dist: trusty
 before_install:
-- rustup toolchain install nightly
-- cargo +nightly install clippy --force --vers 0.0.131
-- cargo install rustfmt --force --vers 0.8.4
+- which rustfmt || cargo install rustfmt --vers 0.8.4
+- which cargo-clippy || rustup toolchain install nightly && cargo +nightly install clippy --force --vers 0.0.131
 - sudo add-apt-repository -y ppa:chris-lea/libsodium
 - sudo apt-get -qq update
 install:
