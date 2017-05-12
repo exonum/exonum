@@ -65,7 +65,7 @@ impl<V: Deserialize> Deserialize for Proofnode<V> {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
     {
-        fn format_err_string(type_str: &str, value: Value, err: SerdeJsonError) -> String {
+        fn format_err_string(type_str: &str, value: &Value, err: &SerdeJsonError) -> String {
             format!("Couldn't deserialize {} from serde_json::Value: {}, error: {}",
                     type_str,
                     value,
@@ -102,33 +102,33 @@ impl<V: Deserialize> Deserialize for Proofnode<V> {
                 if right_value.is_string() {
                     let left_proof: Proofnode<V> = from_value(left_value.clone()).map_err(|err| {
                             D::Error::custom(format_err_string("Proofnode",
-                                                               left_value.clone(),
-                                                               err))
+                                                               left_value,
+                                                               &err))
                         })?;
                     let right_hash: Hash = from_value(right_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Hash", right_value.clone(), err))
+                            D::Error::custom(format_err_string("Hash", right_value, &err))
                         })?;
                     Proofnode::Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
                     let right_proof: Proofnode<V> = from_value(right_value.clone()).map_err(|err| {
                             D::Error::custom(format_err_string("Proofnode",
-                                                               right_value.clone(),
-                                                               err))
+                                                               right_value,
+                                                               &err))
                         })?;
                     let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("Hash", left_value.clone(), err))
+                            D::Error::custom(format_err_string("Hash", left_value, &err))
                         })?;
                     Proofnode::Right(left_hash, Box::new(right_proof))
                 } else {
                     let left_proof = from_value(left_value.clone()).map_err(|err| {
                             D::Error::custom(format_err_string("Proofnode",
-                                                               left_value.clone(),
-                                                               err))
+                                                               left_value,
+                                                               &err))
                         })?;
                     let right_proof = from_value(right_value.clone()).map_err(|err| {
                             D::Error::custom(format_err_string("Proofnode",
-                                                               right_value.clone(),
-                                                               err))
+                                                               right_value,
+                                                               &err))
                         })?;
                     Proofnode::Full(Box::new(left_proof), Box::new(right_proof))
                 }
@@ -143,7 +143,7 @@ impl<V: Deserialize> Deserialize for Proofnode<V> {
                 }
                 if let Some(leaf_value) = map_key_value.get(VAL_DESC) {
                     let val: V = from_value(leaf_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("V", leaf_value.clone(), err))
+                            D::Error::custom(format_err_string("V", leaf_value, &err))
                         })?;
                     Proofnode::Leaf(val)
                 } else {
@@ -151,8 +151,8 @@ impl<V: Deserialize> Deserialize for Proofnode<V> {
                     let left_value = map_key_value.get(LEFT_DESC).unwrap();
                     let left_proof: Proofnode<V> = from_value(left_value.clone()).map_err(|err| {
                             D::Error::custom(format_err_string("Proofnode",
-                                                               left_value.clone(),
-                                                               err))
+                                                               left_value,
+                                                               &err))
                         })?;
                     Proofnode::Left(Box::new(left_proof), None)
                 }

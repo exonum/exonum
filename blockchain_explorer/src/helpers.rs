@@ -56,9 +56,7 @@ impl<'a, 'b> GenerateCommand<'a, 'b>
     }
 
     pub fn start_port(matches: &'a ArgMatches<'a>) -> Option<u16> {
-        matches
-            .value_of("START_PORT")
-            .map(|p| p.parse().unwrap())
+        matches.value_of("START_PORT").map(|p| p.parse().unwrap())
     }
 
     pub fn execute(matches: &'a ArgMatches<'a>) {

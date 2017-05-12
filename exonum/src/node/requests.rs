@@ -1,6 +1,3 @@
-// FIXME avoiding a bug in clippy.
-#![cfg_attr(feature="clippy", allow(map_clone))]
-
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
                RequestBlock, Block};
 use blockchain::Schema;
@@ -105,9 +102,7 @@ impl<S> NodeHandler<S>
         let precommits = schema.precommits(&block_hash)
             .values()
             .unwrap()
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+            .to_vec();
         let transactions = schema.block_txs(height)
             .values()
             .unwrap()
