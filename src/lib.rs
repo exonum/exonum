@@ -121,9 +121,6 @@
 //! }
 //! ```
 //!
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-
 #[macro_use]
 extern crate exonum;
 extern crate blockchain_explorer;
