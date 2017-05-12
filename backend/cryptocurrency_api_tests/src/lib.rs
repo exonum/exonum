@@ -1,3 +1,4 @@
+#[cfg(test)]
 #[macro_use]
 extern crate log;
 extern crate exonum;
@@ -8,6 +9,7 @@ extern crate iron;
 extern crate router;
 extern crate serde_json;
 extern crate serde;
+#[cfg(test)]
 #[macro_use]
 extern crate serde_derive;
 extern crate rand;
