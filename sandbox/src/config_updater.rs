@@ -1,6 +1,7 @@
 use exonum::crypto::{PublicKey, Hash};
 use exonum::blockchain::{Service, Transaction, Schema};
-use exonum::messages::{RawTransaction, Message, FromRaw, Error as MessageError};
+use exonum::messages::{RawTransaction, Message, FromRaw};
+use exonum::stream_struct::Error as MessageError;
 use exonum::storage::{View, Error as StorageError};
 use exonum::blockchain::StoredConfiguration;
 
@@ -54,7 +55,12 @@ impl Service for ConfigUpdateService {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         if raw.message_type() != CONFIG_PROPOSE_MESSAGE_ID {
-            return Err(MessageError::IncorrectMessageType { message_type: raw.message_type() });
+            return Err(
+                MessageError::IncorrectMessageType {
+                    position: 0,
+                    actual_message_type: raw.message_type(),
+                    declared_message_type: CONFIG_PROPOSE_MESSAGE_ID 
+                });
         }
         TxConfig::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }

@@ -1,6 +1,7 @@
 use rand::{Rng, XorShiftRng, SeedableRng};
 
-use exonum::messages::{FromRaw, Message, RawTransaction, Error as MessageError};
+use exonum::messages::{FromRaw, Message, RawTransaction};
+use exonum::stream_struct::Error as MessageError;
 use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
 use exonum::storage::{Error, View as StorageView};
 use exonum::blockchain::{Service, Transaction};
@@ -90,7 +91,12 @@ impl Service for TimestampingService {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         if raw.message_type() != TIMESTAMPING_TRANSACTION_MESSAGE_ID {
-            return Err(MessageError::IncorrectMessageType { message_type: raw.message_type() });
+            return Err(
+                MessageError::IncorrectMessageType {
+                    position: 0,
+                    actual_message_type: raw.message_type(),
+                    declared_message_type: TIMESTAMPING_TRANSACTION_MESSAGE_ID 
+                });
         }
 
         TimestampTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
