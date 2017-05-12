@@ -1,12 +1,18 @@
 language: rust
+rust:
+  - stable
 cache: cargo
 sudo: required
 dist: trusty
+env:
+  global:
+    - NIGHTLY_RUST=nightly-2017-05-10
+    - CLIPPY_VERS=0.0.131
+    - RUSTFMT_VERS=0.8.4
 before_install:
-- which rustfmt || cargo install rustfmt --vers 0.8.4
-- rustup override set nightly-2017-01-08
-- rustc --version
-- cargo --version
+- rustfmt --version | grep $RUSTFMT_VERS || cargo install rustfmt --force --vers $RUSTFMT_VERS
+- rustup toolchain install $NIGHTLY_RUST
+- cargo +$NIGHTLY_RUST clippy --version | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --force --vers $CLIPPY_VERS
 - sudo add-apt-repository -y ppa:chris-lea/libsodium
 - sudo apt-get -qq update
 install:
@@ -14,10 +20,12 @@ install:
 script:
 - cargo fmt -p cryptocurrency -- --write-mode=diff
 - cargo fmt -p cryptocurrency_api_tests -- --write-mode=diff
-- cargo check --features clippy --manifest-path backend/Cargo.toml
+- cd backend
+- cargo +$NIGHTLY_RUST clippy
+- cd ..
 - cargo build --release --manifest-path backend/Cargo.toml
-- cargo test --release --manifest-path backend/Cargo.toml
-- cargo test --release --manifest-path backend/cryptocurrency_api_tests/Cargo.toml
+- RUST_LOG=off cargo test --release --manifest-path backend/Cargo.toml
+- RUST_LOG=off cargo test --release --manifest-path backend/cryptocurrency_api_tests/Cargo.toml
 notifications:
   slack:
     rooms:
