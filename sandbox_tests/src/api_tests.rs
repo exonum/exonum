@@ -250,9 +250,7 @@ fn test_get_following_config() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars()
-        .take(string_len as usize)
-        .collect();
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
@@ -297,9 +295,7 @@ fn test_get_config_by_hash1() {
         propose: None,
     };
 
-    let resp_config_by_hash = api_sandbox
-        .get_config_by_hash(initial_cfg.hash())
-        .unwrap();
+    let resp_config_by_hash = api_sandbox.get_config_by_hash(initial_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_by_hash);
     assert_eq!(actual_body, expected_body.to_json());
 }
@@ -312,9 +308,7 @@ fn test_get_config_by_hash2() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars()
-        .take(string_len as usize)
-        .collect();
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
@@ -364,9 +358,7 @@ fn test_get_config_by_hash3() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars()
-        .take(string_len as usize)
-        .collect();
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
@@ -435,16 +427,12 @@ fn test_get_config_votes() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars()
-        .take(string_len as usize)
-        .collect();
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
     let expected_body = ApiResponseVotesInfo::ProposeAbsent(None);
-    let resp_config_votes = api_sandbox
-        .get_config_votes(following_cfg.hash())
-        .unwrap();
+    let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);
     assert_eq!(actual_body, expected_body.to_json());
 
@@ -479,9 +467,7 @@ fn test_get_config_votes() {
     };
     let expected_body = ApiResponseVotesInfo::Votes(votes);
 
-    let resp_config_votes = api_sandbox
-        .get_config_votes(following_cfg.hash())
-        .unwrap();
+    let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);
     assert_eq!(actual_body, expected_body.to_json());
 }
@@ -494,9 +480,7 @@ fn test_post_propose_response() {
     let initial_cfg = api_sandbox.sandbox.cfg();
 
     let string_len = rng.gen_range(20u8, 255u8);
-    let cfg_name: String = rng.gen_ascii_chars()
-        .take(string_len as usize)
-        .collect();
+    let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
     let proposer = 0;

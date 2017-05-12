@@ -519,8 +519,8 @@ impl<'a> ConfigurationSchema<'a> {
             .configs()
             .get(&cfg.previous_cfg_hash)?
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigPropose:{:?}",
-                             &cfg.previous_cfg_hash,
-                             serde_json::to_string(&tx_propose)?));
+                            &cfg.previous_cfg_hash,
+                            serde_json::to_string(&tx_propose)?));
 
         let votes_table = self.config_votes(cfg_hash);
         debug_assert!(votes_table.is_empty().unwrap());
@@ -547,20 +547,19 @@ impl<'a> ConfigurationSchema<'a> {
         let mut propose_config_data = config_data_table
             .get(cfg_hash)?
             .expect(&format!("Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
-                             &tx_vote));
+                            &tx_vote));
 
         let tx_propose = propose_config_data.tx_propose();
-        let prev_cfg_hash = <StoredConfiguration as StorageValue>::deserialize(tx_propose
-                                                                                   .cfg()
-                                                                                   .to_vec())
+        let prev_cfg_hash =
+            <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec())
                 .previous_cfg_hash;
         let general_schema = Schema::new(self.view);
         let prev_cfg = general_schema
             .configs()
             .get(&prev_cfg_hash)?
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigVote:{:?}",
-                             prev_cfg_hash,
-                             &tx_vote));
+                            prev_cfg_hash,
+                            &tx_vote));
         let from: &PublicKey = tx_vote.from();
         let validator_id = prev_cfg
             .validators
