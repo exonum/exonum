@@ -8,11 +8,12 @@ env:
   global:
     - NIGHTLY_RUST=nightly-2017-05-10
 before_install:
-- which rustfmt || cargo install rustfmt --vers 0.8.4 --force
+- rustfmt -V | grep 0.8.4 || cargo install rustfmt --vers 0.8.4 --force
 - rustup toolchain install $NIGHTLY_RUST
 - which cargo-clippy || cargo +$NIGHTLY_RUST install clippy --force --vers 0.0.131
 - sudo add-apt-repository -y ppa:chris-lea/libsodium
 - sudo apt-get -qq update
+- cargo install --list
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 script:
