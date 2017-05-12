@@ -297,22 +297,20 @@ impl Sandbox {
         }
     }
 
-    pub fn broadcast<T: Message>(&self, msg: T) 
-    {
+    pub fn broadcast<T: Message>(&self, msg: T) {
         let addresses = Vec::from_iter(self.addresses.iter().skip(1));
         self.broadcast_to_addrs(msg, addresses);
     }
 
     // TODO: add self-test for broadcasting?
-    pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: T, addresses: I) 
+    pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: T, addresses: I)
         where I: IntoIterator<Item = &'a SocketAddr>
     {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
-        let mut expected_set: HashSet<_> =
-            HashSet::from_iter(addresses.into_iter());
+        let mut expected_set: HashSet<_> = HashSet::from_iter(addresses.into_iter());
         let count_addr = expected_set.len();
 
 
