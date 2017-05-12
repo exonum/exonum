@@ -4,9 +4,8 @@ use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
-use exonum::blockchain::Blockchain;
-use exonum::crypto::{Hash, HexValue};
-
+use blockchain::Blockchain;
+use crypto::{Hash, HexValue};
 use explorer::{BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
@@ -18,7 +17,7 @@ pub struct BlocksRequest {
 
 #[derive(Clone)]
 pub struct ExplorerApi {
-    pub blockchain: Blockchain,
+    blockchain: Blockchain,
 }
 
 impl ExplorerApi {
