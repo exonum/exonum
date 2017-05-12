@@ -1,20 +1,24 @@
 language: rust
+rust:
+  - stable
 cache: cargo
 sudo: required
 dist: trusty
+env:
+  global:
+    - NIGHTLY_RUST=nightly-2017-05-10
 before_install:
-- rustup override set nightly-2017-01-08
-- rustc --version
-- cargo --version
+- which rustfmt || cargo install rustfmt --vers 0.8.4
+- rustup toolchain install $NIGHTLY_RUST
+- which cargo-clippy || cargo +$NIGHTLY_RUST install clippy --force --vers 0.0.131
 - sudo add-apt-repository -y ppa:chris-lea/libsodium
 - sudo apt-get -qq update
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
-- cargo install rustfmt --force
 script:
 - cargo fmt -p blockchain_explorer -- --write-mode=diff
 - cargo fmt -p sandbox -- --write-mode=diff
-- cargo rustc --manifest-path exonum/Cargo.toml --features clippy -- -D warnings
+- cd exonum; cargo +$NIGHTLY_RUST clippy -- -D warnings; cd ..
 - cargo rustc --manifest-path blockchain_explorer/Cargo.toml --lib -- -D warnings
 - cargo build --manifest-path sandbox/Cargo.toml
 - cargo build --release --manifest-path blockchain_explorer/Cargo.toml

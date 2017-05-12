@@ -195,7 +195,7 @@ impl<S> NodeHandler<S>
         // Lock to propose
         // TODO: avoid loop here
         let start_round = ::std::cmp::max(self.state.locked_round() + 1, propose_round);
-        for round in start_round...self.state.round() {
+        for round in start_round..self.state.round() + 1 {
             if self.state.has_majority_prevotes(round, hash) {
                 self.has_majority_prevotes(round, &hash);
             }
@@ -212,9 +212,7 @@ impl<S> NodeHandler<S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
+                .to_vec();
             self.commit(our_block_hash, precommits.iter());
         }
     }
@@ -282,15 +280,13 @@ impl<S> NodeHandler<S>
         // Commit.
         let precommits = self.state
             .precommits(round, our_block_hash)
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+            .to_vec();
         self.commit(our_block_hash, precommits.iter());
     }
 
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
-        for round in prevote_round...self.state.round() {
+        for round in prevote_round..self.state.round() + 1 {
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
                     self.broadcast_prevote(round, &propose_hash);
