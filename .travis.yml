@@ -21,7 +21,7 @@ install:
 script:
 - cargo fmt -p blockchain_explorer -- --write-mode=diff
 - cargo fmt -p sandbox -- --write-mode=diff
-- cd exonum; cargo +$NIGHTLY_RUST clippy -- -D warnings; cd ..
+- cd exonum; cargo +$NIGHTLY_RUST clippy -- -D warnings; res=$?; cd ..; exit res
 - cargo rustc --manifest-path blockchain_explorer/Cargo.toml --lib -- -D warnings
 - cargo build --manifest-path sandbox/Cargo.toml
 - cargo build --release --manifest-path blockchain_explorer/Cargo.toml
