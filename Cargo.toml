@@ -18,14 +18,13 @@ router = "0.5.1"
 iron = "0.5.1"
 bodyparser = "0.5.0"
 params = "0.6.0"
-clippy = {version = "0.0.107", optional = true}
 
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "0668f2e9708b3b391225af13c571dc37c13434e0"
+rev = "f072f9c38763349611005283eeec8e5be5c2f95c"
 
 [dependencies.blockchain_explorer]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "0668f2e9708b3b391225af13c571dc37c13434e0"
+rev = "f072f9c38763349611005283eeec8e5be5c2f95c"
