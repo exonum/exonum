@@ -7,12 +7,15 @@ dist: trusty
 env:
   global:
     - NIGHTLY_RUST=nightly-2017-05-10
+    - CLIPPY_VERS=0.0.131
+    - RUSTFMT_VERS=0.8.4
 before_install:
-- which rustfmt || cargo install rustfmt --vers 0.8.4
+- rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
 - rustup toolchain install $NIGHTLY_RUST
-- which cargo-clippy || cargo +$NIGHTLY_RUST install clippy --force --vers 0.0.131
+- cargo +$NIGHTLY_RUST clippy -V | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --vers $CLIPPY_VERS --force
 - sudo add-apt-repository -y ppa:chris-lea/libsodium
 - sudo apt-get -qq update
+- cargo install --list
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 script:
