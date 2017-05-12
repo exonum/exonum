@@ -15,9 +15,9 @@ use std::marker::PhantomData;
 use std::io;
 use std::collections::BTreeMap;
 
-use exonum::events::Error as EventsError;
-use exonum::crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash, ToHex};
-use exonum::storage::{Result as StorageResult, Error as StorageError};
+use events::Error as EventsError;
+use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash, ToHex};
+use storage::{Result as StorageResult, Error as StorageError};
 
 #[derive(Debug)]
 pub enum ApiError {
@@ -218,8 +218,8 @@ mod tests {
     use router::Router;
     use serde_json;
 
-    use exonum::blockchain::Block;
-    use exonum::crypto::Hash;
+    use blockchain::Block;
+    use crypto::Hash;
 
     use super::*;
 
