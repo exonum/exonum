@@ -86,7 +86,7 @@ impl Api for ExplorerApi {
                     let info = _self.get_block(height)?;
                     _self.ok_response(&info.to_json())
                 }
-                None => return Err(ApiError::IncorrectRequest)?,
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
 
@@ -98,7 +98,7 @@ impl Api for ExplorerApi {
                     let info = _self.get_transaction(hash_str)?;
                     _self.ok_response(&info.to_json())
                 }
-                None => return Err(ApiError::IncorrectRequest)?,
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
 
