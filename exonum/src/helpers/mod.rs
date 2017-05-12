@@ -28,7 +28,7 @@ fn format_log_record(record: &LogRecord) -> String {
     if verbose_src_path {
         source_path = format!("{}:{}:{}", module, file, line);
     } else {
-        source_path = format!("{}", module);
+        source_path = module.to_string();
     }
 
     if has_colors() {
