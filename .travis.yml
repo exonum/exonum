@@ -21,7 +21,6 @@ install:
 script:
 - cargo fmt -p sandbox -- --write-mode=diff
 - cd exonum; cargo +$NIGHTLY_RUST clippy -- -D warnings; cd ..
-- cargo build --manifest-path sandbox/Cargo.toml
 - cargo test --manifest-path exonum/Cargo.toml
 - cargo test --manifest-path sandbox/Cargo.toml
 notifications:
