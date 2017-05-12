@@ -1,16 +1,10 @@
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(test, feature(test))]
+#![cfg_attr(all(feature = "nightly", test), feature(test))]
 
-#![cfg_attr(feature="clippy", allow(zero_prefixed_literal))]
-
-#![feature(inclusive_range_syntax)]
-#![feature(btree_range, collections_bound)]
+#![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
 #![cfg_attr(feature="flame_profile",feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_profile",plugin(flamer))]
 
-#[macro_use]
 extern crate profiler;
 #[macro_use]
 extern crate log;
@@ -30,7 +24,7 @@ extern crate bit_vec;
 extern crate vec_map;
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(test)]
+#[cfg(all(feature = "nightly", test))]
 extern crate test;
 #[cfg(test)]
 extern crate env_logger;
