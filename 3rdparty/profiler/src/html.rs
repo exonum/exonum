@@ -2,7 +2,6 @@ use std::io::Write;
 use std::io::Result as IoResult;
 use super::{SpanPtr, Span};
 use std::collections::BTreeMap;
-use std::cell::{RefCell, Cell};
 use std::rc::Rc;
 
 

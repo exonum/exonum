@@ -174,16 +174,13 @@ impl<'a> ProposeBuilder<'a> {
     }
 
     pub fn build(&self) -> Propose {
-        Propose::new(self.validator_id
-                         .unwrap_or(self.sandbox.current_leader()),
+        Propose::new(self.validator_id.unwrap_or(self.sandbox.current_leader()),
                      self.height.unwrap_or(self.sandbox.current_height()),
                      self.round.unwrap_or(self.sandbox.current_round()),
-                     self.prev_hash
-                         .unwrap_or(&self.sandbox.last_hash().clone()),
+                     self.prev_hash.unwrap_or(&self.sandbox.last_hash().clone()),
                      self.tx_hashes.unwrap_or(&[]),
                      self.sandbox
-                         .s(self.validator_id
-                                .unwrap_or(self.sandbox.current_leader()) as
+                         .s(self.validator_id.unwrap_or(self.sandbox.current_leader()) as
                             usize))
     }
 }

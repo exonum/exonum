@@ -15,7 +15,7 @@ pub struct BitVec {
 
 impl BitVec {
     pub fn new(db_key: Vec<u8>, from: u16, to: u16) -> BitVec {
-        debug_assert!(db_key.len() == DB_KEY_SIZE);
+        debug_assert_eq!(db_key.len(), DB_KEY_SIZE);
         BitVec {
             db_key_data: db_key,
             from: from,
