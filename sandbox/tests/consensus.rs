@@ -1,6 +1,5 @@
 extern crate exonum;
 extern crate sandbox;
-#[macro_use]
 extern crate log;
 
 use std::time::Duration;
@@ -523,9 +522,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
         .build();
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
-        .build();
+    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
     let precommit_1 = Precommit::new(VALIDATOR_1,
                                      HEIGHT_ONE,
