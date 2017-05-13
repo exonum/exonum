@@ -111,6 +111,23 @@ impl PublicConfigApi {
         Ok(res)
     }
 
+    fn filter_cfg_predicate(cfg: &StoredConfiguration,
+                            previous_cfg_hash_filter: Option<Hash>,
+                            actual_from_filter: Option<u64>)
+                            -> bool {
+        if let Some(prev_ref) = previous_cfg_hash_filter {
+            if cfg.previous_cfg_hash != prev_ref {
+                return false;
+            }
+        }
+        if let Some(from_height) = actual_from_filter {
+            if cfg.actual_from < from_height {
+                return false;
+            }
+        }
+        true
+    }
+
     fn get_all_proposes(&self,
                         previous_cfg_hash_filter: Option<Hash>,
                         actual_from_filter: Option<u64>)
@@ -129,15 +146,10 @@ impl PublicConfigApi {
                                                                              .tx_propose()
                                                                              .cfg()
                                                                              .to_vec());
-            if let Some(prev_ref) = previous_cfg_hash_filter {
-                if cfg.previous_cfg_hash != prev_ref {
-                    continue;
-                }
-            }
-            if let Some(from_height) = actual_from_filter {
-                if cfg.actual_from < from_height {
-                    continue;
-                }
+            if !PublicConfigApi::filter_cfg_predicate(&cfg,
+                                                      previous_cfg_hash_filter,
+                                                      actual_from_filter) {
+                continue;
             }
             let elem = ApiResponseProposeHashInfo {
                 hash: cfg_hash,
@@ -152,7 +164,29 @@ impl PublicConfigApi {
                          previous_cfg_hash_filter: Option<Hash>,
                          actual_from_filter: Option<u64>)
                          -> Result<Vec<ApiResponseConfigHashInfo>, ApiError> {
-        unimplemented!();
+        let view = self.blockchain.view();
+        let general_schema = Schema::new(&view);
+        let references = general_schema.configs_actual_from().values()?;
+        let mut res: Vec<_> = Vec::new();
+        for reference in references {
+            let cfg_hash = reference.cfg_hash();
+            let cfg =
+                general_schema
+                    .configs()
+                    .get(cfg_hash)?
+                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+            if !PublicConfigApi::filter_cfg_predicate(&cfg,
+                                                      previous_cfg_hash_filter,
+                                                      actual_from_filter) {
+                continue;
+            }
+            let elem = ApiResponseConfigHashInfo {
+                hash: *cfg_hash,
+                config: cfg,
+            };
+            res.push(elem);
+        }
+        Ok(res)
     }
 
     fn retrieve_params(map: &ParamsMap) -> Result<(Option<Hash>, Option<u64>), ApiError> {

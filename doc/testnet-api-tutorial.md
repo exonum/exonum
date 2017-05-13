@@ -127,8 +127,8 @@ strings.
 
 | Endpoint      | HTTP method   | Description | Response template |
 | ------------- | ------------- | ------------| ------------------ |
-| `/api/v1/config/actual`         | GET | Lookup actual config| {<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **configuration-hash**<br> }|
-| `/api/v1/config/following`      | GET | Lookup already accepted following config which hasn't yet taken effect.<br> `null` if no config is scheduled |  {<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **configuration-hash**<br> }|
+| `/api/v1/configs/actual`         | GET | Lookup actual config| {<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **configuration-hash**<br> }|
+| `/api/v1/configs/following`      | GET | Lookup already accepted following config which hasn't yet taken effect.<br> `null` if no config is scheduled |  {<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **configuration-hash**<br> }|
 | `/api/v1/configs/<config-hash>` | GET | Lookup config by config hash.<br> If no propose was submitted for a config (genesis config) - "propose" is `null`. <br> If only propose is present, then "committed\_config" is `null`| {<br> &emsp;"committed\_config": **config\_body**,<br> &emsp;"propose": {<br> &emsp;&emsp;"num\_votes": **integer**,<br> &emsp;&emsp;"tx\_propose": {<br> &emsp;&emsp;&emsp;"cfg": **config\_body**,<br> &emsp;&emsp;&emsp;"from": **validator-public-key**,<br> &emsp;&emsp;&emsp;"signature": **validator-node-signature**<br> &emsp;&emsp;},<br> &emsp;"votes\_history\_hash": **vote-history-hash**<br> &emsp;}<br> }|
 | `/api/v1/configs/<config-hash>/votes` | GET | Lookup votes for a config propose by config hash.<br> If a vote from validator is absent - `null` returned at the corresponding index in json array | {<br> &emsp;"Votes": [<br> &emsp;&emsp;{<br> &emsp;&emsp;&emsp;"cfg\_hash": **configuration-hash**,<br> &emsp;&emsp;&emsp;"from": **validator-public-key**,<br> &emsp;&emsp;&emsp;"signature": **validator-node-signature**<br> &emsp;&emsp;},<br> &emsp;&emsp;**null**,<br> &emsp;&emsp;...<br> &emsp;]<br> }|
 
@@ -139,7 +139,7 @@ endpoint.
 
 -   it's important to specify `previous_cfg_hash` in new config body, 
     which should be equal to `hash` of a config, actual at the moment 
-    when the new propose is being composed.
+    when the new propose is being submitted.
 
 -   `cfg_hash`, returned in response to `postpropose` request, should be used 
     as `<config-hash-vote-for>` parameter of `postvote` request. 
