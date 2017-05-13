@@ -1,5 +1,5 @@
 use serde_json::value::ToJson;
-use params::{Params, Value};
+use params::{Map as ParamsMap, Params, Value};
 use router::Router;
 use blockchain_explorer::api::{Api, ApiError};
 use iron::prelude::*;
@@ -147,6 +147,31 @@ impl PublicConfigApi {
         }
         Ok(res)
     }
+
+    fn get_all_committed(&self,
+                         previous_cfg_hash_filter: Option<Hash>,
+                         actual_from_filter: Option<u64>)
+                         -> Result<Vec<ApiResponseConfigHashInfo>, ApiError> {
+        unimplemented!();
+    }
+
+    fn retrieve_params(map: &ParamsMap) -> Result<(Option<Hash>, Option<u64>), ApiError> {
+        let actual_from: Option<u64>;
+        let previous_cfg_hash: Option<Hash>;
+        previous_cfg_hash = match map.find(&["previous_cfg_hash"]) {
+            Some(&Value::String(ref hash_string)) => {
+                Some(Hash::from_hex(hash_string).map_err(ApiError::FromHex)?)
+            }
+            _ => None,
+        };
+        actual_from = match map.find(&["actual_from"]) {
+            Some(&Value::String(ref from_str)) => {
+                Some(from_str.parse().map_err(|_| ApiError::IncorrectRequest)?)
+            }
+            _ => None,
+        };
+        Ok((previous_cfg_hash, actual_from))
+    }
 }
 
 impl<T> PrivateConfigApi<T>
@@ -217,24 +242,20 @@ impl Api for PublicConfigApi {
                 None => Err(ApiError::IncorrectRequest)?,
             }
         };
+
         let _self = self.clone();
         let get_all_proposes = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
-            let actual_from: Option<u64>;
-            let previous_cfg_hash: Option<Hash>;
-            previous_cfg_hash = match map.find(&["previous_cfg_hash"]) {
-                Some(&Value::String(ref hash_string)) => {
-                    Some(Hash::from_hex(hash_string).map_err(ApiError::FromHex)?)
-                }
-                _ => None,
-            };
-            actual_from = match map.find(&["actual_from"]) {
-                Some(&Value::String(ref from_str)) => {
-                    Some(from_str.parse().map_err(|_| ApiError::IncorrectRequest)?)
-                }
-                _ => None,
-            };
+            let (previous_cfg_hash, actual_from) = PublicConfigApi::retrieve_params(map)?;
             let info = _self.get_all_proposes(previous_cfg_hash, actual_from)?;
+            _self.ok_response(&info.to_json())
+        };
+
+        let _self = self.clone();
+        let get_all_committed = move |req: &mut Request| -> IronResult<Response> {
+            let map = req.get_ref::<Params>().unwrap();
+            let (previous_cfg_hash, actual_from) = PublicConfigApi::retrieve_params(map)?;
+            let info = _self.get_all_committed(previous_cfg_hash, actual_from)?;
             _self.ok_response(&info.to_json())
         };
         router.get("/api/v1/configs/actual", config_actual, "config_actual");
@@ -248,9 +269,9 @@ impl Api for PublicConfigApi {
         router.get("/api/v1/configs/proposed",
                    get_all_proposes,
                    "get_all_proposes");
-        //router.get("/api/v1/configs/committed",
-        //get_all_committed,
-        //"get_votes_for_propose");
+        router.get("/api/v1/configs/committed",
+                   get_all_committed,
+                   "get_all_committed");
 
     }
 }

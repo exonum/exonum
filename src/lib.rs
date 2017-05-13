@@ -611,7 +611,8 @@ impl<'a> ConfigurationSchema<'a> {
     }
 
     pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
-        Ok(vec![self.propose_data_by_config_hash().root_hash()?, self.config_hash_by_ordinal().root_hash()?])
+        Ok(vec![self.propose_data_by_config_hash().root_hash()?,
+                self.config_hash_by_ordinal().root_hash()?])
     }
 }
 
