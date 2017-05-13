@@ -209,7 +209,8 @@ storage_value! {
 ///
 /// 1. `TxConfigPropose` in `tx_propose` field.
 ///
-/// 2. Reference to [config_votes](struct.ConfigurationSchema.html#method.config_votes) table. This
+/// 2. Reference to
+/// [votes_by_config_hash](struct.ConfigurationSchema.html#method.votes_by_config_hash) table. This
 ///    reference is represented by 2 fields:
 ///   - `votest_history_hash`
 ///   - `num_votes`
@@ -222,7 +223,8 @@ storage_value! {
 /// modified after a vote from validator is added.
 impl StorageValueConfigProposeData {
     /// Method to mutate `votes_history_hash` field containing root hash of
-    /// [config_votes](struct.ConfigurationSchema.html#method.config_votes) after replacing [empty
+    /// [votes_by_config_hash](struct.ConfigurationSchema.html#method.votes_by_config_hash)
+    /// after replacing [empty
     /// vote](struct.ZEROVOTE.html) with a real `TxConfigVote` cast by a validator.
     pub fn set_history_hash(&mut self, hash: &Hash) {
         Field::write(&hash, &mut self.raw, 8, 40);
@@ -460,11 +462,21 @@ impl<'a> ConfigurationSchema<'a> {
     /// which contains
     /// [bytes](struct.TxConfigPropose.html#method.cfg), corresponding to
     /// **key**.
-    pub fn config_data(&self)
-                       -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, ProposeData> {
+    pub fn propose_data_by_config_hash
+        (&self)
+         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, ProposeData> {
         MerklePatriciaTable::new(MapTable::new(vec![4], self.view))
     }
 
+    /// - Table **index** is propose_id - position of a proposed [hash of a configuration]
+    /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) in the
+    /// corresponding `TxConfigPropose` commit order.
+    /// - Table **value** is [hash of a configuration]
+    /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) - **key** of
+    /// `propose_data_by_config_hash`
+    pub fn config_hash_by_ordinal(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
+        MerkleTable::new(MapTable::new(vec![9], self.view))
+    }
     /// Returns a table of votes of validators for config, referenced by the
     /// queried
     /// `config_hash` - [hash of a configuration]
@@ -481,27 +493,28 @@ impl<'a> ConfigurationSchema<'a> {
     /// previous to config, referenced by the queried `config_hash`.
     /// - Table **value** is `TxConfigVote`, cast by validator with
     /// [PublicKey](struct.TxConfigVote.html#method.from), corresponding to **index**.
-    pub fn config_votes(&self,
-                        config_hash: &Hash)
-                        -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, TxConfigVote> {
+    pub fn votes_by_config_hash
+        (&self,
+         config_hash: &Hash)
+         -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, TxConfigVote> {
         let mut prefix = vec![5; 1 + HASH_SIZE];
         prefix[1..].copy_from_slice(config_hash.as_ref());
         MerkleTable::new(MapTable::new(prefix, self.view))
     }
 
-    /// Put a new `StorageValueConfigProposeData` into `config_data` table with
+    /// Put a new `StorageValueConfigProposeData` into `propose_data_by_config_hash` table with
     /// following fields:
     ///
     /// - **tx_propose** - `tx_propose` argument
     /// - **num_votes** - `validators.len()` of [StoredConfiguration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html),
     /// referenced by `previous_cfg_hash` of config, stored in `tx_propose`.
-    /// - **votes_history_hash** - root_hash of corresponding `config_votes` table in a
+    /// - **votes_history_hash** - root_hash of corresponding `votes_by_config_hash` table in a
     /// state right after initialization (all indices contain [empty vote](struct.ZEROVOTE.html)).
     ///
     /// If an entry with the same [hash of a configuration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is present
-    /// in `config_data`, as in config inside of `tx_propose`, nothing is done.
+    /// in `propose_data_by_config_hash`, as in config inside of `tx_propose`, nothing is done.
     pub fn put_propose(&self, tx_propose: TxConfigPropose) -> StorageResult<()> {
         let cfg = <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec());
         let cfg_hash = &StorageValue::hash(&cfg);
@@ -522,34 +535,41 @@ impl<'a> ConfigurationSchema<'a> {
                             &cfg.previous_cfg_hash,
                             serde_json::to_string(&tx_propose)?));
 
-        let votes_table = self.config_votes(cfg_hash);
+        let votes_table = self.votes_by_config_hash(cfg_hash);
         debug_assert!(votes_table.is_empty().unwrap());
         let num_validators = prev_cfg.validators.len();
         for _ in 0..num_validators {
             votes_table.append(ZEROVOTE.clone())?;
         }
-        let config_data = StorageValueConfigProposeData::new(tx_propose,
-                                                             &votes_table.root_hash()?,
-                                                             num_validators as u64);
-        let config_data_table = self.config_data();
-        debug_assert!(config_data_table.get(cfg_hash).unwrap().is_none());
-        config_data_table.put(cfg_hash, config_data)
+        let propose_data_by_config_hash = StorageValueConfigProposeData::new(tx_propose,
+                                                                             &votes_table
+                                                                                  .root_hash()?,
+                                                                             num_validators as u64);
+        let propose_data_by_config_hash_table = self.propose_data_by_config_hash();
+        debug_assert!(propose_data_by_config_hash_table
+                          .get(cfg_hash)
+                          .unwrap()
+                          .is_none());
+        propose_data_by_config_hash_table
+            .put(cfg_hash, propose_data_by_config_hash)?;
+        self.config_hash_by_ordinal().append(*cfg_hash)
     }
 
     pub fn get_propose(&self, cfg_hash: &Hash) -> StorageResult<Option<TxConfigPropose>> {
-        let option_config_data = self.config_data().get(cfg_hash)?;
-        Ok(option_config_data.map(|config_data| config_data.tx_propose()))
+        let option_propose_data_by_config_hash = self.propose_data_by_config_hash().get(cfg_hash)?;
+        Ok(option_propose_data_by_config_hash
+               .map(|propose_data_by_config_hash| propose_data_by_config_hash.tx_propose()))
     }
 
     pub fn put_vote(&self, tx_vote: TxConfigVote) -> StorageResult<()> {
         let cfg_hash = tx_vote.cfg_hash();
-        let config_data_table = self.config_data();
-        let mut propose_config_data = config_data_table
+        let propose_data_by_config_hash_table = self.propose_data_by_config_hash();
+        let mut propose_propose_data_by_config_hash = propose_data_by_config_hash_table
             .get(cfg_hash)?
             .expect(&format!("Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
                             &tx_vote));
 
-        let tx_propose = propose_config_data.tx_propose();
+        let tx_propose = propose_propose_data_by_config_hash.tx_propose();
         let prev_cfg_hash =
             <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec())
                 .previous_cfg_hash;
@@ -569,15 +589,15 @@ impl<'a> ConfigurationSchema<'a> {
                               TxConfigVote:{:?}",
                              &tx_vote));
 
-        let votes_for_cfg_table = self.config_votes(cfg_hash);
+        let votes_for_cfg_table = self.votes_by_config_hash(cfg_hash);
         votes_for_cfg_table
             .set(validator_id as u64, tx_vote.clone())?;
-        propose_config_data.set_history_hash(&votes_for_cfg_table.root_hash()?);
-        config_data_table.put(cfg_hash, propose_config_data)
+        propose_propose_data_by_config_hash.set_history_hash(&votes_for_cfg_table.root_hash()?);
+        propose_data_by_config_hash_table.put(cfg_hash, propose_propose_data_by_config_hash)
     }
 
     pub fn get_votes(&self, cfg_hash: &Hash) -> StorageResult<Vec<Option<TxConfigVote>>> {
-        let votes_table = self.config_votes(cfg_hash);
+        let votes_table = self.votes_by_config_hash(cfg_hash);
         let votes_values = votes_table.values()?;
         let votes_options = votes_values
             .into_iter()
@@ -591,7 +611,7 @@ impl<'a> ConfigurationSchema<'a> {
     }
 
     pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
-        Ok(vec![self.config_data().root_hash()?])
+        Ok(vec![self.propose_data_by_config_hash().root_hash()?, self.config_hash_by_ordinal().root_hash()?])
     }
 }
 
@@ -713,7 +733,7 @@ impl TxConfigVote {
         }
 
         config_schema.put_vote(self.clone())?;
-        debug!("Put TxConfigVote:{:?} to corresponding cfg config_votes table",
+        debug!("Put TxConfigVote:{:?} to corresponding cfg votes_by_config_hash table",
                self);
 
         let mut votes_count = 0;
@@ -757,16 +777,18 @@ impl Service for ConfigurationService {
 
     /// `ConfigurationService` returns a vector, containing the single [root_hash]
     /// (../exonum/storage/struct.MerklePatriciaTable.html#method.root_hash)
-    /// of [all config proposes table](struct.ConfigurationSchema.html#method.config_data).
+    /// of [all config proposes table]
+    /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash).
     ///
     /// Thus, `state_hash` is affected by any new valid propose and indirectly by
     /// any new vote for a propose.
     ///
     /// When a new vote for a config propose is added the [root_hash]
     /// (../exonum/storage/struct.MerkleTable.html#method.root_hash) of corresponding
-    /// [votes for a propose table](struct.ConfigurationSchema.html#method.config_votes)
+    /// [votes for a propose table](struct.ConfigurationSchema.html#method.votes_by_config_hash)
     /// is modified. Such hash is stored in each entry of [all config proposes table]
-    /// (struct.ConfigurationSchema.html#method.config_data) - `StorageValueConfigProposeData`.
+    /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash)
+    /// - `StorageValueConfigProposeData`.
     fn state_hash(&self, view: &View) -> StorageResult<Vec<Hash>> {
         let schema = ConfigurationSchema::new(view);
         schema.state_hash()

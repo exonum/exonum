@@ -1,6 +1,6 @@
 ### Public response samples
 
-1.  <http://127.0.0.1:8000/api/v1/config/actual>
+1.  <http://127.0.0.1:8000/api/v1/configs/actual>
 
     ```javascript
     {                                                                                            
@@ -28,7 +28,7 @@
     }
     ```
 
-1.  <http://127.0.0.1:8000/api/v1/config/following> - format same as 
+1.  <http://127.0.0.1:8000/api/v1/configs/following> - format same as 
 for `actual`
 
 1.  <http://127.0.0.1:8000/api/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a> 
