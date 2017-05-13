@@ -92,7 +92,7 @@ impl Blockchain {
             // Commit actual configuration
             {
                 let schema = Schema::new(&view);
-                if let Some(_) = schema.block_hash_by_height(0)? {
+                if schema.block_hash_by_height(0)?.is_some() {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
                     return Ok(());
                 }
