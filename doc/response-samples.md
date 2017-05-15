@@ -1,6 +1,6 @@
-### Public response samples
+### Public endpoints' response samples
 
-1.  <http://127.0.0.1:8000/api/v1/config/actual>
+1.  <http://127.0.0.1:8000/api/v1/configs/actual>
 
     ```javascript
     {                                                                                            
@@ -28,7 +28,7 @@
     }
     ```
 
-1.  <http://127.0.0.1:8000/api/v1/config/following> - format same as 
+1.  <http://127.0.0.1:8000/api/v1/configs/following> - format same as 
 for `actual`
 
 1.  <http://127.0.0.1:8000/api/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a> 
@@ -111,7 +111,175 @@ for `actual`
     }
     ```
 
-### Private response samples
+1.  <http://127.0.0.1:8000/api/v1/configs/committed>
+
+    ```javascript
+    [
+      {
+        "config": {
+          "actual_from": 0,
+          "consensus": {
+            "peers_timeout": 10000,
+            "propose_timeout": 500,
+            "round_timeout": 3000,
+            "status_timeout": 5000,
+            "txs_block_limit": 1000
+          },
+          "previous_cfg_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "services": {
+            "1": null
+          },
+          "validators": [
+            "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284"
+          ]
+        },
+        "hash": "fd1234f01cac886f7ec4a236e15958d6a9095a28d145ec80925abffc6a702565"
+      },
+      {
+        "config": {
+          "actual_from": 3000,
+          "consensus": {
+            "peers_timeout": 10000,
+            "propose_timeout": 500,
+            "round_timeout": 3000,
+            "status_timeout": 5000,
+            "txs_block_limit": 1000
+          },
+          "previous_cfg_hash": "fd1234f01cac886f7ec4a236e15958d6a9095a28d145ec80925abffc6a702565",
+          "services": {
+            "1": {
+              "param": "value1"
+            }
+          },
+          "validators": [
+            "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284"
+          ]
+        },
+        "hash": "64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68"
+      },
+      {
+        "config": {
+          "actual_from": 4000,
+          "consensus": {
+            "peers_timeout": 10000,
+            "propose_timeout": 500,
+            "round_timeout": 3000,
+            "status_timeout": 5000,
+            "txs_block_limit": 1000
+          },
+          "previous_cfg_hash": "64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68",
+          "services": {
+            "1": {
+              "param": "value_5"
+            }
+          },
+          "validators": [
+            "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284"
+          ]
+        },
+        "hash": "4b149012d686b3b66a9a8061e7beb2e72e601675df9fa53e0afde418c0bcb7f4"
+      }
+    ]
+    ```
+
+1.  <http://127.0.0.1:8000/api/v1/configs/proposed?previous_cfg_hash=64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68&actual_from=3100>
+
+    ```javascript
+    [
+      {
+        "hash": "acb7def92c28bc72c2de8b41b648a1e301f1a404cf79d5c350841b27abd30ab2",
+        "propose_data": {
+          "num_votes": "1",
+          "tx_propose": {
+            "cfg": {
+              "actual_from": 3400,
+              "consensus": {
+                "peers_timeout": 10000,
+                "propose_timeout": 500,
+                "round_timeout": 3000,
+                "status_timeout": 5000,
+                "txs_block_limit": 1000
+              },
+              "previous_cfg_hash": "64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68",
+              "services": {
+                "1": {
+                  "param": "value_4"
+                }
+              },
+              "validators": [
+                "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284"
+              ]
+            },
+            "from": "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284",
+            "signature": "e7e43c7119cc077d6a9a6e2e3c9948441b48decaf7d9ce06b663b5c974bf12c95e4bc74aa2ace418ea85ad938e5afe3b31338c47ff44c805a04dea547b68b30b"
+          },
+          "votes_history_hash": "d397c4c800c33521cfc9b4fa8f378ab85018902b42d9bbc2fcdaf27ff88a9dd0"
+        }
+      },
+      {
+        "hash": "c9b98af9a860d4bf9479c3b17a22527c8a59acf3b68de43d748a362ce6ec67b1",
+        "propose_data": {
+          "num_votes": "1",
+          "tx_propose": {
+            "cfg": {
+              "actual_from": 3700,
+              "consensus": {
+                "peers_timeout": 10000,
+                "propose_timeout": 500,
+                "round_timeout": 3000,
+                "status_timeout": 5000,
+                "txs_block_limit": 1000
+              },
+              "previous_cfg_hash": "64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68",
+              "services": {
+                "1": {
+                  "param": "value_4"
+                }
+              },
+              "validators": [
+                "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284"
+              ]
+            },
+            "from": "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284",
+            "signature": "b82e8c9ad45af8a7abcfce9a277da21b41964e87d07505e9a7552fafc81e90d255c93326dfb07a65b66b81114fee093e504339c3338c85106e4e8821552c990f"
+          },
+          "votes_history_hash": "d397c4c800c33521cfc9b4fa8f378ab85018902b42d9bbc2fcdaf27ff88a9dd0"
+        }
+      },
+      {
+        "hash": "4b149012d686b3b66a9a8061e7beb2e72e601675df9fa53e0afde418c0bcb7f4",
+        "propose_data": {
+          "num_votes": "1",
+          "tx_propose": {
+            "cfg": {
+              "actual_from": 4000,
+              "consensus": {
+                "peers_timeout": 10000,
+                "propose_timeout": 500,
+                "round_timeout": 3000,
+                "status_timeout": 5000,
+                "txs_block_limit": 1000
+              },
+              "previous_cfg_hash": "64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68",
+              "services": {
+                "1": {
+                  "param": "value_5"
+                }
+              },
+              "validators": [
+                "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284"
+              ]
+            },
+            "from": "3f5925a3ce57ed059bc45d6b358dc4d68be5ca39c9a8d649d22458a67560d284",
+            "signature": "83084e0bb334dc5806354c537686c1a04cdf0f86fc23aa9ff950eedca8ed6a4082325686be4a0878fce60deaebe3b5ddc7a13735b1a74f5cf1753210601f6004"
+          },
+          "votes_history_hash": "4ad431e86676907b228a8bf0ba61f73df0a6392271b30cb977382cfc291c18ee"
+        }
+      }
+    ]
+    ```
+
+### Private endpoints' response samples
 
 1.  <http://127.0.0.1:8010/api/v1/configs/postpropose>
 

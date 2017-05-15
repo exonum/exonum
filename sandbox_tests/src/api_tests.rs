@@ -153,12 +153,12 @@ impl ConfigurationApiSandbox {
 
     fn get_actual_config(&self) -> IronResult<Response> {
         let api = self.obtain_test_api(0);
-        request_get("/api/v1/config/actual", &api)
+        request_get("/api/v1/configs/actual", &api)
     }
 
     fn get_following_config(&self) -> IronResult<Response> {
         let api = self.obtain_test_api(0);
-        request_get("/api/v1/config/following", &api)
+        request_get("/api/v1/configs/following", &api)
     }
 
     fn get_config_by_hash(&self, config_hash: Hash) -> IronResult<Response> {
