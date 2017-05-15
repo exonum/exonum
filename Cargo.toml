@@ -23,9 +23,4 @@ params = "0.6.0"
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "6f6b4f1404f327f2bd34b2f4590d5ffa06b3c0ee"
-
-[dependencies.blockchain_explorer]
-git = "ssh://git@github.com/exonum/exonum-core.git"
-version = "0.1.0"
-rev = "6f6b4f1404f327f2bd34b2f4590d5ffa06b3c0ee"
+rev = "d4c2fec9537df08ecf51732a12c0f02440331298"

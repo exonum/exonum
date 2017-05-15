@@ -52,7 +52,6 @@
 //! extern crate tempdir;
 //! extern crate router;
 //! extern crate exonum;
-//! extern crate blockchain_explorer;
 //! extern crate configuration_service;
 //!
 //! use std::thread;
@@ -64,8 +63,8 @@
 //! use exonum::blockchain::Blockchain;
 //! use exonum::node::Node;
 //! use exonum::storage::{LevelDB, LevelDBOptions};
-//! use blockchain_explorer::api::Api;
-//! use blockchain_explorer::helpers::generate_testnet_config;
+//! use exonum::api::Api;
+//! use exonum::helpers::generate_testnet_config;
 //! use configuration_service::{ConfigurationService};
 //! use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi};
 //!
@@ -145,7 +144,6 @@
 //!
 #[macro_use]
 extern crate exonum;
-extern crate blockchain_explorer;
 #[macro_use]
 extern crate log;
 

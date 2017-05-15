@@ -4,7 +4,6 @@
 #[macro_use]
 extern crate log;
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate sandbox;
 extern crate configuration_service;
 extern crate iron;
@@ -67,10 +66,9 @@ mod tests {
                                 ConfigurationSchema};
     use serde_json::Value;
 
-    use blockchain_explorer;
-
     pub fn configuration_sandbox() -> (Sandbox, SandboxState, StoredConfiguration) {
-        let _ = blockchain_explorer::helpers::init_logger();
+        use exonum;
+        let _ = exonum::helpers::init_logger();
         let sandbox = sandbox_with_services(vec![Box::new(TimestampingService::new()),
                                                  Box::new(ConfigurationService::new())]);
         let sandbox_state = SandboxState::new();
