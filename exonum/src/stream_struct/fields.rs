@@ -1,13 +1,11 @@
 use byteorder::{ByteOrder, LittleEndian};
 
 use std::mem;
-use std::sync::Arc;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use crypto::{Hash, PublicKey, Signature};
-use super::{Error, Offset, SegmentReference};
-use messages::{RawMessage, MessageBuffer, BitVec, FromRaw};
+use super::{Error, SegmentReference};
 
 
 
@@ -41,7 +39,7 @@ impl<'a> Field<'a> for bool {
         buffer[from] = if *self { 1 } else { 0 }
     }
 
-    fn check(buffer: &'a [u8], from: usize, to: usize)
+    fn check(buffer: &'a [u8], from: usize, _: usize)
          -> Result<Option<SegmentReference>, Error>
     {
         if buffer[from] != 0 && buffer[from] != 1 {
