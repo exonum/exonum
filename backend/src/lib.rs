@@ -13,7 +13,6 @@ extern crate tempdir;
 extern crate serde_json;
 #[macro_use(message, storage_value)]
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate params;
 extern crate router;
 extern crate iron;
@@ -31,7 +30,6 @@ use exonum::crypto::{PublicKey, Hash, Signature, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
-use blockchain_explorer::TransactionInfo;
 
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
@@ -243,8 +241,6 @@ impl Deserialize for CurrencyTx {
         Ok(res)
     }
 }
-
-impl TransactionInfo for CurrencyTx {}
 
 impl Message for CurrencyTx {
     fn raw(&self) -> &RawMessage {

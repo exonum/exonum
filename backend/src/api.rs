@@ -6,7 +6,7 @@ use bodyparser;
 use jsonway;
 use params::{Params, Value};
 
-use blockchain_explorer::api::{Api, ApiError};
+use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
 use exonum::messages::BlockProof;
 use exonum::crypto::{HexValue, PublicKey, Hash};

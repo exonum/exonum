@@ -101,7 +101,7 @@ impl WalletTestData {
     }
 }
 
-pub fn assert_wallet(wallet: Wallet,
+pub fn assert_wallet(wallet: &Wallet,
                      pub_key: &PublicKey,
                      name: &str,
                      balance: u64,
@@ -122,7 +122,7 @@ fn test_wallet() {
     let wallet = Wallet::new(&pub_key, name, 100500, 0, &hash);
 
     let wallet = wallet.clone();
-    assert_wallet(wallet, &pub_key, name, 100500, 0, &hash);
+    assert_wallet(&wallet, &pub_key, name, 100500, 0, &hash);
 }
 
 #[test]

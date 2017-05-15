@@ -2,7 +2,6 @@
 #[macro_use]
 extern crate log;
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate sandbox;
 extern crate cryptocurrency;
 extern crate iron;
@@ -38,8 +37,8 @@ mod tests {
     use exonum::blockchain::{Service, Transaction};
     use exonum::events::Error as EventsError;
     use exonum::messages::{FromRaw, Message, RawMessage};
-    use blockchain_explorer::api::Api;
-    use blockchain_explorer::helpers::init_logger;
+    use exonum::api::Api;
+    use exonum::helpers::init_logger;
     use cryptocurrency::{CurrencyService, CurrencyTx, TxCreateWallet, TxIssue, TxTransfer};
     use cryptocurrency::api::CryptocurrencyApi;
     use sandbox::sandbox::{sandbox_with_services, Sandbox};
