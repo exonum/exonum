@@ -8,7 +8,6 @@ extern crate serde_json;
 extern crate bodyparser;
 
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate router;
 extern crate configuration_service;
 
