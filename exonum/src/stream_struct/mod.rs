@@ -25,14 +25,14 @@ pub type Result = ::std::result::Result<Option<SegmentReference>, Error>;
 
 pub struct SegmentReference {
     pub from: Offset,
-    pub size: Offset
+    pub to: Offset
 }
 
 impl SegmentReference {
-    pub fn new(from: Offset, size: Offset) -> SegmentReference {
+    pub fn new(from: Offset, to: Offset) -> SegmentReference {
         SegmentReference {
             from: from,
-            size: size
+            to: to
         }
     }
 
@@ -48,7 +48,7 @@ impl SegmentReference {
         else if self.from > *last_data {
             Err(Error::SpaceBetweenSegments{last_end: *last_data, start: self.from})
         } else {
-            *last_data = self.from + self.size;
+            *last_data = self.to;
             Ok(())
         }
     }

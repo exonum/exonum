@@ -82,10 +82,10 @@ fn test_segments_of_arrays() {
     <Vec<&[u8]> as Field>::check(&buf2, 48, 56).unwrap();
     let dat2: Vec<&[u8]> = Field::read(&buf2, 48, 56);
     assert_eq!(dat2, dat);
-    //48 spaces + 8 segment of vec + 8 spaces + 4 vector_header + 
+    //48 spaces + 8 segment of vec + 8 spaces = 64 + 
     // + v1_segment + v2_segment + v3_segment +
     // + v1_body + v2_body + v3_body
-    assert_eq!(buf.len(), 64 + v1.len() + v2.len() + v3.len() + 3 * 8 + 4);
+    assert_eq!(buf.len(), 64 + v1.len() + v2.len() + v3.len() + 3 * 8);
 }
 
 
@@ -94,6 +94,7 @@ fn assert_write_check_read<T>(input: T, header_size: usize)
 {
     let mut buffer = vec![0; header_size];
     Field::write(&input, &mut buffer, 0, header_size);
+    println!("buffer ={:?}", buffer);
     <T as Field>::check(&buffer, 0, header_size).unwrap();
     let new_buffer = buffer.clone();
     //clear buffer
