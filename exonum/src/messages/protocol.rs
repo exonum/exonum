@@ -215,10 +215,10 @@ pub struct BlockProof {
 impl ExonumJsonSerialize for BlockProof {
     fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error> {
         use ::serde::ser::SerializeStruct;
-        let mut strukt = serializer.serialize_struct("BlockProof", 2 )?;
-        strukt.serialize_field("block", &::serialize::json::wrap(&self.block))?;
-        strukt.serialize_field("precommits", &::serialize::json::wrap(&self.precommits))?;
-        strukt.end()
+        let mut structure = serializer.serialize_struct("BlockProof", 2 )?;
+        structure.serialize_field("block", &::serialize::json::wrap(&self.block))?;
+        structure.serialize_field("precommits", &::serialize::json::wrap(&self.precommits))?;
+        structure.end()
     }
 }
 impl ExonumJsonDeserialize for BlockProof{

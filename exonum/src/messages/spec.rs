@@ -82,10 +82,10 @@ macro_rules! message {
         impl $crate::serialize::json::ExonumJsonSerialize for $name {
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: $crate::serialize::json::reexport::Serializer {
                     use $crate::serialize::json::reexport::SerializeStruct;
-                    let mut strukt = serializer.serialize_struct(stringify!($name), counter!($($field_name)*) + 1)?;
-                    $(strukt.serialize_field(stringify!($field_name), &$crate::serialize::json::wrap(&self.$field_name()))?;)*
-                    strukt.serialize_field("signature", &$crate::serialize::json::wrap(self.raw.signature()))?;
-                    strukt.end()               
+                    let mut structure = serializer.serialize_struct(stringify!($name), counter!($($field_name)*) + 1)?;
+                    $(structure.serialize_field(stringify!($field_name), &$crate::serialize::json::wrap(&self.$field_name()))?;)*
+                    structure.serialize_field("signature", &$crate::serialize::json::wrap(self.raw.signature()))?;
+                    structure.end()               
                 }
         }
 
