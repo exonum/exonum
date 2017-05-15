@@ -298,8 +298,7 @@ impl Sandbox {
     }
 
     pub fn broadcast<T: Message>(&self, msg: T) {
-        let addresses = Vec::from_iter(self.addresses.iter().skip(1));
-        self.broadcast_to_addrs(msg, addresses);
+        self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
 
     // TODO: add self-test for broadcasting?
@@ -310,11 +309,9 @@ impl Sandbox {
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
-        let mut expected_set: HashSet<_> = HashSet::from_iter(addresses.into_iter());
-        let count_addr = expected_set.len();
+        let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
 
-
-        for _ in 0..count_addr {
+        for _ in 0..expected_set.len() {
             let sended = self.inner.lock().unwrap().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
