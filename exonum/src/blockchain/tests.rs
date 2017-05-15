@@ -11,7 +11,7 @@ storage_value! {
 
 #[test]
 fn test_correct_storage_value() {
-    let dat: Vec<u8> = vec![8u8, 0, 0, 0, 22, 0, 0, 0,
+    let dat: Vec<u8> = vec![8u8, 0, 0, 0, 
         18, 0, 0, 0,
         16, 0, 0, 0, 1, 0, 0, 0,
         17, 0, 0, 0, 1, 0, 0, 0,
@@ -29,7 +29,7 @@ fn test_correct_storage_value() {
 }
 
 #[test]
-#[should_panic="OverlappingSegment"]
+#[should_panic(expected ="OverlappingSegment")]
 fn test_overlap_segments() {
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0,
         16, 0, 0, 0, 1, 0, 0, 0,
@@ -40,7 +40,7 @@ fn test_overlap_segments() {
 }
 
 #[test]
-#[should_panic="IncorrectSegmentReference"]
+#[should_panic(expected ="IncorrectSegmentReference")]
 fn test_segments_reffer_header() {
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0,
         1, 0, 0, 0, 1, 0, 0, 0,
@@ -51,7 +51,7 @@ fn test_segments_reffer_header() {
 }
 
 #[test]
-#[should_panic="SpaceBetweenSegments"]
+#[should_panic(expected ="SpaceBetweenSegments")]
 fn test_segments_has_spaces_between() {
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0,
         18, 0, 0, 0, 1, 0, 0, 0, // <-- link after space
