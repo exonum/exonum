@@ -4,9 +4,8 @@ use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
-use exonum::blockchain::Blockchain;
-use exonum::crypto::{Hash, HexValue};
-
+use blockchain::Blockchain;
+use crypto::{Hash, HexValue};
 use explorer::{BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
@@ -18,7 +17,7 @@ pub struct BlocksRequest {
 
 #[derive(Clone)]
 pub struct ExplorerApi {
-    pub blockchain: Blockchain,
+    blockchain: Blockchain,
 }
 
 impl ExplorerApi {
@@ -87,7 +86,7 @@ impl Api for ExplorerApi {
                     let info = _self.get_block(height)?;
                     _self.ok_response(&info.to_json())
                 }
-                None => return Err(ApiError::IncorrectRequest)?,
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
 
@@ -99,7 +98,7 @@ impl Api for ExplorerApi {
                     let info = _self.get_transaction(hash_str)?;
                     _self.ok_response(&info.to_json())
                 }
-                None => return Err(ApiError::IncorrectRequest)?,
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
 

@@ -26,8 +26,16 @@ extern crate vec_map;
 extern crate tempdir;
 #[cfg(all(feature = "nightly", test))]
 extern crate test;
-#[cfg(test)]
 extern crate env_logger;
+extern crate colored;
+extern crate term;
+extern crate clap;
+extern crate hyper;
+extern crate iron;
+extern crate router;
+extern crate bodyparser;
+extern crate params;
+extern crate cookie;
 
 #[macro_use]
 pub mod messages;
@@ -37,3 +45,6 @@ pub mod node;
 pub mod storage;
 pub mod blockchain;
 pub mod config;
+pub mod explorer;
+pub mod helpers;
+pub mod api;
