@@ -145,7 +145,6 @@
 //!
 #[macro_use]
 extern crate exonum;
-extern crate blockchain_explorer;
 #[macro_use]
 extern crate log;
 

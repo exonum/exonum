@@ -29,8 +29,8 @@ use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, ApiRe
                                         ApiResponseConfigHashInfo, ApiResponseVotesInfo,
                                         ApiResponseProposePost, ApiResponseVotePost};
 
-use blockchain_explorer::api::Api;
-use blockchain_explorer::helpers::init_logger;
+use exonum::api::Api;
+use exonum::helpers::init_logger;
 
 use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};

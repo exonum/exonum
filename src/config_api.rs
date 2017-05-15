@@ -1,7 +1,7 @@
 use serde_json::value::ToJson;
 use params::{Map as ParamsMap, Params, Value};
 use router::Router;
-use blockchain_explorer::api::{Api, ApiError};
+use exonum::api::{Api, ApiError};
 use iron::prelude::*;
 use bodyparser;
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
