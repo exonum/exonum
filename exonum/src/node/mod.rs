@@ -26,7 +26,7 @@ pub enum ExternalMessage {
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NodeTimeout {
-    Status,
+    Status(Height),
     Round(u64, u32),
     Request(RequestData, Option<PublicKey>),
     Propose(u64, u32),
@@ -92,7 +92,7 @@ impl<S> NodeHandler<S>
             (block.hash(), block.height() + 1)
         };
 
-        let stored = Schema::new(&blockchain.view()).get_actual_configuration().unwrap();
+        let stored = Schema::new(&blockchain.view()).actual_configuration().unwrap();
         info!("Create node with config={:#?}", stored);
 
         let validator_id = stored.validators
@@ -239,7 +239,7 @@ impl<S> NodeHandler<S>
 
     pub fn add_status_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
-        self.channel.add_timeout(NodeTimeout::Status, time);
+        self.channel.add_timeout(NodeTimeout::Status(self.state.height()), time);
     }
 
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
@@ -293,7 +293,7 @@ impl<S> EventHandler for NodeHandler<S>
         match timeout {
             NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
-            NodeTimeout::Status => self.handle_status_timeout(),
+            NodeTimeout::Status(height) => self.handle_status_timeout(height),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
             NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
         }

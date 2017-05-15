@@ -6,7 +6,7 @@ use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPr
                RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
 use storage::{Map, Patch};
 use events::Channel;
-use super::{NodeHandler, Round, Height, RequestData, ValidatorId, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout};
 
 // TODO reduce view invokations
 impl<S> NodeHandler<S>
@@ -36,30 +36,31 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        match self.state.public_key_of(msg.validator()) {
-            // incorrect signature of message
+        let key = match self.state.public_key_of(msg.validator()) {
             Some(public_key) => {
                 if !msg.verify(public_key) {
-                    error!("Received message with incorrect signature msg={:?}", msg);
+                    error!("Received message with incorrect signature, msg={:?}", msg);
                     return;
                 }
+                *public_key
             }
-            // incorrect validator id
             None => {
-                error!("Received message from incorrect msg={:?}", msg);
+                error!("Received message from incorrect validator, msg={:?}", msg);
                 return;
             }
-        }
+        };
 
         trace!("Handle message={:?}", msg);
         match msg {
-            ConsensusMessage::Propose(msg) => self.handle_propose(msg),
-            ConsensusMessage::Prevote(msg) => self.handle_prevote(msg),
-            ConsensusMessage::Precommit(msg) => self.handle_precommit(msg),
+            ConsensusMessage::Propose(msg) => self.handle_propose(key, msg),
+            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, msg),
+            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, msg),
         }
     }
 
-    pub fn handle_propose(&mut self, msg: Propose) {
+    pub fn handle_propose(&mut self, from: PublicKey, msg: Propose) {
+        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
+
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
             error!("Received propose with wrong last_block_hash msg={:?}", msg);
@@ -100,8 +101,8 @@ impl<S> NodeHandler<S>
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS!!!");
-            let key = self.public_key_of(msg.validator());
-            self.request(RequestData::Transactions(hash), key);
+            self.request(RequestData::Transactions(hash), from);
+
             for node in known_nodes {
                 self.request(RequestData::Transactions(hash), node);
             }
@@ -194,7 +195,7 @@ impl<S> NodeHandler<S>
         // Lock to propose
         // TODO: avoid loop here
         let start_round = ::std::cmp::max(self.state.locked_round() + 1, propose_round);
-        for round in start_round...self.state.round() {
+        for round in start_round..self.state.round() + 1 {
             if self.state.has_majority_prevotes(round, hash) {
                 self.has_majority_prevotes(round, &hash);
             }
@@ -211,32 +212,31 @@ impl<S> NodeHandler<S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
+                .to_vec();
             self.commit(our_block_hash, precommits.iter());
         }
     }
 
-    pub fn handle_prevote(&mut self, prevote: Prevote) {
+    pub fn handle_prevote(&mut self, from: PublicKey, msg: Prevote) {
         trace!("Handle prevote");
+
+        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
+
         // Add prevote
-        let has_consensus = self.state.add_prevote(&prevote);
+        let has_consensus = self.state.add_prevote(&msg);
 
         // Request propose or transactions
-        let has_propose_with_txs =
-            self.request_propose_or_txs(prevote.propose_hash(), prevote.validator());
+        let has_propose_with_txs = self.request_propose_or_txs(msg.propose_hash(), from);
 
         // Request prevotes
-        if prevote.locked_round() > self.state.locked_round() {
-            let key = self.public_key_of(prevote.validator());
-            self.request(RequestData::Prevotes(prevote.locked_round(), *prevote.propose_hash()),
-                         key);
+        if msg.locked_round() > self.state.locked_round() {
+            self.request(RequestData::Prevotes(msg.locked_round(), *msg.propose_hash()),
+                         from);
         }
 
         // Lock to propose
         if has_consensus && has_propose_with_txs {
-            self.has_majority_prevotes(prevote.round(), prevote.propose_hash());
+            self.has_majority_prevotes(msg.round(), msg.propose_hash());
         }
     }
 
@@ -253,43 +253,40 @@ impl<S> NodeHandler<S>
                                    round: Round,
                                    propose_hash: &Hash,
                                    block_hash: &Hash) {
-        // Commit
-        if self.state.propose(propose_hash).is_some() {
-            // Check for unknown txs
-            let has_unknown_txs = {
-                let state = self.state.propose(propose_hash).unwrap();
-                if state.has_unknown_txs() {
-                    Some(state.message().validator())
-                } else {
-                    None
-                }
-            };
-            if let Some(validator) = has_unknown_txs {
-                let data = RequestData::Transactions(*propose_hash);
-                let key = self.public_key_of(validator);
-                self.request(data, key);
-                return;
-            }
-
-            // Execute block and get state hash
-            let our_block_hash = self.execute(propose_hash);
-
-            assert_eq!(&our_block_hash, block_hash, "Our block_hash different from precommits one.");
-
-            let precommits = self.state
-                .precommits(round, our_block_hash)
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
-            self.commit(our_block_hash, precommits.iter());
-        } else {
+        // Check if propose is known.
+        if self.state.propose(propose_hash).is_none() {
             self.state.add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
+            return;
         }
+
+        // Request transactions if needed.
+        let proposer = {
+            let propose_state = self.state.propose(propose_hash).unwrap();
+            if propose_state.has_unknown_txs() {
+                Some(*self.state.public_key_of(propose_state.message().validator()).unwrap())
+            } else {
+                None
+            }
+        };
+        if let Some(proposer) = proposer {
+            self.request(RequestData::Transactions(*propose_hash), proposer);
+            return;
+        }
+
+        // Execute block and get state hash
+        let our_block_hash = self.execute(propose_hash);
+        assert_eq!(&our_block_hash, block_hash, "Our block_hash different from precommits one.");
+
+        // Commit.
+        let precommits = self.state
+            .precommits(round, our_block_hash)
+            .to_vec();
+        self.commit(our_block_hash, precommits.iter());
     }
 
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
-        for round in prevote_round...self.state.round() {
+        for round in prevote_round..self.state.round() + 1 {
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
                     self.broadcast_prevote(round, &propose_hash);
@@ -315,15 +312,17 @@ impl<S> NodeHandler<S>
         }
     }
 
-    pub fn handle_precommit(&mut self, msg: Precommit) {
+    pub fn handle_precommit(&mut self, from: PublicKey, msg: Precommit) {
         trace!("Handle precommit");
+
+        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
+
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
 
-        let peer = self.public_key_of(msg.validator());
         // Request propose
         if self.state.propose(msg.propose_hash()).is_none() {
-            self.request(RequestData::Propose(*msg.propose_hash()), peer);
+            self.request(RequestData::Propose(*msg.propose_hash()), from);
         }
 
         // Request prevotes
@@ -331,7 +330,7 @@ impl<S> NodeHandler<S>
         // So can we get rid of useless sending RequestPrevotes message?
         if msg.round() > self.state.locked_round() {
             self.request(RequestData::Prevotes(msg.round(), *msg.propose_hash()),
-                         peer);
+                         from);
         }
 
         // Has majority precommits
@@ -380,6 +379,10 @@ impl<S> NodeHandler<S>
               block_hash.to_hex(),
               );
 
+        // TODO: reset status timeout.
+        self.broadcast_status();
+        self.add_status_timeout();
+           
         let timeout = self.timeout_adjuster.adjust_timeout(&self.state, self.blockchain.view());
         self.state.set_propose_timeout(timeout);
 
@@ -633,7 +636,7 @@ impl<S> NodeHandler<S>
         block_hash
     }
 
-    pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, validator: ValidatorId) -> bool {
+    pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, key: PublicKey) -> bool {
         let requested_data = match self.state.propose(propose_hash) {
             Some(state) => {
                 // Request transactions
@@ -650,7 +653,6 @@ impl<S> NodeHandler<S>
         };
 
         if let Some(data) = requested_data.clone() {
-            let key = self.public_key_of(validator);
             self.request(data, key);
             false
         } else {
@@ -763,9 +765,5 @@ impl<S> NodeHandler<S>
             return Err(e);
         }
         Ok(())
-    }
-
-    fn public_key_of(&self, id: ValidatorId) -> PublicKey {
-        *self.state.public_key_of(id).unwrap()
     }
 }

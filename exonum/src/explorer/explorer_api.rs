@@ -4,9 +4,8 @@ use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
-use exonum::blockchain::Blockchain;
-use exonum::crypto::{Hash, HexValue};
-
+use blockchain::Blockchain;
+use crypto::{Hash, HexValue};
 use explorer::{BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
@@ -18,7 +17,7 @@ pub struct BlocksRequest {
 
 #[derive(Clone)]
 pub struct ExplorerApi {
-    pub blockchain: Blockchain,
+    blockchain: Blockchain,
 }
 
 impl ExplorerApi {
@@ -58,9 +57,7 @@ impl Api for ExplorerApi {
             let from: Option<u64>;
             count = match map.find(&["count"]) {
                 Some(&Value::String(ref count_str)) => {
-                    count_str
-                        .parse()
-                        .map_err(|_| ApiError::IncorrectRequest)?
+                    count_str.parse().map_err(|_| ApiError::IncorrectRequest)?
                 }
                 _ => {
                     return Err(ApiError::IncorrectRequest)?;
@@ -68,9 +65,7 @@ impl Api for ExplorerApi {
             };
             from = match map.find(&["from"]) {
                 Some(&Value::String(ref from_str)) => {
-                    Some(from_str
-                             .parse()
-                             .map_err(|_| ApiError::IncorrectRequest)?)
+                    Some(from_str.parse().map_err(|_| ApiError::IncorrectRequest)?)
                 }
                 _ => None,
             };
@@ -87,13 +82,11 @@ impl Api for ExplorerApi {
             let params = req.extensions.get::<Router>().unwrap();
             match params.find("height") {
                 Some(height_str) => {
-                    let height: u64 = height_str
-                        .parse()
-                        .map_err(|_| ApiError::IncorrectRequest)?;
+                    let height: u64 = height_str.parse().map_err(|_| ApiError::IncorrectRequest)?;
                     let info = _self.get_block(height)?;
                     _self.ok_response(&info.to_json())
                 }
-                None => return Err(ApiError::IncorrectRequest)?,
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
 
@@ -105,7 +98,7 @@ impl Api for ExplorerApi {
                     let info = _self.get_transaction(hash_str)?;
                     _self.ok_response(&info.to_json())
                 }
-                None => return Err(ApiError::IncorrectRequest)?,
+                None => Err(ApiError::IncorrectRequest)?,
             }
         };
 

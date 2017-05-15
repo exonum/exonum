@@ -1,19 +1,13 @@
 use clap::{SubCommand, App, Arg, ArgMatches};
-use log::{LogRecord, LogLevel, SetLoggerError};
-use env_logger::LogBuilder;
-use colored::*;
 
 use std::path::Path;
 use std::marker::PhantomData;
 use std::fs;
-use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
 
-use exonum::config::ConfigFile;
-use exonum::blockchain::GenesisConfig;
-use exonum::node::NodeConfig;
-use exonum::crypto::gen_keypair;
-use exonum::storage::Storage;
+use config::ConfigFile;
+use node::NodeConfig;
+use storage::Storage;
+use helpers::generate_testnet_config;
 
 pub struct GenerateCommand<'a, 'b>
     where 'a: 'b
@@ -56,9 +50,7 @@ impl<'a, 'b> GenerateCommand<'a, 'b>
     }
 
     pub fn start_port(matches: &'a ArgMatches<'a>) -> Option<u16> {
-        matches
-            .value_of("START_PORT")
-            .map(|p| p.parse().unwrap())
+        matches.value_of("START_PORT").map(|p| p.parse().unwrap())
     }
 
     pub fn execute(matches: &'a ArgMatches<'a>) {
@@ -121,7 +113,7 @@ impl<'a, 'b> RunCommand<'a, 'b>
 
     #[cfg(not(feature="memorydb"))]
     pub fn db(matches: &'a ArgMatches<'a>) -> Storage {
-        use exonum::storage::{LevelDB, LevelDBOptions};
+        use storage::{LevelDB, LevelDBOptions};
 
         let path = Self::leveldb_path(matches).unwrap();
         let mut options = LevelDBOptions::new();
@@ -131,85 +123,7 @@ impl<'a, 'b> RunCommand<'a, 'b>
 
     #[cfg(feature="memorydb")]
     pub fn db(_: &'a ArgMatches<'a>) -> Storage {
-        use exonum::storage::MemoryDB;
+        use storage::MemoryDB;
         MemoryDB::new()
     }
-}
-
-fn has_colors() -> bool {
-    use term::terminfo::TerminfoTerminal;
-    use term::Terminal;
-    use std::io;
-
-    let out = io::stderr();
-    if let Some(term) = TerminfoTerminal::new(out) {
-        term.supports_color()
-    } else {
-        false
-    }
-}
-
-pub fn init_logger() -> Result<(), SetLoggerError> {
-    let format = |record: &LogRecord| {
-        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let now = (ts.as_secs() * 1000 + ts.subsec_nanos() as u64 / 1000000).to_string();
-
-        if has_colors() {
-            let level = match record.level() {
-                LogLevel::Error => "ERROR".red(),
-                LogLevel::Warn => "WARN".yellow(),
-                LogLevel::Info => "INFO".green(),
-                LogLevel::Debug => "DEBUG".cyan(),
-                LogLevel::Trace => "TRACE".white(),
-            };
-            format!("{} - [ {} ] - {}", now.bold(), level, record.args())
-        } else {
-            let level = match record.level() {
-                LogLevel::Error => "ERROR",
-                LogLevel::Warn => "WARN",
-                LogLevel::Info => "INFO",
-                LogLevel::Debug => "DEBUG",
-                LogLevel::Trace => "TRACE",
-            };
-            format!("{} - [ {} ] - {}", now, level, record.args())
-        }
-    };
-
-    let mut builder = LogBuilder::new();
-    builder.format(format);
-
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
-
-    builder.init()
-}
-
-pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
-    let validators = (0..count as usize)
-        .map(|_| gen_keypair())
-        .collect::<Vec<_>>();
-    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
-    let peers = (0..validators.len())
-        .map(|x| {
-                 format!("127.0.0.1:{}", start_port + x as u16)
-                     .parse()
-                     .unwrap()
-             })
-        .collect::<Vec<_>>();
-
-    validators
-        .into_iter()
-        .enumerate()
-        .map(|(idx, validator)| {
-            NodeConfig {
-                listen_address: peers[idx],
-                network: Default::default(),
-                peers: peers.clone(),
-                public_key: validator.0,
-                secret_key: validator.1,
-                genesis: genesis.clone(),
-            }
-        })
-        .collect::<Vec<_>>()
 }

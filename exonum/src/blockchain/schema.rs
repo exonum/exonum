@@ -85,13 +85,13 @@ impl<'a> Schema<'a> {
 
     pub fn last_block(&self) -> Result<Option<Block>, Error> {
         Ok(match self.block_hashes_by_height().last()? {
-            Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
-            None => None,
-        })
+               Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
+               None => None,
+           })
     }
 
     pub fn last_height(&self) -> Result<Option<u64>, Error> {
-        let block_opt = self.last_block()?; 
+        let block_opt = self.last_block()?;
         Ok(block_opt.map(|block| block.height()))
     }
 
@@ -103,9 +103,8 @@ impl<'a> Schema<'a> {
         };
         Ok(res)
     }
-    pub fn commit_actual_configuration(&self,
-                                       config_data: StoredConfiguration)
-                                       -> Result<(), Error> {
+
+    pub fn commit_configuration(&self, config_data: StoredConfiguration) -> Result<(), Error> {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
             let last_actual_from = last_cfg_reference.actual_from();
@@ -119,43 +118,25 @@ impl<'a> Schema<'a> {
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from().append(cfg_ref)?;
-        warn!("Scheduled the following configuration for acceptance: {:?}", config_data);
+        info!("Scheduled the following configuration for acceptance: {:?}", config_data);
         // TODO: clear storages
         Ok(())
     }
 
-    pub fn get_actual_configuration_index_for_height(&self, height: u64) -> Result<u64, Error> {
-        let configs_actual_from = self.configs_actual_from();
-        let cfg_references: Vec<ConfigReference> = configs_actual_from.values()?;
-
-        let idx = cfg_references.into_iter()
-         .rposition(|r| r.actual_from() <= height)
-         .expect(&format!("Couldn't find a config in configs_actual_from table with actual_from height less than \
-                          the height: {:?}", height));
-        Ok(idx as u64)
-    }
-
-    pub fn get_actual_configuration(&self) -> Result<StoredConfiguration, Error> {
+    pub fn actual_configuration(&self) -> Result<StoredConfiguration, Error> {
         let current_height = self.current_height()?;
-        let idx = self.get_actual_configuration_index_for_height(current_height)?;
-        let cfg_ref: ConfigReference = self.configs_actual_from()
-            .get(idx)?
-            .expect(&format!("No element at idx {:?} in configs_actual_from table", idx));
-        let cfg_hash = cfg_ref.cfg_hash();
-        let res = self.get_configuration_by_hash(cfg_hash).map(|x| {
-            x.expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash))
-        });
+        let res = self.configuration_by_height(current_height);
         trace!("Retrieved actual_config: {:?}", res);
         res
     }
 
-    pub fn get_following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
+    pub fn following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
         let current_height = self.current_height()?;
-        let idx = self.get_actual_configuration_index_for_height(current_height)?;
+        let idx = self.find_configurations_index_by_height(current_height)?;
         let res = match self.configs_actual_from().get(idx + 1)? {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.get_configuration_by_hash(cfg_hash)?
+                let cfg = self.configuration_by_hash(cfg_hash)?
                     .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
                 Some(cfg)
             }
@@ -164,9 +145,19 @@ impl<'a> Schema<'a> {
         Ok(res)
     }
 
-    pub fn get_configuration_by_hash(&self,
-                                     hash: &Hash)
-                                     -> Result<Option<StoredConfiguration>, Error> {
+    pub fn configuration_by_height(&self, height: u64) -> Result<StoredConfiguration, Error> {
+        let idx = self.find_configurations_index_by_height(height)?;
+        let cfg_ref = self.configs_actual_from()
+            .get(idx)?
+            .expect("Configuration at index {} not found");
+        let cfg_hash = cfg_ref.cfg_hash();
+        let cfg =
+            self.configuration_by_hash(cfg_hash)?
+                .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+        Ok(cfg)
+    }
+
+    pub fn configuration_by_hash(&self, hash: &Hash) -> Result<Option<StoredConfiguration>, Error> {
         self.configs().get(hash)
     }
 
@@ -181,5 +172,17 @@ impl<'a> Schema<'a> {
         let key = Blockchain::service_table_unique_key(service_id, table_idx);
         let sum_table = self.state_hash_aggregator();
         sum_table.construct_path_to_key(key)
+    }
+
+    fn find_configurations_index_by_height(&self, height: u64) -> Result<u64, Error> {
+        let configs_actual_from = self.configs_actual_from();
+        let cfg_references = configs_actual_from.values()?;
+
+        let idx = cfg_references
+            .into_iter()
+            .rposition(|r| r.actual_from() <= height)
+            .expect(&format!("Couldn't not find any config for height {},\
+          that means that genesis block was created incorrectly.", height));
+        Ok(idx as u64)
     }
 }

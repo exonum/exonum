@@ -1,5 +1,4 @@
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate rand;
 #[macro_use]
 extern crate clap;
@@ -18,7 +17,7 @@ use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Fork};
 /// seed - seed for rng
 
 fn main() {
-    blockchain_explorer::helpers::init_logger().unwrap();
+    exonum::helpers::init_logger().unwrap();
 
     let matches = clap_app!(merkle_map =>
         (version: "0.1")
@@ -30,11 +29,15 @@ fn main() {
         (@arg seed: -s --seed +takes_value "Seed for rng")
         (@arg fork: -f --fork "Use fork to write data in one transaction")
     )
-        .get_matches();
+            .get_matches();
 
     let path = matches.value_of("DIR").unwrap();
     let count: usize = matches.value_of("count").unwrap_or("100").parse().unwrap();
-    let data_len: usize = matches.value_of("data_len").unwrap_or("64").parse().unwrap();
+    let data_len: usize = matches
+        .value_of("data_len")
+        .unwrap_or("64")
+        .parse()
+        .unwrap();
     let seed_part: u32 = matches.value_of("seed").unwrap_or("0").parse().unwrap();
     let use_fork: bool = matches.is_present("fork");
     // TODO get them from command line
