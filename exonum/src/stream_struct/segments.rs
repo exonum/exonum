@@ -1,6 +1,6 @@
 use byteorder::{ByteOrder, LittleEndian};
 
-use messages::{BitVec, RawMessage, HEADER_SIZE, MessageBuffer, Message};
+use messages::{BitVec, RawMessage, HEADER_SIZE, MessageBuffer};
 use crypto::Hash;
 
 use super::{Error, Field, SegmentReference};
@@ -22,14 +22,12 @@ impl<'a, T> Field<'a> for T
     }
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> T {
-        unsafe {
-            let pos = LittleEndian::read_u32(&buffer[from..from + 4]);
-            let count = LittleEndian::read_u32(&buffer[from + 4..to]);
-            let start = pos as usize;
-            let end = start + count as usize;
-            let chunk = &buffer[start..end];
-            Self::from_chunk(chunk)
-        }
+        let pos = LittleEndian::read_u32(&buffer[from..from + 4]);
+        let count = LittleEndian::read_u32(&buffer[from + 4..to]);
+        let start = pos as usize;
+        let end = start + count as usize;
+        let chunk = &buffer[start..end];
+        Self::from_chunk(chunk)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
@@ -67,11 +65,11 @@ impl<'a, T> Field<'a> for T
             });
         }
 
-        unsafe {
-            let chunk = &buffer[start..end];
-            Self::check_data(chunk, from as u32)
-                    .map(|_| Some(SegmentReference::new(pos, chunk.len() as u32)))
-        }
+        
+        let chunk = &buffer[start..end];
+        Self::check_data(chunk, from as u32)
+                .map(|_| Some(SegmentReference::new(pos, chunk.len() as u32)))
+    
     }
 }
 
@@ -134,9 +132,8 @@ impl<'a> SegmentField<'a> for RawMessage {
 impl<'a, T> SegmentField<'a> for Vec<T> where T: Field<'a> {
 
     // FIXME: reduce memory allocation
-    // TODO: For now we need adittional header, to know what in slice is
-    // sized types, and what is not, may be we can split implementation
-    // for Vec<T> where T: FixedSize; Vec<T> where T: SegmentField,
+    // TODO: implement different realisation for 
+    // for Vec<T> where T: Field,
     // for Vec<T> where T = u8
     // but this is possible only after specialization land
     fn from_chunk(slice: &'a [u8]) -> Self {
@@ -200,7 +197,7 @@ impl<'a> SegmentField<'a> for &'a [u8] {
         buffer.extend_from_slice(self)
     }
 
-    fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
+    fn check_data(slice: &'a [u8], _: u32) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -221,7 +218,7 @@ impl<'a> SegmentField<'a> for &'a [Hash] {
         buffer.extend_from_slice(&slice)
     }
 
-    fn check_data(slice: &'a [u8], pos: u32) -> Result<(), Error> {
+    fn check_data(slice: &'a [u8], _: u32) -> Result<(), Error> {
         Ok(())
     }
 }
