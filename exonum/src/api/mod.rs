@@ -15,9 +15,9 @@ use std::marker::PhantomData;
 use std::io;
 use std::collections::BTreeMap;
 
-use exonum::events::Error as EventsError;
-use exonum::crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash, ToHex};
-use exonum::storage::{Result as StorageResult, Error as StorageError};
+use events::Error as EventsError;
+use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash, ToHex};
+use storage::{Result as StorageResult, Error as StorageError};
 
 #[derive(Debug)]
 pub enum ApiError {
@@ -87,10 +87,7 @@ impl From<ApiError> for IronError {
         let mut body = BTreeMap::new();
         body.insert("type", e.description().into());
         let code = match e {
-            ApiError::FileExists(hash) => {
-                body.insert("hash", ToHex::to_hex(&hash));
-                status::Conflict
-            }
+            ApiError::FileExists(hash) |
             ApiError::FileNotFound(hash) => {
                 body.insert("hash", ToHex::to_hex(&hash));
                 status::Conflict
@@ -164,15 +161,12 @@ pub trait Api {
                                       -> StorageResult<Vec<u8>> {
         if let Some(&Cookie(ref cookies)) = request.headers.get() {
             for cookie in cookies.iter() {
-                match CookiePair::parse(cookie.as_str()) {
-                    Ok(c) => {
-                        if c.name() == key {
-                            if let Ok(value) = HexValue::from_hex(c.value()) {
-                                return Ok(value);
-                            }
+                if let Ok(c) = CookiePair::parse(cookie.as_str()) {
+                    if c.name() == key {
+                        if let Ok(value) = HexValue::from_hex(c.value()) {
+                            return Ok(value);
                         }
                     }
-                    Err(_) => {}
                 }
             }
         }
@@ -182,10 +176,10 @@ pub trait Api {
     fn load_keypair_from_cookies(&self,
                                  request: &Request)
                                  -> Result<(PublicKey, SecretKey), ApiError> {
-        let public_key = PublicKey::from_slice(self.load_hex_value_from_cookie(&request,
+        let public_key = PublicKey::from_slice(self.load_hex_value_from_cookie(request,
                                                                                "public_key")?
                                                    .as_ref());
-        let secret_key = SecretKey::from_slice(self.load_hex_value_from_cookie(&request,
+        let secret_key = SecretKey::from_slice(self.load_hex_value_from_cookie(request,
                                                                                "secret_key")?
                                                    .as_ref());
 
@@ -218,8 +212,8 @@ mod tests {
     use router::Router;
     use serde_json;
 
-    use exonum::blockchain::Block;
-    use exonum::crypto::Hash;
+    use blockchain::Block;
+    use crypto::Hash;
 
     use super::*;
 
