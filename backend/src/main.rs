@@ -9,7 +9,6 @@ extern crate rand;
 extern crate serde_json;
 extern crate bodyparser;
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate cryptocurrency;
 extern crate router;
 extern crate cookie;
@@ -24,9 +23,9 @@ use exonum::blockchain::{Blockchain, Service};
 use exonum::node::{Node, NodeConfig};
 use cryptocurrency::CurrencyService;
 use cryptocurrency::api::CryptocurrencyApi;
-use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
-use blockchain_explorer::api::Api;
-use blockchain_explorer::explorer_api::ExplorerApi;
+use exonum::helpers::clap::{GenerateCommand, RunCommand};
+use exonum::api::Api;
+//use exonum::explorer::explorer_api::ExplorerApi;
 
 fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
     if let Some(port) = port {
@@ -39,13 +38,13 @@ fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
                 channel: channel.clone(),
                 blockchain: blockchain.clone(),
             };
-            let explorer_api = ExplorerApi { blockchain: blockchain.clone() };
+            //let explorer_api = ExplorerApi { blockchain: blockchain.clone() };
             let listen_address: SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
             println!("Cryptocurrency node server started on {}", listen_address);
 
             let mut router = Router::new();
             cryptocurrency_api.wire(&mut router);
-            explorer_api.wire(&mut router);
+            //explorer_api.wire(&mut router);
             let chain = iron::Chain::new(router);
             iron::Iron::new(chain).http(listen_address).unwrap();
 
@@ -60,7 +59,7 @@ fn run_node(blockchain: Blockchain, node_cfg: NodeConfig, port: Option<u16>) {
 
 fn main() {
     exonum::crypto::init();
-    blockchain_explorer::helpers::init_logger().unwrap();
+    exonum::helpers::init_logger().unwrap();
 
     let app = App::new("Simple cryptocurrency demo program")
         .version(env!("CARGO_PKG_VERSION"))

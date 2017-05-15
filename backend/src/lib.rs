@@ -13,7 +13,6 @@ extern crate tempdir;
 extern crate serde_json;
 #[macro_use(message, storage_value)]
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate params;
 extern crate router;
 extern crate iron;
@@ -31,7 +30,6 @@ use exonum::crypto::{PublicKey, Hash, Signature, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
-use blockchain_explorer::TransactionInfo;
 
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
@@ -243,8 +241,6 @@ impl Deserialize for CurrencyTx {
         Ok(res)
     }
 }
-
-impl TransactionInfo for CurrencyTx {}
 
 impl Message for CurrencyTx {
     fn raw(&self) -> &RawMessage {
@@ -653,7 +649,7 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, _) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1);
         assert_eq!(w2, None);
         let h1 = s.wallet_history(&p1).values().unwrap();
         let h2 = s.wallet_history(&p2).values().unwrap();
@@ -686,8 +682,8 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, rh2) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1);
-        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1);
+        assert_wallet(&w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2);
         let h1 = s.wallet_history(&p1).values().unwrap();
         let h2 = s.wallet_history(&p2).values().unwrap();
         let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
@@ -715,7 +711,7 @@ mod tests {
         CurrencyTx::from(cw2.clone()).execute(&v).unwrap();
 
         let (w, rh) = get_wallet_and_history(&s, &p1);
-        assert_wallet(w.unwrap(), &p1, "name_wallet1", 0, 2, &rh);
+        assert_wallet(&w.unwrap(), &p1, "name_wallet1", 0, 2, &rh);
         let h1 = s.wallet_history(&p1).values().unwrap();
         assert_eq!(h1, vec![meta_create1, meta_create2]);
     }
@@ -738,8 +734,8 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, rh2) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 0, 1, &rh1);
-        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 0, 1, &rh1);
+        assert_wallet(&w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2);
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
@@ -748,16 +744,16 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, rh2) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 1000, 2, &rh1);
-        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 100, 2, &rh2);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 1000, 2, &rh1);
+        assert_wallet(&w2.unwrap(), &p2, "name_wallet2", 100, 2, &rh2);
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
         CurrencyTx::from(tw.clone()).execute(&v).unwrap();
 
         let (w1, rh1) = get_wallet_and_history(&s, &p1);
         let (w2, rh2) = get_wallet_and_history(&s, &p2);
-        assert_wallet(w1.unwrap(), &p1, "name_wallet1", 600, 3, &rh1);
-        assert_wallet(w2.unwrap(), &p2, "name_wallet2", 500, 3, &rh2);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 600, 3, &rh1);
+        assert_wallet(&w2.unwrap(), &p2, "name_wallet2", 500, 3, &rh2);
 
         let h1 = s.wallet_history(&p1).values().unwrap();
         let h2 = s.wallet_history(&p2).values().unwrap();
