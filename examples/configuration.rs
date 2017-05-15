@@ -21,8 +21,8 @@ use exonum::node::{Node, NodeConfig};
 use configuration_service::ConfigurationService;
 use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi};
 
-use blockchain_explorer::helpers::{GenerateCommand, RunCommand};
-use blockchain_explorer::api::Api;
+use exonum::helpers::clap::{GenerateCommand, RunCommand};
+use exonum::api::Api;
 
 fn run_node(blockchain: Blockchain,
             node_cfg: NodeConfig,
@@ -85,7 +85,7 @@ fn run_node(blockchain: Blockchain,
 
 fn main() {
     exonum::crypto::init();
-    blockchain_explorer::helpers::init_logger().unwrap();
+    exonum::helpers::init_logger().unwrap();
 
     let app = App::new("Simple configuration api demo program")
         .version(env!("CARGO_PKG_VERSION"))
