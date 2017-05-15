@@ -377,6 +377,7 @@ impl Serialize for ConfigTx {
 /// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
 /// [TxConfigPropose](struct.TxConfigPropose.html#method.execute) and
 /// [TxConfigVote](struct.TxConfigVote.html#method.execute).
+#[derive(Default)]
 pub struct ConfigurationService {}
 
 /// `ConfigurationService` database schema: tables and logically atomic mutation methods.

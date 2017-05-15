@@ -136,7 +136,7 @@ impl PublicConfigApi {
         let configuration_schema = ConfigurationSchema::new(&view);
         let proposes: Vec<Hash> = configuration_schema.config_hash_by_ordinal().values()?;
         let mut res: Vec<_> = Vec::new();
-        for cfg_hash in proposes.into_iter() {
+        for cfg_hash in proposes {
             let propose_data =
                 configuration_schema
                     .propose_data_by_config_hash()
