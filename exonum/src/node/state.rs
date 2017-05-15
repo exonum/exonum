@@ -192,7 +192,7 @@ impl<T> Votes<T>
 
 impl RequestData {
     pub fn timeout(&self) -> Duration {
-        #![cfg_attr(feature="clippy", allow(match_same_arms))]
+        #![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => REQUEST_PROPOSE_TIMEOUT,
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_TIMEOUT,
@@ -275,7 +275,7 @@ impl BlockState {
 }
 
 impl State {
-    #![cfg_attr(feature="clippy", allow(too_many_arguments))]
+    #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     pub fn new(validator_id: Option<ValidatorId>,
                public_key: PublicKey,
                secret_key: SecretKey,
@@ -363,7 +363,7 @@ impl State {
             .position(|pk| pk == peer)
             .map(|id| id as ValidatorId)
     }
-    
+
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
     }
@@ -373,13 +373,13 @@ impl State {
     }
 
     pub fn update_config(&mut self, config: StoredConfiguration) {
-        info!("Updating node config={:#?}", config);
+        trace!("Updating node config={:#?}", config);
         let validator_id = config.validators
                             .iter()
                             .position(|pk| pk == self.public_key())
                             .map(|id| id as u32);
         self.renew_validator_id(validator_id);
-        info!("Validator={:#?}", self.validator_state());
+        trace!("Validator={:#?}", self.validator_state());
         self.config = config;
     }
 
@@ -483,8 +483,8 @@ impl State {
         self.locked_propose
     }
 
-    pub fn propose(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
-        self.proposes.get_mut(hash)
+    pub fn propose(&self, hash: &Hash) -> Option<&ProposeState> {
+        self.proposes.get(hash)
     }
 
     pub fn block(&self, hash: &Hash) -> Option<&BlockState> {
@@ -541,17 +541,27 @@ impl State {
 
     pub fn add_transaction(&mut self, tx_hash: Hash, msg: Box<Transaction>) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
+        // if tx is in some of propose, we should add it, or we can stuck on some state
+        let mut high_priority_tx = false;
         for (propose_hash, propose_state) in &mut self.proposes {
-            propose_state.unknown_txs.remove(&tx_hash);
+            high_priority_tx |= propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
                 full_proposes.push((*propose_hash, propose_state.message().round()));
             }
         }
-        self.transactions.insert(tx_hash, msg);
+
         if self.transactions.len() >= TX_POOL_LIMIT {
-            panic!("Too many transactions in pool, txs={}",
-                   self.transactions.len());
+            // but make warn about pool exceeded, even if we should add tx
+            warn!("Too many transactions in pool, txs={}, high_priority={}",
+                  self.transactions.len(),
+                  high_priority_tx);
+            if !high_priority_tx {
+                return full_proposes;
+            }
         }
+
+        self.transactions.insert(tx_hash, msg);
+
         full_proposes
     }
 
@@ -724,7 +734,7 @@ impl State {
     }
 
     pub fn have_incompatible_prevotes(&self) -> bool {
-        for round in self.locked_round + 1...self.round {
+        for round in self.locked_round + 1..self.round + 1 {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {

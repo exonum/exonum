@@ -12,7 +12,7 @@ use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
@@ -20,6 +20,7 @@ use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 use exonum::crypto::gen_keypair;
 
 use timestamping::TimestampingService;
+use config_updater::ConfigUpdateService;
 
 type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
 
@@ -41,7 +42,7 @@ impl Ord for TimerPair {
 pub struct SandboxInner {
     pub address: SocketAddr,
     pub time: SystemTime,
-    pub sended: VecDeque<(SocketAddr, RawMessage)>,
+    pub sent: VecDeque<(SocketAddr, RawMessage)>,
     pub events: VecDeque<SandboxEvent>,
     pub timers: BinaryHeap<TimerPair>,
 }
@@ -57,7 +58,11 @@ impl SandboxChannel {
     }
 
     fn send_message(&self, address: &SocketAddr, message: RawMessage) {
-        self.inner.lock().unwrap().sended.push_back((address.clone(), message));
+        self.inner
+            .lock()
+            .unwrap()
+            .sent
+            .push_back((address.clone(), message));
     }
 }
 
@@ -137,7 +142,6 @@ impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
 }
 
 impl SandboxReactor {
-
     pub fn is_leader(&self) -> bool {
         self.handler.state().is_leader()
     }
@@ -148,7 +152,7 @@ impl SandboxReactor {
 
     pub fn is_validator(&self) -> bool {
         self.handler.state().is_validator()
-    }    
+    }
 
     pub fn last_block(&self) -> Result<Block, StorageError> {
         self.handler.blockchain.last_block()
@@ -161,13 +165,13 @@ impl SandboxReactor {
     pub fn actual_config(&self) -> Result<StoredConfiguration, StorageError> {
         let view = self.handler.blockchain.view();
         let schema = Schema::new(&view);
-        schema.get_actual_configuration()
+        schema.actual_configuration()
     }
 
     pub fn following_config(&self) -> Result<Option<StoredConfiguration>, StorageError> {
         let view = self.handler.blockchain.view();
         let schema = Schema::new(&view);
-        schema.get_following_configuration()
+        schema.following_configuration()
     }
 
     pub fn handle_message(&mut self, msg: RawMessage) {
@@ -177,6 +181,14 @@ impl SandboxReactor {
 
     pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
         self.handler.handle_timeout(timeout);
+    }
+
+    pub fn public_key(&self) -> &PublicKey {
+        self.handler.state().public_key()
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        self.handler.state().secret_key()
     }
 }
 
@@ -189,7 +201,10 @@ pub struct Sandbox {
 }
 
 impl Sandbox {
-    pub fn initialize(&self, connect_message_time: SystemTime, start_index: usize, end_index: usize) {
+    pub fn initialize(&self,
+                      connect_message_time: SystemTime,
+                      start_index: usize,
+                      end_index: usize) {
         let connect = Connect::new(&self.p(0), self.a(0), connect_message_time, self.s(0));
 
         for validator in start_index..end_index {
@@ -203,15 +218,17 @@ impl Sandbox {
         self.check_unexpected_message()
     }
 
-    pub fn set_validators_map(&mut self, new_addresses_len: u8, validators: Vec<(PublicKey, SecretKey)>) {
-        self.addresses =
-            (1..(new_addresses_len + 1) as u8).map(gen_primitive_socket_addr).collect::<Vec<_>>();
+    pub fn set_validators_map(&mut self,
+                              new_addresses_len: u8,
+                              validators: Vec<(PublicKey, SecretKey)>) {
+        self.addresses = (1..(new_addresses_len + 1) as u8)
+            .map(gen_primitive_socket_addr)
+            .collect::<Vec<_>>();
         self.validators_map.extend(validators);
     }
 
     fn check_unexpected_message(&self) {
-        let sended = self.inner.lock().unwrap().sended.pop_front();
-        if let Some((addr, msg)) = sended {
+        if let Some((addr, msg)) = self.inner.lock().unwrap().sent.pop_front() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
@@ -263,7 +280,7 @@ impl Sandbox {
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let sended = self.inner.lock().unwrap().sended.pop_front();
+        let sended = self.inner.lock().unwrap().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
@@ -280,15 +297,22 @@ impl Sandbox {
         }
     }
 
-    // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
+        self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
+    }
+
+    // TODO: add self-test for broadcasting?
+    pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: T, addresses: I)
+        where I: IntoIterator<Item = &'a SocketAddr>
+    {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let mut set: HashSet<SocketAddr> = HashSet::from_iter(self.addresses
-            .iter()
-            .skip(1)
-            .cloned());
-        for _ in 0..self.n_validators() - 1 {
-            let sended = self.inner.lock().unwrap().sended.pop_front();
+
+        // If node is excluded from validators, then it still will broadcast messages.
+        // So in that case we should not skip addresses and validators count.
+        let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
+
+        for _ in 0..expected_set.len() {
+            let sended = self.inner.lock().unwrap().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
@@ -297,20 +321,27 @@ impl Sandbox {
                            any_real_msg,
                            real_addr)
                 }
-                if !set.contains(&real_addr) {
+                if !expected_set.contains(&real_addr) {
                     panic!("Double send the same message {:?} to {:?} during broadcasting",
                            any_expected_msg,
                            real_addr)
                 } else {
-                    set.remove(&real_addr);
+                    expected_set.remove(&real_addr);
                 }
             } else {
                 panic!("Expected to broadcast the message {:?} but someone don't recieve \
                         messages: {:?}",
                        any_expected_msg,
-                       set);
+                       expected_set);
             }
         }
+    }
+
+    pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
+        self.broadcast(Status::new(&self.node_public_key(),
+                                   height,
+                                   block_hash,
+                                   &self.node_secret_key()));
     }
 
     pub fn add_time(&self, duration: Duration) {
@@ -355,7 +386,7 @@ impl Sandbox {
         let reactor = self.reactor.borrow();
         reactor.is_validator()
     }
-    
+
     pub fn last_block(&self) -> Block {
         let reactor = self.reactor.borrow();
         reactor.last_block().unwrap()
@@ -413,7 +444,8 @@ impl Sandbox {
 
         let view = {
             let db = blockchain.view();
-            let (_, patch) = blockchain.create_patch(self.current_height(),
+            let (_, patch) = blockchain
+                .create_patch(self.current_height(),
                               self.current_round(),
                               &hashes,
                               &tx_pool)
@@ -467,7 +499,14 @@ impl Sandbox {
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        self.reactor.borrow().handler.state().transactions().keys().cloned().collect()
+        self.reactor
+            .borrow()
+            .handler
+            .state()
+            .transactions()
+            .keys()
+            .cloned()
+            .collect()
     }
 
     pub fn current_round(&self) -> Round {
@@ -485,7 +524,11 @@ impl Sandbox {
     }
 
     pub fn current_leader(&self) -> Round {
-        self.reactor.borrow().handler.state().leader(self.current_round())
+        self.reactor
+            .borrow()
+            .handler
+            .state()
+            .leader(self.current_round())
     }
 
     pub fn assert_state(&self, height: Height, round: Round) {
@@ -518,6 +561,16 @@ impl Sandbox {
                 "Incorrect hash, actual={:?}, expected={:?}",
                 actual_hash,
                 hash);
+    }
+
+    fn node_public_key(&self) -> PublicKey {
+        let reactor = self.reactor.borrow();
+        *reactor.public_key()
+    }
+
+    fn node_secret_key(&self) -> SecretKey {
+        let reactor = self.reactor.borrow();
+        reactor.secret_key().clone()
     }
 }
 
@@ -568,12 +621,12 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     // TODO use factory or other solution like set_handler or run
 
     let inner = Arc::new(Mutex::new(SandboxInner {
-        address: addresses[0].clone(),
-        time: UNIX_EPOCH + Duration::new(1486720340, 0),
-        sended: VecDeque::new(),
-        events: VecDeque::new(),
-        timers: BinaryHeap::new(),
-    }));
+                                        address: addresses[0].clone(),
+                                        time: UNIX_EPOCH + Duration::new(1486720340, 0),
+                                        sent: VecDeque::new(),
+                                        events: VecDeque::new(),
+                                        timers: BinaryHeap::new(),
+                                    }));
 
     let channel = SandboxChannel { inner: inner.clone() };
     let node = NodeHandler::new(blockchain.clone(), channel, config.clone());
@@ -593,12 +646,14 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     };
 
     sandbox.initialize(sandbox.time(), 1, validators.len());
-    assert!(sandbox.propose_timeout() < sandbox.round_timeout()); //general assumption; necessary for correct work of consensus algorithm
+    // General assumption; necessary for correct work of consensus algorithm
+    assert!(sandbox.propose_timeout() < sandbox.round_timeout());
     sandbox
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
-    sandbox_with_services(vec![Box::new(TimestampingService::new())])
+    sandbox_with_services(vec![Box::new(TimestampingService::new()),
+                               Box::new(ConfigUpdateService::new())])
 }
 
 #[test]

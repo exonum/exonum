@@ -16,7 +16,6 @@ use std::path::Path;
 use std::error;
 use std::sync::Arc;
 use std::cell::RefCell;
-use std::collections::Bound::{Included, Unbounded};
 use std::cmp::Ordering;
 
 use profiler;
@@ -134,7 +133,7 @@ impl Map<[u8], Vec<u8>> for LevelDBView {
 
     fn find_key(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Error> {
         let map_changes = self.changes.borrow();
-        let mut it_changes = map_changes.range::<[u8], [u8]>(Included(key), Unbounded);
+        let mut it_changes = map_changes.range(key.to_vec()..);
         let mut it_snapshot = self.snap.keys_iter(LEVELDB_READ_OPTIONS).from(key);
 
         let res: Option<Vec<u8>>;
