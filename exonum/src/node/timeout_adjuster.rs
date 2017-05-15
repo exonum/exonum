@@ -2,8 +2,8 @@ use events::Milliseconds;
 use node::State;
 use storage::View;
 
-const MIN_TIMEOUT: Milliseconds = 50;
-const MAX_TIMEOUT: Milliseconds = 200;
+/// Timeout value used in the `Default` implementation for the `Constant` timeout adjuster.
+const DEFAULT_CONSTANT_TIMEOUT: Milliseconds = 200;
 
 /// `TimeoutAdjuster` trait can be used to dynamically change propose timeout.
 ///
@@ -17,6 +17,7 @@ const MAX_TIMEOUT: Milliseconds = 200;
 /// use exonum::events::Milliseconds;
 /// use exonum::storage::View;
 ///
+/// # #[allow(dead_code)]
 /// struct CustomAdjuster {}
 ///
 /// impl TimeoutAdjuster for CustomAdjuster {
@@ -50,7 +51,7 @@ impl Constant {
 
 impl Default for Constant {
     fn default() -> Self {
-        Constant{ timeout: MAX_TIMEOUT }
+        Constant{ timeout: DEFAULT_CONSTANT_TIMEOUT }
     }
 }
 
@@ -60,53 +61,105 @@ impl TimeoutAdjuster for Constant {
     }
 }
 
-/// Calculates propose timeout using last block size and precious timeout.
-///
-/// `target_delta_t =
-///     DELTA_T_MAX - (DELTA_T_MAX - DELTA_T_MIN) * min(1, block  / (ALPHA * MAX_BLOCK))`
+/// Moving average timeout calculation. Initial timeout is equal to `min_timeout`.
 pub struct MovingAverage {
-    min_timeout: Milliseconds,
-    max_timeout: Milliseconds,
     adjustment_speed: f64,
-    target_block_portion_feel: f64,
-    desired_max_block_size: u64,
+    optimal_block_load: f64,
+    min_timeout: f64,
+    max_timeout: f64,
+    previous_timeout: f64,
 }
 
 impl MovingAverage {
-    /// Created `DynamicTimeout` with default values.
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl Default for MovingAverage {
-    fn default() -> Self {
-        MovingAverage{
-            min_timeout: MIN_TIMEOUT,
-            max_timeout: MAX_TIMEOUT,
-            adjustment_speed: 0.7,
-            target_block_portion_feel: 0.7,
-            desired_max_block_size: 3000,
+    /// Creates `MovingAverage` that generates values between `min_timeout` and `max_timeout`.
+    pub fn new(adjustment_speed: f64,
+               optimal_block_load: f64,
+               min_timeout: Milliseconds,
+               max_timeout: Milliseconds) -> Self {
+        MovingAverage {
+            adjustment_speed: adjustment_speed,
+            optimal_block_load: optimal_block_load,
+            min_timeout: min_timeout as f64,
+            max_timeout: max_timeout as f64,
+            previous_timeout: min_timeout as f64,
         }
+    }
+
+    fn adjust_timeout_impl(&mut self,
+                           txs_block_limit: f64,
+                           current_load: f64) -> Milliseconds {
+        let optimal_load = txs_block_limit * self.optimal_block_load;
+        let load_percent = current_load / optimal_load;
+
+        let target_t = if current_load < optimal_load {
+            self.max_timeout - (self.max_timeout - self.previous_timeout) * load_percent
+        } else {
+            self.previous_timeout - (self.previous_timeout - self.min_timeout) *
+                (load_percent - 1.) / (1. / self.optimal_block_load - 1.)
+        };
+
+        self.previous_timeout = target_t * self.adjustment_speed + self.previous_timeout *
+            (1. - self.adjustment_speed);
+        self.previous_timeout.round() as Milliseconds
     }
 }
 
 impl TimeoutAdjuster for MovingAverage {
     fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
-        let last_block_size = state.transactions().len() as f64;
+        self.adjust_timeout_impl(state.config().consensus.txs_block_limit as f64,
+                                 state.transactions().len() as f64)
+    }
+}
 
-        // min(1, block  / (ALPHA * MAX_BLOCK))
-        let filling_rate = 1f64.min(last_block_size /
-            (self.target_block_portion_feel * self.desired_max_block_size as f64));
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use events::Milliseconds;
 
-        // (DELTA_T_MAX - DELTA_T_MIN)
-        let adjusted_timeout = (self.max_timeout - self.min_timeout) as f64;
+    #[test]
+    fn moving_average_timeout_adjuster() {
+        static MIN_TIMEOUT: Milliseconds = 1;
+        static MAX_TIMEOUT: Milliseconds = 10000;
+        static TXS_BLOCK_LIMIT: f64 = 5000.;
+        static TEST_COUNT: usize = 10;
 
-        // Collects parts of the original formula.
-        let target_timeout = self.max_timeout as f64 + adjusted_timeout * filling_rate;
+        let mut adjuster = MovingAverage::new(0.75, 0.7, MIN_TIMEOUT, MAX_TIMEOUT);
 
-        // delta_t = delta_t * BETA + (1 - BETA) * target_delta_t
-        (target_timeout * self.adjustment_speed + state.propose_timeout() as f64
-            * (1f64 - self.adjustment_speed)) as Milliseconds
+        // Timeout should stay minimal if there are `TXS_BLOCK_LIMIT` or more transactions.
+        for _ in 0..TEST_COUNT {
+            assert_eq!(MIN_TIMEOUT, adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, TXS_BLOCK_LIMIT));
+        }
+
+        for _ in 0..TEST_COUNT {
+            assert_eq!(MIN_TIMEOUT, adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT,
+                                                                 TXS_BLOCK_LIMIT * 2.));
+        }
+
+        static TXS_TEST_DATA: &'static [f64] = &[0., 100., 200., 300., 400., 500., 1000., 1500.,
+            2000., 2500., 3000., 4000., 4500., 5000., 5500., 6000.];
+
+        // As the transaction number declines, timeout should increase until it reaches maximum.
+        let mut previous_timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, TXS_BLOCK_LIMIT);
+        for timeout in TXS_TEST_DATA.iter().rev() {
+            let timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, *timeout);
+            println!("Timeout: current = {}, previous = {}", timeout, previous_timeout);
+            assert!(timeout >= previous_timeout);
+            previous_timeout = timeout;
+        }
+
+        // Timeout should stay maximal if there are no transactions for some time.
+        for _ in 0..TEST_COUNT {
+            assert_eq!(MAX_TIMEOUT, adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, 0.));
+        }
+
+        // As the transactions number increases, timeout should decrease until it reaches minimum.
+        let mut previous_timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, 0.);
+        for timeout in TXS_TEST_DATA {
+            let timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, *timeout);
+            println!("Timeout: current = {}, previous = {}", timeout, previous_timeout);
+            assert!(timeout <= previous_timeout);
+            previous_timeout = timeout;
+        }
+        assert_eq!(MIN_TIMEOUT, adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, TXS_BLOCK_LIMIT));
     }
 }
