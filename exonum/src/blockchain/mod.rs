@@ -207,13 +207,13 @@ impl Blockchain {
 
     pub fn wire_public_api(&self, router: &mut Router) {
         for service in self.service_map.values() {
-            service.wire_public_api(router)
+            service.wire_public_api(self, router)
         }
     }
 
     pub fn wire_private_api(&self, router: &mut Router) {
         for service in self.service_map.values() {
-            service.wire_private_api(router)
+            service.wire_private_api(self, router)
         }
     }
 }
