@@ -19,10 +19,9 @@ use router::Router;
 use exonum::blockchain::{Blockchain, Service};
 use exonum::node::{Node, NodeConfig};
 use configuration_service::ConfigurationService;
-use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi};
 
 use exonum::helpers::clap::{GenerateCommand, RunCommand};
-use exonum::api::Api;
+use exonum::blockchain::ApiContext;
 
 fn run_node(blockchain: Blockchain,
             node_cfg: NodeConfig,
@@ -33,20 +32,15 @@ fn run_node(blockchain: Blockchain,
 
     let private_config_api_thread = match private_port {
         Some(private_port) => {
-            let channel_clone = node.channel().clone();
+            let blockchain_clone = blockchain.clone();
+            let api_context = ApiContext::new(&node);
             let thread = thread::spawn(move || {
-
-                let config_api = PrivateConfigApi {
-                    channel: channel_clone,
-                    config: (node_cfg.public_key, node_cfg.secret_key),
-                };
-
                 let listen_address: SocketAddr =
                     format!("127.0.0.1:{}", private_port).parse().unwrap();
                 info!("Private config service api started on {}", listen_address);
 
                 let mut router = Router::new();
-                config_api.wire(&mut router);
+                blockchain_clone.wire_private_api(&api_context, &mut router);
                 let chain = iron::Chain::new(router);
                 iron::Iron::new(chain).http(listen_address).unwrap();
             });
@@ -57,16 +51,15 @@ fn run_node(blockchain: Blockchain,
 
     let public_config_api_thread = match public_port {
         Some(public_port) => {
+            let blockchain_clone = blockchain.clone();
+            let api_context = ApiContext::new(&node);
             let thread = thread::spawn(move || {
-
-                let config_api = PublicConfigApi { blockchain: blockchain };
-
                 let listen_address: SocketAddr =
                     format!("127.0.0.1:{}", public_port).parse().unwrap();
                 info!("Config service api started on {}", listen_address);
 
                 let mut router = Router::new();
-                config_api.wire(&mut router);
+                blockchain_clone.wire_public_api(&api_context, &mut router);
                 let chain = iron::Chain::new(router);
                 iron::Iron::new(chain).http(listen_address).unwrap();
             });

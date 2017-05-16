@@ -21,6 +21,6 @@ bodyparser = "0.5.0"
 params = "0.6.0"
 
 [dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/alekseysidorov/exonum-core.git"
 version = "0.1.0"
-rev = "d4c2fec9537df08ecf51732a12c0f02440331298"
+rev = "2433c666648a4819e7eb75fcf2e8316625c88109"

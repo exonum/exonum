@@ -163,9 +163,11 @@ pub mod config_api;
 use std::fmt;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use router::Router;
 
+use exonum::api::Api;
 use exonum::messages::Field;
-use exonum::blockchain::{Service, Transaction, Schema, NodeState};
+use exonum::blockchain::{Service, Transaction, Schema, ApiContext};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
 use exonum::messages::utils::U64;
@@ -799,9 +801,18 @@ impl Service for ConfigurationService {
         ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
+    fn wire_public_api(&self, ctx: &ApiContext, router: &mut Router) {
+        let api = config_api::PublicConfigApi {
+            blockchain: ctx.blockchain().clone()
+        };
+        api.wire(router);
+    }
 
-    /// Update config in `NodeState` upon reaching the height, when a new config is actual from.
-    fn handle_commit(&self, _: &mut NodeState) -> StorageResult<()> {
-        Ok(())
+    fn wire_private_api(&self, ctx: &ApiContext, router: &mut Router) {
+        let api = config_api::PrivateConfigApi {
+            channel: ctx.node_channel().clone(),
+            config: (ctx.public_key().clone(), ctx.secret_key().clone())
+        };
+        api.wire(router);
     }
 }
