@@ -15,7 +15,7 @@ pub use self::block::Block;
 pub use self::schema::Schema;
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction, NodeState};
+pub use self::service::{Service, Transaction, NodeState, ApiContext};
 
 #[macro_use]
 mod spec;
@@ -205,15 +205,15 @@ impl Blockchain {
         Ok(txs)
     }
 
-    pub fn wire_public_api(&self, router: &mut Router) {
+    pub fn wire_public_api(&self, context: &ApiContext, router: &mut Router) {
         for service in self.service_map.values() {
-            service.wire_public_api(self, router)
+            service.wire_public_api(context, router)
         }
     }
 
-    pub fn wire_private_api(&self, router: &mut Router) {
+    pub fn wire_private_api(&self, context: &ApiContext, router: &mut Router) {
         for service in self.service_map.values() {
-            service.wire_private_api(self, router)
+            service.wire_private_api(context, router)
         }
     }
 }

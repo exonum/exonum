@@ -343,6 +343,10 @@ impl Node {
         self.reactor.handler().state()
     }
 
+    pub fn handler(&self) -> &NodeHandler<NodeChannel> {
+        self.reactor.handler()
+    }
+
     pub fn channel(&self) -> TxSender<NodeChannel> {
         TxSender::new(self.reactor.handler().channel.clone())
     }
