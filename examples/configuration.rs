@@ -2,8 +2,6 @@ extern crate iron;
 extern crate env_logger;
 extern crate clap;
 extern crate serde;
-#[macro_use]
-extern crate log;
 extern crate serde_json;
 extern crate bodyparser;
 
@@ -12,69 +10,14 @@ extern crate router;
 extern crate configuration_service;
 
 use std::net::SocketAddr;
-use std::thread;
 use clap::{Arg, App};
-use router::Router;
 
 use exonum::blockchain::{Blockchain, Service};
-use exonum::node::{Node, NodeConfig};
-use configuration_service::ConfigurationService;
-
+use exonum::node::Node;
 use exonum::helpers::clap::{GenerateCommand, RunCommand};
-use exonum::blockchain::ApiContext;
+use exonum::helpers::{run_node_with_api, NodeRunOptions};
 
-fn run_node(blockchain: Blockchain,
-            node_cfg: NodeConfig,
-            private_port: Option<u16>,
-            public_port: Option<u16>) {
-
-    let mut node = Node::new(blockchain.clone(), node_cfg.clone());
-
-    let private_config_api_thread = match private_port {
-        Some(private_port) => {
-            let blockchain_clone = blockchain.clone();
-            let api_context = ApiContext::new(&node);
-            let thread = thread::spawn(move || {
-                let listen_address: SocketAddr =
-                    format!("127.0.0.1:{}", private_port).parse().unwrap();
-                info!("Private config service api started on {}", listen_address);
-
-                let mut router = Router::new();
-                blockchain_clone.wire_private_api(&api_context, &mut router);
-                let chain = iron::Chain::new(router);
-                iron::Iron::new(chain).http(listen_address).unwrap();
-            });
-            Some(thread)
-        }
-        None => None,
-    };
-
-    let public_config_api_thread = match public_port {
-        Some(public_port) => {
-            let blockchain_clone = blockchain.clone();
-            let api_context = ApiContext::new(&node);
-            let thread = thread::spawn(move || {
-                let listen_address: SocketAddr =
-                    format!("127.0.0.1:{}", public_port).parse().unwrap();
-                info!("Config service api started on {}", listen_address);
-
-                let mut router = Router::new();
-                blockchain_clone.wire_public_api(&api_context, &mut router);
-                let chain = iron::Chain::new(router);
-                iron::Iron::new(chain).http(listen_address).unwrap();
-            });
-            Some(thread)
-        }
-        None => None,
-    };
-    node.run().unwrap();
-    if let Some(private_config_api_thread) = private_config_api_thread {
-        private_config_api_thread.join().unwrap();
-    }
-    if let Some(public_config_api_thread) = public_config_api_thread {
-        public_config_api_thread.join().unwrap();
-    }
-}
+use configuration_service::ConfigurationService;
 
 fn main() {
     exonum::crypto::init();
@@ -114,7 +57,14 @@ fn main() {
 
             let services: Vec<Box<Service>> = vec![Box::new(ConfigurationService::new())];
             let blockchain = Blockchain::new(db, services);
-            run_node(blockchain, node_cfg, priv_port, pub_port)
+
+            let node = Node::new(blockchain, node_cfg);
+            let opts = NodeRunOptions {
+                enable_explorer: true,
+                public_api_address: pub_port.map(|port| SocketAddr::from(([127, 0, 0, 1], port))),
+                private_api_address: priv_port.map(|port| SocketAddr::from(([127, 0, 0, 1], port))),
+            };
+            run_node_with_api(node, opts);
         }
         _ => {
             unreachable!("Wrong subcommand");
