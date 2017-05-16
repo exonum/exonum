@@ -1,4 +1,5 @@
 use serde_json::Value;
+use router::Router;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{View, Error as StorageError};
@@ -32,6 +33,10 @@ pub trait Service: Send + Sync + 'static {
     fn handle_commit(&self, _: &mut NodeState) -> Result<(), StorageError> {
         Ok(())
     }
+
+    fn wire_public_api(&self, _: &mut Router) {}
+
+    fn wire_private_api(&self, _: &mut Router) {}
 }
 
 pub struct NodeState<'a, 'b> {
