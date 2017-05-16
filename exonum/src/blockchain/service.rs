@@ -7,7 +7,7 @@ use messages::{Message, RawTransaction, Error as MessageError};
 use node::State;
 use node::state::ValidatorState;
 use events::Milliseconds;
-use blockchain::{StoredConfiguration, ConsensusConfig};
+use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
@@ -34,9 +34,9 @@ pub trait Service: Send + Sync + 'static {
         Ok(())
     }
 
-    fn wire_public_api(&self, _: &mut Router) {}
+    fn wire_public_api(&self, _: &Blockchain, _: &mut Router) {}
 
-    fn wire_private_api(&self, _: &mut Router) {}
+    fn wire_private_api(&self, _: &Blockchain, _: &mut Router) {}
 }
 
 pub struct NodeState<'a, 'b> {
@@ -55,7 +55,7 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 
     pub fn validator_state(&self) -> &Option<ValidatorState> {
-       self.state.validator_state()
+        self.state.validator_state()
     }
 
     pub fn view(&self) -> &View {
