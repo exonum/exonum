@@ -111,8 +111,10 @@
 //!             let node = Node::new(blockchain, node_cfg);
 //!             let opts = NodeRunOptions {
 //!                 enable_explorer: true,
-//!                 public_api_address: pub_port.map(|port| SocketAddr::from(([127, 0, 0, 1], port))),
-//!                 private_api_address: priv_port.map(|port| SocketAddr::from(([127, 0, 0, 1], port))),
+//!                 public_api_address: pub_port
+//!                     .map(|port| SocketAddr::from(([127, 0, 0, 1], port))),
+//!                 private_api_address: priv_port
+//!                     .map(|port| SocketAddr::from(([127, 0, 0, 1], port))),
 //!             };
 //!             run_node_with_api(node, opts);
 //!         }
