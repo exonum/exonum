@@ -59,7 +59,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
 }
 
 /// Options for the `run_node_with_api` function.
-pub struct RunNodeOptions {
+pub struct NodeRunOptions {
     /// Enable api endpoints for the `blockchain_explorer` on public api address.
     pub enable_explorer: bool,
     /// Listen address for public api endpoints
@@ -70,7 +70,7 @@ pub struct RunNodeOptions {
 
 /// A generic implementation that launches `Node` and optionally creates threads 
 /// for public and private api handlers.
-pub fn run_node_with_api(mut node: Node, options: RunNodeOptions) {
+pub fn run_node_with_api(mut node: Node, options: NodeRunOptions) {
     let blockchain = node.handler().blockchain.clone();
     let private_config_api_thread = match options.private_api_address {
         Some(listen_address) => {
