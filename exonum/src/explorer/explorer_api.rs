@@ -17,7 +17,7 @@ pub struct BlocksRequest {
 
 #[derive(Clone)]
 pub struct ExplorerApi {
-    blockchain: Blockchain,
+    pub blockchain: Blockchain,
 }
 
 impl ExplorerApi {
