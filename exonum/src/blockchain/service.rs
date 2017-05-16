@@ -133,7 +133,7 @@ impl ApiContext {
         ApiContext {
             blockchain: handler.blockchain.clone(),
             node_channel: node.channel(),
-            public_key: node.state().public_key().clone(),
+            public_key: *node.state().public_key(),
             secret_key: node.state().secret_key().clone(),
         }
     }
