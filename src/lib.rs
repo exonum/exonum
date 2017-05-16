@@ -802,16 +802,14 @@ impl Service for ConfigurationService {
     }
 
     fn wire_public_api(&self, ctx: &ApiContext, router: &mut Router) {
-        let api = config_api::PublicConfigApi {
-            blockchain: ctx.blockchain().clone()
-        };
+        let api = config_api::PublicConfigApi { blockchain: ctx.blockchain().clone() };
         api.wire(router);
     }
 
     fn wire_private_api(&self, ctx: &ApiContext, router: &mut Router) {
         let api = config_api::PrivateConfigApi {
             channel: ctx.node_channel().clone(),
-            config: (ctx.public_key().clone(), ctx.secret_key().clone())
+            config: (ctx.public_key().clone(), ctx.secret_key().clone()),
         };
         api.wire(router);
     }
