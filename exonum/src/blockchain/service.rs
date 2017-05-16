@@ -4,7 +4,7 @@ use router::Router;
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{View, Error as StorageError};
 use messages::{Message, RawTransaction, Error as MessageError};
-use node::State;
+use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
 use events::Milliseconds;
 use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
@@ -34,9 +34,9 @@ pub trait Service: Send + Sync + 'static {
         Ok(())
     }
 
-    fn wire_public_api(&self, _: &Blockchain, _: &mut Router) {}
+    fn wire_public_api(&self, _: &ApiContext, _: &mut Router) {}
 
-    fn wire_private_api(&self, _: &Blockchain, _: &mut Router) {}
+    fn wire_private_api(&self, _: &ApiContext, _: &mut Router) {}
 }
 
 pub struct NodeState<'a, 'b> {
@@ -117,5 +117,40 @@ impl<'a, 'b> NodeState<'a, 'b> {
 
     pub fn transactions(self) -> Vec<Box<Transaction>> {
         self.txs
+    }
+}
+
+pub struct ApiContext {
+    blockchain: Blockchain,
+    node_channel: TxSender<NodeChannel>,
+    public_key: PublicKey,
+    secret_key: SecretKey,
+}
+
+impl ApiContext {
+    pub fn new(node: &Node) -> ApiContext {
+        let handler = node.handler();
+        ApiContext {
+            blockchain: handler.blockchain.clone(),
+            node_channel: node.channel(),
+            public_key: node.state().public_key().clone(),
+            secret_key: node.state().secret_key().clone(),
+        }
+    }
+
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
+    }
+
+    pub fn node_channel(&self) -> &TxSender<NodeChannel> {
+        &self.node_channel
+    }
+    
+    pub fn public_key(&self) -> &PublicKey {
+        &self.public_key
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
     }
 }
