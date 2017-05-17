@@ -1,17 +1,22 @@
+extern crate rand;
 extern crate exonum;
 extern crate sandbox;
 extern crate log;
 
-use std::time::Duration;
+use rand::{thread_rng, Rng};
 
-use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
-                       RequestPrevotes, BitVec, CONSENSUS};
-use exonum::crypto::{Hash, gen_keypair};
+use std::time::Duration;
+use std::collections::BTreeMap;
+
+use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, RequestPropose,
+                       RequestTransactions, RequestPrevotes, BitVec, CONSENSUS};
+use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
 use exonum::blockchain::{Block, Blockchain, Schema};
 use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
                           REQUEST_TRANSACTIONS_TIMEOUT};
+use exonum::storage::Map;
 
-use sandbox::timestamping::{TimestampTx, TIMESTAMPING_SERVICE};
+use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox_tests_helper::*;
 use sandbox::config_updater::TxConfig;
@@ -193,6 +198,43 @@ fn test_retrieve_block_and_precommits() {
 
     // let validators = sandbox.validators.iter().map(|pair| pair.0 ).collect::<Vec<_>>();
     // println!("validators public keys: {}", &serde_json::to_string(&validators).unwrap());
+}
+
+#[test]
+fn test_store_txs_positions() {
+    let mut rng = thread_rng();
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    let data_size = 20;
+    let generator = TimestampingTxGenerator::with_keypair(data_size,
+                                                          gen_keypair_from_seed(&Seed::new([11;
+                                                                                            32])));
+
+    let committed_height = rng.gen_range(2, 30u64);
+    {
+        for _ in 1..committed_height {
+            add_one_height(&sandbox, &sandbox_state)
+        }
+    }
+    let num_txs = rng.gen_range(3, 100);
+    let committed_block1 = generator
+        .take(num_txs)
+        .map(|tx| (tx.hash(), tx.raw().clone()))
+        .collect::<BTreeMap<Hash, RawMessage>>();
+    let hashes = committed_block1.keys().collect::<Vec<_>>();
+
+    add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
+    sandbox.assert_state(committed_height + 1, ROUND_ONE);
+
+    let view = sandbox.blockchain_ref().view();
+    let schema = Schema::new(&view);
+    let locations = schema.tx_location_by_tx_hash();
+    for (expected_idx, hash) in hashes.iter().enumerate() {
+        let location = locations.get(hash).unwrap().unwrap();
+        assert_eq!(expected_idx as u64, location.position_in_block());
+        assert_eq!(committed_height, location.block_height());
+    }
 }
 
 /// idea of the scenario is to:

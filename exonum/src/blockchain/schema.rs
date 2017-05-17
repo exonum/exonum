@@ -1,19 +1,19 @@
 use byteorder::{ByteOrder, BigEndian};
+
 use std::mem;
+
 use crypto::{Hash, hash};
-use messages::{RawMessage, Precommit, BlockProof};
+use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
 use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
               List, RootProofNode, View};
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
-use messages::CONSENSUS;
 
 pub fn gen_prefix(service_id: u16, ord: u8, suf: Option<&[u8]>) -> Vec<u8> {
-    let size;
     let pos = mem::size_of::<u16>();
     let mut res;
     if let Some(suffix) = suf {
-        size = pos + 1 + suffix.len();
+        let size = pos + 1 + suffix.len();
         res = vec![0; size];
         res[pos + 1..].copy_from_slice(suffix);
     } else {
@@ -130,8 +130,8 @@ impl<'a> Schema<'a> {
     pub fn current_height(&self) -> Result<u64, Error> {
         let last_height = self.last_height()?;
         let res = match last_height {
-            Some(last_height) => last_height + 1, 
-            None => 0, 
+            Some(last_height) => last_height + 1,
+            None => 0,
         };
         Ok(res)
     }
@@ -141,8 +141,10 @@ impl<'a> Schema<'a> {
         if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
             let last_actual_from = last_cfg_reference.actual_from();
             if actual_from <= last_actual_from {
-                return Err(Error::new(format!("Attempting to commit configuration with actual_from {:?} less than \
-                                              the last committed actual_from {:?}",  actual_from, last_actual_from)));
+                return Err(Error::new(format!("Attempting to commit configuration \
+                                               with actual_from {:?} less than \
+                                              the last committed actual_from {:?}",
+                                              actual_from, last_actual_from)));
             }
         }
         let cfg_hash = config_data.hash();

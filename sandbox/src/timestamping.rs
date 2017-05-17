@@ -30,14 +30,20 @@ pub struct TimestampingTxGenerator {
 
 impl TimestampingTxGenerator {
     pub fn new(data_size: usize) -> TimestampingTxGenerator {
+        let keypair = gen_keypair();
+        TimestampingTxGenerator::with_keypair(data_size, keypair)
+    }
+
+    pub fn with_keypair(data_size: usize,
+                        keypair: (PublicKey, SecretKey))
+                        -> TimestampingTxGenerator {
         let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
-        let (public_key, secret_key) = gen_keypair();
 
         TimestampingTxGenerator {
             rand: rand,
             data_size: data_size,
-            public_key: public_key,
-            secret_key: secret_key,
+            public_key: keypair.0,
+            secret_key: keypair.1,
         }
     }
 }
