@@ -74,13 +74,12 @@ pub fn run_node_with_api(mut node: Node, options: NodeRunOptions) {
     let blockchain = node.handler().blockchain.clone();
     let private_config_api_thread = match options.private_api_address {
         Some(listen_address) => {
-            let blockchain_clone = blockchain.clone();
+            let mut router = Router::new();
             let api_context = ApiContext::new(&node);
+            api_context.wire_private_api(&mut router);
+
             let thread = thread::spawn(move || {
                 info!("Private exonum api started on {}", listen_address);
-
-                let mut router = Router::new();
-                blockchain_clone.wire_private_api(&api_context, &mut router);
                 let chain = Chain::new(router);
                 Iron::new(chain).http(listen_address).unwrap();
             });
@@ -91,19 +90,19 @@ pub fn run_node_with_api(mut node: Node, options: NodeRunOptions) {
 
     let public_config_api_thread = match options.public_api_address {
         Some(listen_address) => {
-            let blockchain_clone = blockchain.clone();
             let api_context = ApiContext::new(&node);
+            let mut router = Router::new();
+            api_context.wire_public_api(&mut router);
+            if options.enable_explorer {
+                let explorer_api = ExplorerApi {
+                    blockchain: blockchain
+                };
+                explorer_api.wire(&mut router);
+            }
+             
             let thread = thread::spawn(move || {
                 info!("Public exonum api started on {}", listen_address);
 
-                let mut router = Router::new();
-                blockchain_clone.wire_public_api(&api_context, &mut router);
-                if options.enable_explorer {
-                    let explorer_api = ExplorerApi {
-                        blockchain: blockchain_clone
-                    };
-                    explorer_api.wire(&mut router);
-                }
                 let chain = Chain::new(router);
                 Iron::new(chain).http(listen_address).unwrap();
             });
