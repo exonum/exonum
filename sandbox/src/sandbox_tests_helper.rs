@@ -493,8 +493,8 @@ fn get_propose_with_transactions_for_validator(sandbox: &TimestampingSandbox,
 
 /// assumptions:
 /// - that we come in this function with leader state
-/// - in current round propose_timeout is not triggered yet
-/// - propose_timeout < round_timeout
+/// - in current round `propose_timeout` is not triggered yet
+/// - `propose_timeout` < `round_timeout`
 fn check_and_broadcast_propose_and_prevote(sandbox: &TimestampingSandbox,
                                            sandbox_state: &SandboxState,
                                            transactions: &[Hash])

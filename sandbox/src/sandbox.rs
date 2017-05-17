@@ -409,7 +409,7 @@ impl Sandbox {
         let view = self.reactor.borrow().handler.blockchain.view();
         let schema = Schema::new(&view);
         let schema_transactions = schema.transactions();
-        let res: Vec<RawTransaction> = txs.into_iter()
+        txs.into_iter()
             .filter(|elem| {
                 let hash_elem = elem.hash();
                 if unique_set.contains(&hash_elem) {
@@ -422,8 +422,7 @@ impl Sandbox {
                 true
             })
             .map(|elem| elem.clone())
-            .collect::<Vec<_>>();
-        res
+            .collect()
     }
     /// Extract state_hash from fake block
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash

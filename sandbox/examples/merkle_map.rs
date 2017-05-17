@@ -11,10 +11,10 @@ use exonum::storage::{LevelDB, LevelDBOptions};
 use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Fork};
 
 /// usage
-/// path  - Directory where database is situated
-/// count - Total amount of data items to write
-/// data_len - Length of data chunk
-/// seed - seed for rng
+/// `path`  - Directory where database is situated
+/// `count` - Total amount of data items to write
+/// `data_len` - Length of data chunk
+/// `seed` - seed for rng
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
@@ -56,13 +56,13 @@ fn main() {
 
     let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
-    let mut db = LevelDB::new(&Path::new(&path), options).unwrap();
+    let db = LevelDB::new(Path::new(&path), options).unwrap();
     if use_fork {
         let patch;
         {
-            let mut fork = db.fork();
+            let fork = db.fork();
             {
-                let map = MerklePatriciaTable::new(MapTable::new(prefix, &mut fork));
+                let map = MerklePatriciaTable::new(MapTable::new(prefix, &fork));
                 for item in (0..count).map(kv_generator) {
                     map.put(&item.0, item.1.clone()).unwrap();
                 }
@@ -71,7 +71,7 @@ fn main() {
         }
         db.merge(&patch).unwrap();
     } else {
-        let map = MerklePatriciaTable::new(MapTable::new(prefix, &mut db));
+        let map = MerklePatriciaTable::new(MapTable::new(prefix, &db));
         for item in (0..count).map(kv_generator) {
             map.put(&item.0, item.1.clone()).unwrap();
         }

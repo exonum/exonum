@@ -42,7 +42,7 @@ fn test_queue_message_from_future_round() {
                                    sandbox.s(VALIDATOR_0 as usize)));
 }
 
-/// idea of the test is to verify that at certain periodic rounds we (validator_0) become a leader
+/// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
 /// assumption: in some loops current node becomes a leader
 #[test]
 fn test_check_leader() {
@@ -96,7 +96,7 @@ fn test_reach_one_height_repeatable() {
 }
 
 /// idea of the test is to reach some height
-/// assumptions: status timeout and request_peers timeout are not handled in thi stest,
+/// assumptions: status timeout and `request_peers` timeout are not handled in this test,
 /// so, according timeouts should be big enough not to occur
 #[test]
 fn test_reach_thirteen_height() {
@@ -200,7 +200,7 @@ fn test_retrieve_block_and_precommits() {
 /// - queue it
 /// - reach that first height
 /// - handle queued Prevote
-/// - and observe RequestPropose for queued Prevote
+/// - and observe `RequestPropose` for queued `Prevote`
 #[test]
 #[should_panic(expected = "Send unexpected message Request(RequestPropose")]
 fn test_queue_prevote_message_from_next_height() {
@@ -226,8 +226,8 @@ fn test_queue_prevote_message_from_next_height() {
 /// - reach that first height
 /// - handle queued Propose
 /// - and observe Prevote for queued Propose
-/// check line from NodeHandler.handle_consensus()
-/// case msg.height() == self.state.height() + 1
+/// check line from `NodeHandler.handle_consensus()`
+/// case `msg.height() == self.state.height() + 1`
 #[test]
 #[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
@@ -269,8 +269,8 @@ fn test_queue_propose_message_from_next_height() {
 }
 
 /// idea of scenario is to check line // Ignore messages from previous and future height
-/// from NodeHandler.handle_consensus()
-/// case msg.height() > self.state.height() + 1
+/// from `NodeHandler.handle_consensus()`
+/// case `msg.height() > self.state.height() + 1`
 #[test]
 fn test_ignore_message_from_far_height() {
     let sandbox = timestamping_sandbox();
@@ -284,8 +284,8 @@ fn test_ignore_message_from_far_height() {
 }
 
 /// idea of scenario is to check line // Ignore messages from previous and future height
-/// from NodeHandler.handle_consensus()
-/// case msg.height() < self.state.height()
+/// from `NodeHandler.handle_consensus()`
+/// case `msg.height() < self.state.height()`
 #[test]
 fn test_ignore_message_from_prev_height() {
     let sandbox = timestamping_sandbox();
@@ -868,7 +868,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
 /// idea: lock to propose from past round and observe broadcast Prevote
 /// LOCK
 /// - Send prevote
-///     - round < current_round
+///     - round < `current_round`
 #[test]
 fn lock_to_past_round_broadcast_prevote() {
     let sandbox = timestamping_sandbox();
@@ -943,11 +943,11 @@ fn lock_to_past_round_broadcast_prevote() {
 
 /// HANDLE PRECOMMIT //all are done
 /// - Request prevotes
-///     - if msg.round > locked round    //covered in handle_precommit_remove_request_prevotes()
+///     - if `msg.round` > locked round    // covered in `handle_precommit_remove_request_prevotes`
 /// idea of the scenario:
 ///   - obtain lock
 ///   - receive precommit in same round
-///   - verify that RequestPrevotes are absent
+///   - verify that `RequestPrevotes` are absent
 #[test]
 fn handle_precommit_remove_request_prevotes() {
     let sandbox = timestamping_sandbox();
@@ -1103,8 +1103,8 @@ fn lock_to_propose_and_send_prevote() {
 ///         - remove prevote request
 /// idea of the scenario:
 ///  - just obtain lock
-///  - wait REQUEST_PREVOTES_WAIT
-///  - verify that RequestPrevotes request is absent (it would have been observed without
+///  - wait `REQUEST_PREVOTES_TIMEOUT`
+///  - verify that `RequestPrevotes` request is absent (it would have been observed without
 ///    last block with appropriate comment)
 #[test]
 fn lock_remove_request_prevotes() {
@@ -1163,7 +1163,7 @@ fn lock_remove_request_prevotes() {
 }
 
 /// scenario: // HANDLE PRECOMMIT positive scenario
-///         - Our block_hash different from precommits one.
+///         - Our `block_hash` is different from the precommits one.
 #[test]
 #[should_panic(expected = "Our block_hash different from precommits one.")]
 fn handle_precommit_different_block_hash() {
@@ -1287,12 +1287,12 @@ fn handle_precommit_positive_scenario_commit() {
 }
 
 /// LOCK
-/// - Send precommit when get lock   //covered in lock_to_propose_when_get_2_3_prevote_positive()
+/// - Send precommit when get lock   // covered in `lock_to_propose_when_get_2_3_prevote_positive`
 /// - if haven’t incompatible prevotes
 ///     - if has +2/3 precommits
 ///         - remove precommit request //todo this idea is unreachable because there are no
-///           any places in the code where RequestPrecommit is added
-///         - COMMIT //covered in test_reach_one_height
+///           any places in the code where `RequestPrecommit` is added
+///         - COMMIT // covered in `test_reach_one_height`
 ///         -> not send prevotes after commit
 ///
 /// idea of the scenario:
@@ -1303,7 +1303,7 @@ fn handle_precommit_positive_scenario_commit() {
 ///  - increment round
 ///  - observe absence of broadcast prevote(because lock is committed already) message
 /// idea of alternate scenario
-/// (this scenario will occur if comment block of code with precommit_2 and uncomment
+/// (this scenario will occur if comment block of code with `precommit_2` and uncomment
 /// last broadcast of Prevote):
 ///  - receive single precommit
 ///  - receive prevotes => make lock
@@ -1548,16 +1548,16 @@ fn do_not_commit_if_tx_is_unknown() {
 }
 
 /// scenario: // HANDLE PRECOMMIT
-///         - purpose of the test is to check add_unknown_propose_with_precommits()
+///         - purpose of the test is to check `add_unknown_propose_with_precommits()`
 ///         - scenario:
 ///             - get 3 precommits => majority precommits are observed =>
-///               add_unknown_propose_with_precommits() is called
-///             - then receive valid tx and Propose in order to call has_full_propose() =>
-///               commit using state.unknown_propose_with_precommits
-///         - it appeared that this test is almost same as handle_precommit_positive_scenario_commit
-///         the only difference that is in handle_precommit_positive_scenario_commit propose and
-///         tx are received after second precommit and here propose and tx are received
-///         after third precommit
+///               `add_unknown_propose_with_precommits()` is called
+///             - then receive valid tx and Propose in order to call `has_full_propose()` =>
+///               commit using `state.unknown_propose_with_precommits`
+///         - it appeared that this test is almost the same as
+///         `handle_precommit_positive_scenario_commit` the only difference that is in
+///         `handle_precommit_positive_scenario_commit` propose and tx are received after second
+///         precommit and here propose and tx are received after third precommit
 #[test]
 fn commit_using_unknown_propose_with_precommits() {
     let sandbox = timestamping_sandbox();
@@ -1641,16 +1641,16 @@ fn commit_using_unknown_propose_with_precommits() {
 }
 
 /// scenario: // HANDLE PRECOMMIT
-///         - purpose of the test is to check add_unknown_propose_with_precommits()
+///         - purpose of the test is to check `add_unknown_propose_with_precommits()`
 ///         - scenario:
 ///             - get 3 precommits (!! with block with wrong state hash) => majority precommits
-///               are observed => add_unknown_propose_with_precommits() is called
-///             - then receive valid tx and Propose in order to call has_full_propose() =>
+///               are observed => `add_unknown_propose_with_precommits()` is called
+///             - then receive valid tx and Propose in order to call `has_full_propose()` =>
 ///               fall with "Full propose: wrong state hash"
-///         - it appeared that this test is almost same as handle_precommit_positive_scenario_commit
-///         the only difference that is in handle_precommit_positive_scenario_commit propose and
-///         tx are received after second precommit and here propose and tx are received
-///         after third precommit
+///         - it appeared that this test is almost the same as
+///         `handle_precommit_positive_scenario_commit` the only difference that is in
+///         `handle_precommit_positive_scenario_commit` propose and tx are received after second
+///         precommit and here propose and tx are received after third precommit
 #[test]
 #[should_panic(expected = "Full propose: wrong state hash")]
 fn has_full_propose_wrong_state_hash() {
@@ -1799,14 +1799,14 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
 /// - same as positive scenario, but
 ///     - start from 1 height
 ///     - one precommit get from 0 round and queue it
-/// - code is based on handle_precommit_positive_scenario_commit()
+/// - code is based on `handle_precommit_positive_scenario_commit()`
 /// with folowing updates:
 ///     - use manually created tx because we need to know which tx will be used
-///       in add_one_height() function
-///         - take into account that in add_one_height() tx will be generated
-///         and in add_one_height_with_transaction tx is taken as param
+///       in `add_one_height()` function
+///         - take into account that in `add_one_height()` tx will be generated
+///         and in `add_one_height_with_transaction` tx is taken as param
 ///     - predict & calculate blocks which would be created in
-///       handle_precommit_positive_scenario_commit() on zero and one heights
+///       `handle_precommit_positive_scenario_commit()` on zero and one heights
 ///     - if we know block from 1st height we can construct valid precommit for 1st height and
 ///       receive it earlier: on zero height.
 ///     this early precommit will be queued and will be used after 1st height will be achieved
@@ -2035,7 +2035,7 @@ fn commit_as_leader_send_propose_round_timeout() {
 /// idea of test is:
 /// - to receive propose with unknown tx
 /// - receive that tx, so, all required txs are present
-/// - call node/consensus.rs->has_full_propose() => broadcast prevote
+/// - call `node/consensus.rs->has_full_propose()` => broadcast prevote
 #[test]
 fn handle_tx_has_full_propose() {
     let sandbox = timestamping_sandbox();
@@ -2135,7 +2135,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
 /// - Ignore if height and round are not the same
 /// scenario:
 ///  - make commit at first round
-///  - and verify that at moment when first round_timeout is triggered, round remains the same
+///  - and verify that at moment when first `round_timeout` is triggered, round remains the same
 #[test]
 fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     let sandbox = timestamping_sandbox();
@@ -2254,7 +2254,7 @@ fn test_send_propose_and_prevote_when_we_are_leader() {
 /// - send prevote if locked to propose
 /// idea:
 ///  - lock to propose
-///  - trigger round_timeout
+///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
 #[test]
 fn handle_round_timeout_send_prevote_if_locked_to_propose() {
@@ -2319,7 +2319,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - handle queued messages
 /// idea:
 ///  - lock to propose
-///  - trigger round_timeout
+///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
 #[test]
 #[should_panic(expected = "Send unexpected message Request(RequestPropose")]
@@ -2361,7 +2361,7 @@ fn test_exclude_validator_from_consensus() {
         TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
                       &consensus_cfg.clone().serialize(),
                       consensus_cfg.actual_from,
-                      &sandbox.s(VALIDATOR_0 as usize))
+                      sandbox.s(VALIDATOR_0 as usize))
     };
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
@@ -2389,7 +2389,7 @@ fn test_schema_config_changes() {
         let tx = TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
                                &consensus_cfg.clone().serialize(),
                                consensus_cfg.actual_from,
-                               &sandbox.s(VALIDATOR_0 as usize));
+                               sandbox.s(VALIDATOR_0 as usize));
         (tx, consensus_cfg)
     };
     let prev_cfg = sandbox.cfg();
