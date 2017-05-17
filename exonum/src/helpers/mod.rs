@@ -70,7 +70,7 @@ pub struct NodeRunOptions {
 
 /// A generic implementation that launches `Node` and optionally creates threads 
 /// for public and private api handlers.
-pub fn run_node_with_api(mut node: Node, options: NodeRunOptions) {
+pub fn run_node_with_api(mut node: Node, options: &NodeRunOptions) {
     let blockchain = node.handler().blockchain.clone();
     let private_config_api_thread = match options.private_api_address {
         Some(listen_address) => {
