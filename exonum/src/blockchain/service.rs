@@ -153,4 +153,12 @@ impl ApiContext {
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }
+
+    pub fn wire_public_api(&self, router: &mut Router) {
+        self.blockchain.wire_public_api(self, router)
+    }
+
+    pub fn wire_private_api(&self, router: &mut Router) {
+        self.blockchain.wire_public_api(self, router)
+    }
 }
