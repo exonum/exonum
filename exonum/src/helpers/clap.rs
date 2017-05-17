@@ -3,6 +3,7 @@ use clap::{SubCommand, App, Arg, ArgMatches};
 use std::path::Path;
 use std::marker::PhantomData;
 use std::fs;
+use std::net::SocketAddr;
 
 use config::ConfigFile;
 use node::NodeConfig;
@@ -82,6 +83,7 @@ impl<'a, 'b> RunCommand<'a, 'b>
 {
     pub fn new() -> App<'a, 'b> {
         SubCommand::with_name("run")
+            .about("Run node with given configuration")
             .arg(Arg::with_name("NODE_CONFIG_PATH")
                      .short("c")
                      .long("node-config")
@@ -92,19 +94,45 @@ impl<'a, 'b> RunCommand<'a, 'b>
             .arg(Arg::with_name("LEVELDB_PATH")
                      .short("d")
                      .long("leveldb-path")
-                     .value_name("LEVELDB_PATH")
                      .help("Use leveldb database with the given path")
+                     .required(false)
+                     .takes_value(true))
+            .arg(Arg::with_name("PUBLIC_API_ADDRESS")
+                     .short("p")
+                     .long("public-api-address")
+                     .help("Listen address for public api")
+                     .required(false)
+                     .takes_value(true))
+            .arg(Arg::with_name("PRIVATE_API_ADDRESS")
+                     .short("s")
+                     .long("private-api-address")
+                     .help("Listen address for private api")
                      .required(false)
                      .takes_value(true))
     }
 
     pub fn node_config_path(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("NODE_CONFIG_PATH").unwrap())
+        matches
+            .value_of("NODE_CONFIG_PATH")
+            .map(Path::new)
+            .expect("Path to node configuration is no setted")
     }
 
     pub fn node_config(matches: &'a ArgMatches<'a>) -> NodeConfig {
         let path = Self::node_config_path(matches);
         ConfigFile::load(path).unwrap()
+    }
+
+    pub fn public_api_address(matches: &'a ArgMatches<'a>) -> Option<SocketAddr> {
+        matches
+            .value_of("PUBLIC_API_ADDRESS")
+            .map(|s| s.parse().expect("Public api address has incorrect format"))
+    }
+
+    pub fn private_api_address(matches: &'a ArgMatches<'a>) -> Option<SocketAddr> {
+        matches
+            .value_of("PRIVATE_API_ADDRESS")
+            .map(|s| s.parse().expect("Private api address has incorrect format"))
     }
 
     pub fn leveldb_path(matches: &'a ArgMatches<'a>) -> Option<&'a Path> {
