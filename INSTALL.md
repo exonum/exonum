@@ -18,7 +18,7 @@ brew install libsodium leveldb openssl
 ## Linux
 For deb based systems like Debian or Ubuntu you need the following packages:
 ```shell
-apt install build-essential libsodium-dev libleveldb-dev libssl-dev
+apt install build-essential libsodium-dev libleveldb-dev libssl-dev pkg-config
 ```
 Other linux users may find the packages with similar names in their package managers.
 
