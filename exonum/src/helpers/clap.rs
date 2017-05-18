@@ -120,7 +120,15 @@ impl<'a, 'b> RunCommand<'a, 'b>
 
     pub fn node_config(matches: &'a ArgMatches<'a>) -> NodeConfig {
         let path = Self::node_config_path(matches);
-        ConfigFile::load(path).unwrap()
+        let mut cfg: NodeConfig = ConfigFile::load(path).unwrap();
+        // Override api options
+        if let Some(addr) = Self::public_api_address(matches) {
+            cfg.api.public_api_address = Some(addr);
+        }
+        if let Some(addr) = Self::private_api_address(matches) {
+            cfg.api.private_api_address = Some(addr);
+        }
+        cfg
     }
 
     pub fn public_api_address(matches: &'a ArgMatches<'a>) -> Option<SocketAddr> {
