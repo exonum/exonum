@@ -453,10 +453,10 @@ impl Sandbox {
             db
         };
         *Schema::new(&view)
-            .last_block()
-            .unwrap()
-            .unwrap()
-            .state_hash()
+             .last_block()
+             .unwrap()
+             .unwrap()
+             .state_hash()
     }
 
     pub fn get_proof_to_service_table(&self,
