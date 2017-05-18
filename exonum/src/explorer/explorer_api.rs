@@ -102,8 +102,8 @@ impl Api for ExplorerApi {
             }
         };
 
-        router.get("/api/v1/blockchain/blocks", blocks, "blocks");
-        router.get("/api/v1/blockchain/blocks/:height", block, "height");
-        router.get("/api/v1/blockchain/transactions/:hash", transaction, "hash");
+        router.get("/v1/blocks", blocks, "blocks");
+        router.get("/v1/blocks/:height", block, "height");
+        router.get("/v1/transactions/:hash", transaction, "hash");
     }
 }

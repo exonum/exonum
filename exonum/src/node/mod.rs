@@ -54,6 +54,27 @@ pub struct ListenerConfig {
     pub address: SocketAddr,
 }
 
+/// An api configuration options
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct NodeApiConfig {
+    /// Enable api endpoints for the `blockchain_explorer` on public api address.
+    pub enable_blockchain_explorer: bool,
+    /// Listen address for public api endpoints.
+    pub public_api_address: Option<SocketAddr>,
+    /// Listen address for private api endpoints.
+    pub private_api_address: Option<SocketAddr>
+}
+
+impl Default for NodeApiConfig {
+    fn default() -> NodeApiConfig {
+        NodeApiConfig {
+            enable_blockchain_explorer: false,
+            public_api_address: None,
+            private_api_address: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
     pub genesis: GenesisConfig,
@@ -62,6 +83,7 @@ pub struct NodeConfig {
     pub peers: Vec<SocketAddr>,
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
+    pub api: NodeApiConfig,
 }
 
 #[derive(Debug, Clone)]
