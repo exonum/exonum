@@ -1,17 +1,17 @@
 use std::thread;
-use std::net::SocketAddr;
 
 use log::{LogRecord, LogLevel, SetLoggerError};
 use env_logger::LogBuilder;
 use colored::*;
 use router::Router;
+use mount::Mount;
 use iron::{Chain, Iron};
 
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use blockchain::{GenesisConfig, ApiContext};
-use node::{NodeConfig, Node};
+use node::{NodeConfig, Node, NodeApiConfig};
 use crypto::gen_keypair;
 use explorer::ExplorerApi;
 use api::Api;
@@ -53,34 +53,25 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 public_key: validator.0,
                 secret_key: validator.1,
                 genesis: genesis.clone(),
+                api: Default::default(),
             }
         })
         .collect::<Vec<_>>()
 }
 
-/// Options for the `run_node_with_api` function.
-pub struct NodeRunOptions {
-    /// Enable api endpoints for the `blockchain_explorer` on public api address.
-    pub enable_explorer: bool,
-    /// Listen address for public api endpoints
-    pub public_api_address: Option<SocketAddr>,
-    /// Listen address for private api endpoints
-    pub private_api_address: Option<SocketAddr>,
-}
-
 /// A generic implementation that launches `Node` and optionally creates threads 
 /// for public and private api handlers.
-pub fn run_node_with_api(mut node: Node, options: &NodeRunOptions) {
+pub fn run_node_with_api(mut node: Node, options: &NodeApiConfig) {
     let blockchain = node.handler().blockchain.clone();
     let private_config_api_thread = match options.private_api_address {
         Some(listen_address) => {
-            let mut router = Router::new();
             let api_context = ApiContext::new(&node);
-            api_context.wire_private_api(&mut router);
-
+            let mut mount = Mount::new();
+            mount.mount("services", api_context.mount_private_api());
+        
             let thread = thread::spawn(move || {
                 info!("Private exonum api started on {}", listen_address);
-                let chain = Chain::new(router);
+                let chain = Chain::new(mount);
                 Iron::new(chain).http(listen_address).unwrap();
             });
             Some(thread)
@@ -91,19 +82,22 @@ pub fn run_node_with_api(mut node: Node, options: &NodeRunOptions) {
     let public_config_api_thread = match options.public_api_address {
         Some(listen_address) => {
             let api_context = ApiContext::new(&node);
-            let mut router = Router::new();
-            api_context.wire_public_api(&mut router);
-            if options.enable_explorer {
+            let mut mount = Mount::new();
+            mount.mount("services", api_context.mount_public_api());
+
+            if options.enable_blockchain_explorer {
+                let mut router = Router::new();
                 let explorer_api = ExplorerApi {
                     blockchain: blockchain
                 };
                 explorer_api.wire(&mut router);
+                mount.mount("explorer", router);
             }
              
             let thread = thread::spawn(move || {
                 info!("Public exonum api started on {}", listen_address);
 
-                let chain = Chain::new(router);
+                let chain = Chain::new(mount);
                 Iron::new(chain).http(listen_address).unwrap();
             });
             Some(thread)

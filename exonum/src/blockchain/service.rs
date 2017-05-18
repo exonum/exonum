@@ -1,5 +1,6 @@
 use serde_json::Value;
-use router::Router;
+use iron::Handler;
+use mount::Mount;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{View, Error as StorageError};
@@ -17,8 +18,12 @@ pub trait Transaction: Message + 'static {
     }
 }
 
+#[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
+    /// Unique service identification for database schema and service messages.
     fn service_id(&self) -> u16;
+    /// Unique human readable service name.
+    fn service_name(&self) -> &'static str;
 
     fn state_hash(&self, _: &View) -> Result<Vec<Hash>, StorageError> {
         Ok(Vec::new())
@@ -26,17 +31,21 @@ pub trait Service: Send + Sync + 'static {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    fn handle_genesis_block(&self, _: &View) -> Result<Value, StorageError> {
+    fn handle_genesis_block(&self, view: &View) -> Result<Value, StorageError> {
         Ok(Value::Null)
     }
 
-    fn handle_commit(&self, _: &mut NodeState) -> Result<(), StorageError> {
+    fn handle_commit(&self, context: &mut NodeState) -> Result<(), StorageError> {
         Ok(())
     }
-
-    fn wire_public_api(&self, _: &ApiContext, _: &mut Router) {}
-
-    fn wire_private_api(&self, _: &ApiContext, _: &mut Router) {}
+    /// Returns api handler for public users.
+    fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
+        None
+    }
+    /// Returns api handler for maintainers. 
+    fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
+        None
+    }
 }
 
 pub struct NodeState<'a, 'b> {
@@ -154,11 +163,11 @@ impl ApiContext {
         &self.secret_key
     }
 
-    pub fn wire_public_api(&self, router: &mut Router) {
-        self.blockchain.wire_public_api(self, router)
+    pub fn mount_public_api(&self) -> Mount {
+        self.blockchain.mount_public_api(self)
     }
 
-    pub fn wire_private_api(&self, router: &mut Router) {
-        self.blockchain.wire_public_api(self, router)
+    pub fn mount_private_api(&self) -> Mount {
+        self.blockchain.mount_private_api(self)
     }
 }

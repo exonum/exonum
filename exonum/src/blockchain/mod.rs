@@ -1,6 +1,6 @@
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
-use router::Router;
+use mount::Mount;
 
 use std::sync::Arc;
 use std::collections::BTreeMap;
@@ -205,15 +205,23 @@ impl Blockchain {
         Ok(txs)
     }
 
-    pub fn wire_public_api(&self, context: &ApiContext, router: &mut Router) {
+    pub fn mount_public_api(&self, context: &ApiContext) -> Mount {
+        let mut mount = Mount::new();
         for service in self.service_map.values() {
-            service.wire_public_api(context, router)
+            if let Some(handler) = service.public_api_handler(context) {
+                mount.mount(service.service_name(), handler);
+            }
         }
+        return mount;
     }
 
-    pub fn wire_private_api(&self, context: &ApiContext, router: &mut Router) {
+    pub fn mount_private_api(&self, context: &ApiContext) -> Mount {
+        let mut mount = Mount::new();
         for service in self.service_map.values() {
-            service.wire_private_api(context, router)
+            if let Some(handler) = service.private_api_handler(context) {
+                mount.mount(service.service_name(), handler);
+            }
         }
+        return mount;
     }
 }
