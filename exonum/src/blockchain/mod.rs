@@ -212,7 +212,7 @@ impl Blockchain {
                 mount.mount(service.service_name(), handler);
             }
         }
-        return mount;
+        mount
     }
 
     pub fn mount_private_api(&self, context: &ApiContext) -> Mount {
@@ -222,6 +222,6 @@ impl Blockchain {
                 mount.mount(service.service_name(), handler);
             }
         }
-        return mount;
+        mount
     }
 }
