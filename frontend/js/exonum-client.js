@@ -235,7 +235,7 @@ var bigInt = (function (undefined) {
     }
 
     BigInteger.prototype.add = function (v) {
-        var value, n = parseValue(v);
+        var n = parseValue(v);
         if (this.sign !== n.sign) {
             return this.subtract(n.negate());
         }
@@ -294,7 +294,7 @@ var bigInt = (function (undefined) {
     }
 
     function subtractAny(a, b, sign) {
-        var value, isSmall;
+        var value;
         if (compareAbs(a, b) >= 0) {
             value = subtract(a,b);
         } else {
@@ -443,7 +443,7 @@ var bigInt = (function (undefined) {
     }
 
     BigInteger.prototype.multiply = function (v) {
-        var value, n = parseValue(v),
+        var n = parseValue(v),
             a = this.value, b = n.value,
             sign = this.sign !== n.sign,
             abs;
@@ -943,23 +943,24 @@ var bigInt = (function (undefined) {
     BigInteger.prototype.modInv = function (n) {
         var t = bigInt.zero, newT = bigInt.one, r = parseValue(n), newR = this.abs(), q, lastT, lastR;
         while (!newR.equals(bigInt.zero)) {
-        	q = r.divide(newR);
-          lastT = t;
-          lastR = r;
-          t = newT;
-          r = newR;
-          newT = lastT.subtract(q.multiply(newT));
-          newR = lastR.subtract(q.multiply(newR));
+            q = r.divide(newR);
+            lastT = t;
+            lastR = r;
+            t = newT;
+            r = newR;
+            newT = lastT.subtract(q.multiply(newT));
+            newR = lastR.subtract(q.multiply(newR));
         }
         if (!r.equals(1)) throw new Error(this.toString() + " and " + n.toString() + " are not co-prime");
         if (t.compare(0) === -1) {
-        	t = t.add(n);
+            t = t.add(n);
         }
         if (this.isNegative()) {
             return t.negate();
         }
         return t;
-    }
+    };
+
     SmallInteger.prototype.modInv = BigInteger.prototype.modInv;
 
     BigInteger.prototype.next = function () {
@@ -1153,8 +1154,7 @@ var bigInt = (function (undefined) {
         return low.add(typeof result === "number" ? new SmallInteger(result) : new BigInteger(result, false));
     }
     var parseBase = function (text, base) {
-        var val = Integer[0], pow = Integer[1],
-            length = text.length;
+        var length = text.length;
         if (2 <= base && base <= 36) {
             if (length <= LOG_MAX_INT / Math.log(base)) {
                 return new SmallInteger(parseInt(text, base));
@@ -1176,13 +1176,17 @@ var bigInt = (function (undefined) {
             }
             else throw new Error(c + " is not a valid character");
         }
-        digits.reverse();
-        for (i = 0; i < digits.length; i++) {
+        return parseBaseFromArray(digits, base, isNegative);
+    };
+
+    function parseBaseFromArray(digits, base, isNegative) {
+        var val = Integer[0], pow = Integer[1], i;
+        for (i = digits.length - 1; i >= 0; i--) {
             val = val.add(digits[i].times(pow));
             pow = pow.times(base);
         }
         return isNegative ? val.negate() : val;
-    };
+    }
 
     function stringify(digit) {
         var v = digit.value;
@@ -1326,6 +1330,11 @@ var bigInt = (function (undefined) {
     Integer.lcm = lcm;
     Integer.isInstance = function (x) { return x instanceof BigInteger || x instanceof SmallInteger; };
     Integer.randBetween = randBetween;
+
+    Integer.fromArray = function (digits, base, isNegative) {
+        return parseBaseFromArray(digits.map(parseValue), parseValue(base || 10), isNegative);
+    };
+
     return Integer;
 })();
 
@@ -6574,10 +6583,10 @@ var Precommit = Exonum.newMessage({
 });
 
 /**
- * Verifies block
+ * Validate block and each precommit in block
  * @param {Object} data
  * @param {Array} validators
- * @return {Boolean}
+ * @return {boolean}
  */
 Exonum.verifyBlock = function(data, validators) {
     if (Exonum.isObject(data) === false) {
@@ -6642,7 +6651,7 @@ Exonum.verifyBlock = function(data, validators) {
 
         var publicKey = validators[precommit.body.validator];
 
-        if (Exonum.verifySignature(precommit.body, Precommit, precommit.signature, publicKey) === false) {
+        if (Precommit.verifySignature(precommit.signature, publicKey, precommit.body) === false) {
             console.error('Wrong signature of precommit.');
             return false;
         }
@@ -6667,12 +6676,19 @@ var Exonum = require('../src/core');
 
 require('../src/types');
 
+/**
+ * Convert hexadecimal string into uint8Array
+ * @param {string} str
+ * @returns {Uint8Array}
+ */
 Exonum.hexadecimalToUint8Array = function(str) {
     var array = [];
 
     if (typeof str !== 'string') {
-        console.error('Wrong data type of hexadecimal string');
-        return new Uint8Array([]);
+        console.error('Wrong data type passed to convertor. Hexadecimal string is expected');
+        return;
+    } else if (Exonum.validateHexHash(str, Math.ceil(str.length / 2)) === false) {
+        return;
     }
 
     for (var i = 0, len = str.length; i < len; i += 2) {
@@ -6682,9 +6698,20 @@ Exonum.hexadecimalToUint8Array = function(str) {
     return new Uint8Array(array);
 };
 
+/**
+ * Convert sting into uint8Array
+ * @param {string} str
+ * @param {number} [len] - optional
+ * @returns {Uint8Array}
+ */
 Exonum.stringToUint8Array = function(str, len) {
     var array = [];
     var from = 0;
+
+    if (typeof str !== 'string') {
+        console.error('Wrong data type passed to convertor. String is expected');
+        return;
+    }
 
     if (len > 0) {
         for (var i = 0; i < len; i++) {
@@ -6717,8 +6744,20 @@ Exonum.stringToUint8Array = function(str, len) {
     return new Uint8Array(array);
 };
 
+/**
+ * Convert binary string into uint8Array
+ * @param {string} binaryStr
+ * @returns {Uint8Array}
+ */
 Exonum.binaryStringToUint8Array = function(binaryStr) {
     var array = [];
+
+    if (typeof binaryStr !== 'string') {
+        console.error('Wrong data type passed to convertor. Binary string is expected');
+        return;
+    } else if (Exonum.validateBinaryString(binaryStr) === false) {
+        return;
+    }
 
     for (var i = 0, len = binaryStr.length; i < len; i += 8) {
         array.push(parseInt(binaryStr.substr(i, 8), 2));
@@ -6727,12 +6766,19 @@ Exonum.binaryStringToUint8Array = function(binaryStr) {
     return new Uint8Array(array);
 };
 
+/**
+ * Convert uint8Array into string
+ * @param {Uint8Array} uint8arr
+ * @returns {string}
+ */
 Exonum.uint8ArrayToHexadecimal = function(uint8arr) {
     var str = '';
 
     if (!(uint8arr instanceof Uint8Array)) {
-        console.error('Wrong data type of array of 8-bit integers');
-        return '';
+        console.error('Wrong data type of array of 8-bit integers. Uint8Array is expected');
+        return;
+    } else if (Exonum.validateBytesArray(uint8arr) === false) {
+        return;
     }
 
     for (var i = 0, len = uint8arr.length; i < len; i++) {
@@ -6744,8 +6790,20 @@ Exonum.uint8ArrayToHexadecimal = function(uint8arr) {
     return str.toLowerCase();
 };
 
+/**
+ * Convert binary string into hexadecimal string
+ * @param {string} binaryStr
+ * @returns {string}
+ */
 Exonum.binaryStringToHexadecimal = function(binaryStr) {
     var str = '';
+
+    if (typeof binaryStr !== 'string') {
+        console.error('Wrong data type passed to convertor. Binary string is expected');
+        return;
+    } else if (Exonum.validateBinaryString(binaryStr) === false) {
+        return;
+    }
 
     for (var i = 0, len = binaryStr.length; i < len; i += 8) {
         var hex = (parseInt(binaryStr.substr(i, 8), 2)).toString(16);
@@ -6756,8 +6814,20 @@ Exonum.binaryStringToHexadecimal = function(binaryStr) {
     return str.toLowerCase();
 };
 
+/**
+ * Convert hexadecimal string into binary string
+ * @param {string} str
+ * @returns {string}
+ */
 Exonum.hexadecimalToBinaryString = function(str) {
     var binaryStr = '';
+
+    if (typeof str !== 'string') {
+        console.error('Wrong data type passed to convertor. Hexadecimal string is expected');
+        return;
+    } else if (Exonum.validateHexHash(str, Math.ceil(str.length / 2)) === false) {
+        return;
+    }
 
     for (var i = 0, len = str.length; i < len; i++) {
         var bin = parseInt(str.substr(i, 1), 16).toString(2);
@@ -6778,7 +6848,7 @@ var Exonum = {
 };
 
 /**
- * Check if element is of type {Object}
+ * Check if element is of type Object
  * @param obj
  * @returns {boolean}
  */
@@ -6787,9 +6857,9 @@ Exonum.isObject = function(obj) {
 };
 
 /**
- * Get length of object
+ * Get length of element of type Object
  * @param {Object} obj
- * @returns {Number}
+ * @returns {number}
  */
 Exonum.getObjectLength = function(obj) {
     var l = 0;
@@ -6818,13 +6888,13 @@ var bigInt = require('big-integer');
 
 /**
  * Get SHA256 hash
- * Method with overloading. Accept two combinations of arguments:
- * 1) {Object} data, type
- * 2) {Array} buffer
- * @return {String}
+ * @param {Object|Array|Uint8Array} data - object of NewType type or array of 8-bit integers
+ * @param {NewType|NewMessage} [type] - optional, used only if data of {Object} type is passed
+ * @return {string}
  */
 Exonum.hash = function(data, type) {
     var buffer;
+
     if (Exonum.isInstanceofOfNewType(type)) {
         if (Exonum.isObject(data) === true) {
             buffer = type.serialize(data);
@@ -6833,10 +6903,10 @@ Exonum.hash = function(data, type) {
                 return;
             }
         } else {
-            console.error('Wrong type of data. Should be object.');
+            console.error('Wrong type of data parameter. Object is expected.');
             return;
         }
-    } else if (Exonum.isInstanceofOfMessage(type)) {
+    } else if (Exonum.isInstanceofOfNewMessage(type)) {
         if (Exonum.isObject(data) === true) {
             buffer = type.serialize(data);
             if (typeof buffer === 'undefined') {
@@ -6844,13 +6914,20 @@ Exonum.hash = function(data, type) {
                 return;
             }
         } else {
-            console.error('Wrong type of data. Should be object.');
+            console.error('Wrong type of data parameter. Object is expected.');
             return;
         }
-    } else if (data instanceof Uint8Array) {
-        buffer = data;
-    } else if (Array.isArray(data)) {
-        buffer = new Uint8Array(data);
+    } else if (typeof type === 'undefined') {
+        if (Exonum.validateBytesArray(data)) {
+            if (Array.isArray(data)) {
+                buffer = data;
+            } else {
+                buffer = Array.from(data);
+            }
+        } else {
+            console.error('Invalid data parameter.');
+            return;
+        }
     } else {
         console.error('Invalid type parameter.');
         return;
@@ -6861,112 +6938,147 @@ Exonum.hash = function(data, type) {
 
 /**
  * Get ED25519 signature
- * Method with overloading. Accept two combinations of arguments:
- * 1) {Object} data, type, {String} secretKey
- * 2) {Array} buffer, {String} secretKey
- * @return {String}
+ * @param {string} secretKey
+ * @param {Object|Array} data - object of NewType type or array of 8-bit integers
+ * @param {NewType|NewMessage} [type] - optional, used only if data of {Object} type is passed
+ * @return {string}
  */
-Exonum.sign = function(data, type, secretKey) {
+Exonum.sign = function(secretKey, data, type) {
+    var secretKeyUint8Array;
     var buffer;
     var signature;
-
-    if (typeof secretKey !== 'undefined') {
-        if (Exonum.isInstanceofOfNewType(type)) {
-            buffer = type.serialize(data);
-            if (typeof buffer === 'undefined') {
-                console.error('Invalid data parameter. Instance of NewType is expected.');
-                return;
-            }
-        } else if (Exonum.isInstanceofOfMessage(type)) {
-            buffer = type.serialize(data, true);
-            if (typeof buffer === 'undefined') {
-                console.error('Invalid data parameter. Instance of NewMessage is expected.');
-                return;
-            }
-        } else {
-            console.error('Invalid type parameter.');
-            return;
-        }
-    } else {
-        if (Exonum.validateBytesArray(data) === false) {
-            console.error('Invalid data parameter.');
-            return;
-        }
-
-        buffer = data;
-        secretKey = type;
-    }
 
     if (Exonum.validateHexHash(secretKey, 64) === false) {
         console.error('Invalid secretKey parameter.');
         return;
     }
 
-    buffer = new Uint8Array(buffer);
-    secretKey = Exonum.hexadecimalToUint8Array(secretKey);
-    signature = nacl.sign.detached(buffer, secretKey);
+    secretKeyUint8Array = Exonum.hexadecimalToUint8Array(secretKey);
+
+    if (Exonum.isInstanceofOfNewType(type)) {
+        if (Exonum.isObject(data) === true) {
+            buffer = type.serialize(data);
+            if (typeof buffer === 'undefined') {
+                console.error('Invalid data parameter. Instance of NewType is expected.');
+                return;
+            } else {
+                buffer = new Uint8Array(buffer);
+            }
+        } else {
+            console.error('Wrong type of data. Should be object.');
+            return;
+        }
+    } else if (Exonum.isInstanceofOfNewMessage(type)) {
+        if (Exonum.isObject(data) === true) {
+            buffer = type.serialize(data);
+            if (typeof buffer === 'undefined') {
+                console.error('Invalid data parameter. Instance of NewMessage is expected.');
+                return;
+            } else {
+                buffer = new Uint8Array(buffer);
+            }
+        } else {
+            console.error('Wrong type of data. Should be object.');
+            return;
+        }
+    } else if (typeof type === 'undefined') {
+        if (Exonum.validateBytesArray(data)) {
+            if (data instanceof Uint8Array) {
+                buffer = data;
+            } else {
+                buffer = new Uint8Array(data);
+            }
+        } else {
+            console.error('Invalid data parameter.');
+            return;
+        }
+    } else {
+        console.error('Invalid type parameter.');
+        return;
+    }
+
+    signature = nacl.sign.detached(buffer, secretKeyUint8Array);
 
     return Exonum.uint8ArrayToHexadecimal(signature);
 };
 
 /**
  * Verifies ED25519 signature
- * Method with overloading. Accept two combinations of arguments:
- * 1) {Object} data, type, {String} signature, {String} publicKey
- * 2) {Array} buffer, {String} signature, {String} publicKey
- * @return {Boolean}
+ * @param {string} signature
+ * @param {string} publicKey
+ * @param {Object|Array} data - object of NewType type or array of 8-bit integers
+ * @param {NewType|NewMessage} [type] - optional, used only if data of {Object} type is passed
+ * @return {boolean}
  */
-Exonum.verifySignature = function(data, type, signature, publicKey) {
+Exonum.verifySignature = function(signature, publicKey, data, type) {
+    var signatureUint8Array;
+    var publicKeyUint8Array;
     var buffer;
 
-    if (typeof publicKey !== 'undefined') {
-        if (Exonum.isInstanceofOfNewType(type)) {
-            buffer = type.serialize(data);
-            if (typeof buffer === 'undefined') {
-                console.error('Invalid data parameter. Instance of NewType is expected.');
-                return;
-            }
-        } else if (Exonum.isInstanceofOfMessage(type)) {
-            buffer = type.serialize(data, true);
-            if (typeof buffer === 'undefined') {
-                console.error('Invalid data parameter. Instance of NewMessage is expected.');
-                return;
-            }
-        } else {
-            console.error('Invalid type parameter.');
-            return;
-        }
-    } else {
-        if (Exonum.validateBytesArray(data) === false) {
-            console.error('Invalid data parameter.');
-            return;
-        }
-
-        buffer = data;
-        publicKey = signature;
-        signature = type;
-    }
-
-    if (Exonum.validateHexHash(publicKey) === false) {
-        console.error('Invalid publicKey parameter.');
-        return;
-    } else if (Exonum.validateHexHash(signature, 64) === false) {
+    if (Exonum.validateHexHash(signature, 64) === false) {
         console.error('Invalid signature parameter.');
         return;
     }
 
-    buffer = new Uint8Array(buffer);
-    signature = Exonum.hexadecimalToUint8Array(signature);
-    publicKey = Exonum.hexadecimalToUint8Array(publicKey);
+    signatureUint8Array = Exonum.hexadecimalToUint8Array(signature);
 
-    return nacl.sign.detached.verify(buffer, signature, publicKey);
+    if (Exonum.validateHexHash(publicKey) === false) {
+        console.error('Invalid publicKey parameter.');
+        return;
+    }
+
+    publicKeyUint8Array = Exonum.hexadecimalToUint8Array(publicKey);
+
+    if (Exonum.isInstanceofOfNewType(type)) {
+        if (Exonum.isObject(data) === true) {
+            buffer = type.serialize(data);
+            if (typeof buffer === 'undefined') {
+                console.error('Invalid data parameter. Instance of NewType is expected.');
+                return;
+            } else {
+                buffer = new Uint8Array(buffer);
+            }
+        } else {
+            console.error('Wrong type of data. Should be object.');
+            return;
+        }
+    } else if (Exonum.isInstanceofOfNewMessage(type)) {
+        if (Exonum.isObject(data) === true) {
+            buffer = type.serialize(data, true);
+            if (typeof buffer === 'undefined') {
+                console.error('Invalid data parameter. Instance of NewMessage is expected.');
+                return;
+            } else {
+                buffer = new Uint8Array(buffer);
+            }
+        } else {
+            console.error('Wrong type of data. Should be object.');
+            return;
+        }
+    } else if (typeof type === 'undefined') {
+        if (Exonum.validateBytesArray(data)) {
+            if (data instanceof Uint8Array) {
+                buffer = data;
+            } else {
+                buffer = new Uint8Array(data);
+            }
+        } else {
+            console.error('Invalid data parameter.');
+            return;
+        }
+    } else {
+        console.error('Invalid type parameter.');
+        return;
+    }
+
+    return nacl.sign.detached.verify(buffer, signatureUint8Array, publicKeyUint8Array);
 };
 
 /**
  * Generate random pair of publicKey and secretKey
  * @return {Object}
- *  publicKey {String}
- *  secretKey {String}
+ *  publicKey {string}
+ *  secretKey {string}
  */
 Exonum.keyPair = function() {
     var pair = nacl.sign.keyPair();
@@ -6979,48 +7091,15 @@ Exonum.keyPair = function() {
     };
 };
 
-Exonum.randomNonce = function() {
-    var buffer = nacl.randomBytes(24);
-    return Exonum.uint8ArrayToHexadecimal(buffer);
-};
-
+/**
+ * Get random number of cryptographic quality
+ * @returns {string}
+ */
 Exonum.randomUint64 = function() {
     var buffer = nacl.randomBytes(8);
     var hex = Exonum.uint8ArrayToHexadecimal(buffer);
 
     return bigInt(hex, 16).toString();
-};
-
-/**
- * Encrypt data of type Digest
- * @param {String} digest
- * @param {Number} nonce
- * @param {String} key
- * @return {String}
- */
-Exonum.encryptDigest = function(digest, nonce, key) {
-    var digestUint8Array = Exonum.hexadecimalToUint8Array(digest);
-    var nonceUint8Array = Exonum.hexadecimalToUint8Array(nonce);
-    var keyUint8Array = Exonum.stringToUint8Array(key, 32);
-    var box = nacl.secretbox(digestUint8Array, nonceUint8Array, keyUint8Array);
-
-    return Exonum.uint8ArrayToHexadecimal(box);
-};
-
-/**
- * Decrypt data of type Digest
- * @param {String} box
- * @param {Number} nonce
- * @param {String} key
- * @return {String}
- */
-Exonum.decryptDigest = function(box, nonce, key) {
-    var messageUint8Array = Exonum.hexadecimalToUint8Array(box);
-    var nonceUint8Array = Exonum.hexadecimalToUint8Array(nonce);
-    var keyUint8Array = Exonum.stringToUint8Array(key, 32);
-    var digest = nacl.secretbox.open(messageUint8Array, nonceUint8Array, keyUint8Array);
-
-    return Exonum.uint8ArrayToHexadecimal(digest);
 };
 
 },{"../src/convertors":20,"../src/core":21,"../src/data-management":23,"../src/serialization":27,"../src/validators":29,"big-integer":2,"sha.js":10,"tweetnacl":17}],23:[function(require,module,exports){
@@ -7043,7 +7122,7 @@ function NewType(type) {
 }
 
 /**
- * Built-in method to serialize data into array of 8-bit integers
+ * Serialize data of NewType type into array of 8-bit integers
  * @param {Object} data
  * @returns {Array}
  */
@@ -7051,16 +7130,34 @@ NewType.prototype.serialize = function(data) {
     return Exonum.serialize([], 0, data, this);
 };
 
+/**
+ * Get SHA256 hash
+ * @param {Object} data
+ * @returns {string}
+ */
 NewType.prototype.hash = function(data) {
     return Exonum.hash(data, this);
 };
 
-NewType.prototype.sign = function(data, secretKey) {
-    return Exonum.sign(data, this, secretKey);
+/**
+ * Get ED25519 signature
+ * @param {string} secretKey
+ * @param {Object} data
+ * @returns {string}
+ */
+NewType.prototype.sign = function(secretKey, data) {
+    return Exonum.sign(secretKey, data, this);
 };
 
-NewType.prototype.verifySignature = function(data, signature, publicKey) {
-    return Exonum.verifySignature(data, this, signature, publicKey);
+/**
+ * Verifies ED25519 signature
+ * @param {string} signature
+ * @param {string} publicKey
+ * @param {Object} data
+ * @returns {boolean}
+ */
+NewType.prototype.verifySignature = function(signature, publicKey, data) {
+    return Exonum.verifySignature(signature, publicKey, data, this);
 };
 
 /**
@@ -7072,6 +7169,11 @@ Exonum.newType = function(type) {
     return new NewType(type);
 };
 
+/**
+ * Check if passed object is of type NewType
+ * @param {Object} type
+ * @returns {boolean}
+ */
 Exonum.isInstanceofOfNewType = function(type) {
     return type instanceof NewType;
 };
@@ -7089,9 +7191,9 @@ function NewMessage(type) {
 }
 
 /**
- * Built-in method to serialize data into array of 8-bit integers
+ * Serialize data of NewMessage type into array of 8-bit integers
  * @param {Object} data
- * @param {Boolean} cutSignature
+ * @param {boolean} [cutSignature] - optional parameter used flag that signature should not be appended to serialized data
  * @returns {Array}
  */
 NewMessage.prototype.serialize = function(data, cutSignature) {
@@ -7129,16 +7231,34 @@ NewMessage.prototype.serialize = function(data, cutSignature) {
     return buffer;
 };
 
+/**
+ * Get SHA256 hash
+ * @param {Object} data
+ * @returns {string}
+ */
 NewMessage.prototype.hash = function(data) {
     return Exonum.hash(data, this);
 };
 
-NewMessage.prototype.sign = function(data, secretKey) {
-    return Exonum.sign(data, this, secretKey);
+/**
+ * Get ED25519 signature
+ * @param {string} secretKey
+ * @param {Object} data
+ * @returns {string}
+ */
+NewMessage.prototype.sign = function(secretKey, data) {
+    return Exonum.sign(secretKey, data, this);
 };
 
-NewMessage.prototype.verifySignature = function(data, signature, publicKey) {
-    return Exonum.verifySignature(data, this, signature, publicKey);
+/**
+ * Verifies ED25519 signature
+ * @param {string} signature
+ * @param {string} publicKey
+ * @param {Object} data
+ * @returns {boolean}
+ */
+NewMessage.prototype.verifySignature = function(signature, publicKey, data) {
+    return Exonum.verifySignature(signature, publicKey, data, this);
 };
 
 /**
@@ -7150,7 +7270,12 @@ Exonum.newMessage = function(type) {
     return new NewMessage(type);
 };
 
-Exonum.isInstanceofOfMessage = function(type) {
+/**
+ * Check if passed object is of type NewMessage
+ * @param type
+ * @returns {boolean}
+ */
+Exonum.isInstanceofOfNewMessage = function(type) {
     return type instanceof NewMessage;
 };
 
@@ -7205,17 +7330,17 @@ var RootBranch = Exonum.newType({
 
 /**
  * Check Merkle Patricia tree proof and return element
- * @param {String} rootHash
+ * @param {string} rootHash
  * @param {Object} proofNode
- * @param key
- * @param {NewType} type (optional)
+ * @param {string} key
+ * @param {NewType} [type] - optional
  * @return {Object}
  */
 Exonum.merklePatriciaProof = function(rootHash, proofNode, key, type) {
     /**
      * Get value from node
      * @param data
-     * @returns {String || Array || Object}
+     * @returns {string} or {Array} or {Object}
      */
     function getHash(data) {
         var elementsHash;
@@ -7252,9 +7377,9 @@ Exonum.merklePatriciaProof = function(rootHash, proofNode, key, type) {
 
     /**
      * Check either suffix is a part of search key
-     * @param {String} prefix
-     * @param {String} suffix
-     * @returns {Boolean}
+     * @param {string} prefix
+     * @param {string} suffix
+     * @returns {boolean}
      */
     function isPartOfSearchKey(prefix, suffix) {
         // remove prefix from searched binary key
@@ -7265,8 +7390,8 @@ Exonum.merklePatriciaProof = function(rootHash, proofNode, key, type) {
     /**
      * Recursive tree traversal function
      * @param {Object} node
-     * @param {String} keyPrefix
-     * @returns {String}
+     * @param {string} keyPrefix
+     * @returns {string}
      */
     function recursive(node, keyPrefix) {
         if (Exonum.getObjectLength(node) !== 2) {
@@ -7556,7 +7681,7 @@ var objectAssign = require('object-assign');
 /**
  * Calculate height of merkle tree
  * @param {bigInt} count
- * @return {Number}
+ * @return {number}
  */
 function calcHeight(count) {
     var i = 0;
@@ -7568,11 +7693,11 @@ function calcHeight(count) {
 
 /**
  * Check proof of Merkle tree and return array of elements
- * @param {String} rootHash
- * @param {Number} count
+ * @param {string} rootHash
+ * @param {number} count
  * @param {Object} proofNode
  * @param {Array} range
- * @param type (optional)
+ * @param {NewType} [type] - optional
  * @return {Array}
  */
 Exonum.merkleProof = function(rootHash, count, proofNode, range, type) {
@@ -7582,9 +7707,9 @@ Exonum.merkleProof = function(rootHash, count, proofNode, range, type) {
     /**
      * Get value from node, insert into elements array and return its hash
      * @param data
-     * @param {Number} depth
-     * @param {Number} index
-     * @returns {String}
+     * @param {number} depth
+     * @param {number} index
+     * @returns {string}
      */
     function getHash(data, depth, index) {
         var element;
@@ -7641,9 +7766,9 @@ Exonum.merkleProof = function(rootHash, count, proofNode, range, type) {
     /**
      * Recursive tree traversal function
      * @param {Object} node
-     * @param {Number} depth
-     * @param {Number} index
-     * @returns {String}
+     * @param {number} depth
+     * @param {number} index
+     * @returns {string}
      */
     function recursive(node, depth, index) {
         var hashLeft;
@@ -7667,7 +7792,7 @@ Exonum.merkleProof = function(rootHash, count, proofNode, range, type) {
                 } else {
                     hashLeft = recursive(node.left, depth + 1, index * 2);
                 }
-                if (typeof hashLeft === 'undefined') {
+                if (typeof hashLeft === 'undefined' || hashLeft === null) {
                     return null;
                 }
             } else {
@@ -7695,7 +7820,7 @@ Exonum.merkleProof = function(rootHash, count, proofNode, range, type) {
                 } else {
                     hashRight = recursive(node.right, depth + 1, index * 2 + 1);
                 }
-                if (typeof hashRight === 'undefined') {
+                if (typeof hashRight === 'undefined' || hashRight === null) {
                     return null;
                 }
             } else {
@@ -7808,7 +7933,7 @@ require('../src/types');
 /**
  * Serialize data into array of 8-bit integers and insert into buffer
  * @param {Array} buffer
- * @param {Number} shift - the index to start write into buffer
+ * @param {number} shift - the index to start write into buffer
  * @param {Object} data
  * @param type - can be {NewType} or one of built-in types
  */
@@ -7890,6 +8015,12 @@ const MAX_UINT64 = '18446744073709551615';
 
 var bigInt = require('big-integer');
 
+/**
+ * @param {string} str
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ */
 function insertHexadecimalToByteArray(str, buffer, from, to) {
     for (var i = 0, len = str.length; i < len; i += 2) {
         buffer[from] = parseInt(str.substr(i, 2), 16);
@@ -7901,7 +8032,14 @@ function insertHexadecimalToByteArray(str, buffer, from, to) {
     }
 }
 
-// store Number as little-endian
+/**
+ * Insert number into array as as little-endian
+ * @param {number} number
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {boolean}
+ */
 function insertIntegerToByteArray(number, buffer, from, to) {
     var str = number.toString(16);
 
@@ -7925,6 +8063,11 @@ function insertIntegerToByteArray(number, buffer, from, to) {
     }
 }
 
+/**
+ * @param {string} str
+ * @param {Array} buffer
+ * @param {number} from
+ */
 function insertStringToByteArray(str, buffer, from) {
     for (var i = 0; i < str.length; i++) {
         var c = str.charCodeAt(i);
@@ -7949,6 +8092,14 @@ function insertStringToByteArray(str, buffer, from) {
     }
 }
 
+/**
+ * @param {number} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Int8 = function(value, buffer, from, to) {
     if (Exonum.validateInteger(value, MIN_INT8, MAX_INT8, from, to, 1) === false) {
         return;
@@ -7963,6 +8114,14 @@ Exonum.Int8 = function(value, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {number} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Int16 = function(value, buffer, from, to) {
     if (Exonum.validateInteger(value, MIN_INT16, MAX_INT16, from, to, 2) === false) {
         return;
@@ -7977,6 +8136,14 @@ Exonum.Int16 = function(value, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {number} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Int32 = function(value, buffer, from, to) {
     if (Exonum.validateInteger(value, MIN_INT32, MAX_INT32, from, to, 4) === false) {
         return;
@@ -7991,7 +8158,13 @@ Exonum.Int32 = function(value, buffer, from, to) {
     return buffer;
 };
 
-// value can be of type string or number
+/**
+ * @param {number|string} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ */
 Exonum.Int64 = function(value, buffer, from, to) {
     var val = Exonum.validateBigInteger(value, MIN_INT64, MAX_INT64, from, to, 8);
 
@@ -8008,6 +8181,14 @@ Exonum.Int64 = function(value, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {number} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Uint8 = function(value, buffer, from, to) {
     if (Exonum.validateInteger(value, 0, MAX_UINT8, from, to, 1) === false) {
         return;
@@ -8018,6 +8199,14 @@ Exonum.Uint8 = function(value, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {number} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Uint16 = function(value, buffer, from, to) {
     if (Exonum.validateInteger(value, 0, MAX_UINT16, from, to, 2) === false) {
         return;
@@ -8028,6 +8217,14 @@ Exonum.Uint16 = function(value, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {number} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Uint32 = function(value, buffer, from, to) {
     if (Exonum.validateInteger(value, 0, MAX_UINT32, from, to, 4) === false) {
         return;
@@ -8038,7 +8235,13 @@ Exonum.Uint32 = function(value, buffer, from, to) {
     return buffer;
 };
 
-// value can be of type string or number
+/**
+ * @param {number|string} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ */
 Exonum.Uint64 = function(value, buffer, from, to) {
     var val = Exonum.validateBigInteger(value, 0, MAX_UINT64, from, to, 8);
 
@@ -8051,19 +8254,14 @@ Exonum.Uint64 = function(value, buffer, from, to) {
     return buffer;
 };
 
-Exonum.Nonce = function(nonce, buffer, from, to) {
-    if (Exonum.validateHexHash(nonce, 24) === false) {
-        return;
-    } else if ((to - from) !== 24) {
-        console.error('Nonce segment is of wrong length. 24 bytes long is required to store transmitted value.');
-        return;
-    }
-
-    insertHexadecimalToByteArray(nonce, buffer, from, to);
-
-    return buffer;
-};
-
+/**
+ * @param {string} string
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.String = function(string, buffer, from, to) {
     if (typeof string !== 'string') {
         console.error('Wrong data type is passed as String. String is required');
@@ -8081,6 +8279,14 @@ Exonum.String = function(string, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {string} hash
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Hash = function(hash, buffer, from, to) {
     if (Exonum.validateHexHash(hash) === false) {
         return;
@@ -8094,6 +8300,14 @@ Exonum.Hash = function(hash, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {string} digest
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Digest = function(digest, buffer, from, to) {
     if (Exonum.validateHexHash(digest, 64) === false) {
         return;
@@ -8107,6 +8321,14 @@ Exonum.Digest = function(digest, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {string} publicKey
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.PublicKey = function(publicKey, buffer, from, to) {
     if (Exonum.validateHexHash(publicKey) === false) {
         return;
@@ -8120,6 +8342,14 @@ Exonum.PublicKey = function(publicKey, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {boolean} value
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Bool = function(value, buffer, from, to) {
     if (typeof value !== 'boolean') {
         console.error('Wrong data type is passed as Boolean. Boolean is required');
@@ -8134,6 +8364,14 @@ Exonum.Bool = function(value, buffer, from, to) {
     return buffer;
 };
 
+/**
+ * @param {number|string} nanoseconds
+ * @param {Array} buffer
+ * @param {number} from
+ * @param {number} to
+ * @returns {Array}
+ * @constructor
+ */
 Exonum.Timespec = function(nanoseconds, buffer, from, to) {
     var val = Exonum.validateBigInteger(nanoseconds, 0, MAX_UINT64, from, to, 8);
 
@@ -8152,6 +8390,15 @@ var Exonum = require('../src/core');
 
 var bigInt = require('big-integer');
 
+/**
+ * @param {number} value
+ * @param {number} min
+ * @param {number} max
+ * @param {number} from
+ * @param {number} to
+ * @param {number} length
+ * @returns {boolean}
+ */
 Exonum.validateInteger = function(value, min, max, from, to, length) {
     if (typeof value !== 'number') {
         console.error('Wrong data type is passed as number. Should be of type Number.');
@@ -8170,7 +8417,15 @@ Exonum.validateInteger = function(value, min, max, from, to, length) {
     return true;
 };
 
-// value can be of type string or number
+/**
+ * @param {number|string} value
+ * @param {number} min
+ * @param {number} max
+ * @param {number} from
+ * @param {number} to
+ * @param {number} length
+ * @returns {*}
+ */
 Exonum.validateBigInteger = function(value, min, max, from, to, length) {
     var val;
 
@@ -8200,6 +8455,11 @@ Exonum.validateBigInteger = function(value, min, max, from, to, length) {
     }
 };
 
+/**
+ * @param {string} hash
+ * @param {number} [bytes=32] - optional
+ * @returns {boolean}
+ */
 Exonum.validateHexHash = function(hash, bytes) {
     bytes = bytes || 32;
 
@@ -8221,8 +8481,16 @@ Exonum.validateHexHash = function(hash, bytes) {
     return true;
 };
 
+/**
+ * @param {Array} arr
+ * @param {number} [bytes] - optional
+ * @returns {boolean}
+ */
 Exonum.validateBytesArray = function(arr, bytes) {
-    if (bytes && arr.length !== bytes) {
+    if (Array.isArray(arr) === false && !(arr instanceof Uint8Array)) {
+        console.error('Wrong data type is passed. Array is required');
+        return false;
+    } if (bytes && arr.length !== bytes) {
         console.error('Array of 8-bit integers validity is of wrong length. ' + bytes * 2 + ' char symbols long is required. ' + arr.length + ' is passed.');
         return false;
     }
@@ -8240,6 +8508,11 @@ Exonum.validateBytesArray = function(arr, bytes) {
     return true;
 };
 
+/**
+ * @param {string} str
+ * @param {number} [bits] - optional
+ * @returns {*}
+ */
 Exonum.validateBinaryString = function(str, bits) {
     if (typeof bits !== 'undefined' && str.length !== bits) {
         console.error('Binary string is of wrong length.');

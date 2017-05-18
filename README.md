@@ -103,7 +103,7 @@ var data = {
     nonce: nonce
 };
 
-var signature = CreateWalletTransaction.sign(data, pair.secretKey);
+var signature = CreateWalletTransaction.sign(pair.secretKey, data);
 ```
 
 Finally, signed data and signature can be submitted to server:
