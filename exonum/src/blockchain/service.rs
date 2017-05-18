@@ -84,12 +84,20 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.state.validators()
     }
 
-    pub fn public_key(&self) -> &PublicKey {
-        self.state.public_key()
+    pub fn consensus_public_key(&self) -> &PublicKey {
+        self.state.consensus_public_key()
     }
 
-    pub fn secret_key(&self) -> &SecretKey {
-        self.state.secret_key()
+    pub fn consensus_secret_key(&self) -> &SecretKey {
+        self.state.consensus_secret_key()
+    }
+
+    pub fn txs_public_key(&self) -> &PublicKey {
+        self.state.txs_public_key()
+    }
+
+    pub fn txs_secret_key(&self) -> &SecretKey {
+        self.state.txs_secret_key()
     }
 
     pub fn actual_consensus_config(&self) -> &ConsensusConfig {

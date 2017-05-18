@@ -63,8 +63,10 @@ pub struct NodeHandler<S>
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
+    pub consensus_public_key: PublicKey,
+    pub consensus_secret_key: SecretKey,
+    pub txs_public_key: PublicKey,
+    pub txs_secret_key: SecretKey,
     pub whitelist: Whitelist,
     pub address: SocketAddr,
 }
@@ -96,8 +98,10 @@ pub struct NodeConfig {
     pub listen_address: SocketAddr,
     pub network: NetworkConfiguration,
     pub peers: Vec<SocketAddr>,
-    pub public_key: PublicKey,
-    pub secret_key: SecretKey,
+    pub consensus_public_key: PublicKey,
+    pub consensus_secret_key: SecretKey,
+    pub txs_public_key: PublicKey,
+    pub txs_secret_key: SecretKey,
     pub whitelist: Whitelist,
     pub api: NodeApiConfig,
 }
@@ -136,19 +140,21 @@ impl<S> NodeHandler<S>
         let validator_id = stored
             .validators
             .iter()
-            .position(|pk| pk == &config.listener.public_key)
+            .position(|pk| pk == &config.listener.consensus_public_key)
             .map(|id| id as ValidatorId);
         info!("Validator={:#?}", validator_id);
-        let connect = Connect::new(&config.listener.public_key,
+        let connect = Connect::new(&config.listener.consensus_public_key,
                                    sender.address(),
                                    sender.get_time(),
-                                   &config.listener.secret_key);
+                                   &config.listener.consensus_secret_key);
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validators.iter().cloned()); 
         let mut state = State::new(validator_id,
-                               config.listener.public_key,
-                               config.listener.secret_key,
+                               config.listener.consensus_public_key,
+                               config.listener.consensus_secret_key,
+                               config.listener.txs_public_key,
+                               config.listener.txs_secret_key,
                                whitelist,
                                stored,
                                connect,
@@ -390,8 +396,10 @@ impl Node {
 
         let config = Configuration {
             listener: ListenerConfig {
-                public_key: node_cfg.public_key,
-                secret_key: node_cfg.secret_key,
+                consensus_public_key: node_cfg.consensus_public_key,
+                consensus_secret_key: node_cfg.consensus_secret_key,
+                txs_public_key: node_cfg.txs_public_key,
+                txs_secret_key: node_cfg.txs_secret_key,
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
             },
