@@ -34,8 +34,11 @@ pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Connect,
 
-    public_key: PublicKey,
-    secret_key: SecretKey,
+    consensus_public_key: PublicKey,
+    consensus_secret_key: SecretKey,
+    txs_public_key: PublicKey,
+    txs_secret_key: SecretKey,
+
     config: StoredConfiguration,
     whitelist: Whitelist,
 
@@ -207,7 +210,7 @@ impl RequestData {
 }
 
 impl RequestState {
-    fn new() -> RequestState {
+    fn new() -> Self {
         RequestState {
             retries: 0,
             known_nodes: HashSet::new(),
@@ -284,8 +287,10 @@ impl BlockState {
 impl State {
     #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     pub fn new(validator_id: Option<ValidatorId>,
-               public_key: PublicKey,
-               secret_key: SecretKey,
+               consensus_public_key: PublicKey,
+               consensus_secret_key: SecretKey,
+               txs_public_key: PublicKey,
+               txs_secret_key: SecretKey,
                whitelist: Whitelist,
                stored: StoredConfiguration,
                connect: Connect,
@@ -296,8 +301,10 @@ impl State {
 
         State {
             validator_state: validator_id.map(ValidatorState::new),
-            public_key: public_key,
-            secret_key: secret_key,
+            consensus_public_key,
+            consensus_secret_key,
+            txs_public_key,
+            txs_secret_key,
             whitelist: whitelist,
             peers: HashMap::new(),
             connections: HashMap::new(),
@@ -306,7 +313,7 @@ impl State {
             round: 0,
             locked_round: 0,
             locked_propose: None,
-            last_hash: last_hash,
+            last_hash,
 
             proposes: HashMap::new(),
             blocks: HashMap::new(),
@@ -389,7 +396,7 @@ impl State {
         trace!("Updating node config={:#?}", config);
         let validator_id = config.validators
                             .iter()
-                            .position(|pk| pk == self.public_key())
+                            .position(|pk| pk == self.consensus_public_key())
                             .map(|id| id as ValidatorId);
         self.whitelist.set_validators(config.validators.iter().cloned());
         self.renew_validator_id(validator_id);
@@ -427,12 +434,20 @@ impl State {
         self.validators().get(id as usize)
     }
 
-    pub fn public_key(&self) -> &PublicKey {
-        &self.public_key
+    pub fn consensus_public_key(&self) -> &PublicKey {
+        &self.consensus_public_key
     }
 
-    pub fn secret_key(&self) -> &SecretKey {
-        &self.secret_key
+    pub fn consensus_secret_key(&self) -> &SecretKey {
+        &self.consensus_secret_key
+    }
+
+    pub fn txs_public_key(&self) -> &PublicKey {
+        &self.txs_public_key
+    }
+
+    pub fn txs_secret_key(&self) -> &SecretKey {
+        &self.txs_secret_key
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {

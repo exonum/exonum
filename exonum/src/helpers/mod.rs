@@ -24,9 +24,9 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 
 pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
     let validators = (0..count as usize)
-        .map(|_| gen_keypair())
+        .map(|_| (gen_keypair(), gen_keypair()))
         .collect::<Vec<_>>();
-    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
+    let genesis = GenesisConfig::new(validators.iter().map(|x| (x.0).0));
     let peers = (0..validators.len())
         .map(|x| {
                  format!("127.0.0.1:{}", start_port + x as u16)
@@ -43,8 +43,10 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 listen_address: peers[idx],
                 network: Default::default(),
                 peers: peers.clone(),
-                public_key: validator.0,
-                secret_key: validator.1,
+                consensus_public_key: (validator.0).0,
+                consensus_secret_key: (validator.0).1,
+                txs_public_key: (validator.1).0,
+                txs_secret_key: (validator.1).1,
                 genesis: genesis.clone(),
                 whitelist: Default::default(),
                 api: Default::default(),

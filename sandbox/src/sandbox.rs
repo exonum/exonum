@@ -185,11 +185,11 @@ impl SandboxReactor {
     }
 
     pub fn public_key(&self) -> &PublicKey {
-        self.handler.state().public_key()
+        self.handler.state().consensus_public_key()
     }
 
     pub fn secret_key(&self) -> &SecretKey {
-        self.handler.state().secret_key()
+        self.handler.state().consensus_secret_key()
     }
 }
 
@@ -588,11 +588,15 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
     blockchain.create_genesis_block(genesis).unwrap();
 
+    let txs_keys = gen_keypair_from_seed(&Seed::new([24; 32]));
+
     let config = Configuration {
         listener: ListenerConfig {
             address: addresses[0],
-            public_key: validators[0].0,
-            secret_key: validators[0].1.clone(),
+            consensus_public_key: validators[0].0.clone(),
+            consensus_secret_key: validators[0].1.clone(),
+            txs_public_key: txs_keys.0,
+            txs_secret_key: txs_keys.1,
             whitelist: Default::default(),
         },
         network: NetworkConfiguration::default(),

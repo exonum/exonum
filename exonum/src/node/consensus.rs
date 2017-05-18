@@ -114,7 +114,7 @@ impl<S> NodeHandler<S>
     // TODO write helper function which returns Result
     pub fn handle_block(&mut self, msg: Block) {
         // Request are sended to us
-        if msg.to() != self.state.public_key() {
+        if msg.to() != self.state.consensus_public_key() {
             error!("Received block that intended for another peer, to={}, from={}",
                    msg.to().to_hex(),
                    msg.from().to_hex());
@@ -543,7 +543,7 @@ impl<S> NodeHandler<S>
                                     round,
                                     self.state.last_hash(),
                                     &txs,
-                                    self.state.secret_key());
+                                    self.state.consensus_secret_key());
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
 
@@ -566,11 +566,11 @@ impl<S> NodeHandler<S>
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    RequestPropose::new(self.state.public_key(),
+                    RequestPropose::new(self.state.consensus_public_key(),
                                         &peer,
                                         self.state.height(),
                                         propose_hash,
-                                        self.state.secret_key())
+                                        self.state.consensus_secret_key())
                         .raw()
                         .clone()
                 }
@@ -582,29 +582,29 @@ impl<S> NodeHandler<S>
                         .iter()
                         .cloned()
                         .collect();
-                    RequestTransactions::new(self.state.public_key(),
+                    RequestTransactions::new(self.state.consensus_public_key(),
                                              &peer,
                                              &txs,
-                                             self.state.secret_key())
+                                             self.state.consensus_secret_key())
                         .raw()
                         .clone()
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    RequestPrevotes::new(self.state.public_key(),
+                    RequestPrevotes::new(self.state.consensus_public_key(),
                                          &peer,
                                          self.state.height(),
                                          round,
                                          propose_hash,
                                          self.state.known_prevotes(round, propose_hash),
-                                         self.state.secret_key())
+                                         self.state.consensus_secret_key())
                         .raw()
                         .clone()
                 }
                 RequestData::Block(height) => {
-                    RequestBlock::new(self.state.public_key(),
+                    RequestBlock::new(self.state.consensus_public_key(),
                                       &peer,
                                       height,
-                                      self.state.secret_key())
+                                      self.state.consensus_secret_key())
                         .raw()
                         .clone()
                 }
@@ -696,7 +696,7 @@ impl<S> NodeHandler<S>
                                 round,
                                 propose_hash,
                                 locked_round,
-                                self.state.secret_key());
+                                self.state.consensus_secret_key());
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
@@ -711,7 +711,7 @@ impl<S> NodeHandler<S>
                                         propose_hash,
                                         block_hash,
                                         self.channel.get_time(),
-                                        self.state.secret_key());
+                                        self.state.consensus_secret_key());
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
