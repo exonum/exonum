@@ -69,6 +69,10 @@ impl Transaction for TimestampTx {
 }
 
 impl Service for TimestampingService {
+    fn service_name(&self) -> &'static str {
+        "sandbox_timestamping"
+    }
+
     fn service_id(&self) -> u16 {
         TIMESTAMPING_SERVICE
     }

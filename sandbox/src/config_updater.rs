@@ -40,6 +40,10 @@ impl Transaction for TxConfig {
 }
 
 impl Service for ConfigUpdateService {
+    fn service_name(&self) -> &'static str {
+        "sandbox_config_updater"
+    }
+
     fn service_id(&self) -> u16 {
         CONFIG_SERVICE
     }
