@@ -113,11 +113,15 @@ impl TimeoutAdjuster for MovingAverage {
 
 #[cfg(test)]
 mod tests {
+    use env_logger;
+
     use super::*;
     use events::Milliseconds;
 
     #[test]
     fn moving_average_timeout_adjuster() {
+        let _ = env_logger::init();
+
         static MIN_TIMEOUT: Milliseconds = 1;
         static MAX_TIMEOUT: Milliseconds = 10000;
         static TXS_BLOCK_LIMIT: f64 = 5000.;
@@ -140,9 +144,9 @@ mod tests {
 
         // As the transaction number declines, timeout should increase until it reaches maximum.
         let mut previous_timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, TXS_BLOCK_LIMIT);
-        for timeout in TXS_TEST_DATA.iter().rev() {
-            let timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, *timeout);
-            println!("Timeout: current = {}, previous = {}", timeout, previous_timeout);
+        for transactions in TXS_TEST_DATA.iter().rev() {
+            let timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, *transactions);
+            info!("Timeout: current = {}, previous = {}", timeout, previous_timeout);
             assert!(timeout >= previous_timeout);
             previous_timeout = timeout;
         }
@@ -154,9 +158,9 @@ mod tests {
 
         // As the transactions number increases, timeout should decrease until it reaches minimum.
         let mut previous_timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, 0.);
-        for timeout in TXS_TEST_DATA {
-            let timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, *timeout);
-            println!("Timeout: current = {}, previous = {}", timeout, previous_timeout);
+        for transactions in TXS_TEST_DATA {
+            let timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, *transactions);
+            info!("Timeout: current = {}, previous = {}", timeout, previous_timeout);
             assert!(timeout <= previous_timeout);
             previous_timeout = timeout;
         }
