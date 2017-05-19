@@ -411,7 +411,7 @@ impl Node {
 
                 if self.api_options.enable_blockchain_explorer {
                     let mut router = Router::new();
-                    let explorer_api = ExplorerApi { blockchain: blockchain };
+                    let explorer_api = ExplorerApi::new(blockchain);
                     explorer_api.wire(&mut router);
                     mount.mount("api/explorer", router);
                 }
