@@ -17,10 +17,16 @@ pub struct BlocksRequest {
 
 #[derive(Clone)]
 pub struct ExplorerApi {
-    pub blockchain: Blockchain,
+    blockchain: Blockchain,
 }
 
 impl ExplorerApi {
+    pub fn new(blockchain: Blockchain) -> ExplorerApi {
+        ExplorerApi {
+            blockchain: blockchain
+        }
+    }
+
     fn get_blocks(&self, blocks_request: BlocksRequest) -> Result<Vec<BlockInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         match explorer.blocks_range(blocks_request.count, blocks_request.from) {
