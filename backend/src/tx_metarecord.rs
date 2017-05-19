@@ -12,35 +12,6 @@ storage_value! {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct TxMetaRecordSerializeHelper {
-    tx_hash: Hash,
-    execution_status: bool,
-}
-
-impl Serialize for TxMetaRecord {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let helper = TxMetaRecordSerializeHelper {
-            tx_hash: *self.tx_hash(),
-            execution_status: self.execution_status(),
-        };
-        helper.serialize(ser)
-    }
-}
-
-impl Deserialize for TxMetaRecord {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let helper = <TxMetaRecordSerializeHelper>::deserialize(deserializer)?;
-        let wallet = TxMetaRecord::new(&helper.tx_hash, helper.execution_status);
-        Ok(wallet)
-    }
-}
-
-
 #[allow(dead_code)]
 #[derive(Serialize)]
 struct TxMetaRecordTestData {

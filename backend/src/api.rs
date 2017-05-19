@@ -1,5 +1,4 @@
 use serde::Serialize;
-use serde_json::value::ToJson;
 use router::Router;
 use iron::prelude::*;
 use bodyparser;

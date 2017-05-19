@@ -1,9 +1,10 @@
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde_json::Value;
 
 use exonum::messages::Field;
-use exonum::messages::utils::U64;
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::StorageValue;
+use exonum::serialize::json::{ExonumJsonDeserialize, from_value,wrap};
 
 
 storage_value! {
@@ -11,7 +12,7 @@ storage_value! {
         const SIZE = 88;
 
         pub_key:            &PublicKey  [00 => 32]
-        name:               &str        [32 => 40]
+        name:               &[u8]        [32 => 40]
         balance:            u64         [40 => 48]
         history_len:        u64         [48 => 56]
         history_hash:       &Hash       [56 => 88]
@@ -40,45 +41,22 @@ impl Wallet {
         other.set_balance(other_amount);
     }
 }
-#[derive(Serialize, Deserialize)]
-struct WalletSerializeHelper {
-    pub_key: PublicKey,
-    name: String,
-    balance: U64,
-    history_len: U64,
-    history_hash: Hash,
-}
 
+impl<'de> Deserialize<'de> for Wallet {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
+    {
+        let value = <Value>::deserialize(deserializer)?;
+        from_value(&value)
+    }
+}
 impl Serialize for Wallet {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
-    {
-        let helper = WalletSerializeHelper {
-            pub_key: *self.pub_key(),
-            name: self.name().to_string(),
-            balance: U64(self.balance()),
-            history_len: U64(self.history_len()),
-            history_hash: *self.history_hash(),
-        };
-        helper.serialize(ser)
-    }
+        {
+            wrap(self).serialize(serializer)
+        }
 }
-
-impl Deserialize for Wallet {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let helper = <WalletSerializeHelper>::deserialize(deserializer)?;
-
-        let wallet = Wallet::new(&helper.pub_key,
-                                 &helper.name,
-                                 helper.balance.0,
-                                 helper.history_len.0,
-                                 &helper.history_hash);
-        Ok(wallet)
-    }
-}
-
 
 #[allow(dead_code)]
 #[derive(Serialize)]
