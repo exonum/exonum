@@ -1,11 +1,10 @@
 extern crate exonum;
 extern crate sandbox;
+#[macro_use]
 extern crate log;
 extern crate env_logger;
 
 use std::time::Duration;
-
-use env_logger;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
                        RequestPrevotes, BitVec, CONSENSUS};
