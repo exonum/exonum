@@ -36,8 +36,8 @@ pub struct State {
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
-    txs_public_key: PublicKey,
-    txs_secret_key: SecretKey,
+    service_public_key: PublicKey,
+    service_secret_key: SecretKey,
 
     config: StoredConfiguration,
     whitelist: Whitelist,
@@ -289,8 +289,8 @@ impl State {
     pub fn new(validator_id: Option<ValidatorId>,
                consensus_public_key: PublicKey,
                consensus_secret_key: SecretKey,
-               txs_public_key: PublicKey,
-               txs_secret_key: SecretKey,
+               service_public_key: PublicKey,
+               service_secret_key: SecretKey,
                whitelist: Whitelist,
                stored: StoredConfiguration,
                connect: Connect,
@@ -303,8 +303,8 @@ impl State {
             validator_state: validator_id.map(ValidatorState::new),
             consensus_public_key,
             consensus_secret_key,
-            txs_public_key,
-            txs_secret_key,
+            service_public_key,
+            service_secret_key,
             whitelist: whitelist,
             peers: HashMap::new(),
             connections: HashMap::new(),
@@ -442,12 +442,12 @@ impl State {
         &self.consensus_secret_key
     }
 
-    pub fn txs_public_key(&self) -> &PublicKey {
-        &self.txs_public_key
+    pub fn service_public_key(&self) -> &PublicKey {
+        &self.service_public_key
     }
 
-    pub fn txs_secret_key(&self) -> &SecretKey {
-        &self.txs_secret_key
+    pub fn service_secret_key(&self) -> &SecretKey {
+        &self.service_secret_key
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {

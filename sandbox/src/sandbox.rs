@@ -588,15 +588,15 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
     blockchain.create_genesis_block(genesis).unwrap();
 
-    let txs_keys = gen_keypair_from_seed(&Seed::new([24; 32]));
+    let service_keys = gen_keypair_from_seed(&Seed::new([24; 32]));
 
     let config = Configuration {
         listener: ListenerConfig {
             address: addresses[0],
             consensus_public_key: validators[0].0.clone(),
             consensus_secret_key: validators[0].1.clone(),
-            txs_public_key: txs_keys.0,
-            txs_secret_key: txs_keys.1,
+            service_public_key: service_keys.0,
+            service_secret_key: service_keys.1,
             whitelist: Default::default(),
         },
         network: NetworkConfiguration::default(),
