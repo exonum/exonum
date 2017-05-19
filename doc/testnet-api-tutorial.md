@@ -42,17 +42,17 @@ cargo install --example configuration
   - manually for each node process:
 
     ```bash
-    configuration run --node-config configuration_service/validators/0.toml --leveldb-path configuration_service/db/0 --public-port 8000 --private-port 8010
+    configuration run --node-config configuration_service/validators/0.toml --leveldb-path configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
     ...                                                                                                                                                        
-    configuration run --node-config configuration_service/validators/3.toml --leveldb-path configuration_service/db/3 --public-port 8003 --private-port 8013
+    configuration run --node-config configuration_service/validators/3.toml --leveldb-path configuration_service/db/3 --public-api-address 127.0.0.1:8003 --private-api-address 127.0.0.1:8013
     ```
 
       - parameters
 
-          - `--public-port` is for configuration service's [public http api 
+          - `--public-port` is for all of exonum's [public http api 
           endpoints](#public-endpoints)
 
-          - `--private-port` is for configuration service's [private http api 
+          - `--private-port` is for exonum's [private http api 
           endpoints](#private-endpoints)
 
           - `--node-config` and `--leveldb-path` are described on 
@@ -127,12 +127,12 @@ strings.
 
 | Endpoint      | HTTP method   | Description |Query parameters|Response template |
 | ------------- | ------------- | ------------| ------------------ |------------------ |
-| `/api/v1/configs/actual`         | GET | Lookup actual config|      None       |{<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **config-hash**<br> }|
-| `/api/v1/configs/following`      | GET | Lookup already scheduled following config which hasn't yet taken effect.<br> `null` if no config is scheduled |    None            |{<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **config-hash**<br> }|
-| `/api/v1/configs/<config-hash>` | GET | Lookup config by config hash.<br> If no propose was submitted for a config (genesis config) - "propose" is `null`. <br> If only propose is present, then "committed\_config" is `null`.<br> "propose" key has json-object values, that match **propose-template**.| `<config-hash>` - hash of looked up config.|{<br> &emsp;"committed\_config": **config\_body**,<br> &emsp;"propose": {<br> &emsp;&emsp;"num\_votes": **integer**,<br> &emsp;&emsp;"tx\_propose": {<br> &emsp;&emsp;&emsp;"cfg": **config\_body**,<br> &emsp;&emsp;&emsp;"from": **validator-public-key**,<br> &emsp;&emsp;&emsp;"signature": **validator-signature**<br> &emsp;&emsp;},<br> &emsp;"votes\_history\_hash": **vote-history-hash**<br> &emsp;}<br> }|
-| `/api/v1/configs/<config-hash>/votes` | GET | Lookup votes for a config propose by config hash.<br> If a vote from validator is absent - `null` returned at the corresponding index in json array | `<config-hash>` - hash of looked up config. |{<br> &emsp;"Votes": [<br> &emsp;&emsp;{<br> &emsp;&emsp;&emsp;"cfg\_hash": **config-hash**,<br> &emsp;&emsp;&emsp;"from": **validator-public-key**,<br> &emsp;&emsp;&emsp;"signature": **validator-signature**<br> &emsp;&emsp;},<br> &emsp;&emsp;**null**,<br> &emsp;&emsp;...<br> &emsp;]<br> }|
-| `/api/v1/configs/committed?previous_cfg_hash=<config-hash>&actual_from=<lowest-actual-from>` | GET | Lookup all committed configs in commit order. |  `<previous_cfg_hash>` and `<lowest_actual_from>` are optional filtering parameters.<br> **config-body** is included in response if its _previous\_cfg\_hash_ field equals the corresponding parameter. <br>It's included if its _actual\_from_ field is greater or equal than corresponding parameter. |[<br> &emsp;{<br> &emsp;&emsp;"config": **config-body**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;{<br> &emsp;&emsp;"config": **config-body**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;...<br> ]|
-| `/api/v1/configs/proposed?previous_cfg_hash=<config-hash>&actual_from=<lowest-actual-from>` | GET | Lookup all proposed configs in commit order.<br> |  `<previous_cfg_hash>` and `<lowest_actual_from>` are optional filtering parameters.<br> **propose-template** is included in response if its _previous\_cfg\_hash_ field equals the corresponding parameter. <br>It's included if its _actual\_from_ field is greater or equal than corresponding parameter. |[<br> &emsp;{<br> &emsp;&emsp;"propose-data": **propose-template**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;{<br> &emsp;&emsp;"propose-data": **propose-template**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;...<br> ]|
+| `/api/services/configuration/v1/configs/actual`         | GET | Lookup actual config|      None       |{<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **config-hash**<br> }|
+| `/api/services/configuration/v1/configs/following`      | GET | Lookup already scheduled following config which hasn't yet taken effect.<br> `null` if no config is scheduled |    None            |{<br>&emsp; "config": **config-body**,<br>&emsp; "hash": **config-hash**<br> }|
+| `/api/services/configuration/v1/configs/<config-hash>` | GET | Lookup config by config hash.<br> If no propose was submitted for a config (genesis config) - "propose" is `null`. <br> If only propose is present, then "committed\_config" is `null`.<br> "propose" key has json-object values, that match **propose-template**.| `<config-hash>` - hash of looked up config.|{<br> &emsp;"committed\_config": **config\_body**,<br> &emsp;"propose": {<br> &emsp;&emsp;"num\_votes": **integer**,<br> &emsp;&emsp;"tx\_propose": {<br> &emsp;&emsp;&emsp;"cfg": **config\_body**,<br> &emsp;&emsp;&emsp;"from": **validator-public-key**,<br> &emsp;&emsp;&emsp;"signature": **validator-signature**<br> &emsp;&emsp;},<br> &emsp;"votes\_history\_hash": **vote-history-hash**<br> &emsp;}<br> }|
+| `/api/services/configuration/v1/configs/<config-hash>/votes` | GET | Lookup votes for a config propose by config hash.<br> If a vote from validator is absent - `null` returned at the corresponding index in json array | `<config-hash>` - hash of looked up config. |{<br> &emsp;"Votes": [<br> &emsp;&emsp;{<br> &emsp;&emsp;&emsp;"cfg\_hash": **config-hash**,<br> &emsp;&emsp;&emsp;"from": **validator-public-key**,<br> &emsp;&emsp;&emsp;"signature": **validator-signature**<br> &emsp;&emsp;},<br> &emsp;&emsp;**null**,<br> &emsp;&emsp;...<br> &emsp;]<br> }|
+| `/api/services/configuration/v1/configs/committed?previous_cfg_hash=<config-hash>&actual_from=<lowest-actual-from>` | GET | Lookup all committed configs in commit order. |  `<previous_cfg_hash>` and `<lowest_actual_from>` are optional filtering parameters.<br> **config-body** is included in response if its _previous\_cfg\_hash_ field equals the corresponding parameter. <br>It's included if its _actual\_from_ field is greater or equal than corresponding parameter. |[<br> &emsp;{<br> &emsp;&emsp;"config": **config-body**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;{<br> &emsp;&emsp;"config": **config-body**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;...<br> ]|
+| `/api/services/configuration/v1/configs/configs/proposed?previous_cfg_hash=<config-hash>&actual_from=<lowest-actual-from>` | GET | Lookup all proposed configs in commit order.<br> |  `<previous_cfg_hash>` and `<lowest_actual_from>` are optional filtering parameters.<br> **propose-template** is included in response if its _previous\_cfg\_hash_ field equals the corresponding parameter. <br>It's included if its _actual\_from_ field is greater or equal than corresponding parameter. |[<br> &emsp;{<br> &emsp;&emsp;"propose-data": **propose-template**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;{<br> &emsp;&emsp;"propose-data": **propose-template**,<br> &emsp;&emsp;"hash": **config-hash**<br> &emsp;},<br> &emsp;...<br> ]|
 
 ### Private endpoints
 
@@ -150,5 +150,5 @@ endpoint.
 
 | Endpoint      | HTTP method   | Description | Response template |
 | ------------- | ------------- | ------------| ------------------ |
-| `/api/v1/configs/postpropose`         | POST | Post proposed config body | {<br> &emsp;"cfg\_hash": **configuration-hash**,<br> &emsp;"tx\_hash": **transaction-hash**<br> }|
-| `/api/v1/configs/<config-hash-vote-for>/postvote`      | POST | Vote for a configuration having specific hash | {<br> &emsp;"tx\_hash": **transaction-hash**<br> } |
+| `/api/services/configuration/v1/configs/configs/postpropose`         | POST | Post proposed config body | {<br> &emsp;"cfg\_hash": **configuration-hash**,<br> &emsp;"tx\_hash": **transaction-hash**<br> }|
+| `/api/services/configuration/v1/configs/configs/<config-hash-vote-for>/postvote`      | POST | Vote for a configuration having specific hash | {<br> &emsp;"tx\_hash": **transaction-hash**<br> } |
