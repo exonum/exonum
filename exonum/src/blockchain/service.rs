@@ -92,12 +92,12 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.state.consensus_secret_key()
     }
 
-    pub fn txs_public_key(&self) -> &PublicKey {
-        self.state.txs_public_key()
+    pub fn service_public_key(&self) -> &PublicKey {
+        self.state.service_public_key()
     }
 
-    pub fn txs_secret_key(&self) -> &SecretKey {
-        self.state.txs_secret_key()
+    pub fn service_secret_key(&self) -> &SecretKey {
+        self.state.service_secret_key()
     }
 
     pub fn actual_consensus_config(&self) -> &ConsensusConfig {

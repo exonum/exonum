@@ -65,8 +65,8 @@ pub struct NodeHandler<S>
 pub struct ListenerConfig {
     pub consensus_public_key: PublicKey,
     pub consensus_secret_key: SecretKey,
-    pub txs_public_key: PublicKey,
-    pub txs_secret_key: SecretKey,
+    pub service_public_key: PublicKey,
+    pub service_secret_key: SecretKey,
     pub whitelist: Whitelist,
     pub address: SocketAddr,
 }
@@ -100,8 +100,8 @@ pub struct NodeConfig {
     pub peers: Vec<SocketAddr>,
     pub consensus_public_key: PublicKey,
     pub consensus_secret_key: SecretKey,
-    pub txs_public_key: PublicKey,
-    pub txs_secret_key: SecretKey,
+    pub service_public_key: PublicKey,
+    pub service_secret_key: SecretKey,
     pub whitelist: Whitelist,
     pub api: NodeApiConfig,
 }
@@ -153,8 +153,8 @@ impl<S> NodeHandler<S>
         let mut state = State::new(validator_id,
                                config.listener.consensus_public_key,
                                config.listener.consensus_secret_key,
-                               config.listener.txs_public_key,
-                               config.listener.txs_secret_key,
+                               config.listener.service_public_key,
+                               config.listener.service_secret_key,
                                whitelist,
                                stored,
                                connect,
@@ -398,8 +398,8 @@ impl Node {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
                 consensus_secret_key: node_cfg.consensus_secret_key,
-                txs_public_key: node_cfg.txs_public_key,
-                txs_secret_key: node_cfg.txs_secret_key,
+                service_public_key: node_cfg.service_public_key,
+                service_secret_key: node_cfg.service_secret_key,
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
             },
