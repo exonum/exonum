@@ -1,20 +1,13 @@
-use std::thread;
-
 use log::{LogRecord, LogLevel, SetLoggerError};
 use env_logger::LogBuilder;
 use colored::*;
-use router::Router;
-use mount::Mount;
-use iron::{Chain, Iron};
 
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use blockchain::{GenesisConfig, ApiContext};
-use node::{NodeConfig, Node, NodeApiConfig};
+use blockchain::GenesisConfig;
+use node::NodeConfig;
 use crypto::gen_keypair;
-use explorer::ExplorerApi;
-use api::Api;
 
 pub mod clap;
 
@@ -57,61 +50,6 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
             }
         })
         .collect::<Vec<_>>()
-}
-
-/// A generic implementation that launches `Node` and optionally creates threads 
-/// for public and private api handlers.
-pub fn run_node_with_api(mut node: Node, options: &NodeApiConfig) {
-    let blockchain = node.handler().blockchain.clone();
-    let private_config_api_thread = match options.private_api_address {
-        Some(listen_address) => {
-            let api_context = ApiContext::new(&node);
-            let mut mount = Mount::new();
-            mount.mount("services", api_context.mount_private_api());
-        
-            let thread = thread::spawn(move || {
-                info!("Private exonum api started on {}", listen_address);
-                let chain = Chain::new(mount);
-                Iron::new(chain).http(listen_address).unwrap();
-            });
-            Some(thread)
-        }
-        None => None,
-    };
-
-    let public_config_api_thread = match options.public_api_address {
-        Some(listen_address) => {
-            let api_context = ApiContext::new(&node);
-            let mut mount = Mount::new();
-            mount.mount("services", api_context.mount_public_api());
-
-            if options.enable_blockchain_explorer {
-                let mut router = Router::new();
-                let explorer_api = ExplorerApi {
-                    blockchain: blockchain
-                };
-                explorer_api.wire(&mut router);
-                mount.mount("explorer", router);
-            }
-             
-            let thread = thread::spawn(move || {
-                info!("Public exonum api started on {}", listen_address);
-
-                let chain = Chain::new(mount);
-                Iron::new(chain).http(listen_address).unwrap();
-            });
-            Some(thread)
-        }
-        None => None,
-    };
-    
-    node.run().unwrap();
-    if let Some(private_config_api_thread) = private_config_api_thread {
-        private_config_api_thread.join().unwrap();
-    }
-    if let Some(public_config_api_thread) = public_config_api_thread {
-        public_config_api_thread.join().unwrap();
-    }
 }
 
 fn has_colors() -> bool {

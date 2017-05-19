@@ -1,13 +1,20 @@
 use std::io;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
+use std::thread;
+
+use router::Router;
+use mount::Mount;
+use iron::{Chain, Iron};
 
 use crypto::{PublicKey, SecretKey, Hash};
-use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel, MioChannel,
-             Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
+use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
+             MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
-use blockchain::{Blockchain, Schema, GenesisConfig, Transaction};
+use blockchain::{Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
+use explorer::ExplorerApi;
+use api::Api;
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 
 mod basic;
@@ -62,7 +69,7 @@ pub struct NodeApiConfig {
     /// Listen address for public api endpoints.
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
-    pub private_api_address: Option<SocketAddr>
+    pub private_api_address: Option<SocketAddr>,
 }
 
 impl Default for NodeApiConfig {
@@ -98,6 +105,7 @@ pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
 
 pub struct Node {
     reactor: Events<NodeHandler<NodeChannel>>,
+    api_options: NodeApiConfig,
 }
 
 impl<S> NodeHandler<S>
@@ -110,10 +118,13 @@ impl<S> NodeHandler<S>
             (block.hash(), block.height() + 1)
         };
 
-        let stored = Schema::new(&blockchain.view()).actual_configuration().unwrap();
+        let stored = Schema::new(&blockchain.view())
+            .actual_configuration()
+            .unwrap();
         info!("Create node with config={:#?}", stored);
 
-        let validator_id = stored.validators
+        let validator_id = stored
+            .validators
             .iter()
             .position(|pk| pk == &config.listener.public_key)
             .map(|id| id as ValidatorId);
@@ -248,13 +259,15 @@ impl<S> NodeHandler<S>
 
     pub fn add_status_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
-        self.channel.add_timeout(NodeTimeout::Status(self.state.height()), time);
+        self.channel
+            .add_timeout(NodeTimeout::Status(self.state.height()), time);
     }
 
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
-        self.channel.add_timeout(NodeTimeout::Request(data, peer), time);
+        self.channel
+            .add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     pub fn add_peer_exchange_timeout(&mut self) {
@@ -263,10 +276,7 @@ impl<S> NodeHandler<S>
     }
 
     pub fn last_block_hash(&self) -> Hash {
-        self.blockchain
-            .last_block()
-            .unwrap()
-            .hash()
+        self.blockchain.last_block().unwrap().hash()
     }
 
     pub fn round_start_time(&self, round: Round) -> SystemTime {
@@ -335,8 +345,11 @@ impl<S> TransactionSend for TxSender<S>
 }
 
 impl Node {
+    /// Creates node for the given blockchain and node configuration
     pub fn new(blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
-        blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
+        blockchain
+            .create_genesis_block(node_cfg.genesis.clone())
+            .unwrap();
 
         let config = Configuration {
             listener: ListenerConfig {
@@ -352,13 +365,79 @@ impl Node {
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
         let worker = NodeHandler::new(blockchain, channel, config);
-        Node { reactor: Events::with_event_loop(network, worker, event_loop) }
+        Node {
+            reactor: Events::with_event_loop(network, worker, event_loop),
+            api_options: node_cfg.api,
+        }
     }
 
-    pub fn run(&mut self) -> io::Result<()> {
+    /// Launches only consensus messages handler. 
+    /// This may be used if you want to customize api with the `ApiContext`.
+    pub fn run_handler(&mut self) -> io::Result<()> {
         self.reactor.bind()?;
         self.reactor.handler_mut().initialize();
         self.reactor.run()
+    }
+
+    /// A generic implementation that launches `Node` and optionally creates threads
+    /// for public and private api handlers.
+    /// Explorer api prefix is `/api/explorer`
+    /// Public api prefix is `/api/{service_name}`
+    /// Private api prefix is `/api/{service_name}`
+    pub fn run(&mut self) -> io::Result<()> {
+        let blockchain = self.handler().blockchain.clone();
+
+        let private_config_api_thread = match self.api_options.private_api_address {
+            Some(listen_address) => {
+                let api_context = ApiContext::new(self);
+                let mut mount = Mount::new();
+                mount.mount("services", api_context.mount_private_api());
+
+                let thread = thread::spawn(move || {
+                                               info!("Private exonum api started on {}",
+                                                     listen_address);
+                                               let chain = Chain::new(mount);
+                                               Iron::new(chain).http(listen_address).unwrap();
+                                           });
+                Some(thread)
+            }
+            None => None,
+        };
+        let public_config_api_thread = match self.api_options.public_api_address {
+            Some(listen_address) => {
+                let api_context = ApiContext::new(self);
+                let mut mount = Mount::new();
+                mount.mount("api/services", api_context.mount_public_api());
+
+                if self.api_options.enable_blockchain_explorer {
+                    let mut router = Router::new();
+                    let explorer_api = ExplorerApi { blockchain: blockchain };
+                    explorer_api.wire(&mut router);
+                    mount.mount("api/explorer", router);
+                }
+
+                let thread = thread::spawn(move || {
+                                               info!("Public exonum api started on {}",
+                                                     listen_address);
+
+                                               let chain = Chain::new(mount);
+                                               Iron::new(chain).http(listen_address).unwrap();
+                                           });
+                Some(thread)
+            }
+            None => None,
+        };
+
+        self.run_handler()?;
+
+        if let Some(private_config_api_thread) = private_config_api_thread {
+            private_config_api_thread.join().unwrap();
+        }
+        if let Some(public_config_api_thread) = public_config_api_thread {
+            public_config_api_thread.join().unwrap();
+        }
+
+        Ok(())
     }
 
     pub fn state(&self) -> &State {
