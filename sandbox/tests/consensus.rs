@@ -1,6 +1,8 @@
 extern crate exonum;
 extern crate sandbox;
+#[macro_use]
 extern crate log;
+extern crate env_logger;
 
 use std::time::Duration;
 
@@ -231,6 +233,8 @@ fn test_queue_prevote_message_from_next_height() {
 #[test]
 #[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
+    let _ = env_logger::init();
+
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
@@ -257,12 +261,12 @@ fn test_queue_propose_message_from_next_height() {
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
 
-    println!("last_block={:#?}, hash={:?}",
-             sandbox.last_block(),
-             sandbox.last_block().hash());
-    println!("proposed_block={:#?}, hash={:?}",
-             block_at_first_height,
-             block_at_first_height.hash());
+    info!("last_block={:#?}, hash={:?}",
+          sandbox.last_block(),
+          sandbox.last_block().hash());
+    info!("proposed_block={:#?}, hash={:?}",
+          block_at_first_height,
+          block_at_first_height.hash());
 
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     sandbox.add_time(Duration::from_millis(0));
@@ -308,6 +312,8 @@ fn test_ignore_message_from_prev_height() {
 /// - send prevote when lock=0 for known propose
 #[test]
 fn positive_get_propose_send_prevote() {
+    let _ = env_logger::init();
+
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -326,7 +332,7 @@ fn positive_get_propose_send_prevote() {
                                    LOCK_ZERO,
                                    sandbox.s(VALIDATOR_0 as usize)));
 
-    println!("time: {:?}", sandbox.time());
+    info!("time: {:?}", sandbox.time());
 }
 
 #[test]
