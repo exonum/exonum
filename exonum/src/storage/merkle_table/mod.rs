@@ -319,15 +319,18 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
 #[cfg(test)]
 mod tests {
     extern crate rand;
+
     use rand::{thread_rng, Rng};
+    use env_logger;
+    use serde::Serialize;
+    use serde_json;
+
     use std::collections::HashSet;
 
     use ::crypto::{Hash, hash};
     use ::storage::{MemoryDB, List, MapTable, MerkleTable};
-    use serde_json;
     use super::{split_range, index_of_first_element_in_subtree};
     use super::proofnode::{proof_indices_values, Proofnode};
-    use serde::Serialize;
     const KEY_SIZE: usize = 10;
 
     #[derive(Serialize)]
@@ -411,6 +414,8 @@ mod tests {
 
     #[test]
     fn generate_proof_in_table_containing_hashes() {
+        let _ = env_logger::init();
+
         let storage = MemoryDB::new();
         let table: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Hash> =
             MerkleTable::new(MapTable::new(vec![255], &storage));
@@ -443,11 +448,13 @@ mod tests {
             range_st: st_r as usize,
             range_end: end_r as usize,
         };
-        println!("{}", serde_json::to_string(&proof_info).unwrap());
+        info!("{}", serde_json::to_string(&proof_info).unwrap());
     }
 
     #[test]
     fn randomly_generate_proofs() {
+        let _ = env_logger::init();
+
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
         let num_vals = 100u32;
@@ -486,7 +493,7 @@ mod tests {
                 range_st: start_range as usize,
                 range_end: end_range as usize,
             };
-            println!("{}", serde_json::to_string(&proof_info).unwrap());
+            info!("{}", serde_json::to_string(&proof_info).unwrap());
 
             let deser_proof: Proofnode<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
             assert_eq!(proof_indices_values(&deser_proof).len(),
@@ -497,6 +504,8 @@ mod tests {
 
     #[test]
     fn test_table_and_proof_roots() {
+        let _ = env_logger::init();
+
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
         assert_eq!(table.root_hash().unwrap(), Hash::zero());
@@ -563,7 +572,7 @@ mod tests {
                 range_st: proof_ind as usize,
                 range_end: (proof_ind + 1) as usize,
             };
-            println!("{}", serde_json::to_string(&proof_info).unwrap());
+            info!("{}", serde_json::to_string(&proof_info).unwrap());
 
             let range_proof = table.construct_path_for_range(0, proof_ind + 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
@@ -582,7 +591,7 @@ mod tests {
                 range_st: 0,
                 range_end: (proof_ind + 1) as usize,
             };
-            println!("{}", serde_json::to_string(&proof_info).unwrap());
+            info!("{}", serde_json::to_string(&proof_info).unwrap());
             let range_proof = table.construct_path_for_range(0, 1).unwrap();
             assert_eq!(range_proof.compute_proof_root(), exp_root);
             assert_eq!(proof_indices_values(&range_proof).len(), 1);
@@ -599,7 +608,7 @@ mod tests {
                 range_st: 0,
                 range_end: 1,
             };
-            println!("{}", serde_json::to_string(&proof_info).unwrap());
+            info!("{}", serde_json::to_string(&proof_info).unwrap());
         }
 
         let range_proof = table.construct_path_for_range(0, 8).unwrap();

@@ -151,7 +151,7 @@ impl<S> NodeHandler<S>
                 if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                     let hash = tx.hash();
                     if schema.transactions().get(&hash).unwrap().is_some() {
-                        error!("Received block with already commited transaction, block={:?}",
+                        error!("Received block with already committed transaction, block={:?}",
                                msg);
                         return;
                     }
@@ -359,11 +359,6 @@ impl<S> NodeHandler<S>
             (propose_round, txs_count, txs)
         };
 
-        for tx in new_txs {
-            assert!(tx.verify());
-            self.handle_incoming_tx(tx);
-        }
-
         let height = self.state.height();
         let proposer = self.state.leader(propose_round);
 
@@ -382,6 +377,12 @@ impl<S> NodeHandler<S>
         // TODO: reset status timeout.
         self.broadcast_status();
         self.add_status_timeout();
+
+        // Handle queued transactions from services
+        for tx in new_txs {
+            assert!(tx.verify());
+            self.handle_incoming_tx(tx);
+        }
 
         // Add timeout for first round
         self.add_round_timeout();
