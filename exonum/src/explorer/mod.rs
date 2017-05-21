@@ -1,28 +1,27 @@
-use serde::Serialize;
 use serde_json::Value;
 
 use std::cmp;
 
-use exonum::storage::{Map, List, Result as StorageResult};
-use exonum::crypto::Hash;
-use exonum::blockchain::{Schema, Blockchain};
+use storage::{Map, List, Result as StorageResult};
+use crypto::Hash;
+use blockchain::{Schema, Blockchain};
 
-use api::HexField;
+pub use self::explorer_api::{ExplorerApi, BlocksRequest};
+
+mod explorer_api;
 
 pub struct BlockchainExplorer<'a> {
     blockchain: &'a Blockchain,
 }
-
-pub trait TransactionInfo: Serialize {}
 
 #[derive(Debug, Serialize)]
 pub struct BlockInfo {
     height: u64,
     proposer: u32,
 
-    hash: HexField<Hash>,
-    state_hash: HexField<Hash>,
-    tx_hash: HexField<Hash>,
+    hash: Hash,
+    state_hash: Hash,
+    tx_hash: Hash,
     tx_count: u64,
     precommits_count: u64,
     txs: Option<Vec<Value>>,
@@ -78,10 +77,9 @@ impl<'a> BlockchainExplorer<'a> {
             let info = BlockInfo {
                 height: height,
                 proposer: proposer,
-
-                hash: HexField(*block_hash),
-                state_hash: HexField(*block.state_hash()),
-                tx_hash: HexField(*block.tx_hash()),
+                hash: *block_hash,
+                state_hash: *block.state_hash(),
+                tx_hash: *block.tx_hash(),
                 tx_count: txs_count,
                 precommits_count: precommits_count,
                 txs: txs,

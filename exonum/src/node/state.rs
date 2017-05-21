@@ -652,7 +652,7 @@ impl State {
             if validator_state.id == msg.validator() {
                 if let Some(other) = validator_state.our_prevotes.insert(msg.round(), msg.clone()) {
                     if &other != msg {
-                        panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
+                        panic!("Trying to send different prevotes for the same round, old={:?}, new={:?}",
                                 other,
                                 msg);
                     }
