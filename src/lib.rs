@@ -766,16 +766,16 @@ impl Service for ConfigurationService {
         let mut router = Router::new();
         let api = config_api::PublicConfigApi { blockchain: ctx.blockchain().clone() };
         api.wire(&mut router);
-        return Some(Box::new(router))
+        return Some(Box::new(router));
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();        
+        let mut router = Router::new();
         let api = config_api::PrivateConfigApi {
             channel: ctx.node_channel().clone(),
             config: (ctx.public_key().clone(), ctx.secret_key().clone()),
         };
         api.wire(&mut router);
-        return Some(Box::new(router))
+        return Some(Box::new(router));
     }
 }

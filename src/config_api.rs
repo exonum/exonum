@@ -300,9 +300,7 @@ impl Api for PublicConfigApi {
         router.get("/v1/configs/:hash/votes",
                    get_votes_for_propose,
                    "get_votes_for_propose");
-        router.get("/v1/configs/proposed",
-                   get_all_proposes,
-                   "get_all_proposes");
+        router.get("/v1/configs/proposed", get_all_proposes, "get_all_proposes");
         router.get("/v1/configs/committed",
                    get_all_committed,
                    "get_all_committed");
