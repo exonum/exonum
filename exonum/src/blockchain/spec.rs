@@ -118,5 +118,24 @@ macro_rules! storage_value {
             }
         }
 
+        //\TODO: Rewrite Deserialize and Serializa implementation
+        impl<'de> $crate::serialize::json::reexport::Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where D: $crate::serialize::json::reexport::Deserializer<'de>
+            {
+                use $crate::serialize::json::reexport::Error;
+                let value = <$crate::serialize::json::reexport::Value>::deserialize(deserializer)?;
+                $crate::serialize::json::reexport::from_value(value)
+                        .map_err(|_| D::Error::custom("Can not deserialize value."))
+            }
+        }
+
+        impl $crate::serialize::json::reexport::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where S: $crate::serialize::json::reexport::Serializer
+                {
+                    $crate::serialize::json::wrap(self).serialize(serializer)
+                }
+        }
     )
 }
