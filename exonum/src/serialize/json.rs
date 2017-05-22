@@ -103,6 +103,12 @@ impl<'a> ExonumJsonSerialize for &'a [u8] {
     }
 }
 
+impl<'a> ExonumJsonSerialize for &'a str {
+    fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self)
+    }
+}
+
 impl ExonumJsonSerialize for BitVec {
     fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error> {
         let mut out = String::new();
@@ -229,6 +235,14 @@ impl ExonumJsonDeserializeField for bool  {
     }
 }
 
+impl<'a> ExonumJsonDeserializeField for &'a str  {
+    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
+        let val = value.as_str().ok_or("Can't cast json as string")?;
+        buffer.write(from, to, val);
+        Ok(())
+    }
+}
+
 impl ExonumJsonDeserializeField for SystemTime  {
     fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
         let helper: DurationHelper = ::serde_json::from_value(value.clone())?;
@@ -326,7 +340,8 @@ impl ExonumJsonDeserializeField for BitVec  {
 /// reexport some of serde function to use in macros
 pub mod reexport {
     pub use serde_json::{Value, to_value, from_value};
-    pub use serde::Serializer;
+    pub use serde::{Serializer, Deserializer, Serialize, Deserialize};
+    pub use serde::de::Error;
     pub use serde::ser::SerializeStruct;
 
 }
