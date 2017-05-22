@@ -14,9 +14,10 @@ extern crate serde;
 extern crate serde_derive;
 extern crate rand;
 
-use std::collections::BTreeMap;
 use serde_json::Value;
-use serde_json::value::ToJson;
+
+use std::collections::BTreeMap;
+
 use exonum::crypto::Hash;
 use exonum::blockchain::config::StoredConfiguration;
 use exonum::blockchain::Service;
@@ -36,7 +37,7 @@ fn generate_config_with_message(prev_cfg_hash: Hash,
     let mut services: BTreeMap<String, Value> = BTreeMap::new();
     let tmstmp_id = TimestampingService::new().service_id();
     let service_cfg = CfgStub { cfg_string: timestamping_service_cfg_message.to_string() };
-    services.insert(format!("{}", tmstmp_id), service_cfg.to_json());
+    services.insert(format!("{}", tmstmp_id), serde_json::to_value(service_cfg).unwrap());
     StoredConfiguration {
         previous_cfg_hash: prev_cfg_hash,
         actual_from: actual_from,
@@ -51,8 +52,10 @@ mod api_tests;
 
 #[cfg(test)]
 mod tests {
+    use serde_json::{self, Value};
+
     use std::collections::BTreeMap;
-    use super::generate_config_with_message;
+
     use exonum::crypto::{Hash, Seed, SEED_LENGTH, HASH_SIZE, gen_keypair_from_seed, hash};
     use exonum::blockchain::config::StoredConfiguration;
     use exonum::storage::{StorageValue, Error as StorageError};
@@ -64,7 +67,8 @@ mod tests {
                                         add_one_height_with_transactions_from_other_validator};
     use configuration_service::{TxConfigPropose, TxConfigVote, ConfigurationService,
                                 ConfigurationSchema};
-    use serde_json::Value;
+
+    use super::generate_config_with_message;
 
     pub fn configuration_sandbox() -> (Sandbox, SandboxState, StoredConfiguration) {
         use exonum;
@@ -97,7 +101,6 @@ mod tests {
         use super::CfgStub;
         use exonum::blockchain::Service;
         use serde_json::Value;
-        use serde_json::value::ToJson;
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
 
         sandbox.assert_state(1, 1);
@@ -111,8 +114,7 @@ mod tests {
         let mut services: BTreeMap<String, Value> = BTreeMap::new();
         let tmstmp_id = TimestampingService::new().service_id();
         let service_cfg = CfgStub { cfg_string: "some test".to_string() };
-        services.insert(format!("{}", tmstmp_id), service_cfg.to_json());
-
+        services.insert(format!("{}", tmstmp_id), serde_json::to_value(service_cfg).unwrap());
 
         let full_node_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),

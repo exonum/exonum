@@ -64,14 +64,14 @@
 //! use exonum::node::Node;
 //! use exonum::storage::{LevelDB, LevelDBOptions};
 //! use exonum::api::Api;
-//! use exonum::helpers::generate_testnet_config;
+//! use exonum::helpers::{init_logger, generate_testnet_config};
 //! use configuration_service::{ConfigurationService};
 //! use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi};
 //!
 //! fn main() {
 //!     // Init crypto engine and pretty logger.
 //!     exonum::crypto::init();
-//!     blockchain_explorer::helpers::init_logger().unwrap();
+//!     init_logger().unwrap();
 //!
 //!     // Blockchain params
 //!     let count = 4;
@@ -162,13 +162,10 @@ extern crate lazy_static;
 pub mod config_api;
 use std::fmt;
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-
 use exonum::messages::Field;
 use exonum::blockchain::{Service, Transaction, Schema, NodeState};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
-use exonum::messages::utils::U64;
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
@@ -229,38 +226,6 @@ impl StorageValueConfigProposeData {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct StorageValueConfigProposeDataSerdeHelper {
-    tx_propose: TxConfigPropose,
-    votes_history_hash: Hash,
-    num_votes: U64,
-}
-
-impl Serialize for StorageValueConfigProposeData {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let helper = StorageValueConfigProposeDataSerdeHelper {
-            tx_propose: self.tx_propose(),
-            votes_history_hash: *self.votes_history_hash(),
-            num_votes: U64(self.num_votes()),
-        };
-        helper.serialize(ser)
-    }
-}
-
-impl Deserialize for StorageValueConfigProposeData {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let h = <StorageValueConfigProposeDataSerdeHelper>::deserialize(deserializer)?;
-
-        let precommit =
-            StorageValueConfigProposeData::new(h.tx_propose, &h.votes_history_hash, h.num_votes.0);
-        Ok(precommit)
-    }
-}
-
 message! {
     TxConfigPropose {
         const TYPE = CONFIG_SERVICE;
@@ -289,86 +254,6 @@ message! {
 pub enum ConfigTx {
     ConfigPropose(TxConfigPropose),
     ConfigVote(TxConfigVote),
-}
-
-#[derive(Deserialize)]
-struct TxConfigProposeSerdeHelper {
-    from: PublicKey,
-    cfg: StoredConfiguration,
-    signature: Signature,
-}
-
-#[derive(Deserialize)]
-struct TxConfigVoteSerdeHelper {
-    from: PublicKey,
-    cfg_hash: Hash,
-    signature: Signature,
-}
-
-impl Serialize for TxConfigPropose {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let mut state;
-        state = ser.serialize_struct("config_propose", 3)?;
-        ser.serialize_struct_elt(&mut state, "from", self.from())?;
-        if let Ok(cfg) = StoredConfiguration::try_deserialize(self.cfg()) {
-            ser.serialize_struct_elt(&mut state, "cfg", cfg)?;
-        } else {
-            ser.serialize_struct_elt(&mut state, "cfg", self.cfg())?;
-        }
-        ser.serialize_struct_elt(&mut state, "signature", self.raw().signature())?;
-        ser.serialize_struct_end(state)
-    }
-}
-
-impl Deserialize for TxConfigPropose {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let h = <TxConfigProposeSerdeHelper>::deserialize(deserializer)?;
-
-        let precommit =
-            TxConfigPropose::new_with_signature(&h.from,
-                                                &StorageValue::serialize(h.cfg.clone()),
-                                                &h.signature);
-        Ok(precommit)
-    }
-}
-
-impl Serialize for TxConfigVote {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let mut state;
-        state = ser.serialize_struct("vote", 3)?;
-        ser.serialize_struct_elt(&mut state, "from", self.from())?;
-        ser.serialize_struct_elt(&mut state, "cfg_hash", self.cfg_hash())?;
-        ser.serialize_struct_elt(&mut state, "signature", self.raw().signature())?;
-        ser.serialize_struct_end(state)
-    }
-}
-
-impl Deserialize for TxConfigVote {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let h = <TxConfigVoteSerdeHelper>::deserialize(deserializer)?;
-
-        let precommit = TxConfigVote::new_with_signature(&h.from, &h.cfg_hash, &h.signature);
-        Ok(precommit)
-    }
-}
-
-impl Serialize for ConfigTx {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        match *self {
-            ConfigTx::ConfigPropose(ref propose) => propose.serialize(ser),
-            ConfigTx::ConfigVote(ref vote) => vote.serialize(ser),
-        }
-    }
 }
 
 /// Struct, implementing [Service](../exonum/blockchain/service/trait.Service.html) trait template.

@@ -7,21 +7,21 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re",
 
 [dependencies]
 iron = "0.5.1"
-serde = "0.8.23"
-serde_derive = "0.8.0"
+serde = "1.0.0"
+serde_derive = "1.0.0"
+serde_json = "1.0.0"
 rand = "0.3"
-serde_json = "0.8.6"
 router = "0.5.1"
 log = "0.3"
 iron-test = { git = "https://github.com/reem/iron-test" }
 configuration_service = {version="0.1.0", path="../"}
 
 [dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "4754cb7bff3dc647b2e4527208152c0d60fb67f7"
+rev = "2277c1406f74ef8e6a4cef2c7eb972a4af4909f3"
 
 [dependencies.sandbox]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "4754cb7bff3dc647b2e4527208152c0d60fb67f7"
+rev = "2277c1406f74ef8e6a4cef2c7eb972a4af4909f3"

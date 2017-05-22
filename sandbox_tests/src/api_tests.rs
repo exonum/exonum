@@ -1,11 +1,5 @@
 extern crate iron_test;
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
-use std::path::Path;
-use std::fs::File;
-use std::io::Read;
-
 use rand::{thread_rng, Rng};
 use router::Router;
 use iron::Headers;
@@ -14,8 +8,12 @@ use iron::prelude::*;
 use iron::headers::ContentType;
 use serde::Serialize;
 use serde_json;
-use serde_json::value::ToJson;
 
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
+use std::path::Path;
+use std::fs::File;
+use std::io::Read;
 
 use exonum::storage::{MemoryDB, MerkleTable, StorageValue, List};
 use exonum::node::TransactionSend;
@@ -23,19 +21,17 @@ use exonum::crypto::Hash;
 use exonum::blockchain::{Service, Transaction};
 use exonum::events::Error as EventsError;
 use exonum::messages::{FromRaw, Message, RawMessage};
+use exonum::api::Api;
+use exonum::helpers::init_logger;
+use sandbox::sandbox::{sandbox_with_services, Sandbox};
+use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
+
 use configuration_service::{StorageValueConfigProposeData, ConfigTx, TxConfigPropose,
                             TxConfigVote, ConfigurationService, ZEROVOTE};
 use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, ApiResponseConfigInfo,
                                         ApiResponseConfigHashInfo, ApiResponseVotesInfo,
                                         ApiResponseProposePost, ApiResponseVotePost};
-
-use exonum::api::Api;
-use exonum::helpers::init_logger;
-
-use sandbox::sandbox::{sandbox_with_services, Sandbox};
-use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 use super::generate_config_with_message;
-
 
 fn response_body(response: Response) -> serde_json::Value {
     if let Some(mut body) = response.body {
@@ -239,7 +235,7 @@ fn test_get_actual_config() {
 
     let resp_actual_config = api_sandbox.get_actual_config().unwrap();
     let actual_body = response_body(resp_actual_config);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -281,7 +277,7 @@ fn test_get_following_config() {
 
     let resp_following_config = api_sandbox.get_following_config().unwrap();
     let actual_body = response_body(resp_following_config);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -297,7 +293,7 @@ fn test_get_config_by_hash1() {
 
     let resp_config_by_hash = api_sandbox.get_config_by_hash(initial_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_by_hash);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -347,7 +343,7 @@ fn test_get_config_by_hash2() {
         .get_config_by_hash(following_cfg.hash())
         .unwrap();
     let actual_body = response_body(resp_config_by_hash);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -416,7 +412,7 @@ fn test_get_config_by_hash3() {
         .get_config_by_hash(following_cfg.hash())
         .unwrap();
     let actual_body = response_body(resp_config_by_hash);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -434,7 +430,7 @@ fn test_get_config_votes() {
     let expected_body = ApiResponseVotesInfo::ProposeAbsent(None);
     let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 
     let proposer = 0;
     {
@@ -469,7 +465,7 @@ fn test_get_config_votes() {
 
     let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -499,7 +495,7 @@ fn test_post_propose_response() {
         .post_config_propose(proposer, following_cfg.clone())
         .unwrap();
     let actual_body = response_body(resp_config_post);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -523,7 +519,7 @@ fn test_post_vote_response() {
         .post_config_vote(voter, following_cfg.hash(), voter)
         .unwrap();
     let actual_body = response_body(resp_config_post);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 fn assert_response_status(response: IronResult<Response>,

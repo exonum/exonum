@@ -1,15 +1,18 @@
-use serde_json::value::ToJson;
 use params::{Map as ParamsMap, Params, Value};
 use router::Router;
-use exonum::api::{Api, ApiError};
 use iron::prelude::*;
 use bodyparser;
+use serde_json;
+
+use exonum::api::{Api, ApiError};
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
-use {StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigTx, ConfigurationSchema};
 use exonum::storage::{Map, StorageValue};
-
 use exonum::node::{TxSender, NodeChannel, TransactionSend};
+
+use super::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigTx,
+            ConfigurationSchema};
+
 pub type ConfigTxSender = TxSender<NodeChannel>;
 
 #[derive(Serialize, Deserialize)]
@@ -242,13 +245,13 @@ impl Api for PublicConfigApi {
         let _self = self.clone();
         let config_actual = move |_: &mut Request| -> IronResult<Response> {
             let info = _self.get_actual_config()?;
-            _self.ok_response(&info.to_json())
+            _self.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let _self = self.clone();
         let config_following = move |_: &mut Request| -> IronResult<Response> {
             let info = _self.get_following_config()?;
-            _self.ok_response(&info.to_json())
+            _self.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let _self = self.clone();
@@ -258,7 +261,7 @@ impl Api for PublicConfigApi {
                 Some(hash_str) => {
                     let hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
                     let info = _self.get_config_by_hash(&hash)?;
-                    _self.ok_response(&info.to_json())
+                    _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => Err(ApiError::IncorrectRequest)?,
             }
@@ -271,7 +274,7 @@ impl Api for PublicConfigApi {
                 Some(hash_str) => {
                     let propose_cfg_hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
                     let info = _self.get_votes_for_propose(&propose_cfg_hash)?;
-                    _self.ok_response(&info.to_json())
+                    _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => Err(ApiError::IncorrectRequest)?,
             }
@@ -282,7 +285,7 @@ impl Api for PublicConfigApi {
             let map = req.get_ref::<Params>().unwrap();
             let (previous_cfg_hash, actual_from) = PublicConfigApi::retrieve_params(map)?;
             let info = _self.get_all_proposes(previous_cfg_hash, actual_from)?;
-            _self.ok_response(&info.to_json())
+            _self.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let _self = self.clone();
@@ -290,7 +293,7 @@ impl Api for PublicConfigApi {
             let map = req.get_ref::<Params>().unwrap();
             let (previous_cfg_hash, actual_from) = PublicConfigApi::retrieve_params(map)?;
             let info = _self.get_all_committed(previous_cfg_hash, actual_from)?;
-            _self.ok_response(&info.to_json())
+            _self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/api/v1/configs/actual", config_actual, "config_actual");
         router.get("/api/v1/configs/following",
@@ -319,7 +322,7 @@ impl<T> Api for PrivateConfigApi<T>
             match req.get::<bodyparser::Struct<StoredConfiguration>>() {
                 Ok(Some(cfg)) => {
                     let info = _self.put_config_propose(cfg)?;
-                    _self.ok_response(&info.to_json())
+                    _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 Ok(None) => Err(ApiError::IncorrectRequest)?,
                 Err(e) => {
@@ -336,7 +339,7 @@ impl<T> Api for PrivateConfigApi<T>
                 Some(hash_str) => {
                     let propose_cfg_hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
                     let info = _self.put_config_vote(&propose_cfg_hash)?;
-                    _self.ok_response(&info.to_json())
+                    _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => Err(ApiError::IncorrectRequest)?,
             }
