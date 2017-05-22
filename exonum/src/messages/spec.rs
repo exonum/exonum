@@ -53,19 +53,25 @@ macro_rules! message {
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                let mut writer = MessageWriter::new($extension, $id, $body);
+                let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION, 
+                                                    $crate::messages::TEST_NETWORK_ID, 
+                                                    $extension, $id, $body);
                 $(writer.write($field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
             pub fn new_with_signature($($field_name: $field_type,)*
                        signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                let mut writer = MessageWriter::new($extension, $id, $body);
+                let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION, 
+                                                    $crate::messages::TEST_NETWORK_ID, 
+                                                    $extension, $id, $body);
                 $(writer.write($field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
 
             }
-            $(pub fn $field_name(&self) -> $field_type {
+            
+            $(
+            pub fn $field_name(&self) -> $field_type {
                 self.raw.read::<$field_type>($from, $to)
             })*
         }
@@ -101,7 +107,8 @@ macro_rules! message {
                     structure.serialize_field("signature", &json::wrap(self.raw.signature()))?;
                     structure.serialize_field("message_id", &json::wrap(&self.raw.message_type()))?;
                     structure.serialize_field("service_id", &json::wrap(&self.raw.service_id()))?;
-                    
+                    structure.serialize_field("network_id", &json::wrap(&self.raw.network_id()))?;
+                    structure.serialize_field("protocol_version", &json::wrap(&self.raw.version()))?;
                     structure.end()               
                 }
         }
@@ -111,7 +118,7 @@ macro_rules! message {
             where B: $crate::serialize::json::WriteBufferWrapper
             {
                 // deserialize full field
-                let structure = Self::deserialize_owned(value)?;
+                let structure = <Self as $crate::serialize::json::ExonumJsonDeserialize>::deserialize_owned(value)?;
                 // then write it
                 buffer.write(from, to, structure); 
                 Ok(())
@@ -132,6 +139,10 @@ macro_rules! message {
                 let signature = from_value(obj.get("signature").ok_or("Can't get signature from json")?.clone())?;
                 let message_type = from_value(obj.get("message_id").ok_or("Can't get message_type from json")?.clone())?;
                 let service_id = from_value(obj.get("service_id").ok_or("Can't get service_id from json")?.clone())?;
+
+                let network_id = from_value(obj.get("network_id").ok_or("Can't get network_id from json")?.clone())?;
+                let protocol_version = from_value(obj.get("protocol_version").ok_or("Can't get protocol_version from json")?.clone())?;
+
                 if service_id != $extension {
                     return Err("service_id didn't equal real service_id.".into())
                 }
@@ -140,7 +151,7 @@ macro_rules! message {
                     return Err("message_id didn't equal real message_id.".into())
                 }
 
-                let mut writer = MessageWriter::new(service_id, message_type, $body);
+                let mut writer = MessageWriter::new(protocol_version, network_id, service_id, message_type, $body);
                 let obj = body.as_object().ok_or("Can't cast body as object.")?;
                 $(
                     let val = obj.get(stringify!($field_name)).ok_or("Can't get object from json.")?;
@@ -165,7 +176,7 @@ macro_rules! message {
 
         impl $crate::serialize::json::reexport::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: Serializer
+                where S: $crate::serialize::json::reexport::Serializer
                 {
                     $crate::serialize::json::wrap(self).serialize(serializer)
                 }
