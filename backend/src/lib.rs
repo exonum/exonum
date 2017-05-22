@@ -21,13 +21,14 @@ extern crate bodyparser;
 
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer};
-use serde_json::{Value, from_value};
+use serde_json::{Value, to_value};
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
-use exonum::crypto::{PublicKey, Hash, Signature, PUBLIC_KEY_LENGTH};
+use exonum::crypto::{PublicKey, Hash, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
+use exonum::serialize::json::from_value;
 
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
@@ -75,7 +76,7 @@ message! {
         const SIZE = 40;
 
         pub_key:     &PublicKey  [00 => 32]
-        name:        &[u8]        [32 => 40]
+        name:        &str        [32 => 40]
     }
 }
 
@@ -100,9 +101,6 @@ impl Serialize for CurrencyTx {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        let id: u16;
-        let signature = *self.raw().signature();
-        let body;
         match *self {
             CurrencyTx::Issue(ref issue) => {
                 issue.serialize(ser)
@@ -122,10 +120,17 @@ impl<'de> Deserialize<'de> for CurrencyTx {
         where D: Deserializer<'de>
     {
         let value = <Value>::deserialize(deserializer)?;
-        if let Some(obj) = value.as_object() {
+        let service_id: u16;
+        let message_id: u16;
+        if let Some(_) = value.as_object() {
         //TODO: fix errors here
-        let service_id: u16 = value.get("service_id").unwrap().as_str().unwrap();
-        let message_id: u16 = value.get("message_id").unwrap().as_str().unwrap();
+        service_id = value.get("service_id").unwrap().as_str().unwrap().parse().unwrap();
+        message_id = value.get("message_id").unwrap().as_str().unwrap().parse().unwrap();
+        }
+        else {
+                return Err(de::Error::custom(format!("Tx is not a json object")));
+        }
+
         match service_id {
             CRYPTOCURRENCY => {}
             other => {
@@ -138,18 +143,18 @@ impl<'de> Deserialize<'de> for CurrencyTx {
         let res = match message_id {
             TX_ISSUE_ID => {
                 //TODO: fix errors here
-                let ret: TxIssue = from_value(value).unwrap();
-                CurrencyTx::Issue(ret) 
+                let ret: TxIssue = from_value(&value).unwrap();
+                CurrencyTx::Issue(ret)
             }
             TX_WALLET_ID => {
                 //TODO: fix errors here
-                let ret: TxCreateWallet = from_value(value).unwrap();
-                CurrencyTx::TxCreateWallet(ret) 
+                let ret: TxCreateWallet = from_value(&value).unwrap();
+                CurrencyTx::CreateWallet(ret)
             }
             TX_TRANSFER_ID => {
                 //TODO: fix errors here
-                let ret: TxTransfer = from_value(value).unwrap();
-                CurrencyTx::Transfer(ret) 
+                let ret: TxTransfer = from_value(&value).unwrap();
+                CurrencyTx::Transfer(ret)
             }
             other => {
                 return Err(de::Error::custom(format!("Unknown transaction id for \
@@ -158,10 +163,6 @@ impl<'de> Deserialize<'de> for CurrencyTx {
             }
         };
         Ok(res)
-        }
-        else {
-                return Err(de::Error::custom(format!("Tx is not a json object")));
-        }
     }
 }
 
@@ -337,7 +338,7 @@ impl TxCreateWallet {
 
 impl Transaction for CurrencyTx {
     fn info(&self) -> Value {
-        self.to_json()
+        to_value(self).unwrap()
     }
 
     fn verify(&self) -> bool {

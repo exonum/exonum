@@ -1,18 +1,13 @@
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use serde_json::Value;
-
 use exonum::messages::Field;
 use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::StorageValue;
-use exonum::serialize::json::{ExonumJsonDeserialize, from_value,wrap};
-
 
 storage_value! {
     Wallet {
         const SIZE = 88;
 
         pub_key:            &PublicKey  [00 => 32]
-        name:               &[u8]        [32 => 40]
+        name:               &str        [32 => 40]
         balance:            u64         [40 => 48]
         history_len:        u64         [48 => 56]
         history_hash:       &Hash       [56 => 88]
@@ -40,22 +35,6 @@ impl Wallet {
         self.set_balance(self_amount);
         other.set_balance(other_amount);
     }
-}
-
-impl<'de> Deserialize<'de> for Wallet {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
-    {
-        let value = <Value>::deserialize(deserializer)?;
-        from_value(&value)
-    }
-}
-impl Serialize for Wallet {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-        {
-            wrap(self).serialize(serializer)
-        }
 }
 
 #[allow(dead_code)]
