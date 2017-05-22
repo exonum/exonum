@@ -233,6 +233,7 @@ impl PreInitCommand
         matches.value_of("LISTEN_ADDR").unwrap().to_string()
     }
 
+    #[cfg_attr(feature="cargo-clippy", allow(map_entry))]
     pub fn execute_default(matches: &ArgMatches) {
         let template_path = Self::template(matches);
         let keychain_path = Self::keychain(matches);
@@ -307,8 +308,8 @@ impl InitCommand
         }
 
         let genesis = GenesisConfig::new(template.validators.iter().map(|(k,_)| *k));
-        let peers = template.validators.iter().map(|(_,ident)| ident.addr.clone()).collect();
-        let validator_ident = template.validators.get(&keychain.public_key).unwrap();
+        let peers = template.validators.iter().map(|(_,ident)| ident.addr).collect();
+        let validator_ident = &template.validators[&keychain.public_key];
 
         let config =  NodeConfig {
             listen_address: validator_ident.addr,
@@ -319,7 +320,7 @@ impl InitCommand
             genesis: genesis,
         };
 
-        ConfigFile::save(&config, &config_path).unwrap();
+        ConfigFile::save(&config, config_path).unwrap();
     }
 
 }
