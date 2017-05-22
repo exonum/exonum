@@ -166,7 +166,7 @@ mod tests {
                                                   public_key_str: A)
                                                   -> IronResult<Response> {
             let api = self.obtain_test_api();
-            let get_route = format!("api/v1/wallets/info?pubkey={}", public_key_str.as_ref());
+            let get_route = format!("/v1/wallets/info?pubkey={}", public_key_str.as_ref());
             request_get(get_route, &api)
         }
 
@@ -177,7 +177,7 @@ mod tests {
 
         fn post_transaction<T: Serialize>(&self, tx: T) -> IronResult<Response> {
             let api = self.obtain_test_api();
-            let post_route = "api/v1/wallets/transaction";
+            let post_route = "/v1/wallets/transaction";
             request_post_body(post_route, tx, &api)
         }
     }
