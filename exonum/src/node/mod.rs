@@ -75,7 +75,7 @@ pub struct NodeApiConfig {
 impl Default for NodeApiConfig {
     fn default() -> NodeApiConfig {
         NodeApiConfig {
-            enable_blockchain_explorer: false,
+            enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
         }
@@ -382,8 +382,8 @@ impl Node {
     /// A generic implementation that launches `Node` and optionally creates threads
     /// for public and private api handlers.
     /// Explorer api prefix is `/api/explorer`
-    /// Public api prefix is `/api/{service_name}`
-    /// Private api prefix is `/api/{service_name}`
+    /// Public api prefix is `/api/services/{service_name}`
+    /// Private api prefix is `/api/services/{service_name}`
     pub fn run(&mut self) -> io::Result<()> {
         let blockchain = self.handler().blockchain.clone();
 
