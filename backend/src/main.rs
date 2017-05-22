@@ -1,4 +1,3 @@
-extern crate jsonway;
 extern crate iron;
 extern crate hyper;
 extern crate env_logger;

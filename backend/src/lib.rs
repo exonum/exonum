@@ -5,7 +5,6 @@ extern crate cookie;
 #[macro_use]
 extern crate serde_derive;
 extern crate byteorder;
-extern crate jsonway;
 #[macro_use]
 extern crate log;
 #[cfg(test)]

@@ -5,10 +5,10 @@ authors = ["Oleg Kuzmin <oleg.kuzmin@bitfury.com>"]
 
 [dependencies]
 iron = "0.5.1"
-serde = "0.8.23"
-serde_derive = "0.8"
+serde = "1.0.0"
+serde_derive = "1.0.0"
 rand = "0.3"
-serde_json = "0.8"
+serde_json = "1.0.2"
 router = "0.5.1"
 log = "0.3"
 iron-test = { git = "https://github.com/reem/iron-test" }
