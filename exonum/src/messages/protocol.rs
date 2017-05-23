@@ -12,15 +12,11 @@
 //!     * processing - how message is processed and result of the processing
 //!     * generation - in which cases message is generated
 
-use serde::Serializer;
-use serde_json::Value;
-
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use crypto::{Hash, PublicKey};
 use blockchain;
-use serialize::json::{ExonumJsonSerialize, ExonumJsonDeserialize};
 use super::{RawMessage, BitVec};
 
 pub const CONSENSUS: u16 = 0;
@@ -207,38 +203,10 @@ message! {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockProof {
     pub block: blockchain::Block,
     pub precommits: Vec<Precommit>,
-}
-impl ExonumJsonSerialize for BlockProof {
-    fn serialize<S: Serializer>(& self, serializer: S) -> Result<S::Ok, S::Error> {
-        use ::serde::ser::SerializeStruct;
-        let mut structure = serializer.serialize_struct("BlockProof", 2 )?;
-        structure.serialize_field("block", &::serialize::json::wrap(&self.block))?;
-        structure.serialize_field("precommits", &::serialize::json::wrap(&self.precommits))?;
-        structure.end()
-    }
-}
-impl ExonumJsonDeserialize for BlockProof{
-    fn deserialize_owned(value: &Value) -> Result<Self, Box<::std::error::Error>> where Self: Sized {
-        let obj = value.as_object().ok_or("Can't cast json as object.")?;
-        let block = obj.get("block").ok_or("Can't get block from json.")?;
-        let block = <blockchain::Block as ExonumJsonDeserialize>::deserialize_owned(block )?;
-
-        let precommits = obj.get("precommits").ok_or("Can't get precommits from json.")?;
-        let precommits_vec = precommits.as_array().ok_or("Can't cast json as array.")?;
-
-        let precommits:Result<Vec<Precommit>,_> = precommits_vec.iter().map(
-            <Precommit as ExonumJsonDeserialize>::deserialize_owned)
-            .collect();
-        Ok(BlockProof{
-            block: block,
-            precommits: precommits?
-        })
-        
-    }
 }
 
 /// Request for the `Propose`.

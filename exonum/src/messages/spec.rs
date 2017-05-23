@@ -167,10 +167,10 @@ macro_rules! message {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::serialize::json::reexport::Deserializer<'de>
             {
-                use $crate::serialize::json::reexport::Error;
-                let value = <$crate::serialize::json::reexport::Value>::deserialize(deserializer)?;
-                $crate::serialize::json::reexport::from_value(value)
-                        .map_err(|_| D::Error::custom("Can not deserialize value."))
+                use $crate::serialize::json::reexport::{Error, Deserialize, Value};
+                let value = <Value as Deserialize>::deserialize(deserializer)?;
+                <Self as $crate::serialize::json::ExonumJsonDeserialize>::deserialize_owned(&value)
+                .map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 

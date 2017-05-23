@@ -339,26 +339,8 @@ impl ExonumJsonDeserializeField for BitVec  {
 
 /// reexport some of serde function to use in macros
 pub mod reexport {
-    pub use serde_json::{Value, to_value, from_value};
+    pub use serde_json::{Value, to_value, from_value, to_string, from_str};
     pub use serde::{Serializer, Deserializer, Serialize, Deserialize};
     pub use serde::de::Error;
     pub use serde::ser::SerializeStruct;
-
-}
-//api
-pub fn to_value<T: ExonumJsonSerialize>(value: &T) -> Result<Value, Box<Error>> {       
-    Ok(::serde_json::to_value(&wrap(value))?)
-}
-
-pub fn from_value<T: ExonumJsonDeserialize>(value: &Value) -> Result<T, Box<Error>> {    
-    T::deserialize_owned(value)
-}
-
-pub fn to_string<T: ExonumJsonSerialize>(value: &T) -> Result<String, Box<Error>> {    
-   Ok(::serde_json::to_string(&wrap(value))?)
-}
-
-pub fn from_str<T: ExonumJsonDeserialize>(value: &str) -> Result<T, Box<Error>> {    
-    let value: Value = ::serde_json::from_str(value)?;
-    from_value(&value)
 }
