@@ -23,6 +23,8 @@ use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer};
 use serde_json::value::ToJson;
 use serde_json::{Value, from_value};
+use iron::Handler;
+use router::Router;
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
 use exonum::messages::utils::U64;
@@ -30,6 +32,7 @@ use exonum::crypto::{PublicKey, Hash, Signature, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
+use exonum::blockchain::ApiContext;
 
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
@@ -439,6 +442,10 @@ impl Transaction for CurrencyTx {
 }
 
 impl Service for CurrencyService {
+    fn service_name(&self) -> &'static str {
+        "cryptocurrency"
+    }
+
     fn service_id(&self) -> u16 {
         CRYPTOCURRENCY
     }
@@ -450,6 +457,18 @@ impl Service for CurrencyService {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         CurrencyTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+    }
+
+    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
+        let mut router = Router::new();
+        use api;
+        use exonum::api::Api;
+        let api = api::CryptocurrencyApi {
+            channel: ctx.node_channel().clone(),
+            blockchain: ctx.blockchain().clone(),
+        };
+        api.wire(&mut router);
+        return Some(Box::new(router));
     }
 }
 

@@ -149,8 +149,8 @@ impl<T> Api for CryptocurrencyApi<T>
                 }
             }
         };
-        let route_post = "/api/v1/wallets/transaction";
-        let route_get = "/api/v1/wallets/info";
+        let route_post = "/v1/wallets/transaction";
+        let route_get = "/v1/wallets/info";
         router.post(&route_post, transaction, "transaction");
         info!("Created post route: {}", route_post);
         router.get(&route_get, wallet_info, "wallet_info");
