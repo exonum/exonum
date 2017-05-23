@@ -6,10 +6,10 @@ use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
 storage_value! (
-    ConfigReference {
+    struct ConfigReference {
         const SIZE = 40;
-        actual_from: u64    [00 => 08]
-        cfg_hash:    &Hash  [08 => 40]
+        field actual_from: u64    [00 => 08]
+        field cfg_hash:    &Hash  [08 => 40]
     }
 );
 
