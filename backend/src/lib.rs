@@ -9,7 +9,7 @@ extern crate byteorder;
 extern crate log;
 #[cfg(test)]
 extern crate tempdir;
-extern crate serde_json;
+//extern crate serde_json;
 #[macro_use(message, storage_value, counter)]
 extern crate exonum;
 extern crate params;
@@ -20,14 +20,15 @@ extern crate bodyparser;
 
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer};
-use serde_json::{Value, to_value};
+
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
-use exonum::serialize::json::from_value;
+use exonum::serialize::json::reexport as serde_json;
+use serde_json::{Value, to_value, from_value};
 
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
@@ -121,10 +122,13 @@ impl<'de> Deserialize<'de> for CurrencyTx {
         let value = <Value>::deserialize(deserializer)?;
         let service_id: u16;
         let message_id: u16;
-        if let Some(_) = value.as_object() {
-        //TODO: fix errors here
-        service_id = value.get("service_id").unwrap().as_str().unwrap().parse().unwrap();
-        message_id = value.get("message_id").unwrap().as_str().unwrap().parse().unwrap();
+        if let Some(value) = value.as_object() {
+            service_id = value.get("service_id")
+                              .and_then(|v| v.as_i64())
+                              .ok_or(de::Error::custom("Can't parse service_id."))? as u16;
+            message_id = value.get("message_id")
+                              .and_then(|v| v.as_i64())
+                              .ok_or(de::Error::custom("Can't parse message_id."))? as u16;
         }
         else {
                 return Err(de::Error::custom(format!("Tx is not a json object")));
@@ -142,17 +146,17 @@ impl<'de> Deserialize<'de> for CurrencyTx {
         let res = match message_id {
             TX_ISSUE_ID => {
                 //TODO: fix errors here
-                let ret: TxIssue = from_value(&value).unwrap();
+                let ret: TxIssue = from_value(value).unwrap();
                 CurrencyTx::Issue(ret)
             }
             TX_WALLET_ID => {
                 //TODO: fix errors here
-                let ret: TxCreateWallet = from_value(&value).unwrap();
+                let ret: TxCreateWallet = from_value(value).unwrap();
                 CurrencyTx::CreateWallet(ret)
             }
             TX_TRANSFER_ID => {
                 //TODO: fix errors here
-                let ret: TxTransfer = from_value(&value).unwrap();
+                let ret: TxTransfer = from_value(value).unwrap();
                 CurrencyTx::Transfer(ret)
             }
             other => {

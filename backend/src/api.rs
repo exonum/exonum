@@ -1,4 +1,4 @@
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 use serde_json::{to_value};
 use router::Router;
 use iron::prelude::*;
@@ -7,11 +7,10 @@ use params::{Params, Value};
 
 use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
-use exonum::messages::BlockProof as BlPr;
+use exonum::messages::BlockProof;
 use exonum::crypto::{HexValue, PublicKey, Hash};
 use exonum::storage::{StorageValue, List, Map, Proofnode, RootProofNode};
 use exonum::blockchain::{self, Blockchain};
-use exonum::serialize::json::{wrap};
 
 use super::tx_metarecord::TxMetaRecord;
 use super::wallet::Wallet;
@@ -29,16 +28,6 @@ pub struct HashMTproofLinker<V: Serialize> {
     values: Vec<V>,
 }
 
-
-struct BlockProof(BlPr);
-
-impl Serialize for BlockProof {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-        {
-            wrap(&self.0).serialize(serializer)
-        }
-}
 
 #[derive(Serialize)]
 pub struct WalletInfo {
@@ -110,7 +99,7 @@ impl<T> CryptocurrencyApi<T>
             None => None,
         };
         let res = WalletInfo {
-            block_info: BlockProof(block_proof),
+            block_info: block_proof,
             wallet: wallet_path,
             wallet_history: wallet_history,
         };
