@@ -9,13 +9,13 @@ pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
 
 message! {
-    TimestampTx {
+    struct TimestampTx {
         const TYPE = TIMESTAMPING_SERVICE;
         const ID = TIMESTAMPING_TRANSACTION_MESSAGE_ID;
         const SIZE = 40;
 
-        pub_key:        &PublicKey  [00 => 32]
-        data:           &[u8]       [32 => 40]
+        field pub_key:        &PublicKey  [00 => 32]
+        field data:           &[u8]       [32 => 40]
     }
 }
 
