@@ -23,6 +23,9 @@ script:
 - cd exonum
 - cargo +$NIGHTLY_RUST clippy -- -D warnings
 - cd ..
+- cd sandbox
+- cargo +$NIGHTLY_RUST clippy -- -D warnings
+- cd ..
 - cargo test --manifest-path exonum/Cargo.toml
 - cargo test --manifest-path sandbox/Cargo.toml
 notifications:
