@@ -54,23 +54,23 @@
 //! extern crate serde;
 //! extern crate serde_json;
 //! extern crate bodyparser;
-
+//!
 //! extern crate exonum;
 //! extern crate router;
 //! extern crate configuration_service;
-
+//!
 //! use clap::App;
-
+//!
 //! use exonum::blockchain::{Blockchain, Service};
 //! use exonum::node::Node;
 //! use exonum::helpers::clap::{GenerateCommand, RunCommand};
-
+//!
 //! use configuration_service::ConfigurationService;
-
+//!
 //! fn main() {
 //!     exonum::crypto::init();
 //!     exonum::helpers::init_logger().unwrap();
-
+//!
 //!     let app = App::new("Simple configuration api demo program")
 //!         .version(env!("CARGO_PKG_VERSION"))
 //!         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
@@ -78,16 +78,16 @@
 //!         .subcommand(GenerateCommand::new())
 //!         .subcommand(RunCommand::new());
 //!     let matches = app.get_matches();
-
+//!
 //!     match matches.subcommand() {
 //!         ("generate", Some(matches)) => GenerateCommand::execute(matches),
 //!         ("run", Some(matches)) => {
 //!             let node_cfg = RunCommand::node_config(matches);
 //!             let db = RunCommand::db(matches);
-
+//!
 //!             let services: Vec<Box<Service>> = vec![Box::new(ConfigurationService::new())];
 //!             let blockchain = Blockchain::new(db, services);
-
+//!
 //!             let mut node = Node::new(blockchain, node_cfg);
 //!             node.run().unwrap();
 //!         }
@@ -97,12 +97,11 @@
 //!     }
 //! }
 //! ```
-//!
+
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate log;
-
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -114,23 +113,21 @@ extern crate params;
 #[macro_use]
 extern crate lazy_static;
 
-/// Configuration service http api.
-pub mod config_api;
-use std::fmt;
-
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use router::Router;
 use iron::Handler;
 
+use std::fmt;
+
 use exonum::api::Api;
-use exonum::messages::Field;
-use exonum::blockchain::{Service, Transaction, Schema, ApiContext};
+use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
-use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
+use exonum::messages::{Field, RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
-use exonum::blockchain::StoredConfiguration;
+
+/// Configuration service http api.
+pub mod config_api;
 
 type ProposeData = StorageValueConfigProposeData;
 /// Value of [service_id](struct.ConfigurationService.html#method.service_id) of
@@ -152,12 +149,12 @@ It is used as placeholder in database for votes of validators, which didn't cast
 }
 
 storage_value! {
-    StorageValueConfigProposeData {
+    struct StorageValueConfigProposeData {
         const SIZE = 48;
 
-        tx_propose:            TxConfigPropose   [00 => 8]
-        votes_history_hash:    &Hash             [8 => 40]
-        num_votes:             u64               [40 => 48]
+        field tx_propose:            TxConfigPropose   [00 => 8]
+        field votes_history_hash:    &Hash             [8 => 40]
+        field num_votes:             u64               [40 => 48]
     }
 }
 
@@ -188,24 +185,24 @@ impl StorageValueConfigProposeData {
 }
 
 message! {
-    TxConfigPropose {
+    struct TxConfigPropose {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
         const SIZE = 40;
 
-        from:           &PublicKey  [00 => 32]
-        cfg:            &[u8]       [32 => 40]
+        field from:           &PublicKey  [00 => 32]
+        field cfg:            &[u8]       [32 => 40]
     }
 }
 
 message! {
-    TxConfigVote {
+    struct TxConfigVote {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_VOTE_MESSAGE_ID;
         const SIZE = 64;
 
-        from:           &PublicKey  [00 => 32]
-        cfg_hash:       &Hash       [32 => 64]
+        field from:           &PublicKey  [00 => 32]
+        field cfg_hash:       &Hash       [32 => 64]
     }
 }
 
