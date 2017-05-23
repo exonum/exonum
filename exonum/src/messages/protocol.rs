@@ -35,6 +35,7 @@ pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 9;
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
 
+message! {
 /// Connect to a node.
 ///
 /// ### Validation
@@ -47,7 +48,6 @@ pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
 /// ### Generation
 /// A node sends `Connect` message to all known addresses during initialization. Additionally,
 /// the node responds by its own `Connect` message after receiving `node::Event::Connected`.
-message! {
     struct Connect {
         const TYPE = CONSENSUS;
         const ID = CONNECT_MESSAGE_ID;
@@ -59,6 +59,7 @@ message! {
     }
 }
 
+message! {
 /// Proposal for a new block.
 ///
 /// ### Validation
@@ -75,7 +76,6 @@ message! {
 /// ### Generation
 /// A node broadcasts `Propose` if it is a leader and is not locked for a different proposal. Also
 /// `Propose` can be sent as response to `RequestPropose`.
-message! {
     struct Propose {
         const TYPE = CONSENSUS;
         const ID = PROPOSE_MESSAGE_ID;
@@ -89,6 +89,7 @@ message! {
     }
 }
 
+message! {
 /// Pre-vote for a new block.
 ///
 /// ### Validation
@@ -105,7 +106,6 @@ message! {
 ///
 /// ### Generation
 /// A node broadcasts `Prevote` in response to `Propose` when it has received all the transactions.
-message! {
     struct Prevote {
         const TYPE = CONSENSUS;
         const ID = PREVOTE_MESSAGE_ID;
@@ -119,6 +119,7 @@ message! {
     }
 }
 
+message! {
 /// Pre-commit for a proposal.
 ///
 /// ### Validation
@@ -136,7 +137,6 @@ message! {
 /// ### Generation
 /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3 pre-votes and no
 /// unknown transactions.
-message! {
     struct Precommit {
         const TYPE = CONSENSUS;
         const ID = PRECOMMIT_MESSAGE_ID;
@@ -151,6 +151,7 @@ message! {
     }
 }
 
+message! {
 /// Current node status.
 ///
 /// ### Validation
@@ -165,7 +166,6 @@ message! {
 /// `Status` message is broadcast regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast after accepting a new
 /// block.
-message! {
     struct Status {
         const TYPE = CONSENSUS;
         const ID = STATUS_MESSAGE_ID;
@@ -177,6 +177,7 @@ message! {
     }
 }
 
+message! {
 /// Information about a block.
 ///
 /// ### Validation
@@ -189,7 +190,6 @@ message! {
 ///
 /// ### Generation
 /// The message is sent as response to `RequestBlock`.
-message! {
     struct Block {
         const TYPE = CONSENSUS;
         const ID = BLOCK_MESSAGE_ID;
@@ -209,6 +209,7 @@ pub struct BlockProof {
     pub precommits: Vec<Precommit>,
 }
 
+message! {
 /// Request for the `Propose`.
 ///
 /// ### Validation
@@ -219,7 +220,6 @@ pub struct BlockProof {
 ///
 /// ### Generation
 /// A node can send `RequestPropose` during `Precommit` handling.
-message! {
     struct RequestPropose {
         const TYPE = CONSENSUS;
         const ID = REQUEST_PROPOSE_MESSAGE_ID;
@@ -232,6 +232,7 @@ message! {
     }
 }
 
+message! {
 /// Request for transactions by hash.
 ///
 /// ### Processing
@@ -239,7 +240,6 @@ message! {
 ///
 /// ### Generation
 /// This message can be sent during `Propose`, `Prevote` and `Precommit` handling.
-message! {
     struct RequestTransactions {
         const TYPE = CONSENSUS;
         const ID = REQUEST_TRANSACTIONS_MESSAGE_ID;
@@ -251,6 +251,7 @@ message! {
     }
 }
 
+message! {
 /// Request for pre-votes.
 ///
 /// ### Validation
@@ -261,7 +262,6 @@ message! {
 ///
 /// ### Generation
 /// This message can be sent during `Prevote` and `Precommit` handling.
-message! {
     struct RequestPrevotes {
         const TYPE = CONSENSUS;
         const ID = REQUEST_PREVOTES_MESSAGE_ID;
@@ -276,6 +276,7 @@ message! {
     }
 }
 
+message! {
 /// Request connected peers from a node.
 ///
 /// ### Validation
@@ -288,7 +289,6 @@ message! {
 /// ### Generation
 /// `RequestPeers` message is sent regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::peers_timeout`.
-message! {
     struct RequestPeers {
         const TYPE = CONSENSUS;
         const ID = REQUEST_PEERS_MESSAGE_ID;
@@ -299,6 +299,7 @@ message! {
     }
 }
 
+message! {
 /// Request for the block with the given `height`.
 ///
 /// ### Validation
@@ -309,7 +310,6 @@ message! {
 ///
 /// ### Generation
 /// This message can be sent during `Status` processing.
-message! {
     struct RequestBlock {
         const TYPE = CONSENSUS;
         const ID = REQUEST_BLOCK_MESSAGE_ID;
