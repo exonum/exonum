@@ -1,5 +1,6 @@
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
+use mount::Mount;
 
 use std::sync::Arc;
 use std::collections::BTreeMap;
@@ -14,7 +15,7 @@ pub use self::block::Block;
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction, NodeState};
+pub use self::service::{Service, Transaction, NodeState, ApiContext};
 
 #[macro_use]
 mod spec;
@@ -204,5 +205,25 @@ impl Blockchain {
         };
         self.merge(&patch)?;
         Ok(txs)
+    }
+
+    pub fn mount_public_api(&self, context: &ApiContext) -> Mount {
+        let mut mount = Mount::new();
+        for service in self.service_map.values() {
+            if let Some(handler) = service.public_api_handler(context) {
+                mount.mount(service.service_name(), handler);
+            }
+        }
+        mount
+    }
+
+    pub fn mount_private_api(&self, context: &ApiContext) -> Mount {
+        let mut mount = Mount::new();
+        for service in self.service_map.values() {
+            if let Some(handler) = service.private_api_handler(context) {
+                mount.mount(service.service_name(), handler);
+            }
+        }
+        mount
     }
 }

@@ -21,6 +21,12 @@ pub struct ExplorerApi {
 }
 
 impl ExplorerApi {
+    pub fn new(blockchain: Blockchain) -> ExplorerApi {
+        ExplorerApi {
+            blockchain: blockchain
+        }
+    }
+
     fn get_blocks(&self, blocks_request: BlocksRequest) -> Result<Vec<BlockInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         match explorer.blocks_range(blocks_request.count, blocks_request.from) {
@@ -102,8 +108,8 @@ impl Api for ExplorerApi {
             }
         };
 
-        router.get("/api/v1/blockchain/blocks", blocks, "blocks");
-        router.get("/api/v1/blockchain/blocks/:height", block, "height");
-        router.get("/api/v1/blockchain/transactions/:hash", transaction, "hash");
+        router.get("/v1/blocks", blocks, "blocks");
+        router.get("/v1/blocks/:height", block, "height");
+        router.get("/v1/transactions/:hash", transaction, "hash");
     }
 }
