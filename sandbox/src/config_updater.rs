@@ -19,12 +19,12 @@ message! {
     }
 }
 
-
+#[derive(Default)]
 pub struct ConfigUpdateService {}
 
 impl ConfigUpdateService {
-    pub fn new() -> ConfigUpdateService {
-        ConfigUpdateService {}
+    pub fn new() -> Self {
+        ConfigUpdateService::default()
     }
 }
 
