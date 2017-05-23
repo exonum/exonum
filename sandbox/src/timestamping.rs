@@ -19,6 +19,7 @@ message! {
     }
 }
 
+#[derive(Default)]
 pub struct TimestampingService {}
 
 pub struct TimestampingTxGenerator {
@@ -59,8 +60,8 @@ impl Iterator for TimestampingTxGenerator {
 }
 
 impl TimestampingService {
-    pub fn new() -> TimestampingService {
-        TimestampingService {}
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
