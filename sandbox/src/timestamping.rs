@@ -19,6 +19,7 @@ message! {
     }
 }
 
+#[derive(Default)]
 pub struct TimestampingService {}
 
 pub struct TimestampingTxGenerator {
@@ -30,14 +31,20 @@ pub struct TimestampingTxGenerator {
 
 impl TimestampingTxGenerator {
     pub fn new(data_size: usize) -> TimestampingTxGenerator {
+        let keypair = gen_keypair();
+        TimestampingTxGenerator::with_keypair(data_size, keypair)
+    }
+
+    pub fn with_keypair(data_size: usize,
+                        keypair: (PublicKey, SecretKey))
+                        -> TimestampingTxGenerator {
         let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
-        let (public_key, secret_key) = gen_keypair();
 
         TimestampingTxGenerator {
             rand: rand,
             data_size: data_size,
-            public_key: public_key,
-            secret_key: secret_key,
+            public_key: keypair.0,
+            secret_key: keypair.1,
         }
     }
 }
@@ -53,8 +60,8 @@ impl Iterator for TimestampingTxGenerator {
 }
 
 impl TimestampingService {
-    pub fn new() -> TimestampingService {
-        TimestampingService {}
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -69,6 +76,10 @@ impl Transaction for TimestampTx {
 }
 
 impl Service for TimestampingService {
+    fn service_name(&self) -> &'static str {
+        "sandbox_timestamping"
+    }
+
     fn service_id(&self) -> u16 {
         TIMESTAMPING_SERVICE
     }

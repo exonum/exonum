@@ -1,12 +1,14 @@
 use serde_json::Value;
+use iron::Handler;
+use mount::Mount;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{View, Error as StorageError};
 use messages::{Message, RawTransaction, Error as MessageError};
-use node::State;
+use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
 use events::Milliseconds;
-use blockchain::{StoredConfiguration, ConsensusConfig};
+use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
@@ -16,8 +18,12 @@ pub trait Transaction: Message + 'static {
     }
 }
 
+#[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
+    /// Unique service identification for database schema and service messages.
     fn service_id(&self) -> u16;
+    /// Unique human readable service name.
+    fn service_name(&self) -> &'static str;
 
     fn state_hash(&self, _: &View) -> Result<Vec<Hash>, StorageError> {
         Ok(Vec::new())
@@ -25,12 +31,20 @@ pub trait Service: Send + Sync + 'static {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    fn handle_genesis_block(&self, _: &View) -> Result<Value, StorageError> {
+    fn handle_genesis_block(&self, view: &View) -> Result<Value, StorageError> {
         Ok(Value::Null)
     }
 
-    fn handle_commit(&self, _: &mut NodeState) -> Result<(), StorageError> {
+    fn handle_commit(&self, context: &mut NodeState) -> Result<(), StorageError> {
         Ok(())
+    }
+    /// Returns api handler for public users.
+    fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
+        None
+    }
+    /// Returns api handler for maintainers. 
+    fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
+        None
     }
 }
 
@@ -50,7 +64,7 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 
     pub fn validator_state(&self) -> &Option<ValidatorState> {
-       self.state.validator_state()
+        self.state.validator_state()
     }
 
     pub fn view(&self) -> &View {
@@ -112,5 +126,48 @@ impl<'a, 'b> NodeState<'a, 'b> {
 
     pub fn transactions(self) -> Vec<Box<Transaction>> {
         self.txs
+    }
+}
+
+pub struct ApiContext {
+    blockchain: Blockchain,
+    node_channel: TxSender<NodeChannel>,
+    public_key: PublicKey,
+    secret_key: SecretKey,
+}
+
+impl ApiContext {
+    pub fn new(node: &Node) -> ApiContext {
+        let handler = node.handler();
+        ApiContext {
+            blockchain: handler.blockchain.clone(),
+            node_channel: node.channel(),
+            public_key: *node.state().public_key(),
+            secret_key: node.state().secret_key().clone(),
+        }
+    }
+
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
+    }
+
+    pub fn node_channel(&self) -> &TxSender<NodeChannel> {
+        &self.node_channel
+    }
+    
+    pub fn public_key(&self) -> &PublicKey {
+        &self.public_key
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
+    }
+
+    pub fn mount_public_api(&self) -> Mount {
+        self.blockchain.mount_public_api(self)
+    }
+
+    pub fn mount_private_api(&self) -> Mount {
+        self.blockchain.mount_private_api(self)
     }
 }

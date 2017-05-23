@@ -19,12 +19,12 @@ message! {
     }
 }
 
-
+#[derive(Default)]
 pub struct ConfigUpdateService {}
 
 impl ConfigUpdateService {
-    pub fn new() -> ConfigUpdateService {
-        ConfigUpdateService {}
+    pub fn new() -> Self {
+        ConfigUpdateService::default()
     }
 }
 
@@ -40,6 +40,10 @@ impl Transaction for TxConfig {
 }
 
 impl Service for ConfigUpdateService {
+    fn service_name(&self) -> &'static str {
+        "sandbox_config_updater"
+    }
+
     fn service_id(&self) -> u16 {
         CONFIG_SERVICE
     }
