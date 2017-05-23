@@ -295,18 +295,16 @@ impl Api for PublicConfigApi {
             let info = _self.get_all_committed(previous_cfg_hash, actual_from)?;
             _self.ok_response(&serde_json::to_value(info).unwrap())
         };
-        router.get("/api/v1/configs/actual", config_actual, "config_actual");
-        router.get("/api/v1/configs/following",
+        router.get("/v1/configs/actual", config_actual, "config_actual");
+        router.get("/v1/configs/following",
                    config_following,
                    "config_following");
-        router.get("/api/v1/configs/:hash", config_by_hash, "config_by_hash");
-        router.get("/api/v1/configs/:hash/votes",
+        router.get("/v1/configs/:hash", config_by_hash, "config_by_hash");
+        router.get("/v1/configs/:hash/votes",
                    get_votes_for_propose,
                    "get_votes_for_propose");
-        router.get("/api/v1/configs/proposed",
-                   get_all_proposes,
-                   "get_all_proposes");
-        router.get("/api/v1/configs/committed",
+        router.get("/v1/configs/proposed", get_all_proposes, "get_all_proposes");
+        router.get("/v1/configs/committed",
                    get_all_committed,
                    "get_all_committed");
 
@@ -344,10 +342,10 @@ impl<T> Api for PrivateConfigApi<T>
                 None => Err(ApiError::IncorrectRequest)?,
             }
         };
-        router.post("/api/v1/configs/postpropose",
+        router.post("/v1/configs/postpropose",
                     put_config_propose,
                     "put_config_propose");
-        router.post("/api/v1/configs/:hash/postvote",
+        router.post("/v1/configs/:hash/postvote",
                     put_config_vote,
                     "put_config_vote");
     }

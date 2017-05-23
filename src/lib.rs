@@ -49,95 +49,51 @@
 //!
 //! ```rust,no_run
 //! extern crate iron;
-//! extern crate tempdir;
-//! extern crate router;
+//! extern crate env_logger;
+//! extern crate clap;
+//! extern crate serde;
+//! extern crate serde_json;
+//! extern crate bodyparser;
+
 //! extern crate exonum;
+//! extern crate router;
 //! extern crate configuration_service;
-//!
-//! use std::thread;
-//!
-//! use std::net::SocketAddr;
-//! use tempdir::TempDir;
-//! use router::Router;
-//!
-//! use exonum::blockchain::Blockchain;
+
+//! use clap::App;
+
+//! use exonum::blockchain::{Blockchain, Service};
 //! use exonum::node::Node;
-//! use exonum::storage::{LevelDB, LevelDBOptions};
-//! use exonum::api::Api;
-//! use exonum::helpers::{init_logger, generate_testnet_config};
-//! use configuration_service::{ConfigurationService};
-//! use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi};
-//!
+//! use exonum::helpers::clap::{GenerateCommand, RunCommand};
+
+//! use configuration_service::ConfigurationService;
+
 //! fn main() {
-//!     // Init crypto engine and pretty logger.
 //!     exonum::crypto::init();
-//!     init_logger().unwrap();
-//!
-//!     // Blockchain params
-//!     let count = 4;
-//!     // Inner exonum network start port (4000, 4001, 4002, ..)
-//!     let start_port = 4000;
-//!     // External http api port (8000, 8001, 8002, ...)
-//!     let api_port = 8000;
-//!     let tmpdir_handle = TempDir::new("exonum_configuration").unwrap();
-//!     let destdir = tmpdir_handle.path();
-//!
-//!     // Generate blockchain configuration
-//!     let node_cfgs = generate_testnet_config(count, start_port);
-//!
-//!     // Create testnet threads
-//!     let node_threads = {
-//!         let mut node_threads = Vec::new();
-//!         for idx in 0..count as usize {
-//!             // Create configuration service for node[idx]
-//!             let service = ConfigurationService::new();
-//!             // Create database for node[idx]
-//!             let db = {
-//!                 let mut options = LevelDBOptions::new();
-//!                 let path = destdir.join(idx.to_string());
-//!                 options.create_if_missing = true;
-//!                 LevelDB::new(&path, options).expect("Unable to create database")
-//!             };
-//!             // Create node[idx]
-//!             let blockchain = Blockchain::new(db, vec![Box::new(service)]);
-//!             let mut node = Node::new(blockchain.clone(), node_cfgs[idx].clone());
-//!             let channel_clone = node.channel().clone();
-//!             let node_thread = thread::spawn(move || {
-//!                                                 // Run it in separate thread
-//!                                                 node.run().expect("Unable to run node");
-//!                                             });
-//!             node_threads.push(node_thread);
-//!
-//!             let node_cfg = node_cfgs[idx].clone();
-//!             // Create node api thread
-//!             let api_thread = thread::spawn(move || {
-//!
-//!                 let private_config_api = PrivateConfigApi {
-//!                     channel: channel_clone,
-//!                     config: (node_cfg.public_key, node_cfg.secret_key),
-//!                 };
-//!
-//!                 let public_config_api = PublicConfigApi {
-//!                     blockchain: blockchain,
-//!                 };
-//!
-//!                 let listen_address: SocketAddr =
-//!                     format!("127.0.0.1:{}", api_port+idx).parse().unwrap();
-//!
-//!                 let mut router = Router::new();
-//!                 private_config_api.wire(&mut router);
-//!                 public_config_api.wire(&mut router);
-//!                 let chain = iron::Chain::new(router);
-//!                 iron::Iron::new(chain).http(listen_address).unwrap();
-//!             });
-//!
-//!             node_threads.push(api_thread);
+//!     exonum::helpers::init_logger().unwrap();
+
+//!     let app = App::new("Simple configuration api demo program")
+//!         .version(env!("CARGO_PKG_VERSION"))
+//!         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+//!         .about("Demo validator node")
+//!         .subcommand(GenerateCommand::new())
+//!         .subcommand(RunCommand::new());
+//!     let matches = app.get_matches();
+
+//!     match matches.subcommand() {
+//!         ("generate", Some(matches)) => GenerateCommand::execute(matches),
+//!         ("run", Some(matches)) => {
+//!             let node_cfg = RunCommand::node_config(matches);
+//!             let db = RunCommand::db(matches);
+
+//!             let services: Vec<Box<Service>> = vec![Box::new(ConfigurationService::new())];
+//!             let blockchain = Blockchain::new(db, services);
+
+//!             let mut node = Node::new(blockchain, node_cfg);
+//!             node.run().unwrap();
 //!         }
-//!         node_threads
-//!     };
-//!
-//!     for node_thread in node_threads {
-//!         node_thread.join().unwrap();
+//!         _ => {
+//!             unreachable!("Wrong subcommand");
+//!         }
 //!     }
 //! }
 //! ```
@@ -162,8 +118,13 @@ extern crate lazy_static;
 pub mod config_api;
 use std::fmt;
 
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use router::Router;
+use iron::Handler;
+
+use exonum::api::Api;
 use exonum::messages::Field;
-use exonum::blockchain::{Service, Transaction, Schema, NodeState};
+use exonum::blockchain::{Service, Transaction, Schema, ApiContext};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
@@ -656,6 +617,10 @@ impl ConfigurationService {
 }
 
 impl Service for ConfigurationService {
+    fn service_name(&self) -> &'static str {
+        "configuration"
+    }
+
     fn service_id(&self) -> u16 {
         CONFIG_SERVICE
     }
@@ -684,9 +649,20 @@ impl Service for ConfigurationService {
         ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
+    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
+        let mut router = Router::new();
+        let api = config_api::PublicConfigApi { blockchain: ctx.blockchain().clone() };
+        api.wire(&mut router);
+        return Some(Box::new(router));
+    }
 
-    /// Update config in `NodeState` upon reaching the height, when a new config is actual from.
-    fn handle_commit(&self, _: &mut NodeState) -> StorageResult<()> {
-        Ok(())
+    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
+        let mut router = Router::new();
+        let api = config_api::PrivateConfigApi {
+            channel: ctx.node_channel().clone(),
+            config: (ctx.public_key().clone(), ctx.secret_key().clone()),
+        };
+        api.wire(&mut router);
+        return Some(Box::new(router));
     }
 }
