@@ -37,7 +37,8 @@ fn generate_config_with_message(prev_cfg_hash: Hash,
     let mut services: BTreeMap<String, Value> = BTreeMap::new();
     let tmstmp_id = TimestampingService::new().service_id();
     let service_cfg = CfgStub { cfg_string: timestamping_service_cfg_message.to_string() };
-    services.insert(format!("{}", tmstmp_id), serde_json::to_value(service_cfg).unwrap());
+    services.insert(format!("{}", tmstmp_id),
+                    serde_json::to_value(service_cfg).unwrap());
     StoredConfiguration {
         previous_cfg_hash: prev_cfg_hash,
         actual_from: actual_from,
@@ -114,7 +115,8 @@ mod tests {
         let mut services: BTreeMap<String, Value> = BTreeMap::new();
         let tmstmp_id = TimestampingService::new().service_id();
         let service_cfg = CfgStub { cfg_string: "some test".to_string() };
-        services.insert(format!("{}", tmstmp_id), serde_json::to_value(service_cfg).unwrap());
+        services.insert(format!("{}", tmstmp_id),
+                        serde_json::to_value(service_cfg).unwrap());
 
         let full_node_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
