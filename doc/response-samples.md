@@ -1,6 +1,6 @@
 ### Public endpoints' response samples
 
-1.  <http://127.0.0.1:8000/api/v1/configs/actual>
+1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/actual>
 
     ```javascript
     {                                                                                            
@@ -28,10 +28,10 @@
     }
     ```
 
-1.  <http://127.0.0.1:8000/api/v1/configs/following> - format same as 
-for `actual`
+1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/following> - 
+format same as for `actual`
 
-1.  <http://127.0.0.1:8000/api/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a> 
+1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a> 
 
     ```javascript                                                                                                                                         
     {
@@ -86,7 +86,7 @@ for `actual`
     }
     ```
 
-1.  <http://127.0.0.1:8000/api/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/votes> 
+1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/votes> 
 
     ```javascript
     {                                                                                                                                                     
@@ -111,7 +111,7 @@ for `actual`
     }
     ```
 
-1.  <http://127.0.0.1:8000/api/v1/configs/committed>
+1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/committed>
 
     ```javascript
     [
@@ -182,7 +182,7 @@ for `actual`
     ]
     ```
 
-1.  <http://127.0.0.1:8000/api/v1/configs/proposed?previous_cfg_hash=64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68&actual_from=3100>
+1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/proposed?previous_cfg_hash=64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68&actual_from=3100>
 
     ```javascript
     [
@@ -281,7 +281,7 @@ for `actual`
 
 ### Private endpoints' response samples
 
-1.  <http://127.0.0.1:8010/api/v1/configs/postpropose>
+1.  <http://127.0.0.1:8010/api/services/configuration/v1/configs/postpropose>
 
     ```bash
     curl -X POST -d '{                                                                                         
@@ -312,7 +312,7 @@ for `actual`
     }
     ```
 
-1.  <http://127.0.0.1:8012/api/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postvote>
+1.  <http://127.0.0.1:8012/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postvote>
 
     ```bash
     curl -X POST -d '{}' http://127.0.0.1:8012/api/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postvote
