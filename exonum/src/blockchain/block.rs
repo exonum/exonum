@@ -38,8 +38,8 @@ mod tests {
         assert_eq!(block.tx_hash(), &tx_hash);
         assert_eq!(block.state_hash(), &state_hash);
         assert_eq!(block.propose_round(), round);
-        let json_str = ::serialize::json::to_string(&block).unwrap();
-        let block1: Block = ::serialize::json::from_str(&json_str).unwrap();
+        let json_str = ::serde_json::to_string(&block).unwrap();
+        let block1: Block = ::serde_json::from_str(&json_str).unwrap();
         assert_eq!(block1, block);
     }
 }

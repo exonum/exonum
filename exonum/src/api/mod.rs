@@ -220,7 +220,6 @@ mod tests {
 
     use blockchain::Block;
     use crypto::Hash;
-    use serialize::json;
 
     use super::*;
 
@@ -241,7 +240,7 @@ mod tests {
         let stub = SampleAPI;
         let result = stub.ok_response(&serde_json::to_value(str_val).unwrap());
         assert!(result.is_ok());
-        let result = stub.ok_response(&json::to_value(&complex_val).unwrap());
+        let result = stub.ok_response(&serde_json::to_value(&complex_val).unwrap());
         assert!(result.is_ok());
         print!("{:?}", result);
     }
