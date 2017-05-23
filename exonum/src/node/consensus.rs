@@ -359,11 +359,6 @@ impl<S> NodeHandler<S>
             (propose_round, txs_count, txs)
         };
 
-        for tx in new_txs {
-            assert!(tx.verify());
-            self.handle_incoming_tx(tx);
-        }
-
         let height = self.state.height();
         let proposer = self.state.leader(propose_round);
 
@@ -382,6 +377,15 @@ impl<S> NodeHandler<S>
         // TODO: reset status timeout.
         self.broadcast_status();
         self.add_status_timeout();
+           
+        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, self.blockchain.view());
+        self.state.set_propose_timeout(timeout);
+
+        // Handle queued transactions from services
+        for tx in new_txs {
+            assert!(tx.verify());
+            self.handle_incoming_tx(tx);
+        }
 
         // Add timeout for first round
         self.add_round_timeout();

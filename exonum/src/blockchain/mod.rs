@@ -12,7 +12,7 @@ use node::{State, TxPool};
 use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
 
 pub use self::block::Block;
-pub use self::schema::Schema;
+pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, NodeState, ApiContext};
@@ -132,11 +132,13 @@ impl Blockchain {
         // Get last hash
         let last_hash = self.last_hash()?;
         // Save & execute transactions
-        for hash in tx_hashes {
+        for (index, hash) in tx_hashes.iter().enumerate() {
             let tx = &pool[hash];
             tx.execute(&fork)?;
             schema.transactions().put(hash, tx.raw().clone()).unwrap();
             schema.block_txs(height).append(*hash).unwrap();
+            let location = TxLocation::new(height, index as u64);
+            schema.tx_location_by_tx_hash().put(hash, location).unwrap();
         }
         // Get tx hash
         let tx_hash = schema.block_txs(height).root_hash()?;

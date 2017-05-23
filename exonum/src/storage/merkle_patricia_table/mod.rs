@@ -856,6 +856,7 @@ mod tests {
     use std::collections::HashSet;
 
     use rand::{thread_rng, Rng};
+    use env_logger;
 
     use ::crypto::{hash, Hash};
     use ::storage::{Map, MemoryDB, MapTable};
@@ -1372,6 +1373,8 @@ mod tests {
 
     #[test]
     fn build_proof_in_empty_tree() {
+        let _ = env_logger::init();
+
         let storage = MemoryDB::new();
         let map = MapTable::new(vec![255], &storage);
         let table = MerklePatriciaTable::new(map);
@@ -1397,11 +1400,13 @@ mod tests {
             key_found: false,
         };
         let json_repre = serde_json::to_string(&proof_info).unwrap();
-        println!("{}", json_repre);
+        info!("{}", json_repre);
     }
 
     #[test]
     fn build_proof_in_leaf_tree() {
+        let _ = env_logger::init();
+
         let storage = MemoryDB::new();
         let map = MapTable::new(vec![255], &storage);
         let table = MerklePatriciaTable::new(map);
@@ -1426,7 +1431,7 @@ mod tests {
                 key_found: false,
             };
             let json_repre = serde_json::to_string(&proof_info).unwrap();
-            println!("{}", json_repre);
+            info!("{}", json_repre);
         }
 
         match proof_path {
@@ -1452,7 +1457,7 @@ mod tests {
                 key_found: true,
             };
             let json_repre = serde_json::to_string(&proof_info).unwrap();
-            println!("{}", json_repre);
+            info!("{}", json_repre);
         }
         match proof_path {
             RootProofNode::LeafRootInclusive(key, val) => {
@@ -1465,6 +1470,8 @@ mod tests {
 
     #[test]
     fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
+        let _ = env_logger::init();
+
         let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(100).into_iter().map(|el| {
             let (key, val) = el; 
             (hash(&key), hash(&val))
@@ -1494,11 +1501,13 @@ mod tests {
         };
 
         let json_repre = serde_json::to_string(&proof_info).unwrap();
-        println!("{}", json_repre);
+        info!("{}", json_repre);
     }
 
     #[test]
     fn fuzz_insert_build_proofs() {
+        let _ = env_logger::init();
+
         let data = generate_fully_random_data_keys(100);
 
         let storage = MemoryDB::new();
@@ -1526,12 +1535,14 @@ mod tests {
             };
 
             let json_repre = serde_json::to_string(&proof_info).unwrap();
-            println!("{}", json_repre);
+            info!("{}", json_repre);
         }
     }
 
     #[test]
     fn fuzz_delete_build_proofs() {
+        let _ = env_logger::init();
+
         let data = generate_fully_random_data_keys(100);
         let mut rng = rand::thread_rng();
 
@@ -1567,7 +1578,7 @@ mod tests {
                 key_found: false,
             };
             let json_repre = serde_json::to_string(&proof_info).unwrap();
-            println!("{}", json_repre);
+            info!("{}", json_repre);
         }
     }
 
