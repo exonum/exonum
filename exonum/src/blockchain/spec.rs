@@ -1,11 +1,12 @@
 #[macro_export]
 macro_rules! storage_value {
-    ($name:ident {
+    ($(#[$attr:meta])* struct $name:ident {
         const SIZE = $body:expr;
 
-        $($field_name:ident : $field_type:ty [$from:expr => $to:expr])*
+        $($(#[$field_attr:meta])* field $field_name:ident : $field_type:ty [$from:expr => $to:expr])*
     }) => (
         #[derive(Clone, PartialEq)]
+        $(#[$attr])*
         pub struct $name {
             raw: Vec<u8>
         }
@@ -68,7 +69,9 @@ macro_rules! storage_value {
                 hash(self.raw.as_ref())
             }
 
-            $(pub fn $field_name(&self) -> $field_type {
+            $(
+            $(#[$field_attr])*
+            pub fn $field_name(&self) -> $field_type {
                 use $crate::messages::Field;
                 Field::read(&self.raw, $from, $to)
             })*

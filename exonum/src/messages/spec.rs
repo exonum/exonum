@@ -1,13 +1,14 @@
 #[macro_export]
 macro_rules! message {
-    ($name:ident {
+    ($(#[$attr:meta])* struct $name:ident {
         const TYPE = $extension:expr;
         const ID = $id:expr;
         const SIZE = $body:expr;
 
-        $($field_name:ident : $field_type:ty [$from:expr => $to:expr])*
+        $($(#[$field_attr:meta])* field $field_name:ident : $field_type:ty [$from:expr => $to:expr])*
     }) => (
         #[derive(Clone, PartialEq)]
+        $(#[$attr])*
         pub struct $name {
             raw: $crate::messages::RawMessage
         }
@@ -47,7 +48,6 @@ macro_rules! message {
                 Ok($name { raw: raw })
             }
         }
-
         impl $name {
             #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             pub fn new($($field_name: $field_type,)*
@@ -71,6 +71,7 @@ macro_rules! message {
             }
             
             $(
+            $(#[$field_attr])*
             pub fn $field_name(&self) -> $field_type {
                 self.raw.read::<$field_type>($from, $to)
             })*

@@ -4,14 +4,14 @@ use crypto::{Hash, hash};
 pub const BLOCK_SIZE: usize = 108;
 
 storage_value!(
-    Block {
+    struct Block {
         const SIZE = BLOCK_SIZE;
 
-        height:                 u64         [00 => 08]
-        propose_round:          u32         [08 => 12]
-        prev_hash:              &Hash       [12 => 44]
-        tx_hash:                &Hash       [44 => 76]
-        state_hash:             &Hash       [76 => 108]
+        field height:                 u64         [00 => 08]
+        field propose_round:          u32         [08 => 12]
+        field prev_hash:              &Hash       [12 => 44]
+        field tx_hash:                &Hash       [44 => 76]
+        field state_hash:             &Hash       [76 => 108]
     }
 );
 
