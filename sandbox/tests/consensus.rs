@@ -1,17 +1,24 @@
+extern crate rand;
 extern crate exonum;
 extern crate sandbox;
+#[macro_use]
 extern crate log;
+extern crate env_logger;
+
+use rand::{thread_rng, Rng};
 
 use std::time::Duration;
+use std::collections::BTreeMap;
 
-use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
-                       RequestPrevotes, BitVec, CONSENSUS};
-use exonum::crypto::{Hash, gen_keypair};
+use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, RequestPropose,
+                       RequestTransactions, RequestPrevotes, BitVec, CONSENSUS};
+use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
 use exonum::blockchain::{Block, Blockchain, Schema};
 use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
                           REQUEST_TRANSACTIONS_TIMEOUT};
+use exonum::storage::Map;
 
-use sandbox::timestamping::{TimestampTx, TIMESTAMPING_SERVICE};
+use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox_tests_helper::*;
 use sandbox::config_updater::TxConfig;
@@ -195,6 +202,43 @@ fn test_retrieve_block_and_precommits() {
     // println!("validators public keys: {}", &serde_json::to_string(&validators).unwrap());
 }
 
+#[test]
+fn test_store_txs_positions() {
+    let mut rng = thread_rng();
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    let data_size = 20;
+    let generator = TimestampingTxGenerator::with_keypair(data_size,
+                                                          gen_keypair_from_seed(&Seed::new([11;
+                                                                                            32])));
+
+    let committed_height = rng.gen_range(2, 30u64);
+    {
+        for _ in 1..committed_height {
+            add_one_height(&sandbox, &sandbox_state)
+        }
+    }
+    let num_txs = rng.gen_range(3, 100);
+    let committed_block1 = generator
+        .take(num_txs)
+        .map(|tx| (tx.hash(), tx.raw().clone()))
+        .collect::<BTreeMap<Hash, RawMessage>>();
+    let hashes = committed_block1.keys().collect::<Vec<_>>();
+
+    add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
+    sandbox.assert_state(committed_height + 1, ROUND_ONE);
+
+    let view = sandbox.blockchain_ref().view();
+    let schema = Schema::new(&view);
+    let locations = schema.tx_location_by_tx_hash();
+    for (expected_idx, hash) in hashes.iter().enumerate() {
+        let location = locations.get(hash).unwrap().unwrap();
+        assert_eq!(expected_idx as u64, location.position_in_block());
+        assert_eq!(committed_height, location.block_height());
+    }
+}
+
 /// idea of the scenario is to:
 /// - receive correct Prevote for some next height (first one) at 0 time (and respectively 1 height)
 /// - queue it
@@ -231,6 +275,8 @@ fn test_queue_prevote_message_from_next_height() {
 #[test]
 #[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
+    let _ = env_logger::init();
+
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
@@ -257,12 +303,12 @@ fn test_queue_propose_message_from_next_height() {
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
 
-    println!("last_block={:#?}, hash={:?}",
-             sandbox.last_block(),
-             sandbox.last_block().hash());
-    println!("proposed_block={:#?}, hash={:?}",
-             block_at_first_height,
-             block_at_first_height.hash());
+    info!("last_block={:#?}, hash={:?}",
+          sandbox.last_block(),
+          sandbox.last_block().hash());
+    info!("proposed_block={:#?}, hash={:?}",
+          block_at_first_height,
+          block_at_first_height.hash());
 
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     sandbox.add_time(Duration::from_millis(0));
@@ -308,6 +354,8 @@ fn test_ignore_message_from_prev_height() {
 /// - send prevote when lock=0 for known propose
 #[test]
 fn positive_get_propose_send_prevote() {
+    let _ = env_logger::init();
+
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -326,7 +374,7 @@ fn positive_get_propose_send_prevote() {
                                    LOCK_ZERO,
                                    sandbox.s(VALIDATOR_0 as usize)));
 
-    println!("time: {:?}", sandbox.time());
+    info!("time: {:?}", sandbox.time());
 }
 
 #[test]

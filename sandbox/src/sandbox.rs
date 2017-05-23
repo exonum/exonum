@@ -18,6 +18,7 @@ use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, 
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
+use exonum::helpers::init_logger;
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
@@ -652,6 +653,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
+    let _ = init_logger();
     sandbox_with_services(vec![Box::new(TimestampingService::new()),
                                Box::new(ConfigUpdateService::new())])
 }
