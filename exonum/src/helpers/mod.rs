@@ -11,6 +11,60 @@ use crypto::gen_keypair;
 
 pub mod clap;
 
+pub fn init_logger() -> Result<(), SetLoggerError> {
+    let mut builder = LogBuilder::new();
+    builder.format(format_log_record);
+
+    if env::var("RUST_LOG").is_ok() {
+        builder.parse(&env::var("RUST_LOG").unwrap());
+    }
+
+    builder.init()
+}
+
+pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
+    let validators = (0..count as usize)
+        .map(|_| gen_keypair())
+        .collect::<Vec<_>>();
+    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
+    let peers = (0..validators.len())
+        .map(|x| {
+                 format!("127.0.0.1:{}", start_port + x as u16)
+                     .parse()
+                     .unwrap()
+             })
+        .collect::<Vec<_>>();
+
+    validators
+        .into_iter()
+        .enumerate()
+        .map(|(idx, validator)| {
+            NodeConfig {
+                listen_address: peers[idx],
+                network: Default::default(),
+                peers: peers.clone(),
+                public_key: validator.0,
+                secret_key: validator.1,
+                genesis: genesis.clone(),
+                api: Default::default(),
+            }
+        })
+        .collect::<Vec<_>>()
+}
+
+fn has_colors() -> bool {
+    use term::terminfo::TerminfoTerminal;
+    use term::Terminal;
+    use std::io;
+
+    let out = io::stderr();
+    if let Some(term) = TerminfoTerminal::new(out) {
+        term.supports_color()
+    } else {
+        false
+    }
+}
+
 fn format_log_record(record: &LogRecord) -> String {
     let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     let secs = ts.as_secs().to_string();
@@ -59,58 +113,5 @@ fn format_log_record(record: &LogRecord) -> String {
                 level,
                 &source_path,
                 record.args())
-    }
-}
-
-pub fn init_logger() -> Result<(), SetLoggerError> {
-    let mut builder = LogBuilder::new();
-    builder.format(format_log_record);
-
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
-
-    builder.init()
-}
-
-pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
-    let validators = (0..count as usize)
-        .map(|_| gen_keypair())
-        .collect::<Vec<_>>();
-    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
-    let peers = (0..validators.len())
-        .map(|x| {
-                 format!("127.0.0.1:{}", start_port + x as u16)
-                     .parse()
-                     .unwrap()
-             })
-        .collect::<Vec<_>>();
-
-    validators
-        .into_iter()
-        .enumerate()
-        .map(|(idx, validator)| {
-            NodeConfig {
-                listen_address: peers[idx],
-                network: Default::default(),
-                peers: peers.clone(),
-                public_key: validator.0,
-                secret_key: validator.1,
-                genesis: genesis.clone(),
-            }
-        })
-        .collect::<Vec<_>>()
-}
-
-fn has_colors() -> bool {
-    use term::terminfo::TerminfoTerminal;
-    use term::Terminal;
-    use std::io;
-
-    let out = io::stderr();
-    if let Some(term) = TerminfoTerminal::new(out) {
-        term.supports_color()
-    } else {
-        false
     }
 }
