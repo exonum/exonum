@@ -18,6 +18,7 @@ use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, 
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
+use exonum::helpers::init_logger;
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
@@ -62,7 +63,7 @@ impl SandboxChannel {
             .lock()
             .unwrap()
             .sent
-            .push_back((address.clone(), message));
+            .push_back((*address, message));
     }
 }
 
@@ -251,7 +252,7 @@ impl Sandbox {
     }
 
     pub fn a(&self, id: usize) -> SocketAddr {
-        self.addresses[id].clone()
+        self.addresses[id]
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
@@ -348,13 +349,13 @@ impl Sandbox {
         self.check_unexpected_message();
         let now = {
             let mut inner = self.inner.lock().unwrap();
-            inner.time = inner.time + duration;
+            inner.time += duration;
             inner.time
         };
         // handle timeouts if occurs
         loop {
             let timeout = {
-                let ref mut timers = self.inner.lock().unwrap().timers;
+                let timers = &mut self.inner.lock().unwrap().timers;
                 if let Some(TimerPair(time, timeout)) = timers.pop() {
                     if time > now {
                         timers.push(TimerPair(time, timeout));
@@ -409,7 +410,7 @@ impl Sandbox {
         let view = self.reactor.borrow().handler.blockchain.view();
         let schema = Schema::new(&view);
         let schema_transactions = schema.transactions();
-        let res: Vec<RawTransaction> = txs.into_iter()
+        txs.into_iter()
             .filter(|elem| {
                 let hash_elem = elem.hash();
                 if unique_set.contains(&hash_elem) {
@@ -421,15 +422,14 @@ impl Sandbox {
                 }
                 true
             })
-            .map(|elem| elem.clone())
-            .collect::<Vec<_>>();
-        res
+            .cloned()
+            .collect()
     }
     /// Extract state_hash from fake block
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
         where I: IntoIterator<Item = &'a RawTransaction>
     {
-        let ref blockchain = self.reactor.borrow().handler.blockchain;
+        let blockchain = &self.reactor.borrow().handler.blockchain;
         let (hashes, tx_pool) = {
             let mut pool = TxPool::new();
             let mut hashes = Vec::new();
@@ -453,12 +453,11 @@ impl Sandbox {
             db.merge(&patch);
             db
         };
-        Schema::new(&view)
-            .last_block()
-            .unwrap()
-            .unwrap()
-            .state_hash()
-            .clone()
+        *Schema::new(&view)
+             .last_block()
+             .unwrap()
+             .unwrap()
+             .state_hash()
     }
 
     pub fn get_proof_to_service_table(&self,
@@ -531,36 +530,24 @@ impl Sandbox {
             .leader(self.current_round())
     }
 
-    pub fn assert_state(&self, height: Height, round: Round) {
+    pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
         let reactor = self.reactor.borrow();
-        let ref state = reactor.handler.state();
+        let state = &reactor.handler.state();
 
         let achual_height = state.height();
         let actual_round = state.round();
-        assert!(achual_height == height,
-                "Incorrect height, actual={}, expected={}",
-                achual_height,
-                height);
-        assert!(actual_round == round,
-                "Incorrect round, actual={}, expected={}",
-                actual_round,
-                round);
+        assert_eq!(achual_height, expected_height);
+        assert_eq!(actual_round, expected_round);
     }
 
-    pub fn assert_lock(&self, round: Round, hash: Option<Hash>) {
+    pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
         let reactor = self.reactor.borrow();
         let state = reactor.handler.state();
 
         let actual_round = state.locked_round();
         let actual_hash = state.locked_propose();
-        assert!(actual_round == round,
-                "Incorrect round, actual={}, expected={}",
-                actual_round,
-                round);
-        assert!(actual_hash == hash,
-                "Incorrect hash, actual={:?}, expected={:?}",
-                actual_hash,
-                hash);
+        assert_eq!(actual_round, expected_round);
+        assert_eq!(actual_hash, expected_hash);
     }
 
     fn node_public_key(&self) -> PublicKey {
@@ -609,8 +596,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let config = Configuration {
         listener: ListenerConfig {
-            address: addresses[0].clone(),
-            public_key: validators[0].0.clone(),
+            address: addresses[0],
+            public_key: validators[0].0,
             secret_key: validators[0].1.clone(),
         },
         network: NetworkConfiguration::default(),
@@ -621,7 +608,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     // TODO use factory or other solution like set_handler or run
 
     let inner = Arc::new(Mutex::new(SandboxInner {
-                                        address: addresses[0].clone(),
+                                        address: addresses[0],
                                         time: UNIX_EPOCH + Duration::new(1486720340, 0),
                                         sent: VecDeque::new(),
                                         events: VecDeque::new(),
@@ -652,6 +639,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
+    let _ = init_logger();
     sandbox_with_services(vec![Box::new(TimestampingService::new()),
                                Box::new(ConfigUpdateService::new())])
 }

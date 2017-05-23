@@ -36,6 +36,7 @@ extern crate router;
 extern crate bodyparser;
 extern crate params;
 extern crate cookie;
+extern crate mount;
 
 #[macro_use]
 pub mod serialize;
