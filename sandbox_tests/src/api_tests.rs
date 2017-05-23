@@ -153,12 +153,12 @@ impl ConfigurationApiSandbox {
 
     fn get_actual_config(&self) -> IronResult<Response> {
         let api = self.obtain_test_api(0);
-        request_get("/api/v1/configs/actual", &api)
+        request_get("/v1/configs/actual", &api)
     }
 
     fn get_following_config(&self) -> IronResult<Response> {
         let api = self.obtain_test_api(0);
-        request_get("/api/v1/configs/following", &api)
+        request_get("/v1/configs/following", &api)
     }
 
     fn get_config_by_hash(&self, config_hash: Hash) -> IronResult<Response> {
@@ -170,7 +170,7 @@ impl ConfigurationApiSandbox {
 
     fn get_config_by_hash_str<A: AsRef<str>>(&self, hash_str: A) -> IronResult<Response> {
         let api = self.obtain_test_api(0);
-        request_get(format!("/api/v1/configs/{}", hash_str.as_ref()), &api)
+        request_get(format!("/v1/configs/{}", hash_str.as_ref()), &api)
     }
 
     fn get_config_votes(&self, config_hash: Hash) -> IronResult<Response> {
@@ -182,7 +182,7 @@ impl ConfigurationApiSandbox {
 
     fn get_config_votes_by_str<A: AsRef<str>>(&self, hash_str: A) -> IronResult<Response> {
         let api = self.obtain_test_api(0);
-        request_get(format!("/api/v1/configs/{}/votes", hash_str.as_ref()), &api)
+        request_get(format!("/v1/configs/{}/votes", hash_str.as_ref()), &api)
     }
 
     fn post_config_propose<T: Serialize>(&self,
@@ -190,7 +190,7 @@ impl ConfigurationApiSandbox {
                                          config: T)
                                          -> IronResult<Response> {
         let api = self.obtain_test_api(validator_id);
-        request_post_body("/api/v1/configs/postpropose", config, &api)
+        request_post_body("/v1/configs/postpropose", config, &api)
     }
 
     fn post_config_vote<T: Serialize>(&self,
@@ -210,7 +210,7 @@ impl ConfigurationApiSandbox {
                                                             body: T)
                                                             -> IronResult<Response> {
         let api = self.obtain_test_api(validator_id);
-        request_post_body(format!("/api/v1/configs/{}/postvote", hash_str.as_ref()),
+        request_post_body(format!("/v1/configs/{}/postvote", hash_str.as_ref()),
                           body,
                           &api)
     }
