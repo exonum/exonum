@@ -127,13 +127,13 @@ impl<'de> Deserialize<'de> for CurrencyTx {
         if let Some(value) = value.as_object() {
             service_id = value.get("service_id")
                               .and_then(|v| v.as_i64())
-                              .ok_or(de::Error::custom("Can't parse service_id."))? as u16;
+                              .ok_or_else(|| de::Error::custom("Can't parse service_id."))? as u16;
             message_id = value.get("message_id")
                               .and_then(|v| v.as_i64())
-                              .ok_or(de::Error::custom("Can't parse message_id."))? as u16;
+                              .ok_or_else(|| de::Error::custom("Can't parse message_id."))? as u16;
         }
         else {
-                return Err(de::Error::custom(format!("Tx is not a json object")));
+                return Err(de::Error::custom("Tx is not a json object"));
         }
 
         match service_id {
@@ -147,18 +147,15 @@ impl<'de> Deserialize<'de> for CurrencyTx {
         }
         let res = match message_id {
             TX_ISSUE_ID => {
-                //TODO: fix errors here
-                let ret: TxIssue = from_value(value).unwrap();
+                let ret: TxIssue = from_value(value).map_err(|e| de::Error::custom(format!("Can't parse TxIssue {:?}", e)))?;
                 CurrencyTx::Issue(ret)
             }
             TX_WALLET_ID => {
-                //TODO: fix errors here
-                let ret: TxCreateWallet = from_value(value).unwrap();
+                let ret: TxCreateWallet = from_value(value).map_err(|e| de::Error::custom(format!("Can't parse TxCreateWallet {:?}", e)))?;
                 CurrencyTx::CreateWallet(ret)
             }
             TX_TRANSFER_ID => {
-                //TODO: fix errors here
-                let ret: TxTransfer = from_value(value).unwrap();
+                let ret: TxTransfer = from_value(value).map_err(|e| de::Error::custom(format!("Can't parse TxTransfer {:?}", e)))?;;
                 CurrencyTx::Transfer(ret)
             }
             other => {
@@ -394,7 +391,7 @@ impl Service for CurrencyService {
             blockchain: ctx.blockchain().clone(),
         };
         api.wire(&mut router);
-        return Some(Box::new(router));
+        Some(Box::new(router))
     }
 }
 
