@@ -45,38 +45,38 @@ pub const TX_ISSUE_ID: u16 = 129;
 pub const TX_WALLET_ID: u16 = 130;
 
 message! {
-    TxTransfer {
+    struct TxTransfer {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_TRANSFER_ID;
         const SIZE = 80;
 
-        from:        &PublicKey  [00 => 32]
-        to:          &PublicKey  [32 => 64]
-        amount:      u64         [64 => 72]
-        seed:        u64         [72 => 80]
+        field from:        &PublicKey  [00 => 32]
+        field to:          &PublicKey  [32 => 64]
+        field amount:      u64         [64 => 72]
+        field seed:        u64         [72 => 80]
     }
 }
 
 message! {
-    TxIssue {
+    struct TxIssue {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_ISSUE_ID;
         const SIZE = 48;
 
-        wallet:      &PublicKey  [00 => 32]
-        amount:      u64         [32 => 40]
-        seed:        u64         [40 => 48]
+        field wallet:      &PublicKey  [00 => 32]
+        field amount:      u64         [32 => 40]
+        field seed:        u64         [40 => 48]
     }
 }
 
 message! {
-    TxCreateWallet {
+    struct TxCreateWallet {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_WALLET_ID;
         const SIZE = 40;
 
-        pub_key:     &PublicKey  [00 => 32]
-        name:        &str        [32 => 40]
+        field pub_key:     &PublicKey  [00 => 32]
+        field name:        &str        [32 => 40]
     }
 }
 

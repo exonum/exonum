@@ -3,14 +3,14 @@ use exonum::crypto::{PublicKey, Hash, hash};
 use exonum::storage::StorageValue;
 
 storage_value! {
-    Wallet {
+    struct Wallet {
         const SIZE = 88;
 
-        pub_key:            &PublicKey  [00 => 32]
-        name:               &str        [32 => 40]
-        balance:            u64         [40 => 48]
-        history_len:        u64         [48 => 56]
-        history_hash:       &Hash       [56 => 88]
+        field pub_key:            &PublicKey  [00 => 32]
+        field name:               &str        [32 => 40]
+        field balance:            u64         [40 => 48]
+        field history_len:        u64         [48 => 56]
+        field history_hash:       &Hash       [56 => 88]
     }
 }
 
