@@ -1,71 +1,83 @@
 {
-        "block_info": {
-                "block": {
-                        "height": "1",
-                        "prev_hash": "00042b279bb8e297bbecab18e8ac7ef2b2f631c448a951c3f6b5961ce0b1cb91",
-                        "propose_round": 3,
-                        "state_hash": "7377adb4ce01d7c3ac620a6e982b39a2b8de729494a671cc89ae31d1acf5f9b5",
-                        "tx_hash": "7e83b5377fd7319f81394d530a82b793a48610070268ab6d2fbe8ec61bb666fc"
-                },
-                "precommits": [
-                        {
-                                "body": {
-                                        "block_hash": "9947a3b89ce69f67f951525ac0ccc62741a81fe02b7dcf92b006b158aa6a9432",
-                                        "height": "1",
-                                        "propose_hash": "45a2a0f2e0b177c09fda3bbd99648d4cc8b1ee4deb0ccf8120611f4adc5ab45f",
-                                        "round": 3,
-                                        "time": {
-                                                "nanos": 201000000,
-                                                "secs": "1486720342"
-                                        },
-                                        "validator": 0
-                                },
-                                "signature": "8a3bc51f01b712bfb096053ff1ea8d4aa292b44ef9a1321c9cac97fb0cbf940e9e32aa177f70e13d0f91f4eac58d0cc3662566f494483880038741a3919d2402"
-                        },
-                        {
-                                "body": {
-                                        "block_hash": "9947a3b89ce69f67f951525ac0ccc62741a81fe02b7dcf92b006b158aa6a9432",
-                                        "height": "1",
-                                        "propose_hash": "45a2a0f2e0b177c09fda3bbd99648d4cc8b1ee4deb0ccf8120611f4adc5ab45f",
-                                        "round": 3,
-                                        "time": {
-                                                "nanos": 201000000,
-                                                "secs": "1486720342"
-                                        },
-                                        "validator": 1
-                                },
-                                "signature": "9e2a91ca797f27911f496b7307904a98c23e3d4e20043f1e78cceff06894e17332d8356ae7d29150c43a26970d40bb8be3a3908a6b333a08b0e55d03dccab70a"
-                        },
-                        {
-                                "body": {
-                                        "block_hash": "9947a3b89ce69f67f951525ac0ccc62741a81fe02b7dcf92b006b158aa6a9432",
-                                        "height": "1",
-                                        "propose_hash": "45a2a0f2e0b177c09fda3bbd99648d4cc8b1ee4deb0ccf8120611f4adc5ab45f",
-                                        "round": 3,
-                                        "time": {
-                                                "nanos": 201000000,
-                                                "secs": "1486720342"
-                                        },
-                                        "validator": 2
-                                },
-                                "signature": "a0296951ef562e8edeb03b7d5fb35174b4ae85751e0f03823812d3a8c26d153233a1978997b80ecf66927d08273c66793ccb17d38ec6760792a9e958c859c60d"
-                        }
-                ]
+  "block_info": {
+    "block": {
+      "height": "1",
+      "prev_hash": "00042b279bb8e297bbecab18e8ac7ef2b2f631c448a951c3f6b5961ce0b1cb91",
+      "propose_round": 3,
+      "state_hash": "7377adb4ce01d7c3ac620a6e982b39a2b8de729494a671cc89ae31d1acf5f9b5",
+      "tx_hash": "7e83b5377fd7319f81394d530a82b793a48610070268ab6d2fbe8ec61bb666fc"
+    },
+    "precommits": [
+      {
+        "body": {
+          "block_hash": "9947a3b89ce69f67f951525ac0ccc62741a81fe02b7dcf92b006b158aa6a9432",
+          "height": "1",
+          "propose_hash": "45a2a0f2e0b177c09fda3bbd99648d4cc8b1ee4deb0ccf8120611f4adc5ab45f",
+          "round": 3,
+          "time": {
+            "nanos": 201000000,
+            "secs": "1486720342"
+          },
+          "validator": 0
         },
-        "wallet": {
-                "mpt_proof": {
-                        "0101000011001000101110100011101001100001011100001111000010100010111110110110011100110110111011001110100010100110000000110101011101101110111101100011000010011010001101011110100000010000100100010001010110011001101111000110001000010001101101010101010010101001": {
-                                "val": "bdbbc4edb3f589728bb954f10867332ffd9dac8e933fc6b3607ef552e4ed84d3"
-                        },
-                        "1101111100111111011000011001100000000100101010010010111111011011010000000101011100011001001011011100010000111101110101110100100011101010011101111000101011011100010100101011110001001001100011001110100000000101001001001100000000010100101110000001000100011001": "0a65aa0aebd2312981223d2d61d1b635daf984b9b33cf10bd94f569bfb2af995"
-                },
-                "value": {
-                        "0": {
-                                "0001011": "28a2dd35b4e98d539a0c21ea54662d97e4791b254ff4210015dbf7f0b6b1bec7",
-                                "1": "da7e2858a39ed6484918f8aefed0ca33b7e0b0a1cecd1f8b4524e192b096d0f2"
-                        },
-                        "1": "f6fe41be6c12b7e06a201da4b563ac7f49ab52e1836f6a9b13133a7294330f0f"
-                }
+        "message_id": 4,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "8a3bc51f01b712bfb096053ff1ea8d4aa292b44ef9a1321c9cac97fb0cbf940e9e32aa177f70e13d0f91f4eac58d0cc3662566f494483880038741a3919d2402"
+      },
+      {
+        "body": {
+          "block_hash": "9947a3b89ce69f67f951525ac0ccc62741a81fe02b7dcf92b006b158aa6a9432",
+          "height": "1",
+          "propose_hash": "45a2a0f2e0b177c09fda3bbd99648d4cc8b1ee4deb0ccf8120611f4adc5ab45f",
+          "round": 3,
+          "time": {
+            "nanos": 201000000,
+            "secs": "1486720342"
+          },
+          "validator": 1
         },
-        "wallet_history": null
+        "message_id": 4,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "9e2a91ca797f27911f496b7307904a98c23e3d4e20043f1e78cceff06894e17332d8356ae7d29150c43a26970d40bb8be3a3908a6b333a08b0e55d03dccab70a"
+      },
+      {
+        "body": {
+          "block_hash": "9947a3b89ce69f67f951525ac0ccc62741a81fe02b7dcf92b006b158aa6a9432",
+          "height": "1",
+          "propose_hash": "45a2a0f2e0b177c09fda3bbd99648d4cc8b1ee4deb0ccf8120611f4adc5ab45f",
+          "round": 3,
+          "time": {
+            "nanos": 201000000,
+            "secs": "1486720342"
+          },
+          "validator": 2
+        },
+        "message_id": 4,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "a0296951ef562e8edeb03b7d5fb35174b4ae85751e0f03823812d3a8c26d153233a1978997b80ecf66927d08273c66793ccb17d38ec6760792a9e958c859c60d"
+      }
+    ]
+  },
+  "wallet": {
+    "mpt_proof": {
+      "0101000011001000101110100011101001100001011100001111000010100010111110110110011100110110111011001110100010100110000000110101011101101110111101100011000010011010001101011110100000010000100100010001010110011001101111000110001000010001101101010101010010101001": {
+        "val": "bdbbc4edb3f589728bb954f10867332ffd9dac8e933fc6b3607ef552e4ed84d3"
+      },
+      "1101111100111111011000011001100000000100101010010010111111011011010000000101011100011001001011011100010000111101110101110100100011101010011101111000101011011100010100101011110001001001100011001110100000000101001001001100000000010100101110000001000100011001": "0a65aa0aebd2312981223d2d61d1b635daf984b9b33cf10bd94f569bfb2af995"
+    },
+    "value": {
+      "0": {
+        "0001011": "28a2dd35b4e98d539a0c21ea54662d97e4791b254ff4210015dbf7f0b6b1bec7",
+        "1": "da7e2858a39ed6484918f8aefed0ca33b7e0b0a1cecd1f8b4524e192b096d0f2"
+      },
+      "1": "f6fe41be6c12b7e06a201da4b563ac7f49ab52e1836f6a9b13133a7294330f0f"
+    }
+  },
+  "wallet_history": null
 }
