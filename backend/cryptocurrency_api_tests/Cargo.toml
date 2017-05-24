@@ -17,9 +17,9 @@ cryptocurrency = {version="0.1.0", path="../"}
 [dependencies.exonum]
 git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "6e9257438780a668fa5002bd12e78a0b2f47911b"
+rev = "60545be54b03b7cf2bc3166c66590c8aa4cfc011"
 
 [dependencies.sandbox]
 git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "6e9257438780a668fa5002bd12e78a0b2f47911b"
+rev = "60545be54b03b7cf2bc3166c66590c8aa4cfc011"
