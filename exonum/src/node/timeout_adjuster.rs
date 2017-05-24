@@ -32,7 +32,7 @@ const DEFAULT_CONSTANT_TIMEOUT: Milliseconds = 200;
 /// }
 /// ```
 /// For more examples see `Constant` and `MovingAverage` implementations.
-pub trait TimeoutAdjuster {
+pub trait TimeoutAdjuster: Send {
     /// Called during node initialization and after accepting a new height.
     fn adjust_timeout(&mut self, state: &State, view: View) -> Milliseconds;
 }
