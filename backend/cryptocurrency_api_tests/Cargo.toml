@@ -5,21 +5,21 @@ authors = ["Oleg Kuzmin <oleg.kuzmin@bitfury.com>"]
 
 [dependencies]
 iron = "0.5.1"
-serde = "0.8.23"
-serde_derive = "0.8"
+serde = "1.0.0"
+serde_derive = "1.0.0"
 rand = "0.3"
-serde_json = "0.8"
+serde_json = "1.0.2"
 router = "0.5.1"
 log = "0.3"
 iron-test = { git = "https://github.com/reem/iron-test" }
 cryptocurrency = {version="0.1.0", path="../"}
 
 [dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "61dd294"
+rev = "6e9257438780a668fa5002bd12e78a0b2f47911b"
 
 [dependencies.sandbox]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "61dd294"
+rev = "6e9257438780a668fa5002bd12e78a0b2f47911b"

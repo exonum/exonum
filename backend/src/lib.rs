@@ -5,13 +5,12 @@ extern crate cookie;
 #[macro_use]
 extern crate serde_derive;
 extern crate byteorder;
-extern crate jsonway;
 #[macro_use]
 extern crate log;
 #[cfg(test)]
 extern crate tempdir;
-extern crate serde_json;
-#[macro_use(message, storage_value)]
+//extern crate serde_json;
+#[macro_use(message, storage_value, counter)]
 extern crate exonum;
 extern crate params;
 extern crate router;
@@ -21,18 +20,17 @@ extern crate bodyparser;
 
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer};
-use serde_json::value::ToJson;
-use serde_json::{Value, from_value};
 use iron::Handler;
 use router::Router;
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
-use exonum::messages::utils::U64;
-use exonum::crypto::{PublicKey, Hash, Signature, PUBLIC_KEY_LENGTH};
+use exonum::crypto::{PublicKey, Hash, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction};
 use exonum::blockchain::ApiContext;
+use exonum::serialize::json::reexport as serde_json;
+use serde_json::{Value, to_value, from_value};
 
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
@@ -49,68 +47,39 @@ pub const TX_ISSUE_ID: u16 = 129;
 pub const TX_WALLET_ID: u16 = 130;
 
 message! {
-    TxTransfer {
+    struct TxTransfer {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_TRANSFER_ID;
         const SIZE = 80;
 
-        from:        &PublicKey  [00 => 32]
-        to:          &PublicKey  [32 => 64]
-        amount:      u64         [64 => 72]
-        seed:        u64         [72 => 80]
+        field from:        &PublicKey  [00 => 32]
+        field to:          &PublicKey  [32 => 64]
+        field amount:      u64         [64 => 72]
+        field seed:        u64         [72 => 80]
     }
 }
 
 message! {
-    TxIssue {
+    struct TxIssue {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_ISSUE_ID;
         const SIZE = 48;
 
-        wallet:      &PublicKey  [00 => 32]
-        amount:      u64         [32 => 40]
-        seed:        u64         [40 => 48]
+        field wallet:      &PublicKey  [00 => 32]
+        field amount:      u64         [32 => 40]
+        field seed:        u64         [40 => 48]
     }
 }
 
 message! {
-    TxCreateWallet {
+    struct TxCreateWallet {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_WALLET_ID;
         const SIZE = 40;
 
-        pub_key:     &PublicKey  [00 => 32]
-        name:        &str        [32 => 40]
+        field pub_key:     &PublicKey  [00 => 32]
+        field name:        &str        [32 => 40]
     }
-}
-
-#[derive(Serialize, Deserialize)]
-struct TxSerdeHelper {
-    service_id: u16,
-    message_id: u16,
-    body: serde_json::Value,
-    signature: Signature,
-}
-
-#[derive(Serialize, Deserialize)]
-struct TxIssueSerdeHelper {
-    wallet: PublicKey,
-    amount: U64,
-    seed: U64,
-}
-
-#[derive(Serialize, Deserialize)]
-struct TxCreateSerdeHelper {
-    pub_key: PublicKey,
-    name: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct TxTransferSerdeHelper {
-    from: PublicKey,
-    to: PublicKey,
-    amount: U64,
-    seed: U64,
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -131,57 +100,43 @@ impl CurrencyTx {
 }
 
 impl Serialize for CurrencyTx {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        let id: u16;
-        let signature = *self.raw().signature();
-        let body;
         match *self {
             CurrencyTx::Issue(ref issue) => {
-                id = TX_ISSUE_ID;
-                let issue_body = TxIssueSerdeHelper {
-                    wallet: *issue.wallet(),
-                    amount: U64(issue.amount()),
-                    seed: U64(issue.seed()),
-                };
-                body = issue_body.to_json();
+                issue.serialize(ser)
             }
             CurrencyTx::Transfer(ref transfer) => {
-                id = TX_TRANSFER_ID;
-                let transfer_body = TxTransferSerdeHelper {
-                    from: *transfer.from(),
-                    to: *transfer.to(),
-                    amount: U64(transfer.amount()),
-                    seed: U64(transfer.seed()),
-                };
-                body = transfer_body.to_json();
+                transfer.serialize(ser)
             }
             CurrencyTx::CreateWallet(ref wallet) => {
-                id = TX_WALLET_ID;
-                let create_body = TxCreateSerdeHelper {
-                    pub_key: *wallet.pub_key(),
-                    name: wallet.name().to_string(),
-                };
-                body = create_body.to_json();
+                wallet.serialize(ser)
             }
         }
-        let h = TxSerdeHelper {
-            service_id: CRYPTOCURRENCY,
-            message_id: id,
-            body: body,
-            signature: signature,
-        };
-        h.serialize(ser)
     }
 }
 
-impl Deserialize for CurrencyTx {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
+impl<'de> Deserialize<'de> for CurrencyTx {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
     {
-        let h = <TxSerdeHelper>::deserialize(deserializer)?;
-        match h.service_id {
+        let value = <Value>::deserialize(deserializer)?;
+        let service_id: u16;
+        let message_id: u16;
+        if let Some(value) = value.as_object() {
+            service_id = value.get("service_id")
+                              .and_then(|v| v.as_i64())
+                              .ok_or(de::Error::custom("Can't parse service_id."))? as u16;
+            message_id = value.get("message_id")
+                              .and_then(|v| v.as_i64())
+                              .ok_or(de::Error::custom("Can't parse message_id."))? as u16;
+        }
+        else {
+                return Err(de::Error::custom(format!("Tx is not a json object")));
+        }
+
+        match service_id {
             CRYPTOCURRENCY => {}
             other => {
                 return Err(de::Error::custom(format!("service_id doesn't match the expected. \
@@ -190,50 +145,21 @@ impl Deserialize for CurrencyTx {
                                                      CRYPTOCURRENCY)))
             }
         }
-        let res = match h.message_id {
+        let res = match message_id {
             TX_ISSUE_ID => {
-                let body_type = "Tx_ISSUE";
-                let body = from_value::<TxIssueSerdeHelper>(h.body)
-                    .map_err(|e| {
-                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
-                                                   json. serde_json::error: {}",
-                                                  body_type,
-                                                  e))
-                    })?;
-                let tx = TxIssue::new_with_signature(&body.wallet,
-                                                     body.amount.0,
-                                                     body.seed.0,
-                                                     &h.signature);
-                CurrencyTx::Issue(tx)
+                //TODO: fix errors here
+                let ret: TxIssue = from_value(value).unwrap();
+                CurrencyTx::Issue(ret)
             }
             TX_WALLET_ID => {
-                let body_type = "Tx_CREATE";
-                let body = from_value::<TxCreateSerdeHelper>(h.body)
-                    .map_err(|e| {
-                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
-                                                   json. serde_json::error: {}",
-                                                  body_type,
-                                                  e))
-                    })?;
-                let tx =
-                    TxCreateWallet::new_with_signature(&body.pub_key, &body.name, &h.signature);
-                CurrencyTx::CreateWallet(tx)
+                //TODO: fix errors here
+                let ret: TxCreateWallet = from_value(value).unwrap();
+                CurrencyTx::CreateWallet(ret)
             }
             TX_TRANSFER_ID => {
-                let body_type = "Tx_TRANSFER";
-                let body = from_value::<TxTransferSerdeHelper>(h.body)
-                    .map_err(|e| {
-                        de::Error::custom(format!("Coudn't parse '{}' transaction body from \
-                                                   json. serde_json::error: {}",
-                                                  body_type,
-                                                  e))
-                    })?;
-                let tx = TxTransfer::new_with_signature(&body.from,
-                                                        &body.to,
-                                                        body.amount.0,
-                                                        body.seed.0,
-                                                        &h.signature);
-                CurrencyTx::Transfer(tx)
+                //TODO: fix errors here
+                let ret: TxTransfer = from_value(value).unwrap();
+                CurrencyTx::Transfer(ret)
             }
             other => {
                 return Err(de::Error::custom(format!("Unknown transaction id for \
@@ -417,7 +343,7 @@ impl TxCreateWallet {
 
 impl Transaction for CurrencyTx {
     fn info(&self) -> Value {
-        self.to_json()
+        to_value(self).unwrap()
     }
 
     fn verify(&self) -> bool {
