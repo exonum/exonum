@@ -108,6 +108,7 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
     }
 
     pub fn clear(&mut self) {
+        self.length.set(Some(0));
         self.base.clear()
     }
 }
