@@ -1,20 +1,15 @@
-use num::{Integer, range, ToPrimitive};
-
 use std::marker::PhantomData;
 use std::cell::Cell;
 
 use super::{Map, Error, StorageValue, List};
 
-pub struct ListTable<T: Map<[u8], Vec<u8>>, K, V> {
+pub struct ListTable<T: Map<[u8], Vec<u8>>, V> {
     map: T,
-    count: Cell<Option<K>>,
+    count: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
 
-impl<'a, T, K, V> ListTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue
+impl<'a, T, V> ListTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageValue
 {
     pub fn new(map: T) -> Self {
         ListTable {
@@ -29,43 +24,40 @@ impl<'a, T, K, V> ListTable<T, K, V>
         Ok(if self.is_empty()? {
             Vec::new()
         } else {
-            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
+            (0..self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
         })
     }
 }
 
-impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue
+impl<T, V> List<V> for ListTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageValue
 {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.map.put(&len.serialize(), value.serialize())?;
-        self.map.put(&[], (len + K::one()).serialize())?;
-        self.count.set(Some(len + K::one()));
+        self.map.put(&[], (len + 1).serialize())?;
+        self.count.set(Some(len + 1));
         Ok(())
     }
 
     fn extend<I>(&self, iter: I) -> Result<(), Error>
-        where I: IntoIterator<Item = V>
+        where I: IntoIterator<Item=V>
     {
         let mut len = self.len()?;
         for value in iter {
             self.map.put(&len.serialize(), value.serialize())?;
-            len = len + K::one();
+            len = len + 1;
         }
         self.map.put(&[], len.serialize())?;
         self.count.set(Some(len));
         Ok(())
     }
 
-    fn get(&self, index: K) -> Result<Option<V>, Error> {
+    fn get(&self, index: u64) -> Result<Option<V>, Error> {
         let value = self.map.get(&index.serialize())?;
         Ok(value.map(StorageValue::deserialize))
     }
 
-    fn set(&self, index: K, value: V) -> Result<(), Error> {
+    fn set(&self, index: u64, value: V) -> Result<(), Error> {
         if index >= self.len()? {
             return Err(Error::new("Wrong index!"));
         }
@@ -74,24 +66,24 @@ impl<T, K: ?Sized, V> List<K, V> for ListTable<T, K, V>
 
     fn last(&self) -> Result<Option<V>, Error> {
         let len = self.len()?;
-        if len == K::zero() {
+        if len == 0 {
             Ok(None)
         } else {
-            self.get(len - K::one())
+            self.get(len - 1)
         }
     }
 
     fn is_empty(&self) -> Result<bool, Error> {
-        Ok(self.len()? == K::zero())
+        Ok(self.len()? == 0)
     }
 
-    fn len(&self) -> Result<K, Error> {
+    fn len(&self) -> Result<u64, Error> {
         if let Some(count) = self.count.get() {
             return Ok(count);
         }
 
         let v = self.map.get(&[])?;
-        let c = v.map_or_else(K::zero, K::deserialize);
+        let c = v.map(StorageValue::deserialize).unwrap_or(0);
         self.count.set(Some(c));
         Ok(c)
     }
@@ -113,7 +105,7 @@ mod tests {
         let extended_by = vec![45u64, 3422u64, 234u64];
         list_table.extend(extended_by.into_iter()).unwrap();
         assert!(!list_table.is_empty().unwrap());
-        assert_eq!(Some(45u64), list_table.get(0u32).unwrap());
+        assert_eq!(Some(45u64), list_table.get(0).unwrap());
         assert_eq!(Some(3422u64), list_table.get(1).unwrap());
         assert_eq!(Some(234u64), list_table.get(2).unwrap());
         assert_eq!(3, list_table.len().unwrap());
