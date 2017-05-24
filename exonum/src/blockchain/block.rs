@@ -1,4 +1,4 @@
-use crypto::{Hash, hash};
+use crypto::{Hash};
 
 
 pub const BLOCK_SIZE: usize = 108;

@@ -2,7 +2,7 @@ use byteorder::{ByteOrder, BigEndian};
 
 use std::mem;
 
-use crypto::{Hash, hash};
+use crypto::{Hash};
 use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
 use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
               List, RootProofNode, View};

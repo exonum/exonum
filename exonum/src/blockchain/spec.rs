@@ -53,7 +53,7 @@ macro_rules! storage_value {
                 }
             }
 
-            fn hash(&self) -> Hash {
+            fn hash(&self) -> $crate::crypto::Hash {
                 $name::hash(self)
             }
         }
@@ -67,13 +67,14 @@ macro_rules! storage_value {
                 $name { raw: buf }
             }
 
+            #[allow(dead_code)]
             pub fn from_raw(raw: Vec<u8>) -> $name {
                 debug_assert_eq!(raw.len(), $body);
                 $ name { raw: raw }
             }
 
-            pub fn hash(&self) -> Hash {
-                hash(self.raw.as_ref())
+            pub fn hash(&self) -> $crate::crypto::Hash {
+                $crate::crypto::hash(self.raw.as_ref())
             }
 
             $(
