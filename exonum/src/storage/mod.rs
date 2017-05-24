@@ -1,4 +1,3 @@
-use num::{Integer, ToPrimitive};
 use serde_json;
 
 use std::fmt;
@@ -60,15 +59,15 @@ pub trait Map<K: ?Sized, V> {
     fn find_key(&self, key: &K) -> Result<Option<Vec<u8>>>;
 }
 
-pub trait List<K: Integer + Copy + Clone + ToPrimitive, V> {
+pub trait List<V> {
     fn append(&self, value: V) -> Result<()>;
     fn extend<I: IntoIterator<Item = V>>(&self, iter: I) -> Result<()>;
-    fn get(&self, index: K) -> Result<Option<V>>;
-    fn set(&self, index: K, value: V) -> Result<()>;
+    fn get(&self, index: u64) -> Result<Option<V>>;
+    fn set(&self, index: u64, value: V) -> Result<()>;
     fn last(&self) -> Result<Option<V>>;
     fn is_empty(&self) -> Result<bool>;
-    fn len(&self) -> Result<K>;
-    fn swap(&self, i: K, j: K) -> Result<()> {
+    fn len(&self) -> Result<u64>;
+    fn swap(&self, i: u64, j: u64) -> Result<()> {
         let first_val = self.get(i)?;
         let second_val = self.get(j)?;
         match (first_val, second_val) {

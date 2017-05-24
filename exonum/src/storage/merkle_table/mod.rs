@@ -1,5 +1,3 @@
-use num::{Integer, range, ToPrimitive, pow};
-
 use std::marker::PhantomData;
 use std::cell::Cell;
 
@@ -9,11 +7,13 @@ use self::proofnode::Proofnode;
 
 pub mod proofnode;
 
-type Range<K> = Option<(K, K)>;
+const HEIGHT_SHIFT : u64 = 58;
+// TODO: add checks for overflow
+// const MAX_LENGTH : u64 = 288230376151711743; // 2 ** 58 - 1
 
-fn split_range<K>(start: K, middle: K, end: K) -> (Range<K>, Range<K>)
-    where K: Integer + Copy + ToPrimitive
-{
+type Range = Option<(u64, u64)>;
+
+fn split_range(start: u64, middle: u64, end: u64) -> (Range, Range) {
     debug_assert!(start < end);
     if middle >= end {
         (Some((start, end)), None)
@@ -25,12 +25,10 @@ fn split_range<K>(start: K, middle: K, end: K) -> (Range<K>, Range<K>)
     }
 }
 
-fn index_of_first_element_in_subtree<K>(subtree_root_height: K, subtree_root_index: K) -> K
-    where K: Integer + Copy + ToPrimitive
-{
-    pow(K::one() + K::one(),
-        (subtree_root_height - K::one()).to_usize().unwrap()) * subtree_root_index
+fn index_of_first_element_in_subtree(subtree_root_height: u64, subtree_root_index: u64) -> u64 {
+    (1 << (subtree_root_height - 1)) * subtree_root_index
 }
+
 mod hash_rules {
     use ::crypto::{hash, Hash};
     use ::storage::fields::StorageValue;
@@ -61,16 +59,13 @@ mod hash_rules {
 /// |>1| Merkle tree node, where at position `(h, i) = Hash((h - 1, 2i) + (h - 1, 2i + 1))` |
 ///
 /// `+` operation is concatenation of byte arrays.
-pub struct MerkleTable<T: Map<[u8], Vec<u8>>, K, V> {
+pub struct MerkleTable<T: Map<[u8], Vec<u8>>, V> {
     map: T,
-    count: Cell<Option<K>>,
+    count: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
 
-impl<'a, T, K, V> MerkleTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue
+impl<'a, T, V> MerkleTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageValue
 {
     pub fn new(map: T) -> Self {
         MerkleTable {
@@ -85,29 +80,29 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         Ok(if self.is_empty()? {
             Vec::new()
         } else {
-            range(K::zero(), self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
+            (0..self.len()?).map(|i| self.get(i).unwrap().unwrap()).collect()
         })
     }
 
     pub fn root_hash(&self) -> Result<Hash, Error> {
-        self.get_hash(self.height()?, K::zero())
+        self.get_hash(self.height()?, 0)
             .map(|h| h.unwrap_or_else(Hash::zero))
     }
 
     fn construct_proof_subtree(&self,
-                               node_height: K,
-                               node_index: K,
-                               range_start: K,
-                               range_end: K)
+                               node_height: u64,
+                               node_index: u64,
+                               range_start: u64,
+                               range_end: u64)
                                -> Result<Proofnode<V>, Error> {
 
         let res: Proofnode<V>;
-        if node_height == K::one() {
+        if node_height == 1 {
             res = Proofnode::Leaf(self.get(node_index)?.unwrap());
-        } else if node_height > K::one() {
-            let subtree_hight = node_height - K::one();
-            let left_child_index = node_index * (K::one() + K::one());
-            let righ_child_index = node_index * (K::one() + K::one()) + K::one();
+        } else if node_height > 1 {
+            let subtree_hight = node_height - 1;
+            let left_child_index = node_index * (1 + 1);
+            let righ_child_index = node_index * (1 + 1) + 1;
             let right_subtree_first_index = index_of_first_element_in_subtree(subtree_hight,
                                                                               righ_child_index);
             let (left_range, right_range) =
@@ -144,49 +139,46 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
     }
 
     pub fn construct_path_for_range(&self,
-                                    range_start: K,
-                                    range_end: K)
+                                    range_start: u64,
+                                    range_end: u64)
                                     -> Result<Proofnode<V>, Error> {
-        if (range_start < K::zero() || range_end > self.len()?) || range_end <= range_start {
+        if (range_end > self.len()?) || range_end <= range_start {
             return Err(Error::new(format!("Illegal range boundaries for MerkleTable. len: \
                                            {:?}, range start: {:?}, range_end: {:?}",
-                                          self.len()?.to_usize().unwrap(),
-                                          range_start.to_usize().unwrap(),
-                                          range_end.to_usize().unwrap())));
+                                          self.len()?, range_start, range_end)));
         }
 
-        self.construct_proof_subtree(self.height()?, K::zero(), range_start, range_end)
+        self.construct_proof_subtree(self.height()?, 0, range_start, range_end)
     }
 
-    fn height(&self) -> Result<K, Error> {
+    fn height(&self) -> Result<u64, Error> {
         let len = self.len()?;
-        let h = Self::upper_power_of_two(len) + K::one();
+        let h = Self::upper_power_of_two(len) + 1;
         Ok(h)
     }
 
     // TODO replace by library method
-    fn upper_power_of_two(v: K) -> K {
-        let mut p = K::one();
-        let mut i = K::zero();
+    fn upper_power_of_two(v: u64) -> u64 {
+        let mut p = 1;
+        let mut i = 0;
         while p < v {
-            p = p * (K::one() + K::one());
-            i = i + K::one();
+            p = p * (1 + 1);
+            i = i + 1;
         }
         i
     }
 
-    fn set_len(&self, len: K) -> Result<(), Error> {
+    fn set_len(&self, len: u64) -> Result<(), Error> {
         self.count.set(Some(len));
         self.map.put(&[], len.serialize())
     }
 
-    // TODO reduce reallocations. We can create a key by one allocation.
-    fn db_key(h: K, i: K) -> Vec<u8> {
-        [h.serialize(), i.serialize()].concat()
+    fn db_key(h: u64, i: u64) -> Vec<u8> {
+        StorageValue::serialize((h << HEIGHT_SHIFT) + i)
     }
 
-    fn get_hash(&self, height: K, index: K) -> Result<Option<Hash>, Error> {
-        debug_assert!(height > K::zero());
+    fn get_hash(&self, height: u64, index: u64) -> Result<Option<Hash>, Error> {
+        debug_assert!(height > 0);
 
         let v = self.map.get(&Self::db_key(height, index))?;
         let hash = v.map(|x| {
@@ -196,75 +188,72 @@ impl<'a, T, K, V> MerkleTable<T, K, V>
         Ok(hash)
     }
 
-    fn set_hash(&self, height: K, index: K, bytes: Hash) -> Result<(), Error> {
+    fn set_hash(&self, height: u64, index: u64, bytes: Hash) -> Result<(), Error> {
         // FIXME avoid reallocation
         let vec = bytes.as_ref().to_vec();
         let key = Self::db_key(height, index);
         self.map.put(&key, vec)
     }
 
-    fn append_hash(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
-        self.set_hash(K::one(), index, bytes)?;
-        let mut current_height = K::one();
-        while index != K::zero() {
+    fn append_hash(&self, mut index: u64, bytes: Hash) -> Result<(), Error> {
+        self.set_hash(1, index, bytes)?;
+        let mut current_height = 1;
+        while index != 0 {
             // Left leaf, Right leaf is empty
-            let new_hash = if index.is_even() {
+            let new_hash = if index & 1 == 0 {
                 let h1 = self.get_hash(current_height, index)?.unwrap();
                 hash_rules::hash_single_branch(h1)
                 // TODO replace by error
 
             } else {
                 // Right leaf
-                let h1 = self.get_hash(current_height, index - K::one())?.unwrap();
+                let h1 = self.get_hash(current_height, index - 1)?.unwrap();
                 let h2 = self.get_hash(current_height, index)?.unwrap();
                 hash_rules::hash_branch(h1, h2)
             };
-            current_height = current_height + K::one();
-            index = index / (K::one() + K::one());
+            current_height = current_height + 1;
+            index = index / (1 + 1);
             self.set_hash(current_height, index, new_hash)?;
         }
         Ok(())
     }
 
-    fn update_hash_subtree(&self, mut index: K, bytes: Hash) -> Result<(), Error> {
-        self.set_hash(K::one(), index, bytes)?;
+    fn update_hash_subtree(&self, mut index: u64, bytes: Hash) -> Result<(), Error> {
+        self.set_hash(1, index, bytes)?;
 
         let height = self.height()?;
-        let mut current_height = K::one();
+        let mut current_height = 1;
         while current_height != height {
-            let i = if !index.is_even() {
-                index - K::one()
+            let i = if index & 1 == 1 {
+                index - 1
             } else {
                 index
             };
 
             let h1 = self.get_hash(current_height, i)?.unwrap();
-            let h2 = self.get_hash(current_height, i + K::one())?;
+            let h2 = self.get_hash(current_height, i + 1)?;
             let new_hash = if let Some(h2) = h2 {
                 hash_rules::hash_branch(h1, h2)
             } else {
                 hash_rules::hash_single_branch(h1)
             };
 
-            current_height = current_height + K::one();
-            index = index / (K::one() + K::one());
+            current_height = current_height + 1;
+            index = index / (1 + 1);
             self.set_hash(current_height, index, new_hash)?;
         }
         Ok(())
     }
 }
 
-impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
-    where T: Map<[u8], Vec<u8>>,
-          K: Integer + Copy + Clone + ToPrimitive + StorageValue,
-          V: StorageValue
+impl<T, V> List<V> for MerkleTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageValue
 {
     fn append(&self, value: V) -> Result<(), Error> {
         let len = self.len()?;
         self.append_hash(len, hash_rules::hash_leaf(&value))?;
 
-        self.map.put(&Self::db_key(K::zero(), len), value.serialize())?;
-        self.set_len(len + K::one())?;
+        self.map.put(&Self::db_key(0, len), value.serialize())?;
+        self.set_len(len + 1)?;
         Ok(())
     }
 
@@ -277,41 +266,41 @@ impl<T, K: ?Sized, V> List<K, V> for MerkleTable<T, K, V>
         Ok(())
     }
 
-    fn get(&self, index: K) -> Result<Option<V>, Error> {
-        let value = self.map.get(&Self::db_key(K::zero(), index))?;
+    fn get(&self, index: u64) -> Result<Option<V>, Error> {
+        let value = self.map.get(&Self::db_key(0, index))?;
         Ok(value.map(StorageValue::deserialize))
     }
 
-    fn set(&self, index: K, value: V) -> Result<(), Error> {
-        if index >= self.len()? || index < K::zero() {
+    fn set(&self, index: u64, value: V) -> Result<(), Error> {
+        if index >= self.len()? {
             return Err(Error::new("Wrong index!"));
         }
 
         self.update_hash_subtree(index, hash_rules::hash_leaf(&value))?;
-        self.map.put(&Self::db_key(K::zero(), index), value.serialize())
+        self.map.put(&Self::db_key(0, index), value.serialize())
     }
 
 
     fn last(&self) -> Result<Option<V>, Error> {
         let len = self.len()?;
-        if len == K::zero() {
+        if len == 0 {
             Ok(None)
         } else {
-            self.get(len - K::one())
+            self.get(len - 1)
         }
     }
 
     fn is_empty(&self) -> Result<bool, Error> {
-        Ok(self.len()? == K::zero())
+        Ok(self.len()? == 0)
     }
 
-    fn len(&self) -> Result<K, Error> {
+    fn len(&self) -> Result<u64, Error> {
         if let Some(count) = self.count.get() {
             return Ok(count);
         }
 
         let v = self.map.get(&[])?;
-        let c = v.map_or_else(K::zero, K::deserialize);
+        let c = v.map(StorageValue::deserialize).unwrap_or(0);
         self.count.set(Some(c));
         Ok(c)
     }
@@ -383,7 +372,7 @@ mod tests {
         table.append(vec![3]).unwrap();
         assert_eq!(table.len().unwrap(), 3);
 
-        assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
+        assert_eq!(table.get(0).unwrap(), Some(vec![1]));
         assert_eq!(table.get(1).unwrap(), Some(vec![2]));
         assert_eq!(table.get(2).unwrap(), Some(vec![3]));
     }
@@ -406,7 +395,7 @@ mod tests {
         assert_eq!(table.height().unwrap(), 3);
 
         assert_eq!(table.len().unwrap(), 4);
-        assert_eq!(table.get(0u32).unwrap(), Some(vec![1]));
+        assert_eq!(table.get(0).unwrap(), Some(vec![1]));
         assert_eq!(table.get(1).unwrap(), Some(vec![2]));
         assert_eq!(table.get(2).unwrap(), Some(vec![3]));
         assert_eq!(table.get(3).unwrap(), Some(vec![4]));
@@ -420,9 +409,9 @@ mod tests {
         let _ = env_logger::init();
 
         let storage = MemoryDB::new();
-        let table: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Hash> =
+        let table: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, Hash> =
             MerkleTable::new(MapTable::new(vec![255], &storage));
-        let num_vals = 10u32;
+        let num_vals = 10;
         let values = generate_fully_random_data_keys(num_vals as usize);
         let hash_vals: Vec<Hash> = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>();
         for value in &hash_vals {
@@ -460,18 +449,18 @@ mod tests {
 
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        let num_vals = 100u32;
+        let num_vals = 100;
         let values = generate_fully_random_data_keys(num_vals as usize);
         let mut rng = thread_rng();
         for value in &values {
             table.append(value.clone()).unwrap();
         }
-        table.get(0u32).unwrap();
+        table.get(0).unwrap();
         let table_root_hash = table.root_hash().unwrap();
         let table_len = table.len().unwrap() as usize;
 
         for _ in 0..50 {
-            let start_range = rng.gen_range(0u32, num_vals);
+            let start_range = rng.gen_range(0, num_vals);
             let end_range = rng.gen_range(start_range + 1, num_vals + 1);
             let range_proof = table.construct_path_for_range(start_range, end_range).unwrap();
             assert_eq!(range_proof.compute_proof_root(), table_root_hash);
@@ -547,7 +536,7 @@ mod tests {
         let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
         let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
-        let expected_hash_comb: Vec<(Vec<u8>, Hash, u32)> = vec![(vec![1, 2], h1, 0),
+        let expected_hash_comb: Vec<(Vec<u8>, Hash, u64)> = vec![(vec![1, 2], h1, 0),
                                                                  (vec![2, 3], h12, 1),
                                                                  (vec![3, 4], h123, 2),
                                                                  (vec![4, 5], h1234, 3),
@@ -639,7 +628,7 @@ mod tests {
         range_proof = table.construct_path_for_range(2, 6).unwrap();
         assert_eq!(proof_indices_values(&range_proof).len(), 4);
         assert_eq!(range_proof.compute_proof_root(), h12345678);
-        assert_eq!(table.get(0u32).unwrap(), Some(vec![1, 2]));
+        assert_eq!(table.get(0).unwrap(), Some(vec![1, 2]));
     }
 
     #[test]
@@ -647,7 +636,7 @@ mod tests {
     fn test_proof_illegal_lower_bound() {
         let storage = MemoryDB::new();
         let table = MerkleTable::new(MapTable::new(vec![255], &storage));
-        table.construct_path_for_range(0u32, 1u32).unwrap();
+        table.construct_path_for_range(0, 1).unwrap();
         table.append(vec![1]).unwrap();
     }
 
@@ -659,7 +648,7 @@ mod tests {
         for i in 0u8..8 {
             table.append(vec![i]).unwrap();
         }
-        table.construct_path_for_range(8u32, 9).unwrap();
+        table.construct_path_for_range(8, 9).unwrap();
     }
 
     #[test]
@@ -670,7 +659,7 @@ mod tests {
         for i in 0u8..4 {
             table.append(vec![i]).unwrap();
         }
-        table.construct_path_for_range(2u32, 2).unwrap();
+        table.construct_path_for_range(2, 2).unwrap();
     }
 
     #[test]
@@ -696,7 +685,7 @@ mod tests {
         }
 
         assert_eq!(table.root_hash().unwrap(), h12345);
-        let range_proof = table.construct_path_for_range(4u32, 5).unwrap();
+        let range_proof = table.construct_path_for_range(4, 5).unwrap();
         assert_eq!(range_proof.compute_proof_root(), h12345);
 
         assert_eq!(vec![4, 5, 6], *(proof_indices_values(&range_proof)[0].1));
@@ -719,7 +708,7 @@ mod tests {
             assert!(false);
         }
         table.append(vec![5, 6, 7]).unwrap();
-        // let range_proof = table.construct_path_for_range(3u32, 5).unwrap();
+        // let range_proof = table.construct_path_for_range(3, 5).unwrap();
         // println!("{:?}", range_proof);
         // let json_repre = serde_json::to_string(&range_proof).unwrap();
         // println!("{}", json_repre );
@@ -732,7 +721,7 @@ mod tests {
 
         let h = hash(&[1, 2, 3, 4]);
         table.append(h).unwrap();
-        assert_eq!(table.get(0u32).unwrap(), Some(h));
+        assert_eq!(table.get(0).unwrap(), Some(h));
     }
 
     #[test]
@@ -742,7 +731,7 @@ mod tests {
 
         let s = MemoryDB::new();
         let t = MerkleTable::new(MapTable::new(vec![255], &s));
-        assert_eq!(t.get(0u32).unwrap(), None);
+        assert_eq!(t.get(0).unwrap(), None);
         t.append(vec![1]).unwrap();
         assert_eq!(t.root_hash().unwrap(), h1);
 
@@ -754,7 +743,7 @@ mod tests {
     fn test_swap_values() {
 
         let s1 = MemoryDB::new();
-        let t1: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Vec<u8>> =
+        let t1: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, Vec<u8>> =
             MerkleTable::new(MapTable::new(vec![255], &s1));
         let values1 = vec![
             vec![1],
@@ -766,7 +755,7 @@ mod tests {
         t1.swap(2, 3).unwrap();
 
         let s2 = MemoryDB::new();
-        let t2: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, u32, Vec<u8>> =
+        let t2: MerkleTable<MapTable<MemoryDB, [u8], Vec<u8>>, Vec<u8>> =
             MerkleTable::new(MapTable::new(vec![255], &s2));
         let values2 = vec![
             vec![1],
@@ -782,7 +771,7 @@ mod tests {
     fn test_hash_set_value() {
         let s1 = MemoryDB::new();
         let t1 = MerkleTable::new(MapTable::new(vec![255], &s1));
-        assert_eq!(t1.get(0u32).unwrap(), None);
+        assert_eq!(t1.get(0).unwrap(), None);
         t1.append(vec![1]).unwrap();
         t1.append(vec![2]).unwrap();
         t1.append(vec![3]).unwrap();
@@ -795,7 +784,7 @@ mod tests {
 
         let s2 = MemoryDB::new();
         let t2 = MerkleTable::new(MapTable::new(vec![255], &s2));
-        assert_eq!(t2.get(0u32).unwrap(), None);
+        assert_eq!(t2.get(0).unwrap(), None);
         t2.append(vec![4]).unwrap();
         t2.append(vec![7]).unwrap();
         t2.append(vec![5]).unwrap();
@@ -806,18 +795,18 @@ mod tests {
 
     #[test]
     fn test_indices_converting_for_merkle_range_proof() {
-        assert_eq!(index_of_first_element_in_subtree(4u32, 1u32), 8u32);
-        assert_eq!(index_of_first_element_in_subtree(5u32, 1u32), 16u32);
-        assert_eq!(index_of_first_element_in_subtree(3u32, 3u32), 12u32);
-        assert_eq!(index_of_first_element_in_subtree(2u32, 3u32), 6u32);
-        assert_eq!(index_of_first_element_in_subtree(1u32, 7u32), 7u32);
+        assert_eq!(index_of_first_element_in_subtree(4, 1), 8);
+        assert_eq!(index_of_first_element_in_subtree(5, 1), 16);
+        assert_eq!(index_of_first_element_in_subtree(3, 3), 12);
+        assert_eq!(index_of_first_element_in_subtree(2, 3), 6);
+        assert_eq!(index_of_first_element_in_subtree(1, 7), 7);
     }
 
     #[test]
     fn test_split_range() {
-        assert_eq!((Some((0u32, 17u32)), Some((17u32, 31u32))),
-                   split_range(0u32, 17u32, 31u32));
-        assert_eq!((Some((0u32, 31u32)), None), split_range(0u32, 31u32, 31u32));
-        assert_eq!((None, Some((5u32, 31u32))), split_range(5u32, 0u32, 31u32));
+        assert_eq!((Some((0, 17)), Some((17, 31))),
+                   split_range(0, 17, 31));
+        assert_eq!((Some((0, 31)), None), split_range(0, 31, 31));
+        assert_eq!((None, Some((5, 31))), split_range(5, 0, 31));
     }
 }
