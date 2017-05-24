@@ -84,19 +84,11 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.state.validators()
     }
 
-    pub fn consensus_public_key(&self) -> &PublicKey {
-        self.state.consensus_public_key()
-    }
-
-    pub fn consensus_secret_key(&self) -> &SecretKey {
-        self.state.consensus_secret_key()
-    }
-
-    pub fn service_public_key(&self) -> &PublicKey {
+    pub fn public_key(&self) -> &PublicKey {
         self.state.service_public_key()
     }
 
-    pub fn service_secret_key(&self) -> &SecretKey {
+    pub fn secret_key(&self) -> &SecretKey {
         self.state.service_secret_key()
     }
 
@@ -133,8 +125,8 @@ impl ApiContext {
         ApiContext {
             blockchain: handler.blockchain.clone(),
             node_channel: node.channel(),
-            public_key: *node.state().public_key(),
-            secret_key: node.state().secret_key().clone(),
+            public_key: *node.state().service_public_key(),
+            secret_key: node.state().service_secret_key().clone(),
         }
     }
 
