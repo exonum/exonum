@@ -45,7 +45,7 @@ impl<T, V> List<V> for ListTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageVa
         let mut len = self.len()?;
         for value in iter {
             self.map.put(&len.serialize(), value.serialize())?;
-            len = len + 1;
+            len += 1;
         }
         self.map.put(&[], len.serialize())?;
         self.count.set(Some(len));

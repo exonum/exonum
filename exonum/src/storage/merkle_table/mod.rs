@@ -162,8 +162,8 @@ impl<'a, T, V> MerkleTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageValue
         let mut p = 1;
         let mut i = 0;
         while p < v {
-            p = p * (1 + 1);
-            i = i + 1;
+            p *= 2;
+            i += 1;
         }
         i
     }
@@ -211,8 +211,8 @@ impl<'a, T, V> MerkleTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageValue
                 let h2 = self.get_hash(current_height, index)?.unwrap();
                 hash_rules::hash_branch(h1, h2)
             };
-            current_height = current_height + 1;
-            index = index / (1 + 1);
+            current_height += 1;
+            index /= 2;
             self.set_hash(current_height, index, new_hash)?;
         }
         Ok(())
@@ -238,8 +238,8 @@ impl<'a, T, V> MerkleTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageValue
                 hash_rules::hash_single_branch(h1)
             };
 
-            current_height = current_height + 1;
-            index = index / (1 + 1);
+            current_height += 1;
+            index /= 2;
             self.set_hash(current_height, index, new_hash)?;
         }
         Ok(())
