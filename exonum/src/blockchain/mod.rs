@@ -227,3 +227,40 @@ impl Blockchain {
         mount
     }
 }
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_u64() {
+        storage_value! {
+            struct Test {
+                const SIZE = 8;
+                field some_test:u64 [0 => 8]
+            }
+        }
+        let test_data = r##"{"some_test":"1234"}"##;
+        let test = Test::new(1234);
+        let data = ::serialize::json::reexport::to_string(&test).unwrap();
+        println!("{:?}", data);
+        assert_eq!(data, test_data);
+    }
+
+    #[test]
+    fn test_system_time() {
+    use std::time::{SystemTime, UNIX_EPOCH};
+        storage_value! {
+            struct Test {
+                const SIZE = 12;
+                field some_test:SystemTime [0 => 12]
+            }
+        }
+        let test_data = r##"{"some_test":{"secs":"0","nanos":0}}"##;
+
+
+        let test = Test::new(UNIX_EPOCH);
+        let data = ::serialize::json::reexport::to_string(&test).unwrap();
+        assert_eq!(data, test_data);
+    }
+
+
+}

@@ -74,7 +74,7 @@ pub struct ExonumJsonSerializeWrapper<'a, T: ExonumJsonSerialize + 'a>(&'a T);
 
 #[derive(Serialize, Deserialize)]
 struct DurationHelper {
-    secs: u64,
+    secs: String,
     nanos: u32,
 }
 
@@ -160,7 +160,7 @@ impl ExonumJsonSerialize for SystemTime {
         let duration = self.duration_since(UNIX_EPOCH)
             .map_err(S::Error::custom)?;
         let duration = DurationHelper {
-            secs: duration.as_secs(),
+            secs: duration.as_secs().to_string(),
             nanos: duration.subsec_nanos(),
         };
         <DurationHelper as Serialize>::serialize(&duration, serializer)
@@ -275,7 +275,7 @@ impl ExonumJsonDeserializeField for SystemTime {
                                                 to: usize)
                                                 -> Result<(), Box<Error>> {
         let helper: DurationHelper = ::serde_json::from_value(value.clone())?;
-        let duration = Duration::new(helper.secs, helper.nanos);
+        let duration = Duration::new(helper.secs.parse()?, helper.nanos);
         let system_time = UNIX_EPOCH + duration;
         buffer.write(from, to, system_time);
         Ok(())
@@ -394,3 +394,5 @@ pub mod reexport {
     pub use serde::de::Error;
     pub use serde::ser::SerializeStruct;
 }
+
+
