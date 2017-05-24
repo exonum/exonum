@@ -2411,7 +2411,7 @@ fn test_exclude_validator_from_consensus() {
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
 }
 
-/// - Check following_configuration method in schema
+/// - Check `following_configuration` method in schema
 /// - idea of the test is check configurations method from schema
 #[test]
 fn test_schema_config_changes() {
