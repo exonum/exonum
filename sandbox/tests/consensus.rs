@@ -2467,6 +2467,12 @@ fn test_schema_config_changes() {
                    .actual_configuration()
                    .unwrap(),
                following_cfg);
+    // Check previous configuration
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .previous_configuration()
+                   .unwrap()
+                   .unwrap(),
+               prev_cfg);
 
     // Finally check configuration for some heights
     assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
