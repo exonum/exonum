@@ -1,4 +1,4 @@
-use exonum::crypto::{Hash, hash};
+use exonum::crypto::Hash;
 use exonum::storage::StorageValue;
 
 storage_value! {

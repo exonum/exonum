@@ -1,5 +1,5 @@
 use serde::Serialize;
-use serde_json::{to_value};
+use serde_json::to_value;
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
@@ -144,7 +144,7 @@ impl<T> Api for CryptocurrencyApi<T>
             match req.get::<bodyparser::Struct<CurrencyTx>>() {
                 Ok(Some(transaction)) => {
                     let tx_hash = _self.transaction(transaction)?;
-                    let json = TxResponse{tx_hash: tx_hash};
+                    let json = TxResponse { tx_hash: tx_hash };
                     _self.ok_response(&to_value(&json).unwrap())
                 }
                 Ok(None) => Err(ApiError::IncorrectRequest)?,

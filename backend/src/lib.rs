@@ -104,15 +104,9 @@ impl Serialize for CurrencyTx {
         where S: Serializer
     {
         match *self {
-            CurrencyTx::Issue(ref issue) => {
-                issue.serialize(ser)
-            }
-            CurrencyTx::Transfer(ref transfer) => {
-                transfer.serialize(ser)
-            }
-            CurrencyTx::CreateWallet(ref wallet) => {
-                wallet.serialize(ser)
-            }
+            CurrencyTx::Issue(ref issue) => issue.serialize(ser),
+            CurrencyTx::Transfer(ref transfer) => transfer.serialize(ser),
+            CurrencyTx::CreateWallet(ref wallet) => wallet.serialize(ser),
         }
     }
 }
@@ -125,15 +119,18 @@ impl<'de> Deserialize<'de> for CurrencyTx {
         let service_id: u16;
         let message_id: u16;
         if let Some(value) = value.as_object() {
-            service_id = value.get("service_id")
-                              .and_then(|v| v.as_i64())
-                              .ok_or_else(|| de::Error::custom("Can't parse service_id."))? as u16;
-            message_id = value.get("message_id")
-                              .and_then(|v| v.as_i64())
-                              .ok_or_else(|| de::Error::custom("Can't parse message_id."))? as u16;
-        }
-        else {
-                return Err(de::Error::custom("Tx is not a json object"));
+            service_id = value
+                .get("service_id")
+                .and_then(|v| v.as_i64())
+                .ok_or_else(|| de::Error::custom("Can't parse service_id."))? as
+                         u16;
+            message_id = value
+                .get("message_id")
+                .and_then(|v| v.as_i64())
+                .ok_or_else(|| de::Error::custom("Can't parse message_id."))? as
+                         u16;
+        } else {
+            return Err(de::Error::custom("Tx is not a json object"));
         }
 
         match service_id {
@@ -147,15 +144,24 @@ impl<'de> Deserialize<'de> for CurrencyTx {
         }
         let res = match message_id {
             TX_ISSUE_ID => {
-                let ret: TxIssue = from_value(value).map_err(|e| de::Error::custom(format!("Can't parse TxIssue {:?}", e)))?;
+                let ret: TxIssue =
+                    from_value(value)
+                        .map_err(|e| de::Error::custom(format!("Can't parse TxIssue {:?}", e)))?;
                 CurrencyTx::Issue(ret)
             }
             TX_WALLET_ID => {
-                let ret: TxCreateWallet = from_value(value).map_err(|e| de::Error::custom(format!("Can't parse TxCreateWallet {:?}", e)))?;
+                let ret: TxCreateWallet =
+                    from_value(value)
+                        .map_err(|e| {
+                                     de::Error::custom(format!("Can't parse TxCreateWallet {:?}",
+                                                               e))
+                                 })?;
                 CurrencyTx::CreateWallet(ret)
             }
             TX_TRANSFER_ID => {
-                let ret: TxTransfer = from_value(value).map_err(|e| de::Error::custom(format!("Can't parse TxTransfer {:?}", e)))?;;
+                let ret: TxTransfer =
+                    from_value(value)
+                        .map_err(|e| de::Error::custom(format!("Can't parse TxTransfer {:?}", e)))?;
                 CurrencyTx::Transfer(ret)
             }
             other => {

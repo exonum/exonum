@@ -1,5 +1,5 @@
 use exonum::messages::Field;
-use exonum::crypto::{PublicKey, Hash, hash};
+use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::StorageValue;
 
 storage_value! {
