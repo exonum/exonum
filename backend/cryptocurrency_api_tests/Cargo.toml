@@ -8,7 +8,6 @@ iron = "0.5.1"
 serde = "1.0.0"
 serde_derive = "1.0.0"
 rand = "0.3"
-serde_json = "1.0.2"
 router = "0.5.1"
 log = "0.3"
 iron-test = { git = "https://github.com/reem/iron-test" }

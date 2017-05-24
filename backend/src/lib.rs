@@ -9,7 +9,6 @@ extern crate byteorder;
 extern crate log;
 #[cfg(test)]
 extern crate tempdir;
-//extern crate serde_json;
 #[macro_use(message, storage_value, counter)]
 extern crate exonum;
 extern crate params;

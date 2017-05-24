@@ -5,7 +5,6 @@ extern crate clap;
 extern crate serde;
 extern crate time;
 extern crate rand;
-extern crate serde_json;
 extern crate bodyparser;
 extern crate exonum;
 extern crate cryptocurrency;

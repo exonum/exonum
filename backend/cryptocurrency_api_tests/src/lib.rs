@@ -6,7 +6,6 @@ extern crate sandbox;
 extern crate cryptocurrency;
 extern crate iron;
 extern crate router;
-extern crate serde_json;
 extern crate serde;
 #[cfg(test)]
 #[macro_use]
@@ -24,7 +23,6 @@ mod tests {
     use iron::prelude::*;
     use iron::headers::ContentType;
     use serde::Serialize;
-    use serde_json;
 
     use std::collections::VecDeque;
     use std::sync::{Arc, Mutex};
@@ -32,6 +30,7 @@ mod tests {
     use std::fs::File;
     use std::io::Read;
 
+    use exonum::serialize::json::reexport as serde_json;
     use exonum::node::TransactionSend;
     use exonum::crypto::{Seed, Hash, PublicKey, gen_keypair, gen_keypair_from_seed};
     use exonum::blockchain::{Service, Transaction};
