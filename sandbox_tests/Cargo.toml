@@ -9,7 +9,6 @@ authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re",
 iron = "0.5.1"
 serde = "1.0.0"
 serde_derive = "1.0.0"
-serde_json = "1.0.0"
 rand = "0.3"
 router = "0.5.1"
 log = "0.3"
@@ -19,9 +18,9 @@ configuration_service = {version="0.1.0", path="../"}
 [dependencies.exonum]
 git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "eb025edb3aac74d4bb930e639c5f8682f7bef0ee"
+rev = "6e9257438780a668fa5002bd12e78a0b2f47911b"
 
 [dependencies.sandbox]
 git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "eb025edb3aac74d4bb930e639c5f8682f7bef0ee"
+rev = "6e9257438780a668fa5002bd12e78a0b2f47911b"

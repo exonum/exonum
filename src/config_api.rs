@@ -2,13 +2,13 @@ use params::{Map as ParamsMap, Params, Value};
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
-use serde_json;
 
 use exonum::api::{Api, ApiError};
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
 use exonum::storage::{Map, StorageValue};
 use exonum::node::{TxSender, NodeChannel, TransactionSend};
+use exonum::serialize::json::reexport as serde_json;
 
 use super::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigTx,
             ConfigurationSchema};

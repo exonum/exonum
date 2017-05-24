@@ -7,7 +7,6 @@ use iron::status::Status;
 use iron::prelude::*;
 use iron::headers::ContentType;
 use serde::Serialize;
-use serde_json;
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -23,6 +22,7 @@ use exonum::events::Error as EventsError;
 use exonum::messages::{FromRaw, Message, RawMessage};
 use exonum::api::Api;
 use exonum::helpers::init_logger;
+use exonum::serialize::json::reexport as serde_json;
 use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 

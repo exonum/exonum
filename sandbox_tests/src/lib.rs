@@ -8,7 +8,6 @@ extern crate sandbox;
 extern crate configuration_service;
 extern crate iron;
 extern crate router;
-extern crate serde_json;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -21,6 +20,7 @@ use std::collections::BTreeMap;
 use exonum::crypto::Hash;
 use exonum::blockchain::config::StoredConfiguration;
 use exonum::blockchain::Service;
+use exonum::serialize::json::reexport as serde_json;
 use sandbox::sandbox::Sandbox;
 use sandbox::timestamping::TimestampingService;
 

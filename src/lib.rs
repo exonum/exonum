@@ -52,9 +52,7 @@
 //! extern crate env_logger;
 //! extern crate clap;
 //! extern crate serde;
-//! extern crate serde_json;
 //! extern crate bodyparser;
-//!
 //! extern crate exonum;
 //! extern crate router;
 //! extern crate configuration_service;
@@ -105,7 +103,7 @@ extern crate log;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
+//extern crate serde_json;
 extern crate iron;
 extern crate router;
 extern crate bodyparser;
@@ -125,6 +123,7 @@ use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
 use exonum::messages::{Field, RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
+use exonum::serialize::json::reexport as serde_json;
 
 /// Configuration service http api.
 pub mod config_api;

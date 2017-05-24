@@ -12,7 +12,6 @@ env_logger = "0.3"
 log = "0.3"
 serde = "1.0.0"
 serde_derive = "1.0.0"
-serde_json = "1.0.0"
 lazy_static = "0.2.1"
 
 router = "0.5.1"
@@ -23,4 +22,4 @@ params = "0.6.0"
 [dependencies.exonum]
 git = "ssh://git@github.com/vldm/exonum-core.git"
 version = "0.1.0"
-rev = "eb025edb3aac74d4bb930e639c5f8682f7bef0ee"
+rev = "6e9257438780a668fa5002bd12e78a0b2f47911b"
