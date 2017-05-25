@@ -8,14 +8,14 @@ pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 
 message! {
-    TxConfig {
+    struct TxConfig {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
         const SIZE = 48;
 
-        from:               &PublicKey  [00 => 32]
-        config:             &[u8]       [32 => 40]
-        actual_from_height: u64         [40 => 48]
+        field from:               &PublicKey  [00 => 32]
+        field config:             &[u8]       [32 => 40]
+        field actual_from_height: u64         [40 => 48]
     }
 }
 

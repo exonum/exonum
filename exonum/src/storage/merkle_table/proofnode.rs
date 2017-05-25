@@ -1,5 +1,6 @@
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::Error;
+use serde::ser::SerializeStruct;
 use serde_json::{Error as SerdeJsonError, Value, from_value};
 
 use std::fmt;
@@ -11,7 +12,6 @@ use super::hash_rules;
 const LEFT_DESC: &'static str = "left";
 const RIGHT_DESC: &'static str = "right";
 const VAL_DESC: &'static str = "val";
-
 #[allow(dead_code)]
 pub fn proof_indices_values<V: StorageValue>(proof: &Proofnode<V>) -> Vec<(usize, &V)> {
     let mut res = Vec::new();
@@ -27,7 +27,7 @@ pub enum Proofnode<V> {
 }
 
 impl<V: Serialize> Serialize for Proofnode<V> {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         use self::Proofnode::*;
@@ -35,35 +35,37 @@ impl<V: Serialize> Serialize for Proofnode<V> {
         match *self {
             Full(ref left_proof, ref right_proof) => {
                 state = ser.serialize_struct("Full", 2)?;
-                ser.serialize_struct_elt(&mut state, LEFT_DESC, left_proof)?;
-                ser.serialize_struct_elt(&mut state, RIGHT_DESC, right_proof)?;
+                state.serialize_field(LEFT_DESC, left_proof)?;
+                state.serialize_field(RIGHT_DESC, right_proof)?;
             } 
             Left(ref left_proof, ref option_hash) => {
                 if let Some(ref hash) = *option_hash {
                     state = ser.serialize_struct("Left", 2)?;
-                    ser.serialize_struct_elt(&mut state, LEFT_DESC, left_proof)?;
-                    ser.serialize_struct_elt(&mut state, RIGHT_DESC, hash)?;
+                    state.serialize_field(LEFT_DESC, left_proof)?;
+                    state.serialize_field(RIGHT_DESC, hash)?;
                 } else {
                     state = ser.serialize_struct("Left", 1)?;
-                    ser.serialize_struct_elt(&mut state, LEFT_DESC, left_proof)?;
+                    state.serialize_field(LEFT_DESC, left_proof)?;
                 }
             } 
             Right(ref hash, ref right_proof) => {
                 state = ser.serialize_struct("Right", 2)?;
-                ser.serialize_struct_elt(&mut state, LEFT_DESC, hash)?;
-                ser.serialize_struct_elt(&mut state, RIGHT_DESC, right_proof)?;
+                state.serialize_field(LEFT_DESC, hash)?;
+                state.serialize_field(RIGHT_DESC, right_proof)?;
             } 
             Leaf(ref val) => {
                 state = ser.serialize_struct("Leaf", 1)?;
-                ser.serialize_struct_elt(&mut state, VAL_DESC, val)?;
+                state.serialize_field(VAL_DESC, val)?;
             }
         }
-        ser.serialize_struct_end(state)
+        state.end()
     }
 }
-impl<V: Deserialize> Deserialize for Proofnode<V> {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
+impl<'de, V> Deserialize<'de> for Proofnode<V> 
+where  for<'r> V: Deserialize<'r> 
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
     {
         fn format_err_string(type_str: &str, value: &Value, err: &SerdeJsonError) -> String {
             format!("Couldn't deserialize {} from serde_json::Value: {}, error: {}",

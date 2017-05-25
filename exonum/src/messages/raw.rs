@@ -83,10 +83,10 @@ pub struct MessageWriter {
 }
 
 impl MessageWriter {
-    pub fn new(service_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
+    pub fn new(protocol_version: u8, network_id: u8, service_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
         let mut raw = MessageWriter { raw: vec![0; HEADER_SIZE + payload_length] };
-        raw.set_network_id(TEST_NETWORK_ID);
-        raw.set_version(PROTOCOL_MAJOR_VERSION);
+        raw.set_network_id(network_id);
+        raw.set_version(protocol_version);
         raw.set_service_id(service_id);
         raw.set_message_type(message_type);
         raw
