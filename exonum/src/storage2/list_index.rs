@@ -59,11 +59,15 @@ impl<T, V> ListIndex<T, V> where T: AsRef<Snapshot>,
 }
 
 impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
+    fn set_len(&mut self, len: u64) {
+        self.base.put(&(), len);
+        self.length.set(Some(len));
+    }
+
     pub fn push(&mut self, value: V) {
         let len = self.len();
         self.base.put(&len, value);
-        self.base.put(&(), len + 1);
-        self.length.set(Some(len + 1));
+        self.set_len(len + 1)
     }
 
     pub fn pop(&mut self) -> Option<V> {
@@ -73,7 +77,7 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
             l => {
                 let v = self.base.get(&(l - 1));
                 self.base.delete(&(l - 1));
-                self.base.put(&(), l - 1);
+                self.set_len(l - 1);
                 v
             }
         }
@@ -86,7 +90,7 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
             len = len + 1;
         }
         self.base.put(&(), len);
-        self.length.set(Some(len));
+        self.set_len(len);
     }
 
     pub fn truncate(&mut self, len: u64) {
@@ -97,10 +101,10 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
     }
 
     pub fn set(&mut self, index: u64, value: V) {
-        // TODO: shoud we panic here?
-        if index < self.len() {
-            self.base.put(&index, value)
+        if index >= self.len() {
+            panic!("index out of bounds: the len is {} but the index is {}", self.len(), index);
         }
+        self.base.put(&index, value)
     }
 
     pub fn clear(&mut self) {

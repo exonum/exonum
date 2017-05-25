@@ -16,7 +16,7 @@ pub use self::map_index::MapIndex;
 pub use self::list_index::ListIndex;
 pub use self::key_set_index::KeySetIndex;
 pub use self::value_set_index::ValueSetIndex;
-
+pub use self::proof_list_index::ProofListIndex;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 
@@ -35,6 +35,14 @@ mod map_index;
 mod list_index;
 mod key_set_index;
 mod value_set_index;
+mod proof_list_index;
+
+pub fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
+    let mut v = [0; HASH_SIZE * 2];
+    v[..HASH_SIZE].copy_from_slice(h1.as_ref());
+    v[HASH_SIZE..].copy_from_slice(h2.as_ref());
+    hash(&v)
+}
 
 pub fn merkle_hash(hashes: &[Hash]) -> Hash {
     match hashes.len() {
@@ -42,10 +50,7 @@ pub fn merkle_hash(hashes: &[Hash]) -> Hash {
         1 => hashes[0],
         n => {
             let (l, r) = hashes.split_at(n.next_power_of_two() / 2);
-            let mut v = [0; HASH_SIZE * 2];
-            v[..HASH_SIZE].copy_from_slice(merkle_hash(l).as_ref());
-            v[HASH_SIZE..].copy_from_slice(merkle_hash(r).as_ref());
-            hash(&v)
+            pair_hash(&merkle_hash(l), &merkle_hash(r))
         }
     }
 }
