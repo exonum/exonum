@@ -97,7 +97,7 @@ pub struct NodeConfig {
     pub peers: Vec<SocketAddr>,
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub whitelist: Whitelist
+    pub whitelist: Whitelist,
     pub api: NodeApiConfig,
 }
 
@@ -144,7 +144,7 @@ impl<S> NodeHandler<S>
 
         let mut whitelist = config.listener.whitelist;
         whitelist.update_validators(stored.validators.iter().cloned()); 
-        let state = State::new(validator_id,
+        let mut state = State::new(validator_id,
                                config.listener.public_key,
                                config.listener.secret_key,
                                whitelist,

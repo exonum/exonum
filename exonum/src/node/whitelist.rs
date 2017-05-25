@@ -1,4 +1,4 @@
-//\TODO don't reload whitelisted_peers if path the same 
+//\TODO don't reload whitelisted_peers if path the same
 use std::collections::BTreeSet;
 
 use crypto::PublicKey;
@@ -12,7 +12,6 @@ pub struct Whitelist {
     #[serde(default)]
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    // keep validators independent, to allow easy update
     validators_list: BTreeSet<PublicKey>,
 }
 
@@ -20,25 +19,26 @@ pub struct Whitelist {
 
 impl Whitelist {
     /// is this `peer` can connect or not
-    pub fn contains(& self, peer: &PublicKey) -> bool {
-        !self.whitelist_on || self.validators_list.contains(peer)
-        || self.whitelisted_peers.contains(peer)
+    pub fn contains(&self, peer: &PublicKey) -> bool {
+        !self.whitelist_on || self.validators_list.contains(peer) ||
+        self.whitelisted_peers.contains(peer)
     }
 
     /// append `peer` to whitelist
-    pub fn set(&mut self, peer: PublicKey) {
+    pub fn add(&mut self, peer: PublicKey) {
         self.whitelisted_peers.insert(peer);
     }
 
     /// get list of peers in whitelist
-    pub fn get_whitelist(&self) -> Vec<&PublicKey> {
-        self.whitelisted_peers.iter()
-                              .chain(self.validators_list.iter())
-                              .collect()
+    pub fn collect_whitelist(&self) -> Vec<&PublicKey> {
+        self.whitelisted_peers
+            .iter()
+            .chain(self.validators_list.iter())
+            .collect()
     }
 
-    pub fn update_validators<I>(&mut self, list: I)
-        where I:IntoIterator<Item=PublicKey>
+    pub fn set_validators<I>(&mut self, list: I)
+        where I: IntoIterator<Item = PublicKey>
     {
         self.validators_list = list.into_iter().collect();
     }
