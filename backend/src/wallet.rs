@@ -1,20 +1,16 @@
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-
 use exonum::messages::Field;
-use exonum::messages::utils::U64;
-use exonum::crypto::{PublicKey, Hash, hash};
+use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::StorageValue;
 
-
 storage_value! {
-    Wallet {
+    struct Wallet {
         const SIZE = 88;
 
-        pub_key:            &PublicKey  [00 => 32]
-        name:               &str        [32 => 40]
-        balance:            u64         [40 => 48]
-        history_len:        u64         [48 => 56]
-        history_hash:       &Hash       [56 => 88]
+        field pub_key:            &PublicKey  [00 => 32]
+        field name:               &str        [32 => 40]
+        field balance:            u64         [40 => 48]
+        field history_len:        u64         [48 => 56]
+        field history_hash:       &Hash       [56 => 88]
     }
 }
 
@@ -40,45 +36,6 @@ impl Wallet {
         other.set_balance(other_amount);
     }
 }
-#[derive(Serialize, Deserialize)]
-struct WalletSerializeHelper {
-    pub_key: PublicKey,
-    name: String,
-    balance: U64,
-    history_len: U64,
-    history_hash: Hash,
-}
-
-impl Serialize for Wallet {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let helper = WalletSerializeHelper {
-            pub_key: *self.pub_key(),
-            name: self.name().to_string(),
-            balance: U64(self.balance()),
-            history_len: U64(self.history_len()),
-            history_hash: *self.history_hash(),
-        };
-        helper.serialize(ser)
-    }
-}
-
-impl Deserialize for Wallet {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let helper = <WalletSerializeHelper>::deserialize(deserializer)?;
-
-        let wallet = Wallet::new(&helper.pub_key,
-                                 &helper.name,
-                                 helper.balance.0,
-                                 helper.history_len.0,
-                                 &helper.history_hash);
-        Ok(wallet)
-    }
-}
-
 
 #[allow(dead_code)]
 #[derive(Serialize)]

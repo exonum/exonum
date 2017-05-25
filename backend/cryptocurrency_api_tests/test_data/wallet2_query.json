@@ -1,140 +1,158 @@
 {
-        "block_info": {
-                "block": {
-                        "height": "4",
-                        "prev_hash": "c39093917cc0d2163db08abb82d4a3d7d458fbe4ac563698b32332fa09d8dbd1",
-                        "propose_round": 4,
-                        "state_hash": "656f8b5f40f3f439544965abf2a865669d455b935ee5cf21d39efbfd2140d716",
-                        "tx_hash": "759de4b2df16488e1c13c20cb9a356487204abcedd97177f2fe773c187beb29e"
-                },
-                "precommits": [
-                        {
-                                "body": {
-                                        "block_hash": "29a5b5797b1fcf3e32236440f5fa79c64662b8ba29c791d4ee4e0e498b11263c",
-                                        "height": "4",
-                                        "propose_hash": "90cc7ebb90e8873e98a6cb662471b3baae68eb5f1ab205f13a898037323edc76",
-                                        "round": 4,
-                                        "time": {
-                                                "nanos": 804000000,
-                                                "secs": "1486720350"
-                                        },
-                                        "validator": 0
-                                },
-                                "signature": "11380a7faf53dcfea888642d9027db417162e5f75939db7efd6e892abb8543f4c2b7922ec4689a0f096da3a3e50600cd78a7d28e49b89d0de43f8e92d53c490e"
-                        },
-                        {
-                                "body": {
-                                        "block_hash": "29a5b5797b1fcf3e32236440f5fa79c64662b8ba29c791d4ee4e0e498b11263c",
-                                        "height": "4",
-                                        "propose_hash": "90cc7ebb90e8873e98a6cb662471b3baae68eb5f1ab205f13a898037323edc76",
-                                        "round": 4,
-                                        "time": {
-                                                "nanos": 804000000,
-                                                "secs": "1486720350"
-                                        },
-                                        "validator": 1
-                                },
-                                "signature": "c1844d4a34442e6642f2a7ef833f5167b9a026a1d5d27eb1fd6f2a74292a7668839da150d5a3bf13713fe73f8f078a77ff2cee3e6b5c30a0e2314d0c835de50d"
-                        },
-                        {
-                                "body": {
-                                        "block_hash": "29a5b5797b1fcf3e32236440f5fa79c64662b8ba29c791d4ee4e0e498b11263c",
-                                        "height": "4",
-                                        "propose_hash": "90cc7ebb90e8873e98a6cb662471b3baae68eb5f1ab205f13a898037323edc76",
-                                        "round": 4,
-                                        "time": {
-                                                "nanos": 804000000,
-                                                "secs": "1486720350"
-                                        },
-                                        "validator": 2
-                                },
-                                "signature": "5f762a61ecd583f5047068ef5cf4409c8be3db6b4d276cb8c9fc0291483f2700abbd70843c7e38ae3fc219240caa92c554a0cfde7f10c16a1ec1b8bce830110b"
-                        }
-                ]
+  "block_info": {
+    "block": {
+      "height": "4",
+      "prev_hash": "c39093917cc0d2163db08abb82d4a3d7d458fbe4ac563698b32332fa09d8dbd1",
+      "propose_round": 4,
+      "state_hash": "656f8b5f40f3f439544965abf2a865669d455b935ee5cf21d39efbfd2140d716",
+      "tx_hash": "759de4b2df16488e1c13c20cb9a356487204abcedd97177f2fe773c187beb29e"
+    },
+    "precommits": [
+      {
+        "body": {
+          "block_hash": "29a5b5797b1fcf3e32236440f5fa79c64662b8ba29c791d4ee4e0e498b11263c",
+          "height": "4",
+          "propose_hash": "90cc7ebb90e8873e98a6cb662471b3baae68eb5f1ab205f13a898037323edc76",
+          "round": 4,
+          "time": {
+            "nanos": 804000000,
+            "secs": "1486720350"
+          },
+          "validator": 0
         },
-        "wallet": {
-                "mpt_proof": {
-                        "0101000011001000101110100011101001100001011100001111000010100010111110110110011100110110111011001110100010100110000000110101011101101110111101100011000010011010001101011110100000010000100100010001010110011001101111000110001000010001101101010101010010101001": {
-                                "val": "199f9c6f92d49e62ccbb9ff17d07644838cf1e85b19f229b9b28daff978d0af6"
-                        },
-                        "1101111100111111011000011001100000000100101010010010111111011011010000000101011100011001001011011100010000111101110101110100100011101010011101111000101011011100010100101011110001001001100011001110100000000101001001001100000000010100101110000001000100011001": "0a65aa0aebd2312981223d2d61d1b635daf984b9b33cf10bd94f569bfb2af995"
-                },
-                "value": {
-                        "0": {
-                                "0001011": {
-                                        "01010001001110101101100110110100100100100100000000010101110010100000100100000010111011010000011110010000010001001101001110101100010111011011111011000010001100000110111100000110100101001000110000010000110110101000111010110110111000111001111100101101": {
-                                                "val": {
-                                                        "balance": "2000",
-                                                        "history_hash": "207799f4a3fa412890614d6c513c82ad2bd4ffca5fd9d5392b68b1a8c85d7e6c",
-                                                        "history_len": "3",
-                                                        "name": "Dillinger Escape Plan",
-                                                        "pub_key": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
-                                                }
-                                        },
-                                        "11101110111101011010100111100110011110011110011010100011111000010011010011111110001001111000001101111011111111110011001011000111110010110101111101011101010001001110101000001001101111001011000011100101010000101011101011010110101001001100000011001100": "522bff7530dc9ba73f1aee5e78b3786b27206fa95fee2239e9891f166a35511c"
-                                },
-                                "1": "b100ec21ab0f0038ebb40c161111bad3ffb3bb059224b90971b47ea90e0c568e"
-                        },
-                        "1": "f6fe41be6c12b7e06a201da4b563ac7f49ab52e1836f6a9b13133a7294330f0f"
-                }
+        "message_id": 4,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "11380a7faf53dcfea888642d9027db417162e5f75939db7efd6e892abb8543f4c2b7922ec4689a0f096da3a3e50600cd78a7d28e49b89d0de43f8e92d53c490e"
+      },
+      {
+        "body": {
+          "block_hash": "29a5b5797b1fcf3e32236440f5fa79c64662b8ba29c791d4ee4e0e498b11263c",
+          "height": "4",
+          "propose_hash": "90cc7ebb90e8873e98a6cb662471b3baae68eb5f1ab205f13a898037323edc76",
+          "round": 4,
+          "time": {
+            "nanos": 804000000,
+            "secs": "1486720350"
+          },
+          "validator": 1
         },
-        "wallet_history": {
-                "mt_proof": {
-                        "left": {
-                                "left": {
-                                        "val": {
-                                                "execution_status": true,
-                                                "tx_hash": "334045918808103ea8d23b9f31628cb265ebcdb4ef3f60ea9788ddca76aa7b78"
-                                        }
-                                },
-                                "right": {
-                                        "val": {
-                                                "execution_status": true,
-                                                "tx_hash": "48ce786b1fd365038836cb512ce22d589f6896c3188af1f0841cf06d869c6b59"
-                                        }
-                                }
-                        },
-                        "right": {
-                                "left": {
-                                        "val": {
-                                                "execution_status": true,
-                                                "tx_hash": "c44759951d9cfc30de58e891bd842efec8e11d38fdbfb4875fb93ad0f3752fb2"
-                                        }
-                                }
-                        }
-                },
-                "values": [
-                        {
-                                "body": {
-                                        "name": "Dillinger Escape Plan",
-                                        "pub_key": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
-                                },
-                                "message_id": 130,
-                                "service_id": 128,
-                                "signature": "16ed1d1fb4402ea6b5d920ef4ea8878e1a6dffc0b120542c5c7834212553c2a838df4857be061b5c6cda326e78698ff8d73d8a66576507850337df5dd4fb5107"
-                        },
-                        {
-                                "body": {
-                                        "amount": "3000",
-                                        "from": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
-                                        "seed": "2000",
-                                        "to": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
-                                },
-                                "message_id": 128,
-                                "service_id": 128,
-                                "signature": "51a142df1654bf28a3bb251ca4b1c18b78c569dbfdb29b7f2b2e70d43295d1a3731cf0dd1da15c8bf39abd9c7d84791edb4a592423870a1fe94b9ff2cc22c405"
-                        },
-                        {
-                                "body": {
-                                        "amount": "1000",
-                                        "from": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d",
-                                        "seed": "3000",
-                                        "to": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
-                                },
-                                "message_id": 128,
-                                "service_id": 128,
-                                "signature": "de3164d461ee455c3360bdf54e3d0004f8c1dbe7e6371787c328710db55243bb77e77a7e71bdd64ca3ad205acf95d8d1cdb7e2c37f95b91c8ddaa9f1337de806"
-                        }
-                ]
+        "message_id": 4,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "c1844d4a34442e6642f2a7ef833f5167b9a026a1d5d27eb1fd6f2a74292a7668839da150d5a3bf13713fe73f8f078a77ff2cee3e6b5c30a0e2314d0c835de50d"
+      },
+      {
+        "body": {
+          "block_hash": "29a5b5797b1fcf3e32236440f5fa79c64662b8ba29c791d4ee4e0e498b11263c",
+          "height": "4",
+          "propose_hash": "90cc7ebb90e8873e98a6cb662471b3baae68eb5f1ab205f13a898037323edc76",
+          "round": 4,
+          "time": {
+            "nanos": 804000000,
+            "secs": "1486720350"
+          },
+          "validator": 2
+        },
+        "message_id": 4,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 0,
+        "signature": "5f762a61ecd583f5047068ef5cf4409c8be3db6b4d276cb8c9fc0291483f2700abbd70843c7e38ae3fc219240caa92c554a0cfde7f10c16a1ec1b8bce830110b"
+      }
+    ]
+  },
+  "wallet": {
+    "mpt_proof": {
+      "0101000011001000101110100011101001100001011100001111000010100010111110110110011100110110111011001110100010100110000000110101011101101110111101100011000010011010001101011110100000010000100100010001010110011001101111000110001000010001101101010101010010101001": {
+        "val": "199f9c6f92d49e62ccbb9ff17d07644838cf1e85b19f229b9b28daff978d0af6"
+      },
+      "1101111100111111011000011001100000000100101010010010111111011011010000000101011100011001001011011100010000111101110101110100100011101010011101111000101011011100010100101011110001001001100011001110100000000101001001001100000000010100101110000001000100011001": "0a65aa0aebd2312981223d2d61d1b635daf984b9b33cf10bd94f569bfb2af995"
+    },
+    "value": {
+      "0": {
+        "0001011": {
+          "01010001001110101101100110110100100100100100000000010101110010100000100100000010111011010000011110010000010001001101001110101100010111011011111011000010001100000110111100000110100101001000110000010000110110101000111010110110111000111001111100101101": {
+            "val": {
+              "balance": "2000",
+              "history_hash": "207799f4a3fa412890614d6c513c82ad2bd4ffca5fd9d5392b68b1a8c85d7e6c",
+              "history_len": "3",
+              "name": "Dillinger Escape Plan",
+              "pub_key": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+            }
+          },
+          "11101110111101011010100111100110011110011110011010100011111000010011010011111110001001111000001101111011111111110011001011000111110010110101111101011101010001001110101000001001101111001011000011100101010000101011101011010110101001001100000011001100": "522bff7530dc9ba73f1aee5e78b3786b27206fa95fee2239e9891f166a35511c"
+        },
+        "1": "b100ec21ab0f0038ebb40c161111bad3ffb3bb059224b90971b47ea90e0c568e"
+      },
+      "1": "f6fe41be6c12b7e06a201da4b563ac7f49ab52e1836f6a9b13133a7294330f0f"
+    }
+  },
+  "wallet_history": {
+    "mt_proof": {
+      "left": {
+        "left": {
+          "val": {
+            "execution_status": true,
+            "tx_hash": "334045918808103ea8d23b9f31628cb265ebcdb4ef3f60ea9788ddca76aa7b78"
+          }
+        },
+        "right": {
+          "val": {
+            "execution_status": true,
+            "tx_hash": "48ce786b1fd365038836cb512ce22d589f6896c3188af1f0841cf06d869c6b59"
+          }
         }
+      },
+      "right": {
+        "left": {
+          "val": {
+            "execution_status": true,
+            "tx_hash": "c44759951d9cfc30de58e891bd842efec8e11d38fdbfb4875fb93ad0f3752fb2"
+          }
+        }
+      }
+    },
+    "values": [
+      {
+        "body": {
+          "name": "Dillinger Escape Plan",
+          "pub_key": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+        },
+        "message_id": 130,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 128,
+        "signature": "16ed1d1fb4402ea6b5d920ef4ea8878e1a6dffc0b120542c5c7834212553c2a838df4857be061b5c6cda326e78698ff8d73d8a66576507850337df5dd4fb5107"
+      },
+      {
+        "body": {
+          "amount": "3000",
+          "from": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+          "seed": "2000",
+          "to": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d"
+        },
+        "message_id": 128,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 128,
+        "signature": "51a142df1654bf28a3bb251ca4b1c18b78c569dbfdb29b7f2b2e70d43295d1a3731cf0dd1da15c8bf39abd9c7d84791edb4a592423870a1fe94b9ff2cc22c405"
+      },
+      {
+        "body": {
+          "amount": "1000",
+          "from": "0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d",
+          "seed": "3000",
+          "to": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a"
+        },
+        "message_id": 128,
+        "network_id": 0,
+        "protocol_version": 0,
+        "service_id": 128,
+        "signature": "de3164d461ee455c3360bdf54e3d0004f8c1dbe7e6371787c328710db55243bb77e77a7e71bdd64ca3ad205acf95d8d1cdb7e2c37f95b91c8ddaa9f1337de806"
+      }
+    ]
+  }
 }

@@ -1,9 +1,8 @@
 use serde::Serialize;
-use serde_json::value::ToJson;
+use serde_json::to_value;
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
-use jsonway;
 use params::{Params, Value};
 
 use exonum::api::{Api, ApiError};
@@ -28,6 +27,7 @@ pub struct HashMTproofLinker<V: Serialize> {
     mt_proof: Proofnode<TxMetaRecord>,
     values: Vec<V>,
 }
+
 
 #[derive(Serialize)]
 pub struct WalletInfo {
@@ -116,6 +116,11 @@ impl<T> CryptocurrencyApi<T>
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct TxResponse {
+    tx_hash: Hash,
+}
+
 impl<T> Api for CryptocurrencyApi<T>
     where T: 'static + TransactionSend + Clone
 {
@@ -128,7 +133,7 @@ impl<T> Api for CryptocurrencyApi<T>
                     let public_key = PublicKey::from_hex(pub_key_string)
                         .map_err(ApiError::FromHex)?;
                     let info = _self.wallet_info(&public_key)?;
-                    _self.ok_response(&info.to_json())
+                    _self.ok_response(&to_value(&info).unwrap())
                 }
                 _ => Err(ApiError::IncorrectRequest)?,
             }
@@ -139,8 +144,8 @@ impl<T> Api for CryptocurrencyApi<T>
             match req.get::<bodyparser::Struct<CurrencyTx>>() {
                 Ok(Some(transaction)) => {
                     let tx_hash = _self.transaction(transaction)?;
-                    let json = &jsonway::object(|json| json.set("tx_hash", tx_hash)).unwrap();
-                    _self.ok_response(json)
+                    let json = TxResponse { tx_hash: tx_hash };
+                    _self.ok_response(&to_value(&json).unwrap())
                 }
                 Ok(None) => Err(ApiError::IncorrectRequest)?,
                 Err(e) => {
