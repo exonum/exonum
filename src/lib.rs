@@ -190,7 +190,7 @@ message! {
         const SIZE = 40;
 
         field from:           &PublicKey  [00 => 32]
-        field cfg:            &[u8]       [32 => 40]
+        field cfg:            &str        [32 => 40]
     }
 }
 
