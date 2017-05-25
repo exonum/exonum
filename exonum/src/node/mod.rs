@@ -36,6 +36,7 @@ mod whitelist;
 pub mod state; // TODO: temporary solution to get access to WAIT consts
 pub mod timeout_adjuster;
 
+const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
@@ -493,6 +494,15 @@ impl Node {
     /// Creates node for the given blockchain and node configuration.
     pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Self {
         crypto::init();
+        
+        if cfg!(feature="flame_profile") {
+            ::profiler::init_handler(
+                ::std::env::var(PROFILE_ENV_VARIABLE_NAME)
+                .expect(
+                    &format!("You compile exonum with profiling support, but {}",
+                     PROFILE_ENV_VARIABLE_NAME)))
+        };
+
         blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
 
 
