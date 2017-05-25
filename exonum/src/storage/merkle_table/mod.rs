@@ -152,20 +152,7 @@ impl<'a, T, V> MerkleTable<T, V> where T: Map<[u8], Vec<u8>>, V: StorageValue
     }
 
     fn height(&self) -> Result<u64, Error> {
-        let len = self.len()?;
-        let h = Self::upper_power_of_two(len) + 1;
-        Ok(h)
-    }
-
-    // TODO replace by library method
-    fn upper_power_of_two(v: u64) -> u64 {
-        let mut p = 1;
-        let mut i = 0;
-        while p < v {
-            p *= 2;
-            i += 1;
-        }
-        i
+        Ok(self.len()?.next_power_of_two().trailing_zeros() as u64 + 1)
     }
 
     fn set_len(&self, len: u64) -> Result<(), Error> {
