@@ -1,5 +1,3 @@
-use serde_json;
-
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
@@ -250,8 +248,9 @@ fn test_precommit() {
     assert_eq!(precommit.block_hash(), &block_hash);
     assert!(precommit.verify_signature(&public_key));
     assert_eq!(precommit.time(), time);
-    let json_str = serde_json::to_string(&precommit).unwrap();
-    let precommit1 : Precommit = serde_json::from_str(&json_str).unwrap(); 
+    let json_str = ::serde_json::to_string(&precommit).unwrap();
+    println!("{}", json_str);
+    let precommit1 : Precommit = ::serde_json::from_str(&json_str).unwrap(); 
     assert_eq!(precommit, precommit1);
 }
 
@@ -328,8 +327,8 @@ fn test_block() {
         block: content.clone(),
         precommits: precommits.clone(),
     };
-    let json_str = serde_json::to_string(&block_proof).unwrap();
-    let  block_proof_1: BlockProof = serde_json::from_str(&json_str).unwrap(); 
+    let json_str = ::serialize::json::reexport::to_string(&block_proof).unwrap();
+    let block_proof_1: BlockProof = ::serialize::json::reexport::from_str(&json_str).unwrap(); 
     assert_eq!(block_proof, block_proof_1);
 }
 
