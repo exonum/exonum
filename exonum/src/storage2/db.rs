@@ -46,32 +46,32 @@ pub trait Database: Sized + Clone + Send + Sync + 'static {
 }
 
 pub trait Snapshot {
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>>;
-    fn contains(&self, key: &[u8]) -> Result<bool> {
-        Ok(self.get(key)?.is_some())
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
+    fn contains(&self, key: &[u8]) -> bool {
+        self.get(key).is_some()
     }
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
 }
 
 impl Snapshot for Fork {
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         match self.changes.get(key) {
-            Some(change) => Ok(match *change {
+            Some(change) => match *change {
                 Change::Put(ref v) => Some(v.clone()),
                 Change::Delete => None,
-            }),
+            },
             None => self.snapshot.get(key)
         }
     }
 
-    fn contains(&self, key: &[u8]) -> Result<bool> {
-        Ok(match self.changes.get(key) {
+    fn contains(&self, key: &[u8]) -> bool {
+        match self.changes.get(key) {
             Some(change) => match *change {
                 Change::Put(..) => true,
                 Change::Delete => false,
             },
-            None => self.snapshot.get(key)?.is_some()
-        })
+            None => self.snapshot.get(key).is_some()
+        }
     }
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {

@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crypto::Hash;
 
-use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 pub struct ValueSetIndex<T, V> {
     base: BaseIndex<T>,
@@ -28,11 +28,11 @@ impl<T, V> ValueSetIndex<T, V> {
 
 impl<T, V> ValueSetIndex<T, V> where T: AsRef<Snapshot>,
                                      V: StorageValue {
-    pub fn contains(&self, item: &V) -> Result<bool> {
+    pub fn contains(&self, item: &V) -> bool {
         self.contains_by_hash(&item.hash())
     }
 
-    pub fn contains_by_hash(&self, hash: &Hash) -> Result<bool> {
+    pub fn contains_by_hash(&self, hash: &Hash) -> bool {
         self.base.contains(hash)
     }
 
