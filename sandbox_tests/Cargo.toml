@@ -3,14 +3,13 @@ name = "sandbox_tests"
 version = "0.1.0"
 authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re",
            "Aleksey Sidorov <aleksei.sidorov@xdev.re>",
-	   "Oleg Kuzmin <oleg.kuzmin@xdev.re>"]
+           "Oleg Kuzmin <oleg.kuzmin@xdev.re>"]
 
 [dependencies]
 iron = "0.5.1"
-serde = "0.8.23"
-serde_derive = "0.8.0"
+serde = "1.0.0"
+serde_derive = "1.0.0"
 rand = "0.3"
-serde_json = "0.8.6"
 router = "0.5.1"
 log = "0.3"
 iron-test = { git = "https://github.com/reem/iron-test" }
@@ -19,9 +18,9 @@ configuration_service = {version="0.1.0", path="../"}
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "b7c33b6ce86efe169020d7f64c75aacd36f3f4ee"
+rev = "1d89dce47d0dc0100d631bf5eefbb85abf0a01d9"
 
 [dependencies.sandbox]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "b7c33b6ce86efe169020d7f64c75aacd36f3f4ee"
+rev = "1d89dce47d0dc0100d631bf5eefbb85abf0a01d9"

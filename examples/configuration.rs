@@ -2,9 +2,7 @@ extern crate iron;
 extern crate env_logger;
 extern crate clap;
 extern crate serde;
-extern crate serde_json;
 extern crate bodyparser;
-
 extern crate exonum;
 extern crate router;
 extern crate configuration_service;

@@ -52,25 +52,23 @@
 //! extern crate env_logger;
 //! extern crate clap;
 //! extern crate serde;
-//! extern crate serde_json;
 //! extern crate bodyparser;
-
 //! extern crate exonum;
 //! extern crate router;
 //! extern crate configuration_service;
-
+//!
 //! use clap::App;
-
+//!
 //! use exonum::blockchain::{Blockchain, Service};
 //! use exonum::node::Node;
 //! use exonum::helpers::clap::{GenerateCommand, RunCommand};
-
+//!
 //! use configuration_service::ConfigurationService;
-
+//!
 //! fn main() {
 //!     exonum::crypto::init();
 //!     exonum::helpers::init_logger().unwrap();
-
+//!
 //!     let app = App::new("Simple configuration api demo program")
 //!         .version(env!("CARGO_PKG_VERSION"))
 //!         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
@@ -78,16 +76,16 @@
 //!         .subcommand(GenerateCommand::new())
 //!         .subcommand(RunCommand::new());
 //!     let matches = app.get_matches();
-
+//!
 //!     match matches.subcommand() {
 //!         ("generate", Some(matches)) => GenerateCommand::execute(matches),
 //!         ("run", Some(matches)) => {
 //!             let node_cfg = RunCommand::node_config(matches);
 //!             let db = RunCommand::db(matches);
-
+//!
 //!             let services: Vec<Box<Service>> = vec![Box::new(ConfigurationService::new())];
 //!             let blockchain = Blockchain::new(db, services);
-
+//!
 //!             let mut node = Node::new(blockchain, node_cfg);
 //!             node.run().unwrap();
 //!         }
@@ -97,16 +95,15 @@
 //!     }
 //! }
 //! ```
-//!
+
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate log;
-
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
+//extern crate serde_json;
 extern crate iron;
 extern crate router;
 extern crate bodyparser;
@@ -114,24 +111,22 @@ extern crate params;
 #[macro_use]
 extern crate lazy_static;
 
-/// Configuration service http api.
-pub mod config_api;
-use std::fmt;
-
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use router::Router;
 use iron::Handler;
 
+use std::fmt;
+
 use exonum::api::Api;
-use exonum::messages::Field;
-use exonum::blockchain::{Service, Transaction, Schema, ApiContext};
+use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext};
 use exonum::node::State;
-use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
-use exonum::messages::utils::U64;
-use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
+use exonum::crypto::{Signature, PublicKey, Hash, HASH_SIZE};
+use exonum::messages::{Field, RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
-use exonum::blockchain::StoredConfiguration;
+use exonum::serialize::json::reexport as serde_json;
+
+/// Configuration service http api.
+pub mod config_api;
 
 type ProposeData = StorageValueConfigProposeData;
 /// Value of [service_id](struct.ConfigurationService.html#method.service_id) of
@@ -153,12 +148,12 @@ It is used as placeholder in database for votes of validators, which didn't cast
 }
 
 storage_value! {
-    StorageValueConfigProposeData {
+    struct StorageValueConfigProposeData {
         const SIZE = 48;
 
-        tx_propose:            TxConfigPropose   [00 => 8]
-        votes_history_hash:    &Hash             [8 => 40]
-        num_votes:             u64               [40 => 48]
+        field tx_propose:            TxConfigPropose   [00 => 8]
+        field votes_history_hash:    &Hash             [8 => 40]
+        field num_votes:             u64               [40 => 48]
     }
 }
 
@@ -188,57 +183,25 @@ impl StorageValueConfigProposeData {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct StorageValueConfigProposeDataSerdeHelper {
-    tx_propose: TxConfigPropose,
-    votes_history_hash: Hash,
-    num_votes: U64,
-}
-
-impl Serialize for StorageValueConfigProposeData {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let helper = StorageValueConfigProposeDataSerdeHelper {
-            tx_propose: self.tx_propose(),
-            votes_history_hash: *self.votes_history_hash(),
-            num_votes: U64(self.num_votes()),
-        };
-        helper.serialize(ser)
-    }
-}
-
-impl Deserialize for StorageValueConfigProposeData {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let h = <StorageValueConfigProposeDataSerdeHelper>::deserialize(deserializer)?;
-
-        let precommit =
-            StorageValueConfigProposeData::new(h.tx_propose, &h.votes_history_hash, h.num_votes.0);
-        Ok(precommit)
-    }
-}
-
 message! {
-    TxConfigPropose {
+    struct TxConfigPropose {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
         const SIZE = 40;
 
-        from:           &PublicKey  [00 => 32]
-        cfg:            &[u8]       [32 => 40]
+        field from:           &PublicKey  [00 => 32]
+        field cfg:            &str        [32 => 40]
     }
 }
 
 message! {
-    TxConfigVote {
+    struct TxConfigVote {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_VOTE_MESSAGE_ID;
         const SIZE = 64;
 
-        from:           &PublicKey  [00 => 32]
-        cfg_hash:       &Hash       [32 => 64]
+        field from:           &PublicKey  [00 => 32]
+        field cfg_hash:       &Hash       [32 => 64]
     }
 }
 
@@ -248,86 +211,6 @@ message! {
 pub enum ConfigTx {
     ConfigPropose(TxConfigPropose),
     ConfigVote(TxConfigVote),
-}
-
-#[derive(Deserialize)]
-struct TxConfigProposeSerdeHelper {
-    from: PublicKey,
-    cfg: StoredConfiguration,
-    signature: Signature,
-}
-
-#[derive(Deserialize)]
-struct TxConfigVoteSerdeHelper {
-    from: PublicKey,
-    cfg_hash: Hash,
-    signature: Signature,
-}
-
-impl Serialize for TxConfigPropose {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let mut state;
-        state = ser.serialize_struct("config_propose", 3)?;
-        ser.serialize_struct_elt(&mut state, "from", self.from())?;
-        if let Ok(cfg) = StoredConfiguration::try_deserialize(self.cfg()) {
-            ser.serialize_struct_elt(&mut state, "cfg", cfg)?;
-        } else {
-            ser.serialize_struct_elt(&mut state, "cfg", self.cfg())?;
-        }
-        ser.serialize_struct_elt(&mut state, "signature", self.raw().signature())?;
-        ser.serialize_struct_end(state)
-    }
-}
-
-impl Deserialize for TxConfigPropose {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let h = <TxConfigProposeSerdeHelper>::deserialize(deserializer)?;
-
-        let precommit =
-            TxConfigPropose::new_with_signature(&h.from,
-                                                &StorageValue::serialize(h.cfg.clone()),
-                                                &h.signature);
-        Ok(precommit)
-    }
-}
-
-impl Serialize for TxConfigVote {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let mut state;
-        state = ser.serialize_struct("vote", 3)?;
-        ser.serialize_struct_elt(&mut state, "from", self.from())?;
-        ser.serialize_struct_elt(&mut state, "cfg_hash", self.cfg_hash())?;
-        ser.serialize_struct_elt(&mut state, "signature", self.raw().signature())?;
-        ser.serialize_struct_end(state)
-    }
-}
-
-impl Deserialize for TxConfigVote {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
-    {
-        let h = <TxConfigVoteSerdeHelper>::deserialize(deserializer)?;
-
-        let precommit = TxConfigVote::new_with_signature(&h.from, &h.cfg_hash, &h.signature);
-        Ok(precommit)
-    }
-}
-
-impl Serialize for ConfigTx {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        match *self {
-            ConfigTx::ConfigPropose(ref propose) => propose.serialize(ser),
-            ConfigTx::ConfigVote(ref vote) => vote.serialize(ser),
-        }
-    }
 }
 
 /// Struct, implementing [Service](../exonum/blockchain/service/trait.Service.html) trait template.
@@ -432,7 +315,7 @@ impl<'a> ConfigurationSchema<'a> {
     /// - Table **value** is [hash of a configuration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) - **key** of
     /// `propose_data_by_config_hash`
-    pub fn config_hash_by_ordinal(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
+    pub fn config_hash_by_ordinal(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         MerkleTable::new(MapTable::new(vec![9], self.view))
     }
     /// Returns a table of votes of validators for config, referenced by the
@@ -451,10 +334,9 @@ impl<'a> ConfigurationSchema<'a> {
     /// previous to config, referenced by the queried `config_hash`.
     /// - Table **value** is `TxConfigVote`, cast by validator with
     /// [PublicKey](struct.TxConfigVote.html#method.from), corresponding to **index**.
-    pub fn votes_by_config_hash
-        (&self,
-         config_hash: &Hash)
-         -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, TxConfigVote> {
+    pub fn votes_by_config_hash(&self,
+                                config_hash: &Hash)
+                                -> MerkleTable<MapTable<View, [u8], Vec<u8>>, TxConfigVote> {
         let mut prefix = vec![5; 1 + HASH_SIZE];
         prefix[1..].copy_from_slice(config_hash.as_ref());
         MerkleTable::new(MapTable::new(prefix, self.view))
@@ -474,7 +356,10 @@ impl<'a> ConfigurationSchema<'a> {
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is present
     /// in `propose_data_by_config_hash`, as in config inside of `tx_propose`, nothing is done.
     pub fn put_propose(&self, tx_propose: TxConfigPropose) -> StorageResult<()> {
-        let cfg = <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec());
+        let cfg = <StoredConfiguration as StorageValue>::deserialize(tx_propose
+                                                                         .cfg()
+                                                                         .as_bytes()
+                                                                         .to_vec());
         let cfg_hash = &StorageValue::hash(&cfg);
 
         if let Some(old_tx_propose) = self.get_propose(cfg_hash)? {
@@ -528,8 +413,10 @@ impl<'a> ConfigurationSchema<'a> {
                             &tx_vote));
 
         let tx_propose = propose_propose_data_by_config_hash.tx_propose();
-        let prev_cfg_hash =
-            <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec())
+        let prev_cfg_hash = <StoredConfiguration as StorageValue>::deserialize(tx_propose
+                                                                                   .cfg()
+                                                                                   .as_bytes()
+                                                                                   .to_vec())
                 .previous_cfg_hash;
         let general_schema = Schema::new(self.view);
         let prev_cfg = general_schema
@@ -599,7 +486,7 @@ impl TxConfigPropose {
             return Ok(());
         }
 
-        let config_candidate = StoredConfiguration::try_deserialize(self.cfg());
+        let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes());
         if config_candidate.is_err() {
             error!("Discarding TxConfigPropose:{} which contains config, which cannot be parsed: \
                     {:?}",
@@ -668,8 +555,8 @@ impl TxConfigVote {
         }
 
         let referenced_tx_propose = propose_option.unwrap();
-        let parsed_config = StoredConfiguration::try_deserialize(referenced_tx_propose.cfg())
-            .unwrap();
+        let parsed_config =
+            StoredConfiguration::try_deserialize(referenced_tx_propose.cfg().as_bytes()).unwrap();
         let actual_config_hash = actual_config.hash();
         if parsed_config.previous_cfg_hash != actual_config_hash {
             error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} does \

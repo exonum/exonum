@@ -1,11 +1,5 @@
 extern crate iron_test;
 
-use std::collections::VecDeque;
-use std::sync::{Arc, Mutex};
-use std::path::Path;
-use std::fs::File;
-use std::io::Read;
-
 use rand::{thread_rng, Rng};
 use router::Router;
 use iron::Headers;
@@ -13,9 +7,13 @@ use iron::status::Status;
 use iron::prelude::*;
 use iron::headers::ContentType;
 use serde::Serialize;
-use serde_json;
-use serde_json::value::ToJson;
 
+use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
+use std::path::Path;
+use std::fs::File;
+use std::io::Read;
+use std::str;
 
 use exonum::storage::{MemoryDB, MerkleTable, StorageValue, List};
 use exonum::node::TransactionSend;
@@ -23,19 +21,18 @@ use exonum::crypto::Hash;
 use exonum::blockchain::{Service, Transaction};
 use exonum::events::Error as EventsError;
 use exonum::messages::{FromRaw, Message, RawMessage};
+use exonum::api::Api;
+use exonum::helpers::init_logger;
+use exonum::serialize::json::reexport as serde_json;
+use sandbox::sandbox::{sandbox_with_services, Sandbox};
+use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
+
 use configuration_service::{StorageValueConfigProposeData, ConfigTx, TxConfigPropose,
                             TxConfigVote, ConfigurationService, ZEROVOTE};
 use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, ApiResponseConfigInfo,
                                         ApiResponseConfigHashInfo, ApiResponseVotesInfo,
                                         ApiResponseProposePost, ApiResponseVotePost};
-
-use exonum::api::Api;
-use exonum::helpers::init_logger;
-
-use sandbox::sandbox::{sandbox_with_services, Sandbox};
-use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 use super::generate_config_with_message;
-
 
 fn response_body(response: Response) -> serde_json::Value {
     if let Some(mut body) = response.body {
@@ -239,7 +236,7 @@ fn test_get_actual_config() {
 
     let resp_actual_config = api_sandbox.get_actual_config().unwrap();
     let actual_body = response_body(resp_actual_config);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -281,7 +278,7 @@ fn test_get_following_config() {
 
     let resp_following_config = api_sandbox.get_following_config().unwrap();
     let actual_body = response_body(resp_following_config);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -297,7 +294,7 @@ fn test_get_config_by_hash1() {
 
     let resp_config_by_hash = api_sandbox.get_config_by_hash(initial_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_by_hash);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -323,7 +320,7 @@ fn test_get_config_by_hash2() {
     let expected_body = {
         let expected_hash = {
             let db = MemoryDB::new();
-            let hashes: MerkleTable<MemoryDB, u64, TxConfigVote> = MerkleTable::new(db);
+            let hashes: MerkleTable<MemoryDB, TxConfigVote> = MerkleTable::new(db);
             for _ in 0..api_sandbox.sandbox.n_validators() {
                 hashes.append(ZEROVOTE.clone()).unwrap();
             }
@@ -332,7 +329,10 @@ fn test_get_config_by_hash2() {
         let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
                                   api_sandbox.sandbox.s(proposer).clone());
         let expected_propose =
-            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+            TxConfigPropose::new(&pub_key,
+                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                     .unwrap(),
+                                 &sec_key);
         let expected_voting_data =
             StorageValueConfigProposeData::new(expected_propose,
                                                &expected_hash,
@@ -347,7 +347,7 @@ fn test_get_config_by_hash2() {
         .get_config_by_hash(following_cfg.hash())
         .unwrap();
     let actual_body = response_body(resp_config_by_hash);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -394,14 +394,17 @@ fn test_get_config_by_hash3() {
     let expected_body = {
         let expected_hash = {
             let db = MemoryDB::new();
-            let hashes: MerkleTable<MemoryDB, u64, TxConfigVote> = MerkleTable::new(db);
+            let hashes: MerkleTable<MemoryDB, TxConfigVote> = MerkleTable::new(db);
             hashes.extend(votes).unwrap();
             hashes.root_hash().unwrap()
         };
         let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
                                   api_sandbox.sandbox.s(proposer).clone());
         let expected_propose =
-            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+            TxConfigPropose::new(&pub_key,
+                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                     .unwrap(),
+                                 &sec_key);
         let expected_voting_data =
             StorageValueConfigProposeData::new(expected_propose,
                                                &expected_hash,
@@ -416,7 +419,7 @@ fn test_get_config_by_hash3() {
         .get_config_by_hash(following_cfg.hash())
         .unwrap();
     let actual_body = response_body(resp_config_by_hash);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -434,7 +437,7 @@ fn test_get_config_votes() {
     let expected_body = ApiResponseVotesInfo::ProposeAbsent(None);
     let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 
     let proposer = 0;
     {
@@ -469,7 +472,7 @@ fn test_get_config_votes() {
 
     let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -488,7 +491,10 @@ fn test_post_propose_response() {
                               api_sandbox.sandbox.s(proposer).clone());
     let expected_body = {
         let propose_tx =
-            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+            TxConfigPropose::new(&pub_key,
+                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                     .unwrap(),
+                                 &sec_key);
         ApiResponseProposePost {
             tx_hash: Message::hash(&propose_tx),
             cfg_hash: following_cfg.hash(),
@@ -499,7 +505,7 @@ fn test_post_propose_response() {
         .post_config_propose(proposer, following_cfg.clone())
         .unwrap();
     let actual_body = response_body(resp_config_post);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 #[test]
@@ -523,7 +529,7 @@ fn test_post_vote_response() {
         .post_config_vote(voter, following_cfg.hash(), voter)
         .unwrap();
     let actual_body = response_body(resp_config_post);
-    assert_eq!(actual_body, expected_body.to_json());
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
 fn assert_response_status(response: IronResult<Response>,

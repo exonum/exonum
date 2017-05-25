@@ -31,12 +31,12 @@
 1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/following> - 
 format same as for `actual`
 
-1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a> 
+1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7> 
 
-    ```javascript                                                                                                                                         
+    ```javascript
     {
       "committed_config": {
-        "actual_from": 5500,
+        "actual_from": 450,
         "consensus": {
           "peers_timeout": 10000,
           "propose_timeout": 500,
@@ -44,69 +44,74 @@ format same as for `actual`
           "status_timeout": 5000,
           "txs_block_limit": 1000
         },
-        "previous_cfg_hash": "daeb250090f2d6b3689a5effd32cb16a77b7770bb1df123e1f32b13143cd3623",
+        "previous_cfg_hash": "267e8cd86262117be995379e7f5acd205cac619ed5d346cc42d5c3578de33c06",
         "services": {
           "1": null
         },
         "validators": [
-          "1087206077acf8a456e78cf52fef0f8f275becbb05338dd58822f29015f56f62",
-          "44d7e4d9df214a5d946e0f0c955c628f2e08ffedac9eba079446a183715a0796",
-          "3484e75181e584787da3a5fe040243b14e1275c9e277ba639e0e2169c5473d9f",
-          "d5864b6eb03fd70971d1b25302d2c344cc894d4b42bb953dd17a1d0fe4fba9c5"
+          "de24ff6ba3ac92035ab09792c397d9af9264528af689cdaed98688a595e5b6ac",
+          "5eb97034457d7632cd6f3d3230f958ef2f00c167e514d34b59975277fbb24baa",
+          "1d087863b9b474520dd529ac16815d9a45b6c7d13133c7db0f59b94642b4e911",
+          "1995c0a3f6313e872549316d52d2f070cc10ecebe78ce3bc730af1d24537f420"
         ]
       },
       "propose": {
         "num_votes": "4",
         "tx_propose": {
-          "cfg": {
-            "actual_from": 5500,
-            "consensus": {
-              "peers_timeout": 10000,
-              "propose_timeout": 500,
-              "round_timeout": 3000,
-              "status_timeout": 5000,
-              "txs_block_limit": 1000
-            },
-            "previous_cfg_hash": "daeb250090f2d6b3689a5effd32cb16a77b7770bb1df123e1f32b13143cd3623",
-            "services": {
-              "1": null
-            },
-            "validators": [
-              "1087206077acf8a456e78cf52fef0f8f275becbb05338dd58822f29015f56f62",
-              "44d7e4d9df214a5d946e0f0c955c628f2e08ffedac9eba079446a183715a0796",
-              "3484e75181e584787da3a5fe040243b14e1275c9e277ba639e0e2169c5473d9f",
-              "d5864b6eb03fd70971d1b25302d2c344cc894d4b42bb953dd17a1d0fe4fba9c5"
-            ]
+          "body": {
+            "cfg": "{\"previous_cfg_hash\":\"267e8cd86262117be995379e7f5acd205cac619ed5d346cc42d5c3578de33c06\",\"actual_from\":450,\"validators\":[\"de24ff6ba3ac92035ab09792c397d9af9264528af689cdaed98688a595e5b6ac\",\"5eb97034457d7632cd6f3d3230f958ef2f00c167e514d34b59975277fbb24baa\",\"1d087863b9b474520dd529ac16815d9a45b6c7d13133c7db0f59b94642b4e911\",\"1995c0a3f6313e872549316d52d2f070cc10ecebe78ce3bc730af1d24537f420\"],\"consensus\":{\"round_timeout\":3000,\"status_timeout\":5000,\"peers_timeout\":10000,\"propose_timeout\":500,\"txs_block_limit\":1000},\"services\":{\"1\":null}}",
+            "from": "de24ff6ba3ac92035ab09792c397d9af9264528af689cdaed98688a595e5b6ac"
           },
-          "from": "1087206077acf8a456e78cf52fef0f8f275becbb05338dd58822f29015f56f62",
-          "signature": "b949a3131080995179ca547ec128cb5df0bc731d3c2b7737d925ab3aba76b33b279960eddb89f222c301047d6d0e4b797945230fcc05d01378d92e0f7686d705"
+          "message_id": 0,
+          "network_id": 0,
+          "protocol_version": 0,
+          "service_id": 1,
+          "signature": "0033beb4d628d0475a34c176eeea192b25dd56ac0652a952ee89ecc858e027532606771378e8a5970c5ed99f5d5968aed6d71e5b6c56d45908b37ff0e736f002"
         },
-        "votes_history_hash": "f8349c1b2f17511c95a18e21e37dfb51348d35f39f5fdfc9191740e4ef479928"
+        "votes_history_hash": "9563a61a7eeef5199aef320547e45aa18ed023f2f0c63b740e0c6c1b93021709"
       }
     }
     ```
 
-1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/votes> 
+1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7/votes> 
 
     ```javascript
-    {                                                                                                                                                     
+    {
       "Votes": [
         {
-          "cfg_hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a",
-          "from": "1087206077acf8a456e78cf52fef0f8f275becbb05338dd58822f29015f56f62",
-          "signature": "e79ae7ea9c12f1a1cdde52b7643cd3b6a8e6a64ea1a5c8bae51aec060c521e33b5a7c0233955a3aa6167243e8e49ff98e104f99bc1eae31cbf198bdd4ca95a02"
+          "body": {
+            "cfg_hash": "d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7",
+            "from": "de24ff6ba3ac92035ab09792c397d9af9264528af689cdaed98688a595e5b6ac"
+          },
+          "message_id": 1,
+          "network_id": 0,
+          "protocol_version": 0,
+          "service_id": 1,
+          "signature": "a5767124e1dc5166a536a44571d8c3f848a9cb8b424aeb913499c1a665f9f051a9d20d92fb3e9c6e8b76fe64f60789de52904b778b8de6458299d2ae3603a00c"
         },
         {
-          "cfg_hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a",
-          "from": "44d7e4d9df214a5d946e0f0c955c628f2e08ffedac9eba079446a183715a0796",
-          "signature": "0d82841e448ac073d99ff25c6e62a7e0b832c4cc3da0947b8fcab28c7e53fb925847642af9af4ed3304334d0db38e03f7474b9342ccc7a6bc171358723f3930e"
+          "body": {
+            "cfg_hash": "d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7",
+            "from": "5eb97034457d7632cd6f3d3230f958ef2f00c167e514d34b59975277fbb24baa"
+          },
+          "message_id": 1,
+          "network_id": 0,
+          "protocol_version": 0,
+          "service_id": 1,
+          "signature": "4853d9b622b55eff57327425ee83c95b75b8ede0641d0c684747a6ff44e5ffe7e06b0d7b070364e1bae3cbf5bde18c590a2ae9952b65ba51966a4fce913e2f00"
         },
+        null,
         {
-          "cfg_hash": "f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a",
-          "from": "3484e75181e584787da3a5fe040243b14e1275c9e277ba639e0e2169c5473d9f",
-          "signature": "57366360e10541a59c7f4b692089a1baa3d849083dc7b21a143d00b47392eb512b859bc07aef9748b1720d2273484a605f662b6ad53e3eeb8f4ca89ba06aba05"
-        },
-        null
+          "body": {
+            "cfg_hash": "d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7",
+            "from": "1995c0a3f6313e872549316d52d2f070cc10ecebe78ce3bc730af1d24537f420"
+          },
+          "message_id": 1,
+          "network_id": 0,
+          "protocol_version": 0,
+          "service_id": 1,
+          "signature": "ec041203eebd2b3aa2c5353e98142c94f8b8e40ba76de2595d26cab9ddafd301c26d697cbc5b5f355db5be42fbd2f7309c8f4f3eddd24303691ef07c3d4fab06"
+        }
       ]
     }
     ```
