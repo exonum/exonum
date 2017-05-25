@@ -179,11 +179,29 @@ impl<'a> Schema<'a> {
         Ok(res)
     }
 
+    pub fn previous_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
+        let current_height = self.current_height()?;
+        let idx = self.find_configurations_index_by_height(current_height)?;
+        let res = if idx > 0 {
+            let cfg_ref = self.configs_actual_from()
+                .get(idx - 1)?
+                .expect(&format!("Configuration at index {} not found", idx));
+            let cfg_hash = cfg_ref.cfg_hash();
+            let cfg =
+                self.configuration_by_hash(cfg_hash)?
+                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+            Some(cfg)
+        } else {
+            None
+        };
+        Ok(res)
+    }
+
     pub fn configuration_by_height(&self, height: u64) -> Result<StoredConfiguration, Error> {
         let idx = self.find_configurations_index_by_height(height)?;
         let cfg_ref = self.configs_actual_from()
             .get(idx)?
-            .expect("Configuration at index {} not found");
+            .expect(&format!("Configuration at index {} not found", idx));
         let cfg_hash = cfg_ref.cfg_hash();
         let cfg =
             self.configuration_by_hash(cfg_hash)?
