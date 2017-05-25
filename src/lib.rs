@@ -119,7 +119,7 @@ use std::fmt;
 use exonum::api::Api;
 use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext};
 use exonum::node::State;
-use exonum::crypto::{Signature, PublicKey, hash, Hash, HASH_SIZE};
+use exonum::crypto::{Signature, PublicKey, Hash, HASH_SIZE};
 use exonum::messages::{Field, RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
@@ -357,7 +357,10 @@ impl<'a> ConfigurationSchema<'a> {
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is present
     /// in `propose_data_by_config_hash`, as in config inside of `tx_propose`, nothing is done.
     pub fn put_propose(&self, tx_propose: TxConfigPropose) -> StorageResult<()> {
-        let cfg = <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec());
+        let cfg = <StoredConfiguration as StorageValue>::deserialize(tx_propose
+                                                                         .cfg()
+                                                                         .as_bytes()
+                                                                         .to_vec());
         let cfg_hash = &StorageValue::hash(&cfg);
 
         if let Some(old_tx_propose) = self.get_propose(cfg_hash)? {
@@ -411,8 +414,10 @@ impl<'a> ConfigurationSchema<'a> {
                             &tx_vote));
 
         let tx_propose = propose_propose_data_by_config_hash.tx_propose();
-        let prev_cfg_hash =
-            <StoredConfiguration as StorageValue>::deserialize(tx_propose.cfg().to_vec())
+        let prev_cfg_hash = <StoredConfiguration as StorageValue>::deserialize(tx_propose
+                                                                                   .cfg()
+                                                                                   .as_bytes()
+                                                                                   .to_vec())
                 .previous_cfg_hash;
         let general_schema = Schema::new(self.view);
         let prev_cfg = general_schema
@@ -482,7 +487,7 @@ impl TxConfigPropose {
             return Ok(());
         }
 
-        let config_candidate = StoredConfiguration::try_deserialize(self.cfg());
+        let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes());
         if config_candidate.is_err() {
             error!("Discarding TxConfigPropose:{} which contains config, which cannot be parsed: \
                     {:?}",
@@ -551,8 +556,8 @@ impl TxConfigVote {
         }
 
         let referenced_tx_propose = propose_option.unwrap();
-        let parsed_config = StoredConfiguration::try_deserialize(referenced_tx_propose.cfg())
-            .unwrap();
+        let parsed_config =
+            StoredConfiguration::try_deserialize(referenced_tx_propose.cfg().as_bytes()).unwrap();
         let actual_config_hash = actual_config.hash();
         if parsed_config.previous_cfg_hash != actual_config_hash {
             error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} does \

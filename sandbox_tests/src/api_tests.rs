@@ -13,6 +13,7 @@ use std::sync::{Arc, Mutex};
 use std::path::Path;
 use std::fs::File;
 use std::io::Read;
+use std::str;
 
 use exonum::storage::{MemoryDB, MerkleTable, StorageValue, List};
 use exonum::node::TransactionSend;
@@ -328,7 +329,10 @@ fn test_get_config_by_hash2() {
         let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
                                   api_sandbox.sandbox.s(proposer).clone());
         let expected_propose =
-            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+            TxConfigPropose::new(&pub_key,
+                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                     .unwrap(),
+                                 &sec_key);
         let expected_voting_data =
             StorageValueConfigProposeData::new(expected_propose,
                                                &expected_hash,
@@ -397,7 +401,10 @@ fn test_get_config_by_hash3() {
         let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
                                   api_sandbox.sandbox.s(proposer).clone());
         let expected_propose =
-            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+            TxConfigPropose::new(&pub_key,
+                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                     .unwrap(),
+                                 &sec_key);
         let expected_voting_data =
             StorageValueConfigProposeData::new(expected_propose,
                                                &expected_hash,
@@ -484,7 +491,10 @@ fn test_post_propose_response() {
                               api_sandbox.sandbox.s(proposer).clone());
     let expected_body = {
         let propose_tx =
-            TxConfigPropose::new(&pub_key, &following_cfg.clone().serialize(), &sec_key);
+            TxConfigPropose::new(&pub_key,
+                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                     .unwrap(),
+                                 &sec_key);
         ApiResponseProposePost {
             tx_hash: Message::hash(&propose_tx),
             cfg_hash: following_cfg.hash(),

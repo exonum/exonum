@@ -3,6 +3,8 @@ use router::Router;
 use iron::prelude::*;
 use bodyparser;
 
+use std::str;
+
 use exonum::api::{Api, ApiError};
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
@@ -148,6 +150,7 @@ impl PublicConfigApi {
             let cfg = <StoredConfiguration as StorageValue>::deserialize(propose_data
                                                                              .tx_propose()
                                                                              .cfg()
+                                                                             .as_bytes()
                                                                              .to_vec());
             if !PublicConfigApi::filter_cfg_predicate(&cfg,
                                                       previous_cfg_hash_filter,
@@ -218,7 +221,10 @@ impl<T> PrivateConfigApi<T>
                           cfg: StoredConfiguration)
                           -> Result<ApiResponseProposePost, ApiError> {
         let cfg_hash = cfg.hash();
-        let config_propose = TxConfigPropose::new(&self.config.0, &cfg.serialize(), &self.config.1);
+        let config_propose = TxConfigPropose::new(&self.config.0,
+                                                  str::from_utf8(cfg.serialize().as_slice())
+                                                      .unwrap(),
+                                                  &self.config.1);
         let tx_hash = config_propose.hash();
         let ch = self.channel.clone();
         ch.send(ConfigTx::ConfigPropose(config_propose))?;
