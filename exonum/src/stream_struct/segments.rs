@@ -36,7 +36,7 @@ impl<'a, T> Field<'a> for T
         LittleEndian::write_u32(&mut buffer[from..from + 4], pos);
         LittleEndian::write_u32(&mut buffer[from + 4..to], self.count() as u32);
         self.extend_buffer(buffer);
-        
+
     }
 
     fn check(buffer: &'a [u8], from: usize, to: usize) -> Result {
@@ -51,17 +51,17 @@ impl<'a, T> Field<'a> for T
 
         if start < from + 8 {
             return Err(Error::IncorrectSegmentReference {
-                position: from as u32,
-                value: pos,
-            });
+                           position: from as u32,
+                           value: pos,
+                       });
         }
 
         let end = start + (count as usize * Self::item_size());
         if end > buffer.len() {
             return Err(Error::IncorrectSegmentSize {
-                position: (from + 4) as u32,
-                value: count,
-            });
+                           position: (from + 4) as u32,
+                           value: count,
+                       });
         }
 
         Self::check_data(buffer, start, count as usize)
@@ -69,7 +69,6 @@ impl<'a, T> Field<'a> for T
 }
 
 impl<'a> SegmentField<'a> for &'a str {
-    
     fn item_size() -> usize {
         1
     }
@@ -93,9 +92,9 @@ impl<'a> SegmentField<'a> for &'a str {
         let slice = &buffer[from..to];
         if let Err(e) = ::std::str::from_utf8(slice) {
             return Err(Error::Utf8 {
-                position: from as u32,
-                error: e,
-            });
+                           position: from as u32,
+                           error: e,
+                       });
         }
 
         let to = from + count * Self::item_size();
@@ -104,7 +103,6 @@ impl<'a> SegmentField<'a> for &'a str {
 }
 
 impl<'a> SegmentField<'a> for RawMessage {
-
     fn item_size() -> usize {
         1
     }
@@ -120,7 +118,9 @@ impl<'a> SegmentField<'a> for RawMessage {
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-        println!("extend buffer={:?}, \n extend={:?}", buffer, self.as_ref().as_ref());
+        println!("extend buffer={:?}, \n extend={:?}",
+                 buffer,
+                 self.as_ref().as_ref());
         buffer.extend_from_slice(self.as_ref().as_ref())
     }
 
@@ -130,25 +130,26 @@ impl<'a> SegmentField<'a> for RawMessage {
         println!("from ={:?}, count = {:?}, slice = {:?}", from, count, slice);
         if slice.len() < HEADER_SIZE {
             return Err(Error::UnexpectedlyShortRawMessage {
-                position: from as u32,
-                size: slice.len() as u32
-            });
+                           position: from as u32,
+                           size: slice.len() as u32,
+                       });
         }
         let actual_size = slice.len() as u32;
         let declared_size = LittleEndian::read_u32(&slice[6..10]);
         if actual_size != declared_size {
             return Err(Error::IncorrectSizeOfRawMessage {
-                position: from as u32,
-                actual_size: slice.len() as u32,
-                declared_size: declared_size
-            });
+                           position: from as u32,
+                           actual_size: slice.len() as u32,
+                           declared_size: declared_size,
+                       });
         }
         Ok(Some(SegmentReference::new(from as u32, to as u32)))
     }
 }
 
-impl<'a, T> SegmentField<'a> for Vec<T> where T: Field<'a> {
-
+impl<'a, T> SegmentField<'a> for Vec<T>
+    where T: Field<'a>
+{
     fn item_size() -> usize {
         T::field_size()
     }
@@ -162,7 +163,7 @@ impl<'a, T> SegmentField<'a> for Vec<T> where T: Field<'a> {
     // for Vec<T> where T = u8
     // but this is possible only after specialization land
     fn from_buffer(buffer: &'a [u8], from: usize, count: usize) -> Self {
-        // read vector len        
+        // read vector len
         let mut vec = Vec::with_capacity(count as usize);
         let mut start = from;
         for _ in 0..count {
@@ -185,21 +186,20 @@ impl<'a, T> SegmentField<'a> for Vec<T> where T: Field<'a> {
     fn check_data(buffer: &'a [u8], from: usize, count: usize) -> Result {
         let mut start = from;
         let header = (start + count * Self::item_size()) as u32;
-        let mut last_data = header ;
-        
+        let mut last_data = header;
+
         for _ in 0..count {
             println!("HEADER = {:?}, start = {:?}", last_data, start);
             T::check(buffer, start, start + Self::item_size())?
-                .map_or(Ok(()), |mut e| e.check_segment(header as u32, &mut last_data))?;
+                .map_or(Ok(()),
+                        |mut e| e.check_segment(header as u32, &mut last_data))?;
             start += Self::item_size();
         }
-        Ok((Some(SegmentReference::new(from as u32, last_data))))
+        Ok(Some(SegmentReference::new(from as u32, last_data)))
     }
-    
 }
 
 impl<'a> SegmentField<'a> for BitVec {
-
     fn item_size() -> usize {
         1
     }
@@ -223,7 +223,6 @@ impl<'a> SegmentField<'a> for BitVec {
 }
 
 impl<'a> SegmentField<'a> for &'a [u8] {
-
     fn item_size() -> usize {
         1
     }
@@ -234,8 +233,7 @@ impl<'a> SegmentField<'a> for &'a [u8] {
 
     fn from_buffer(buffer: &'a [u8], from: usize, count: usize) -> Self {
         let to = from + count * Self::item_size();
-        let slice = &buffer[from..to];
-        slice
+        &buffer[from..to]
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
@@ -245,7 +243,6 @@ impl<'a> SegmentField<'a> for &'a [u8] {
 
 const HASH_ITEM_SIZE: usize = 32;
 impl<'a> SegmentField<'a> for &'a [Hash] {
-
     fn item_size() -> usize {
         HASH_ITEM_SIZE
     }
@@ -267,8 +264,6 @@ impl<'a> SegmentField<'a> for &'a [Hash] {
         let slice = unsafe {
             ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * HASH_ITEM_SIZE)
         };
-        buffer.extend_from_slice(&slice)
+        buffer.extend_from_slice(slice)
     }
-
 }
-

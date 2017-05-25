@@ -20,7 +20,8 @@ macro_rules! impl_default_serialize_deref {
             }
         }
     };
-    ($traitname:ident => $($name:ty);*) => ($(impl_default_serialize_deref!{@impl $traitname $name})*);
+    ($traitname:ident => $($name:ty);*) => 
+        ($(impl_default_serialize_deref!{@impl $traitname $name})*);
 }
 
 

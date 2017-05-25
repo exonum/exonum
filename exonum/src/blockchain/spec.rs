@@ -27,7 +27,7 @@ macro_rules! storage_value {
             }
 
             fn check(buffer: &'a [u8], from_st_val: usize, to_st_val: usize)
-                -> Result<(), $crate::stream_struct::Error>
+                -> $crate::stream_struct::Result
             {
                 <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, to_st_val)?;
                 let vec: Vec<u8> = $crate::stream_struct::Field::read(buffer, from_st_val, to_st_val);
@@ -35,7 +35,6 @@ macro_rules! storage_value {
                 $( <$field_type as $crate::stream_struct::Field>::check(&vec, $from, $to)?
                         .map_or(Ok(()), |mut e| e.check_segment($body as u32, &mut last_data))?;
                 )*
-                //$(raw_message.check::<$field_type>($from, $to)?;)*
                 Ok(None)
             }
 
@@ -117,7 +116,7 @@ macro_rules! storage_value {
                 -> Result<(), Box<::std::error::Error>>
                 where B: $crate::stream_struct::serialize::json::WriteBufferWrapper
             {
-                use $crate::stream_struct::stream_struct::serialize::json::ExonumJsonDeserializeField;
+                use $crate::stream_struct::serialize::json::ExonumJsonDeserializeField;
                 let obj = value.as_object().ok_or("Can't cast json as object.")?;
                 $(
                 let val = obj.get(stringify!($field_name)).ok_or("Can't get object from json.")?;

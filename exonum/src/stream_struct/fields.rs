@@ -12,16 +12,17 @@ use super::{Error, SegmentReference};
 pub trait Field<'a> {
     // TODO: use Read and Cursor
     // TODO: debug_assert_eq!(to-from == size of Self)
+    /// Read Field from buffer, with given position
     fn read(buffer: &'a [u8], from: usize, to: usize) -> Self;
+    /// Write Field to buffer, in given position
     fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize);
+    /// Field's header size
     fn field_size() -> usize;
 
-    /// check if data in buffer could be deserialized.
-    /// return optional segment reference, if it should consume some. 
+    /// Checks if data in the buffer could be deserialized.
+    /// Returns an optional segment reference, if it should consume some.
     #[allow(unused_variables)]
-    fn check(buffer: &'a [u8], from: usize, to: usize)
-         -> Result<Option<SegmentReference>, Error>
-    {
+    fn check(buffer: &'a [u8], from: usize, to: usize) -> Result<Option<SegmentReference>, Error> {
         Ok(None)
     }
 }
@@ -39,14 +40,12 @@ impl<'a> Field<'a> for bool {
         buffer[from] = if *self { 1 } else { 0 }
     }
 
-    fn check(buffer: &'a [u8], from: usize, _: usize)
-         -> Result<Option<SegmentReference>, Error>
-    {
+    fn check(buffer: &'a [u8], from: usize, _: usize) -> Result<Option<SegmentReference>, Error> {
         if buffer[from] != 0 && buffer[from] != 1 {
             Err(Error::IncorrectBoolean {
-                position: from as u32,
-                value: buffer[from],
-            })
+                    position: from as u32,
+                    value: buffer[from],
+                })
         } else {
             Ok(None)
         }
@@ -55,7 +54,7 @@ impl<'a> Field<'a> for bool {
 
 impl<'a> Field<'a> for u8 {
     fn field_size() -> usize {
-        1
+        mem::size_of::<u8>()
     }
 
     fn read(buffer: &'a [u8], from: usize, _: usize) -> u8 {
@@ -69,7 +68,7 @@ impl<'a> Field<'a> for u8 {
 
 impl<'a> Field<'a> for u16 {
     fn field_size() -> usize {
-        2
+        mem::size_of::<u16>()
     }
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u16 {
@@ -83,7 +82,7 @@ impl<'a> Field<'a> for u16 {
 
 impl<'a> Field<'a> for u32 {
     fn field_size() -> usize {
-        4
+        mem::size_of::<u32>()
     }
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u32 {
@@ -97,7 +96,7 @@ impl<'a> Field<'a> for u32 {
 
 impl<'a> Field<'a> for u64 {
     fn field_size() -> usize {
-        8
+        mem::size_of::<u64>()
     }
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> u64 {
@@ -111,7 +110,7 @@ impl<'a> Field<'a> for u64 {
 
 impl<'a> Field<'a> for i64 {
     fn field_size() -> usize {
-        8
+        mem::size_of::<i64>()
     }
 
     fn read(buffer: &'a [u8], from: usize, to: usize) -> i64 {
@@ -125,7 +124,7 @@ impl<'a> Field<'a> for i64 {
 
 impl<'a> Field<'a> for &'a Hash {
     fn field_size() -> usize {
-        32
+        mem::size_of::<Hash>()
     }
 
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
@@ -139,7 +138,7 @@ impl<'a> Field<'a> for &'a Hash {
 
 impl<'a> Field<'a> for &'a Signature {
     fn field_size() -> usize {
-        32
+        mem::size_of::<Signature>()
     }
 
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Signature {
@@ -153,7 +152,7 @@ impl<'a> Field<'a> for &'a Signature {
 
 impl<'a> Field<'a> for &'a PublicKey {
     fn field_size() -> usize {
-        32
+        mem::size_of::<PublicKey>()
     }
 
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a PublicKey {
@@ -187,6 +186,7 @@ impl<'a> Field<'a> for SystemTime {
 
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> usize {
+        // reserve space for future compatibility
         32
     }
 
