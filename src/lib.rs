@@ -315,7 +315,7 @@ impl<'a> ConfigurationSchema<'a> {
     /// - Table **value** is [hash of a configuration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) - **key** of
     /// `propose_data_by_config_hash`
-    pub fn config_hash_by_ordinal(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>,Hash> {
+    pub fn config_hash_by_ordinal(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         MerkleTable::new(MapTable::new(vec![9], self.view))
     }
     /// Returns a table of votes of validators for config, referenced by the
@@ -334,10 +334,9 @@ impl<'a> ConfigurationSchema<'a> {
     /// previous to config, referenced by the queried `config_hash`.
     /// - Table **value** is `TxConfigVote`, cast by validator with
     /// [PublicKey](struct.TxConfigVote.html#method.from), corresponding to **index**.
-    pub fn votes_by_config_hash
-        (&self,
-         config_hash: &Hash)
-         -> MerkleTable<MapTable<View, [u8], Vec<u8>>, TxConfigVote> {
+    pub fn votes_by_config_hash(&self,
+                                config_hash: &Hash)
+                                -> MerkleTable<MapTable<View, [u8], Vec<u8>>, TxConfigVote> {
         let mut prefix = vec![5; 1 + HASH_SIZE];
         prefix[1..].copy_from_slice(config_hash.as_ref());
         MerkleTable::new(MapTable::new(prefix, self.view))
