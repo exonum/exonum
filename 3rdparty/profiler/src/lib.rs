@@ -25,7 +25,7 @@ lazy_static!{
 
 } 
 
-struct ThreadFrame {
+pub struct ThreadFrame {
     epoch: Instant,
     root: Rc<SpanPtr>,
     events: Vec<Event>,
@@ -68,6 +68,10 @@ impl ThreadFrame {
         }
     }
 
+    fn root(&self) -> &SpanPtr {
+        &self.root
+    }
+
     fn start_span(&mut self, name: &'static str) {
         let timestamp = ns_since_epoch(self.epoch);
         let span = Span::sub_span(&self.events[self.events.len()-1].span, name);
@@ -80,7 +84,7 @@ impl ThreadFrame {
             let name: String = SETTED_NAME.lock().unwrap().clone()
                                 .expect("Profiler: received interrupt without setted name.");
             File::create(&name)
-                    .and_then(|ref mut  file| dump_html(file) )
+                    .and_then(|ref mut  file| dump_html(file, &self) )
                     .expect("could not write profiler data");
             self.dumped_time = new_time;
         };
@@ -215,14 +219,14 @@ pub fn init_handler(file: String) {
 
 #[cfg(feature="nomock")]
 pub fn init_handler(file: String) {
-    unsafe {
-        SETTED_NAME = Some(file);
-    }
+
+    *SETTED_NAME.lock().unwrap() = Some(file);
+
     let r = INTERRUPTED_TICKS.clone();
     ctrlc::set_handler(move || {
         let secs = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
-                            .unwrap().as_secs();
+                            .unwrap().as_secs() as usize;
         r.store(secs, Ordering::SeqCst);
     }).expect("Error setting Ctrl-C handler");
 }

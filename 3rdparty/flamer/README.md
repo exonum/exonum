@@ -3,6 +3,7 @@ A plugin to insert appropriate `flame::start_guard(_)` calls (for use with
 
 [![Build Status](https://travis-ci.org/llogiq/flamer.svg)](https://travis-ci.org/llogiq/flamer)
 [![Current Version](https://img.shields.io/crates/v/flamer.svg)](https://crates.io/crates/flamer)
+[![Docs](https://docs.rs/flamer/badge.svg)](https://docs.rs/flamer)
 
 **This needs a nightly rustc!** Because flamer is a compiler plugin, it uses
 unstable APIs, which are not available on stable or beta. It may be possible to
@@ -15,7 +16,7 @@ In your Cargo.toml add `flame` and `flamer` to your dependencies:
 ```toml
 [dependencies]
 flame = "^0.1.9"
-flamer = "^0.1.3"
+flamer = "^0.1.4"
 ```
 
 Then in your crate root, add the following:
@@ -32,7 +33,7 @@ You may also opt for an *optional dependency*. In that case your Cargo.toml shou
 ```toml
 [dependencies]
 flame = { version = "^0.1.9", optional = true }
-flamer = { version = "^0.1.3", optional = true }
+flamer = { version = "^0.1.4", optional = true }
 
 [features]
 default = []
@@ -45,7 +46,7 @@ And your crate root should contain:
 #![cfg_attr(feature="flame_it", feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_it", plugin(flamer))]
 
-#[cfg(feature="flame_it")
+#[cfg(feature="flame_it")]
 extern crate flame;
 
 // as well as the following instead of `#[flame]`
