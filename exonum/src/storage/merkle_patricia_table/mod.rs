@@ -883,7 +883,7 @@ mod tests {
         }
     }
 
-    fn serialize_str_u8<S, A>(data: &A, serializer: &mut S) -> Result<(), S::Error>
+    fn serialize_str_u8<S, A>(data: &A, serializer:  S) -> Result<S::Ok, S::Error>
         where S: Serializer,
               A: AsRef<[u8]>
     {
