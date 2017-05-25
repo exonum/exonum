@@ -320,7 +320,7 @@ fn test_get_config_by_hash2() {
     let expected_body = {
         let expected_hash = {
             let db = MemoryDB::new();
-            let hashes: MerkleTable<MemoryDB, u64, TxConfigVote> = MerkleTable::new(db);
+            let hashes: MerkleTable<MemoryDB, TxConfigVote> = MerkleTable::new(db);
             for _ in 0..api_sandbox.sandbox.n_validators() {
                 hashes.append(ZEROVOTE.clone()).unwrap();
             }
@@ -394,7 +394,7 @@ fn test_get_config_by_hash3() {
     let expected_body = {
         let expected_hash = {
             let db = MemoryDB::new();
-            let hashes: MerkleTable<MemoryDB, u64, TxConfigVote> = MerkleTable::new(db);
+            let hashes: MerkleTable<MemoryDB, TxConfigVote> = MerkleTable::new(db);
             hashes.extend(votes).unwrap();
             hashes.root_hash().unwrap()
         };
