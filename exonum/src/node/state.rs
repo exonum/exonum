@@ -353,7 +353,7 @@ impl State {
                       .unwrap_or(false)
     }
 
-    pub fn whitelist(&self) -> &Whitelist{
+    pub fn whitelist(&self) -> &Whitelist {
         &self.whitelist
     }
 
