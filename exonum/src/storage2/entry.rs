@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use crypto::Hash;
 
-use super::{BaseIndex, Result, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, Snapshot, Fork, StorageValue};
 
 pub struct Entry<T, V> {
     base: BaseIndex<T>,
@@ -20,16 +20,16 @@ impl<T, V> Entry<T, V> {
 
 impl<T, V> Entry<T, V> where T: AsRef<Snapshot>,
                              V: StorageValue {
-    pub fn get(&self) -> Result<Option<V>> {
+    pub fn get(&self) -> Option<V> {
         self.base.get(&())
     }
 
-    pub fn exists(&self) -> Result<bool> {
+    pub fn exists(&self) -> bool {
         self.base.contains(&())
     }
 
-    pub fn hash(&self) -> Result<Hash> {
-        Ok(self.base.get::<(), V>(&())?.map(|v| v.hash()).unwrap_or_default())
+    pub fn hash(&self) -> Hash {
+        self.base.get::<(), V>(&()).map(|v| v.hash()).unwrap_or_default()
     }
 }
 

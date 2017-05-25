@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 pub struct ListIndex<T, V> {
     base: BaseIndex<T>,
@@ -25,28 +25,28 @@ impl<T, V> ListIndex<T, V> {
 
 impl<T, V> ListIndex<T, V> where T: AsRef<Snapshot>,
                                  V: StorageValue {
-    pub fn get(&self, index: u64) -> Result<Option<V>> {
+    pub fn get(&self, index: u64) -> Option<V> {
         self.base.get(&index)
     }
 
-    pub fn last(&self) -> Result<Option<V>> {
-        match self.len()? {
-            0 => Ok(None),
+    pub fn last(&self) -> Option<V> {
+        match self.len() {
+            0 => None,
             l => self.get(l - 1)
         }
     }
 
-    pub fn is_empty(&self) -> Result<bool> {
-        Ok(self.len()? == 0)
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
-    pub fn len(&self) -> Result<u64> {
+    pub fn len(&self) -> u64 {
         if let Some(len) = self.length.get() {
-            return Ok(len)
+            return len
         }
-        let len = self.base.get(&())?.unwrap_or(0);
+        let len = self.base.get(&()).unwrap_or(0);
         self.length.set(Some(len));
-        Ok(len)
+        len
     }
 
     pub fn iter(&self) -> ListIndexIter<V> {
@@ -59,52 +59,48 @@ impl<T, V> ListIndex<T, V> where T: AsRef<Snapshot>,
 }
 
 impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
-    pub fn push(&mut self, value: V) -> Result<()> {
-        let len = self.len()?;
+    pub fn push(&mut self, value: V) {
+        let len = self.len();
         self.base.put(&len, value);
         self.base.put(&(), len + 1);
         self.length.set(Some(len + 1));
-        Ok(())
     }
 
-    pub fn pop(&mut self) -> Result<Option<V>> {
+    pub fn pop(&mut self) -> Option<V> {
         // TODO: shoud we get and return dropped value?
-        match self.len()? {
-            0 => Ok(None),
+        match self.len() {
+            0 => None,
             l => {
-                let v = self.base.get(&(l - 1))?;
+                let v = self.base.get(&(l - 1));
                 self.base.delete(&(l - 1));
                 self.base.put(&(), l - 1);
-                Ok(v)
+                v
             }
         }
     }
 
-    pub fn extend<I>(&mut self, iter: I) -> Result<()> where I: IntoIterator<Item=V> {
-        let mut len = self.len()?;
+    pub fn extend<I>(&mut self, iter: I) where I: IntoIterator<Item=V> {
+        let mut len = self.len();
         for value in iter {
             self.base.put(&len, value);
             len = len + 1;
         }
         self.base.put(&(), len);
         self.length.set(Some(len));
-        Ok(())
     }
 
-    pub fn truncate(&mut self, len: u64) -> Result<()> {
+    pub fn truncate(&mut self, len: u64) {
         // TODO: optimize this
-        while self.len()? > len {
-            self.pop()?;
+        while self.len() > len {
+            self.pop();
         }
-        Ok(())
     }
 
-    pub fn set(&mut self, index: u64, value: V) -> Result<()> {
+    pub fn set(&mut self, index: u64, value: V) {
         // TODO: shoud we panic here?
-        if index < self.len()? {
+        if index < self.len() {
             self.base.put(&index, value)
         }
-        Ok(())
     }
 
     pub fn clear(&mut self) {

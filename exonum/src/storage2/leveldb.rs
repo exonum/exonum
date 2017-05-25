@@ -15,7 +15,7 @@ use std::error;
 use std::sync::Arc;
 
 
-use super::{Database, Iter, Snapshot, Error, Result, Patch, Change};
+use super::{Database, Iter, Snapshot, Error, Patch, Change, Result};
 
 const LEVELDB_READ_OPTIONS: ReadOptions<'static> = ReadOptions {
     verify_checksums: false,
@@ -79,8 +79,11 @@ impl Database for LevelDB {
 }
 
 impl Snapshot for LevelDBSnapshot {
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        self.snapshot.get(LEVELDB_READ_OPTIONS, key).map_err(Into::into)
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        match self.snapshot.get(LEVELDB_READ_OPTIONS, key) {
+            Ok(value) => value,
+            Err(err) => panic!(err)
+        }
     }
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {

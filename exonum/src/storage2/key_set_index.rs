@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Result, Snapshot, Fork, StorageKey};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
 
 pub struct KeySetIndex<T, K> {
     base: BaseIndex<T>,
@@ -22,7 +22,7 @@ impl<T, K> KeySetIndex<T, K> {
 
 impl<T, K> KeySetIndex<T, K> where T: AsRef<Snapshot>,
                                    K: StorageKey {
-    pub fn contains(&self, item: &K) -> Result<bool> {
+    pub fn contains(&self, item: &K) -> bool {
         self.base.contains(item)
     }
 

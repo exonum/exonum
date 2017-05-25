@@ -1,7 +1,7 @@
 use std::clone::Clone;
 use std::collections::BTreeMap;
 
-use super::{Database, Snapshot, Result, Patch, Change, Iter};
+use super::{Database, Snapshot, Patch, Change, Iter, Result};
 
 #[derive(Default, Clone)]
 pub struct MemoryDB {
@@ -31,12 +31,12 @@ impl Database for MemoryDB {
 }
 
 impl Snapshot for MemoryDB {
-    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>> {
-        Ok(self.map.get(key).map(Clone::clone))
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        self.map.get(key).map(Clone::clone)
     }
 
-    fn contains(&self, key: &[u8]) -> Result<bool> {
-        Ok(self.map.contains_key(key))
+    fn contains(&self, key: &[u8]) -> bool {
+        self.map.contains_key(key)
     }
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {

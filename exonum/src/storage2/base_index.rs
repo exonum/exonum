@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use super::{Result, StorageKey, StorageValue, Snapshot, Fork, Iter};
+use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 
 pub struct BaseIndex<T> {
     prefix: Vec<u8>,
@@ -32,12 +32,12 @@ impl<T> BaseIndex<T> {
 }
 
 impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
-    pub fn get<K, V>(&self, key: &K) -> Result<Option<V>> where K: StorageKey,
-                                                                V: StorageValue {
-        Ok(self.view.as_ref().get(&self.prefixed_key(key))?.map(StorageValue::from_vec))
+    pub fn get<K, V>(&self, key: &K) -> Option<V> where K: StorageKey,
+                                                        V: StorageValue {
+        self.view.as_ref().get(&self.prefixed_key(key)).map(StorageValue::from_vec)
     }
 
-    pub fn contains<K>(&self, key: &K) -> Result<bool> where K: StorageKey {
+    pub fn contains<K>(&self, key: &K) -> bool where K: StorageKey {
         self.view.as_ref().contains(&self.prefixed_key(key))
     }
 
