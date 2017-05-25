@@ -91,12 +91,11 @@ impl Service for TimestampingService {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         if raw.message_type() != TIMESTAMPING_TRANSACTION_MESSAGE_ID {
-            return Err(
-                MessageError::IncorrectMessageType {
-                    position: 0,
-                    actual_message_type: raw.message_type(),
-                    declared_message_type: TIMESTAMPING_TRANSACTION_MESSAGE_ID 
-                });
+            return Err(MessageError::IncorrectMessageType {
+                           position: 0,
+                           actual_message_type: raw.message_type(),
+                           declared_message_type: TIMESTAMPING_TRANSACTION_MESSAGE_ID,
+                       });
         }
 
         TimestampTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)

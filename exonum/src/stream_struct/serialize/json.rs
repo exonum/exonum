@@ -20,8 +20,10 @@ use std::error::Error;
 
 use crypto::{Hash, PublicKey, SecretKey, Seed, Signature};
 
+use stream_struct::Field;
 use messages::MessageWriter;
 use super::HexValue;
+
 
 /// `ExonumJsonDeserializeField` is trait for object
 /// that can be serialized "in-place" of storage structure.
@@ -311,18 +313,12 @@ impl<'a> ExonumJsonDeserializeField for &'a [Hash] {
 
     }
 }
-<<<<<<< HEAD
 impl<'a> ExonumJsonDeserializeField for &'a [u8] {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: usize,
                                                 to: usize)
                                                 -> Result<(), Box<Error>> {
-=======
-
-impl<'a> ExonumJsonDeserializeField for &'a [u8]  {
-    fn deserialize<B: WriteBufferWrapper>(value: &Value, buffer: & mut B, from: usize, to: usize ) -> Result<(), Box<Error>> {
->>>>>>> add check for spaces between segments, add some tests
         let bytes = value.as_str().ok_or("Can't cast json as string")?;
         let arr = <Vec<u8> as HexValue>::from_hex(bytes)?;
         buffer.write(from, to, arr.as_slice());
@@ -399,5 +395,3 @@ pub mod reexport {
     pub use serde::de::Error;
     pub use serde::ser::SerializeStruct;
 }
-
-

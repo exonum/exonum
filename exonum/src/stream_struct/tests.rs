@@ -5,8 +5,8 @@ use crypto::{hash, gen_keypair};
 use blockchain;
 
 use super::Field;
-use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
-            Block, BlockProof, RequestBlock, BitVec};
+use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
+               BlockProof, RequestBlock, BitVec};
 
 
 #[test]
@@ -82,14 +82,14 @@ fn test_segments_of_arrays() {
     <Vec<&[u8]> as Field>::check(&buf2, 48, 56).unwrap();
     let dat2: Vec<&[u8]> = Field::read(&buf2, 48, 56);
     assert_eq!(dat2, dat);
-    //48 spaces + 8 segment of vec + 8 spaces = 64 + 
+    //48 spaces + 8 segment of vec + 8 spaces = 64 +
     // + v1_segment + v2_segment + v3_segment +
     // + v1_body + v2_body + v3_body
     assert_eq!(buf.len(), 64 + v1.len() + v2.len() + v3.len() + 3 * 8);
 }
 
 
-fn assert_write_check_read<T>(input: T, header_size: usize) 
+fn assert_write_check_read<T>(input: T, header_size: usize)
     where T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug
 {
     let mut buffer = vec![0; header_size];
@@ -102,11 +102,11 @@ fn assert_write_check_read<T>(input: T, header_size: usize)
     buffer.clear();
     //and fill old buffer with zeros
     buffer.resize(len, 0);
-    
+
     <T as Field>::check(&new_buffer, 0, 8).unwrap();
-    let output =  Field::read(&new_buffer, 0, 8);
+    let output = Field::read(&new_buffer, 0, 8);
     assert_eq!(input, output);
-    
+
 }
 
 #[test]
@@ -174,12 +174,7 @@ fn test_propose() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let propose = Propose::new(validator,
-                               height,
-                               round,
-                               &prev_hash,
-                               &txs,
-                               &secret_key);
+    let propose = Propose::new(validator, height, round, &prev_hash, &txs, &secret_key);
     // read
     assert_eq!(propose.validator(), validator);
     assert_eq!(propose.height(), height);
@@ -245,7 +240,7 @@ fn test_precommit() {
     assert_eq!(precommit.time(), time);
     let json_str = ::serde_json::to_string(&precommit).unwrap();
     println!("{}", json_str);
-    let precommit1 : Precommit = ::serde_json::from_str(&json_str).unwrap(); 
+    let precommit1: Precommit = ::serde_json::from_str(&json_str).unwrap();
     assert_eq!(precommit, precommit1);
 }
 
@@ -269,11 +264,7 @@ fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
     let ts = SystemTime::now();
 
-    let content = blockchain::Block::new(500,
-                                         1,
-                                         &hash(&[1]),
-                                         &hash(&[2]),
-                                         &hash(&[3]));
+    let content = blockchain::Block::new(500, 1, &hash(&[1]), &hash(&[2]), &hash(&[3]));
 
     let precommits = vec![Precommit::new(123,
                                          15,
@@ -296,9 +287,15 @@ fn test_block() {
                                          &hash(&[5, 2, 1]),
                                          ts,
                                          &secret_key)];
-    let transactions = vec![Status::new(&pub_key, 2, &hash(&[]), &secret_key).raw().clone(),
-                            Status::new(&pub_key, 4, &hash(&[2]), &secret_key).raw().clone(),
-                            Status::new(&pub_key, 7, &hash(&[3]), &secret_key).raw().clone()];
+    let transactions = vec![Status::new(&pub_key, 2, &hash(&[]), &secret_key)
+                                .raw()
+                                .clone(),
+                            Status::new(&pub_key, 4, &hash(&[2]), &secret_key)
+                                .raw()
+                                .clone(),
+                            Status::new(&pub_key, 7, &hash(&[3]), &secret_key)
+                                .raw()
+                                .clone()];
     let block = Block::new(&pub_key,
                            &pub_key,
                            content.clone(),
@@ -322,8 +319,8 @@ fn test_block() {
         block: content.clone(),
         precommits: precommits.clone(),
     };
-    let json_str = super::serialize::json::to_string(&block_proof).unwrap();
-    let block_proof_1: BlockProof = super::serialize::json::from_str(&json_str).unwrap(); 
+    let json_str = ::serde_json::to_string(&block_proof).unwrap();
+    let block_proof_1: BlockProof = ::serde_json::from_str(&json_str).unwrap();
     assert_eq!(block_proof, block_proof_1);
 }
 

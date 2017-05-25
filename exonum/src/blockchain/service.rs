@@ -4,7 +4,8 @@ use mount::Mount;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{View, Error as StorageError};
-use messages::{Message, RawTransaction, Error as MessageError};
+use messages::{Message, RawTransaction};
+use stream_struct::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
 use events::Milliseconds;
