@@ -61,7 +61,7 @@ impl<'a> Schema<'a> {
         MapTable::new(gen_prefix(CONSENSUS, 2, None), self.view)
     }
 
-    pub fn block_hashes_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
+    pub fn block_hashes_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 3, None), self.view))
     }
 
@@ -69,14 +69,14 @@ impl<'a> Schema<'a> {
         self.block_hashes_by_height().get(height)
     }
 
-    pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u32, Hash> {
+    pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         MerkleTable::new(MapTable::new(gen_prefix(CONSENSUS, 4, Some(&height.serialize())),
                                        self.view))
     }
 
     pub fn precommits(&self,
                       hash: &Hash)
-                      -> ListTable<MapTable<View, [u8], Vec<u8>>, u32, Precommit> {
+                      -> ListTable<MapTable<View, [u8], Vec<u8>>, Precommit> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 5, Some(hash.as_ref())), self.view))
     }
 
@@ -105,7 +105,7 @@ impl<'a> Schema<'a> {
     // TODO: consider List index to reduce storage volume
     pub fn configs_actual_from
         (&self)
-         -> ListTable<MapTable<View, [u8], Vec<u8>>, u64, ConfigReference> {
+         -> ListTable<MapTable<View, [u8], Vec<u8>>, ConfigReference> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
     }
 
