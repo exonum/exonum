@@ -53,30 +53,35 @@ impl Whitelist {
 
 #[cfg(test)]
 mod test {
-use super::Whitelist;
-use crypto::PublicKey;
+    use super::Whitelist;
+    use crypto::PublicKey;
 
-static VALIDATORS: [[[u8; 32];2];2] = [[
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2]
-],
-[
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
-    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2]
-]];
-static REGULAR_PEERS: [[u8;32]; 4] = [
-    [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2],
-    [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3],
-    [2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
-];
+    static VALIDATORS: [[[u8; 32]; 2]; 2] = [[[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                                              [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]],
+                                             [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
+                                              [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2]]];
+    static REGULAR_PEERS: [[u8; 32]; 4] = [[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                                           [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
+                                           [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
+                                           [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]];
 
-    fn make_keys(source:&[[u8; 32]]) -> Vec<PublicKey> {
-        source.iter().map(|k|PublicKey::from_slice(k).unwrap()).collect()
+    fn make_keys(source: &[[u8; 32]]) -> Vec<PublicKey> {
+        source
+            .iter()
+            .map(|k| PublicKey::from_slice(k).unwrap())
+            .collect()
     }
 
     fn check_in_whitelist(whitelist: &Whitelist,
-                          keys:&[PublicKey],
+                          keys: &[PublicKey],
                           in_whitelist: &[usize],
                           not_in_whitelist: &[usize]) {
         for i in in_whitelist {
@@ -95,7 +100,7 @@ static REGULAR_PEERS: [[u8;32]; 4] = [
         whitelist.whitelist_on = true;
         check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
         whitelist.add(regular[0]);
-        check_in_whitelist(&whitelist, &regular, &[0], &[ 1, 2, 3]);
+        check_in_whitelist(&whitelist, &regular, &[0], &[1, 2, 3]);
         whitelist.add(regular[2]);
         check_in_whitelist(&whitelist, &regular, &[0, 2], &[1, 3]);
         assert_eq!(whitelist.collect_whitelist().len(), 2);
