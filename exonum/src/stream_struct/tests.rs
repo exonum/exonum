@@ -94,7 +94,7 @@ fn assert_write_check_read<T>(input: T, header_size: usize)
 {
     let mut buffer = vec![0; header_size];
     Field::write(&input, &mut buffer, 0, header_size);
-    println!("buffer ={:?}", buffer);
+    trace!("buffer ={:?}", buffer);
     <T as Field>::check(&buffer, 0, header_size).unwrap();
     let new_buffer = buffer.clone();
     //clear buffer
@@ -239,7 +239,7 @@ fn test_precommit() {
     assert!(precommit.verify_signature(&public_key));
     assert_eq!(precommit.time(), time);
     let json_str = ::serde_json::to_string(&precommit).unwrap();
-    println!("{}", json_str);
+    trace!("{}", json_str);
     let precommit1: Precommit = ::serde_json::from_str(&json_str).unwrap();
     assert_eq!(precommit, precommit1);
 }

@@ -7,7 +7,47 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use crypto::{Hash, PublicKey, Signature};
 use super::{Error, SegmentReference};
 
+macro_rules! implement_std_field {
+    ($name:ident $fn_read:expr; $fn_write:expr) => (
+        impl<'a> Field<'a> for $name {
+            fn field_size() -> usize {
+                mem::size_of::<$name>()
+            }
 
+            fn read(buffer: &'a [u8], from: usize, to: usize) -> $name {
+                $fn_read(&buffer[from..to])
+            }
+
+            fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
+                $fn_write(&mut buffer[from..to], *self)
+            }
+        }
+    )
+}
+
+
+/// implement field helper for all 
+macro_rules! implement_pod_as_ref_field {
+    ($name:ident) => (
+        impl<'a> Field<'a> for &'a $name {
+            fn field_size() -> usize {
+                mem::size_of::<$name>()
+            }
+
+            fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a $name {
+                unsafe { mem::transmute(&buffer[from]) }
+            }
+
+            fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
+                let ptr: *const $name = *self as *const $name;
+                let slice = unsafe {
+                    ::std::slice::from_raw_parts(ptr as * const u8, 
+                                                        mem::size_of::<$name>())};
+                buffer[from..to].copy_from_slice(slice);
+            }
+        }
+    )
+}
 
 pub trait Field<'a> {
     // TODO: use Read and Cursor
@@ -66,103 +106,17 @@ impl<'a> Field<'a> for u8 {
     }
 }
 
-impl<'a> Field<'a> for u16 {
-    fn field_size() -> usize {
-        mem::size_of::<u16>()
-    }
 
-    fn read(buffer: &'a [u8], from: usize, to: usize) -> u16 {
-        LittleEndian::read_u16(&buffer[from..to])
-    }
+implement_std_field!{u16 LittleEndian::read_u16; LittleEndian::write_u16}
+implement_std_field!{i16 LittleEndian::read_i16; LittleEndian::write_i16}
+implement_std_field!{u32 LittleEndian::read_u32; LittleEndian::write_u32}
+implement_std_field!{i32 LittleEndian::read_i32; LittleEndian::write_i32}
+implement_std_field!{u64 LittleEndian::read_u64; LittleEndian::write_u64}
+implement_std_field!{i64 LittleEndian::read_i64; LittleEndian::write_i64}
 
-    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
-        LittleEndian::write_u16(&mut buffer[from..to], *self)
-    }
-}
-
-impl<'a> Field<'a> for u32 {
-    fn field_size() -> usize {
-        mem::size_of::<u32>()
-    }
-
-    fn read(buffer: &'a [u8], from: usize, to: usize) -> u32 {
-        LittleEndian::read_u32(&buffer[from..to])
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
-        LittleEndian::write_u32(&mut buffer[from..to], *self)
-    }
-}
-
-impl<'a> Field<'a> for u64 {
-    fn field_size() -> usize {
-        mem::size_of::<u64>()
-    }
-
-    fn read(buffer: &'a [u8], from: usize, to: usize) -> u64 {
-        LittleEndian::read_u64(&buffer[from..to])
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
-        LittleEndian::write_u64(&mut buffer[from..to], *self)
-    }
-}
-
-impl<'a> Field<'a> for i64 {
-    fn field_size() -> usize {
-        mem::size_of::<i64>()
-    }
-
-    fn read(buffer: &'a [u8], from: usize, to: usize) -> i64 {
-        LittleEndian::read_i64(&buffer[from..to])
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
-        LittleEndian::write_i64(&mut buffer[from..to], *self)
-    }
-}
-
-impl<'a> Field<'a> for &'a Hash {
-    fn field_size() -> usize {
-        mem::size_of::<Hash>()
-    }
-
-    fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
-        unsafe { mem::transmute(&buffer[from]) }
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
-        buffer[from..to].copy_from_slice(self.as_ref());
-    }
-}
-
-impl<'a> Field<'a> for &'a Signature {
-    fn field_size() -> usize {
-        mem::size_of::<Signature>()
-    }
-
-    fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Signature {
-        unsafe { mem::transmute(&buffer[from]) }
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
-        buffer[from..to].copy_from_slice(self.as_ref());
-    }
-}
-
-impl<'a> Field<'a> for &'a PublicKey {
-    fn field_size() -> usize {
-        mem::size_of::<PublicKey>()
-    }
-
-    fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a PublicKey {
-        unsafe { mem::transmute(&buffer[from]) }
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
-        buffer[from..to].copy_from_slice(self.as_ref());
-    }
-}
+implement_pod_as_ref_field! {Signature}
+implement_pod_as_ref_field! {PublicKey}
+implement_pod_as_ref_field! {Hash}
 
 impl<'a> Field<'a> for SystemTime {
     fn field_size() -> usize {
