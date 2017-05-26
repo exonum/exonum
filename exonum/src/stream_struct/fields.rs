@@ -7,6 +7,11 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use crypto::{Hash, PublicKey, Signature};
 use super::{Error, SegmentReference};
 
+/// implement field for all types, that has writer, and reader functions
+///
+/// - reader signature is `fn (&[u8]) -> T`
+/// - writer signature is `fn (&mut [u8], T)`
+#[macro_export]
 macro_rules! implement_std_field {
     ($name:ident $fn_read:expr; $fn_write:expr) => (
         impl<'a> Field<'a> for $name {
@@ -26,7 +31,11 @@ macro_rules! implement_std_field {
 }
 
 
-/// implement field helper for all 
+/// Implement field helper for all POD types
+/// it writes POD type as bytearray in place.
+///
+/// **Beware of platform specific data representation.**
+#[macro_export]
 macro_rules! implement_pod_as_ref_field {
     ($name:ident) => (
         impl<'a> Field<'a> for &'a $name {
@@ -41,7 +50,7 @@ macro_rules! implement_pod_as_ref_field {
             fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
                 let ptr: *const $name = *self as *const $name;
                 let slice = unsafe {
-                    ::std::slice::from_raw_parts(ptr as * const u8, 
+                    ::std::slice::from_raw_parts(ptr as * const u8,
                                                         mem::size_of::<$name>())};
                 buffer[from..to].copy_from_slice(slice);
             }
@@ -106,6 +115,19 @@ impl<'a> Field<'a> for u8 {
     }
 }
 
+impl<'a> Field<'a> for i8 {
+    fn field_size() -> usize {
+        mem::size_of::<i8>()
+    }
+
+    fn read(buffer: &'a [u8], from: usize, _: usize) -> i8 {
+        buffer[from] as i8
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: usize, _: usize) {
+        buffer[from] = *self as u8;
+    }
+}
 
 implement_std_field!{u16 LittleEndian::read_u16; LittleEndian::write_u16}
 implement_std_field!{i16 LittleEndian::read_i16; LittleEndian::write_i16}

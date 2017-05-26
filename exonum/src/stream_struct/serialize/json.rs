@@ -21,12 +21,13 @@ use std::error::Error;
 use crypto::{Hash, PublicKey, SecretKey, Seed, Signature};
 
 use stream_struct::Field;
-use messages::MessageWriter;
 use super::HexValue;
+use super::WriteBufferWrapper;
 
 
 /// `ExonumJsonDeserializeField` is trait for object
 /// that can be serialized "in-place" of storage structure.
+///
 /// This trait important for field types that could not be
 /// deserialized directly, for example: borrowed array.
 pub trait ExonumJsonDeserializeField {
@@ -46,23 +47,6 @@ pub trait ExonumJsonDeserialize {
 /// could be serialized as json with exonum protocol specific aspects.
 pub trait ExonumJsonSerialize {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error>;
-}
-
-/// `WriteBufferWrapper` is a trait specific for writing fields in place.
-pub trait WriteBufferWrapper {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: usize, to: usize, val: T);
-}
-
-impl WriteBufferWrapper for MessageWriter {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: usize, to: usize, val: T) {
-        self.write(val, from, to)
-    }
-}
-
-impl WriteBufferWrapper for Vec<u8> {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: usize, to: usize, val: T) {
-        val.write(self, from, to)
-    }
 }
 
 /// Helper function, for wrapping value that should be serialized as `ExonumJsonSerialize`
@@ -238,12 +222,10 @@ macro_rules! impl_deserialize_hex_segment {
     ($($name:ty);*) => ($(impl_deserialize_hex_segment!{@impl $name})*);
 }
 
-impl_deserialize_int!{
-    u8; u16; u32 /*i8; i16; i32;*/ }
+impl_deserialize_int!{u8; u16; u32; i8; i16; i32 }
 impl_deserialize_bigint!{u64; i64}
 
-impl_deserialize_hex_segment!{
-    Hash; PublicKey; Signature /*;  Seed; */}
+impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
 
 impl ExonumJsonDeserializeField for bool {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
@@ -391,7 +373,4 @@ impl ExonumJsonDeserializeField for BitVec {
 /// reexport some of serde function to use in macros
 pub mod reexport {
     pub use serde_json::{Value, to_value, from_value, to_string, from_str};
-    pub use serde::{Serializer, Deserializer, Serialize, Deserialize};
-    pub use serde::de::Error;
-    pub use serde::ser::SerializeStruct;
 }

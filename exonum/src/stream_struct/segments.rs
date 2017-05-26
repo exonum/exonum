@@ -118,7 +118,7 @@ impl<'a> SegmentField<'a> for RawMessage {
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-        
+
         buffer.extend_from_slice(self.as_ref().as_ref())
     }
 
