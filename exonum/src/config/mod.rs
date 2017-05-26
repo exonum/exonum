@@ -29,7 +29,8 @@ impl ConfigFile {
         }
 
         let mut file = File::create(path)?;
-        file.write_all(&toml::ser::to_vec(&value)?)?;
+        let value_toml = toml::Value::try_from(value)?;
+        file.write_all(&format!("{}", value_toml).into_bytes())?;
 
         Ok(())
     }
