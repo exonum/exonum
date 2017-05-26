@@ -1,3 +1,34 @@
+/// `storage_value!` implement structure that could be saved in blockchain.
+///
+/// Storage value unlike message, could be mapped on buffers without any checks.
+/// For now it's required to set `storage_value` fixed part size as `const SIZE`.
+///
+/// For each field, it's required to set exact position in `storage_value`.
+/// # Usage Example:
+/// ```
+/// #[macro_use] extern crate exonum;
+/// # extern crate serde;
+/// # extern crate serde_json;
+///
+/// storage_value! {
+///     struct SaveTwoInteger {
+///         const SIZE = 16;
+///         
+///         field first: u64 [0 => 8]
+///         field second: u64 [8 => 16]
+///     }
+/// }
+/// # fn main() {
+///     let first = 1u64;
+///     let second = 2u64;
+///     let s = SaveTwoInteger::new(first, second);
+///     println!("Debug structure = {:?}", s);
+/// # }
+/// ```
+///
+/// For additionall reference about data layout see also 
+/// *[ `stream_struct` documentation](./stream_struct/index.html).*
+/// 
 #[macro_export]
 macro_rules! storage_value {
     (
@@ -114,7 +145,7 @@ macro_rules! storage_value {
             fn deserialize_field<B> (value: &$crate::stream_struct::serialize::json::reexport::Value,
                                         buffer: & mut B, from: usize, _to: usize )
                 -> Result<(), Box<::std::error::Error>>
-                where B: $crate::stream_struct::serialize::json::WriteBufferWrapper
+                where B: $crate::stream_struct::serialize::WriteBufferWrapper
             {
                 use $crate::stream_struct::serialize::json::ExonumJsonDeserializeField;
                 let obj = value.as_object().ok_or("Can't cast json as object.")?;
@@ -141,20 +172,21 @@ macro_rules! storage_value {
         }
 
         //\TODO: Rewrite Deserialize and Serializa implementation
-        impl<'de> $crate::stream_struct::serialize::json::reexport::Deserialize<'de> for $name {
+        impl<'de> $crate::stream_struct::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where D: $crate::stream_struct::serialize::json::reexport::Deserializer<'de>
+                where D: $crate::stream_struct::serialize::reexport::Deserializer<'de>
             {
-                use $crate::stream_struct::serialize::json::reexport::{Error, Deserialize, Value};
+                use $crate::stream_struct::serialize::json::reexport::Value;
+                use $crate::stream_struct::serialize::reexport::{Error, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
                 <Self as $crate::stream_struct::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
                 .map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 
-        impl $crate::stream_struct::serialize::json::reexport::Serialize for $name {
+        impl $crate::stream_struct::serialize::reexport::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: $crate::stream_struct::serialize::json::reexport::Serializer
+                where S: $crate::stream_struct::serialize::reexport::Serializer
                 {
                     $crate::stream_struct::serialize::json::wrap(self).serialize(serializer)
                 }
