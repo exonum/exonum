@@ -2,7 +2,7 @@ use byteorder::{ByteOrder, BigEndian};
 
 use std::mem;
 
-use crypto::{Hash, hash};
+use crypto::{Hash};
 use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
 use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
               List, RootProofNode, View};
@@ -25,18 +25,18 @@ pub fn gen_prefix(service_id: u16, ord: u8, suf: Option<&[u8]>) -> Vec<u8> {
 }
 
 storage_value! (
-    ConfigReference {
+    struct ConfigReference {
         const SIZE = 40;
-        actual_from: u64    [00 => 08]
-            cfg_hash:    &Hash  [08 => 40]
+        field actual_from: u64    [00 => 08]
+        field cfg_hash:    &Hash  [08 => 40]
     }
 );
 
 storage_value! (
-    TxLocation {
+    struct TxLocation {
         const SIZE = 16;
-        block_height:         u64  [00 => 08]
-        position_in_block:    u64  [08 => 16]
+        field block_height:         u64  [00 => 08]
+        field position_in_block:    u64  [08 => 16]
     }
 );
 
@@ -61,7 +61,7 @@ impl<'a> Schema<'a> {
         MapTable::new(gen_prefix(CONSENSUS, 2, None), self.view)
     }
 
-    pub fn block_hashes_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, u64, Hash> {
+    pub fn block_hashes_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 3, None), self.view))
     }
 
@@ -69,14 +69,14 @@ impl<'a> Schema<'a> {
         self.block_hashes_by_height().get(height)
     }
 
-    pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u32, Hash> {
+    pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         MerkleTable::new(MapTable::new(gen_prefix(CONSENSUS, 4, Some(&height.serialize())),
                                        self.view))
     }
 
     pub fn precommits(&self,
                       hash: &Hash)
-                      -> ListTable<MapTable<View, [u8], Vec<u8>>, u32, Precommit> {
+                      -> ListTable<MapTable<View, [u8], Vec<u8>>, Precommit> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 5, Some(hash.as_ref())), self.view))
     }
 
@@ -105,7 +105,7 @@ impl<'a> Schema<'a> {
     // TODO: consider List index to reduce storage volume
     pub fn configs_actual_from
         (&self)
-         -> ListTable<MapTable<View, [u8], Vec<u8>>, u64, ConfigReference> {
+         -> ListTable<MapTable<View, [u8], Vec<u8>>, ConfigReference> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
     }
 
@@ -179,11 +179,29 @@ impl<'a> Schema<'a> {
         Ok(res)
     }
 
+    pub fn previous_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
+        let current_height = self.current_height()?;
+        let idx = self.find_configurations_index_by_height(current_height)?;
+        let res = if idx > 0 {
+            let cfg_ref = self.configs_actual_from()
+                .get(idx - 1)?
+                .expect(&format!("Configuration at index {} not found", idx));
+            let cfg_hash = cfg_ref.cfg_hash();
+            let cfg =
+                self.configuration_by_hash(cfg_hash)?
+                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+            Some(cfg)
+        } else {
+            None
+        };
+        Ok(res)
+    }
+
     pub fn configuration_by_height(&self, height: u64) -> Result<StoredConfiguration, Error> {
         let idx = self.find_configurations_index_by_height(height)?;
         let cfg_ref = self.configs_actual_from()
             .get(idx)?
-            .expect("Configuration at index {} not found");
+            .expect(&format!("Configuration at index {} not found", idx));
         let cfg_hash = cfg_ref.cfg_hash();
         let cfg =
             self.configuration_by_hash(cfg_hash)?

@@ -4,7 +4,8 @@ use std::fmt;
 
 use crypto::PublicKey;
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_SIZE};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw,
+                     HEADER_SIZE, TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
 pub use self::error::Error;
 pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;

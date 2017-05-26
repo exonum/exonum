@@ -1,4 +1,3 @@
-use serde_json::value::ToJson;
 use serde_json::Value as JValue;
 use params::{Params, Value};
 use router::Router;
@@ -80,7 +79,7 @@ impl Api for ExplorerApi {
                                 count: count,
                                 from: from,
                             })?;
-            _self.ok_response(&info.to_json())
+            _self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         let _self = self.clone();
@@ -90,7 +89,7 @@ impl Api for ExplorerApi {
                 Some(height_str) => {
                     let height: u64 = height_str.parse().map_err(|_| ApiError::IncorrectRequest)?;
                     let info = _self.get_block(height)?;
-                    _self.ok_response(&info.to_json())
+                    _self.ok_response(&::serde_json::to_value(info).unwrap())
                 }
                 None => Err(ApiError::IncorrectRequest)?,
             }
@@ -102,7 +101,7 @@ impl Api for ExplorerApi {
             match params.find("hash") {
                 Some(hash_str) => {
                     let info = _self.get_transaction(hash_str)?;
-                    _self.ok_response(&info.to_json())
+                    _self.ok_response(&::serde_json::to_value(info).unwrap())
                 }
                 None => Err(ApiError::IncorrectRequest)?,
             }
