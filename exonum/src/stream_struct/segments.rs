@@ -118,16 +118,13 @@ impl<'a> SegmentField<'a> for RawMessage {
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-        println!("extend buffer={:?}, \n extend={:?}",
-                 buffer,
-                 self.as_ref().as_ref());
+        
         buffer.extend_from_slice(self.as_ref().as_ref())
     }
 
     fn check_data(buffer: &'a [u8], from: usize, count: usize) -> Result {
         let to = from + count * Self::item_size();
         let slice = &buffer[from..to];
-        println!("from ={:?}, count = {:?}, slice = {:?}", from, count, slice);
         if slice.len() < HEADER_SIZE {
             return Err(Error::UnexpectedlyShortRawMessage {
                            position: from as u32,
@@ -179,7 +176,6 @@ impl<'a, T> SegmentField<'a> for Vec<T>
         // write rest of fields
         for i in self.iter() {
             i.write(&mut buffer, start, start + Self::item_size());
-            println!("EXTENDBUFFER = {:?}", buffer);
             start += Self::item_size();
         }
     }
@@ -189,7 +185,6 @@ impl<'a, T> SegmentField<'a> for Vec<T>
         let mut last_data = header;
 
         for _ in 0..count {
-            println!("HEADER = {:?}, start = {:?}", last_data, start);
             T::check(buffer, start, start + Self::item_size())?
                 .map_or(Ok(()),
                         |mut e| e.check_segment(header as u32, &mut last_data))?;
