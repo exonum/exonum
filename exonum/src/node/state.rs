@@ -386,7 +386,7 @@ impl State {
                             .iter()
                             .position(|pk| pk == self.public_key())
                             .map(|id| id as u32);
-        self.whitelist.update_validators(config.validators.iter().cloned());
+        self.whitelist.set_validators(config.validators.iter().cloned());
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
         self.config = config;

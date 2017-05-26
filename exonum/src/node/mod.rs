@@ -143,7 +143,7 @@ impl<S> NodeHandler<S>
                                    &config.listener.secret_key);
 
         let mut whitelist = config.listener.whitelist;
-        whitelist.update_validators(stored.validators.iter().cloned()); 
+        whitelist.set_validators(stored.validators.iter().cloned()); 
         let mut state = State::new(validator_id,
                                config.listener.public_key,
                                config.listener.secret_key,
