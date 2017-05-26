@@ -134,8 +134,10 @@ fn serializer() {
     let b_s = b.serialize();
     let c_s = c.clone().serialize();
     let c_d: Vec<u8> = StorageValue::deserialize(c_s);
-    assert_eq!(a, StorageValue::deserialize(a_s));
-    assert_eq!(b, StorageValue::deserialize(b_s));
+    let a_d: u32 = StorageValue::deserialize(a_s);
+    let b_d: u64 = StorageValue::deserialize(b_s);
+    assert_eq!(a, a_d);
+    assert_eq!(b, b_d);
     assert_eq!(c, c_d);
 }
 

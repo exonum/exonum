@@ -12,7 +12,6 @@ extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
 extern crate leveldb;
-extern crate num;
 extern crate rand;
 extern crate serde;
 #[macro_use]
@@ -38,6 +37,8 @@ extern crate params;
 extern crate cookie;
 extern crate mount;
 
+#[macro_use]
+pub mod serialize;
 #[macro_use]
 pub mod messages;
 pub mod events;

@@ -1,6 +1,7 @@
-use serde::{Serialize, Serializer};
+/* use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 
+use std::fmt;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 pub struct U64(pub u64);
@@ -9,7 +10,7 @@ pub struct I64(pub i64);
 pub struct SystemTimeSerdeHelper(pub SystemTime);
 
 impl Serialize for U64 {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         ser.serialize_str(&self.0.to_string())
@@ -18,7 +19,7 @@ impl Serialize for U64 {
 
 
 impl Deserialize for U64 {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
         struct U64Visitor;
@@ -26,7 +27,11 @@ impl Deserialize for U64 {
         impl Visitor for U64Visitor {
             type Value = U64;
 
-            fn visit_str<E>(&mut self, s: &str) -> Result<Self::Value, E>
+            fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+                write!(fmt, "expecting u64 in str.")
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
                 where E: de::Error
             {
                 s.parse().map(U64).map_err(|_| {
@@ -40,7 +45,7 @@ impl Deserialize for U64 {
 
 
 impl Serialize for I64 {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         ser.serialize_str(&self.0.to_string())
@@ -49,7 +54,7 @@ impl Serialize for I64 {
 
 
 impl Deserialize for I64 {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
         struct I64Visitor;
@@ -57,7 +62,11 @@ impl Deserialize for I64 {
         impl Visitor for I64Visitor {
             type Value = I64;
 
-            fn visit_str<E>(&mut self, s: &str) -> Result<Self::Value, E>
+            fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+                write!(fmt, "expecting i64 in str.")
+            }
+
+            fn visit_str<E>( self, s: &str) -> Result<Self::Value, E>
                 where E: de::Error
             {
                 s.parse().map(I64).map_err(|_| {
@@ -70,7 +79,7 @@ impl Deserialize for I64 {
 }
 
 impl Serialize for SystemTimeSerdeHelper {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         let duration = self.0.duration_since(UNIX_EPOCH).unwrap();
@@ -83,7 +92,7 @@ impl Serialize for SystemTimeSerdeHelper {
 }
 
 impl Deserialize for SystemTimeSerdeHelper {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
         let helper = <DurationSerdeHelper>::deserialize(deserializer)?;
@@ -133,3 +142,4 @@ mod tests {
         assert_eq!(helper.nanos, helper1.nanos);
     }
 }
+*/

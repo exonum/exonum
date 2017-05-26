@@ -385,7 +385,7 @@ impl Node {
         }
     }
 
-    /// Launches only consensus messages handler. 
+    /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
     pub fn run_handler(&mut self) -> io::Result<()> {
         self.reactor.bind()?;
@@ -405,7 +405,7 @@ impl Node {
             Some(listen_address) => {
                 let api_context = ApiContext::new(self);
                 let mut mount = Mount::new();
-                mount.mount("services", api_context.mount_private_api());
+                mount.mount("api/services", api_context.mount_private_api());
 
                 let thread = thread::spawn(move || {
                                                info!("Private exonum api started on {}",

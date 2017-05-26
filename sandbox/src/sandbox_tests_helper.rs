@@ -222,7 +222,7 @@ pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
     use exonum::storage::{MemoryDB, List, MerkleTable};
 
     let db = MemoryDB::new();
-    let hashes: MerkleTable<MemoryDB, u64, Hash> = MerkleTable::new(db);
+    let hashes: MerkleTable<MemoryDB, Hash> = MerkleTable::new(db);
     hashes.extend(txs.iter().cloned()).unwrap();
     hashes.root_hash().unwrap()
 }
