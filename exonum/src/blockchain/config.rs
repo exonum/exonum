@@ -25,7 +25,7 @@ pub struct ConsensusConfig {
 }
 
 impl Default for ConsensusConfig {
-    fn default() -> ConsensusConfig {
+    fn default() -> Self {
         ConsensusConfig {
             round_timeout: 3000,
             propose_timeout: 500,
