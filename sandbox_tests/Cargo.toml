@@ -18,9 +18,9 @@ configuration_service = {version="0.1.0", path="../"}
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "1d89dce47d0dc0100d631bf5eefbb85abf0a01d9"
+rev = "3a4c74df9f9fe0787b60612018190fa0f0a6f7ad"
 
 [dependencies.sandbox]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "1d89dce47d0dc0100d631bf5eefbb85abf0a01d9"
+rev = "3a4c74df9f9fe0787b60612018190fa0f0a6f7ad"
