@@ -1,12 +1,12 @@
 /// trait `ExonumSerializeJson` implemented for all field that allows serializing in
-/// json like format.
+/// json format.
 ///
 
 //\TODO refer to difference between json serialization and exonum_json
-//\TODO implement Field for float, signed integers
-//\TODO implement Field for crypto structures
+//\TODO implement Field for float
 //\TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage
-//\TODO split deserialization for `in-place` and regular
+//\TODO implement ExonumJsonDeserialize for big ints
+
 use serde::{Serializer, Serialize};
 
 use serde_json::value::Value;
@@ -24,6 +24,42 @@ use stream_struct::Field;
 use super::HexValue;
 use super::WriteBufferWrapper;
 
+macro_rules! impl_default_deserialize_owned {
+    (@impl $name:ty) => {
+        impl $crate::stream_struct::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &$crate::stream_struct::serialize::json::reexport::Value)
+                                                        -> Result<Self, Box<::std::error::Error>> {
+                use $crate::stream_struct::serialize::json::reexport::from_value;
+                Ok(from_value(value.clone())?)
+            }
+        }
+    };
+    ($($name:ty);*) =>
+        ($(impl_default_deserialize_owned!{@impl $name})*);
+}
+
+macro_rules! propagate_deserialize_to_owned {
+    (@impl $name:ty) => {
+        impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
+            fn deserialize_field<B: WriteBufferWrapper>(
+                value: &$crate::stream_struct::serialize::json::reexport::Value,
+                                                        buffer: &mut B,
+                                                        from: usize,
+                                                        to: usize)
+                                                        -> Result<(), Box<::std::error::Error>> {
+                use $crate::stream_struct::serialize::json::ExonumJsonDeserialize;
+                // deserialize full field
+                let structure = <Self as ExonumJsonDeserialize>::deserialize(value)?;
+                // then write it
+                buffer.write(from, to, structure);
+                Ok(())
+            }
+        }
+
+    };
+    ($($name:ty);*) =>
+        ($(propagate_deserialize_to_owned!{@impl $name})*);
+}
 
 /// `ExonumJsonDeserializeField` is trait for object
 /// that can be serialized "in-place" of storage structure.
@@ -227,6 +263,9 @@ impl_deserialize_bigint!{u64; i64}
 
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
 
+impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
+                                Hash; PublicKey; Signature; bool}
+
 impl ExonumJsonDeserializeField for bool {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
@@ -324,6 +363,23 @@ impl ExonumJsonDeserializeField for Vec<Arc<::messages::MessageBuffer>> {
         }
         buffer.write(from, to, vec);
         Ok(())
+    }
+}
+
+
+impl<T> ExonumJsonDeserialize for Vec<T>
+    where T: ExonumJsonDeserialize,
+          for<'a> Vec<T>: Field<'a>
+{
+    fn deserialize<>(value: &Value) -> Result<Self, Box<Error>> {
+        let bytes = value.as_array().ok_or("Can't cast json as array")?;
+        let mut vec: Vec<_> = Vec::new();
+        for el in bytes {
+            let obj = T::deserialize(el)?;
+            vec.push(obj);
+        }
+        
+        Ok(vec)
     }
 }
 
