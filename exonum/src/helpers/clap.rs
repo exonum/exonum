@@ -128,6 +128,26 @@ pub struct ConfigTemplate {
     services: BTreeMap<String, String>,
 }
 
+// toml file could not save array without "field name"
+#[derive(Serialize, Deserialize)]
+struct PubKeyConfig {
+    public_key: PublicKey,
+}
+
+impl ::std::convert::From<PublicKey> for PubKeyConfig {
+    fn from(pk: PublicKey) -> Self {
+        PubKeyConfig {
+            public_key: pk
+        }
+    }
+}
+
+impl ::std::convert::Into<PublicKey> for PubKeyConfig {
+    fn into(self) -> PublicKey {
+        self.public_key
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct KeyConfig {
     public_key: PublicKey,
@@ -152,25 +172,28 @@ impl KeyGeneratorCommand {
         Path::new(matches.value_of("KEYCHAIN").unwrap())
     }
 
+
     /// Generates and writes key config to `keychain()` path.
-    pub fn execute_default(matches: &ArgMatches) {
+    pub fn execute(matches: &ArgMatches) {
         let (pub_key, sec_key) = crypto::gen_keypair();
         let keyconfig = Self::keychain(matches);
         let pub_key_path = keyconfig.with_extension("pub");
-
+        let pub_key_config: PubKeyConfig = pub_key.into();
         // save pub_key seperately
-        ConfigFile::save(&pub_key, &pub_key_path).unwrap();
+        ConfigFile::save(&pub_key_config, &pub_key_path)
+                    .expect("Could not write public key file.");
 
         let config = KeyConfig {
             public_key: pub_key,
             secret_key: sec_key,
         };
 
-        ConfigFile::save(&config, Self::keychain(matches)).unwrap();
+        ConfigFile::save(&config, Self::keychain(matches))
+                    .expect("Could not write keychain file.");
     }
 }
 
-/// implement command for template generating
+/// implements command for template generating
 pub struct GenerateTemplateCommand;
 impl GenerateTemplateCommand {
     pub fn new<'a>() -> App<'a, 'a> {
@@ -206,7 +229,8 @@ impl GenerateTemplateCommand {
             ..ConfigTemplate::default()
         };
 
-        ConfigFile::save(&template, Self::template(matches)).unwrap();
+        ConfigFile::save(&template, Self::template(matches))
+                        .expect("Could not write template file.");
     }
 }
 
@@ -262,16 +286,16 @@ impl AddValidatorCommand {
 
 
     #[cfg_attr(feature="cargo-clippy", allow(map_entry))]
-    pub fn execute<F, X>(matches: &ArgMatches, on_add: F)
-        where F: Into<Option<X>>,
-              X: FnOnce(usize, &mut BTreeMap<String, String>)
-                        -> Result<BTreeMap<String, String>, Box<Error>>
+    pub fn execute<'a, F>(matches: &ArgMatches, on_add: F)
+        where F: Into<Option<&'a Fn(usize, &mut BTreeMap<String, String>)
+                        -> Result<BTreeMap<String, String>, Box<Error>>>>,
     {
         let template_path = Self::template(matches);
         let public_key_path = Self::public_key(matches);
 
         let mut template: ConfigTemplate = ConfigFile::load(template_path).unwrap();
-        let public_key: PublicKey = ConfigFile::load(public_key_path).unwrap();
+        let public_key: PubKeyConfig = ConfigFile::load(public_key_path).unwrap();
+        let public_key = public_key.into();
         let addr = format!("{}:{}",
                            Self::addr(matches),
                            Self::port(matches).unwrap_or(DEFAULT_EXONUM_LISTEN_PORT))
@@ -335,18 +359,19 @@ impl InitCommand {
         Path::new(matches.value_of("KEYCHAIN").unwrap())
     }
 
-    pub fn execute<F, X>(matches: &ArgMatches, on_init: F)
-        where F: Into<Option<X>>,
-              X: FnOnce(&BTreeMap<String, String>,
+    pub fn execute<'a, F>(matches: &ArgMatches, on_init: F)
+        where F: Into<Option<&'a Fn(&BTreeMap<String, String>,
                         &BTreeMap<PublicKey, ValidatorIdent>)
-                        -> Result<(), Box<Error>>
+                        -> Result<(), Box<Error>>>>
     {
         let config_path = Self::config(matches);
         let template_path = Self::template(matches);
         let keychain_path = Self::keychain(matches);
 
-        let template: ConfigTemplate = ConfigFile::load(template_path).unwrap();
-        let keychain: KeyConfig = ConfigFile::load(keychain_path).unwrap();
+        let template: ConfigTemplate = ConfigFile::load(template_path)
+                                                .expect("Failed to load config template.");
+        let keychain: KeyConfig = ConfigFile::load(keychain_path)
+                                                .expect("Failed to load key config.");
 
         if template.validators.len() != template.count {
             panic!("Template should be full.");
@@ -379,7 +404,8 @@ impl InitCommand {
             api: Default::default(),
         };
 
-        ConfigFile::save(&config, config_path).unwrap();
+        ConfigFile::save(&config, config_path)
+                    .expect("Could not write config file.");
     }
 }
 

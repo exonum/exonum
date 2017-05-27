@@ -1,0 +1,24 @@
+listen_address = "127.0.0.1:6333"
+peers = ["127.0.0.1:6333", "127.0.0.1:6333", "127.0.0.1:6333", "127.0.0.1:6333"]
+public_key = "66932870aff6b5483cd78e88489d311373c78a6c9701dfea813cb437bd66b00a"
+secret_key = "70556a577705fbec054c335393836ecf4cc86e0a4b32c459efe3356901edc13466932870aff6b5483cd78e88489d311373c78a6c9701dfea813cb437bd66b00a"
+
+[api]
+enable_blockchain_explorer = true
+
+[genesis]
+validators = ["1bf7f976bc8e6931ca8fb70bb3abde5f053c1f99c91b9ba79db34f1bf846f1be", "66932870aff6b5483cd78e88489d311373c78a6c9701dfea813cb437bd66b00a", "9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9", "facf7923e15d1cfc8d8c8c9c6ddd23cd392e9b964fdff761f764ce95a027e67b"]
+
+[genesis.consensus]
+peers_timeout = 10000
+propose_timeout = 500
+round_timeout = 3000
+status_timeout = 5000
+txs_block_limit = 1000
+
+[network]
+max_incoming_connections = 128
+max_outgoing_connections = 128
+tcp_nodelay = false
+tcp_reconnect_timeout = 500
+tcp_reconnect_timeout_max = 600000
