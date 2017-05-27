@@ -1,0 +1,21 @@
+count = 4
+
+[consensus_cfg]
+peers_timeout = 10000
+propose_timeout = 500
+round_timeout = 3000
+status_timeout = 5000
+txs_block_limit = 1000
+
+[services]
+
+[validators]
+[validators.1bf7f976bc8e6931ca8fb70bb3abde5f053c1f99c91b9ba79db34f1bf846f1be]
+addr = "127.0.0.1:6333"
+
+[validators.1bf7f976bc8e6931ca8fb70bb3abde5f053c1f99c91b9ba79db34f1bf846f1be.values]
+
+[validators.9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9]
+addr = "127.0.0.1:6333"
+
+[validators.9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9.values]
