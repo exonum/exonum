@@ -435,8 +435,10 @@ impl<'a> ConfigurationSchema<'a> {
                              &tx_vote));
 
         let votes_for_cfg_table = self.votes_by_config_hash(cfg_hash);
-        votes_for_cfg_table
-            .set(validator_id as u64, tx_vote.clone())?;
+        if votes_for_cfg_table.get(validator_id as u64)?.unwrap() == ZEROVOTE.clone() {
+            votes_for_cfg_table
+                .set(validator_id as u64, tx_vote.clone())?;
+        }
         propose_propose_data_by_config_hash.set_history_hash(&votes_for_cfg_table.root_hash()?);
         propose_data_by_config_hash_table.put(cfg_hash, propose_propose_data_by_config_hash)
     }
@@ -516,7 +518,7 @@ impl TxConfigPropose {
 
         config_schema.put_propose(self.clone())?;
 
-        debug!("Put TxConfigPropose:{} to config_proposes table",
+        trace!("Put TxConfigPropose:{} to config_proposes table",
                serde_json::to_string(self)?);
         Ok(())
     }
@@ -579,7 +581,7 @@ impl TxConfigVote {
         }
 
         config_schema.put_vote(self.clone())?;
-        debug!("Put TxConfigVote:{:?} to corresponding cfg votes_by_config_hash table",
+        trace!("Put TxConfigVote:{:?} to corresponding cfg votes_by_config_hash table",
                self);
 
         let mut votes_count = 0;
