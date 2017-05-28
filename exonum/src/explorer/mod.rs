@@ -4,7 +4,8 @@ use std::cmp;
 
 use storage::{Map, List, Result as StorageResult};
 use crypto::Hash;
-use blockchain::{Schema, Blockchain};
+use blockchain::{Schema, Blockchain, Block};
+use messages::Precommit;
 
 pub use self::explorer_api::{ExplorerApi, BlocksRequest};
 
@@ -16,15 +17,9 @@ pub struct BlockchainExplorer<'a> {
 
 #[derive(Debug, Serialize)]
 pub struct BlockInfo {
-    height: u64,
-    proposer: u32,
-
-    hash: Hash,
-    state_hash: Hash,
-    tx_hash: Hash,
-    tx_count: u64,
-    precommits_count: u64,
-    txs: Option<Vec<Value>>,
+    pub block: Block,
+    pub precommits: Vec<Precommit>,
+    txs: Vec<Hash>,
 }
 
 impl<'a> BlockchainExplorer<'a> {
@@ -47,47 +42,25 @@ impl<'a> BlockchainExplorer<'a> {
 
     }
 
-    pub fn block_info(&self,
-                      block_hash: &Hash,
-                      full_info: bool)
-                      -> StorageResult<Option<BlockInfo>> {
+    pub fn block_info(&self, height: u64) -> StorageResult<Option<BlockInfo>> {
         let b = self.blockchain.clone();
         let view = b.view();
         let schema = Schema::new(&view);
-        let block = schema.blocks().get(block_hash)?;
-        if let Some(block) = block {
-            let height = block.height();
-            let (txs, txs_count) = {
-                if full_info {
-                    let txs = self.block_txs(block.height())?;
-                    let txs_count = txs.len() as u64;
-                    (Some(txs), txs_count)
-                } else {
-                    (None, schema.block_txs(height).len()? as u64)
-                }
-            };
-
-            let config = schema.actual_configuration()?;
-            // TODO Find more common solution
-            // FIXME this code was copied from state.rs
-            let proposer = ((height + block.propose_round() as u64) %
-                            (config.validators.len() as u64)) as u32;
-
-            let precommits_count = schema.precommits(block_hash).len()? as u64;
-            let info = BlockInfo {
-                height: height,
-                proposer: proposer,
-                hash: *block_hash,
-                state_hash: *block.state_hash(),
-                tx_hash: *block.tx_hash(),
-                tx_count: txs_count,
-                precommits_count: precommits_count,
-                txs: txs,
-            };
-            Ok(Some(info))
-        } else {
-            Ok(None)
-        }
+        let txs_table = schema.block_txs(height);
+        let block_proof = schema.block_and_precommits(height)?;
+        let res = match block_proof {
+            None => None,
+            Some(proof) => {
+               let txs = txs_table.values()?;
+               let bl =  BlockInfo {
+                    block: proof.block,
+                    precommits: proof.precommits,
+                    txs: txs,
+               };
+               Some(bl)
+            }
+        };
+        Ok(res)
     }
 
     fn block_txs(&self, height: u64) -> StorageResult<Vec<Value>> {
@@ -108,15 +81,6 @@ impl<'a> BlockchainExplorer<'a> {
         Ok(v)
     }
 
-    pub fn block_info_with_height(&self, height: u64) -> StorageResult<Option<BlockInfo>> {
-        if let Some(block_hash) = Schema::new(&self.blockchain.view())
-               .block_hash_by_height(height)? {
-            self.block_info(&block_hash, true)
-        } else {
-            Ok(None)
-        }
-    }
-
     pub fn blocks_range(&self, count: u64, from: Option<u64>) -> StorageResult<Vec<BlockInfo>> {
         let b = self.blockchain.clone();
         let view = b.view();
@@ -130,10 +94,9 @@ impl<'a> BlockchainExplorer<'a> {
         let mut v = Vec::new();
         for height in (from..to).rev() {
             if let Some(ref h) = hashes.get(height)? {
-                if let Some(block_info) = self.block_info(h, false)? {
-                    v.push(block_info);
-                }
+                unimplemented!();
             }
+
         }
         Ok(v)
     }
