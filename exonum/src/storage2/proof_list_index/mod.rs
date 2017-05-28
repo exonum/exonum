@@ -9,6 +9,7 @@ use self::proof::ListProof;
 
 #[cfg(test)]
 mod tests;
+mod key;
 mod proof;
 
 // TODO: implement pop and truncate methods for Merkle tree
