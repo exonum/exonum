@@ -234,7 +234,7 @@ impl<'a> CurrencySchema<'a> {
 
     pub fn wallet_history(&self,
                           public_key: &PublicKey)
-                          -> MerkleTable<MapTable<View, [u8], Vec<u8>>, u64, TxMetaRecord> {
+                          -> MerkleTable<MapTable<View, [u8], Vec<u8>>, TxMetaRecord> {
         let mut prefix = vec![19; 1 + PUBLIC_KEY_LENGTH];
         prefix[1..].copy_from_slice(public_key.as_ref());
         MerkleTable::new(MapTable::new(prefix, self.view))
