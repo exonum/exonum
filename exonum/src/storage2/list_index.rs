@@ -102,7 +102,8 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
 
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
-            panic!("index out of bounds: the len is {} but the index is {}", self.len(), index);
+            panic!("index out of bounds: \
+                    the len is {} but the index is {}", self.len(), index);
         }
         self.base.put(&index, value)
     }

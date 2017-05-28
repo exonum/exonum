@@ -1,12 +1,17 @@
-// #[cfg(test)]
-// mod tests;
-
 use std::cell::Cell;
 use std::marker::PhantomData;
 
 use crypto::{Hash, hash};
 
 use super::{pair_hash, BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+
+use self::proof::ListProof;
+
+#[cfg(test)]
+mod tests;
+mod proof;
+
+// TODO: implement pop and truncate methods for Merkle tree
 
 const HEIGHT_SHIFT : u64 = 58;
 // TODO: add checks for overflow
@@ -51,6 +56,43 @@ impl<T, V> ProofListIndex<T, V> {
 
 impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
                                       V: StorageValue {
+    fn has_branch(&self, height: u64, index: u64) -> bool {
+        debug_assert!(height > 0 && height <= self.height() && index <= (1 << height));
+
+        (index << (height - 1)) < self.len()
+    }
+
+    fn get_branch(&self, height: u64, index: u64) -> Option<Hash> {
+        if self.has_branch(height, index) {
+            Some(self.get_branch_unchecked(height, index))
+        } else {
+            None
+        }
+    }
+
+    fn get_branch_unchecked(&self, height: u64, index: u64) -> Hash {
+        debug_assert!(self.has_branch(height, index));
+
+        self.base.get(&key(height, index)).unwrap()
+    }
+
+    fn construct_proof(&self, height: u64, index: u64, from: u64, to: u64) -> ListProof<V> {
+        if height == 1 {
+            return ListProof::Leaf(self.get(index).unwrap())
+        }
+        let (left, right, middle) = (index << 1, index << 1 + 1, index << (height - 1));
+        if middle > to {
+            ListProof::Left(Box::new(self.construct_proof(height - 1, left, from, to)),
+                            self.get_branch(height - 1, right))
+        } else if middle <= from {
+            ListProof::Right(self.get_branch_unchecked(height - 1, left),
+                             Box::new(self.construct_proof(height - 1, right, from, to)))
+        } else {
+            ListProof::Full(Box::new(self.construct_proof(height - 1, left, from, middle)),
+                            Box::new(self.construct_proof(height - 1, right, middle, to)))
+        }
+    }
+
     pub fn get(&self, index: u64) -> Option<V> {
         self.base.get(&key(0, index))
     }
@@ -80,7 +122,24 @@ impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
     }
 
     pub fn root_hash(&self) -> Hash {
-        self.base.get(&key(self.height(), 0)).unwrap_or_default()
+        self.get_branch(0, 0).unwrap_or_default()
+    }
+
+    pub fn get_proof(&self, index: u64) -> ListProof<V> {
+        self.get_range_proof(index, index + 1)
+    }
+
+    pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
+        if to > self.len() {
+            panic!("illegal range boundaries: \
+                    the len is {:?}, but the range end is {:?}", self.len(), to)
+        }
+        if to <= from {
+            panic!("illegal range boundaries: \
+                    the range start is {:?}, but the range end is {:?}", from, to)
+        }
+
+        self.construct_proof(self.height(), 0, from, to)
     }
 }
 
@@ -88,18 +147,6 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V> where V: StorageValue {
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
         self.length.set(Some(len));
-    }
-
-    fn has_branch(&self, height: u64, index: u64) -> bool {
-        debug_assert!(height > 0 && height <= self.height() && index <= (1 << height));
-
-        index >> height != 0
-    }
-
-    fn get_branch(&self, height: u64, index: u64) -> Hash {
-        debug_assert!(self.has_branch(height, index));
-
-        self.base.get(&key(height, index)).unwrap()
     }
 
     fn set_branch(&mut self, height: u64, index: u64, hash: Hash) {
@@ -116,10 +163,10 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V> where V: StorageValue {
         let mut index = len;
         while index > 0 {
             let hash = if index & 1 == 0 {
-                hash(self.get_branch(height, index).as_ref())
+                hash(self.get_branch_unchecked(height, index).as_ref())
             } else {
-                pair_hash(&self.get_branch(height, index - 1),
-                          &self.get_branch(height, index))
+                pair_hash(&self.get_branch_unchecked(height, index - 1),
+                          &self.get_branch_unchecked(height, index))
             };
             height += 1; index >>= 1;
             self.set_branch(height, index, hash);
@@ -133,21 +180,21 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V> where V: StorageValue {
         }
     }
 
-    pub fn set(&mut self, index: u64, value: V) {
+    pub fn set(&mut self, mut index: u64, value: V) {
         if index >= self.len() {
-            panic!("index out of bounds: the len is {} but the index is {}", self.len(), index);
+            panic!("index out of bounds: \
+                    the len is {} but the index is {}", self.len(), index);
         }
         self.base.put(&key(1, index), value.hash());
         self.base.put(&key(0, index), value);
         let mut height = 1;
-        let mut index = index | 1;
         while index > 0 {
-            let (left, right) = (index | 1 - 1, index | 1);
+            let (left, right) = (index & !1, index | 1);
             let hash = if self.has_branch(height, right) {
-                pair_hash(&self.get_branch(height, left),
-                          &self.get_branch(height, right))
+                pair_hash(&self.get_branch_unchecked(height, left),
+                          &self.get_branch_unchecked(height, right))
             } else {
-                hash(self.get_branch(height, left).as_ref())
+                hash(self.get_branch_unchecked(height, left).as_ref())
             };
             height += 1; index >>= 1;
             self.set_branch(height, index, hash);
