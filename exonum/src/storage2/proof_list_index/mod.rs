@@ -118,7 +118,7 @@ impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
     }
 
     pub fn height(&self) -> u64 {
-        self.len().next_power_of_two() + 1
+        self.len().next_power_of_two().trailing_zeros() as u64 + 1
     }
 
     pub fn root_hash(&self) -> Hash {

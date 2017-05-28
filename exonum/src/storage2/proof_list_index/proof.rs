@@ -8,7 +8,7 @@ use crypto::{Hash, hash};
 
 use super::super::{StorageValue, pair_hash};
 
-use self::*;
+use self::ListProof::*;
 
 pub enum ListProof<V> {
     Full(Box<ListProof<V>>, Box<ListProof<V>>),
@@ -17,42 +17,47 @@ pub enum ListProof<V> {
     Leaf(V),
 }
 
+pub enum ListProofError {
+    UnexpectedLeaf,
+    UnexpectedBranch,
+    UnmatchedRootHash
+}
+
 impl<V: StorageValue> ListProof<V> {
-    fn collect(&'a self, height: usize, index: usize, vec: &mut Vec<usize, &'a V>) -> Hash {
-        match *self {
+    fn collect<'a>(&'a self, height: u8, index: u64, vec: &mut Vec<(u64, &'a V)>)
+            -> Result<Hash, ListProofError> {
+        if height == 0 {
+            return Err(ListProofError::UnexpectedBranch)
+        }
+        let hash = match *self {
             Full(ref left, ref right) =>
-                pair_hash(&left.collect(index << 1, vec),
-                          &right.collect(index << 1 + 1, vec)),
+                pair_hash(&left.collect(height - 1, index << 1, vec)?,
+                          &right.collect(height - 1, index << 1 + 1, vec)?),
             Left(ref left, Some(ref right)) =>
-                pair_hash(&left.collect(index << 1, vec), right),
+                pair_hash(&left.collect(height - 1, index << 1, vec)?, right),
             Left(ref left, None) =>
-                hash(&left.collect(index << 1, vec)),
+                hash(left.collect(height - 1, index << 1, vec)?.as_ref()),
             Right(ref left, ref right) =>
-                pair_hash(left, &right.collect(index << 1 + 1, vec)),
-            Leaf(ref value) => vec.push((index, value)),
-        }
-    }
-
-    pub fn validate(&self, root_hash: &Hash, len: usize) -> Result<Vec<(usize, &'a V)>, ListProofError> {
-    }
-
-    pub fn root_hash(&self) -> Hash {
-        match *self {
-            Full(ref left, ref right) => {
-                pair_hash(&left.root_hash(), &right.root_hash())
-            }
-            Left(ref left_proof, ref right_hash) => {
-                if let Some(ref hash_val) = *right_hash {
-                    pair_hash(&left_proof.root_hash(), hash_val)
-                } else {
-                    hash(left_proof.root_hash().as_ref())
+                pair_hash(left, &right.collect(height - 1, index << 1 + 1, vec)?),
+            Leaf(ref value) => {
+                if height > 1 {
+                    return Err(ListProofError::UnexpectedLeaf)
                 }
+                vec.push((index, value));
+                value.hash()
             }
-            Right(ref left_hash, ref right_proof) => {
-                pair_hash(left_hash, &right_proof.root_hash())
-            }
-            Leaf(ref val) => val.hash(),
+        };
+        Ok(hash)
+    }
+
+    pub fn validate<'a>(&'a self, root_hash: Hash, len: u64)
+            -> Result<Vec<(u64, &'a V)>, ListProofError> {
+        let mut vec = Vec::new();
+        let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
+        if self.collect(height, 0, &mut vec)? != root_hash {
+            return Err(ListProofError::UnmatchedRootHash)
         }
+        Ok(vec)
     }
 }
 
