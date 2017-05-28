@@ -36,7 +36,7 @@ impl ExplorerApi {
 
     fn get_block(&self, height: u64) -> Result<Option<BlockInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
-        match explorer.block_info_with_height(height) {
+        match explorer.block_info(height) {
             Ok(block_info) => Ok(block_info),
             Err(e) => Err(ApiError::Storage(e)),
         }
