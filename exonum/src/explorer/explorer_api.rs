@@ -2,16 +2,12 @@ use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
-use blockchain::Blockchain;
+use blockchain::{Blockchain, Block};
 use crypto::{Hash, HexValue};
 use explorer::{TxInfo, BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BlocksRequest {
-    pub from: Option<u64>,
-    pub count: u64,
-}
+const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
 #[derive(Clone)]
 pub struct ExplorerApi {
@@ -25,12 +21,12 @@ impl ExplorerApi {
         }
     }
 
-    fn get_blocks(&self, blocks_request: BlocksRequest) -> Result<Vec<BlockInfo>, ApiError> {
-        let explorer = BlockchainExplorer::new(&self.blockchain);
-        match explorer.blocks_range(blocks_request.count, blocks_request.from) {
-            Ok(blocks) => Ok(blocks),
-            Err(e) => Err(ApiError::Storage(e)),
+    fn get_blocks(&self, count: u64, from: Option<u64>, skip_empty_blocks: bool) -> Result<Vec<Block>, ApiError> {
+        if count > MAX_BLOCKS_PER_REQUEST {
+             return Err(ApiError::IncorrectRequest)
         }
+        let explorer = BlockchainExplorer::new(&self.blockchain);
+        Ok(explorer.blocks_range(count, from, skip_empty_blocks)?)
     }
 
     fn get_block(&self, height: u64) -> Result<Option<BlockInfo>, ApiError> {
@@ -59,6 +55,7 @@ impl Api for ExplorerApi {
             let map = req.get_ref::<Params>().unwrap();
             let count: u64;
             let from: Option<u64>;
+            let skip_empty_blocks: bool;
             count = match map.find(&["count"]) {
                 Some(&Value::String(ref count_str)) => {
                     count_str.parse().map_err(|_| ApiError::IncorrectRequest)?
@@ -73,11 +70,14 @@ impl Api for ExplorerApi {
                 }
                 _ => None,
             };
+            skip_empty_blocks = match map.find(&["skip_empty_blocks"]) {
+                Some(&Value::String(ref skip_str)) => {
+                    skip_str.parse().map_err(|_| ApiError::IncorrectRequest)?
+                }
+                _ => false,
+            };
             let info = _self
-                .get_blocks(BlocksRequest {
-                                count: count,
-                                from: from,
-                            })?;
+                .get_blocks(count, from, skip_empty_blocks)?;
             _self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
