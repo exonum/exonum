@@ -23,6 +23,7 @@ use storage::{Result as StorageResult, Error as StorageError};
 
 #[derive(Debug)]
 pub enum ApiError {
+    Service(String),
     Storage(StorageError),
     Events(EventsError),
     FromHex(FromHexError),
@@ -44,6 +45,7 @@ impl ::std::fmt::Display for ApiError {
 impl ::std::error::Error for ApiError {
     fn description(&self) -> &str {
         match *self {
+            ApiError::Service(ref string) => string,
             ApiError::Storage(_) => "Storage",
             ApiError::Events(_) => "Events",
             ApiError::FromHex(_) => "FromHex",

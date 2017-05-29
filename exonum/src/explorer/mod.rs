@@ -8,7 +8,7 @@ use crypto::Hash;
 use blockchain::{Schema, Blockchain, Block, TxLocation};
 use messages::Precommit;
 
-pub use self::explorer_api::{ExplorerApi, BlocksRequest};
+pub use self::explorer_api::{ExplorerApi};
 
 mod explorer_api;
 
@@ -91,22 +91,28 @@ impl<'a> BlockchainExplorer<'a> {
         Ok(res)
     }
 
-    pub fn blocks_range(&self, count: u64, from: Option<u64>) -> StorageResult<Vec<BlockInfo>> {
+    pub fn blocks_range(&self, count: u64, upper: Option<u64>, skip_empty_blocks: bool) -> StorageResult<Vec<Block>> {
         let b = self.blockchain.clone();
         let view = b.view();
         let schema = Schema::new(&view);
         let hashes = schema.block_hashes_by_height();
+        let blocks = schema.blocks();
 
         let max_len = hashes.len()?;
-        let to = from.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
-        let from = to.checked_sub(count).unwrap_or(0);
+        let upper = upper.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
+        let lower = upper.checked_sub(count).unwrap_or(0);
 
         let mut v = Vec::new();
-        for height in (from..to).rev() {
-            if let Some(ref h) = hashes.get(height)? {
-                unimplemented!();
+        for height in (lower..upper).rev() {
+            let block_txs = schema.block_txs(height);
+            if skip_empty_blocks && block_txs.is_empty()? {
+               continue;
             }
-
+            let block_hash = hashes.get(height)?.
+                expect(&format!("Block not found, height:{:?}", height));
+            let block = blocks.get(&block_hash)?.
+                expect(&format!("Block not found, hash:{:?}", block_hash));
+            v.push(block)
         }
         Ok(v)
     }
