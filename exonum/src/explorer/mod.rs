@@ -3,8 +3,9 @@ use serde_json::Value;
 use std::cmp;
 
 use storage::{Map, List, Result as StorageResult};
+use storage::Proofnode;
 use crypto::Hash;
-use blockchain::{Schema, Blockchain, Block};
+use blockchain::{Schema, Blockchain, Block, TxLocation};
 use messages::Precommit;
 
 pub use self::explorer_api::{ExplorerApi, BlocksRequest};
@@ -17,9 +18,16 @@ pub struct BlockchainExplorer<'a> {
 
 #[derive(Debug, Serialize)]
 pub struct BlockInfo {
-    pub block: Block,
-    pub precommits: Vec<Precommit>,
+    block: Block,
+    precommits: Vec<Precommit>,
     txs: Vec<Hash>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TxInfo {
+    content: Value,
+    location: TxLocation,
+    proof_to_block_merkle_root: Proofnode<Hash>,
 }
 
 impl<'a> BlockchainExplorer<'a> {
@@ -27,18 +35,38 @@ impl<'a> BlockchainExplorer<'a> {
         BlockchainExplorer { blockchain: blockchain }
     }
 
-    pub fn tx_info(&self, tx_hash: &Hash) -> StorageResult<Option<Value>> {
-        let tx = Schema::new(&self.blockchain.view())
-            .transactions()
-            .get(tx_hash)?;
-        match tx {
+    pub fn tx_info(&self, tx_hash: &Hash) -> StorageResult<Option<TxInfo>> {
+        let b = self.blockchain.clone();
+        let view = b.view();
+        let schema = Schema::new(&view);
+        let tx = schema.transactions().get(tx_hash)?;
+        let res = match tx {
+            None => None,
             Some(raw_tx) => {
-                Ok(self.blockchain
-                       .tx_from_raw(raw_tx)
-                       .and_then(|t| Some(t.info())))
+                //Explicit panic here if no matching service found
+                //TODO:Replace with service_not_found error
+                let box_transaction = self.blockchain.tx_from_raw(raw_tx).
+                    expect("Service not found");
+                let content = box_transaction.info();
+
+                let location = schema
+                    .tx_location_by_tx_hash()
+                    .get(tx_hash)?
+                    .expect(&format!("Not found tx_hash location: {:?}", tx_hash));
+
+                let block_height = location.block_height();
+                let tx_index = location.position_in_block();
+                let proof = schema.block_txs(block_height).
+                    construct_path_for_range(tx_index, tx_index+1)?;
+                let tx_info = TxInfo {
+                    content: content,
+                    location: location,
+                    proof_to_block_merkle_root: proof,
+                };
+                Some(tx_info)
             }
-            None => Ok(None),
-        }
+        };
+        Ok(res)
 
     }
 
@@ -51,34 +79,16 @@ impl<'a> BlockchainExplorer<'a> {
         let res = match block_proof {
             None => None,
             Some(proof) => {
-               let txs = txs_table.values()?;
-               let bl =  BlockInfo {
+                let txs = txs_table.values()?;
+                let bl = BlockInfo {
                     block: proof.block,
                     precommits: proof.precommits,
                     txs: txs,
-               };
-               Some(bl)
+                };
+                Some(bl)
             }
         };
         Ok(res)
-    }
-
-    fn block_txs(&self, height: u64) -> StorageResult<Vec<Value>> {
-        let b = self.blockchain.clone();
-        let view = b.view();
-        let schema = Schema::new(&view);
-        let txs = schema.block_txs(height);
-        let tx_count = txs.len()?;
-
-        let mut v = Vec::new();
-        for i in 0..tx_count {
-            if let Some(tx_hash) = txs.get(i)? {
-                if let Some(tx_info) = self.tx_info(&tx_hash)? {
-                    v.push(tx_info);
-                }
-            }
-        }
-        Ok(v)
     }
 
     pub fn blocks_range(&self, count: u64, from: Option<u64>) -> StorageResult<Vec<BlockInfo>> {

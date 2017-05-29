@@ -1,11 +1,10 @@
-use serde_json::Value as JValue;
 use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
 use blockchain::Blockchain;
 use crypto::{Hash, HexValue};
-use explorer::{BlockInfo, BlockchainExplorer};
+use explorer::{TxInfo, BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -42,7 +41,7 @@ impl ExplorerApi {
         }
     }
 
-    fn get_transaction(&self, hash_str: &str) -> Result<Option<JValue>, ApiError> {
+    fn get_transaction(&self, hash_str: &str) -> Result<Option<TxInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         let hash = Hash::from_hex(hash_str)?;
         match explorer.tx_info(&hash) {
