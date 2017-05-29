@@ -4,13 +4,19 @@ use crypto::{Hash};
 pub const BLOCK_SIZE: usize = 108;
 
 storage_value!(
+    /// Exonum block data structure.
     struct Block {
         const SIZE = BLOCK_SIZE;
 
+        /// Height of commited block
         field height:                 u64         [00 => 08]
+        /// Round when the proposal of this block appeared.
         field propose_round:          u32         [08 => 12]
+        /// Link to the previous block in blockchain.
         field prev_hash:              &Hash       [12 => 44]
+        /// Merkle root of transactions list.
         field tx_hash:                &Hash       [44 => 76]
+        /// Hash of the current `exonum` state.
         field state_hash:             &Hash       [76 => 108]
     }
 );
