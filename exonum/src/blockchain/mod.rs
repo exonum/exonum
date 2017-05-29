@@ -1,3 +1,6 @@
+// TODO move to lib.rs
+#![deny(missing_docs)]
+
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
