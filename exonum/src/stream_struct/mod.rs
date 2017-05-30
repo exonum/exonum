@@ -1,3 +1,4 @@
+#![deny(missing_docs)]
 //! `stream_struct` is a lazy serialization library,
 //! it allows to keep struct serialized in place, and deserialize fields on demand.
 //!
@@ -87,6 +88,9 @@
 //! will write on header [in function `field_size()`](./trait.Field.html#tymethod.field_size)
 //! 
 
+use std::convert::From;
+use std::ops::{Add, Sub, Mul, Div};
+
 pub use self::fields::Field;
 pub use self::error::Error;
 
@@ -100,42 +104,102 @@ mod segments;
 #[cfg(test)]
 mod tests;
 
-type Offset = u32;
+/// Type alias usable for reference in buffer
+pub type Offset = u32;
 
+/// Type alias that should be returned in `check` method of `Field`
 pub type Result = ::std::result::Result<Option<SegmentReference>, Error>;
 
+/// Reference to some data in buffer.
+/// Currently used only by `check` method 
+/// and indicates what bytes in buffer we already check.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct SegmentReference {
-    pub from: Offset,
-    pub to: Offset,
+    /// position in buffer where data begin
+    pub from: CheckedOffset,
+    /// position in buffer where data ended
+    pub to: CheckedOffset,
 }
 
 impl SegmentReference {
-    pub fn new(from: Offset, to: Offset) -> SegmentReference {
+    /// creates new reference
+    pub fn new(from: CheckedOffset, to: CheckedOffset) -> SegmentReference {
         SegmentReference { from: from, to: to }
     }
 
+    /// checks overlapping segments.
     pub fn check_segment(&mut self,
-                         header_size: u32,
-                         last_data: &mut u32)
+                         last_data: &mut CheckedOffset)
                          -> ::std::result::Result<(), Error> {
-        if self.from < header_size {
-            Err(Error::SementInHeader {
-                    header_size: header_size,
-                    start: self.from,
-                })
-        } else if self.from < *last_data {
+        println!("check_segment {:?}, {:?}", last_data, self);
+        if self.from < *last_data {
             Err(Error::OverlappingSegment {
-                    last_end: *last_data,
-                    start: self.from,
+                    last_end: (*last_data).unchecked_offset(),
+                    start: self.from.unchecked_offset(),
                 })
         } else if self.from > *last_data {
             Err(Error::SpaceBetweenSegments {
-                    last_end: *last_data,
-                    start: self.from,
+                    last_end: (*last_data).unchecked_offset(),
+                    start: self.from.unchecked_offset(),
                 })
         } else {
             *last_data = self.to;
             Ok(())
         }
+    }
+}
+
+//\TODO replace by more generic type
+/// `CheckedOffset` is a type that take control over overflow,
+/// so you can't panic without `unwrap`, 
+/// and work with this value without overflow checks.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
+pub struct CheckedOffset {
+    offset: Offset
+}
+
+impl CheckedOffset {
+    /// create checked value
+    pub fn new(offset: Offset) -> CheckedOffset {
+        CheckedOffset {
+            offset: offset
+        }
+    }
+
+    /// return unchecked offset
+    pub fn unchecked_offset(self) -> Offset {
+        self.offset
+    }
+}
+
+macro_rules! implement_default_ops_checked {
+    ($trait_name: ident $function:ident $checked_function:ident) => (
+        impl $trait_name<CheckedOffset> for CheckedOffset {
+            type Output = ::std::result::Result<CheckedOffset, Error>;
+            fn $function(self, rhs: CheckedOffset) -> Self::Output {
+                rhs.offset.$checked_function(self.offset)
+                        .map(CheckedOffset::new)
+                        .ok_or(Error::OffsetOverflow)
+            }
+        }
+        impl $trait_name<Offset> for CheckedOffset {
+            type Output = ::std::result::Result<CheckedOffset, Error>;
+            fn $function(self, rhs: Offset) -> Self::Output {
+                rhs.$checked_function(self.offset)
+                        .map(CheckedOffset::new)
+                        .ok_or(Error::OffsetOverflow)
+            }
+        } 
+    )
+}
+
+implement_default_ops_checked!{Add add checked_add }
+implement_default_ops_checked!{Sub sub checked_sub }
+implement_default_ops_checked!{Mul mul checked_mul }
+implement_default_ops_checked!{Div div checked_div }
+
+impl From<Offset> for CheckedOffset {
+    fn from(offset: Offset) -> CheckedOffset {
+        CheckedOffset::new(offset)
     }
 }

@@ -48,29 +48,42 @@ macro_rules! storage_value {
         }
 
         impl<'a> $crate::stream_struct::Field<'a> for $name {
-            fn read(buffer: &'a [u8], from: usize, to: usize) -> Self {
+            unsafe fn read(buffer: &'a [u8],
+                            from: $crate::stream_struct::Offset,
+                            to: $crate::stream_struct::Offset) -> Self {
                 let vec: Vec<u8> = $crate::stream_struct::Field::read(buffer, from, to);
                 $crate::storage::StorageValue::deserialize(vec)
             }
 
-            fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
+            fn write(&self,
+                            buffer: &mut Vec<u8>,
+                            from: $crate::stream_struct::Offset,
+                            to: $crate::stream_struct::Offset) {
                 $crate::stream_struct::Field::write(&self.raw, buffer, from, to);
             }
 
-            fn check(buffer: &'a [u8], from_st_val: usize, to_st_val: usize)
+            fn check(buffer: &'a [u8],
+                        from_st_val: $crate::stream_struct::CheckedOffset,
+                        to_st_val: $crate::stream_struct::CheckedOffset)
                 -> $crate::stream_struct::Result
             {
-                <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, to_st_val)?;
-                let vec: Vec<u8> = $crate::stream_struct::Field::read(buffer, from_st_val, to_st_val);
-                let mut last_data = $body as u32;
-                $( <$field_type as $crate::stream_struct::Field>::check(&vec, $from, $to)?
-                        .map_or(Ok(()), |mut e| e.check_segment($body as u32, &mut last_data))?;
+                let ret = <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, to_st_val)?;
+                let vec: Vec<u8> = unsafe{ $crate::stream_struct::Field::read(buffer, 
+                                                                        from_st_val.unchecked_offset(),
+                                                                        to_st_val.unchecked_offset())};
+                let mut last_data = ($body as $crate::stream_struct::Offset).into();
+                $( 
+                    println!("check_field {} = {:?} {:?}", stringify!($field_name), $from, $to);
+                    <$field_type as $crate::stream_struct::Field>::check(&vec,
+                                                                        $from.into(),
+                                                                        $to.into())?
+                        .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
                 )*
-                Ok(None)
+                Ok(ret)
             }
 
-            fn field_size() -> usize {
-                $body
+            fn field_size() -> $crate::stream_struct::Offset {
+                $body as $crate::stream_struct::Offset
             }
         }
 
@@ -113,7 +126,9 @@ macro_rules! storage_value {
             $(#[$field_attr])*
             pub fn $field_name(&self) -> $field_type {
                 use $crate::stream_struct::Field;
-                Field::read(&self.raw, $from, $to)
+                unsafe {
+                    Field::read(&self.raw, $from, $to)
+                }
             })*
         }
 
@@ -143,7 +158,9 @@ macro_rules! storage_value {
 
         impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
             fn deserialize_field<B> (value: &$crate::stream_struct::serialize::json::reexport::Value,
-                                        buffer: & mut B, from: usize, _to: usize )
+                                        buffer: & mut B,
+                                        from: $crate::stream_struct::Offset,
+                                        _to: $crate::stream_struct::Offset )
                 -> Result<(), Box<::std::error::Error>>
                 where B: $crate::stream_struct::serialize::WriteBufferWrapper
             {
@@ -161,7 +178,7 @@ macro_rules! storage_value {
         }
         impl $crate::stream_struct::serialize::json::ExonumJsonDeserialize for $name {
             fn deserialize(value: &::serde_json::Value) -> Result<Self, Box<::std::error::Error>> {
-                let to = $body;
+                let to = $body as $crate::stream_struct::Offset;
                 let from = 0;
                 use $crate::stream_struct::serialize::json::ExonumJsonDeserializeField;
 

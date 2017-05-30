@@ -70,40 +70,51 @@ macro_rules! message {
         }
 
         impl<'a> $crate::stream_struct::Field<'a> for $name {
-            fn read(buffer: &'a [u8], from: usize, to: usize) -> Self {
+            unsafe fn read(buffer: &'a [u8],
+                           from: $crate::stream_struct::Offset,
+                           to: $crate::stream_struct::Offset) -> Self {
                 let raw_message: $crate::messages::RawMessage = $crate::stream_struct::Field::read(buffer, from, to);
                 $crate::messages::FromRaw::from_raw(raw_message).unwrap()
             }
 
-            fn write(&self, buffer: &mut Vec<u8>, from: usize, to: usize) {
+            fn write(&self,
+                            buffer: &mut Vec<u8>,
+                            from: $crate::stream_struct::Offset,
+                            to: $crate::stream_struct::Offset) {
                 $crate::stream_struct::Field::write(&self.raw, buffer, from, to);
             }
 
-            fn check(buffer: &'a [u8], from: usize, to: usize) -> $crate::stream_struct::Result {
-                let raw_message: $crate::messages::RawMessage = $crate::stream_struct::Field::read(buffer, from, to);
-                 
-                let mut last_data = $body as u32;
-                $(  
-                    raw_message.check::<$field_type>($from, $to)?
-                        .map_or(Ok(()), |mut e| e.check_segment($body, &mut last_data))?;
-                )*
-                Ok(None)
+            fn check(buffer: &'a [u8],
+                     from: $crate::stream_struct::CheckedOffset,
+                     to: $crate::stream_struct::CheckedOffset) -> $crate::stream_struct::Result {
+                let check = <$crate::messages::RawMessage as
+                                $crate::stream_struct::Field>::check(buffer,
+                                                                from,
+                                                                to)?;
+                let raw_message: $crate::messages::RawMessage = 
+                                    unsafe { $crate::stream_struct::Field::read(buffer,
+                                                                from.unchecked_offset(),
+                                                                to.unchecked_offset())};
+                <Self>::check_fields(&raw_message)?;
+                Ok(check)
             }
 
-            fn field_size() -> usize {
-                $body
+            fn field_size() -> $crate::stream_struct::Offset {
+                $body as $crate::stream_struct::Offset
             }
         }
 
         impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::stream_struct::Error> {
-                $(raw.check::<$field_type>($from, $to)?;)*
+                <Self>::check_fields(&raw)?;
                 Ok($name { raw: raw })
             }
         }
         impl $name {
             #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+
+            /// Create messsage `$name` and sign it.
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
@@ -113,6 +124,8 @@ macro_rules! message {
                 $(writer.write($field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
+
+            /// Create message `$name` and append existing signature.
             pub fn new_with_signature($($field_name: $field_type,)*
                        signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
@@ -123,10 +136,25 @@ macro_rules! message {
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
 
             }
+
+            fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::stream_struct::Result {
+                let mut last_data = (($body + $crate::messages::HEADER_SIZE)
+                                        as $crate::stream_struct::Offset).into();
+                $(  
+                    println!("check_field {} = {:?} {:?}", stringify!($field_name), $from, $to);
+                    
+                    let field_from: $crate::stream_struct::Offset = $from;
+                    let field_to: $crate::stream_struct::Offset = $to;
+                    raw_message.check::<$field_type>(field_from.into(),field_to.into())?
+                        .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
+                )*
+                Ok(None)
+            }
+
             $(
             $(#[$field_attr])*
             pub fn $field_name(&self) -> $field_type {
-                self.raw.read::<$field_type>($from, $to)
+                unsafe{ self.raw.read::<$field_type>($from, $to)}
             })*
         }
 
@@ -174,7 +202,9 @@ macro_rules! message {
 
         impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
             fn deserialize_field<B> (value: &$crate::stream_struct::serialize::json::reexport::Value,
-                                        buffer: & mut B, from: usize, to: usize )
+                                        buffer: & mut B,
+                                        from: $crate::stream_struct::Offset,
+                                        to: $crate::stream_struct::Offset )
                 -> Result<(), Box<::std::error::Error>>
             where B: $crate::stream_struct::serialize::WriteBufferWrapper
             {

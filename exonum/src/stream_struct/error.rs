@@ -3,29 +3,86 @@ use std::fmt;
 use super::Offset;
 
 #[derive( Debug)]
+/// This structure represent `stream_struct` specific errors.
+/// This errors returned by function `check` of each `Field`.
 pub enum Error {
-    UnexpectedlyShortPayload { actual_size: u32, minimum_size: u32 },
-    IncorrectBoolean { position: Offset, value: u8 },
-    IncorrectSegmentReference { position: Offset, value: u32 },
-    IncorrectSegmentSize { position: Offset, value: u32 },
-    UnexpectedlyShortRawMessage { position: Offset, size: u32 },
-    IncorrectSizeOfRawMessage {
-        position: Offset,
-        actual_size: u32,
-        declared_size: u32,
+    /// Payload is short for this message.
+    UnexpectedlyShortPayload {
+        /// real message size
+        actual_size: Offset,
+        /// expected size of fixed part
+        minimum_size: Offset
     },
-    IncorrectMessageType {
+    /// Boolean value is incorrect
+    IncorrectBoolean {
+        /// position in buffer where error apears
         position: Offset,
+        /// value that was parsed as bool
+        value: u8
+    },
+    /// Segment reference is incorrect
+    IncorrectSegmentReference {
+        /// position in buffer where error apears
+        position: Offset,
+        /// value that was parsed as segment reference
+        value: Offset
+    },
+    /// Segment size is incorrect
+    IncorrectSegmentSize {
+        /// position in buffer where error apears
+        position: Offset,
+        /// value that was parsed as size
+        value: Offset
+    },
+    /// `RawMessage` is to short
+    UnexpectedlyShortRawMessage {
+        /// position in buffer where error apears
+        position: Offset,
+        /// size of raw message in buffer
+        size: Offset
+    },
+    /// Incorrect size of `RawMessage` found in buffer
+    IncorrectSizeOfRawMessage {
+        /// position in buffer where error apears
+        position: Offset,
+        /// parsed message size
+        actual_size: Offset,
+        /// expected fixed part message size
+        declared_size: Offset,
+    },
+    /// Incorrect `message_id` found in buffer.
+    IncorrectMessageType {
+        /// position in buffer where error apears
+        position: Offset,
+        /// parsed `message_id`
         actual_message_type: u16,
+        /// expected `message_id`
         declared_message_type: u16,
     },
-    OverlappingSegment { last_end: u32, start: u32 },
-    SementInHeader { header_size: u32, start: u32 },
-    SpaceBetweenSegments { last_end: u32, start: u32 },
+    /// Different segments overlaps
+    OverlappingSegment {
+        /// last segment ended position
+        last_end: Offset,
+        /// start of new segment
+        start: Offset
+    },
+    /// Between segments foud spaces
+    SpaceBetweenSegments {
+        /// last segment ended position
+        last_end: Offset,
+        /// start of new segment
+        start: Offset
+    },
+    /// Error in parsing `Utf8` `String`
     Utf8 {
+        /// position in buffer where error apears
         position: Offset,
+        /// what error exact was
         error: ::std::str::Utf8Error,
     },
+    /// Overflow in Offsets
+    OffsetOverflow,
+    /// Other error for custon fields
     Other(Box<StdError>),
 }
 
@@ -46,10 +103,19 @@ impl StdError for Error {
             Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage.",
             Error::IncorrectMessageType { .. } => "Incorrect message type.",
             Error::OverlappingSegment { .. } => "Overlapping segment.",
-            Error::SementInHeader { .. } => "Sement in header.",
             Error::SpaceBetweenSegments { .. } => "Space between segments.",
             Error::Utf8 { .. } => "Utf8 error in parsing string.",
+            Error::OffsetOverflow => "Overflow in offset pointers.",
             Error::Other(_) => "Other error.",
+        }
+    }
+
+    fn cause(&self) -> Option<&StdError> {
+        use std::ops::Deref;
+        if let Error::Other(ref error) = *self {
+            Some(error.deref())
+        } else {
+            None
         }
     }
 }
