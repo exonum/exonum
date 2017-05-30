@@ -19,10 +19,11 @@ fn test_read_overflow() {
     //rewrite header
     pos.write(&mut buf, 0, 4);
     count.write(&mut buf, 4, 8);
-    
-    // let x1 = unsafe{ <Vec<u8> as Field>::read(&buf, 0, 8 )}; << "attempt to add with overflow" in segment.rs
-    <Vec<u8> as Field>::check(&buf, 0.into(), 8.into())
-                        .expect("Found error in check");
+
+    // let x1 = unsafe{ <Vec<u8> as Field>::read(&buf, 0, 8 )};
+    // ^ "attempt to add with overflow" in segment.rs
+
+    <Vec<u8> as Field>::check(&buf, 0.into(), 8.into()).expect("Found error in check");
 }
 
 #[test]
@@ -46,7 +47,7 @@ fn test_str_segment() {
 
     let buf2 = buf.clone();
     <&str as Field>::check(&buf2, 0.into(), 8.into()).unwrap();
-    let s2: &str = unsafe{ Field::read(&buf2, 0, 8)};
+    let s2: &str = unsafe { Field::read(&buf2, 0, 8) };
     assert_eq!(s2, s);
 }
 
@@ -96,7 +97,7 @@ fn test_segments_of_arrays() {
 
     let buf2 = buf.clone();
     <Vec<&[u8]> as Field>::check(&buf2, 48.into(), 56.into()).unwrap();
-    let dat2: Vec<&[u8]> = unsafe{ Field::read(&buf2, 48, 56) };
+    let dat2: Vec<&[u8]> = unsafe { Field::read(&buf2, 48, 56) };
     assert_eq!(dat2, dat);
     //48 spaces + 8 segment of vec + 8 spaces = 64 +
     // + v1_segment + v2_segment + v3_segment +
@@ -120,7 +121,7 @@ fn assert_write_check_read<T>(input: T, header_size: Offset)
     buffer.resize(len, 0);
 
     <T as Field>::check(&new_buffer, 0.into(), 8.into()).unwrap();
-    let output = unsafe{ Field::read(&new_buffer, 0, 8) };
+    let output = unsafe { Field::read(&new_buffer, 0, 8) };
     assert_eq!(input, output);
 
 }
