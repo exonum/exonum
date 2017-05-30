@@ -275,7 +275,6 @@ fn test_block() {
     let ts = SystemTime::now();
 
     let content = blockchain::Block::new(500,
-                                         1,
                                          &hash(&[1]),
                                          &hash(&[2]),
                                          &hash(&[3]));
@@ -336,7 +335,7 @@ fn test_block() {
 fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
 
-    let content = blockchain::Block::new(200, 1, &hash(&[1]), &hash(&[2]), &hash(&[3]));
+    let content = blockchain::Block::new(200, &hash(&[1]), &hash(&[2]), &hash(&[3]));
 
     let precommits = Vec::new();
     let transactions = Vec::new();

@@ -445,10 +445,7 @@ impl Sandbox {
         let view = {
             let db = blockchain.view();
             let (_, patch) = blockchain
-                .create_patch(self.current_height(),
-                              self.current_round(),
-                              &hashes,
-                              &tx_pool)
+                .create_patch(self.current_height(), &hashes, &tx_pool)
                 .unwrap();
             db.merge(&patch);
             db

@@ -17,7 +17,6 @@ pub struct BlockchainExplorer<'a> {
 #[derive(Debug, Serialize)]
 pub struct BlockInfo {
     height: u64,
-    proposer: u32,
 
     hash: Hash,
     state_hash: Hash,
@@ -67,16 +66,9 @@ impl<'a> BlockchainExplorer<'a> {
                 }
             };
 
-            let config = schema.actual_configuration()?;
-            // TODO Find more common solution
-            // FIXME this code was copied from state.rs
-            let proposer = ((height + block.propose_round() as u64) %
-                            (config.validators.len() as u64)) as u32;
-
             let precommits_count = schema.precommits(block_hash).len()? as u64;
             let info = BlockInfo {
                 height: height,
-                proposer: proposer,
                 hash: *block_hash,
                 state_hash: *block.state_hash(),
                 tx_hash: *block.tx_hash(),
