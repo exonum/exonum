@@ -108,7 +108,6 @@ impl<'a> BlockBuilder<'a> {
 
     pub fn build(&self) -> Block {
         Block::new(self.height.unwrap_or_else(|| self.sandbox.current_height()),
-                   self.round.unwrap_or_else(|| self.sandbox.current_round()),
                    &self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
                    //   &[tx.hash(), tx2.hash()],
                    //   &[tx.hash()],

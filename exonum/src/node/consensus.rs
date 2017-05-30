@@ -168,7 +168,6 @@ impl<S> NodeHandler<S>
             }
 
             let (block_hash, patch) = self.create_block(block.height(),
-                                                        block.propose_round(),
                                                         tx_hashes.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
@@ -176,7 +175,7 @@ impl<S> NodeHandler<S>
             }
 
             // Commit block
-            self.state.add_block(block_hash, patch, tx_hashes, block.propose_round());
+            self.state.add_block(block_hash, patch, tx_hashes);
         }
         self.commit(block_hash, msg.precommits().iter());
         self.request_next_block();
@@ -346,29 +345,26 @@ impl<S> NodeHandler<S>
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (propose_round, commited_txs, new_txs) = {
-            let (txs_count, propose_round) = {
+        let (commited_txs, new_txs) = {
+            let txs_count = {
                 let block_state = self.state.block(&block_hash).unwrap();
-                (block_state.txs().len(), block_state.propose_round())
+                block_state.txs().len()
             };
 
             let txs = self.blockchain
                 .commit(&mut self.state, block_hash, precommits)
                 .unwrap();
 
-            (propose_round, txs_count, txs)
+            (txs_count, txs)
         };
 
         let height = self.state.height();
-        let proposer = self.state.leader(propose_round);
 
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
 
-        info!("COMMIT ====== height={}, round={}, proposer={}, commited={}, pool={}, hash={}",
+        info!("COMMIT ====== height={}, commited={}, pool={}, hash={}",
               height,
-              propose_round,
-              proposer,
               commited_txs,
               self.state.transactions().len(),
               block_hash.to_hex(),
@@ -611,11 +607,10 @@ impl<S> NodeHandler<S>
 
     pub fn create_block(&mut self,
                         height: Height,
-                        round: Round,
                         tx_hashes: &[Hash])
                         -> (Hash, Patch) {
         self.blockchain
-            .create_patch(height, round, tx_hashes, self.state.transactions())
+            .create_patch(height, tx_hashes, self.state.transactions())
             .unwrap()
     }
 
@@ -630,10 +625,9 @@ impl<S> NodeHandler<S>
 
         let tx_hashes = propose.transactions().to_vec();
         let (block_hash, patch) = self.create_block(propose.height(),
-                                                    propose.round(),
                                                     tx_hashes.as_slice());
         // Save patch
-        self.state.add_block(block_hash, patch, tx_hashes, propose.round());
+        self.state.add_block(block_hash, patch, tx_hashes);
         block_hash
     }
 

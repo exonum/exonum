@@ -227,7 +227,6 @@ mod tests {
     fn test_json_response_for_complex_val() {
         let str_val = "sghdkgskgskldghshgsd";
         let complex_val = Block::new(24,
-                                     2,
                                      &Hash::new([24; 32]),
                                      &Hash::new([34; 32]),
                                      &Hash::new([38; 32]));

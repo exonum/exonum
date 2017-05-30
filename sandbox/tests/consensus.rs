@@ -181,13 +181,11 @@ fn test_retrieve_block_and_precommits() {
     let block: Block = block_proof.block;
     let precommits: Vec<Precommit> = block_proof.precommits;
     let expected_height = target_height - 1;
-    let expected_round = block.propose_round();
     let expected_block_hash = block.hash();
 
     assert_eq!(expected_height, block.height());
     for precommit in precommits {
         assert_eq!(expected_height, precommit.height());
-        assert_eq!(expected_round, precommit.round());
         assert_eq!(expected_block_hash, *precommit.block_hash());
         assert!(precommit
                     .raw()

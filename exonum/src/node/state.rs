@@ -103,7 +103,6 @@ pub struct BlockState {
     // Changes that should be made for block committing.
     patch: Patch,
     txs: Vec<Hash>,
-    propose_round: Round,
 }
 
 pub trait VoteMessage: Message + Clone {
@@ -248,12 +247,11 @@ impl ProposeState {
 }
 
 impl BlockState {
-    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, propose_round: Round) -> BlockState {
+    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>) -> BlockState {
         BlockState {
             hash: hash,
             patch: patch,
             txs: txs,
-            propose_round: propose_round,
         }
     }
 
@@ -267,10 +265,6 @@ impl BlockState {
 
     pub fn txs(&self) -> &Vec<Hash> {
         &self.txs
-    }
-
-    pub fn propose_round(&self) -> Round {
-        self.propose_round
     }
 }
 
@@ -630,8 +624,7 @@ impl State {
     pub fn add_block(&mut self,
                      block_hash: Hash,
                      patch: Patch,
-                     txs: Vec<Hash>,
-                     propose_round: Round)
+                     txs: Vec<Hash>)
                      -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,
@@ -640,7 +633,6 @@ impl State {
                     hash: block_hash,
                     patch: patch,
                     txs: txs,
-                    propose_round: propose_round,
                 }))
             }
         }
