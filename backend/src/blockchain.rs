@@ -1,66 +1,40 @@
-use serde::{Serialize, Serializer};
+use serde_json;
+use serde_json::Value;
 
-use exonum::crypto::{Hash, hash, HexValue};
+use exonum::crypto::Hash;
 use exonum::storage::View;
 use exonum::blockchain::Transaction;
 use exonum::storage::{MapTable, MerklePatriciaTable, Map, Error as StorageError};
 
 use TIMESTAMPING_SERVICE_ID;
-use blockchain_explorer::TransactionInfo;
 
 pub const TIMESTAMPING_TX_ID: u16 = 0;
 
 message! {
-    TimestampTx {
+    struct TimestampTx {
         const TYPE = TIMESTAMPING_SERVICE_ID;
         const ID = TIMESTAMPING_TX_ID;
         const SIZE = 48;
 
-        description:    &str        [00 => 08]
-        time:           i64         [08 => 16]
-        hash:           &Hash       [16 => 48]
+        field description:    &str        [00 => 08]
+        field time:           i64         [08 => 16]
+        field hash:           &Hash       [16 => 48]
     }
 }
 
 storage_value! {
-    Content {
+    struct Content {
         const SIZE = 48;
 
-        description:        &str        [00 => 08]
-        time:               i64         [08 => 16]
-        data_hash:          &Hash       [16 => 48]
+        field description:        &str        [00 => 08]
+        field time:               i64         [08 => 16]
+        field data_hash:          &Hash       [16 => 48]
     }
 }
 
 pub struct TimestampingSchema<'a> {
     view: &'a View,
 }
-
-impl Serialize for TimestampTx {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let mut state = ser.serialize_struct("transaction", 4)?;
-        ser.serialize_struct_elt(&mut state, "description", self.description())?;
-        ser.serialize_struct_elt(&mut state, "time", self.time())?;
-        ser.serialize_struct_elt(&mut state, "hash", self.hash().to_hex())?;
-        ser.serialize_struct_end(state)
-    }
-}
-
-impl Serialize for Content {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
-        where S: Serializer
-    {
-        let mut state = ser.serialize_struct("content", 4)?;
-        ser.serialize_struct_elt(&mut state, "description", self.description())?;
-        ser.serialize_struct_elt(&mut state, "time", self.time())?;
-        ser.serialize_struct_elt(&mut state, "hash", self.data_hash().to_hex())?;
-        ser.serialize_struct_end(state)
-    }
-}
-
-impl TransactionInfo for TimestampTx {}
 
 impl<'a> TimestampingSchema<'a> {
     pub fn new(view: &'a View) -> TimestampingSchema {
@@ -85,6 +59,10 @@ impl Transaction for TimestampTx {
         let schema = TimestampingSchema::new(view);
         let content = Content::new(self.description(), self.time(), self.hash());
         schema.contents().put(self.hash(), content)
+    }
+
+    fn info(&self) -> Value {
+        serde_json::to_value(self).unwrap()
     }
 }
 

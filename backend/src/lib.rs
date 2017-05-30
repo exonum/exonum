@@ -1,11 +1,9 @@
-#[macro_use(message, storage_value)]
+#[macro_use]
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate serde;
+#[macro_use]
 extern crate serde_json;
 extern crate chrono;
-#[macro_use]
-extern crate derive_error;
 
 extern crate iron;
 extern crate params;
