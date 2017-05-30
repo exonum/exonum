@@ -4,7 +4,7 @@ use std::{mem, convert, sync};
 use std::fmt::Debug;
 
 use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
-use stream_struct::{Field, Error, Result as StructResult};
+use stream_struct::{Field, Error, Result as StructResult, Offset, CheckedOffset};
 
 pub const HEADER_SIZE: usize = 10; // TODO: rename to HEADER_LENGTH?
 
@@ -57,12 +57,12 @@ impl MessageBuffer {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
-    pub fn check<'a, F: Field<'a>>(&'a self, from: usize, to: usize) -> StructResult {
-        F::check(self.body(), from + HEADER_SIZE, to + HEADER_SIZE)
+    pub fn check<'a, F: Field<'a>>(&'a self, from: CheckedOffset, to: CheckedOffset) -> StructResult {
+        F::check(self.body(), (from + HEADER_SIZE as u32)?, (to + HEADER_SIZE as u32)?)
     }
 
-    pub fn read<'a, F: Field<'a>>(&'a self, from: usize, to: usize) -> F {
-        F::read(self.body(), from + HEADER_SIZE, to + HEADER_SIZE)
+    pub unsafe fn read<'a, F: Field<'a>>(&'a self, from: Offset, to: Offset) -> F {
+        F::read(self.body(), from + HEADER_SIZE as u32, to + HEADER_SIZE as u32)
     }
 
     pub fn signature(&self) -> &Signature {
@@ -112,8 +112,8 @@ impl MessageWriter {
         LittleEndian::write_u32(&mut self.raw[6..10], length as u32)
     }
 
-    pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: usize, to: usize) {
-        field.write(&mut self.raw, from + HEADER_SIZE, to + HEADER_SIZE);
+    pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
+        field.write(&mut self.raw, from + HEADER_SIZE as Offset, to + HEADER_SIZE as Offset);
     }
 
     pub fn sign(mut self, secret_key: &SecretKey) -> MessageBuffer {

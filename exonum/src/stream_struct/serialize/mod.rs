@@ -1,6 +1,12 @@
+//! Serialize structure into specific format.
+//! Currently support only json.
+//! This module is a pack of superstructure over serde `Deserializer's`
+
+
 pub use hex::{FromHexError, ToHex, FromHex};
 use stream_struct::Field;
 use messages::MessageWriter;
+use super::Offset;
 // for all internal serializers, implement default realization
 macro_rules! impl_default_serialize {
     (@impl $traitname:ty; $typename:ty) => {
@@ -78,24 +84,30 @@ macro_rules! implement_exonum_serializer {
 #[macro_use]
 pub mod json;
 
+/// `HexValue` is a converting trait, 
+/// for values that could be converted from hex `String`, 
+/// and writed as hex `String`
 pub trait HexValue: Sized {
+    /// Format value as hex representation.
     fn to_hex(&self) -> String;
+    /// Convert value from hex representation.
     fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError>;
 }
 
 /// `WriteBufferWrapper` is a trait specific for writing fields in place.
+#[doc(hidden)]
 pub trait WriteBufferWrapper {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: usize, to: usize, val: T);
+    fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T);
 }
 
 impl WriteBufferWrapper for MessageWriter {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: usize, to: usize, val: T) {
+    fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {
         self.write(val, from, to)
     }
 }
 
 impl WriteBufferWrapper for Vec<u8> {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: usize, to: usize, val: T) {
+    fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {
         val.write(self, from, to)
     }
 }
@@ -103,7 +115,9 @@ impl WriteBufferWrapper for Vec<u8> {
 #[macro_use]
 mod utils;
 
-// serde compatibility level
+
+/// Reexport of `serde` specific traits, this reexports 
+/// provide compatibility layer with important `serde` version.
 pub mod reexport {
     pub use serde::{Serializer, Deserializer, Serialize, Deserialize};
     pub use serde::de::Error;

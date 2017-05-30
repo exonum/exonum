@@ -4,10 +4,26 @@ use std::time::SystemTime;
 use crypto::{hash, gen_keypair};
 use blockchain;
 
-use super::Field;
+use super::{Field, Offset};
 use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
                BlockProof, RequestBlock, BitVec};
 
+#[test]
+#[should_panic(expected = "Found error in check: OffsetOverflow")]
+fn test_read_overflow() {
+    let pos = <u32>::max_value();
+    let count: u32 = 4;
+    let dat = vec![0xCC as u8; 4]; // u32
+    let mut buf = vec![255;8];
+    dat.write(&mut buf, 0, 8);
+    //rewrite header
+    pos.write(&mut buf, 0, 4);
+    count.write(&mut buf, 4, 8);
+    
+    // let x1 = unsafe{ <Vec<u8> as Field>::read(&buf, 0, 8 )}; << "attempt to add with overflow" in segment.rs
+    <Vec<u8> as Field>::check(&buf, 0.into(), 8.into())
+                        .expect("Found error in check");
+}
 
 #[test]
 fn test_bitvec() {
@@ -26,11 +42,11 @@ fn test_str_segment() {
     let mut buf = vec![0; 8];
     let s = "test юникодной строчки efw_adqq ss/adfq";
     Field::write(&s, &mut buf, 0, 8);
-    <&str as Field>::check(&buf, 0, 8).unwrap();
+    <&str as Field>::check(&buf, 0.into(), 8.into()).unwrap();
 
     let buf2 = buf.clone();
-    <&str as Field>::check(&buf2, 0, 8).unwrap();
-    let s2: &str = Field::read(&buf2, 0, 8);
+    <&str as Field>::check(&buf2, 0.into(), 8.into()).unwrap();
+    let s2: &str = unsafe{ Field::read(&buf2, 0, 8)};
     assert_eq!(s2, s);
 }
 
@@ -58,11 +74,11 @@ fn test_byte_array() {
     let arr = [2u8, 5, 2, 3, 56, 3];
 
     Field::write(&arr.as_ref(), &mut buf, 0, 8);
-    <&[u8] as Field>::check(&buf, 0, 8).unwrap();
+    <&[u8] as Field>::check(&buf, 0.into(), 8.into()).unwrap();
 
     let buf2 = buf.clone();
-    <&[u8] as Field>::check(&buf2, 0, 8).unwrap();
-    let dat2: &[u8] = Field::read(&buf2, 0, 8);
+    <&[u8] as Field>::check(&buf2, 0.into(), 8.into()).unwrap();
+    let dat2: &[u8] = unsafe { Field::read(&buf2, 0, 8) };
     assert_eq!(dat2, arr);
     assert_eq!(buf.len(), 8 + arr.len());
 }
@@ -76,11 +92,11 @@ fn test_segments_of_arrays() {
 
     let dat = vec![v1.as_ref(), v2.as_ref(), v3.as_ref()];
     Field::write(&dat, &mut buf, 48, 56);
-    <Vec<&[u8]> as Field>::check(&buf, 48, 56).unwrap();
+    <Vec<&[u8]> as Field>::check(&buf, 48.into(), 56.into()).unwrap();
 
     let buf2 = buf.clone();
-    <Vec<&[u8]> as Field>::check(&buf2, 48, 56).unwrap();
-    let dat2: Vec<&[u8]> = Field::read(&buf2, 48, 56);
+    <Vec<&[u8]> as Field>::check(&buf2, 48.into(), 56.into()).unwrap();
+    let dat2: Vec<&[u8]> = unsafe{ Field::read(&buf2, 48, 56) };
     assert_eq!(dat2, dat);
     //48 spaces + 8 segment of vec + 8 spaces = 64 +
     // + v1_segment + v2_segment + v3_segment +
@@ -89,13 +105,13 @@ fn test_segments_of_arrays() {
 }
 
 
-fn assert_write_check_read<T>(input: T, header_size: usize)
+fn assert_write_check_read<T>(input: T, header_size: Offset)
     where T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug
 {
-    let mut buffer = vec![0; header_size];
+    let mut buffer = vec![0; header_size as usize];
     Field::write(&input, &mut buffer, 0, header_size);
     trace!("buffer ={:?}", buffer);
-    <T as Field>::check(&buffer, 0, header_size).unwrap();
+    <T as Field>::check(&buffer, 0.into(), header_size.into()).unwrap();
     let new_buffer = buffer.clone();
     //clear buffer
     let len = buffer.len();
@@ -103,8 +119,8 @@ fn assert_write_check_read<T>(input: T, header_size: usize)
     //and fill old buffer with zeros
     buffer.resize(len, 0);
 
-    <T as Field>::check(&new_buffer, 0, 8).unwrap();
-    let output = Field::read(&new_buffer, 0, 8);
+    <T as Field>::check(&new_buffer, 0.into(), 8.into()).unwrap();
+    let output = unsafe{ Field::read(&new_buffer, 0, 8) };
     assert_eq!(input, output);
 
 }
