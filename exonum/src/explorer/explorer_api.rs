@@ -53,10 +53,7 @@ impl Api for ExplorerApi {
         let _self = self.clone();
         let blocks = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
-            let count: u64;
-            let from: Option<u64>;
-            let skip_empty_blocks: bool;
-            count = match map.find(&["count"]) {
+            let count: u64 = match map.find(&["count"]) {
                 Some(&Value::String(ref count_str)) => {
                     count_str.parse().map_err(|_| ApiError::IncorrectRequest)?
                 }
@@ -64,13 +61,13 @@ impl Api for ExplorerApi {
                     return Err(ApiError::IncorrectRequest)?;
                 }
             };
-            from = match map.find(&["from"]) {
+            let from: Option<u64> = match map.find(&["from"]) {
                 Some(&Value::String(ref from_str)) => {
                     Some(from_str.parse().map_err(|_| ApiError::IncorrectRequest)?)
                 }
                 _ => None,
             };
-            skip_empty_blocks = match map.find(&["skip_empty_blocks"]) {
+            let skip_empty_blocks: bool = match map.find(&["skip_empty_blocks"]) {
                 Some(&Value::String(ref skip_str)) => {
                     skip_str.parse().map_err(|_| ApiError::IncorrectRequest)?
                 }
