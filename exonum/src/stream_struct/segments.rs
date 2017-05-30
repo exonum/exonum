@@ -27,23 +27,28 @@ impl<'a, T> Field<'a> for T
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> T {
-        let pos = LittleEndian::read_u32(&buffer[from as usize .. from as usize + 4]);
+        let pos = LittleEndian::read_u32(&buffer[from as usize..from as usize + 4]);
         let count = LittleEndian::read_u32(&buffer[from as usize + 4..to as usize]);
         Self::from_buffer(buffer, pos, count)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         let pos = buffer.len() as u32;
-        LittleEndian::write_u32(&mut buffer[from as usize .. from as usize + 4], pos);
-        LittleEndian::write_u32(&mut buffer[from as usize + 4.. to as usize], self.count() as u32);
+        LittleEndian::write_u32(&mut buffer[from as usize..from as usize + 4], pos);
+        LittleEndian::write_u32(&mut buffer[from as usize + 4..to as usize],
+                                self.count() as u32);
         self.extend_buffer(buffer);
 
     }
 
     fn check(buffer: &'a [u8], from: CheckedOffset, to: CheckedOffset) -> Result {
         let end_pos: Offset = (from + 4)?.unchecked_offset();
-        let pos: CheckedOffset = LittleEndian::read_u32(&buffer[from.unchecked_offset() as usize .. end_pos as usize]).into();
-        let count: CheckedOffset = LittleEndian::read_u32(&buffer[end_pos as usize .. to.unchecked_offset() as usize]).into();
+        let pos: CheckedOffset = LittleEndian::read_u32(&buffer[from.unchecked_offset() as usize..
+                                                         end_pos as usize])
+                .into();
+        let count: CheckedOffset = LittleEndian::read_u32(&buffer[end_pos as usize..
+                                                           to.unchecked_offset() as usize])
+                .into();
 
         if count.unchecked_offset() == 0 {
             return Ok(None);
@@ -79,7 +84,7 @@ impl<'a> SegmentField<'a> for &'a str {
 
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
         let to = from + count * Self::item_size();
-        let slice = &buffer[from as usize ..to as usize];
+        let slice = &buffer[from as usize..to as usize];
         ::std::str::from_utf8_unchecked(slice)
     }
 
@@ -90,7 +95,7 @@ impl<'a> SegmentField<'a> for &'a str {
     fn check_data(buffer: &'a [u8], from: CheckedOffset, count: CheckedOffset) -> Result {
         let size: CheckedOffset = (count * Self::item_size())?;
         let to: CheckedOffset = (from + size)?;
-        let slice = &buffer[from.unchecked_offset() as usize .. to.unchecked_offset() as usize];
+        let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
         if let Err(e) = ::std::str::from_utf8(slice) {
             return Err(Error::Utf8 {
                            position: from.unchecked_offset(),
@@ -112,7 +117,7 @@ impl<'a> SegmentField<'a> for RawMessage {
 
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         let to = from + to * Self::item_size();
-        let slice = &buffer[from as usize .. to as usize];
+        let slice = &buffer[from as usize..to as usize];
         RawMessage::new(MessageBuffer::from_vec(Vec::from(slice)))
     }
 
@@ -124,7 +129,7 @@ impl<'a> SegmentField<'a> for RawMessage {
     fn check_data(buffer: &'a [u8], from: CheckedOffset, count: CheckedOffset) -> Result {
         let size: CheckedOffset = (count * Self::item_size())?;
         let to: CheckedOffset = (from + size)?;
-        let slice = &buffer[from.unchecked_offset() as usize .. to.unchecked_offset() as usize];
+        let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
         if slice.len() < HEADER_SIZE {
             return Err(Error::UnexpectedlyShortRawMessage {
                            position: from.unchecked_offset(),
@@ -172,7 +177,7 @@ impl<'a, T> SegmentField<'a> for Vec<T>
 
     fn extend_buffer(&self, mut buffer: &mut Vec<u8>) {
         let mut start = buffer.len() as Offset;
-        buffer.resize( (start + self.count() * Self::item_size() ) as usize , 0);
+        buffer.resize((start + self.count() * Self::item_size()) as usize, 0);
         // write rest of fields
         for i in self.iter() {
             i.write(&mut buffer, start, start + Self::item_size());
@@ -180,18 +185,15 @@ impl<'a, T> SegmentField<'a> for Vec<T>
         }
     }
 
-    fn check_data(buffer: &'a [u8],
-                  from: CheckedOffset,
-                  count: CheckedOffset) -> Result {
+    fn check_data(buffer: &'a [u8], from: CheckedOffset, count: CheckedOffset) -> Result {
         let mut start = from;
         let size: CheckedOffset = (count * Self::item_size())?;
         let header = (start + size)?;
         let mut last_data = header;
 
         for _ in 0..count.unchecked_offset() {
-            T::check(buffer, start, (start + Self::item_size())? )?
-                .map_or(Ok(()),
-                        |mut e| e.check_segment(&mut last_data))?;
+            T::check(buffer, start, (start + Self::item_size())?)?
+                .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
             start = (start + Self::item_size())?;
         }
         println!("check_data = {:?} {:?}", from, last_data);
@@ -233,7 +235,7 @@ impl<'a> SegmentField<'a> for &'a [u8] {
 
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
         let to = from + count * Self::item_size();
-        &buffer[from as usize ..to as usize]
+        &buffer[from as usize..to as usize]
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
@@ -254,13 +256,14 @@ impl<'a> SegmentField<'a> for &'a [Hash] {
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
         let to = from + count * Self::item_size();
         let slice = &buffer[(from as usize)..(to as usize)];
-            ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
-                                         slice.len() / HASH_ITEM_SIZE as usize)
+        ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
+                                     slice.len() / HASH_ITEM_SIZE as usize)
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
         let slice = unsafe {
-            ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * HASH_ITEM_SIZE as usize)
+            ::std::slice::from_raw_parts(self.as_ptr() as *const u8,
+                                         self.len() * HASH_ITEM_SIZE as usize)
         };
         buffer.extend_from_slice(slice)
     }

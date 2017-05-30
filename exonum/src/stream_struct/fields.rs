@@ -58,7 +58,7 @@ macro_rules! implement_pod_as_ref_field {
     )
 }
 
-/// Trait for all types that should be possible to serrialize as 
+/// Trait for all types that should be possible to serrialize as
 pub trait Field<'a> {
     // TODO: use Read and Cursor
     // TODO: debug_assert_eq!(to-from == size of Self)
@@ -68,7 +68,7 @@ pub trait Field<'a> {
 
     /// Write Field to buffer, in given position
     /// `write` didn't lead to memory unsafety.
-    /// But it work in pair with `read`, 
+    /// But it work in pair with `read`,
     /// and you should to pay additionaly attention to `write` calls
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset);
     /// Field's header size
@@ -77,7 +77,10 @@ pub trait Field<'a> {
     /// Checks if data in the buffer could be deserialized.
     /// Returns an optional segment reference, if it should consume some.
     #[allow(unused_variables)]
-    fn check(buffer: &'a [u8], from: CheckedOffset, to: CheckedOffset) -> Result<Option<SegmentReference>, Error> {
+    fn check(buffer: &'a [u8],
+             from: CheckedOffset,
+             to: CheckedOffset)
+             -> Result<Option<SegmentReference>, Error> {
         Ok(None)
     }
 }
@@ -95,8 +98,11 @@ impl<'a> Field<'a> for bool {
         buffer[from as usize] = if *self { 1 } else { 0 }
     }
 
-    fn check(buffer: &'a [u8], from: CheckedOffset, _: CheckedOffset) -> Result<Option<SegmentReference>, Error> {
-        let from:Offset = from.unchecked_offset();
+    fn check(buffer: &'a [u8],
+             from: CheckedOffset,
+             _: CheckedOffset)
+             -> Result<Option<SegmentReference>, Error> {
+        let from: Offset = from.unchecked_offset();
         if buffer[from as usize] != 0 && buffer[from as usize] != 1 {
             Err(Error::IncorrectBoolean {
                     position: from,
@@ -155,7 +161,8 @@ impl<'a> Field<'a> for SystemTime {
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> SystemTime {
         let secs = LittleEndian::read_u64(&buffer[from as usize..to as usize]);
-        let nanos = LittleEndian::read_u32(&buffer[from as usize + mem::size_of_val(&secs)..to as usize]);
+        let nanos = LittleEndian::read_u32(&buffer[from as usize + mem::size_of_val(&secs)..
+                                            to as usize]);
         UNIX_EPOCH + Duration::new(secs, nanos)
     }
 
@@ -163,8 +170,10 @@ impl<'a> Field<'a> for SystemTime {
         let duration = self.duration_since(UNIX_EPOCH).unwrap();
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
-        LittleEndian::write_u64(&mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)], secs);
-        LittleEndian::write_u32(&mut buffer[from as usize  + mem::size_of_val(&secs)..to as usize], nanos);
+        LittleEndian::write_u64(&mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
+                                secs);
+        LittleEndian::write_u32(&mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
+                                nanos);
     }
 }
 
@@ -186,13 +195,13 @@ impl<'a> Field<'a> for SocketAddr {
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         match *self {
             SocketAddr::V4(addr) => {
-                buffer[from as usize .. to as usize - 2].copy_from_slice(&addr.ip().octets());
+                buffer[from as usize..to as usize - 2].copy_from_slice(&addr.ip().octets());
             }
             SocketAddr::V6(_) => {
                 // FIXME: Supporting Ipv6
                 panic!("Ipv6 are currently unsupported")
             }
         }
-        LittleEndian::write_u16(&mut buffer[to as usize - 2.. to as usize], self.port());
+        LittleEndian::write_u16(&mut buffer[to as usize - 2..to as usize], self.port());
     }
 }

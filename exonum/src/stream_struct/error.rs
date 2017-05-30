@@ -11,35 +11,35 @@ pub enum Error {
         /// real message size
         actual_size: Offset,
         /// expected size of fixed part
-        minimum_size: Offset
+        minimum_size: Offset,
     },
     /// Boolean value is incorrect
     IncorrectBoolean {
         /// position in buffer where error apears
         position: Offset,
         /// value that was parsed as bool
-        value: u8
+        value: u8,
     },
     /// Segment reference is incorrect
     IncorrectSegmentReference {
         /// position in buffer where error apears
         position: Offset,
         /// value that was parsed as segment reference
-        value: Offset
+        value: Offset,
     },
     /// Segment size is incorrect
     IncorrectSegmentSize {
         /// position in buffer where error apears
         position: Offset,
         /// value that was parsed as size
-        value: Offset
+        value: Offset,
     },
     /// `RawMessage` is to short
     UnexpectedlyShortRawMessage {
         /// position in buffer where error apears
         position: Offset,
         /// size of raw message in buffer
-        size: Offset
+        size: Offset,
     },
     /// Incorrect size of `RawMessage` found in buffer
     IncorrectSizeOfRawMessage {
@@ -64,14 +64,14 @@ pub enum Error {
         /// last segment ended position
         last_end: Offset,
         /// start of new segment
-        start: Offset
+        start: Offset,
     },
     /// Between segments foud spaces
     SpaceBetweenSegments {
         /// last segment ended position
         last_end: Offset,
         /// start of new segment
-        start: Offset
+        start: Offset,
     },
     /// Error in parsing `Utf8` `String`
     Utf8 {

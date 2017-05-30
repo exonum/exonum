@@ -84,8 +84,8 @@ macro_rules! implement_exonum_serializer {
 #[macro_use]
 pub mod json;
 
-/// `HexValue` is a converting trait, 
-/// for values that could be converted from hex `String`, 
+/// `HexValue` is a converting trait,
+/// for values that could be converted from hex `String`,
 /// and writed as hex `String`
 pub trait HexValue: Sized {
     /// Format value as hex representation.
@@ -116,7 +116,7 @@ impl WriteBufferWrapper for Vec<u8> {
 mod utils;
 
 
-/// Reexport of `serde` specific traits, this reexports 
+/// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde` version.
 pub mod reexport {
     pub use serde::{Serializer, Deserializer, Serialize, Deserialize};

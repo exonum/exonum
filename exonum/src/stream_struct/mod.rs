@@ -56,7 +56,7 @@
 //! Fields could be splitted into tree main parts:
 //!
 //! ### Primitive types
-//! 
+//!
 //! Primitive types are all fixed sized, and located fully in header.
 //\TODO explain how an integer is stored in memory (what codding)
 //!
@@ -71,8 +71,8 @@
 //! `u64`    | 8    | long unsigned number storred in little endian  |
 //! `i64`    | 8    | long signed number storred in little endian  |
 //! `bool`   | 1    | stored as single byte, where `0x01` - true `0x00` - false [\[1\]](#1)|
-//! 
-//! ######\[1] 
+//!
+//! ######\[1]
 //! **Trying to represent other values as bool lead to undefined behavior**.
 //!
 //! ### Segment fields
@@ -83,10 +83,10 @@
 //!
 //! ### Custom fields
 //!
-//! This types could be implemented as creator want, 
-//! but they should to declare how many bytes they 
+//! This types could be implemented as creator want,
+//! but they should to declare how many bytes they
 //! will write on header [in function `field_size()`](./trait.Field.html#tymethod.field_size)
-//! 
+//!
 
 use std::convert::From;
 use std::ops::{Add, Sub, Mul, Div};
@@ -111,7 +111,7 @@ pub type Offset = u32;
 pub type Result = ::std::result::Result<Option<SegmentReference>, Error>;
 
 /// Reference to some data in buffer.
-/// Currently used only by `check` method 
+/// Currently used only by `check` method
 /// and indicates what bytes in buffer we already check.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct SegmentReference {
@@ -151,19 +151,17 @@ impl SegmentReference {
 
 //\TODO replace by more generic type
 /// `CheckedOffset` is a type that take control over overflow,
-/// so you can't panic without `unwrap`, 
+/// so you can't panic without `unwrap`,
 /// and work with this value without overflow checks.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 pub struct CheckedOffset {
-    offset: Offset
+    offset: Offset,
 }
 
 impl CheckedOffset {
     /// create checked value
     pub fn new(offset: Offset) -> CheckedOffset {
-        CheckedOffset {
-            offset: offset
-        }
+        CheckedOffset { offset: offset }
     }
 
     /// return unchecked offset
@@ -189,7 +187,7 @@ macro_rules! implement_default_ops_checked {
                         .map(CheckedOffset::new)
                         .ok_or(Error::OffsetOverflow)
             }
-        } 
+        }
     )
 }
 

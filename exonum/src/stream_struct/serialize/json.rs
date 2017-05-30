@@ -181,8 +181,7 @@ impl<T> ExonumJsonSerialize for Vec<T>
 impl ExonumJsonSerialize for SystemTime {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::Error;
-        let duration = self.duration_since(UNIX_EPOCH)
-            .map_err(S::Error::custom)?;
+        let duration = self.duration_since(UNIX_EPOCH).map_err(S::Error::custom)?;
         let duration = DurationHelper {
             secs: duration.as_secs().to_string(),
             nanos: duration.subsec_nanos(),
@@ -380,14 +379,14 @@ impl<T> ExonumJsonDeserialize for Vec<T>
     where T: ExonumJsonDeserialize,
           for<'a> Vec<T>: Field<'a>
 {
-    fn deserialize<>(value: &Value) -> Result<Self, Box<Error>> {
+    fn deserialize(value: &Value) -> Result<Self, Box<Error>> {
         let bytes = value.as_array().ok_or("Can't cast json as array")?;
         let mut vec: Vec<_> = Vec::new();
         for el in bytes {
             let obj = T::deserialize(el)?;
             vec.push(obj);
         }
-        
+
         Ok(vec)
     }
 }
@@ -436,7 +435,7 @@ impl ExonumJsonDeserializeField for BitVec {
 }
 
 
-/// Reexport of `serde` specific traits, this reexports 
+/// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.
 pub mod reexport {
     pub use serde_json::{Value, to_value, from_value, to_string, from_str};
