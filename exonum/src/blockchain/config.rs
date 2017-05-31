@@ -1,4 +1,5 @@
 //! Exonum global variables.
+//! TODO
 
 use serde_json;
 
