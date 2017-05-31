@@ -89,8 +89,8 @@ impl From<ApiError> for IronError {
         use std::error::Error;
 
         let mut body = BTreeMap::new();
-        let description = format!("{:?}; description: {:?}", e, e.description());
-        body.insert("type", description);
+        body.insert("debug", format!("{:?}", e));
+        body.insert("description", e.description().to_string());
         let code = match e {
             ApiError::FileExists(hash) |
             ApiError::FileNotFound(hash) => {
