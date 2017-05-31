@@ -200,8 +200,11 @@ impl<'a> CurrencySchema<'a> {
     }
 
     /// Adds transaction record to the walled by the given public key.
-    fn append_history(&self, mut wallet: Wallet, key: &PublicKey,
-                      meta: TxMetaRecord) -> Result<(), Error> {
+    fn append_history(&self,
+                      mut wallet: Wallet,
+                      key: &PublicKey,
+                      meta: TxMetaRecord)
+                      -> Result<(), Error> {
         let history = self.wallet_history(key);
         history.append(meta)?;
         wallet.set_history_hash(&history.root_hash()?);
@@ -217,7 +220,9 @@ impl TxTransfer {
 
         let mut sender_wallet = match schema.wallet(sender_pub_key)? {
             Some(val) => val,
-            None => { return Ok(()); }
+            None => {
+                return Ok(());
+            }
         };
 
         let meta = match schema.wallet(receiver_pub_key)? {
@@ -225,7 +230,8 @@ impl TxTransfer {
                 let status = sender_wallet.transfer_to(&mut receiver, self.amount());
                 let meta = TxMetaRecord::new(&tx_hash, status);
                 if status {
-                    schema.append_history(receiver, receiver_pub_key, meta.clone())?;
+                    let meta = meta.clone();
+                    schema.append_history(receiver, receiver_pub_key, meta)?;
                 }
                 meta
             }
