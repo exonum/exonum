@@ -142,6 +142,8 @@ impl Blockchain {
         }
         // Get tx hash
         let tx_hash = schema.block_txs(height).root_hash()?;
+        // Get txs length
+        let txs_length = schema.block_txs(height).len()?;
         // Get state hash
         let state_hash = {
             let sum_table = schema.state_hash_aggregator();
@@ -162,7 +164,7 @@ impl Blockchain {
         };
 
         // Create block
-        let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
+        let block = Block::new(height, round, txs_length, &last_hash, &tx_hash, &state_hash);
         trace!("execute block = {:?}", block);
         // Eval block hash
         let block_hash = block.hash();
