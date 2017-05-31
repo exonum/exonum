@@ -91,6 +91,7 @@ message! {
 }
 
 /// Transaction types.
+#[serde(untagged)]
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum CurrencyTx {
     /// Transfer currency from one wallet to another.
