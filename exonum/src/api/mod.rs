@@ -45,7 +45,8 @@ impl ::std::fmt::Display for ApiError {
 impl ::std::error::Error for ApiError {
     fn description(&self) -> &str {
         match *self {
-            ApiError::Service(ref error) => error.description(),
+            ApiError::Service(ref error) |
+            ApiError::IncorrectRequest(ref error) => error.description(),
             ApiError::Storage(ref error) => error.description(),
             ApiError::Events(ref error) => error.description(),
             ApiError::FromHex(ref error) => error.description(),
@@ -54,7 +55,6 @@ impl ::std::error::Error for ApiError {
             ApiError::NotFound => "NotFound",
             ApiError::FileTooBig => "FileToBig",
             ApiError::FileExists(_) => "FileExists",
-            ApiError::IncorrectRequest(ref error) => error.description(),
             ApiError::Unauthorized => "Unauthorized",
         }
     }
