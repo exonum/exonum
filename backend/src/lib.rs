@@ -1,7 +1,11 @@
+//! Cryptocurrency implementation example using [exonum](http://exonum.com/).
+
+// TODO: Uncomment when `storage_value!` and `message!` implementation will be updated.
+// #![deny(missing_docs)]
+#![deny(missing_debug_implementations)]
+
 extern crate rand;
-extern crate time;
 extern crate serde;
-extern crate cookie;
 #[macro_use]
 extern crate serde_derive;
 extern crate byteorder;
@@ -14,22 +18,20 @@ extern crate exonum;
 extern crate params;
 extern crate router;
 extern crate iron;
-extern crate hyper;
 extern crate bodyparser;
 
-use serde::{Serialize, Serializer};
-use serde::de::{self, Deserialize, Deserializer};
 use iron::Handler;
 use router::Router;
+
+use std::fmt;
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
 use exonum::crypto::{PublicKey, Hash, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
-use exonum::blockchain::{Service, Transaction};
-use exonum::blockchain::ApiContext;
+use exonum::blockchain::{Service, Transaction, ApiContext};
 use exonum::serialize::json::reexport as serde_json;
-use serde_json::{Value, to_value, from_value};
+use serde_json::{Value, to_value};
 
 use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
@@ -39,13 +41,18 @@ mod tx_metarecord;
 pub mod api;
 pub mod wallet;
 
+/// Id for our cryptocurrency messages.
 pub const CRYPTOCURRENCY: u16 = 128;
 
+/// TxTransfer Id.
 pub const TX_TRANSFER_ID: u16 = 128;
+/// TxIssue Id.
 pub const TX_ISSUE_ID: u16 = 129;
+/// TxCreateWallet Id.
 pub const TX_WALLET_ID: u16 = 130;
 
 message! {
+/// Transfer `amount` of the currency from one wallet to another.
     struct TxTransfer {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_TRANSFER_ID;
@@ -59,6 +66,7 @@ message! {
 }
 
 message! {
+/// Issue `amount` of the currency to the `wallet`.
     struct TxIssue {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_ISSUE_ID;
@@ -71,6 +79,7 @@ message! {
 }
 
 message! {
+/// Create wallet with the given `name`.
     struct TxCreateWallet {
         const TYPE = CRYPTOCURRENCY;
         const ID = TX_WALLET_ID;
@@ -81,95 +90,25 @@ message! {
     }
 }
 
-#[derive(PartialEq, Debug, Clone)]
+/// Transaction types.
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub enum CurrencyTx {
+    /// Transfer currency from one wallet to another.
     Transfer(TxTransfer),
+    /// Issue currency to some wallet.
     Issue(TxIssue),
+    /// Create wallet with given name.
     CreateWallet(TxCreateWallet),
 }
 
 impl CurrencyTx {
+    /// Returns public key from the transaction.
     pub fn pub_key(&self) -> &PublicKey {
         match *self {
             CurrencyTx::Transfer(ref msg) => msg.from(),
             CurrencyTx::Issue(ref msg) => msg.wallet(),
             CurrencyTx::CreateWallet(ref msg) => msg.pub_key(),
         }
-    }
-}
-
-impl Serialize for CurrencyTx {
-    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        match *self {
-            CurrencyTx::Issue(ref issue) => issue.serialize(ser),
-            CurrencyTx::Transfer(ref transfer) => transfer.serialize(ser),
-            CurrencyTx::CreateWallet(ref wallet) => wallet.serialize(ser),
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for CurrencyTx {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
-    {
-        let value = <Value>::deserialize(deserializer)?;
-        let service_id: u16;
-        let message_id: u16;
-        if let Some(value) = value.as_object() {
-            service_id = value
-                .get("service_id")
-                .and_then(|v| v.as_i64())
-                .ok_or_else(|| de::Error::custom("Can't parse service_id."))? as
-                         u16;
-            message_id = value
-                .get("message_id")
-                .and_then(|v| v.as_i64())
-                .ok_or_else(|| de::Error::custom("Can't parse message_id."))? as
-                         u16;
-        } else {
-            return Err(de::Error::custom("Tx is not a json object"));
-        }
-
-        match service_id {
-            CRYPTOCURRENCY => {}
-            other => {
-                return Err(de::Error::custom(format!("service_id doesn't match the expected. \
-                                                       actual: {}, expected: {}",
-                                                     other,
-                                                     CRYPTOCURRENCY)))
-            }
-        }
-        let res = match message_id {
-            TX_ISSUE_ID => {
-                let ret: TxIssue =
-                    from_value(value)
-                        .map_err(|e| de::Error::custom(format!("Can't parse TxIssue {:?}", e)))?;
-                CurrencyTx::Issue(ret)
-            }
-            TX_WALLET_ID => {
-                let ret: TxCreateWallet =
-                    from_value(value)
-                        .map_err(|e| {
-                                     de::Error::custom(format!("Can't parse TxCreateWallet {:?}",
-                                                               e))
-                                 })?;
-                CurrencyTx::CreateWallet(ret)
-            }
-            TX_TRANSFER_ID => {
-                let ret: TxTransfer =
-                    from_value(value)
-                        .map_err(|e| de::Error::custom(format!("Can't parse TxTransfer {:?}", e)))?;
-                CurrencyTx::Transfer(ret)
-            }
-            other => {
-                return Err(de::Error::custom(format!("Unknown transaction id for \
-                                                      Cryptocurrency Service: {}",
-                                                     other)));
-            }
-        };
-        Ok(res)
     }
 }
 
@@ -199,39 +138,53 @@ impl From<TxTransfer> for CurrencyTx {
         CurrencyTx::Transfer(tx)
     }
 }
+
 impl From<TxCreateWallet> for CurrencyTx {
     fn from(tx: TxCreateWallet) -> CurrencyTx {
         CurrencyTx::CreateWallet(tx)
     }
 }
+
 impl From<TxIssue> for CurrencyTx {
     fn from(tx: TxIssue) -> CurrencyTx {
         CurrencyTx::Issue(tx)
     }
 }
+
 impl From<RawMessage> for CurrencyTx {
     fn from(raw: RawMessage) -> Self {
         CurrencyTx::from_raw(raw).unwrap()
     }
 }
 
+/// Database schema for the cryptocurrency.
 pub struct CurrencySchema<'a> {
     view: &'a View,
 }
 
+impl<'a> fmt::Debug for CurrencySchema<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CurrencySchema {{}}")
+    }
+}
+
 impl<'a> CurrencySchema<'a> {
-    pub fn new(view: &'a View) -> CurrencySchema {
+    /// Constructs schema from the database view.
+    pub fn new(view: &'a View) -> Self {
         CurrencySchema { view: view }
     }
 
+    /// Returns `MerklePatriciaTable` with wallets.
     pub fn wallets(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, Wallet> {
         MerklePatriciaTable::new(MapTable::new(vec![20], self.view))
     }
 
+    /// Returns wallet for the given public key.
     pub fn wallet(&self, pub_key: &PublicKey) -> StorageResult<Option<Wallet>> {
         self.wallets().get(pub_key)
     }
 
+    /// Returns history for the wallet by the given public key.
     pub fn wallet_history(&self,
                           public_key: &PublicKey)
                           -> MerkleTable<MapTable<View, [u8], Vec<u8>>, TxMetaRecord> {
@@ -240,96 +193,73 @@ impl<'a> CurrencySchema<'a> {
         MerkleTable::new(MapTable::new(prefix, self.view))
     }
 
+    /// Returns state hash.
     pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
         Ok(vec![self.wallets().root_hash()?])
     }
-}
 
-#[derive(Default)]
-pub struct CurrencyService {}
-
-impl CurrencyService {
-    pub fn new() -> CurrencyService {
-        CurrencyService {}
+    /// Adds transaction record to the walled by the given public key.
+    fn append_history(&self, mut wallet: Wallet, key: &PublicKey,
+                      meta: TxMetaRecord) -> Result<(), Error> {
+        let history = self.wallet_history(key);
+        history.append(meta)?;
+        wallet.set_history_hash(&history.root_hash()?);
+        self.wallets().put(key, wallet)
     }
 }
 
 impl TxTransfer {
+    /// Executes transfer transaction.
     pub fn execute(&self, schema: CurrencySchema, tx_hash: Hash) -> Result<(), Error> {
         let sender_pub_key = self.from();
         let receiver_pub_key = self.to();
 
-        let sender_w = schema.wallet(sender_pub_key)?;
-        let receiver_w = schema.wallet(receiver_pub_key)?;
-        let mut execution_status: bool = false;
-
-        let (sender_w, receiver_w) = match (sender_w, receiver_w) {
-            (Some(mut sender), Some(mut receiver)) => {
-                if sender.balance() >= self.amount() {
-                    execution_status = true;
-                    sender.transfer_to(&mut receiver, self.amount());
-                }
-                let modify_receiver = if execution_status {
-                    Some(receiver)
-                } else {
-                    None
-                };
-                (Some(sender), modify_receiver)
-            }
-            (Some(sender), None) => (Some(sender), None),
-            _ => (None, None),
+        let mut sender_wallet = match schema.wallet(sender_pub_key)? {
+            Some(val) => val,
+            None => { return Ok(()); }
         };
 
-        let meta = TxMetaRecord::new(&tx_hash, execution_status);
-        if let Some(mut sender) = sender_w {
-            let sender_history = schema.wallet_history(sender_pub_key);
-            sender_history.append(meta.clone())?;
-            sender.set_history_hash(&sender_history.root_hash()?);
-            sender.increase_history_len();
-            schema.wallets().put(sender_pub_key, sender)?;
-        }
-        if let Some(mut receiver) = receiver_w {
-            let receiver_history = schema.wallet_history(receiver_pub_key);
-            receiver_history.append(meta)?;
-            receiver.set_history_hash(&receiver_history.root_hash()?);
-            receiver.increase_history_len();
-            schema.wallets().put(receiver_pub_key, receiver)?;
-        }
-        Ok(())
+        let meta = match schema.wallet(receiver_pub_key)? {
+            Some(mut receiver) => {
+                let status = sender_wallet.transfer_to(&mut receiver, self.amount());
+                let meta = TxMetaRecord::new(&tx_hash, status);
+                if status {
+                    schema.append_history(receiver, receiver_pub_key, meta.clone())?;
+                }
+                meta
+            }
+            None => TxMetaRecord::new(&tx_hash, false),
+        };
+        schema.append_history(sender_wallet, sender_pub_key, meta)
     }
 }
 
 impl TxIssue {
+    /// Executes issue transaction.
     pub fn execute(&self, schema: CurrencySchema, tx_hash: Hash) -> Result<(), Error> {
         let pub_key = self.wallet();
         if let Some(mut wallet) = schema.wallet(pub_key)? {
-            let history = schema.wallet_history(pub_key);
+            let new_balance = wallet.balance() + self.amount();
+            wallet.set_balance(new_balance);
             let meta = TxMetaRecord::new(&tx_hash, true);
-            history.append(meta)?;
-
-            let new_amount = wallet.balance() + self.amount();
-            wallet.set_balance(new_amount);
-            wallet.set_history_hash(&history.root_hash()?);
-            wallet.increase_history_len();
-            schema.wallets().put(pub_key, wallet)?;
+            schema.append_history(wallet, pub_key, meta)?;
         }
         Ok(())
     }
 }
 
 impl TxCreateWallet {
+    /// Executes wallet creation transaction.
     pub fn execute(&self, schema: CurrencySchema, tx_hash: Hash) -> Result<(), Error> {
-        let pub_key = self.pub_key();
-        let found_wallet = schema.wallet(pub_key)?;
-        let execution_status: bool = found_wallet.is_none();
+        let found_wallet = schema.wallet(self.pub_key())?;
+        let execution_status = found_wallet.is_none();
 
         let meta = TxMetaRecord::new(&tx_hash, execution_status);
-        let history = schema.wallet_history(pub_key);
+        let history = schema.wallet_history(self.pub_key());
         history.append(meta)?;
 
         let wallet = if let Some(mut wallet) = found_wallet {
             wallet.set_history_hash(&history.root_hash()?);
-            wallet.increase_history_len();
             wallet
         } else {
             Wallet::new(self.pub_key(),
@@ -338,8 +268,7 @@ impl TxCreateWallet {
                         1, // history_len
                         &history.root_hash()?)
         };
-        schema.wallets().put(pub_key, wallet)?;
-        Ok(())
+        schema.wallets().put(self.pub_key(), wallet)
     }
 }
 
@@ -366,6 +295,17 @@ impl Transaction for CurrencyTx {
             CurrencyTx::Issue(ref msg) => msg.execute(schema, tx_hash),
             CurrencyTx::CreateWallet(ref msg) => msg.execute(schema, tx_hash),
         }
+    }
+}
+
+/// Exonum `Service` implementation.
+#[derive(Default, Debug)]
+pub struct CurrencyService {}
+
+impl CurrencyService {
+    /// Creates `CurrencyService`.
+    pub fn new() -> Self {
+        CurrencyService {}
     }
 }
 
@@ -404,53 +344,17 @@ impl Service for CurrencyService {
 mod tests {
     use byteorder::{ByteOrder, LittleEndian};
     use rand::{thread_rng, Rng};
-    use serde_json;
+    use tempdir::TempDir;
 
     use exonum::crypto::{gen_keypair, Hash, hash, PublicKey};
-    use exonum::storage::Storage;
+    use exonum::storage::{self, Storage};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::messages::{FromRaw, Message};
+    use exonum::serialize::json::reexport as serde_json;
 
     use super::{CurrencyTx, CurrencyService, CurrencySchema, TxCreateWallet, TxIssue, TxTransfer};
     use super::tx_metarecord::TxMetaRecord;
     use super::wallet::{Wallet, assert_wallet};
-
-    #[cfg(feature="memorydb")]
-    fn create_db() -> Storage {
-        use exonum::storage::MemoryDB;
-
-        MemoryDB::new()
-    }
-
-    #[cfg(not(feature="memorydb"))]
-    fn create_db() -> Storage {
-        use exonum::storage::{LevelDB, LevelDBOptions};
-        use tempdir::TempDir;
-
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let dir = TempDir::new("cryptocurrency").unwrap();
-        LevelDB::new(dir.path(), options).unwrap()
-    }
-
-    #[derive(Serialize)]
-    struct TransactionTestData {
-        transaction: CurrencyTx,
-        hash: Hash,
-        raw: Vec<u8>,
-    }
-
-    impl TransactionTestData {
-        fn new(transaction: CurrencyTx) -> TransactionTestData {
-            let hash = transaction.hash();
-            let raw = transaction.raw().as_ref().as_ref().to_vec();
-            TransactionTestData {
-                transaction: transaction,
-                hash: hash,
-                raw: raw,
-            }
-        }
-    }
 
     #[test]
     fn test_tx_transfer_serde() {
@@ -567,14 +471,6 @@ mod tests {
         assert_eq!(prefix, vec![10, 0, 16, 0, 0, 0, 0, 0, 0]);
     }
 
-    fn get_wallet_and_history(schema: &CurrencySchema,
-                              pub_key: &PublicKey)
-                              -> (Option<Wallet>, Hash) {
-        let w = schema.wallet(pub_key).unwrap();
-        let h = schema.wallet_history(pub_key).root_hash().unwrap();
-        (w, h)
-    }
-
     #[test]
     fn test_wallet_history_txtransfer_false_status_absent_receiver_wallet() {
         let db = create_db();
@@ -606,6 +502,7 @@ mod tests {
         assert_eq!(h1, vec![meta_create1, meta_issue1, meta_transfer.clone()]);
         assert_eq!(h2, vec![]);
     }
+
     #[test]
     fn test_wallet_history_txtransfer_false_status_insufficient_balance() {
         let db = create_db();
@@ -711,5 +608,45 @@ mod tests {
         let meta_transfer = TxMetaRecord::new(&tw.hash(), true);
         assert_eq!(h1, vec![meta_create1, meta_issue1, meta_transfer.clone()]);
         assert_eq!(h2, vec![meta_create2, meta_issue2, meta_transfer]);
+    }
+
+    #[cfg(feature="memorydb")]
+    fn create_db() -> Storage {
+        storage::MemoryDB::new()
+    }
+
+    #[cfg(not(feature="memorydb"))]
+    fn create_db() -> Storage {
+        let mut options = storage::LevelDBOptions::new();
+        options.create_if_missing = true;
+        let dir = TempDir::new("cryptocurrency").unwrap();
+        storage::LevelDB::new(dir.path(), options).unwrap()
+    }
+
+    #[derive(Serialize)]
+    struct TransactionTestData {
+        transaction: CurrencyTx,
+        hash: Hash,
+        raw: Vec<u8>,
+    }
+
+    impl TransactionTestData {
+        fn new(transaction: CurrencyTx) -> TransactionTestData {
+            let hash = transaction.hash();
+            let raw = transaction.raw().as_ref().as_ref().to_vec();
+            TransactionTestData {
+                transaction: transaction,
+                hash: hash,
+                raw: raw,
+            }
+        }
+    }
+
+    fn get_wallet_and_history(schema: &CurrencySchema,
+                              pub_key: &PublicKey)
+                              -> (Option<Wallet>, Hash) {
+        let w = schema.wallet(pub_key).unwrap();
+        let h = schema.wallet_history(pub_key).root_hash().unwrap();
+        (w, h)
     }
 }

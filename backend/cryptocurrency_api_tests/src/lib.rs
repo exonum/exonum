@@ -43,158 +43,9 @@ mod tests {
     use sandbox::sandbox::{sandbox_with_services, Sandbox};
     use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 
-
-    fn logger() {
-        let _ = init_logger();
-    }
-
-    fn response_body(response: Response) -> serde_json::Value {
-        if let Some(mut body) = response.body {
-            let mut buf = Vec::new();
-            body.write_body(&mut buf).unwrap();
-            let s = String::from_utf8(buf).unwrap();
-            debug!("Received response body:'{}'", &s);
-            serde_json::from_str(&s).unwrap()
-        } else {
-            serde_json::Value::Null
-        }
-    }
-
-    fn request_get<A: AsRef<str>>(route: A, router: &Router) -> IronResult<Response> {
-        info!("GET request:'{}'",
-              format!("http://127.0.0.1:8000/{}", route.as_ref()));
-        iron_test::request::get(&format!("http://127.0.0.1:8000/{}", route.as_ref()),
-                                Headers::new(),
-                                router)
-    }
-
-    fn request_post_str<B: AsRef<str>, A: AsRef<str>>(route: A,
-                                                      body: B,
-                                                      router: &Router)
-                                                      -> IronResult<Response> {
-        let body_str = body.as_ref();
-        let mut headers = Headers::new();
-        headers.set(ContentType::json());
-        info!("POST request:'{}' with body '{}'",
-              format!("http://127.0.0.1:8000/{}", route.as_ref()),
-              body_str);
-        iron_test::request::post(&format!("http://127.0.0.1:8000/{}", route.as_ref()),
-                                 headers,
-                                 body_str,
-                                 router)
-    }
-
-    fn request_post_body<T: Serialize, A: AsRef<str>>(route: A,
-                                                      body: T,
-                                                      router: &Router)
-                                                      -> IronResult<Response> {
-        let body_str: &str = &serde_json::to_string(&body).unwrap();
-        request_post_str(route, body_str, router)
-    }
-
-    fn from_file<P: AsRef<Path>>(path: P) -> serde_json::Value {
-        let mut file = File::open(path).unwrap();
-        let mut s = String::new();
-        file.read_to_string(&mut s).unwrap();
-        serde_json::from_str(&s).unwrap()
-    }
-
-    #[derive(Clone)]
-    struct TestTxSender {
-        transactions: Arc<Mutex<VecDeque<RawMessage>>>,
-    }
-
-    impl TransactionSend for TestTxSender {
-        fn send<T: Transaction>(&self, tx: T) -> Result<(), EventsError> {
-            if !tx.verify() {
-                return Err(EventsError::new("Unable to verify transaction"));
-            }
-            let rm = tx.raw().clone();
-            self.transactions.lock().unwrap().push_back(rm);
-            Ok(())
-        }
-    }
-
-    struct CurrencySandbox {
-        sandbox: Sandbox,
-        state: SandboxState,
-        transactions: Arc<Mutex<VecDeque<RawMessage>>>,
-    }
-
-
-    impl CurrencySandbox {
-        fn new() -> CurrencySandbox {
-            let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
-            let sandbox = sandbox_with_services(services);
-            info!("Sandbox validators list: {}",
-                  serde_json::to_string(&sandbox.validators()).unwrap());
-            let state = SandboxState::new();
-            CurrencySandbox {
-                sandbox: sandbox,
-                state: state,
-                transactions: Arc::new(Mutex::new(VecDeque::new())),
-            }
-        }
-
-        fn obtain_test_api(&self) -> Router {
-            let channel = TestTxSender { transactions: self.transactions.clone() };
-            let blockchain = self.sandbox.blockchain_ref().clone();
-            let api = CryptocurrencyApi {
-                channel: channel,
-                blockchain: blockchain,
-            };
-            let mut router = Router::new();
-            api.wire(&mut router);
-            router
-        }
-
-        fn commit(&self) {
-            let mut collected_transactions = self.transactions.lock().unwrap();
-            let txs = collected_transactions.drain(..).collect::<Vec<_>>();
-            debug!("Sandbox commits a sequence of {} transactions", txs.len());
-            txs.iter()
-                .inspect(|elem| {
-                             trace!("Message hash: {:?}", (*elem).hash());
-                             trace!("{:?}", CurrencyTx::from_raw((*elem).clone()));
-                         })
-                .collect::<Vec<_>>();
-            add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());
-        }
-
-        fn request_wallet_info_str<A: AsRef<str>>(&self,
-                                                  public_key_str: A)
-                                                  -> IronResult<Response> {
-            let api = self.obtain_test_api();
-            let get_route = format!("/v1/wallets/info?pubkey={}", public_key_str.as_ref());
-            request_get(get_route, &api)
-        }
-
-        fn request_wallet_info(&self, pulic_key: &PublicKey) -> IronResult<Response> {
-            let pubkey_str = serde_json::to_string(&pulic_key).unwrap().replace("\"", "");
-            self.request_wallet_info_str(pubkey_str)
-        }
-
-        fn post_transaction<T: Serialize>(&self, tx: T) -> IronResult<Response> {
-            let api = self.obtain_test_api();
-            let post_route = "/v1/wallets/transaction";
-            request_post_body(post_route, tx, &api)
-        }
-    }
-
-    #[derive(Deserialize)]
-    struct TxResponse {
-        tx_hash: Hash,
-    }
-
-    #[derive(Deserialize)]
-    struct ErrorResponse {
-        #[serde(rename = "type")]
-        type_str: String,
-    }
-
     #[test]
     fn test_create_wallet_correct_post() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let mut rng = thread_rng();
 
@@ -215,7 +66,7 @@ mod tests {
 
     #[test]
     fn test_issue_correct_post() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let mut rng = thread_rng();
 
@@ -231,7 +82,7 @@ mod tests {
 
     #[test]
     fn test_transfer_correct_post() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let mut rng = thread_rng();
 
@@ -248,7 +99,7 @@ mod tests {
 
     #[test]
     fn test_create_incorrect_signature() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let (p1, _) = gen_keypair();
         let (_, s2) = gen_keypair();
@@ -260,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_issue_incorrect_signature() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let (p1, _) = gen_keypair();
         let (_, s2) = gen_keypair();
@@ -272,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_transfer_incorrect_signature() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
@@ -288,7 +139,7 @@ mod tests {
 
     #[test]
     fn test_message_id_from_other_type() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/message_id_from_other.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
@@ -297,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_invalid_message_id() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/invalid_message_id.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
@@ -306,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_invalid_service_id() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/invalid_service_id.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
@@ -315,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_incorrect_wallet_info_query() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
 
         // it's 1 byte and 2 hex symbols shorter
@@ -326,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_query_absent_wallet() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let (p1, s1) = gen_keypair_from_seed(&Seed::new([11; 32]));
         let (p2, s2) = gen_keypair_from_seed(&Seed::new([12; 32]));
@@ -354,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_query_wallet_with_history() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let (p1, s1) = gen_keypair_from_seed(&Seed::new([11; 32]));
         let (p2, s2) = gen_keypair_from_seed(&Seed::new([12; 32]));
@@ -402,7 +253,7 @@ mod tests {
 
     #[test]
     fn test_commit_txs_no_state_change() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let (p1, s1) = gen_keypair_from_seed(&Seed::new([11; 32]));
         let (p2, s2) = gen_keypair_from_seed(&Seed::new([12; 32]));
@@ -483,7 +334,7 @@ mod tests {
 
     #[test]
     fn test_commit_duplicate_txs() {
-        logger();
+        let _ = init_logger();
         let sandbox = CurrencySandbox::new();
         let (p1, s1) = gen_keypair_from_seed(&Seed::new([11; 32]));
         let (p2, s2) = gen_keypair_from_seed(&Seed::new([12; 32]));
@@ -558,5 +409,149 @@ mod tests {
                          assert_eq!(expected_tx_hash, tx_response_res.tx_hash);
                      })
             .collect::<Vec<CurrencyTx>>();
+    }
+
+    fn response_body(response: Response) -> serde_json::Value {
+        if let Some(mut body) = response.body {
+            let mut buf = Vec::new();
+            body.write_body(&mut buf).unwrap();
+            let s = String::from_utf8(buf).unwrap();
+            debug!("Received response body:'{}'", &s);
+            serde_json::from_str(&s).unwrap()
+        } else {
+            serde_json::Value::Null
+        }
+    }
+
+    fn request_get<A: AsRef<str>>(route: A, router: &Router) -> IronResult<Response> {
+        info!("GET request:'{}'",
+        format!("http://127.0.0.1:8000/{}", route.as_ref()));
+        iron_test::request::get(&format!("http://127.0.0.1:8000/{}", route.as_ref()),
+                                Headers::new(),
+                                router)
+    }
+
+    fn request_post_str<B: AsRef<str>, A: AsRef<str>>(route: A,
+                                                      body: B,
+                                                      router: &Router)
+                                                      -> IronResult<Response> {
+        let body_str = body.as_ref();
+        let mut headers = Headers::new();
+        headers.set(ContentType::json());
+        info!("POST request:'{}' with body '{}'",
+        format!("http://127.0.0.1:8000/{}", route.as_ref()),
+        body_str);
+        iron_test::request::post(&format!("http://127.0.0.1:8000/{}", route.as_ref()),
+                                 headers,
+                                 body_str,
+                                 router)
+    }
+
+    fn request_post_body<T: Serialize, A: AsRef<str>>(route: A,
+                                                      body: T,
+                                                      router: &Router)
+                                                      -> IronResult<Response> {
+        let body_str: &str = &serde_json::to_string(&body).unwrap();
+        request_post_str(route, body_str, router)
+    }
+
+    fn from_file<P: AsRef<Path>>(path: P) -> serde_json::Value {
+        let mut file = File::open(path).unwrap();
+        let mut s = String::new();
+        file.read_to_string(&mut s).unwrap();
+        serde_json::from_str(&s).unwrap()
+    }
+
+    #[derive(Clone)]
+    struct TestTxSender {
+        transactions: Arc<Mutex<VecDeque<RawMessage>>>,
+    }
+
+    impl TransactionSend for TestTxSender {
+        fn send<T: Transaction>(&self, tx: T) -> Result<(), EventsError> {
+            if !tx.verify() {
+                return Err(EventsError::new("Unable to verify transaction"));
+            }
+            let rm = tx.raw().clone();
+            self.transactions.lock().unwrap().push_back(rm);
+            Ok(())
+        }
+    }
+
+    struct CurrencySandbox {
+        sandbox: Sandbox,
+        state: SandboxState,
+        transactions: Arc<Mutex<VecDeque<RawMessage>>>,
+    }
+
+
+    impl CurrencySandbox {
+        fn new() -> CurrencySandbox {
+            let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
+            let sandbox = sandbox_with_services(services);
+            info!("Sandbox validators list: {}",
+            serde_json::to_string(&sandbox.validators()).unwrap());
+            let state = SandboxState::new();
+            CurrencySandbox {
+                sandbox: sandbox,
+                state: state,
+                transactions: Arc::new(Mutex::new(VecDeque::new())),
+            }
+        }
+
+        fn obtain_test_api(&self) -> Router {
+            let channel = TestTxSender { transactions: self.transactions.clone() };
+            let blockchain = self.sandbox.blockchain_ref().clone();
+            let api = CryptocurrencyApi {
+                channel: channel,
+                blockchain: blockchain,
+            };
+            let mut router = Router::new();
+            api.wire(&mut router);
+            router
+        }
+
+        fn commit(&self) {
+            let mut collected_transactions = self.transactions.lock().unwrap();
+            let txs = collected_transactions.drain(..).collect::<Vec<_>>();
+            debug!("Sandbox commits a sequence of {} transactions", txs.len());
+            txs.iter()
+                .inspect(|elem| {
+                    trace!("Message hash: {:?}", (*elem).hash());
+                    trace!("{:?}", CurrencyTx::from_raw((*elem).clone()));
+                })
+                .collect::<Vec<_>>();
+            add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());
+        }
+
+        fn request_wallet_info_str<A: AsRef<str>>(&self,
+                                                  public_key_str: A)
+                                                  -> IronResult<Response> {
+            let api = self.obtain_test_api();
+            let get_route = format!("/v1/wallets/info?pubkey={}", public_key_str.as_ref());
+            request_get(get_route, &api)
+        }
+
+        fn request_wallet_info(&self, pulic_key: &PublicKey) -> IronResult<Response> {
+            let pubkey_str = serde_json::to_string(&pulic_key).unwrap().replace("\"", "");
+            self.request_wallet_info_str(pubkey_str)
+        }
+
+        fn post_transaction<T: Serialize>(&self, tx: T) -> IronResult<Response> {
+            let api = self.obtain_test_api();
+            let post_route = "/v1/wallets/transaction";
+            request_post_body(post_route, tx, &api)
+        }
+    }
+
+    #[derive(Deserialize)]
+    struct TxResponse {
+        tx_hash: Hash,
+    }
+
+    #[derive(Deserialize)]
+    struct ErrorResponse {
+        #[serde(rename = "type")]
+        type_str: String,
     }
 }

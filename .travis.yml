@@ -21,7 +21,7 @@ script:
 - cargo fmt -p cryptocurrency -- --write-mode=diff
 - cargo fmt -p cryptocurrency_api_tests -- --write-mode=diff
 - cd backend
-- cargo +$NIGHTLY_RUST clippy
+- cargo +$NIGHTLY_RUST clippy -- -D warnings
 - cd ..
 - cargo build --release --manifest-path backend/Cargo.toml
 - RUST_LOG=off cargo test --release --manifest-path backend/Cargo.toml
