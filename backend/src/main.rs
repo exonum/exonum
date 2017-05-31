@@ -1,23 +1,16 @@
-extern crate iron;
-extern crate hyper;
-extern crate env_logger;
 extern crate clap;
-extern crate serde;
-extern crate time;
-extern crate rand;
-extern crate bodyparser;
 extern crate exonum;
 extern crate cryptocurrency;
-extern crate cookie;
 // extern crate configuration_service;
 
 use clap::App;
 
 use exonum::blockchain::{Blockchain, Service};
 use exonum::node::Node;
-use cryptocurrency::CurrencyService;
 use exonum::helpers::clap::{GenerateCommand, RunCommand};
 // use configuration_service::ConfigurationService;
+
+use cryptocurrency::CurrencyService;
 
 fn main() {
     exonum::crypto::init();
@@ -34,18 +27,15 @@ fn main() {
     match matches.subcommand() {
         ("generate", Some(matches)) => GenerateCommand::execute(matches),
         ("run", Some(matches)) => {
-            let node_cfg = RunCommand::node_config(matches);
-            let db = RunCommand::db(matches);
-
             let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new()),
                                                    // Box::new(ConfigurationService::new())
             ];
-            let blockchain = Blockchain::new(db, services);
-            let mut node = Node::new(blockchain, node_cfg);
+            let blockchain = Blockchain::new(RunCommand::db(matches), services);
+            let mut node = Node::new(blockchain, RunCommand::node_config(matches));
             node.run().unwrap();
         }
         _ => {
-            unreachable!("Wrong subcommand");
+            panic!("Wrong subcommand");
         }
     }
 }

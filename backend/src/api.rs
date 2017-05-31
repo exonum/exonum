@@ -1,9 +1,13 @@
+//! Cryptocurrency API.
+
 use serde::Serialize;
 use serde_json::to_value;
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
 use params::{Params, Value};
+
+use std::fmt;
 
 use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
@@ -16,29 +20,34 @@ use super::tx_metarecord::TxMetaRecord;
 use super::wallet::Wallet;
 use super::{CRYPTOCURRENCY, CurrencySchema, CurrencyTx};
 
-#[derive(Serialize)]
+/// TODO: Add documentation.
+#[derive(Debug, Serialize)]
 pub struct HashMPTproofLinker<V: Serialize> {
     mpt_proof: RootProofNode<Hash>,
     value: V,
 }
 
-#[derive(Serialize)]
+/// TODO: Add documentation.
+#[derive(Debug, Serialize)]
 pub struct HashMTproofLinker<V: Serialize> {
     mt_proof: Proofnode<TxMetaRecord>,
     values: Vec<V>,
 }
 
-
-#[derive(Serialize)]
+/// Wallet information.
+#[derive(Debug, Serialize)]
 pub struct WalletInfo {
     block_info: BlockProof,
     wallet: HashMPTproofLinker<RootProofNode<Wallet>>,
     wallet_history: Option<HashMTproofLinker<CurrencyTx>>,
 }
 
+/// TODO: Add documentation.
 #[derive(Clone)]
 pub struct CryptocurrencyApi<T: TransactionSend + Clone> {
+    /// Exonum blockchain.
     pub blockchain: Blockchain,
+    /// Channel for transactions.
     pub channel: T,
 }
 
@@ -108,44 +117,44 @@ impl<T> CryptocurrencyApi<T>
 
     fn transaction(&self, tx: CurrencyTx) -> Result<Hash, ApiError> {
         let tx_hash = tx.hash();
-        let ch = self.channel.clone();
-        match ch.send(tx) {
+        match self.channel.send(tx) {
             Ok(_) => Ok(tx_hash),
             Err(e) => Err(ApiError::Events(e)),
         }
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct TxResponse {
-    tx_hash: Hash,
+impl<T: Clone + TransactionSend> fmt::Debug for CryptocurrencyApi<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CryptocurrencyApi {{}}")
+    }
 }
 
 impl<T> Api for CryptocurrencyApi<T>
     where T: 'static + TransactionSend + Clone
 {
     fn wire(&self, router: &mut Router) {
-        let _self = self.clone();
+        let self_ = self.clone();
         let wallet_info = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
             match map.find(&["pubkey"]) {
                 Some(&Value::String(ref pub_key_string)) => {
                     let public_key = PublicKey::from_hex(pub_key_string)
                         .map_err(ApiError::FromHex)?;
-                    let info = _self.wallet_info(&public_key)?;
-                    _self.ok_response(&to_value(&info).unwrap())
+                    let info = self_.wallet_info(&public_key)?;
+                    self_.ok_response(&to_value(&info).unwrap())
                 }
                 _ => Err(ApiError::IncorrectRequest)?,
             }
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let transaction = move |req: &mut Request| -> IronResult<Response> {
             match req.get::<bodyparser::Struct<CurrencyTx>>() {
                 Ok(Some(transaction)) => {
-                    let tx_hash = _self.transaction(transaction)?;
+                    let tx_hash = self_.transaction(transaction)?;
                     let json = TxResponse { tx_hash: tx_hash };
-                    _self.ok_response(&to_value(&json).unwrap())
+                    self_.ok_response(&to_value(&json).unwrap())
                 }
                 Ok(None) => Err(ApiError::IncorrectRequest)?,
                 Err(e) => {
@@ -161,4 +170,9 @@ impl<T> Api for CryptocurrencyApi<T>
         router.get(&route_get, wallet_info, "wallet_info");
         info!("Created get route: {}", route_get);
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct TxResponse {
+    tx_hash: Hash,
 }
