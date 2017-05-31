@@ -30,6 +30,8 @@ mod service;
 
 pub mod config;
 
+/// A blockchain with a given services set and data storage.
+/// TODO
 #[derive(Clone)]
 pub struct Blockchain {
     db: Storage,
@@ -37,6 +39,7 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
+    /// Constructs a blockchain for given storage and services.
     pub fn new(db: Storage, services: Vec<Box<Service>>) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
@@ -54,10 +57,13 @@ impl Blockchain {
         }
     }
 
+    /// Creates storage snapshot.
+    /// TODO
     pub fn view(&self) -> StorageView {
         self.db.fork()
     }
 
+    /// Tries to create a `Transaction` object from the given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
         let id = raw.service_id() as usize;
         self.service_map
@@ -65,10 +71,13 @@ impl Blockchain {
             .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
+    /// Applies changes to the storage. This operation is atomic.
+    /// TODO
     pub fn merge(&self, patch: &Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
 
+    /// Returns the hash of latest commited block.
     pub fn last_hash(&self) -> Result<Hash, Error> {
         Ok(Schema::new(&self.view())
                .block_hashes_by_height()
@@ -76,10 +85,12 @@ impl Blockchain {
                .unwrap_or_else(Hash::default))
     }
 
+    /// Returns the latest commited block.
     pub fn last_block(&self) -> Result<Block, Error> {
         Ok(Schema::new(&self.view()).last_block()?.unwrap())
     }
 
+    /// Creates and commits the genesis block for the given genesis configuration.
     pub fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
@@ -209,6 +220,7 @@ impl Blockchain {
         Ok(txs)
     }
 
+    /// Returns `Mount` object that aggregates public api handlers.
     pub fn mount_public_api(&self, context: &ApiContext) -> Mount {
         let mut mount = Mount::new();
         for service in self.service_map.values() {
@@ -219,6 +231,7 @@ impl Blockchain {
         mount
     }
 
+    /// Returns `Mount` object that aggregates private api handlers.
     pub fn mount_private_api(&self, context: &ApiContext) -> Mount {
         let mut mount = Mount::new();
         for service in self.service_map.values() {

@@ -2,13 +2,15 @@ use byteorder::{ByteOrder, BigEndian};
 
 use std::mem;
 
-use crypto::{Hash};
+use crypto::Hash;
 use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
 use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
               List, RootProofNode, View};
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
+/// Generates prefix that combines service identifier,
+/// table identifier and given suffix.
 pub fn gen_prefix(service_id: u16, ord: u8, suf: Option<&[u8]>) -> Vec<u8> {
     let pos = mem::size_of::<u16>();
     let mut res;
@@ -40,20 +42,20 @@ storage_value! (
     }
 );
 
+/// Information schema for `exonum-core`.
 #[derive(Debug)]
 pub struct Schema<'a> {
     view: &'a View,
 }
 
+/// Data tables
 impl<'a> Schema<'a> {
-    pub fn new(view: &'a View) -> Schema {
-        Schema { view: view }
-    }
-
+    /// Table of all commited transactions.
     pub fn transactions(&self) -> MapTable<View, Hash, RawMessage> {
         MapTable::new(gen_prefix(CONSENSUS, 0, None), self.view)
     }
 
+    /// This table contains information of transaction location (block height and index in block).
     pub fn tx_location_by_tx_hash(&self) -> MapTable<View, Hash, TxLocation> {
         MapTable::new(gen_prefix(CONSENSUS, 1, None), self.view)
     }
@@ -75,10 +77,34 @@ impl<'a> Schema<'a> {
                                        self.view))
     }
 
-    pub fn precommits(&self,
-                      hash: &Hash)
-                      -> ListTable<MapTable<View, [u8], Vec<u8>>, Precommit> {
+    pub fn precommits(&self, hash: &Hash) -> ListTable<MapTable<View, [u8], Vec<u8>>, Precommit> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 5, Some(hash.as_ref())), self.view))
+    }
+
+    pub fn configs
+        (&self)
+         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StoredConfiguration> {
+        // configs patricia merkletree <block height> json
+        MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 6, None), self.view))
+    }
+
+    // TODO: consider List index to reduce storage volume
+    pub fn configs_actual_from(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, ConfigReference> {
+        ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
+    }
+
+    pub fn state_hash_aggregator
+        (&self)
+         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Hash> {
+        MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 8, None), self.view))
+    }
+}
+
+/// Methods
+impl<'a> Schema<'a> {
+    /// Constructs schema for the given storage `View`.
+    pub fn new(view: &'a View) -> Schema {
+        Schema { view: view }
     }
 
     pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
@@ -94,26 +120,6 @@ impl<'a> Schema<'a> {
             precommits: precommits,
         };
         Ok(Some(res))
-    }
-
-    pub fn configs
-        (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StoredConfiguration> {
-        // configs patricia merkletree <block height> json
-        MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 6, None), self.view))
-    }
-
-    // TODO: consider List index to reduce storage volume
-    pub fn configs_actual_from
-        (&self)
-         -> ListTable<MapTable<View, [u8], Vec<u8>>, ConfigReference> {
-        ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
-    }
-
-    pub fn state_hash_aggregator
-        (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Hash> {
-        MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 8, None), self.view))
     }
 
     pub fn last_block(&self) -> Result<Option<Block>, Error> {
@@ -145,7 +151,8 @@ impl<'a> Schema<'a> {
                 return Err(Error::new(format!("Attempting to commit configuration \
                                                with actual_from {:?} less than \
                                               the last committed actual_from {:?}",
-                                              actual_from, last_actual_from)));
+                                              actual_from,
+                                              last_actual_from)));
             }
         }
         let cfg_hash = config_data.hash();
@@ -153,7 +160,8 @@ impl<'a> Schema<'a> {
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from().append(cfg_ref)?;
-        info!("Scheduled the following configuration for acceptance: {:?}", config_data);
+        info!("Scheduled the following configuration for acceptance: {:?}",
+              config_data);
         // TODO: clear storages
         Ok(())
     }
@@ -171,8 +179,10 @@ impl<'a> Schema<'a> {
         let res = match self.configs_actual_from().get(idx + 1)? {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.configuration_by_hash(cfg_hash)?
-                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+                let cfg =
+                    self.configuration_by_hash(cfg_hash)?
+                        .expect(&format!("Config with hash {:?} is absent in configs table",
+                                        cfg_hash));
                 Some(cfg)
             }
             None => None,
@@ -235,7 +245,8 @@ impl<'a> Schema<'a> {
             .into_iter()
             .rposition(|r| r.actual_from() <= height)
             .expect(&format!("Couldn't not find any config for height {},\
-          that means that genesis block was created incorrectly.", height));
+          that means that genesis block was created incorrectly.",
+                            height));
         Ok(idx as u64)
     }
 }

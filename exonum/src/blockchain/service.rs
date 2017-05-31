@@ -1,3 +1,14 @@
+//! # Introduction
+//! This module defines the `exonum` services interfaces. Like smart contracts in some other 
+//! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
+//! To create your own service you need to define following things:
+//!  - Define your own information schema. 
+//!  - Create one or more types of messages using a macro `message!` and implement 
+//!    `Transaction` trait for them.
+//!  - Create data structure that implements `Service` trait. 
+//!  - Optionally you can write api handlers.
+//!
+
 use serde_json::Value;
 use iron::Handler;
 use mount::Mount;
@@ -7,15 +18,16 @@ use storage::{View, Error as StorageError};
 use messages::{Message, RawTransaction, Error as MessageError};
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
-use events::Milliseconds;
 use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
 
+/// A trait that describes transaction processing rules for the given message type.
 pub trait Transaction: Message + 'static {
     /// Checks the formal correctness of the transaction.
     /// That can be usefull for signature verification.
     /// *This method should not use external data, that is, it must be a pure function!*
     fn verify(&self) -> bool;
-    /// Defines transaction executing rules.
+    /// Defines the rules for executing transactions, during which the state of 
+    /// `View` can be changed.
     fn execute(&self, view: &View) -> Result<(), StorageError>;
     /// Returns transaction representation in json.
     fn info(&self) -> Value {
@@ -25,17 +37,23 @@ pub trait Transaction: Message + 'static {
 
 /// The main extension point for the `Exonum` framework. Like smart contracts in some other 
 /// blockchain platforms, `Exonum` services encapsulate business logic of the blockchain application.
+/// TODO
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
     /// Unique service identification for database schema and service messages.
     fn service_id(&self) -> u16;
+
     /// Unique human readable service name.
     fn service_name(&self) -> &'static str;
 
+    /// Returns a list of root hashes of tables that determine the current state
+    /// of the service database.
+    /// TODO
     fn state_hash(&self, view: &View) -> Result<Vec<Hash>, StorageError> {
         Ok(Vec::new())
     }
 
+    /// Tries to create `Transaction` object from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
     /// Handles genesis block creation event. 
@@ -51,10 +69,12 @@ pub trait Service: Send + Sync + 'static {
     fn handle_commit(&self, context: &mut NodeState) -> Result<(), StorageError> {
         Ok(())
     }
+
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
+
     /// Returns api handler for maintainers. 
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
@@ -145,30 +165,12 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 
     #[doc(hidden)]
-    // FIXME remove it!
     pub fn transactions(self) -> Vec<Box<Transaction>> {
         self.txs
     }
-
-    #[doc(hidden)]
-    // FIXME remove it!
-    pub fn update_config(&mut self, new_config: StoredConfiguration) {
-        self.state.update_config(new_config)
-    }
-
-    #[doc(hidden)]
-    // FIXME remove it!
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.state.propose_timeout()
-    }
-
-    #[doc(hidden)]
-    // FIXME remove it!
-    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
-        self.state.set_propose_timeout(timeout)
-    }
 }
 
+/// Provides the current node state to api handlers.
 #[derive(Debug)]
 pub struct ApiContext {
     blockchain: Blockchain,
@@ -178,6 +180,7 @@ pub struct ApiContext {
 }
 
 impl ApiContext {
+    /// Constructs context for the given `Node`.
     pub fn new(node: &Node) -> ApiContext {
         let handler = node.handler();
         ApiContext {
@@ -188,26 +191,32 @@ impl ApiContext {
         }
     }
 
+    /// Returns reference to the node's blockchain.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
     }
 
+    /// Returns reference to the transaction sender.
     pub fn node_channel(&self) -> &TxSender<NodeChannel> {
         &self.node_channel
     }
     
+    /// Returns the public key of current node.
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
     }
 
+    /// Returns the secret key of current node.
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }
 
+    /// Returns `Mount` object that aggregates public api handlers.
     pub fn mount_public_api(&self) -> Mount {
         self.blockchain.mount_public_api(self)
     }
 
+    /// Returns `Mount` object that aggregates private api handlers.
     pub fn mount_private_api(&self) -> Mount {
         self.blockchain.mount_private_api(self)
     }
