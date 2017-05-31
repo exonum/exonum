@@ -44,11 +44,11 @@ pub mod wallet;
 /// Id for our cryptocurrency messages.
 pub const CRYPTOCURRENCY: u16 = 128;
 
-/// TxTransfer Id.
+/// `TxTransfer` Id.
 pub const TX_TRANSFER_ID: u16 = 128;
-/// TxIssue Id.
+/// `TxIssue` Id.
 pub const TX_ISSUE_ID: u16 = 129;
-/// TxCreateWallet Id.
+/// `TxCreateWallet` Id.
 pub const TX_WALLET_ID: u16 = 130;
 
 message! {
