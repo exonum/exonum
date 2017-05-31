@@ -44,6 +44,7 @@ pub struct BlockBuilder<'a> {
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
     state_hash: Option<Hash>,
+    txs_length: Option<u64>,
 
     sandbox: &'a TimestampingSandbox,
 }
@@ -57,6 +58,7 @@ impl<'a> BlockBuilder<'a> {
             prev_hash: None,
             tx_hash: None,
             state_hash: None,
+            txs_length: None,
 
             sandbox: sandbox,
         }
@@ -91,6 +93,7 @@ impl<'a> BlockBuilder<'a> {
         // it's _hash(self.as_ref())_ as of now instead of _*self_ as it used to be
         let merkle_root = hash(individual_transaction_hash.as_ref());
         self.tx_hash = Some(merkle_root);
+        self.txs_length = Some(1);
         self
     }
 
@@ -98,6 +101,7 @@ impl<'a> BlockBuilder<'a> {
         // root of merkle table, containing this array of transactions
         let merkle_root = compute_txs_root_hash(tx_hashes);
         self.tx_hash = Some(merkle_root);
+        self.txs_length = Some(tx_hashes.len() as u64);
         self
     }
 
@@ -109,6 +113,7 @@ impl<'a> BlockBuilder<'a> {
     pub fn build(&self) -> Block {
         Block::new(self.height.unwrap_or_else(|| self.sandbox.current_height()),
                    self.round.unwrap_or_else(|| self.sandbox.current_round()),
+                   self.txs_length.unwrap_or(0),
                    &self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
                    //   &[tx.hash(), tx2.hash()],
                    //   &[tx.hash()],

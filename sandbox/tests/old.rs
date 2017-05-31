@@ -49,6 +49,7 @@ fn test_get_lock_and_send_precommit() {
 
     let block = Block::new(1,
                            1,
+                           0,
                            &sandbox.last_hash(),
                            &Hash::zero(),
                            &sandbox.last_state_hash());
@@ -76,6 +77,7 @@ fn test_commit() {
 
     let block = Block::new(1,
                            1,
+                           0,
                            &sandbox.last_hash(),
                            &Hash::zero(),
                            &sandbox.last_state_hash());

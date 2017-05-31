@@ -273,12 +273,13 @@ fn test_status() {
 fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
     let ts = SystemTime::now();
-
+    let txs = [2];
+    let txs_length = txs.len() as u64;
     let content = blockchain::Block::new(500,
                                          1,
-                                         1,
+                                         txs_length,
                                          &hash(&[1]),
-                                         &hash(&[2]),
+                                         &hash(&txs),
                                          &hash(&[3]));
 
     let precommits = vec![Precommit::new(123,
