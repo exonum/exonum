@@ -424,11 +424,9 @@ mod tests {
     }
 
     fn request_get<A: AsRef<str>>(route: A, router: &Router) -> IronResult<Response> {
-        info!("GET request:'{}'",
-        format!("http://127.0.0.1:8000/{}", route.as_ref()));
-        iron_test::request::get(&format!("http://127.0.0.1:8000/{}", route.as_ref()),
-                                Headers::new(),
-                                router)
+        let url = format!("http://127.0.0.1:8000/{}", route.as_ref());
+        info!("GET request:'{}'", url);
+        iron_test::request::get(&url, Headers::new(), router)
     }
 
     fn request_post_str<B: AsRef<str>, A: AsRef<str>>(route: A,
@@ -438,13 +436,9 @@ mod tests {
         let body_str = body.as_ref();
         let mut headers = Headers::new();
         headers.set(ContentType::json());
-        info!("POST request:'{}' with body '{}'",
-        format!("http://127.0.0.1:8000/{}", route.as_ref()),
-        body_str);
-        iron_test::request::post(&format!("http://127.0.0.1:8000/{}", route.as_ref()),
-                                 headers,
-                                 body_str,
-                                 router)
+        let url = format!("http://127.0.0.1:8000/{}", route.as_ref());
+        info!("POST request:'{}' with body '{}'", url, body_str);
+        iron_test::request::post(&url, headers, body_str, router)
     }
 
     fn request_post_body<T: Serialize, A: AsRef<str>>(route: A,
@@ -490,7 +484,7 @@ mod tests {
             let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
             let sandbox = sandbox_with_services(services);
             info!("Sandbox validators list: {}",
-            serde_json::to_string(&sandbox.validators()).unwrap());
+                  serde_json::to_string(&sandbox.validators()).unwrap());
             let state = SandboxState::new();
             CurrencySandbox {
                 sandbox: sandbox,
@@ -515,12 +509,10 @@ mod tests {
             let mut collected_transactions = self.transactions.lock().unwrap();
             let txs = collected_transactions.drain(..).collect::<Vec<_>>();
             debug!("Sandbox commits a sequence of {} transactions", txs.len());
-            txs.iter()
-                .inspect(|elem| {
-                    trace!("Message hash: {:?}", (*elem).hash());
-                    trace!("{:?}", CurrencyTx::from_raw((*elem).clone()));
-                })
-                .collect::<Vec<_>>();
+            for elem in &txs {
+                trace!("Message hash: {:?}", (*elem).hash());
+                trace!("{:?}", CurrencyTx::from_raw((*elem).clone()));
+            }
             add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());
         }
 
