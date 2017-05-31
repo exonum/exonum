@@ -24,9 +24,9 @@ tempdir = "0.3.5"
 params = "0.6.0"
 
 [dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/gisochre/exonum-core.git"
 version = "0.1.0"
-rev = "3a4c74df9f9fe0787b60612018190fa0f0a6f7ad"
+rev = "1d4a4657061a63f6e1e5b8fca3c456cdaf86c41b"
 
 # [dependencies.configuration_service]
 # git = "ssh://git@github.com/exonum/exonum-configuration.git"

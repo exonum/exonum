@@ -145,7 +145,7 @@ impl<T> Api for CryptocurrencyApi<T>
                     let info = self_.wallet_info(&public_key)?;
                     self_.ok_response(&to_value(&info).unwrap())
                 }
-                _ => Err(ApiError::IncorrectRequest)?,
+                _ => Err(ApiError::IncorrectRequest("Required parameter of wallet 'pubkey' is missing".into()))?,
             }
         };
 
@@ -157,10 +157,9 @@ impl<T> Api for CryptocurrencyApi<T>
                     let json = TxResponse { tx_hash: tx_hash };
                     self_.ok_response(&to_value(&json).unwrap())
                 }
-                Ok(None) => Err(ApiError::IncorrectRequest)?,
+                Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
                 Err(e) => {
-                    error!("Incorrect CurrencyTx request body received {}", e);
-                    Err(ApiError::IncorrectRequest)?
+                    Err(ApiError::IncorrectRequest(Box::new(e)))?
                 }
             }
         };
