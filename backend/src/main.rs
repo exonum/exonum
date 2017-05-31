@@ -98,9 +98,7 @@ fn main() {
                 .unwrap()
                 .parse()
                 .unwrap();
-
             let fee: u64 = matches.value_of("ANCHORING_FEE").unwrap().parse().unwrap();
-
             let network = match matches.value_of("ANCHORING_NETWORK").unwrap() {
                 "testnet" => Network::Testnet,
                 "bitcoin" => Network::Bitcoin,
