@@ -254,12 +254,6 @@ impl AddValidatorCommand {
                      .value_name("LISTEN_ADDR")
                      .required(true)
                      .takes_value(true))
-            .arg(Arg::with_name("PORT")
-                     .short("p")
-                     .long("port")
-                     .value_name("PORT")
-                     .required(false)
-                     .takes_value(true))
 
     }
 
@@ -271,13 +265,6 @@ impl AddValidatorCommand {
     /// path to template config
     pub fn template<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
         Path::new(matches.value_of("TEMPLATE").unwrap())
-    }
-
-    // exonum listen port
-    pub fn port(matches: &ArgMatches) -> Option<u16> {
-        matches
-            .value_of("PORT")
-            .and_then(|port| port.parse().ok())
     }
 
     // exonum listen addr
@@ -293,18 +280,21 @@ impl AddValidatorCommand {
     {
         let template_path = Self::template(matches);
         let public_key_path = Self::public_key(matches);
+        let addr = Self::addr(matches);
+        let mut addr_parts = addr.split(':');
 
         let mut template: ConfigTemplate = ConfigFile::load(template_path).unwrap();
         let public_key: PubKeyConfig = ConfigFile::load(public_key_path).unwrap();
         let public_key = public_key.into();
         let addr = format!("{}:{}",
-                           Self::addr(matches),
-                           Self::port(matches).unwrap_or(DEFAULT_EXONUM_LISTEN_PORT))
+                           addr_parts.next().expect("expected ip addr"),
+                           addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, 
+                                                    |s| s.parse().expect("could not parse port")))
                 .parse()
                 .unwrap();
         if !template.validators.contains_key(&public_key) {
             if template.validators.len() >= template.count {
-                panic!("This template alredy full.");
+                panic!("This template already full.");
             }
             let func = on_add
                 .into()
@@ -317,7 +307,7 @@ impl AddValidatorCommand {
             };
             template.validators.insert(public_key, ident);
         } else {
-            panic!("This node alredy in template");
+            panic!("This node already in template");
         }
 
         ConfigFile::save(&template, template_path).unwrap();
