@@ -7,7 +7,7 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use crypto::{Hash, PublicKey, Signature};
 use super::{Error, SegmentReference, CheckedOffset, Offset};
 
-/// implement field for all types, that has writer, and reader functions
+/// implement field for all types that has writer and reader functions
 ///
 /// - reader signature is `fn (&[u8]) -> T`
 /// - writer signature is `fn (&mut [u8], T)`
@@ -58,7 +58,7 @@ macro_rules! implement_pod_as_ref_field {
     )
 }
 
-/// Trait for all types that should be possible to serrialize as
+/// Trait for all types that should be possible to serialize as
 pub trait Field<'a> {
     // TODO: use Read and Cursor
     // TODO: debug_assert_eq!(to-from == size of Self)
@@ -116,7 +116,7 @@ impl<'a> Field<'a> for bool {
 
 impl<'a> Field<'a> for u8 {
     fn field_size() -> Offset {
-        mem::size_of::<u8>() as Offset
+        mem::size_of::<Self>() as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> u8 {
@@ -130,7 +130,7 @@ impl<'a> Field<'a> for u8 {
 
 impl<'a> Field<'a> for i8 {
     fn field_size() -> Offset {
-        mem::size_of::<i8>() as Offset
+        mem::size_of::<Self>() as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> i8 {
@@ -153,7 +153,7 @@ implement_pod_as_ref_field! {Signature}
 implement_pod_as_ref_field! {PublicKey}
 implement_pod_as_ref_field! {Hash}
 
-//\TODO add some checks
+//\TODO should we check `SystemTime` validity in check?
 impl<'a> Field<'a> for SystemTime {
     fn field_size() -> Offset {
         (mem::size_of::<u64>() + mem::size_of::<u32>()) as Offset
@@ -177,7 +177,8 @@ impl<'a> Field<'a> for SystemTime {
     }
 }
 
-//\TODO add some checks
+//\TODO add socketaddr check, for now with only ipv4 
+// all possible (>6 bytes long) sequences is a valid addr.
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
         // reserve space for future compatibility

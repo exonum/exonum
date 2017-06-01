@@ -196,7 +196,6 @@ impl<'a, T> SegmentField<'a> for Vec<T>
                 .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
             start = (start + Self::item_size())?;
         }
-        println!("check_data = {:?} {:?}", from, last_data);
         Ok(Some(SegmentReference::new(from, last_data)))
     }
 }

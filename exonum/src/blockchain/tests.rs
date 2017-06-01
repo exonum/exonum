@@ -11,7 +11,6 @@ fn test_u64() {
     let test_data = r##"{"some_test":"1234"}"##;
     let test = Test::new(1234);
     let data = ::serde_json::to_string(&test).unwrap();
-    println!("{:?}", data);
     assert_eq!(data, test_data);
 }
 
