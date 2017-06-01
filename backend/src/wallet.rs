@@ -128,6 +128,16 @@ mod tests {
         assert_eq!(b.history_len(), 15);
     }
 
+    #[test]
+    fn test_same_wallet_transfer() {
+        let hash = Hash::new([5; 32]);
+        let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
+        let mut a1 = Wallet::new(&pub_key, "a", 100, 12, &hash);
+        let mut a2 = Wallet::new(&pub_key, "a", 100, 12, &hash);
+        assert_eq!(a1.transfer_to(&mut a2, 50), false);
+        assert_eq!(a2.transfer_to(&mut a1, 50), false);
+    }
+
     #[derive(Serialize)]
     struct WalletTestData {
         wallet: Wallet,
