@@ -69,15 +69,14 @@ pub fn wrap<T: ExonumJsonSerialize>(val: &T) -> ExonumJsonSerializeWrapper<T> {
 }
 
 /// Wrapping struct that allows implementing custom serializing aspects in json.
+#[derive(Debug)]
 pub struct ExonumJsonSerializeWrapper<'a, T: ExonumJsonSerialize + 'a>(&'a T);
 
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct DurationHelper {
     secs: String,
     nanos: u32,
 }
-
 
 impl<'a, T: ExonumJsonSerialize + 'a> Serialize for ExonumJsonSerializeWrapper<'a, T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

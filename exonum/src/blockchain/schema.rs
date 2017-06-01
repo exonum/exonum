@@ -40,6 +40,7 @@ storage_value! (
     }
 );
 
+#[derive(Debug)]
 pub struct Schema<'a> {
     view: &'a View,
 }

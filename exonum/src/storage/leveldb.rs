@@ -12,6 +12,7 @@ use leveldb::iterator::LevelDBIterator;
 use std::fs;
 use std::io;
 use std::mem;
+use std::fmt;
 use std::path::Path;
 use std::error;
 use std::sync::Arc;
@@ -210,6 +211,18 @@ impl Database for LevelDB {
         let write_opts = WriteOptions::new();
         let result = self.db.write(write_opts, &batch);
         result.map_err(Into::into)
+    }
+}
+
+impl fmt::Debug for LevelDB {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("LevelDB { .. }")
+    }
+}
+
+impl fmt::Debug for LevelDBView {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("LevelDBView { .. }")
     }
 }
 
