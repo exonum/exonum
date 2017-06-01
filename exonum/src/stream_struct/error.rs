@@ -82,7 +82,7 @@ pub enum Error {
     },
     /// Overflow in Offsets
     OffsetOverflow,
-    /// Other error for custon fields
+    /// Other error for custom fields
     Other(Box<StdError>),
 }
 

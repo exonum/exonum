@@ -72,8 +72,7 @@ macro_rules! storage_value {
                                                                         from_st_val.unchecked_offset(),
                                                                         to_st_val.unchecked_offset())};
                 let mut last_data = ($body as $crate::stream_struct::Offset).into();
-                $( 
-                    println!("check_field {} = {:?} {:?}", stringify!($field_name), $from, $to);
+                $(
                     <$field_type as $crate::stream_struct::Field>::check(&vec,
                                                                         $from.into(),
                                                                         $to.into())?
@@ -147,7 +146,7 @@ macro_rules! storage_value {
                 {
                     use ::serde::ser::SerializeStruct;
                     let mut structure = serializer.serialize_struct(stringify!($name),
-                                                    counter!($($field_name)*))?;
+                                                    indents_count!($($field_name)*))?;
                     $(
                         structure.serialize_field(stringify!($field_name),
                             &$crate::stream_struct::serialize::json::wrap(&self.$field_name()))?;

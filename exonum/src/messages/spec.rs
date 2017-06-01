@@ -1,6 +1,6 @@
 /// `message!` implement structure that could be sent in exonum network.
 ///
-/// Each message is a piece of data, that signed by creators key.
+/// Each message is a piece of data that is signed by creators key.
 /// For now it's required to set service id as `const TYPE`, message id as `const ID`, and 
 /// message fixed part size as `const SIZE`.
 ///
@@ -140,9 +140,7 @@ macro_rules! message {
             fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::stream_struct::Result {
                 let mut last_data = (($body + $crate::messages::HEADER_SIZE)
                                         as $crate::stream_struct::Offset).into();
-                $(  
-                    println!("check_field {} = {:?} {:?}", stringify!($field_name), $from, $to);
-                    
+                $(
                     let field_from: $crate::stream_struct::Offset = $from;
                     let field_to: $crate::stream_struct::Offset = $to;
                     raw_message.check::<$field_type>(field_from.into(),field_to.into())?
@@ -181,7 +179,7 @@ macro_rules! message {
                             where S: $crate::stream_struct::serialize::reexport::Serializer
                         {
                             let mut structure = serializer.serialize_struct(stringify!($name),
-                                                            counter!($($field_name)*) )?;
+                                                            indents_count!($($field_name)*) )?;
                             $(structure.serialize_field(stringify!($field_name),
                                             &json::wrap(&self._self.$field_name()))?;)*
 
@@ -189,7 +187,7 @@ macro_rules! message {
                         }
                     }
 
-                    let mut structure = serializer.serialize_struct(stringify!($name), 4 )?;
+                    let mut structure = serializer.serialize_struct(stringify!($name), 6 )?;
                     structure.serialize_field("body", &Body{_self: &self})?;
                     structure.serialize_field("signature", &json::wrap(self.raw.signature()))?;
                     structure.serialize_field("message_id", &json::wrap(&self.raw.message_type()))?;

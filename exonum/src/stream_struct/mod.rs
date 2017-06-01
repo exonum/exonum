@@ -84,7 +84,7 @@
 //! ### Custom fields
 //!
 //! This types could be implemented as creator want,
-//! but they should to declare how many bytes they
+//! but they should declare how many bytes they
 //! will write on header [in function `field_size()`](./trait.Field.html#tymethod.field_size)
 //!
 
@@ -131,7 +131,6 @@ impl SegmentReference {
     pub fn check_segment(&mut self,
                          last_data: &mut CheckedOffset)
                          -> ::std::result::Result<(), Error> {
-        println!("check_segment {:?}, {:?}", last_data, self);
         if self.from < *last_data {
             Err(Error::OverlappingSegment {
                     last_end: (*last_data).unchecked_offset(),
