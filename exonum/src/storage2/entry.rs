@@ -34,7 +34,7 @@ impl<T, V> Entry<T, V> where T: AsRef<Snapshot>,
 }
 
 impl<'a, V> Entry<&'a mut Fork, V> where V: StorageValue {
-    pub fn put(&mut self, value: V) {
+    pub fn set(&mut self, value: V) {
         self.base.put(&(), value)
     }
 
