@@ -218,7 +218,7 @@ mod tests {
     use router::Router;
     use serde_json;
 
-    use blockchain::Block;
+    use blockchain::{Block, SCHEMA_MAJOR_VERSION};
     use crypto::Hash;
 
     use super::*;
@@ -226,7 +226,10 @@ mod tests {
     #[test]
     fn test_json_response_for_complex_val() {
         let str_val = "sghdkgskgskldghshgsd";
-        let complex_val = Block::new(24,
+        let complex_val = Block::new(SCHEMA_MAJOR_VERSION,
+                                     0,
+                                     0,
+                                     24,
                                      &Hash::new([24; 32]),
                                      &Hash::new([34; 32]),
                                      &Hash::new([38; 32]));

@@ -286,7 +286,7 @@ fn test_queue_propose_message_from_next_height() {
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
     let block_at_first_height = BlockBuilder::new(&sandbox)
-        .with_round(ROUND_THREE)
+        .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
         .build();
 
@@ -923,8 +923,6 @@ fn lock_to_past_round_broadcast_prevote() {
 
     let propose = ProposeBuilder::new(&sandbox).build();
 
-    let block = BlockBuilder::new(&sandbox).build();
-
     sandbox.recv(propose.clone());
     sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
 
@@ -946,6 +944,8 @@ fn lock_to_past_round_broadcast_prevote() {
                               LOCK_ZERO,
                               sandbox.s(VALIDATOR_2 as usize)));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
+
+    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.broadcast(Precommit::new(VALIDATOR_0,
                                      HEIGHT_ONE,
@@ -1089,17 +1089,17 @@ fn lock_to_propose_and_send_prevote() {
         .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
         .with_tx_hashes(&[tx.hash()])
         .build();
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
-        .with_tx_hash(&tx.hash())
-        .build();
 
     sandbox.recv(propose.clone());
 
     // inc round
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
 
-
+    // block, expected in this round
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
+        .with_tx_hash(&tx.hash())
+        .build();
 
     sandbox.recv(Prevote::new(VALIDATOR_1,
                               HEIGHT_ONE,
@@ -1869,9 +1869,9 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
-        .with_round(ROUND_THREE)
         .with_duration_since_sandbox_time(2 * sandbox.round_timeout() + sandbox.propose_timeout() +
                                           1)
+        .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
         .build();
 
@@ -1888,8 +1888,8 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
 
     // this block will be created during second commit while manually creating precommits
     let second_block = BlockBuilder::new(&sandbox)
+        .with_proposer_id(VALIDATOR_3)
         .with_height(HEIGHT_TWO)
-        .with_round(ROUND_ONE)
         .with_duration_since_sandbox_time(2 * sandbox.propose_timeout() +
                                           2 * sandbox.round_timeout() +
                                           1)
