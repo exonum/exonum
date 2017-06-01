@@ -17,7 +17,8 @@ pub enum Change {
 
 pub struct Fork {
     snapshot: Box<Snapshot>,
-    changes: Patch
+    changes: Patch,
+    changelog: Vec<(Vec<u8>, Option<Change>)>
 }
 
 pub struct ForkIter<'a> {
@@ -39,6 +40,7 @@ pub trait Database: Sized + Clone + Send + Sync + 'static {
         Fork {
             snapshot: self.snapshot(),
             changes: Patch::new(),
+            changelog: Vec::new()
         }
     }
     fn merge(&mut self, patch: Patch) -> Result<()>;
@@ -84,12 +86,27 @@ impl Snapshot for Fork {
 }
 
 impl Fork {
+    pub fn checkpoint(&mut self) {
+        self.changelog.clear()
+    }
+
+    pub fn rollback(&mut self) {
+        for (k, c) in self.changelog.drain(..).rev() {
+            match c {
+                Some(change) => self.changes.insert(k, change),
+                None => self.changes.remove(&k)
+            };
+        }
+    }
+
     pub fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
-        self.changes.insert(key, Change::Put(value));
+        self.changelog.push((key.clone(),
+                             self.changes.insert(key, Change::Put(value))))
     }
 
     pub fn delete(&mut self, key: Vec<u8>) {
-        self.changes.insert(key, Change::Delete);
+        self.changelog.push((key.clone(),
+                             self.changes.insert(key, Change::Delete)));
     }
 
     pub fn delete_by_prefix(&mut self, prefix: &[u8]) {
