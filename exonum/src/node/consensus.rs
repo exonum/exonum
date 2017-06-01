@@ -609,8 +609,11 @@ impl<S> NodeHandler<S>
                         height: Height,
                         tx_hashes: &[Hash])
                         -> (Hash, Patch) {
+        // TODO Get network id from config
+        let network_id = 0;
+        let proposer_id = self.state.leader(self.state.round());
         self.blockchain
-            .create_patch(height, tx_hashes, self.state.transactions())
+            .create_patch(network_id, proposer_id, height, tx_hashes, self.state.transactions())
             .unwrap()
     }
 
@@ -624,6 +627,7 @@ impl<S> NodeHandler<S>
             .clone();
 
         let tx_hashes = propose.transactions().to_vec();
+
         let (block_hash, patch) = self.create_block(propose.height(),
                                                     tx_hashes.as_slice());
         // Save patch

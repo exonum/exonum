@@ -4,7 +4,7 @@ extern crate sandbox;
 use std::time::Duration;
 
 use exonum::messages::{Message, Propose, Prevote, Precommit};
-use exonum::blockchain::Block;
+use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::Hash;
 
 use sandbox::timestamping_sandbox;
@@ -47,7 +47,10 @@ fn test_get_lock_and_send_precommit() {
 
     let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
 
-    let block = Block::new(1,
+    let block = Block::new(SCHEMA_MAJOR_VERSION,
+                           0,
+                           2,
+                           1,
                            &sandbox.last_hash(),
                            &Hash::zero(),
                            &sandbox.last_state_hash());
@@ -73,7 +76,10 @@ fn test_commit() {
 
     let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
 
-    let block = Block::new(1,
+    let block = Block::new(SCHEMA_MAJOR_VERSION,
+                           0,
+                           2,
+                           1,
                            &sandbox.last_hash(),
                            &Hash::zero(),
                            &sandbox.last_state_hash());
