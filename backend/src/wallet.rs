@@ -23,7 +23,7 @@ impl Wallet {
     }
 
     /// Sets history hash.
-    pub fn set_history_hash(&mut self, hash: &Hash) {
+    pub fn grow_length_set_history_hash(&mut self, hash: &Hash) {
         Field::write(&hash, &mut self.raw, 56, 88);
         Field::write(&(self.history_len() + 1), &mut self.raw, 48, 56);
     }
@@ -115,8 +115,8 @@ mod tests {
         let mut a = Wallet::new(&pub_key, "a", 100, 12, &hash);
         let mut b = Wallet::new(&pub_key, "b", 0, 14, &hash);
         a.transfer_to(&mut b, 50);
-        a.set_history_hash(&hash);
-        b.set_history_hash(&hash);
+        a.grow_length_set_history_hash(&hash);
+        b.grow_length_set_history_hash(&hash);
         assert_eq!(a.balance(), 50);
         assert_eq!(a.history_len(), 13);
         assert_eq!(b.balance(), 50);

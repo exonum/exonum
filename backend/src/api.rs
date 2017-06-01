@@ -22,14 +22,14 @@ use super::{CRYPTOCURRENCY, CurrencySchema, CurrencyTx};
 
 /// TODO: Add documentation.
 #[derive(Debug, Serialize)]
-pub struct HashMPTproofLinker<V: Serialize> {
+pub struct MPTProofTemplate<V: Serialize> {
     mpt_proof: RootProofNode<Hash>,
     value: V,
 }
 
 /// TODO: Add documentation.
 #[derive(Debug, Serialize)]
-pub struct HashMTproofLinker<V: Serialize> {
+pub struct MTProofTemplate<V: Serialize> {
     mt_proof: Proofnode<TxMetaRecord>,
     values: Vec<V>,
 }
@@ -38,8 +38,8 @@ pub struct HashMTproofLinker<V: Serialize> {
 #[derive(Debug, Serialize)]
 pub struct WalletInfo {
     block_info: BlockProof,
-    wallet: HashMPTproofLinker<RootProofNode<Wallet>>,
-    wallet_history: Option<HashMTproofLinker<CurrencyTx>>,
+    wallet: MPTProofTemplate<RootProofNode<Wallet>>,
+    wallet_history: Option<MTProofTemplate<CurrencyTx>>,
 }
 
 /// TODO: Add documentation.
@@ -63,8 +63,8 @@ impl<T> CryptocurrencyApi<T>
         let block_proof = general_schema.block_and_precommits(max_height)?.unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
-        let wallet_path: HashMPTproofLinker<RootProofNode<Wallet>>;
-        let wallet_history: Option<HashMTproofLinker<CurrencyTx>>;
+        let wallet_path: MPTProofTemplate<RootProofNode<Wallet>>;
+        let wallet_history: Option<MTProofTemplate<CurrencyTx>>;
 
         let to_wallets_table: RootProofNode<Hash> =
             general_schema
@@ -79,7 +79,7 @@ impl<T> CryptocurrencyApi<T>
 
         let to_specific_wallet: RootProofNode<Wallet> =
             currency_schema.wallets().construct_path_to_key(pub_key)?;
-        wallet_path = HashMPTproofLinker {
+        wallet_path = MPTProofTemplate {
             mpt_proof: to_wallets_table,
             value: to_specific_wallet,
         };
@@ -99,7 +99,7 @@ impl<T> CryptocurrencyApi<T>
                 }
                 let to_transaction_hashes: Proofnode<TxMetaRecord> =
                     history.construct_path_for_range(0, history_len)?;
-                let path_to_transactions = HashMTproofLinker {
+                let path_to_transactions = MTProofTemplate {
                     mt_proof: to_transaction_hashes,
                     values: txs,
                 };
