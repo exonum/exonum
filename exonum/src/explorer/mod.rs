@@ -7,8 +7,9 @@ use storage::Proofnode;
 use crypto::Hash;
 use blockchain::{Schema, Blockchain, Block, TxLocation};
 use messages::Precommit;
+use api::ApiError;
 
-pub use self::explorer_api::{ExplorerApi};
+pub use self::explorer_api::ExplorerApi;
 
 mod explorer_api;
 
@@ -35,7 +36,7 @@ impl<'a> BlockchainExplorer<'a> {
         BlockchainExplorer { blockchain: blockchain }
     }
 
-    pub fn tx_info(&self, tx_hash: &Hash) -> StorageResult<Option<TxInfo>> {
+    pub fn tx_info(&self, tx_hash: &Hash) -> Result<Option<TxInfo>, ApiError> {
         let b = self.blockchain.clone();
         let view = b.view();
         let schema = Schema::new(&view);
@@ -43,10 +44,13 @@ impl<'a> BlockchainExplorer<'a> {
         let res = match tx {
             None => None,
             Some(raw_tx) => {
-                //Explicit panic here if no matching service found
-                //TODO:Replace with service_not_found error
-                let box_transaction = self.blockchain.tx_from_raw(raw_tx).
-                    expect("Service not found");
+                let box_transaction = self.blockchain
+                    .tx_from_raw(raw_tx.clone())
+                    .ok_or_else(|| {
+                                    ApiError::Service(format!("Service not found for tx: {:?}",
+                                                              raw_tx)
+                                                              .into())
+                                })?;
                 let content = box_transaction.info();
 
                 let location = schema
@@ -56,8 +60,9 @@ impl<'a> BlockchainExplorer<'a> {
 
                 let block_height = location.block_height();
                 let tx_index = location.position_in_block();
-                let proof = schema.block_txs(block_height).
-                    construct_path_for_range(tx_index, tx_index+1)?;
+                let proof = schema
+                    .block_txs(block_height)
+                    .construct_path_for_range(tx_index, tx_index + 1)?;
                 let tx_info = TxInfo {
                     content: content,
                     location: location,
@@ -91,7 +96,11 @@ impl<'a> BlockchainExplorer<'a> {
         Ok(res)
     }
 
-    pub fn blocks_range(&self, count: u64, upper: Option<u64>, skip_empty_blocks: bool) -> StorageResult<Vec<Block>> {
+    pub fn blocks_range(&self,
+                        count: u64,
+                        upper: Option<u64>,
+                        skip_empty_blocks: bool)
+                        -> StorageResult<Vec<Block>> {
         let b = self.blockchain.clone();
         let view = b.view();
         let schema = Schema::new(&view);
@@ -106,12 +115,14 @@ impl<'a> BlockchainExplorer<'a> {
         for height in (lower..upper).rev() {
             let block_txs = schema.block_txs(height);
             if skip_empty_blocks && block_txs.is_empty()? {
-               continue;
+                continue;
             }
-            let block_hash = hashes.get(height)?.
-                expect(&format!("Block not found, height:{:?}", height));
-            let block = blocks.get(&block_hash)?.
-                expect(&format!("Block not found, hash:{:?}", block_hash));
+            let block_hash = hashes
+                .get(height)?
+                .expect(&format!("Block not found, height:{:?}", height));
+            let block = blocks
+                .get(&block_hash)?
+                .expect(&format!("Block not found, hash:{:?}", block_hash));
             v.push(block)
         }
         Ok(v)

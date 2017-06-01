@@ -34,19 +34,13 @@ impl ExplorerApi {
 
     fn get_block(&self, height: u64) -> Result<Option<BlockInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
-        match explorer.block_info(height) {
-            Ok(block_info) => Ok(block_info),
-            Err(e) => Err(ApiError::Storage(e)),
-        }
+        Ok(explorer.block_info(height)?)
     }
 
     fn get_transaction(&self, hash_str: &str) -> Result<Option<TxInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         let hash = Hash::from_hex(hash_str)?;
-        match explorer.tx_info(&hash) {
-            Ok(tx_info) => Ok(tx_info),
-            Err(e) => Err(ApiError::Storage(e)),
-        }
+        explorer.tx_info(&hash)
     }
 }
 
