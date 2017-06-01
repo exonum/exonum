@@ -31,6 +31,10 @@ impl Wallet {
     /// Transfers currency from this wallet to `other`. Returns `false` if `self.balance()` is
     /// less then `amount`.
     pub fn transfer_to(&mut self, other: &mut Wallet, amount: u64) -> bool {
+        if self.pub_key() == other.pub_key() {
+            return false;
+        }
+
         if self.balance() < amount {
             return false;
         }
@@ -111,9 +115,10 @@ mod tests {
     #[test]
     fn test_amount_transfer() {
         let hash = Hash::new([5; 32]);
-        let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
-        let mut a = Wallet::new(&pub_key, "a", 100, 12, &hash);
-        let mut b = Wallet::new(&pub_key, "b", 0, 14, &hash);
+        let pub_key_1 = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
+        let pub_key_2 = PublicKey::from_slice([2u8; 32].as_ref()).unwrap();
+        let mut a = Wallet::new(&pub_key_1, "a", 100, 12, &hash);
+        let mut b = Wallet::new(&pub_key_2, "b", 0, 14, &hash);
         a.transfer_to(&mut b, 50);
         a.grow_length_set_history_hash(&hash);
         b.grow_length_set_history_hash(&hash);
