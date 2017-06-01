@@ -2,14 +2,14 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use serde::de::Error;
 use serde_json::{Error as SerdeJsonError, Value, from_value};
 
-use std::fmt;
-
 use crypto::{Hash, hash};
 
 use super::super::{StorageValue, pair_hash};
+use super::key::ProofListKey;
 
 use self::ListProof::*;
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum ListProof<V> {
     Full(Box<ListProof<V>>, Box<ListProof<V>>),
     Left(Box<ListProof<V>>, Option<Hash>),
@@ -17,6 +17,7 @@ pub enum ListProof<V> {
     Leaf(V),
 }
 
+#[derive(Debug)]
 pub enum ListProofError {
     UnexpectedLeaf,
     UnexpectedBranch,
@@ -24,26 +25,26 @@ pub enum ListProofError {
 }
 
 impl<V: StorageValue> ListProof<V> {
-    fn collect<'a>(&'a self, height: u8, index: u64, vec: &mut Vec<(u64, &'a V)>)
+    fn collect<'a>(&'a self, key: ProofListKey, vec: &mut Vec<(u64, &'a V)>)
             -> Result<Hash, ListProofError> {
-        if height == 0 {
+        if key.height() == 0 {
             return Err(ListProofError::UnexpectedBranch)
         }
         let hash = match *self {
             Full(ref left, ref right) =>
-                pair_hash(&left.collect(height - 1, index << 1, vec)?,
-                          &right.collect(height - 1, index << 1 + 1, vec)?),
+                pair_hash(&left.collect(key.left(), vec)?,
+                          &right.collect(key.right(), vec)?),
             Left(ref left, Some(ref right)) =>
-                pair_hash(&left.collect(height - 1, index << 1, vec)?, right),
+                pair_hash(&left.collect(key.left(), vec)?, right),
             Left(ref left, None) =>
-                hash(left.collect(height - 1, index << 1, vec)?.as_ref()),
+                hash(left.collect(key.left(), vec)?.as_ref()),
             Right(ref left, ref right) =>
-                pair_hash(left, &right.collect(height - 1, index << 1 + 1, vec)?),
+                pair_hash(left, &right.collect(key.right(), vec)?),
             Leaf(ref value) => {
-                if height > 1 {
+                if key.height() > 1 {
                     return Err(ListProofError::UnexpectedLeaf)
                 }
-                vec.push((index, value));
+                vec.push((key.index(), value));
                 value.hash()
             }
         };
@@ -54,7 +55,7 @@ impl<V: StorageValue> ListProof<V> {
             -> Result<Vec<(u64, &'a V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
-        if self.collect(height, 0, &mut vec)? != root_hash {
+        if self.collect(ProofListKey::new(height, 0), &mut vec)? != root_hash {
             return Err(ListProofError::UnmatchedRootHash)
         }
         Ok(vec)
@@ -197,22 +198,22 @@ impl<V: Deserialize> Deserialize for ListProof<V> {
     }
 }
 
-impl<V: fmt::Debug> fmt::Debug for ListProof<V> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::*;
-        match *self {
-            Full(ref left, ref right) => write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left, right),
-            Left(ref left_proof, ref right_hash) => {
-                if let Some(ref digest) = *right_hash {
-                    write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_proof, digest)
-                } else {
-                    write!(f, "{{\"left\":{:?}}}", left_proof)
-                }
-            }
-            Right(ref left_hash, ref right) => {
-                write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_hash, right)
-            }
-            Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val),
-        }
-    }
-}
+// impl<V: fmt::Debug> fmt::Debug for ListProof<V> {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         use self::*;
+//         match *self {
+//             Full(ref left, ref right) => write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left, right),
+//             Left(ref left_proof, ref right_hash) => {
+//                 if let Some(ref digest) = *right_hash {
+//                     write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_proof, digest)
+//                 } else {
+//                     write!(f, "{{\"left\":{:?}}}", left_proof)
+//                 }
+//             }
+//             Right(ref left_hash, ref right) => {
+//                 write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_hash, right)
+//             }
+//             Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val),
+//         }
+//     }
+// }

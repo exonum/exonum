@@ -1,42 +1,82 @@
 use super::super::StorageKey;
 
 const HEIGHT_SHIFT : u64 = 58;
-// TODO: add checks for overflow
 const MAX_LENGTH : u64 = 288230376151711743; // 2 ** 58 - 1
 
-struct ListIndexKey {
+#[derive(Debug, Copy, Clone)]
+pub struct ProofListKey {
     index: u64,
     height: u8
 }
 
-impl ListIndexKey {
-    fn new(height: u8, index: u64) -> Self {
-        debug_assert!(height <= 58 && index <= (1 << height));
+impl ProofListKey {
+    pub fn new(height: u8, index: u64) -> Self {
+        debug_assert!(height <= 58 && index <= MAX_LENGTH);
         Self { height: height, index: index }
     }
 
-    fn as_db_key(&self) -> u64 {
+    pub fn height(&self) -> u8 {
+        self.height
+    }
+
+    pub fn index(&self) -> u64 {
+        self.index
+    }
+
+    pub fn leaf(index: u64) -> Self {
+        Self::new(0, index)
+    }
+
+    pub fn as_db_key(&self) -> u64 {
         ((self.height as u64) << HEIGHT_SHIFT) + self.index
     }
 
-    fn from_db_key(key: u64) -> Self {
+    pub fn from_db_key(key: u64) -> Self {
         Self::new((key >> HEIGHT_SHIFT) as u8, key & MAX_LENGTH)
     }
 
-    fn parent(&self) -> Self {
+    pub fn parent(&self) -> Self {
         Self::new(self.height + 1, self.index >> 1)
     }
 
-    fn left(&self) -> Self {
+    pub fn left(&self) -> Self {
         Self::new(self.height - 1, self.index << 1)
     }
 
-    fn right(&self) -> Self {
-        Self::new(self.height - 1, self.index << 1 + 1)
+    pub fn right(&self) -> Self {
+        Self::new(self.height - 1, (self.index << 1) + 1)
+    }
+
+    pub fn first_left_leaf_index(&self) -> u64 {
+        if self.height < 2 {
+            self.index
+        } else {
+            self.index << (self.height - 1)
+        }
+    }
+
+    pub fn first_right_leaf_index(&self) -> u64 {
+        if self.height < 2 {
+            self.index
+        } else {
+            ((self.index << 1) + 1) << (self.height - 2)
+        }
+    }
+
+    pub fn is_left(&self) -> bool {
+        self.index & 1 == 0
+    }
+
+    pub fn as_left(&self) -> Self {
+        Self::new(self.height, self.index & !1)
+    }
+
+    pub fn as_right(&self) -> Self {
+        Self::new(self.height, self.index | 1)
     }
 }
 
-impl StorageKey for ListIndexKey {
+impl StorageKey for ProofListKey {
     fn size() -> usize {
         <u64 as StorageKey>::size()
     }
