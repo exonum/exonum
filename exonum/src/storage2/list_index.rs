@@ -124,41 +124,42 @@ impl<'a, V> Iterator for ListIndexIter<'a, V> where V: StorageValue {
 
 #[cfg(test)]
 mod tests {
-    use ::storage::{MemoryDB, Database, List, ListTable};
+    use super::ListIndex;
+    use super::super::{MemoryDB, Database};
 
     #[test]
-    fn test_list_table_methods() {
-        let fork = MemoryDB::new().fork();
-        let list_table = ListTable::new(vec![255], &mut fork);
+    fn test_list_index_methods() {
+        let mut fork = MemoryDB::new().fork();
+        let mut list_index = ListIndex::new(vec![255], &mut fork);
 
-        assert!(list_table.is_empty().unwrap());
-        assert_eq!(0, list_table.len().unwrap());
-        assert!(list_table.last().unwrap().is_none());
+        assert!(list_index.is_empty());
+        assert_eq!(0, list_index.len());
+        assert!(list_index.last().is_none());
 
-        let extended_by = vec![45u64, 3422u64, 234u64];
-        list_table.extend(extended_by.into_iter()).unwrap();
-        assert!(!list_table.is_empty().unwrap());
-        assert_eq!(Some(45u64), list_table.get(0u64).unwrap());
-        assert_eq!(Some(3422u64), list_table.get(1).unwrap());
-        assert_eq!(Some(234u64), list_table.get(2).unwrap());
-        assert_eq!(3, list_table.len().unwrap());
+        let extended_by = vec![45, 3422, 234];
+        list_index.extend(extended_by.into_iter());
+        assert!(!list_index.is_empty());
+        assert_eq!(Some(45), list_index.get(0));
+        assert_eq!(Some(3422), list_index.get(1));
+        assert_eq!(Some(234), list_index.get(2));
+        assert_eq!(3, list_index.len());
 
-        list_table.set(2, 777u64).unwrap();
-        assert_eq!(Some(777u64), list_table.get(2).unwrap());
-        assert_eq!(Some(777u64), list_table.last().unwrap());
-        assert_eq!(3, list_table.len().unwrap());
+        list_index.set(2, 777);
+        assert_eq!(Some(777), list_index.get(2));
+        assert_eq!(Some(777), list_index.last());
+        assert_eq!(3, list_index.len());
 
-        let mut extended_by_again = vec![666u64, 999u64];
+        let mut extended_by_again = vec![666, 999];
         for el in &extended_by_again {
-            list_table.append(*el).unwrap();
+            list_index.push(*el);
         }
-        assert_eq!(Some(666u64), list_table.get(3).unwrap());
-        assert_eq!(Some(999u64), list_table.get(4).unwrap());
-        assert_eq!(5, list_table.len().unwrap());
-        extended_by_again[1] = 1001u64;
-        list_table.extend(extended_by_again).unwrap();
-        assert_eq!(7, list_table.len().unwrap());
-        assert_eq!(Some(1001u64), list_table.last().unwrap());
+        assert_eq!(Some(666), list_index.get(3));
+        assert_eq!(Some(999), list_index.get(4));
+        assert_eq!(5, list_index.len());
+        extended_by_again[1] = 1001;
+        list_index.extend(extended_by_again);
+        assert_eq!(7, list_index.len());
+        assert_eq!(Some(1001), list_index.last());
     }
 
 }

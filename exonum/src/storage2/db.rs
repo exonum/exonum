@@ -10,7 +10,6 @@ use self::NextIterValue::*;
 pub type Patch = BTreeMap<Vec<u8>, Change>;
 pub type Iter<'a> = Box<Iterator<Item=(&'a [u8], &'a [u8])> + 'a>;
 
-#[derive(Clone)]
 pub enum Change {
     Put(Vec<u8>),
     Delete,
@@ -102,10 +101,6 @@ impl Fork {
         }
     }
 
-    pub fn as_snapshot(&self) -> &Snapshot {
-        &*self.snapshot
-    }
-
     pub fn into_patch(self) -> Patch {
         self.changes
     }
@@ -121,7 +116,7 @@ impl AsRef<Snapshot> for Snapshot {
 
 impl AsRef<Snapshot + 'static> for Fork {
     fn as_ref<'a>(&'a self) -> &'a (Snapshot + 'static) {
-        &*self.snapshot
+        &*self
     }
 }
 
