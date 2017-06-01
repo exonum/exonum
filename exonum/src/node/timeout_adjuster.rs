@@ -38,6 +38,7 @@ pub trait TimeoutAdjuster: Send {
 }
 
 /// `Adjuster` implementation that always returns the same value.
+#[derive(Debug)]
 pub struct Constant {
     timeout: Milliseconds,
 }
@@ -62,6 +63,7 @@ impl TimeoutAdjuster for Constant {
 }
 
 /// Moving average timeout calculation. Initial timeout is equal to `min_timeout`.
+#[derive(Debug)]
 pub struct MovingAverage {
     adjustment_speed: f64,
     optimal_block_load: f64,
