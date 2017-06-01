@@ -207,7 +207,7 @@ impl<'a> CurrencySchema<'a> {
                       -> Result<(), Error> {
         let history = self.wallet_history(key);
         history.append(meta)?;
-        wallet.set_history_hash(&history.root_hash()?);
+        wallet.grow_length_set_history_hash(&history.root_hash()?);
         self.wallets().put(key, wallet)
     }
 }
@@ -266,7 +266,7 @@ impl TxCreateWallet {
         history.append(meta)?;
 
         let wallet = if let Some(mut wallet) = found_wallet {
-            wallet.set_history_hash(&history.root_hash()?);
+            wallet.grow_length_set_history_hash(&history.root_hash()?);
             wallet
         } else {
             Wallet::new(self.pub_key(),

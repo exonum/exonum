@@ -23,7 +23,7 @@ impl Wallet {
     }
 
     /// Sets history hash.
-    pub fn set_history_hash(&mut self, hash: &Hash) {
+    pub fn grow_length_set_history_hash(&mut self, hash: &Hash) {
         Field::write(&hash, &mut self.raw, 56, 88);
         Field::write(&(self.history_len() + 1), &mut self.raw, 48, 56);
     }
@@ -31,6 +31,10 @@ impl Wallet {
     /// Transfers currency from this wallet to `other`. Returns `false` if `self.balance()` is
     /// less then `amount`.
     pub fn transfer_to(&mut self, other: &mut Wallet, amount: u64) -> bool {
+        if self.pub_key() == other.pub_key() {
+            return false;
+        }
+
         if self.balance() < amount {
             return false;
         }
@@ -111,16 +115,27 @@ mod tests {
     #[test]
     fn test_amount_transfer() {
         let hash = Hash::new([5; 32]);
-        let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
-        let mut a = Wallet::new(&pub_key, "a", 100, 12, &hash);
-        let mut b = Wallet::new(&pub_key, "b", 0, 14, &hash);
+        let pub_key_1 = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
+        let pub_key_2 = PublicKey::from_slice([2u8; 32].as_ref()).unwrap();
+        let mut a = Wallet::new(&pub_key_1, "a", 100, 12, &hash);
+        let mut b = Wallet::new(&pub_key_2, "b", 0, 14, &hash);
         a.transfer_to(&mut b, 50);
-        a.set_history_hash(&hash);
-        b.set_history_hash(&hash);
+        a.grow_length_set_history_hash(&hash);
+        b.grow_length_set_history_hash(&hash);
         assert_eq!(a.balance(), 50);
         assert_eq!(a.history_len(), 13);
         assert_eq!(b.balance(), 50);
         assert_eq!(b.history_len(), 15);
+    }
+
+    #[test]
+    fn test_same_wallet_transfer() {
+        let hash = Hash::new([5; 32]);
+        let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
+        let mut a1 = Wallet::new(&pub_key, "a", 100, 12, &hash);
+        let mut a2 = Wallet::new(&pub_key, "a", 100, 12, &hash);
+        assert_eq!(a1.transfer_to(&mut a2, 50), false);
+        assert_eq!(a2.transfer_to(&mut a1, 50), false);
     }
 
     #[derive(Serialize)]
