@@ -3,7 +3,6 @@ use std::error;
 use std::io::Error as IoError;
 use std::collections::BTreeMap;
 
-use serde_json::value::ToJson;
 use iron::prelude::*;
 use iron::IronError;
 use iron::status;
@@ -88,7 +87,7 @@ impl From<Error> for IronError {
         };
         IronError {
             error: Box::new(e),
-            response: Response::with((code, body.to_json().to_string())),
+            response: Response::with((code, json!(body).to_string())),
         }
     }
 }

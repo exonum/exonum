@@ -1,8 +1,6 @@
 mod error;
 
-use serde_json::value::ToJson;
 use router::Router;
-use blockchain_explorer::api::Api;
 use iron::prelude::*;
 use iron::status;
 use iron::mime::{Mime, TopLevel, SubLevel};
@@ -14,6 +12,7 @@ use exonum::crypto::{Hash, HexValue, Signature};
 use exonum::blockchain::Blockchain;
 use exonum::storage::Map;
 use exonum::node::TransactionSend;
+use exonum::api::Api;
 
 use {TimestampTx, TimestampingSchema, Content};
 pub use self::error::Error as ApiError;
@@ -84,7 +83,7 @@ impl<T> Api for PublicApi<T>
 
             let tx = api.put_content(hash, description)?;
             let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-            let response = Response::with((content_type, status::Ok, tx.to_json().to_string()));
+            let response = Response::with((content_type, status::Ok, json!(tx).to_string()));
             return Ok(response);
         };
 
@@ -98,12 +97,11 @@ impl<T> Api for PublicApi<T>
             let content = api.get_content(&hash)?;
 
             let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-            let response =
-                Response::with((content_type, status::Ok, content.to_json().to_string()));
+            let response = Response::with((content_type, status::Ok, json!(content).to_string()));
             Ok(response)
         };
 
-        router.get("/timestamping/content/:hash", get_content, "get_content");
-        router.post("/timestamping/content", put_content, "put_content");
+        router.get("/v1/content/:hash", get_content, "get_content");
+        router.post("/v1/content", put_content, "put_content");
     }
 }
