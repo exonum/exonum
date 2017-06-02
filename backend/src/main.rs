@@ -23,8 +23,7 @@ use exonum::helpers::clap::{GenerateCommand, RunCommand};
 use exonum::helpers::generate_testnet_config;
 
 use configuration_service::ConfigurationService;
-use anchoring_btc_service::AnchoringService;
-use anchoring_btc_service::AnchoringRpc;
+use anchoring_btc_service::{AnchoringRpc, AnchoringService};
 use anchoring_btc_service::{AnchoringNodeConfig, AnchoringConfig, AnchoringRpcConfig,
                             gen_anchoring_testnet_config};
 

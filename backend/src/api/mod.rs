@@ -97,8 +97,7 @@ impl<T> Api for PublicApi<T>
             let content = api.get_content(&hash)?;
 
             let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-            let response =
-                Response::with((content_type, status::Ok, json!(content).to_string()));
+            let response = Response::with((content_type, status::Ok, json!(content).to_string()));
             Ok(response)
         };
 
