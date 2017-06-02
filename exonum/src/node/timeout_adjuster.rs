@@ -1,8 +1,10 @@
+//! `TimeoutAdjuster` is used to dynamically change propose timeout.
+
 use events::Milliseconds;
 use node::State;
 use storage::View;
 
-/// `TimeoutAdjuster` trait can be used to dynamically change propose timeout.
+/// `TimeoutAdjuster` trait is used to dynamically change propose timeout.
 ///
 /// # Examples
 ///

@@ -1,3 +1,5 @@
+//! State of the `NodeHandler`.
+
 use serde_json::Value;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -17,18 +19,27 @@ const TX_POOL_LIMIT: usize = 20000;
 
 // TODO: move request timeouts into node configuration
 
+/// Timeout value for the `RequestPropose` message.
 pub const REQUEST_PROPOSE_TIMEOUT: Milliseconds = 100;
+/// Timeout value for the `RequestTransactions` message.
 pub const REQUEST_TRANSACTIONS_TIMEOUT: Milliseconds = 100;
+/// Timeout value for the `RequestPrevotes` message.
 pub const REQUEST_PREVOTES_TIMEOUT: Milliseconds = 100;
+/// Timeout value for the `RequestBlock` message.
 pub const REQUEST_BLOCK_TIMEOUT: Milliseconds = 100;
 
+/// Consensus round index.
 pub type Round = u32;
+/// Blockchain's height (number of blocks).
 pub type Height = u64;
+/// Validators id.
 pub type ValidatorId = u32;
+
 // TODO replace by persistent TxPool
 pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
 
+/// State of the `NodeHandler`.
 #[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
@@ -70,6 +81,7 @@ pub struct State {
     nodes_max_height: BTreeMap<PublicKey, Height>,
 }
 
+/// State of a validator-node.
 #[derive(Debug, Clone)]
 pub struct ValidatorState {
     id: ValidatorId,
@@ -133,7 +145,8 @@ pub struct Votes<T: VoteMessage> {
 }
 
 impl ValidatorState {
-    pub fn new(id: ValidatorId) -> ValidatorState {
+    /// Creates new `ValidatorState` with given validator id.
+    pub fn new(id: ValidatorId) -> Self {
         ValidatorState {
             id: id,
             our_precommits: HashMap::new(),
@@ -141,18 +154,22 @@ impl ValidatorState {
         }
     }
 
+    /// Returns validator id.
     pub fn id(&self) -> ValidatorId {
         self.id
     }
 
+    /// Sets new validator id.
     pub fn set_validator_id(&mut self, id: ValidatorId) {
         self.id = id;
     }
 
+    /// Checks if the node has pre-vote for the specified round.
     pub fn have_prevote(&self, round: Round) -> bool {
         self.our_prevotes.get(&round).is_some()
     }
 
+    /// Clears pre-commits and pre-votes.
     pub fn clear(&mut self) {
         self.our_precommits.clear();
         self.our_prevotes.clear();
@@ -278,7 +295,8 @@ impl BlockState {
 }
 
 impl State {
-    #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+    /// Creates state with the given parameters.
+    #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     pub fn new(validator_id: Option<ValidatorId>,
                public_key: PublicKey,
                secret_key: SecretKey,
@@ -288,21 +306,20 @@ impl State {
                last_hash: Hash,
                last_height: u64,
                height_start_time: SystemTime)
-               -> State {
-
+               -> Self {
         State {
             validator_state: validator_id.map(ValidatorState::new),
-            public_key: public_key,
-            secret_key: secret_key,
+            public_key,
+            secret_key,
             whitelist: whitelist,
             peers: HashMap::new(),
             connections: HashMap::new(),
             height: last_height,
-            height_start_time: height_start_time,
+            height_start_time,
             round: 0,
             locked_round: 0,
             locked_propose: None,
-            last_hash: last_hash,
+            last_hash,
 
             proposes: HashMap::new(),
             blocks: HashMap::new(),
@@ -326,6 +343,7 @@ impl State {
         }
     }
 
+    /// Returns `ValidatorState` if the node is validator.
     pub fn validator_state(&self) -> &Option<ValidatorState> {
         &self.validator_state
     }
@@ -343,10 +361,12 @@ impl State {
         });
     }
 
+    /// Checks if the node is validator.
     pub fn is_validator(&self) -> bool {
         self.validator_state().is_some()
     }
 
+    /// Checks if the node is a leader for the current height and round.
     pub fn is_leader(&self) -> bool {
         self.validator_state()
                       .as_ref()
@@ -362,6 +382,7 @@ impl State {
         &self.config.validators
     }
 
+    /// Returns `StoredConfiguration`.
     pub fn config(&self) -> &StoredConfiguration {
         &self.config
     }
@@ -373,6 +394,7 @@ impl State {
             .map(|id| id as ValidatorId)
     }
 
+    /// Returns `ConsensusConfig`.
     pub fn consensus_config(&self) -> &ConsensusConfig {
         &self.config.consensus
     }
@@ -459,14 +481,17 @@ impl State {
         total * 2 / 3 + 1
     }
 
+    /// Returns current height.
     pub fn height(&self) -> u64 {
         self.height
     }
 
+    /// Returns start time of the current height.
     pub fn height_start_time(&self) -> SystemTime {
         self.height_start_time
     }
 
+    /// Returns current round.
     pub fn round(&self) -> Round {
         self.round
     }
