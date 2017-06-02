@@ -55,12 +55,12 @@ impl Default for ConsensusConfig {
 }
 
 impl StoredConfiguration {
-    /// Tries to serialize given configuration into the utf8 encoded string.
+    /// Tries to serialize given configuration into the utf8 encoded json.
     pub fn try_serialize(&self) -> Result<Vec<u8>, serde_json::error::Error> {
         serde_json::to_vec(&self)
     }
 
-    /// Tries to deserialize `StorageConfiguration` from the given utf8 encoded byte array.
+    /// Tries to deserialize `StorageConfiguration` from the given utf8 encoded json.
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, serde_json::error::Error> {
         serde_json::from_slice(serialized)
     }
