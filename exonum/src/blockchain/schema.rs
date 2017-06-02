@@ -27,17 +27,23 @@ pub fn gen_prefix(service_id: u16, ord: u8, suf: Option<&[u8]>) -> Vec<u8> {
 }
 
 storage_value! (
+    /// Configuration index.
     struct ConfigReference {
         const SIZE = 40;
+        /// The heights with which a configuration becomes an actual.
         field actual_from: u64    [00 => 08]
+        /// Hash of the configuration contents.
         field cfg_hash:    &Hash  [08 => 40]
     }
 );
 
 storage_value! (
+    /// Transaction location in block.
     struct TxLocation {
         const SIZE = 16;
+        /// Height of block.
         field block_height:         u64  [00 => 08]
+        /// Index in block.
         field position_in_block:    u64  [08 => 16]
     }
 );
@@ -50,37 +56,39 @@ pub struct Schema<'a> {
 
 /// Data tables
 impl<'a> Schema<'a> {
-    /// Table of all commited transactions.
+    /// Returns table that represents a map from transaction hash into raw transaction message.
     pub fn transactions(&self) -> MapTable<View, Hash, RawMessage> {
         MapTable::new(gen_prefix(CONSENSUS, 0, None), self.view)
     }
 
-    /// This table contains information of transaction location (block height and index in block).
+    /// Returns table that keeps the block height and tx position inside block for every 
+    /// transaction hash.
     pub fn tx_location_by_tx_hash(&self) -> MapTable<View, Hash, TxLocation> {
         MapTable::new(gen_prefix(CONSENSUS, 1, None), self.view)
     }
 
+    /// Returns table that stores block object for every block height.
     pub fn blocks(&self) -> MapTable<View, Hash, Block> {
         MapTable::new(gen_prefix(CONSENSUS, 2, None), self.view)
     }
 
+    /// Returns table that saves a list of block hashes that had the requested height.
     pub fn block_hashes_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 3, None), self.view))
     }
 
-    pub fn block_hash_by_height(&self, height: u64) -> Result<Option<Hash>, Error> {
-        self.block_hashes_by_height().get(height)
-    }
-
+    /// Returns table that keeps a list of transactions for the each block.
     pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         MerkleTable::new(MapTable::new(gen_prefix(CONSENSUS, 4, Some(&height.serialize())),
                                        self.view))
     }
 
+    /// Returns table that saves a list of precommits for block with given hash.
     pub fn precommits(&self, hash: &Hash) -> ListTable<MapTable<View, [u8], Vec<u8>>, Precommit> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 5, Some(hash.as_ref())), self.view))
     }
 
+    /// Returns table that represents a map from configuration hash into contents.
     pub fn configs
         (&self)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StoredConfiguration> {
@@ -88,11 +96,13 @@ impl<'a> Schema<'a> {
         MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 6, None), self.view))
     }
 
-    // TODO: consider List index to reduce storage volume
+    /// Returns table that builds an index to get config starting height quickly.
     pub fn configs_actual_from(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, ConfigReference> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
     }
 
+    /// Returns the accessory table for calculating patches in the DBView layer.
+    /// TODO
     pub fn state_hash_aggregator
         (&self)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Hash> {
@@ -107,6 +117,12 @@ impl<'a> Schema<'a> {
         Schema { view: view }
     }
 
+    /// Return block hash for the given height.
+    pub fn block_hash_by_height(&self, height: u64) -> Result<Option<Hash>, Error> {
+        self.block_hashes_by_height().get(height)
+    }
+
+    /// Returns the block for the given height with the proof of its inclusion.
     pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
         let block_hash = match self.block_hash_by_height(height)? {
             None => return Ok(None),
@@ -122,6 +138,7 @@ impl<'a> Schema<'a> {
         Ok(Some(res))
     }
 
+    /// Returns latest commited block.
     pub fn last_block(&self) -> Result<Option<Block>, Error> {
         Ok(match self.block_hashes_by_height().last()? {
                Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
@@ -129,11 +146,13 @@ impl<'a> Schema<'a> {
            })
     }
 
+    /// Returns height of the latest commited block.
     pub fn last_height(&self) -> Result<Option<u64>, Error> {
         let block_opt = self.last_block()?;
         Ok(block_opt.map(|block| block.height()))
     }
 
+    /// Returns the current height of the blockchain. Its value is equal to `last_height + 1`.
     pub fn current_height(&self) -> Result<u64, Error> {
         let last_height = self.last_height()?;
         let res = match last_height {
@@ -143,6 +162,9 @@ impl<'a> Schema<'a> {
         Ok(res)
     }
 
+    /// Adds a new configuration to the blockchain, which will become an actual at 
+    /// the `actual_from` height in `config_data`.
+    /// TODO
     pub fn commit_configuration(&self, config_data: StoredConfiguration) -> Result<(), Error> {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
@@ -166,6 +188,7 @@ impl<'a> Schema<'a> {
         Ok(())
     }
 
+    /// Returns configuration for the latest height of blockchain.
     pub fn actual_configuration(&self) -> Result<StoredConfiguration, Error> {
         let current_height = self.current_height()?;
         let res = self.configuration_by_height(current_height);
@@ -173,6 +196,7 @@ impl<'a> Schema<'a> {
         res
     }
 
+    /// Returns the nearest following configuration if it exist.
     pub fn following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
         let current_height = self.current_height()?;
         let idx = self.find_configurations_index_by_height(current_height)?;
@@ -190,6 +214,7 @@ impl<'a> Schema<'a> {
         Ok(res)
     }
 
+    /// Returns the previous configuration if it exists.
     pub fn previous_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
         let current_height = self.current_height()?;
         let idx = self.find_configurations_index_by_height(current_height)?;
@@ -208,6 +233,7 @@ impl<'a> Schema<'a> {
         Ok(res)
     }
 
+    /// Returns the configuration that is the actual for the given height.
     pub fn configuration_by_height(&self, height: u64) -> Result<StoredConfiguration, Error> {
         let idx = self.find_configurations_index_by_height(height)?;
         let cfg_ref = self.configs_actual_from()
@@ -220,14 +246,17 @@ impl<'a> Schema<'a> {
         Ok(cfg)
     }
 
+    /// Returns configuration for given hash.
     pub fn configuration_by_hash(&self, hash: &Hash) -> Result<Option<StoredConfiguration>, Error> {
         self.configs().get(hash)
     }
 
+    /// Returns the `state_hash` table for core tables.
     pub fn core_state_hash(&self) -> Result<Vec<Hash>, Error> {
         Ok(vec![self.configs().root_hash()?])
     }
 
+    /// TODO
     pub fn get_proof_to_service_table(&self,
                                       service_id: u16,
                                       table_idx: usize)
