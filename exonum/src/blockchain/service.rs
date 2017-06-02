@@ -66,7 +66,7 @@ pub trait Service: Send + Sync + 'static {
     /// Handles commit event. This handler is invoked for each service after commit of the block.
     /// For example service can create some transaction if the specific condition occurred. 
     /// Try not to perform long operations here.
-    fn handle_commit(&self, context: &mut NodeState) -> Result<(), StorageError> {
+    fn handle_commit(&self, context: &mut ServiceContext) -> Result<(), StorageError> {
         Ok(())
     }
 
@@ -84,16 +84,16 @@ pub trait Service: Send + Sync + 'static {
 /// The current node state on which the blockchain is running, 
 /// or in other words execution context.
 #[derive(Debug)]
-pub struct NodeState<'a, 'b> {
+pub struct ServiceContext<'a, 'b> {
     state: &'a mut State,
     view: &'b View,
     txs: Vec<Box<Transaction>>,
 }
 
-impl<'a, 'b> NodeState<'a, 'b> {
+impl<'a, 'b> ServiceContext<'a, 'b> {
     #[doc(hidden)]
-    pub fn new(state: &'a mut State, view: &'b View) -> NodeState<'a, 'b> {
-        NodeState {
+    pub fn new(state: &'a mut State, view: &'b View) -> ServiceContext<'a, 'b> {
+        ServiceContext {
             state: state,
             view: view,
             txs: Vec::new(),

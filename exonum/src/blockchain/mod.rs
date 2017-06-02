@@ -19,7 +19,7 @@ pub use self::block::Block;
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction, NodeState, ApiContext};
+pub use self::service::{Service, Transaction, ServiceContext, ApiContext};
 
 #[macro_use]
 mod spec;
@@ -215,7 +215,7 @@ impl Blockchain {
 
             state.update_config(schema.actual_configuration()?);
 
-            let mut node_state = NodeState::new(state, &view);
+            let mut node_state = ServiceContext::new(state, &view);
             for service in self.service_map.values() {
                 service.handle_commit(&mut node_state)?;
             }
