@@ -39,7 +39,7 @@ pub struct Blockchain {
 }
 
 impl Blockchain {
-    /// Constructs a blockchain for given storage and services.
+    /// Constructs a blockchain for given storage and list of services.
     pub fn new(db: Storage, services: Vec<Box<Service>>) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
@@ -123,6 +123,7 @@ impl Blockchain {
         Ok(())
     }
 
+    /// TODO Oleg I need help.
     pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
         debug_assert!(table_idx <= u16::max_value() as usize);
         let size = mem::size_of::<u16>();
@@ -132,6 +133,9 @@ impl Blockchain {
         crypto::hash(&vec)
     }
 
+    /// This method executes the given transactions from pool.
+    /// Then it collects the resulting changhes from the current storage state and returns them
+    /// with the hash of resulting block.
     pub fn create_patch(&self,
                         height: u64,
                         round: u32,
@@ -187,6 +191,7 @@ impl Blockchain {
         Ok((block_hash, fork.changes()))
     }
 
+    /// Commit block that proposes by node `State`.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I>(&self,
                          state: &mut State,
@@ -268,7 +273,7 @@ mod test {
 
     #[test]
     fn test_system_time() {
-    use std::time::{SystemTime, UNIX_EPOCH};
+        use std::time::{SystemTime, UNIX_EPOCH};
         storage_value! {
             struct Test {
                 const SIZE = 12;
