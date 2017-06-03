@@ -123,7 +123,17 @@ impl Blockchain {
         Ok(())
     }
 
-    /// TODO Oleg I need help.
+    /// Helper function to map tuple (`u16`, `u16`) of service table coordinates
+    /// to 32 byte value for use as `MerklePatriciatable` key (it currently
+    /// supports only fixed size keys). `hash` function is used to distribute
+    /// keys uniformly (compared to padding).
+    /// # Arguments
+    ///
+    /// * `service_id` - `service_id` as returned by instance of type of
+    /// `Service` trait
+    /// * `table_idx` - index of service table in `Vec`, returned by
+    /// `state_hash` method of instance of type of `Service` trait
+    // also, it was the first idea around, to use `hash`
     pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
         debug_assert!(table_idx <= u16::max_value() as usize);
         let size = mem::size_of::<u16>();
