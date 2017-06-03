@@ -65,11 +65,13 @@ pub struct TxSender<S>
     inner: S,
 }
 
+/// Handler that that performs consensus algorithm.
 pub struct NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     /// State of the `NodeHandler`.
     pub state: State,
+    /// Channel for messages and timeouts.
     pub channel: S,
     pub blockchain: Blockchain,
     // TODO: move this into peer exchange service

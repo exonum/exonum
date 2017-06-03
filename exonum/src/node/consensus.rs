@@ -262,6 +262,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Executes and commits block. This function is called when the node has +2/3 pre-commits.
     pub fn has_majority_precommits(&mut self,
                                    round: Round,
                                    propose_hash: &Hash,
@@ -687,6 +688,8 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Requests a block for the next height from all peers with a bigger height. Called when the
+    /// node tries to catch up with other nodes' height.
     pub fn request_next_block(&mut self) {
         // TODO randomize next peer
         let heights:Vec<_> = self.state.nodes_with_bigger_height().into_iter().cloned().collect();
@@ -701,6 +704,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Removes the specified request from the pending request list.
     pub fn remove_request(&mut self, data: RequestData) -> HashSet<PublicKey> {
         // TODO: clear timeout
         self.state.remove_request(&data)

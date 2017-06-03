@@ -35,6 +35,7 @@ pub type Height = u64;
 /// Validators id.
 pub type ValidatorId = u32;
 
+/// Transactions pool.
 // TODO replace by persistent TxPool
 pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
@@ -89,12 +90,17 @@ pub struct ValidatorState {
     our_precommits: HashMap<Round, Precommit>,
 }
 
-// Required data specific for some height.
+/// `RequestData` represents a request for some data to other nodes. Each enum variant will be
+/// translated to the corresponding request-message.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RequestData {
+    /// Represents `RequestPropose` message.
     Propose(Hash),
+    /// Represents `RequestTransactions` message.
     Transactions(Hash),
+    /// Represents `RequestPrevotes` message.
     Prevotes(Round, Hash),
+    /// Represents `RequestBlock` message.
     Block(Height),
 }
 
@@ -106,12 +112,15 @@ struct RequestState {
     known_nodes: HashSet<PublicKey>,
 }
 
+/// `ProposeState` represents the state of some propose and is used for tracking of unknown
 #[derive(Debug)]
+/// transactions.
 pub struct ProposeState {
     propose: Propose,
     unknown_txs: HashSet<Hash>,
 }
 
+/// State of a block.
 #[derive(Clone, Debug)]
 pub struct BlockState {
     hash: Hash,
@@ -121,7 +130,9 @@ pub struct BlockState {
     propose_round: Round,
 }
 
+/// `VoteMessage` trait represents voting messages such as `Precommit` and `Prevote`.
 pub trait VoteMessage: Message + Clone {
+    /// Return validator if of the message.
     fn validator(&self) -> ValidatorId;
 }
 
@@ -137,6 +148,7 @@ impl VoteMessage for Prevote {
     }
 }
 
+/// Contains voting messages alongside with there validator ids.
 #[derive(Debug)]
 pub struct Votes<T: VoteMessage> {
     messages: Vec<T>,
@@ -174,12 +186,12 @@ impl ValidatorState {
         self.our_precommits.clear();
         self.our_prevotes.clear();
     }
-
 }
 
 impl<T> Votes<T>
     where T: VoteMessage
 {
+    /// Creates a new `Votes` instance with a specified validators number.
     pub fn new(validators_len: usize) -> Votes<T> {
         Votes {
             messages: Vec::new(),
@@ -188,6 +200,7 @@ impl<T> Votes<T>
         }
     }
 
+    /// Inserts a new message if it hasn't been inserted yet.
     pub fn insert(&mut self, message: &T) {
         let voter = message.validator() as usize;
         if !self.validators[voter] {
@@ -197,20 +210,24 @@ impl<T> Votes<T>
         }
     }
 
+    /// Returns validators.
     pub fn validators(&self) -> &BitVec {
         &self.validators
     }
 
+    /// Returns number of contained messages.
     pub fn count(&self) -> usize {
         self.count
     }
 
+    /// Returns messages.
     pub fn messages(&self) -> &Vec<T> {
         &self.messages
     }
 }
 
 impl RequestData {
+    /// Returns timeout value of the data request.
     pub fn timeout(&self) -> Duration {
         #![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
@@ -250,24 +267,29 @@ impl RequestState {
 }
 
 impl ProposeState {
+    /// Returns hash of the propose.
     pub fn hash(&self) -> Hash {
         self.propose.hash()
     }
 
+    /// Returns propose-message.
     pub fn message(&self) -> &Propose {
         &self.propose
     }
 
+    /// Returns unknown transactions of the propose.
     pub fn unknown_txs(&self) -> &HashSet<Hash> {
         &self.unknown_txs
     }
 
+    /// Returns `true` if there are unknown transactions in the propose.
     pub fn has_unknown_txs(&self) -> bool {
         !self.unknown_txs.is_empty()
     }
 }
 
 impl BlockState {
+    /// Creates a new `BlockState` instance with the given parameters.
     pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, propose_round: Round) -> BlockState {
         BlockState {
             hash: hash,
@@ -277,6 +299,7 @@ impl BlockState {
         }
     }
 
+    /// Returns hash of the block.
     pub fn hash(&self) -> Hash {
         self.hash
     }
@@ -285,10 +308,12 @@ impl BlockState {
         &self.patch
     }
 
+    /// Returns block's transactions.
     pub fn txs(&self) -> &Vec<Hash> {
         &self.txs
     }
 
+    /// Returns round number in which block was proposed.
     pub fn propose_round(&self) -> Round {
         self.propose_round
     }
