@@ -101,8 +101,21 @@ impl<'a> Schema<'a> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
     }
 
-    /// Returns the accessory table for calculating patches in the DBView layer.
-    /// TODO
+    /// Returns the accessory `MerklePatriciaTable` for calculating
+    /// patches in the DBView layer.
+    ///
+    /// Table calculates "sum" of root hashes of individual
+    /// service tables, in effect summing the state of various entities,
+    /// scattered across distinct services and their tables. Sum is performed by
+    /// means of computing root hash of this table.
+    ///
+    /// - Table **key** is 32 bytes of normalized coordinates of a service
+    /// table, as returned by `service_table_unique_key` helper function.
+    /// - Table **value** is root hash of a service table, which contributes
+    /// to the resulting block's `state_hash`.
+    ///
+    /// Core tables participate in resulting state_hash with `CORE_SERVICE`
+    /// service_id. Their vector is returned by `core_state_hash` method. 
     pub fn state_hash_aggregator
         (&self)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Hash> {
@@ -256,7 +269,27 @@ impl<'a> Schema<'a> {
         Ok(vec![self.configs().root_hash()?])
     }
 
-    /// TODO
+    /// Construct proof of inclusion of root hash of a specific service
+    /// table into block's `state_hash`.
+    ///
+    /// Searched key for proof is uniquely identified by (`u16`, `u16`) tuple
+    /// of table's coordinates.
+    /// 
+    /// If found, root hash is returned as a value of proof's leaf
+    /// corresponding to searched key. Otherwise, partial path to searched key
+    /// is returned, which proves its exclusion.
+    ///
+    /// The returned proof is used as a component of proof of state of any
+    /// entity, stored in `exonum` db at specific height, as identified
+    /// by corresponding block's `state_hash`. State of some meta tables
+    /// of core and services isn't tracked.
+    ///
+    /// # Arguments
+    ///
+    /// * `service_id` - `service_id` as returned by instance of type of
+    /// `Service` trait
+    /// * `table_idx` - index of service table in `Vec`, returned by
+    /// `state_hash` method of instance of type of `Service` trait
     pub fn get_proof_to_service_table(&self,
                                       service_id: u16,
                                       table_idx: usize)
