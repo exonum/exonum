@@ -271,8 +271,8 @@ impl<'a> Field<'a> for SystemTime {
 // all possible (>6 bytes long) sequences is a valid addr.
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
-        // reserve space for future compatibility
-        32
+        //\FIXME: reserve space for future compatibility
+        6
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> SocketAddr {
