@@ -50,7 +50,7 @@ fn test_correct_storage_value() {
     test.write(&mut buffer, 0, 8);
     assert_eq!(buffer, dat);
     <StructWithTwoSegments as Field>::check(&dat, 0.into(), 16.into()).unwrap();
-    let strukt = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 16) };
+    let strukt = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 8) };
     assert_eq!(strukt.first(), &[1u8]);
     assert_eq!(strukt.second(), &[2u8]);
 }

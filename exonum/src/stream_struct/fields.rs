@@ -7,6 +7,7 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use crypto::{Hash, PublicKey, Signature};
 use super::{Error, SegmentReference, CheckedOffset, Offset};
 
+
 /// implement field for all types that has writer and reader functions
 ///
 /// - reader signature is `fn (&[u8]) -> T`
@@ -26,10 +27,28 @@ macro_rules! implement_std_field {
             fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
+            fn check(buffer: &'a [u8],
+                    from: CheckedOffset,
+                    to: CheckedOffset)
+                    -> Result<Option<SegmentReference>, Error> {
+                let len = buffer.len();
+                if len < to.unchecked_offset() as usize {
+                    return Err(Error::UnexpectedlyShortPayload {
+                        actual_size: len as Offset,
+                        minimum_size: to.unchecked_offset(),
+                    });
+                }
+                if (to - from)?.unchecked_offset() != Self::field_size() {
+                    return Err(Error::FieldSizeMismatch {
+                        actual_size: (to - from)?.unchecked_offset(),
+                        expected_size: Self::field_size(),
+                    });
+                }
+                Ok(None)
+            }
         }
     )
 }
-
 
 /// Implement field helper for all POD types
 /// it writes POD type as bytearray in place.
@@ -54,8 +73,53 @@ macro_rules! implement_pod_as_ref_field {
                                                         mem::size_of::<$name>())};
                 buffer[from as usize..to as usize].copy_from_slice(slice);
             }
+
+            fn check(buffer: &'a [u8],
+                    from: CheckedOffset,
+                    to: CheckedOffset)
+                    -> Result<Option<SegmentReference>, Error> {
+                let len = buffer.len();
+                if len < to.unchecked_offset() as usize {
+                    return Err(Error::UnexpectedlyShortPayload {
+                        actual_size: len as Offset,
+                        minimum_size: to.unchecked_offset(),
+                    });
+                }
+                if (to - from)?.unchecked_offset() != Self::field_size() {
+                    return Err(Error::FieldSizeMismatch {
+                        actual_size: (to - from)?.unchecked_offset(),
+                        expected_size: Self::field_size(),
+                    });
+                }
+                Ok(None)
+            }
         }
+
+
     )
+}
+
+
+//\TODO this check should be rewritted as part of buffer implementation.
+macro_rules! check_field_size {
+    ($buffer:ident $from:expr; $to:expr) => {
+        {
+        let len = $buffer.len();
+        if len < $to.unchecked_offset() as usize {
+            return Err(Error::UnexpectedlyShortPayload {
+                actual_size: len as Offset,
+                minimum_size: $to.unchecked_offset(),
+            });
+        }
+
+        if ($to - $from)?.unchecked_offset() != Self::field_size() {
+            return Err(Error::FieldSizeMismatch {
+                actual_size: ($to - $from)?.unchecked_offset(),
+                expected_size: Self::field_size(),
+            });
+        }
+        }
+    }
 }
 
 /// Trait for all types that should be possible to serialize as
@@ -80,9 +144,7 @@ pub trait Field<'a> {
     fn check(buffer: &'a [u8],
              from: CheckedOffset,
              to: CheckedOffset)
-             -> Result<Option<SegmentReference>, Error> {
-        Ok(None)
-    }
+             -> Result<Option<SegmentReference>, Error>;
 }
 
 impl<'a> Field<'a> for bool {
@@ -100,8 +162,9 @@ impl<'a> Field<'a> for bool {
 
     fn check(buffer: &'a [u8],
              from: CheckedOffset,
-             _: CheckedOffset)
+             to: CheckedOffset)
              -> Result<Option<SegmentReference>, Error> {
+        check_field_size!{buffer from; to};
         let from: Offset = from.unchecked_offset();
         if buffer[from as usize] != 0 && buffer[from as usize] != 1 {
             Err(Error::IncorrectBoolean {
@@ -126,9 +189,20 @@ impl<'a> Field<'a> for u8 {
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self;
     }
+
+    fn check(buffer: &'a [u8],
+             from: CheckedOffset,
+             to: CheckedOffset)
+             -> Result<Option<SegmentReference>, Error> {
+        check_field_size!{buffer from; to};
+        Ok(None)
+    }
+
 }
 
+//\TODO expect some codding of signed ints?
 impl<'a> Field<'a> for i8 {
+
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
     }
@@ -139,6 +213,14 @@ impl<'a> Field<'a> for i8 {
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self as u8;
+    }
+
+    fn check(buffer: &'a [u8],
+             from: CheckedOffset,
+             to: CheckedOffset)
+             -> Result<Option<SegmentReference>, Error> {
+        check_field_size!{buffer from; to};
+        Ok(None)
     }
 }
 
@@ -175,6 +257,14 @@ impl<'a> Field<'a> for SystemTime {
         LittleEndian::write_u32(&mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
                                 nanos);
     }
+
+    fn check(buffer: &'a [u8],
+             from: CheckedOffset,
+             to: CheckedOffset)
+             -> Result<Option<SegmentReference>, Error> {
+        check_field_size!{buffer from; to};
+        Ok(None)
+    }
 }
 
 //\TODO add socketaddr check, for now with only ipv4 
@@ -204,5 +294,13 @@ impl<'a> Field<'a> for SocketAddr {
             }
         }
         LittleEndian::write_u16(&mut buffer[to as usize - 2..to as usize], self.port());
+    }
+
+    fn check(buffer: &'a [u8],
+             from: CheckedOffset,
+             to: CheckedOffset)
+             -> Result<Option<SegmentReference>, Error> {
+        check_field_size!{buffer from; to};
+        Ok(None)
     }
 }

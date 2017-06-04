@@ -6,12 +6,21 @@ use super::Offset;
 /// This structure represent `stream_struct` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
+    //\TODO: Check this message after refactor buffer.
     /// Payload is short for this message.
     UnexpectedlyShortPayload {
         /// real message size
         actual_size: Offset,
         /// expected size of fixed part
         minimum_size: Offset,
+    },
+    //\TODO: Remove `to` from `Field` signature, it's a bit redurant.
+    /// Expected field size is differ from the field size in buffer.
+    FieldSizeMismatch {
+        /// real field size
+        actual_size: Offset,
+        /// expected size of field
+        expected_size: Offset,
     },
     /// Boolean value is incorrect
     IncorrectBoolean {
@@ -95,6 +104,7 @@ impl fmt::Display for Error {
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
+            Error::FieldSizeMismatch { .. } => "Field size mismatch from the given one.",
             Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
             Error::IncorrectBoolean { .. } => "Incorrect bool.",
             Error::IncorrectSegmentReference { .. } => "Incorrect segment reference.",

@@ -98,6 +98,7 @@ pub use self::error::Error;
 pub mod serialize;
 
 mod error;
+#[macro_use]
 mod fields;
 mod segments;
 
@@ -174,7 +175,7 @@ macro_rules! implement_default_ops_checked {
         impl $trait_name<CheckedOffset> for CheckedOffset {
             type Output = ::std::result::Result<CheckedOffset, Error>;
             fn $function(self, rhs: CheckedOffset) -> Self::Output {
-                rhs.offset.$checked_function(self.offset)
+                self.offset.$checked_function(rhs.offset)
                         .map(CheckedOffset::new)
                         .ok_or(Error::OffsetOverflow)
             }
@@ -182,7 +183,7 @@ macro_rules! implement_default_ops_checked {
         impl $trait_name<Offset> for CheckedOffset {
             type Output = ::std::result::Result<CheckedOffset, Error>;
             fn $function(self, rhs: Offset) -> Self::Output {
-                rhs.$checked_function(self.offset)
+                self.offset.$checked_function(rhs)
                         .map(CheckedOffset::new)
                         .ok_or(Error::OffsetOverflow)
             }

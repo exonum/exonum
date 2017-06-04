@@ -9,8 +9,16 @@ use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommi
                BlockProof, RequestBlock, BitVec};
 
 #[test]
+#[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
+fn test_read_overflow_buffer() {
+    let buf = vec![255;1];
+    <Vec<u8> as Field>::check(&buf, 0.into(), 8.into()).expect("Found error in check");
+}
+
+
+#[test]
 #[should_panic(expected = "Found error in check: OffsetOverflow")]
-fn test_read_overflow() {
+fn test_read_overflow_arithmetic() {
     let pos = <u32>::max_value();
     let count: u32 = 4;
     let dat = vec![0xCC as u8; 4]; // u32
