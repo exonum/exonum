@@ -67,7 +67,7 @@ macro_rules! storage_value {
                         to_st_val: $crate::stream_struct::CheckedOffset)
                 -> $crate::stream_struct::Result
             {
-                let ret = <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, to_st_val)?;
+                let ret = <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, (from_st_val + 8)?)?;
                 let vec: Vec<u8> = unsafe{ $crate::stream_struct::Field::read(buffer, 
                                                                         from_st_val.unchecked_offset(),
                                                                         to_st_val.unchecked_offset())};
@@ -82,7 +82,15 @@ macro_rules! storage_value {
             }
 
             fn field_size() -> $crate::stream_struct::Offset {
-                $body as $crate::stream_struct::Offset
+                // We write `storage_value` as regular buffer,
+                // so real `field_size` is 8.
+                //\TODO: maybe we should write it as sub structure in place?
+                // We could get benefit from it: we limit indirection
+                // in deserializing sub fields, by only one calculation.
+
+                // $body as $crate::stream_struct::Offset
+
+                8 as $crate::stream_struct::Offset
             }
         }
 

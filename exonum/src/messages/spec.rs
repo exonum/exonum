@@ -90,7 +90,7 @@ macro_rules! message {
                 let check = <$crate::messages::RawMessage as
                                 $crate::stream_struct::Field>::check(buffer,
                                                                 from,
-                                                                to)?;
+                                                                (from + 8)?)?;
                 let raw_message: $crate::messages::RawMessage = 
                                     unsafe { $crate::stream_struct::Field::read(buffer,
                                                                 from.unchecked_offset(),
@@ -100,7 +100,9 @@ macro_rules! message {
             }
 
             fn field_size() -> $crate::stream_struct::Offset {
-                $body as $crate::stream_struct::Offset
+                // We write message as regular buffer,
+                // so real `field_size` is 8.
+                8 as $crate::stream_struct::Offset
             }
         }
 

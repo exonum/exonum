@@ -42,6 +42,7 @@ impl<'a, T> Field<'a> for T
     }
 
     fn check(buffer: &'a [u8], from: CheckedOffset, to: CheckedOffset) -> Result {
+        check_field_size!{buffer from; to};
         let end_pos: Offset = (from + 4)?.unchecked_offset();
         let pos: CheckedOffset = LittleEndian::read_u32(&buffer[from.unchecked_offset() as usize..
                                                          end_pos as usize])
