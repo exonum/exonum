@@ -304,6 +304,7 @@ impl BlockState {
         self.hash
     }
 
+    /// Returns the changes that should be made for block committing.
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
@@ -373,6 +374,8 @@ impl State {
         &self.validator_state
     }
 
+    /// Updates the validator id. If there hasn't been `ValidatorState` for that id, then a new
+    /// state will be created.
     pub fn renew_validator_id(&mut self, id: Option<ValidatorId>) {
         let validator_state = self.validator_state.take();
         self.validator_state = id.map(move |id|{
@@ -386,7 +389,7 @@ impl State {
         });
     }
 
-    /// Checks if the node is validator.
+    /// Checks if the node is a validator.
     pub fn is_validator(&self) -> bool {
         self.validator_state().is_some()
     }
@@ -403,6 +406,7 @@ impl State {
         &self.whitelist
     }
 
+    /// Returns public keys of known validators.
     pub fn validators(&self) -> &[PublicKey] {
         &self.config.validators
     }
@@ -412,6 +416,7 @@ impl State {
         &self.config
     }
 
+    /// Returns validator id with a specified public key.
     pub fn find_validator(&self, peer: &PublicKey) -> Option<ValidatorId> {
         self.validators()
             .iter()
@@ -424,10 +429,12 @@ impl State {
         &self.config.consensus
     }
 
+    /// Returns `BTreeMap` with service configs identified by name.
     pub fn services_config(&self) -> &BTreeMap<String, Value> {
         &self.config.services
     }
 
+    /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node.
     pub fn update_config(&mut self, config: StoredConfiguration) {
         trace!("Updating node config={:#?}", config);
         let validator_id = config.validators
@@ -440,20 +447,24 @@ impl State {
         self.config = config;
     }
 
+    /// Returns value of the propose timeout from `ConsensusConfig`.
     pub fn propose_timeout(&self) -> Milliseconds {
         self.config.consensus.propose_timeout
     }
 
+    /// Updates propose timeout value.
     pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
         debug_assert!(timeout < self.config.consensus.round_timeout);
         self.config.consensus.propose_timeout = timeout;
     }
 
+    /// Adds the public key, address, and `Connect` message of a validator.
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
         self.connections.insert(msg.addr(), pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
 
+    /// Removes a peer by the socket address.
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
         if let Some(pubkey) = self.connections.remove(addr) {
             self.peers.remove(&pubkey);
@@ -462,34 +473,42 @@ impl State {
         false
     }
 
+    /// Returns the keys of known peers with their `Connect` messages.
     pub fn peers(&self) -> &HashMap<PublicKey, Connect> {
         &self.peers
     }
 
+    /// Returns public key of a validator identified by id.
     pub fn public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
         self.validators().get(id as usize)
     }
 
+    /// Returns the public key of the current node.
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
     }
 
+    /// Returns the secret key of the current node.
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }
 
+    /// Returns the leader id for the specified round and current height.
     pub fn leader(&self, round: Round) -> ValidatorId {
         ((self.height() + round as u64) % (self.validators().len() as u64)) as ValidatorId
     }
 
+    /// Returns the current node's height.
     pub fn node_height(&self, key: &PublicKey) -> Height {
         *self.nodes_max_height.get(key).unwrap_or(&0)
     }
 
+    /// Updates known height for a validator identified by the public key.
     pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
         *self.nodes_max_height.entry(key).or_insert(0) = height;
     }
 
+    /// Returns a list of nodes whose height is bigger than one of the current node.
     pub fn nodes_with_bigger_height(&self) -> Vec<&PublicKey> {
         self.nodes_max_height
             .iter()
@@ -498,10 +517,12 @@ impl State {
             .collect()
     }
 
+    /// Returns sufficient number of votes.
     pub fn majority_count(&self) -> usize {
         State::byzantine_majority_count(self.validators().len())
     }
 
+    /// Returns sufficient number of votes.
     pub fn byzantine_majority_count(total: usize) -> usize {
         total * 2 / 3 + 1
     }
@@ -516,11 +537,12 @@ impl State {
         self.height_start_time
     }
 
-    /// Returns current round.
+    /// Returns the current round.
     pub fn round(&self) -> Round {
         self.round
     }
 
+    /// Returns a hash of the last block.
     pub fn last_hash(&self) -> &Hash {
         &self.last_hash
     }
@@ -545,14 +567,17 @@ impl State {
         self.proposes.get(hash)
     }
 
+    /// Returns a block with the specified hash.
     pub fn block(&self, hash: &Hash) -> Option<&BlockState> {
         self.blocks.get(hash)
     }
 
+    /// Updates mode's round.
     pub fn jump_round(&mut self, round: Round) {
         self.round = round;
     }
 
+    /// Increments node's round by one.
     pub fn new_round(&mut self) {
         self.round += 1;
     }
@@ -593,6 +618,7 @@ impl State {
         self.queued.push(msg);
     }
 
+    /// Returns non-committed transactions.
     pub fn transactions(&self) -> &TxPool {
         &self.transactions
     }
@@ -834,15 +860,18 @@ impl State {
         next
     }
 
+    /// Removes the specified request from the pending request list.
     pub fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
         let state = self.requests.remove(data);
         state.map(|s| s.known_nodes).unwrap_or_default()
     }
 
+    /// Returns the `Connect` message of the current node.
     pub fn our_connect_message(&self) -> &Connect {
         &self.our_connect_message
     }
 
+    /// Updates the `Connect` message of the current node.
     pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
     }

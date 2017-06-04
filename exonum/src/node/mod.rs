@@ -39,6 +39,7 @@ pub mod timeout_adjuster;
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
+    /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
 }
 
@@ -120,7 +121,9 @@ pub struct NodeConfig {
     /// Network configuration.
     pub network: NetworkConfiguration,
     pub peers: Vec<SocketAddr>,
+    /// Public key of the node.
     pub public_key: PublicKey,
+    /// Secret key of the node.
     pub secret_key: SecretKey,
     pub whitelist: Whitelist,
     pub api: NodeApiConfig,
@@ -286,6 +289,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         self.channel.connect(address);
     }
