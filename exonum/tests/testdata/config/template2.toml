@@ -8,14 +8,16 @@ status_timeout = 5000
 txs_block_limit = 1000
 
 [services]
-
-[validators]
-[validators.1bf7f976bc8e6931ca8fb70bb3abde5f053c1f99c91b9ba79db34f1bf846f1be]
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0]
 addr = "127.0.0.1:6333"
 
-[validators.1bf7f976bc8e6931ca8fb70bb3abde5f053c1f99c91b9ba79db34f1bf846f1be.values]
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.keys]
 
-[validators.9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9]
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.values]
+
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb]
 addr = "127.0.0.1:6333"
 
-[validators.9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9.values]
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.keys]
+
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.values]
