@@ -81,11 +81,11 @@ impl StorageKey for ProofListKey {
         <u64 as StorageKey>::size()
     }
 
-    fn write(&self, buffer: &mut Vec<u8>) {
+    fn write(&self, buffer: &mut [u8]) {
         StorageKey::write(&self.as_db_key(), buffer)
     }
 
-    fn from_slice(buffer: &[u8]) -> Self {
-        Self::from_db_key(StorageKey::from_slice(buffer))
+    fn read(buffer: &[u8]) -> Self {
+        Self::from_db_key(StorageKey::read(buffer))
     }
 }
