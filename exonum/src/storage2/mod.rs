@@ -17,6 +17,7 @@ pub use self::list_index::ListIndex;
 pub use self::key_set_index::KeySetIndex;
 pub use self::value_set_index::ValueSetIndex;
 pub use self::proof_list_index::ProofListIndex;
+// pub use self::proof_map_index::ProofMapIndex;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 
@@ -36,6 +37,7 @@ mod list_index;
 mod key_set_index;
 mod value_set_index;
 mod proof_list_index;
+// mod proof_map_index;
 
 pub fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
     let mut v = [0; HASH_SIZE * 2];
