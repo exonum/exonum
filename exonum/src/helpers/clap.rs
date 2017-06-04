@@ -1,3 +1,4 @@
+pub use toml::value::Value;
 
 use clap::{SubCommand, App, Arg, ArgMatches};
 
@@ -116,8 +117,20 @@ impl<'a, 'b> RunCommand<'a, 'b>
 
 #[derive(Serialize, Deserialize)]
 pub struct ValidatorIdent {
-    pub values: BTreeMap<String, String>,
+    pub values: BTreeMap<String, Value>,
+    keys: BTreeMap<String, Value>,
     addr: SocketAddr,
+}
+
+impl ValidatorIdent {
+
+    pub fn addr(&self) -> SocketAddr {
+        self.addr
+    }
+
+    pub fn keys(&self) -> &BTreeMap<String, Value> {
+        &self.keys
+    }
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -125,33 +138,35 @@ pub struct ConfigTemplate {
     validators: BTreeMap<PublicKey, ValidatorIdent>,
     consensus_cfg: ConsensusConfig,
     count: usize,
-    services: BTreeMap<String, String>,
+    pub services: BTreeMap<String, Value>,
+}
+
+impl ConfigTemplate {
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    pub fn validators(&self) -> &BTreeMap<PublicKey, ValidatorIdent> {
+        &self.validators
+    }
+
+    pub fn consensus_cfg(&self) -> &ConsensusConfig {
+        &self.consensus_cfg
+    }
 }
 
 // toml file could not save array without "field name"
 #[derive(Serialize, Deserialize)]
 struct PubKeyConfig {
     public_key: PublicKey,
-}
-
-impl ::std::convert::From<PublicKey> for PubKeyConfig {
-    fn from(pk: PublicKey) -> Self {
-        PubKeyConfig {
-            public_key: pk
-        }
-    }
-}
-
-impl ::std::convert::Into<PublicKey> for PubKeyConfig {
-    fn into(self) -> PublicKey {
-        self.public_key
-    }
+    services_pub_keys: BTreeMap<String, Value>
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct KeyConfig {
     public_key: PublicKey,
     secret_key: SecretKey,
+    services_sec_keys: BTreeMap<String, Value>
 }
 
 pub struct KeyGeneratorCommand;
@@ -172,13 +187,28 @@ impl KeyGeneratorCommand {
         Path::new(matches.value_of("KEYCHAIN").unwrap())
     }
 
+    /// Generates and writes key config to `keychain()` path.
+    pub fn execute_default(matches: &ArgMatches) {
+        Self::execute(matches, None, None)
+    }
 
     /// Generates and writes key config to `keychain()` path.
-    pub fn execute(matches: &ArgMatches) {
+    /// Append `services_sec_keys` to keychain.
+    /// Append `services_pub_keys` to public key config. 
+    /// `add-validator` command autmaticaly share public key config.
+    pub fn execute<X, Y>(matches: &ArgMatches,
+                    services_sec_keys: X,
+                    services_pub_keys: Y)
+    where X: Into<Option<BTreeMap<String, Value>>>,
+          Y: Into<Option<BTreeMap<String, Value>>>
+    {
         let (pub_key, sec_key) = crypto::gen_keypair();
         let keyconfig = Self::keychain(matches);
         let pub_key_path = keyconfig.with_extension("pub");
-        let pub_key_config: PubKeyConfig = pub_key.into();
+        let pub_key_config: PubKeyConfig = PubKeyConfig {
+            public_key: pub_key,
+            services_pub_keys: services_pub_keys.into().unwrap_or_default(),
+        };
         // save pub_key seperately
         ConfigFile::save(&pub_key_config, &pub_key_path)
                     .expect("Could not write public key file.");
@@ -186,6 +216,7 @@ impl KeyGeneratorCommand {
         let config = KeyConfig {
             public_key: pub_key,
             secret_key: sec_key,
+            services_sec_keys: services_sec_keys.into().unwrap_or_default(),
         };
 
         ConfigFile::save(&config, Self::keychain(matches))
@@ -219,8 +250,13 @@ impl GenerateTemplateCommand {
     }
 
     /// Write default template config into `template()` path.
+    pub fn execute_default(matches: &ArgMatches) {
+        Self::execute(matches, None)
+    }
+    /// Write default template config into `template()` path.
+    /// You can append some values to template as second argument.
     pub fn execute<T>(matches: &ArgMatches, values: T)
-        where T: Into<Option<BTreeMap<String, String>>>
+        where T: Into<Option<BTreeMap<String, Value>>>
     {
         let values = values.into().unwrap_or_default();
         let template = ConfigTemplate {
@@ -234,6 +270,8 @@ impl GenerateTemplateCommand {
     }
 }
 
+/// `add-validator` - append alidator to template.
+/// Automaticaly share keys from public key config.
 pub struct AddValidatorCommand;
 impl AddValidatorCommand {
     pub fn new<'a>() -> App<'a, 'a> {
@@ -271,11 +309,15 @@ impl AddValidatorCommand {
         matches.value_of("LISTEN_ADDR").unwrap().to_string()
     }
 
+    /// Add validator to template config.
+    pub fn execute_default(matches: &ArgMatches) {
+        Self::execute(matches, |_, _| Ok(()))
+    }
 
     #[cfg_attr(feature="cargo-clippy", allow(map_entry))]
-    pub fn execute<'a, F>(matches: &ArgMatches, on_add: F)
-        where F: Into<Option<&'a Fn(usize, &mut BTreeMap<String, String>)
-                        -> Result<BTreeMap<String, String>, Box<Error>>>>,
+    pub fn execute<F>(matches: &ArgMatches, on_add: F)
+        where F: FnOnce(&mut ValidatorIdent, &mut ConfigTemplate)
+                        -> Result<(), Box<Error>>,
     {
         let template_path = Self::template(matches);
         let public_key_path = Self::public_key(matches);
@@ -283,28 +325,28 @@ impl AddValidatorCommand {
         let mut addr_parts = addr.split(':');
 
         let mut template: ConfigTemplate = ConfigFile::load(template_path).unwrap();
-        let public_key: PubKeyConfig = ConfigFile::load(public_key_path).unwrap();
-        let public_key = public_key.into();
+        let public_key_config: PubKeyConfig = ConfigFile::load(public_key_path).unwrap();
         let addr = format!("{}:{}",
                            addr_parts.next().expect("expected ip addr"),
                            addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, 
                                                     |s| s.parse().expect("could not parse port")))
                 .parse()
                 .unwrap();
-        if !template.validators.contains_key(&public_key) {
+        if !template.validators.contains_key(&public_key_config.public_key) {
             if template.validators.len() >= template.count {
                 panic!("This template already full.");
             }
-            let func = on_add
-                .into()
-                .map(|f| f(template.count, &mut template.services));
-            let map = func.unwrap_or_else(|| Ok(BTreeMap::new()));
 
-            let ident = ValidatorIdent {
+            let mut ident = ValidatorIdent {
                 addr: addr,
-                values: map.unwrap(),
+                values: BTreeMap::default(),
+                keys: public_key_config.services_pub_keys,
             };
-            template.validators.insert(public_key, ident);
+
+            on_add(&mut ident, &mut template)
+                  .expect("could not add validator, service return");
+
+            template.validators.insert(public_key_config.public_key, ident);
         } else {
             panic!("This node already in template");
         }
@@ -349,10 +391,14 @@ impl InitCommand {
         Path::new(matches.value_of("KEYCHAIN").unwrap())
     }
 
-    pub fn execute<'a, F>(matches: &ArgMatches, on_init: F)
-        where F: Into<Option<&'a Fn(&BTreeMap<String, String>,
-                        &BTreeMap<PublicKey, ValidatorIdent>)
-                        -> Result<(), Box<Error>>>>
+    /// Add validator to template config.
+    pub fn execute_default(matches: &ArgMatches) {
+        Self::execute(matches, |config, _, _| Ok(Value::try_from(config)? ))
+    }
+
+    pub fn execute<F>(matches: &ArgMatches, on_init: F)
+        where F: FnOnce(NodeConfig, &ConfigTemplate, &BTreeMap<String, Value>)
+                        -> Result<Value, Box<Error>>
     {
         let config_path = Self::config(matches);
         let template_path = Self::template(matches);
@@ -367,13 +413,6 @@ impl InitCommand {
             panic!("Template should be full.");
         }
 
-        let func = on_init
-            .into()
-            .map(|f| f(&template.services, &template.validators));
-        let func = func.unwrap_or(Ok(()));
-        // propogate error
-        func.unwrap();
-
         let genesis = GenesisConfig::new(template.validators.iter().map(|(k, _)| *k));
         let peers = template
             .validators
@@ -381,8 +420,6 @@ impl InitCommand {
             .map(|(_, ident)| ident.addr)
             .collect();
         let validator_ident = &template.validators[&keychain.public_key];
-
-
 
         let config = NodeConfig {
             listen_address: validator_ident.addr,
@@ -393,9 +430,11 @@ impl InitCommand {
             genesis: genesis,
             api: Default::default(),
         };
-
-        ConfigFile::save(&config, config_path)
-                    .expect("Could not write config file.");
+        let value = on_init(config, &template, &keychain.services_sec_keys)
+            .expect("Could not create config from template, services return error");
+        ConfigFile::save(&value, config_path)
+                .expect("Could not write config file.");
+        
     }
 }
 

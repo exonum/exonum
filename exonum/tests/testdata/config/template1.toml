@@ -8,9 +8,9 @@ status_timeout = 5000
 txs_block_limit = 1000
 
 [services]
-
-[validators]
-[validators.9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9]
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb]
 addr = "127.0.0.1:6333"
 
-[validators.9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9.values]
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.keys]
+
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.values]

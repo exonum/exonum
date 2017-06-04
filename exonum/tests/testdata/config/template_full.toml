@@ -8,24 +8,30 @@ status_timeout = 5000
 txs_block_limit = 1000
 
 [services]
-
-[validators]
-[validators.1bf7f976bc8e6931ca8fb70bb3abde5f053c1f99c91b9ba79db34f1bf846f1be]
+[validators.0dd27a711d90dc7aa0057fbc72b7647fc03de242540cfd1b96fe1776779f6973]
 addr = "127.0.0.1:6333"
 
-[validators.1bf7f976bc8e6931ca8fb70bb3abde5f053c1f99c91b9ba79db34f1bf846f1be.values]
+[validators.0dd27a711d90dc7aa0057fbc72b7647fc03de242540cfd1b96fe1776779f6973.keys]
 
-[validators.66932870aff6b5483cd78e88489d311373c78a6c9701dfea813cb437bd66b00a]
+[validators.0dd27a711d90dc7aa0057fbc72b7647fc03de242540cfd1b96fe1776779f6973.values]
+
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0]
 addr = "127.0.0.1:6333"
 
-[validators.66932870aff6b5483cd78e88489d311373c78a6c9701dfea813cb437bd66b00a.values]
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.keys]
 
-[validators.9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9]
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.values]
+
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb]
 addr = "127.0.0.1:6333"
 
-[validators.9d0a405862fb997fab5995ff5c55b396a0c69eaf4f799b737cee0eb4179ed6c9.values]
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.keys]
 
-[validators.facf7923e15d1cfc8d8c8c9c6ddd23cd392e9b964fdff761f764ce95a027e67b]
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.values]
+
+[validators.efa67f8eb63ff7060823d3228a6e38e2d61a6b7c0332932ae00a62e2b21ece9f]
 addr = "127.0.0.1:6333"
 
-[validators.facf7923e15d1cfc8d8c8c9c6ddd23cd392e9b964fdff761f764ce95a027e67b.values]
+[validators.efa67f8eb63ff7060823d3228a6e38e2d61a6b7c0332932ae00a62e2b21ece9f.keys]
+
+[validators.efa67f8eb63ff7060823d3228a6e38e2d61a6b7c0332932ae00a62e2b21ece9f.values]

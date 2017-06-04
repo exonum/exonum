@@ -12,7 +12,7 @@ use std::io::Read;
 use std::path::Path;
 use clap::{App, Result};
 
-use exonum::helpers::clap::{GenerateTemplateCommand, GenerateTestnetCommand,
+use exonum::helpers::clap::{Value, GenerateTemplateCommand, GenerateTestnetCommand,
                                 AddValidatorCommand, InitCommand };
 
 const CONFIG_TMP_FOLDER: &'static str = "/tmp/";
@@ -81,9 +81,9 @@ where
 
     match matches.subcommand() {
         ("generate-template", Some(matches)) => GenerateTemplateCommand::execute(matches, None),
-        ("add-validator", Some(matches)) => AddValidatorCommand::execute(matches, None),
+        ("add-validator", Some(matches)) => AddValidatorCommand::execute(matches, |_, _| Ok(())),
         ("generate", Some(matches)) => GenerateTestnetCommand::execute(matches),
-        ("init", Some(matches)) => InitCommand::execute(matches, None),
+        ("init", Some(matches)) => InitCommand::execute(matches, |config, _, _ | Ok(Value::try_from(config).unwrap())),
         _ => panic!("Wrong subcommand"),
     };
     Ok(())
