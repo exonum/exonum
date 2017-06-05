@@ -498,7 +498,7 @@ impl State {
         ((self.height() + round as u64) % (self.validators().len() as u64)) as ValidatorId
     }
 
-    /// Returns the current node's height.
+    /// Returns the height for a validator identified by the public key.
     pub fn node_height(&self, key: &PublicKey) -> Height {
         *self.nodes_max_height.get(key).unwrap_or(&0)
     }
@@ -517,12 +517,12 @@ impl State {
             .collect()
     }
 
-    /// Returns sufficient number of votes.
+    /// Returns sufficient number of votes for current validators number.
     pub fn majority_count(&self) -> usize {
         State::byzantine_majority_count(self.validators().len())
     }
 
-    /// Returns sufficient number of votes.
+    /// Returns sufficient number of votes for the given validators number.
     pub fn byzantine_majority_count(total: usize) -> usize {
         total * 2 / 3 + 1
     }
@@ -547,6 +547,11 @@ impl State {
         &self.last_hash
     }
 
+    /// Locks the node to the specified round and propose hash.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the current "locked round" is bigger or equal to the new one.
     pub fn lock(&mut self, round: Round, hash: Hash) {
         if self.locked_round >= round {
             panic!("Incorrect lock")
@@ -555,14 +560,17 @@ impl State {
         self.locked_propose = Some(hash);
     }
 
+    /// Returns locked round number. Zero means that the node is not locked to any round.
     pub fn locked_round(&self) -> Round {
         self.locked_round
     }
 
+    /// Returns propose hash on which the node makes lock.
     pub fn locked_propose(&self) -> Option<Hash> {
         self.locked_propose
     }
 
+    /// Returns propose state identified by hash.
     pub fn propose(&self, hash: &Hash) -> Option<&ProposeState> {
         self.proposes.get(hash)
     }
@@ -582,6 +590,7 @@ impl State {
         self.round += 1;
     }
 
+    /// Increments the node height by one and resets previous height data.
     // FIXME use block_hash
     pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height += 1;
@@ -608,12 +617,14 @@ impl State {
         self.requests.clear(); // FIXME: clear all timeouts
     }
 
+    /// Returns a list of queued consensus messages.
     pub fn queued(&mut self) -> Vec<ConsensusMessage> {
         let mut queued = Vec::new();
         ::std::mem::swap(&mut self.queued, &mut queued);
         queued
     }
 
+    /// Add consensus message to the queue.
     pub fn add_queued(&mut self, msg: ConsensusMessage) {
         self.queued.push(msg);
     }
@@ -623,6 +634,12 @@ impl State {
         &self.transactions
     }
 
+    /// Adds a transaction to the pool and returns list of proposes that don't contain unknown
+    /// transactions now.
+    ///
+    /// Transaction is ignored if the following criteria are fulfilled:
+    /// - transactions pool size is exceeded
+    /// - transaction isn't contained in unknown transaction list of any propose
     pub fn add_transaction(&mut self, tx_hash: Hash, msg: Box<Transaction>) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         // if tx is in some of propose, we should add it, or we can stuck on some state
@@ -649,6 +666,7 @@ impl State {
         full_proposes
     }
 
+    /// Returns pre-votes for the specified round and propose hash.
     pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Prevote] {
         self.prevotes
             .get(&(round, propose_hash))
@@ -656,6 +674,7 @@ impl State {
             .unwrap_or_else(|| &[])
     }
 
+    /// Returns pre-commits for the specified round and propose hash.
     pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Precommit] {
         self.precommits
             .get(&(round, propose_hash))
@@ -663,6 +682,11 @@ impl State {
             .unwrap_or_else(|| &[])
     }
 
+    /// Returns `true` if this node has pre-vote for the specified round.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this method is called for a non-validator node.
     pub fn have_prevote(&self, propose_round: Round) -> bool {
         if let Some(ref validator_state) = *self.validator_state(){
             validator_state.have_prevote(propose_round)
@@ -672,6 +696,8 @@ impl State {
         }
     }
 
+    /// Adds propose from this node to the proposes list for the current height. Such propose
+    /// cannot contain unknown transactions. Returns hash of the propose.
     pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
         debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.hash();
@@ -684,6 +710,7 @@ impl State {
         propose_hash
     }
 
+    /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
     pub fn add_propose(&mut self, msg: Propose) -> Option<&ProposeState> {
         let propose_hash = msg.hash();
         let txs = &self.transactions;
@@ -709,6 +736,8 @@ impl State {
         }
     }
 
+    /// Adds block to the list of blocks for the current height. Returns `BlockState` if it is a
+    /// new block.
     pub fn add_block(&mut self,
                      block_hash: Hash,
                      patch: Patch,
@@ -728,6 +757,11 @@ impl State {
         }
     }
 
+    /// Adds pre-vote. Returns `true` there are +2/3 pre-votes.
+    ///
+    /// # Panics
+    ///
+    /// A node panics if it has already sent a different `Prevote` for the same round.
     pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
@@ -749,6 +783,7 @@ impl State {
         votes.count() >= majority_count
     }
 
+    /// Returns `true` if there are +2/3 pre-votes for the specified round and hash.
     pub fn has_majority_prevotes(&self, round: Round, propose_hash: Hash) -> bool {
         match self.prevotes.get(&(round, propose_hash)) {
             Some(votes) => votes.count() >= self.majority_count(),
@@ -756,6 +791,7 @@ impl State {
         }
     }
 
+    /// Returns ids of validators that that sent pre-votes for the specified propose.
     pub fn known_prevotes(&self, round: Round, propose_hash: &Hash) -> BitVec {
         let len = self.validators().len();
         self.prevotes
@@ -764,6 +800,7 @@ impl State {
             .unwrap_or_else(|| BitVec::from_elem(len, false))
     }
 
+    /// Returns ids of validators that that sent pre-commits for the specified propose.
     pub fn known_precommits(&self, round: Round, propose_hash: &Hash) -> BitVec {
         let len = self.validators().len();
         self.precommits
@@ -772,6 +809,11 @@ impl State {
             .unwrap_or_else(|| BitVec::from_elem(len, false))
     }
 
+    /// Adds pre-commit. Returns `true` there are +2/3 pre-commits.
+    ///
+    /// # Panics
+    ///
+    /// A node panics if it has already sent a different `Precommit` for the same round.
     pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
@@ -794,6 +836,7 @@ impl State {
         votes.count() >= majority_count
     }
 
+    /// Adds unknown (for this node) propose.
     pub fn add_unknown_propose_with_precommits(&mut self,
                                                round: Round,
                                                propose_hash: Hash,
@@ -804,10 +847,12 @@ impl State {
             .push((round, block_hash));
     }
 
+    /// Removes propose from the list of unknown proposes and returns its round and hash.
     pub fn unknown_propose_with_precommits(&mut self, propose_hash: &Hash) -> Vec<(Round, Hash)> {
         self.unknown_proposes_with_precommits.remove(propose_hash).unwrap_or_default()
     }
 
+    /// Returns true if the node has +2/3 pre-commits for the specified round and block hash.
     pub fn has_majority_precommits(&self, round: Round, block_hash: Hash) -> bool {
         match self.precommits.get(&(round, block_hash)) {
             Some(votes) => votes.count() >= self.majority_count(),
@@ -815,6 +860,7 @@ impl State {
         }
     }
 
+    /// Returns `true` if the node doesn't have proposes different from the locked one.
     pub fn have_incompatible_prevotes(&self) -> bool {
         for round in self.locked_round + 1..self.round + 1 {
             match self.validator_state {
@@ -832,6 +878,7 @@ impl State {
         false
     }
 
+    /// Adds data-request to the queue. Returns `true` if it is a new request.
     pub fn request(&mut self, data: RequestData, peer: PublicKey) -> bool {
         let mut state = self.requests
             .entry(data)
@@ -841,6 +888,8 @@ impl State {
         is_new
     }
 
+    /// Returns public key of a peer that has required information. Returned key is removed from
+    /// the corresponding validators list, so next time request will be sent to a different peer.
     pub fn retry(&mut self, data: &RequestData, peer: Option<PublicKey>) -> Option<PublicKey> {
         let next = {
             let mut state = if let Some(state) = self.requests.get_mut(data) {

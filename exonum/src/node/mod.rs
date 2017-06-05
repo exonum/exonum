@@ -74,7 +74,9 @@ pub struct NodeHandler<S>
     pub state: State,
     /// Channel for messages and timeouts.
     pub channel: S,
+    /// Blockchain.
     pub blockchain: Blockchain,
+    /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
     timeout_adjuster: Box<TimeoutAdjuster>
@@ -116,16 +118,20 @@ impl Default for NodeApiConfig {
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
+    /// Initial config that will be written in the first block.
     pub genesis: GenesisConfig,
+    /// Network address used by this node.
     pub listen_address: SocketAddr,
     /// Network configuration.
     pub network: NetworkConfiguration,
+    /// Peer addresses.
     pub peers: Vec<SocketAddr>,
     /// Public key of the node.
     pub public_key: PublicKey,
     /// Secret key of the node.
     pub secret_key: SecretKey,
     pub whitelist: Whitelist,
+    /// Api configuration.
     pub api: NodeApiConfig,
 }
 
@@ -142,8 +148,10 @@ pub struct Configuration {
     pub peer_discovery: Vec<SocketAddr>,
 }
 
+/// Channel for messages and timeouts.
 pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
 
+/// Node that contains handler (`NodeHandler') and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
     reactor: Events<NodeHandler<NodeChannel>>,
