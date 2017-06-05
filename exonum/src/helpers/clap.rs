@@ -34,14 +34,12 @@ impl<'a, 'b> RunCommand<'a, 'b>
             .arg(Arg::with_name("NODE_CONFIG_PATH")
                      .short("c")
                      .long("node-config")
-                     .value_name("NODE_CONFIG_PATH")
                      .help("Path to node configuration file")
                      .required(true)
                      .takes_value(true))
             .arg(Arg::with_name("LEVELDB_PATH")
                      .short("d")
                      .long("leveldb-path")
-                     .value_name("LEVELDB_PATH")
                      .help("Use leveldb database with the given path")
                      .required(false)
                      .takes_value(true))
@@ -118,7 +116,7 @@ impl<'a, 'b> RunCommand<'a, 'b>
 
 #[derive(Serialize, Deserialize)]
 pub struct ValidatorIdent {
-    pub values: BTreeMap<String, Value>,
+    pub variables: BTreeMap<String, Value>,
     keys: BTreeMap<String, Value>,
     addr: SocketAddr,
 }
@@ -184,7 +182,7 @@ impl KeyGeneratorCommand {
     }
 
     /// Path where keychain config should be saved
-    pub fn keychain<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
+    pub fn keychain_filee<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
         Path::new(matches.value_of("KEYCHAIN").unwrap())
     }
 
@@ -204,7 +202,7 @@ impl KeyGeneratorCommand {
           Y: Into<Option<BTreeMap<String, Value>>>
     {
         let (pub_key, sec_key) = crypto::gen_keypair();
-        let keyconfig = Self::keychain(matches);
+        let keyconfig = Self::keychain_filee(matches);
         let pub_key_path = keyconfig.with_extension("pub");
         let pub_key_config: PubKeyConfig = PubKeyConfig {
             public_key: pub_key,
@@ -220,7 +218,7 @@ impl KeyGeneratorCommand {
             services_sec_keys: services_sec_keys.into().unwrap_or_default(),
         };
 
-        ConfigFile::save(&config, Self::keychain(matches))
+        ConfigFile::save(&config, Self::keychain_filee(matches))
                     .expect("Could not write keychain file.");
     }
 }
@@ -242,11 +240,11 @@ impl GenerateTemplateCommand {
     }
 
     /// Path where template config should be saved
-    pub fn template<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
+    pub fn template_file_path<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
         Path::new(matches.value_of("TEMPLATE").unwrap())
     }
     /// Validator total count
-    pub fn count(matches: &ArgMatches) -> usize {
+    pub fn validator_count(matches: &ArgMatches) -> usize {
         matches.value_of("COUNT").unwrap().parse().unwrap()
     }
 
@@ -261,17 +259,17 @@ impl GenerateTemplateCommand {
     {
         let values = values.into().unwrap_or_default();
         let template = ConfigTemplate {
-            count: Self::count(matches),
+            count: Self::validator_count(matches),
             services: values,
             ..ConfigTemplate::default()
         };
 
-        ConfigFile::save(&template, Self::template(matches))
+        ConfigFile::save(&template, Self::template_file_path(matches))
                         .expect("Could not write template file.");
     }
 }
 
-/// `add-validator` - append alidator to template.
+/// `add-validator` - append validator to template.
 /// Automaticaly share keys from public key config.
 pub struct AddValidatorCommand;
 impl AddValidatorCommand {
@@ -289,24 +287,23 @@ impl AddValidatorCommand {
             .arg(Arg::with_name("LISTEN_ADDR")
                      .short("a")
                      .long("listen-addr")
-                     .value_name("LISTEN_ADDR")
                      .required(true)
                      .takes_value(true))
 
     }
 
     /// path to public_key file
-    pub fn public_key<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
+    pub fn public_key_file_path<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
         Path::new(matches.value_of("PUBLIC_KEY").unwrap())
     }
 
     /// path to template config
-    pub fn template<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
+    pub fn template_file_path<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
         Path::new(matches.value_of("TEMPLATE").unwrap())
     }
 
     // exonum listen addr
-    pub fn addr(matches: &ArgMatches) -> String {
+    pub fn listen_addr(matches: &ArgMatches) -> String {
         matches.value_of("LISTEN_ADDR").unwrap().to_string()
     }
 
@@ -320,9 +317,9 @@ impl AddValidatorCommand {
         where F: FnOnce(&mut ValidatorIdent, &mut ConfigTemplate)
                         -> Result<(), Box<Error>>,
     {
-        let template_path = Self::template(matches);
-        let public_key_path = Self::public_key(matches);
-        let addr = Self::addr(matches);
+        let template_path = Self::template_file_path(matches);
+        let public_key_path = Self::public_key_file_path(matches);
+        let addr = Self::listen_addr(matches);
         let mut addr_parts = addr.split(':');
 
         let mut template: ConfigTemplate = ConfigFile::load(template_path).unwrap();
@@ -340,7 +337,7 @@ impl AddValidatorCommand {
 
             let mut ident = ValidatorIdent {
                 addr: addr,
-                values: BTreeMap::default(),
+                variables: BTreeMap::default(),
                 keys: public_key_config.services_pub_keys,
             };
 
@@ -448,13 +445,11 @@ impl GenerateTestnetCommand {
             .arg(Arg::with_name("OUTPUT_DIR")
                      .short("o")
                      .long("output-dir")
-                     .value_name("OUTPUT_DIR")
                      .required(true)
                      .takes_value(true))
             .arg(Arg::with_name("START_PORT")
                      .short("p")
                      .long("start-port")
-                     .value_name("START_PORT")
                      .required(false)
                      .takes_value(true))
             .arg(Arg::with_name("COUNT")
