@@ -112,7 +112,7 @@
             self.update();
             self.toggleLoading(false);
 
-            if (wallet && wallet.balance == 0) {
+            if (wallet && wallet.balance === 0) {
                 self.notify('warning', 'You have not any money yet. Add some funds.');
             }
         });

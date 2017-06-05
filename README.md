@@ -48,7 +48,7 @@ cryptocurrency --leveldb-path=example/3 --node-config=example/validators/3.toml
 ### Frontend
 
 Frontend is a lightweight single page application served by Node.js.
-It communicates with backends via REST api and uses [Exonum client](https://github.com/exonum/exonum-client) to parse data and convert it into appropriate format.
+It communicates with the backend via REST API and uses [Exonum client](https://github.com/exonum/exonum-client) library to parse and verify data and perform cryptographic operations.
 
 All business logic is can be found in [cryptocurrency.js](frontend/js/cryptocurrency.js).
 
