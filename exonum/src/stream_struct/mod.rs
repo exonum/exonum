@@ -58,7 +58,7 @@
 //! ### Primitive types
 //!
 //! Primitive types are all fixed sized, and located fully in header.
-//\TODO explain how an integer is stored in memory (what codding)
+// TODO explain how an signed integer is stored in memory (what codding)
 //!
 //! | Type name | Size in Header | Info |
 //! |:--------|:---------------------|:--------------------------------------------------|
@@ -150,7 +150,7 @@ impl SegmentReference {
     }
 }
 
-//\TODO replace by more generic type
+// TODO replace by more generic type
 /// `CheckedOffset` is a type that take control over overflow,
 /// so you can't panic without `unwrap`,
 /// and work with this value without overflow checks.

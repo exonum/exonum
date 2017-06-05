@@ -16,21 +16,29 @@ use super::{Error, SegmentReference, CheckedOffset, Offset};
 macro_rules! implement_std_field {
     ($name:ident $fn_read:expr; $fn_write:expr) => (
         impl<'a> Field<'a> for $name {
-            fn field_size() -> Offset {
-                mem::size_of::<$name>() as Offset
+            fn field_size() -> $crate::stream_struct::Offset {
+                mem::size_of::<$name>() as $crate::stream_struct::Offset
             }
 
-            unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> $name {
+            unsafe fn read(buffer: &'a [u8],
+                           from: $crate::stream_struct::Offset,
+                           to: $crate::stream_struct::Offset) -> $name {
                 $fn_read(&buffer[from as usize..to as usize])
             }
 
-            fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+            fn write(&self,
+                        buffer: &mut Vec<u8>,
+                        from: $crate::stream_struct::Offset,
+                        to: $crate::stream_struct::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
+
             fn check(buffer: &'a [u8],
-                    from: CheckedOffset,
-                    to: CheckedOffset)
-                    -> Result<Option<SegmentReference>, Error> {
+                        from: $crate::stream_struct::CheckedOffset,
+                        to: $crate::stream_struct::CheckedOffset)
+            ->  $crate::stream_struct::Result
+            {
+                use $crate::stream_struct::Error;
                 let len = buffer.len();
                 if len < to.unchecked_offset() as usize {
                     return Err(Error::UnexpectedlyShortPayload {
@@ -58,15 +66,22 @@ macro_rules! implement_std_field {
 macro_rules! implement_pod_as_ref_field {
     ($name:ident) => (
         impl<'a> Field<'a> for &'a $name {
-            fn field_size() -> Offset {
-                ::std::mem::size_of::<$name>() as Offset
+            fn field_size() ->  $crate::stream_struct::Offset {
+                ::std::mem::size_of::<$name>() as $crate::stream_struct::Offset
             }
 
-            unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> &'a $name {
+            unsafe fn read(buffer: &'a [u8],
+                            from: $crate::stream_struct::Offset,
+                            _: $crate::stream_struct::Offset) -> &'a $name
+            {
                 ::std::mem::transmute(&buffer[from as usize])
             }
 
-            fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+            fn write(&self,
+                        buffer: &mut Vec<u8>,
+                        from: $crate::stream_struct::Offset,
+                        to: $crate::stream_struct::Offset)
+            {
                 let ptr: *const $name = *self as *const $name;
                 let slice = unsafe {
                     ::std::slice::from_raw_parts(ptr as * const u8,
@@ -75,13 +90,15 @@ macro_rules! implement_pod_as_ref_field {
             }
 
             fn check(buffer: &'a [u8],
-                    from: CheckedOffset,
-                    to: CheckedOffset)
-                    -> Result<Option<SegmentReference>, Error> {
+                        from:  $crate::stream_struct::CheckedOffset,
+                        to:  $crate::stream_struct::CheckedOffset)
+            ->  $crate::stream_struct::Result
+            {
+                use $crate::stream_struct::Error;
                 let len = buffer.len();
                 if len < to.unchecked_offset() as usize {
                     return Err(Error::UnexpectedlyShortPayload {
-                        actual_size: len as Offset,
+                        actual_size: len as $crate::stream_struct::Offset,
                         minimum_size: to.unchecked_offset(),
                     });
                 }
@@ -100,7 +117,7 @@ macro_rules! implement_pod_as_ref_field {
 }
 
 
-//\TODO this check should be rewritted as part of buffer implementation.
+// TODO this check should be rewritted as part of buffer implementation.
 macro_rules! check_field_size {
     ($buffer:ident $from:expr; $to:expr) => {
         {
@@ -200,7 +217,7 @@ impl<'a> Field<'a> for u8 {
 
 }
 
-//\TODO expect some codding of signed ints?
+// TODO expect some codding of signed ints?
 impl<'a> Field<'a> for i8 {
 
     fn field_size() -> Offset {
@@ -235,7 +252,7 @@ implement_pod_as_ref_field! {Signature}
 implement_pod_as_ref_field! {PublicKey}
 implement_pod_as_ref_field! {Hash}
 
-//\TODO should we check `SystemTime` validity in check?
+// TODO should we check `SystemTime` validity in check?
 impl<'a> Field<'a> for SystemTime {
     fn field_size() -> Offset {
         (mem::size_of::<u64>() + mem::size_of::<u32>()) as Offset
@@ -267,11 +284,11 @@ impl<'a> Field<'a> for SystemTime {
     }
 }
 
-//\TODO add socketaddr check, for now with only ipv4 
+// TODO add socketaddr check, for now with only ipv4 
 // all possible (>6 bytes long) sequences is a valid addr.
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
-        //\FIXME: reserve space for future compatibility
+        // FIXME: reserve space for future compatibility
         6
     }
 

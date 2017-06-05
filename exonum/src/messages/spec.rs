@@ -265,7 +265,7 @@ macro_rules! message {
             }
         }
 
-        //\TODO: Rewrite Deserialize and Serialize implementation
+        // TODO: Rewrite Deserialize and Serialize implementation
         impl<'de> $crate::stream_struct::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::stream_struct::serialize::reexport::Deserializer<'de>

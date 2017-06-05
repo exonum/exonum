@@ -85,7 +85,7 @@ macro_rules! storage_value {
             fn field_size() -> $crate::stream_struct::Offset {
                 // We write `storage_value` as regular buffer,
                 // so real `field_size` is 8.
-                //\TODO: maybe we should write it as sub structure in place?
+                // TODO: maybe we should write it as sub structure in place?
                 // We could get benefit from it: we limit indirection
                 // in deserializing sub fields, by only one calculation.
 
@@ -198,7 +198,7 @@ macro_rules! storage_value {
             }
         }
 
-        //\TODO: Rewrite Deserialize and Serialize implementation
+        // TODO: Rewrite Deserialize and Serialize implementation
         impl<'de> $crate::stream_struct::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::stream_struct::serialize::reexport::Deserializer<'de>
