@@ -13,11 +13,11 @@ addr = "127.0.0.1:6333"
 
 [validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.keys]
 
-[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.values]
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.variables]
 
 [validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb]
 addr = "127.0.0.1:6333"
 
 [validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.keys]
 
-[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.values]
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.variables]
