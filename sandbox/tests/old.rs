@@ -51,6 +51,7 @@ fn test_get_lock_and_send_precommit() {
                            0,
                            2,
                            1,
+                           0,
                            &sandbox.last_hash(),
                            &Hash::zero(),
                            &sandbox.last_state_hash());
@@ -80,6 +81,7 @@ fn test_commit() {
                            0,
                            2,
                            1,
+                           0,
                            &sandbox.last_hash(),
                            &Hash::zero(),
                            &sandbox.last_state_hash());

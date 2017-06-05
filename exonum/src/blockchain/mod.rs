@@ -143,6 +143,8 @@ impl Blockchain {
         }
         // Get tx hash
         let tx_hash = schema.block_txs(height).root_hash()?;
+        // Get tx count
+        let tx_count = schema.block_txs(height).len()?;
         // Get state hash
         let state_hash = {
             let sum_table = schema.state_hash_aggregator();
@@ -167,6 +169,7 @@ impl Blockchain {
                                network_id,
                                proposer_id,
                                height,
+                               tx_count,
                                &last_hash,
                                &tx_hash,
                                &state_hash);

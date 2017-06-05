@@ -226,10 +226,13 @@ mod tests {
     #[test]
     fn test_json_response_for_complex_val() {
         let str_val = "sghdkgskgskldghshgsd";
+        let txs = [34, 32];
+        let tx_count = txs.len() as u64;
         let complex_val = Block::new(SCHEMA_MAJOR_VERSION,
                                      0,
                                      0,
                                      24,
+                                     tx_count,
                                      &Hash::new([24; 32]),
                                      &Hash::new([34; 32]),
                                      &Hash::new([38; 32]));
