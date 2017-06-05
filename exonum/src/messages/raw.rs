@@ -4,7 +4,7 @@ use std::{mem, convert, sync};
 use std::fmt::Debug;
 
 use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
-use stream_struct::{Field, Error, Result as StructResult, Offset, CheckedOffset};
+use stream_struct::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset};
 
 pub const HEADER_SIZE: usize = 10; // TODO: rename to HEADER_LENGTH?
 
@@ -57,7 +57,7 @@ impl MessageBuffer {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
-    pub fn check<'a, F: Field<'a>>(&'a self, from: CheckedOffset, to: CheckedOffset) -> StructResult {
+    pub fn check<'a, F: Field<'a>>(&'a self, from: CheckedOffset, to: CheckedOffset) -> StreamStructResult {
         F::check(self.body(), (from + HEADER_SIZE as u32)?, (to + HEADER_SIZE as u32)?)
     }
 

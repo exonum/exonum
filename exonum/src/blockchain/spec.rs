@@ -28,7 +28,8 @@
 ///
 /// For additionall reference about data layout see also 
 /// *[ `stream_struct` documentation](./stream_struct/index.html).*
-/// 
+///
+/// `storage_value!` internaly use `ident_count!`, be sure to add this macro to namespace.
 #[macro_export]
 macro_rules! storage_value {
     (
@@ -67,7 +68,7 @@ macro_rules! storage_value {
                         to_st_val: $crate::stream_struct::CheckedOffset)
                 -> $crate::stream_struct::Result
             {
-                let ret = <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, (from_st_val + 8)?)?;
+                let ret = <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, to_st_val)?;
                 let vec: Vec<u8> = unsafe{ $crate::stream_struct::Field::read(buffer, 
                                                                         from_st_val.unchecked_offset(),
                                                                         to_st_val.unchecked_offset())};
@@ -154,7 +155,7 @@ macro_rules! storage_value {
                 {
                     use ::serde::ser::SerializeStruct;
                     let mut structure = serializer.serialize_struct(stringify!($name),
-                                                    indents_count!($($field_name)*))?;
+                                                    idents_count!($($field_name)*))?;
                     $(
                         structure.serialize_field(stringify!($field_name),
                             &$crate::stream_struct::serialize::json::wrap(&self.$field_name()))?;
@@ -195,7 +196,7 @@ macro_rules! storage_value {
             }
         }
 
-        //\TODO: Rewrite Deserialize and Serializa implementation
+        //\TODO: Rewrite Deserialize and Serialize implementation
         impl<'de> $crate::stream_struct::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::stream_struct::serialize::reexport::Deserializer<'de>

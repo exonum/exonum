@@ -128,8 +128,8 @@ fn assert_write_check_read<T>(input: T, header_size: Offset)
     //and fill old buffer with zeros
     buffer.resize(len, 0);
 
-    <T as Field>::check(&new_buffer, 0.into(), 8.into()).unwrap();
-    let output = unsafe { Field::read(&new_buffer, 0, 8) };
+    <T as Field>::check(&new_buffer, 0.into(), header_size.into()).unwrap();
+    let output = unsafe { Field::read(&new_buffer, 0, header_size) };
     assert_eq!(input, output);
 
 }

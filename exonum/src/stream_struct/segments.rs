@@ -41,36 +41,40 @@ impl<'a, T> Field<'a> for T
 
     }
 
-    fn check(buffer: &'a [u8], from: CheckedOffset, to: CheckedOffset) -> Result {
-        check_field_size!{buffer from; to};
-        let end_pos: Offset = (from + 4)?.unchecked_offset();
-        let pos: CheckedOffset = LittleEndian::read_u32(&buffer[from.unchecked_offset() as usize..
-                                                         end_pos as usize])
+    fn check(buffer: &'a [u8],
+             header_from: CheckedOffset,
+             header_to: CheckedOffset) -> Result {
+        check_field_size!{buffer header_from; header_to};
+        let header_count_start: Offset = (header_from + 4)?.unchecked_offset();
+        let segment_start: CheckedOffset = LittleEndian::read_u32(
+                                &buffer[header_from.unchecked_offset() as usize
+                                            ..header_count_start as usize])
                 .into();
-        let count: CheckedOffset = LittleEndian::read_u32(&buffer[end_pos as usize..
-                                                           to.unchecked_offset() as usize])
+        let count: CheckedOffset = LittleEndian::read_u32(
+                                &buffer[header_count_start as usize
+                                            ..header_to.unchecked_offset() as usize])
                 .into();
 
         if count.unchecked_offset() == 0 {
             return Ok(None);
         }
 
-        if pos < (from + 8)? {
+        if segment_start < header_to {
             return Err(Error::IncorrectSegmentReference {
-                           position: from.unchecked_offset(),
-                           value: pos.unchecked_offset(),
+                           position: header_from.unchecked_offset(),
+                           value: segment_start.unchecked_offset(),
                        });
         }
 
-        let end = (pos + (count * Self::item_size())?)?;
-        if end.unchecked_offset() > buffer.len() as u32 {
+        let segment_end = (segment_start + (count * Self::item_size())?)?;
+        if segment_end.unchecked_offset() > buffer.len() as u32 {
             return Err(Error::IncorrectSegmentSize {
-                           position: (from + 4)?.unchecked_offset(),
+                           position: header_count_start,
                            value: count.unchecked_offset(),
                        });
         }
 
-        Self::check_data(buffer, pos, count)
+        Self::check_data(buffer, segment_start, count)
     }
 }
 
