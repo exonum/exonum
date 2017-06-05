@@ -146,7 +146,9 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/message_id_from_other.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp, Status::Conflict, "data did not match any variant of untagged enum CurrencyTx");
+        assert_response_status(resp,
+                               Status::Conflict,
+                               "data did not match any variant of untagged enum CurrencyTx");
     }
 
     #[test]
@@ -155,7 +157,9 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/invalid_message_id.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp, Status::Conflict, "data did not match any variant of untagged enum CurrencyTx");
+        assert_response_status(resp,
+                               Status::Conflict,
+                               "data did not match any variant of untagged enum CurrencyTx");
     }
 
     #[test]
@@ -164,7 +168,9 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/invalid_service_id.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp, Status::Conflict, "data did not match any variant of untagged enum CurrencyTx");
+        assert_response_status(resp,
+                               Status::Conflict,
+                               "data did not match any variant of untagged enum CurrencyTx");
     }
 
     #[test]
