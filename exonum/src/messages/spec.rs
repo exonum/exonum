@@ -115,8 +115,7 @@ macro_rules! message {
             }
         }
         impl $name {
-            #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
-
+            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             /// Create messsage `$name` and sign it.
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
@@ -129,6 +128,7 @@ macro_rules! message {
             }
 
             /// Create message `$name` and append existing signature.
+            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             pub fn new_with_signature($($field_name: $field_type,)*
                        signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};

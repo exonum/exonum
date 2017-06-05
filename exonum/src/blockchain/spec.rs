@@ -26,7 +26,7 @@
 /// # }
 /// ```
 ///
-/// For additionall reference about data layout see also 
+/// For additional reference about data layout see also 
 /// *[ `stream_struct` documentation](./stream_struct/index.html).*
 ///
 /// `storage_value!` internaly use `ident_count!`, be sure to add this macro to namespace.
@@ -113,6 +113,8 @@ macro_rules! storage_value {
 
         // TODO extract some fields like hash and from_raw into trait
         impl $name {
+            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            /// Create `$name`.
             pub fn new($($field_name: $field_type,)*) -> $name {
                 use $crate::stream_struct::{Field};
                 let mut buf = vec![0; $body];
