@@ -151,7 +151,7 @@ pub struct Configuration {
 /// Channel for messages and timeouts.
 pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
 
-/// Node that contains handler (`NodeHandler') and `NodeApiConfig`.
+/// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
     reactor: Events<NodeHandler<NodeChannel>>,
