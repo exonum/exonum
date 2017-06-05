@@ -24,7 +24,9 @@ macro_rules! impl_default_serialize {
 macro_rules! impl_default_serialize_deref {
     (@impl $traitname:ident $typename:ty) => {
         impl<'a> $traitname for &'a $typename {
-            fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where S: $crate::stream_struct::serialize::reexport::Serializer
+            {
                 <$typename as ::serde::Serialize>::serialize(*self, serializer)
             }
         }
@@ -62,12 +64,14 @@ macro_rules! implement_exonum_serializer {
         }
 
         impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
-            fn deserialize_field<B: WriteBufferWrapper>(
+            fn deserialize_field<B>(
                 value: &$crate::stream_struct::serialize::json::reexport::Value,
                                                         buffer: &mut B,
-                                                        from: usize,
-                                                        to: usize)
-                                                        -> Result<(), Box<::std::error::Error>> {
+                                                        from: $crate::stream_struct::Offset,
+                                                        to: $crate::stream_struct::Offset)
+                                                        -> Result<(), Box<::std::error::Error>> 
+            where B: $crate::stream_struct::serialize::WriteBufferWrapper
+            {
                 use $crate::stream_struct::serialize::json::reexport::from_value;
                 let value: $name = from_value(value.clone())?;
                 buffer.write(from, to, value);

@@ -2,10 +2,10 @@
 /// json format.
 ///
 
-//\TODO refer to difference between json serialization and exonum_json
-//\TODO implement Field for float
-//\TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage
-//\TODO implement owned ExonumJsonDeserialize for big ints
+// TODO refer to difference between json serialization and exonum_json
+// TODO implement Field for float
+// TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage
+// TODO implement owned ExonumJsonDeserialize for big ints
 
 use serde::{Serializer, Serialize};
 

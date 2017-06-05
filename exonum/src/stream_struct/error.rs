@@ -1,12 +1,15 @@
 use std::error::Error as StdError;
 use std::fmt;
+use std::borrow::Cow;
+
 use super::Offset;
+
 
 #[derive( Debug)]
 /// This structure represent `stream_struct` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
-    //\TODO: Check this message after refactor buffer.
+    // TODO: Check this message after refactor buffer.
     /// Payload is short for this message.
     UnexpectedlyShortPayload {
         /// real message size
@@ -14,7 +17,7 @@ pub enum Error {
         /// expected size of fixed part
         minimum_size: Offset,
     },
-    //\TODO: Remove `to` from `Field` signature, it's a bit redurant.
+    // TODO: Remove `to` from `Field` signature, it's a bit redurant.
     /// Expected field size is different from the field size in buffer.
     FieldSizeMismatch {
         /// real field size
@@ -91,6 +94,8 @@ pub enum Error {
     },
     /// Overflow in Offsets
     OffsetOverflow,
+    /// Basic error suport, for custom fields
+    Basic(Cow<'static, str>),
     /// Other error for custom fields
     Other(Box<StdError>),
 }
@@ -116,6 +121,7 @@ impl StdError for Error {
             Error::SpaceBetweenSegments { .. } => "Space between segments.",
             Error::Utf8 { .. } => "Utf8 error in parsing string.",
             Error::OffsetOverflow => "Overflow in offset pointers.",
+            Error::Basic(ref x) => x.as_ref(),
             Error::Other(_) => "Other error.",
         }
     }
@@ -133,5 +139,19 @@ impl StdError for Error {
 impl From<Box<StdError>> for Error {
     fn from(t: Box<StdError>) -> Error {
         Error::Other(t)
+    }
+}
+
+impl From<Cow<'static, str>> for Error
+{
+    fn from(t: Cow<'static, str>) -> Error {
+        Error::Basic(t)
+    }
+}
+
+impl From<&'static str> for Error
+{
+    fn from(t: &'static str) -> Error {
+        Error::Basic(t.into())
     }
 }
