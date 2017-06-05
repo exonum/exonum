@@ -1,5 +1,4 @@
-//! Exonum global variables.
-//! TODO
+//! Exonum global variables which stored in blockchain as utf8 encoded json.
 
 use serde_json;
 
@@ -30,13 +29,13 @@ pub struct StoredConfiguration {
 /// Consensus algorithm parameters.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
-    /// Interval (ms) between rounds.
+    /// Interval between rounds.
     pub round_timeout: Milliseconds,
-    /// Period (ms) of sending a Status message.
+    /// Period of sending a Status message.
     pub status_timeout: Milliseconds,
-    /// Peer exchange timeout (in ms).
+    /// Peer exchange timeout.
     pub peers_timeout: Milliseconds,
-    /// Proposal timeout (ms) after the new height beginning.
+    /// Proposal timeout after the new height beginning.
     pub propose_timeout: Milliseconds,
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,

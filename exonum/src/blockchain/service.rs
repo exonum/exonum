@@ -1,6 +1,7 @@
 //! # Introduction
 //! This module defines the `exonum` services interfaces. Like smart contracts in some other 
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
+//!
 //! To create your own service you need to define following things:
 //!  - Define your own information schema. 
 //!  - Create one or more types of messages using a macro `message!` and implement 
@@ -24,7 +25,8 @@ use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
 pub trait Transaction: Message + 'static {
     /// Checks the formal correctness of the transaction.
     /// That can be usefull for signature verification.
-    /// *This method should not use external data, that is, it must be a pure function!*
+    ///
+    /// *This method should not use external data, that is, it must be a pure function.*
     fn verify(&self) -> bool;
     /// Defines the rules for executing transactions, during which the state of 
     /// `View` can be changed.
@@ -65,7 +67,8 @@ pub trait Service: Send + Sync + 'static {
 
     /// Handles commit event. This handler is invoked for each service after commit of the block.
     /// For example service can create some transaction if the specific condition occurred. 
-    /// Try not to perform long operations here.
+    ///
+    /// *Try not to perform long operations here*.
     fn handle_commit(&self, context: &mut ServiceContext) -> Result<(), StorageError> {
         Ok(())
     }
@@ -81,8 +84,8 @@ pub trait Service: Send + Sync + 'static {
     }
 }
 
-/// The current node state on which the blockchain is running, 
-/// or in other words execution context.
+/// The current node state on which the blockchain is running, or in other words 
+/// execution context.
 #[derive(Debug)]
 pub struct ServiceContext<'a, 'b> {
     state: &'a mut State,

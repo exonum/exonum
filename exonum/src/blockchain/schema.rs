@@ -54,7 +54,7 @@ pub struct Schema<'a> {
     view: &'a View,
 }
 
-/// Data tables
+/// Data tables section.
 impl<'a> Schema<'a> {
     /// Returns table that represents a map from transaction hash into raw transaction message.
     pub fn transactions(&self) -> MapTable<View, Hash, RawMessage> {
@@ -123,7 +123,7 @@ impl<'a> Schema<'a> {
     }
 }
 
-/// Methods
+/// Business logic section.
 impl<'a> Schema<'a> {
     /// Constructs schema for the given storage `View`.
     pub fn new(view: &'a View) -> Schema {
@@ -177,7 +177,6 @@ impl<'a> Schema<'a> {
 
     /// Adds a new configuration to the blockchain, which will become an actual at 
     /// the `actual_from` height in `config_data`.
-    /// TODO
     pub fn commit_configuration(&self, config_data: StoredConfiguration) -> Result<(), Error> {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
