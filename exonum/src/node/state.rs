@@ -91,7 +91,6 @@ struct RequestState {
 }
 
 pub struct ProposeState {
-    hash: Hash,
     propose: Propose,
     // FIXME: use HashSet here
     unknown_txs: BTreeSet<Hash>,
@@ -231,7 +230,7 @@ impl RequestState {
 
 impl ProposeState {
     pub fn hash(&self) -> Hash {
-        self.hash
+        self.propose.hash()
     }
 
     pub fn message(&self) -> &Propose {
@@ -442,8 +441,6 @@ impl State {
     }
 
     pub fn majority_count(&self) -> usize {
-        // FIXME: What if validators count < 4?
-        //self.validators().len() * 2 / 3 + 1
         State::byzantine_majority_count(self.validators().len())
     }
 
@@ -593,7 +590,6 @@ impl State {
         let propose_hash = msg.hash();
         self.proposes.insert(propose_hash,
                              ProposeState {
-                                 hash: propose_hash,
                                  propose: msg,
                                  unknown_txs: BTreeSet::new(),
                              });
@@ -619,7 +615,6 @@ impl State {
                         .push(propose_hash);
                 }
                 Some(e.insert(ProposeState {
-                    hash: propose_hash,
                     propose: msg.clone(),
                     unknown_txs: unknown_txs,
                 }))
