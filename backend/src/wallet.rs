@@ -107,8 +107,8 @@ mod tests {
             let json_str = serde_json::to_string(&wallet).unwrap();
             let wallet1: Wallet = serde_json::from_str(&json_str).unwrap();
             assert_eq!(wallet, wallet1);
-            println!("wallet test data: {}",
-                     serde_json::to_string(&WalletTestData::new(wallet)).unwrap());
+            trace!("wallet test data: {}",
+                   serde_json::to_string(&WalletTestData::new(wallet)).unwrap());
         }
     }
 

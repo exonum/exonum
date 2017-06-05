@@ -379,8 +379,8 @@ mod tests {
             let json_str = serde_json::to_string(&wrapped_tx).unwrap();
             let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
             assert_eq!(wrapped_tx, parsed_json);
-            println!("tx issue test_data: {}",
-                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+            trace!("tx issue test_data: {}",
+                   serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
         }
     }
 
@@ -399,8 +399,8 @@ mod tests {
             let json_str = serde_json::to_string(&wrapped_tx).unwrap();
             let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
             assert_eq!(wrapped_tx, parsed_json);
-            println!("tx issue test_data: {}",
-                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+            trace!("tx issue test_data: {}",
+                   serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
         }
     }
 
@@ -423,8 +423,8 @@ mod tests {
             let json_str = serde_json::to_string(&wrapped_tx).unwrap();
             let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
             assert_eq!(wrapped_tx, parsed_json);
-            println!("tx issue test_data: {}",
-                     serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+            trace!("tx issue test_data: {}",
+                   serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
         }
     }
 
@@ -444,9 +444,9 @@ mod tests {
                                         tx_transfer_1.into(),
                                         tx_transfer_2.into()];
         for (idx, tx) in txs.iter().enumerate() {
-            println!("transaction #{}: {}",
-                     idx,
-                     serde_json::to_string(tx).unwrap());
+            trace!("transaction #{}: {}",
+                   idx,
+                   serde_json::to_string(tx).unwrap());
         }
     }
 
