@@ -15,7 +15,7 @@ pub enum Error {
         minimum_size: Offset,
     },
     //\TODO: Remove `to` from `Field` signature, it's a bit redurant.
-    /// Expected field size is differ from the field size in buffer.
+    /// Expected field size is different from the field size in buffer.
     FieldSizeMismatch {
         /// real field size
         actual_size: Offset,

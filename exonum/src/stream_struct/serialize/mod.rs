@@ -1,7 +1,6 @@
 //! Serialize structure into specific format.
 //! Currently support only json.
-//! This module is a pack of superstructure over serde `Deserializer's`
-
+//! This module is a pack of superstructures over serde `Serializer's`\\`Deserializer's`
 
 pub use hex::{FromHexError, ToHex, FromHex};
 use stream_struct::Field;

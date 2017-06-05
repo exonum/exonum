@@ -62,9 +62,9 @@ macro_rules! propagate_deserialize_to_owned {
 }
 
 /// `ExonumJsonDeserializeField` is trait for object
-/// that can be serialized "in-place" of storage structure.
+/// that can be serialized "in-place".
 ///
-/// This trait important for field types that could not be
+/// This trait is important for field types that could not be
 /// deserialized directly, for example: borrowed array.
 pub trait ExonumJsonDeserializeField {
     /// write deserialized field in buffer on place.

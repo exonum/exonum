@@ -2,7 +2,7 @@
 //! `stream_struct` is a lazy serialization library,
 //! it allows to keep struct serialized in place, and deserialize fields on demand.
 //!
-//! Binary representation structure splitted into two main parts:
+//! Binary representation of structure is split into two main parts:
 //!
 //! - Header - fixed sized part.
 //! - Body - dynamic sized, known only after parsing header, part.
@@ -16,7 +16,7 @@
 //! - second one is `u64`
 //!
 //! To create message for this structure now, you need to know how many bytes this fields
-//! took in header. See [Field layout].
+//! took in header. See [Fields layout](#fields-layout).
 //!
 //! We know that `u64` [took 8 bytes](#primitive-types),
 //! and string took [8 segment bytes](#segment-fields).
@@ -42,13 +42,13 @@
 //!     let student = MyAwesomeStructure::new("Andrew", 23);
 //! # }
 //! ```
-//! Then in memory of student you will get:
+//! Then in internal buffer of `student` you will get:
 //!
 //! | Position | Stored data  | Hexadecimal form | Comment |
 //! |:--------|:------:|:---------------------|:--------------------------------------------------|
-//! `0  => 4`  | 16    | `10 00 00 00`            | Little endian storred segment pointer, reffer to position in data where real string is located |
-//! `4  => 8`  | 6     | `06 00 00 00`            | Little endian storred segment size |
-//! `8  => 16` | 23    | `10 00 00 00 00 00 00 00`| number in little endian |
+//! `0  => 4`  | 16    | `10 00 00 00`            | Little endian stored segment pointer, reffer to position in data where real string is located |
+//! `4  => 8`  | 6     | `06 00 00 00`            | Little endian stored segment size |
+//! `8  => 16` | 23    | `17 00 00 00 00 00 00 00`| number in little endian |
 //! `16 => 24` | Andrew| `41 6e 64 72 65 77`	    | Real text bytes|
 //!
 //!
@@ -64,16 +64,16 @@
 //! |:--------|:---------------------|:--------------------------------------------------|
 //! `u8`     | 1    | Regular byte  |
 //! `i8`     | 1    | Signed byte  |
-//! `u16`    | 2    | Short unsigned number storred in little endian  |
-//! `i16`    | 2    | Short signed number storred in little endian  |
-//! `u32`    | 4    | 32-bit unsigned number storred in little endian  |
-//! `i32`    | 4    | 32-bit signed number storred in little endian  |
-//! `u64`    | 8    | long unsigned number storred in little endian  |
-//! `i64`    | 8    | long signed number storred in little endian  |
+//! `u16`    | 2    | Short unsigned number stored in little endian  |
+//! `i16`    | 2    | Short signed number stored in little endian  |
+//! `u32`    | 4    | 32-bit unsigned number stored in little endian  |
+//! `i32`    | 4    | 32-bit signed number stored in little endian  |
+//! `u64`    | 8    | long unsigned number stored in little endian  |
+//! `i64`    | 8    | long signed number stored in little endian  |
 //! `bool`   | 1    | stored as single byte, where `0x01` - true `0x00` - false [\[1\]](#1)|
 //!
 //! ######\[1]
-//! **Trying to represent other values as bool lead to undefined behavior**.
+//! **Trying to represent other values as bool leads to undefined behavior**.
 //!
 //! ### Segment fields
 //!
@@ -111,9 +111,9 @@ pub type Offset = u32;
 /// Type alias that should be returned in `check` method of `Field`
 pub type Result = ::std::result::Result<Option<SegmentReference>, Error>;
 
-/// Reference to some data in buffer.
+/// A helper structure used to refer to some data range in buffer.
 /// Currently used only by `check` method
-/// and indicates what bytes in buffer we already check.
+/// and indicates what bytes in buffer we already checked.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct SegmentReference {
     /// position in buffer where data begin
@@ -128,18 +128,19 @@ impl SegmentReference {
         SegmentReference { from: from, to: to }
     }
 
-    /// checks overlapping segments.
+    /// Checks sequence of segments, for overlapping 
+    /// and whether illegal spaces between segments are present.
     pub fn check_segment(&mut self,
                          last_data: &mut CheckedOffset)
                          -> ::std::result::Result<(), Error> {
         if self.from < *last_data {
             Err(Error::OverlappingSegment {
-                    last_end: (*last_data).unchecked_offset(),
+                    last_end: last_data.unchecked_offset(),
                     start: self.from.unchecked_offset(),
                 })
         } else if self.from > *last_data {
             Err(Error::SpaceBetweenSegments {
-                    last_end: (*last_data).unchecked_offset(),
+                    last_end: last_data.unchecked_offset(),
                     start: self.from.unchecked_offset(),
                 })
         } else {

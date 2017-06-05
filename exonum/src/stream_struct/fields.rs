@@ -59,18 +59,18 @@ macro_rules! implement_pod_as_ref_field {
     ($name:ident) => (
         impl<'a> Field<'a> for &'a $name {
             fn field_size() -> Offset {
-                mem::size_of::<$name>() as Offset
+                ::std::mem::size_of::<$name>() as Offset
             }
 
             unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> &'a $name {
-                mem::transmute(&buffer[from as usize])
+                ::std::mem::transmute(&buffer[from as usize])
             }
 
             fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
                 let ptr: *const $name = *self as *const $name;
                 let slice = unsafe {
                     ::std::slice::from_raw_parts(ptr as * const u8,
-                                                        mem::size_of::<$name>())};
+                                                        ::std::mem::size_of::<$name>())};
                 buffer[from as usize..to as usize].copy_from_slice(slice);
             }
 
@@ -122,18 +122,18 @@ macro_rules! check_field_size {
     }
 }
 
-/// Trait for all types that should be possible to serialize as
+/// Trait for all types that could be a field in `stream_struct`.
 pub trait Field<'a> {
     // TODO: use Read and Cursor
     // TODO: debug_assert_eq!(to-from == size of Self)
 
-    /// Read Field from buffer, with given position
+    /// Read Field from buffer, with given position,
+    /// beware of memory unsafety,
+    /// you should `check` `Field` before `read`.
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self;
 
     /// Write Field to buffer, in given position
-    /// `write` didn't lead to memory unsafety.
-    /// But it work in pair with `read`,
-    /// and you should to pay additionaly attention to `write` calls
+    /// `write` doesn't lead to memory unsafety.
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset);
     /// Field's header size
     fn field_size() -> Offset;
@@ -242,8 +242,8 @@ impl<'a> Field<'a> for SystemTime {
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> SystemTime {
-        let secs = LittleEndian::read_u64(&buffer[from as usize..to as usize]);
-        let nanos = LittleEndian::read_u32(&buffer[from as usize + mem::size_of_val(&secs)..
+        let secs = LittleEndian::read_u64(&buffer[from as usize .. from as usize + 8]);
+        let nanos = LittleEndian::read_u32(&buffer[from as usize + 8..
                                             to as usize]);
         UNIX_EPOCH + Duration::new(secs, nanos)
     }
