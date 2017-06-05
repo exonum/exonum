@@ -18,7 +18,7 @@ use exonum::blockchain::{self, Blockchain};
 
 use super::tx_metarecord::TxMetaRecord;
 use super::wallet::Wallet;
-use super::{CRYPTOCURRENCY, CurrencySchema, CurrencyTx};
+use super::{CRYPTOCURRENCY_SERVICE_ID, CurrencySchema, CurrencyTx};
 
 /// TODO: Add documentation.
 #[derive(Debug, Serialize)]
@@ -68,12 +68,13 @@ impl<T> CryptocurrencyApi<T>
 
         let to_wallets_table: RootProofNode<Hash> =
             general_schema
-                .get_proof_to_service_table(CRYPTOCURRENCY, 0)?;
+                .get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0)?;
 
         {
             let wallets_root_hash = currency_schema.wallets().root_hash()?; //debug code
             let check_result = to_wallets_table.verify_root_proof_consistency(
-                Blockchain::service_table_unique_key(CRYPTOCURRENCY, 0), state_hash); //debug code
+                Blockchain::service_table_unique_key(CRYPTOCURRENCY_SERVICE_ID, 0),
+                state_hash); //debug code
             debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());
         }
 

@@ -42,7 +42,7 @@ pub mod api;
 pub mod wallet;
 
 /// Id for our cryptocurrency messages.
-pub const CRYPTOCURRENCY: u16 = 128;
+pub const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
 
 /// `TxTransfer` Id.
 pub const TX_TRANSFER_ID: u16 = 128;
@@ -54,7 +54,7 @@ pub const TX_WALLET_ID: u16 = 130;
 message! {
 /// Transfer `amount` of the currency from one wallet to another.
     struct TxTransfer {
-        const TYPE = CRYPTOCURRENCY;
+        const TYPE = CRYPTOCURRENCY_SERVICE_ID;
         const ID = TX_TRANSFER_ID;
         const SIZE = 80;
 
@@ -68,7 +68,7 @@ message! {
 message! {
 /// Issue `amount` of the currency to the `wallet`.
     struct TxIssue {
-        const TYPE = CRYPTOCURRENCY;
+        const TYPE = CRYPTOCURRENCY_SERVICE_ID;
         const ID = TX_ISSUE_ID;
         const SIZE = 48;
 
@@ -81,7 +81,7 @@ message! {
 message! {
 /// Create wallet with the given `name`.
     struct TxCreateWallet {
-        const TYPE = CRYPTOCURRENCY;
+        const TYPE = CRYPTOCURRENCY_SERVICE_ID;
         const ID = TX_WALLET_ID;
         const SIZE = 40;
 
@@ -322,7 +322,7 @@ impl Service for CurrencyService {
     }
 
     fn service_id(&self) -> u16 {
-        CRYPTOCURRENCY
+        CRYPTOCURRENCY_SERVICE_ID
     }
 
     fn state_hash(&self, view: &View) -> StorageResult<Vec<Hash>> {
