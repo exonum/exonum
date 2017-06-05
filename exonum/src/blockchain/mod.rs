@@ -57,8 +57,7 @@ impl Blockchain {
         }
     }
 
-    /// Creates storage snapshot.
-    /// TODO
+    /// Creates a snapshot of the current storage state.
     pub fn view(&self) -> StorageView {
         self.db.fork()
     }
@@ -71,8 +70,8 @@ impl Blockchain {
             .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
-    /// Applies changes to the storage. This operation is atomic.
-    /// TODO
+    /// Commit changes from the `StorageView` to the blockchain storage.
+    /// See [`Fork`](../storage/trait.Fork.html) for details.
     pub fn merge(&self, patch: &Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
