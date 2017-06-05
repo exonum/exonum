@@ -19,8 +19,7 @@
                 '3d8578be65c4e78e01a0a8270f10ba1e809b4d562a17f7803f20da5928ef1db9',
                 '700c733bd8dfd0f3f40f5811bfd681f23e0caada46abb1719fa48d658efa6ef6',
                 'd858eaad05d8036dbd679535880eb408c943a34ee006cfa9ab7bd97fade6b200'
-            ],
-            baseUrl: 'http://exonum.com/backends/currency/api/v1'
+            ]
         });
 
         // global mixin with common functions and constants

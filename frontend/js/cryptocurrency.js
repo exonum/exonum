@@ -7,8 +7,6 @@ function CryptocurrencyService(params) {
 
     this.validators = params.validators;
 
-    this.baseUrl = params.baseUrl;
-
     this.Wallet = Exonum.newType({
         size: 88,
         fields: {
@@ -100,7 +98,7 @@ function CryptocurrencyService(params) {
 
         $.ajax({
             method: 'POST',
-            url: this.baseUrl + '/wallets/transaction',
+            url: '/api/services/cryptocurrency/v1/wallets/transaction',
             contentType: 'application/json',
             data: JSON.stringify({
                 body: data,
@@ -227,7 +225,7 @@ CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
     var self = this;
     $.ajax({
         method: 'GET',
-        url: this.baseUrl + '/wallets/info?pubkey=' + publicKey,
+        url: '/api/services/cryptocurrency/v1/wallets/info?pubkey=' + publicKey,
         success: function(response, textStatus, jqXHR) {
             callback.apply(this, self.validateWallet(publicKey, response));
         },
@@ -291,7 +289,7 @@ CryptocurrencyService.prototype.getBlocks = function(height, callback) {
     }
     $.ajax({
         method: 'GET',
-        url: this.baseUrl + '/blockchain/blocks?count=10' + suffix,
+        url: '/api/explorer/v1/blocks?count=10' + suffix,
         success: callback,
         error: function(jqXHR, textStatus, errorThrown) {
             console.error(textStatus);
@@ -303,7 +301,7 @@ CryptocurrencyService.prototype.getBlock = function(height, callback) {
     var self = this;
     $.ajax({
         method: 'GET',
-        url: this.baseUrl + '/blockchain/blocks/' + height,
+        url: '/api/explorer/v1/blocks/' + height,
         success: function(data, textStatus, jqXHR) {
             if (data && data.txs) {
                 for (var i in data.txs) {

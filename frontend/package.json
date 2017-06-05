@@ -6,7 +6,9 @@
   "license": "",
   "author": "BitFury Group Limited",
   "dependencies": {
+    "body-parser": "^1.17.1",
     "bower": "^1.8.0",
-    "express": "^4.14.1"
+    "express": "^4.15.2",
+    "request": "^2.81.0"
   }
 }
