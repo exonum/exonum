@@ -106,7 +106,7 @@ mod tests {
 
         let invalid_tx: CurrencyTx = TxCreateWallet::new(&p1, "Incorrect_signature", &s2).into();
         let resp = sandbox.post_transaction(invalid_tx);
-        assert_response_status(resp, Status::Conflict, "Events");
+        assert_response_status(resp, Status::Conflict, "Unable to verify transaction");
     }
 
     #[test]
@@ -118,7 +118,7 @@ mod tests {
 
         let invalid_tx: CurrencyTx = TxIssue::new(&p1, 2600, 7000, &s2).into();
         let resp = sandbox.post_transaction(invalid_tx);
-        assert_response_status(resp, Status::Conflict, "Events");
+        assert_response_status(resp, Status::Conflict, "Unable to verify transaction");
     }
 
     #[test]
@@ -130,11 +130,14 @@ mod tests {
 
         let invalid_tx: CurrencyTx = TxTransfer::new(&p1, &p2, 2000, 4242342, &s2).into();
         let resp = sandbox.post_transaction(invalid_tx);
-        assert_response_status(resp, Status::Conflict, "Events");
+        assert_response_status(resp, Status::Conflict, "Unable to verify transaction");
 
+        //identiacal sender == receiver are also marked as invalid transaction and
+        // not shoved down the event loop
+        // Transaction::verify() for CurrenctyTx
         let invalid_tx: CurrencyTx = TxTransfer::new(&p1, &p1, 2000, 4242342, &s1).into();
         let resp = sandbox.post_transaction(invalid_tx);
-        assert_response_status(resp, Status::Conflict, "Events");
+        assert_response_status(resp, Status::Conflict, "Unable to verify transaction");
     }
 
     #[test]
@@ -143,7 +146,7 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/message_id_from_other.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp, Status::Conflict, "IncorrectRequest");
+        assert_response_status(resp, Status::Conflict, "data did not match any variant of untagged enum CurrencyTx");
     }
 
     #[test]
@@ -152,7 +155,7 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/invalid_message_id.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp, Status::Conflict, "IncorrectRequest");
+        assert_response_status(resp, Status::Conflict, "data did not match any variant of untagged enum CurrencyTx");
     }
 
     #[test]
@@ -161,7 +164,7 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/invalid_service_id.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp, Status::Conflict, "IncorrectRequest");
+        assert_response_status(resp, Status::Conflict, "data did not match any variant of untagged enum CurrencyTx");
     }
 
     #[test]
@@ -172,7 +175,7 @@ mod tests {
         // it's 1 byte and 2 hex symbols shorter
         let pubkey_malformed_str = "cec750b8a1723960c9708a4fe11e49d90ac4592d0bd99d9b3757f8a0f517a3";
         let resp = sandbox.request_wallet_info_str(pubkey_malformed_str);
-        assert_response_status(resp, Status::Conflict, "FromHex");
+        assert_response_status(resp, Status::Conflict, "InvalidHexLength");
     }
 
     #[test]
@@ -388,9 +391,8 @@ mod tests {
                 let resp = iron_error.response;
                 debug!("Error response: {}", resp);
                 assert_eq!(resp.status, Some(expected_status));
-                let body = response_body(resp);
-                let error_body = serde_json::from_value::<ErrorResponse>(body).unwrap();
-                assert_eq!(&error_body.type_str, expected_message);
+                let body = response_body_str(resp).unwrap();
+                assert!(&body.contains(expected_message));
             }
             _ => unreachable!(),
         }
@@ -412,15 +414,23 @@ mod tests {
     }
 
     fn response_body(response: Response) -> serde_json::Value {
-        if let Some(mut body) = response.body {
-            let mut buf = Vec::new();
-            body.write_body(&mut buf).unwrap();
-            let s = String::from_utf8(buf).unwrap();
-            debug!("Received response body:'{}'", &s);
-            serde_json::from_str(&s).unwrap()
+        if let Some(body_string) = response_body_str(response) {
+            serde_json::from_str(&body_string).unwrap()
         } else {
             serde_json::Value::Null
         }
+    }
+
+    fn response_body_str(response: Response) -> Option<String> {
+        response
+            .body
+            .map(|mut body| {
+                     let mut buf = Vec::new();
+                     body.write_body(&mut buf).unwrap();
+                     let s = String::from_utf8(buf).unwrap();
+                     debug!("Received response body:'{}'", &s);
+                     s
+                 })
     }
 
     fn request_get<A: AsRef<str>>(route: A, router: &Router) -> IronResult<Response> {
@@ -539,11 +549,5 @@ mod tests {
     #[derive(Deserialize)]
     struct TxResponse {
         tx_hash: Hash,
-    }
-
-    #[derive(Deserialize)]
-    struct ErrorResponse {
-        #[serde(rename = "type")]
-        type_str: String,
     }
 }
