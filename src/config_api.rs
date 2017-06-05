@@ -207,7 +207,9 @@ impl PublicConfigApi {
         };
         actual_from = match map.find(&["actual_from"]) {
             Some(&Value::String(ref from_str)) => {
-                Some(from_str.parse().map_err(|e: ParseIntError| ApiError::IncorrectRequest(Box::new(e)))?)
+                Some(from_str
+                         .parse()
+                         .map_err(|e: ParseIntError| ApiError::IncorrectRequest(Box::new(e)))?)
             }
             _ => None,
         };
@@ -270,7 +272,12 @@ impl Api for PublicConfigApi {
                     let info = _self.get_config_by_hash(&hash)?;
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
-                None => Err(ApiError::IncorrectRequest("Required route parameter of configuration 'hash' is missing".into()))?,
+                None => {
+                    Err(ApiError::IncorrectRequest("Required route \
+                                           parameter of configuration \
+                                           'hash' is missing"
+                                                           .into()))?
+                }
             }
         };
 
@@ -283,7 +290,12 @@ impl Api for PublicConfigApi {
                     let info = _self.get_votes_for_propose(&propose_cfg_hash)?;
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
-                None => Err(ApiError::IncorrectRequest("Required route parameter of configuration 'hash' is missing".into()))?,
+                None => {
+                    Err(ApiError::IncorrectRequest("Required route \
+                                           parameter of configuration \
+                                           'hash' is missing"
+                                                           .into()))?
+                }
             }
         };
 
@@ -330,9 +342,7 @@ impl<T> Api for PrivateConfigApi<T>
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-                Err(e) => {
-                    Err(ApiError::IncorrectRequest(Box::new(e)))?
-                }
+                Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
             }
         };
 
@@ -345,7 +355,12 @@ impl<T> Api for PrivateConfigApi<T>
                     let info = _self.put_config_vote(&propose_cfg_hash)?;
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
-                None => Err(ApiError::IncorrectRequest("Required route parameter of configuration 'hash' is missing".into()))?,
+                None => {
+                    Err(ApiError::IncorrectRequest("Required route \
+                                           parameter of configuration \
+                                           'hash' is missing"
+                                                           .into()))?
+                }
             }
         };
         router.post("/v1/configs/postpropose",
