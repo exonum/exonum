@@ -8,6 +8,7 @@
   "dependencies": {
     "big-integer": "^1.6.17",
     "bootstrap": "^3.3.7",
+    "exonum-client": "git+ssh://git@github.com/exonum/exonum-client.git",
     "jquery": "^3.1.1",
     "riot": "^3.3.1",
     "riot-route": "^3.1.0",

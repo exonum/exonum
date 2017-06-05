@@ -79,7 +79,7 @@ function CryptocurrencyService(params) {
         var self = this;
         var type = new Exonum.newMessage(typeParams);
 
-        type.signature = type.sign(data, secretKey);
+        type.signature = type.sign(secretKey, data);
 
         var hash = type.hash(data);
 
@@ -178,7 +178,8 @@ function CryptocurrencyService(params) {
         // find wallet in the tree of all wallets
         var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, this.Wallet);
         if (wallet === null) {
-            return;
+            // wallet is not found
+            return [data.block_info.block];
         }
 
         // find hashes of all transactions
@@ -210,7 +211,7 @@ function CryptocurrencyService(params) {
             if (transaction.hash !== hashes[i].tx_hash) {
                 console.error('Wrong transaction hash.');
                 return;
-            } else if (!type.verifySignature(transaction.body, transaction.signature, publicKeyOfTransaction)) {
+            } else if (!type.verifySignature(transaction.signature, publicKeyOfTransaction, transaction.body)) {
                 console.error('Wrong transaction signature.');
                 return;
             }

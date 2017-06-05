@@ -47,11 +47,10 @@ cryptocurrency --leveldb-path=example/3 --node-config=example/validators/3.toml
 
 ### Frontend
 
-Frontend is a lightweight single page application implemented on [riotjs](https://github.com/riot/riot).
+Frontend is a lightweight single page application served by Node.js.
+It communicates with the backend via REST API and uses [Exonum client](https://github.com/exonum/exonum-client) library to parse and verify data and perform cryptographic operations.
 
-Application is served by Node.js and communicates directly with backends REST api and uses Exonum client to convert data into appropriate format and parse it into JSON.
-
-All business logic is can be found in the file `cryptocurrency.js`.
+All business logic is can be found in [cryptocurrency.js](frontend/js/cryptocurrency.js).
 
 #### Submit transaction
 
@@ -103,7 +102,7 @@ var data = {
     nonce: nonce
 };
 
-var signature = CreateWalletTransaction.sign(data, pair.secretKey);
+var signature = CreateWalletTransaction.sign(pair.secretKey, data);
 ```
 
 Finally, signed data and signature can be submitted to server:
@@ -329,13 +328,13 @@ The steps from above guarantees all wallet info reliability and consistency.
 
 #### Build
 
-First, install npm dependencies:
+Install npm dependencies:
 
 ```
 npm install
 ```
 
-Then install bower dependencies:
+Install bower dependencies:
 
 ```
 bower install
@@ -343,10 +342,10 @@ bower install
 
 #### Run
 
-To run application:
+Run application:
 
 ```
 node frontend/app.js
 ```
 
-Application is server on [http://127.0.0.1:3000](http://127.0.0.1:3000).
+Application is served on [http://127.0.0.1:3000](http://127.0.0.1:3000).
