@@ -120,10 +120,11 @@ use exonum::api::Api;
 use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, Hash, HASH_SIZE};
-use exonum::messages::{Field, RawMessage, Message, FromRaw, RawTransaction, Error as MessageError};
+use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
-use exonum::serialize::json::reexport as serde_json;
+use exonum::stream_struct::{Field, Error as StreamStructError};
+use exonum::stream_struct::serialize::json::reexport as serde_json;
 
 /// Configuration service http api.
 pub mod config_api;
@@ -244,13 +245,17 @@ impl fmt::Debug for ConfigTx {
 }
 
 impl FromRaw for ConfigTx {
-    fn from_raw(raw: RawMessage) -> Result<ConfigTx, MessageError> {
+    fn from_raw(raw: RawMessage) -> Result<ConfigTx, StreamStructError> {
         match raw.message_type() {
             CONFIG_PROPOSE_MESSAGE_ID => {
                 Ok(ConfigTx::ConfigPropose(TxConfigPropose::from_raw(raw)?))
             }
             CONFIG_VOTE_MESSAGE_ID => Ok(ConfigTx::ConfigVote(TxConfigVote::from_raw(raw)?)),
-            _ => Err(MessageError::IncorrectMessageType { message_type: raw.message_type() }),
+            _ => Err(StreamStructError::IncorrectMessageType {
+                           position: 2,
+                           actual_message_type: raw.message_type(),
+                           declared_message_type: CONFIG_PROPOSE_MESSAGE_ID,
+                       })
         }
     }
 }
@@ -647,7 +652,7 @@ impl Service for ConfigurationService {
     }
 
     /// Returns box ([ConfigTx](ConfigTx.t.html))
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
         ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
