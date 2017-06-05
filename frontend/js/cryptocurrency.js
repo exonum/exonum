@@ -179,7 +179,7 @@ function CryptocurrencyService(params) {
         var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, this.Wallet);
         if (wallet === null) {
             // wallet is not found
-            return [data.block_info.block, null];
+            return [data.block_info.block];
         }
 
         // find hashes of all transactions
