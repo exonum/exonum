@@ -11,7 +11,7 @@ rand = "0.3"
 router = "0.5.1"
 log = "0.3"
 iron-test = { git = "https://github.com/reem/iron-test" }
-cryptocurrency = {version="0.1.0", path="../"}
+cryptocurrency = {version="0.1.0", path="../cryptocurrency"}
 
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
