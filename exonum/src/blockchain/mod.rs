@@ -5,6 +5,7 @@ use mount::Mount;
 use std::sync::Arc;
 use std::collections::BTreeMap;
 use std::mem;
+use std::fmt;
 
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
@@ -226,6 +227,12 @@ impl Blockchain {
     }
 }
 
+impl fmt::Debug for Blockchain {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Blockchain {{ db: {:?}, service_map: {{ .. }} }}", self.db)
+    }
+}
+
 #[cfg(test)]
 mod test {
     #[test]
@@ -259,6 +266,4 @@ mod test {
         let data = ::serialize::json::reexport::to_string(&test).unwrap();
         assert_eq!(data, test_data);
     }
-
-
 }

@@ -4,6 +4,7 @@ use profiler;
 
 use super::{Map, Error, StorageValue};
 
+#[derive(Debug)]
 pub struct MapTable<'a, T: Map<[u8], Vec<u8>> + 'a, K: ?Sized, V> {
     prefix: Vec<u8>,
     storage: &'a T,

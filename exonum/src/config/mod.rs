@@ -8,6 +8,7 @@ use std::error::Error;
 use std::io::prelude::*;
 use std::fs::File;
 
+#[derive(Debug)]
 pub struct ConfigFile {}
 
 impl ConfigFile {

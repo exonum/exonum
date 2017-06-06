@@ -56,6 +56,7 @@ mod hash_rules {
 /// |>1| Merkle tree node, where at position `(h, i) = Hash((h - 1, 2i) + (h - 1, 2i + 1))` |
 ///
 /// `+` operation is concatenation of byte arrays.
+#[derive(Debug)]
 pub struct MerkleTable<T: Map<[u8], Vec<u8>>, V> {
     map: T,
     count: Cell<Option<u64>>,

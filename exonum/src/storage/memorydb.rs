@@ -6,11 +6,12 @@ use std::cmp::Ordering;
 
 use super::{Map, Database, Error, Patch, Change, Fork};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MemoryDB {
     map: RwLock<BTreeMap<Vec<u8>, Vec<u8>>>,
 }
 
+#[derive(Debug)]
 pub struct MemoryDBView {
     map: MemoryDB,
     changes: RefCell<Patch>,
