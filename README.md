@@ -1,104 +1,100 @@
 # Cryptocurrency demo
 
-This project demonstrates how to bootstrap own cryptocurrency
-with [Exonum](http://exonum.com/) blockchain.
+This project demonstrates how to bootstrap own cryptocurrency with [Exonum](http://exonum.com/) blockchain.
+Exonum blockchain keeps balances of wallets and handles secure transactions between them.
 
-It implements basic operations:
+It implements most basic operations:
 - create a new wallet
 - add funds into a wallet
 - transfer funds from the one wallet to another
-- monitor blocks status
-
-## Demo
-
-Since blockchain is a distributed kind of software you should run
-multiple nodes which handle the transactions and keep the data safe.
+- monitor blocks state
 
 ### Requirements
 
-We prepared a minimal configuration that helps you start and test cryptocurrency
-right now. Be sure you installed necessary packages:
-* git
-* supervisord
-* node (with npm)
-* bower
-* Rust compiler
+We prepared a minimal configuration that helps you start and test cryptocurrency right now.
+Be sure you installed necessary packages:
+* [git](https://git-scm.com/downloads)
+* [supervisord](http://supervisord.org/installing.html)
+* [node](https://nodejs.org/en/download/) *(with npm)*
+* [Rust compiler](https://rustup.rs/)
 * `gnu-sed` on MacOS platform
 
-### Run
+### Quick installation on local machine
 
-Clone this project to a local folder, bootstrap and start it:
+Clone the project to a local folder, bootstrap and start it:
 
 ```sh
-git clone https://github.com/exonum/cryptocurrency
-cd cryptocurrency
+git clone https://github.com/exonum/cryptocurrency-advanced
+cd cryptocurrency-advanced
 export SERVICE_ROOT=$(pwd)/currency_root
 ./service/bootstrap.sh install
 ./service/bootstrap.sh enable
 ./service/bootstrap.sh start cryptocurrency
 ```
 
-Ready! Open the [wallet manager](http://127.0.0.1:8280) in your browser.
+Ready! Open the wallet manager at [http://127.0.0.1:8200](http://127.0.0.1:8200) in your browser.
 
-## Backend
-
-Backend keeps balances of wallets and handles secure transactions between them.
-It consists of nodes which interact with each other. Distributed nodes ensure the reliability.
-
-### Build
-
-To build the backend, use cargo:
-
-```
-cd backend && cargo install
+To stop the project execute:
+```sh
+./service/bootstrap.sh stop cryptocurrency
+./service/bootstrap.sh disable
+./service/bootstrap.sh clear
 ```
 
-### Run
+### Installation with distributed nodes
 
-When backend was built, you should declare all nodes to run.
-There is a special command `generate` which does it automatically:
-
-```
-cryptocurrency generate 4 --output-dir=example
-```
-
-In the example above we created configs for 4 nodes and put them into `example/` folder.
-
-The next step you should start all nodes:
-
-```
-cryptocurrency run --rocksdb=example/0 --node-config=example/validators/0.toml --public-api-address=127.0.0.1:8000
-cryptocurrency run --rocksdb=example/1 --node-config=example/validators/1.toml
-cryptocurrency run --rocksdb=example/2 --node-config=example/validators/2.toml
-cryptocurrency run --rocksdb=example/3 --node-config=example/validators/3.toml
-```
-
-## Frontend
-
-Frontend is a lightweight single page application served by Node.js.
-It communicates with the backend via REST API and uses [Exonum client](https://github.com/exonum/exonum-client) library to parse and verify data and perform cryptographic operations.
-
-All business logic is can be found in [cryptocurrency.js](frontend/js/cryptocurrency.js).
-
-### How it works?
-
-Find detailed [step-by-step tutorial](http://exonum.com/doc/home/cryptocurrency/intro/) how to set up all this demo functionality from the very beginning.
-
-### Install
-
-Install npm dependencies:
+Clone the project to a local folder and build it:
 
 ```sh
-cd frontend
+git clone https://github.com/exonum/cryptocurrency-advanced
+cd cryptocurrency-advanced/backend
+cargo install
+```
+
+Generate template:
+
+```sh
+cd .. && mkdir example && cd example
+cryptocurrency generate-template common.toml
+```
+
+Generate public and secrets keys for each node:
+
+```sh
+cryptocurrency generate-config common.toml  pub_1.toml sec_1.toml --peer-addr 127.0.0.1:6331
+cryptocurrency generate-config common.toml  pub_2.toml sec_2.toml --peer-addr 127.0.0.1:6332
+cryptocurrency generate-config common.toml  pub_3.toml sec_3.toml --peer-addr 127.0.0.1:6333
+cryptocurrency generate-config common.toml  pub_4.toml sec_4.toml --peer-addr 127.0.0.1:6334
+```
+
+Finalize configs:
+
+```sh
+cryptocurrency finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 sec_1.toml node_1_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
+cryptocurrency finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 sec_2.toml node_2_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
+cryptocurrency finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 sec_3.toml node_3_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
+cryptocurrency finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 sec_4.toml node_4_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
+```
+
+Run nodes:
+
+```sh
+cryptocurrency run --node-config node_1_cfg.toml --rocksdb /path/to/db1 --public-api-address 0.0.0.0:8200
+cryptocurrency run --node-config node_2_cfg.toml --rocksdb /path/to/db2 --public-api-address 0.0.0.0:8201
+cryptocurrency run --node-config node_3_cfg.toml --rocksdb /path/to/db3 --public-api-address 0.0.0.0:8202
+cryptocurrency run --node-config node_4_cfg.toml --rocksdb /path/to/db4 --public-api-address 0.0.0.0:8203
+```
+
+Next step is to install frontend application.
+Start with install of frontend dependencies:
+
+```sh
+cd ../frontend
 npm install
 ```
 
-### Configure
-
-Frontend needs configuration file `./frontend/config.json`.
-Use [frontend/config-example.json](frontend/config-example.json) as template.
-
-Check url of backend endpoint and fill the list of validators.
+Clone configuration file [config-example.json](frontend/config-example.json) as `config.json`.
+Fill the list of validators with validators which can be found in `consensus_public_key` field in toml config of each file.
 
 ```json
 {
@@ -115,15 +111,13 @@ Check url of backend endpoint and fill the list of validators.
 }
 ```
 
-### Run
-
-To run the application:
+Run the application:
 
 ```sh
 npm start
 ```
 
-Application is served on [http://127.0.0.1:8280](http://127.0.0.1:8280). Port can be changred in the [frontend/app.js](frontend/app.js).
+Ready! Open the wallet manager at [http://127.0.0.1:8200](http://127.0.0.1:8200) in your browser.
 
 ### Tests
 
@@ -133,13 +127,13 @@ Before execute tests install `karma-cli` globally:
 npm install -g karma-cli
 ```
 
-Execute tests:
+To execute tests run:
 
 ```sh
 karma start
 ```
 
-To lint code execute:
+To lint code run:
 
 ```sh
 npm run lint

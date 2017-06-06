@@ -1,22 +1,18 @@
 var NETWORK_ID = 0;
 var PROTOCOL_VERSION = 0;
 var SERVICE_ID = 128;
+var VALIDATORS = readJSON('test_data/validators2.json');
+var CONFIGURATION = {
+    network_id: NETWORK_ID,
+    protocol_version: PROTOCOL_VERSION,
+    service_id: SERVICE_ID,
+    validators: VALIDATORS
+};
+var service = new CryptocurrencyService(CONFIGURATION);
 
 describe('Configure service', function() {
 
     it('should correctly initialize if valid configuration is passed', function() {
-        var CONFIGURATION = {
-            network_id: NETWORK_ID,
-            protocol_version: PROTOCOL_VERSION,
-            service_id: SERVICE_ID,
-            validators: [
-                '756f0bb877333e4059e785e38d72b716a2ae9981011563cf21e60ab16bec1fbc',
-                '6ce6f6501a03728d25533baf867312d6f425f48c07a1bed669b0afad5d0c136c',
-                '8917ecf39f4dc7c5289b4b9a3331c4455fcb1671b47bde39e0ea9361c5752451',
-                'a2dda8436715e8fdf6a5f865d5bdbe70b0ffb1d6267352e69a169aa6d8d368fb'
-            ]
-        };
-        var service = new CryptocurrencyService(CONFIGURATION);
         expect(service.configuration).to.deep.equal(CONFIGURATION);
     });
 
@@ -24,20 +20,9 @@ describe('Configure service', function() {
 
 describe('Verify API requests', function() {
 
-    var CONFIGURATION = {
-        network_id: NETWORK_ID,
-        protocol_version: PROTOCOL_VERSION,
-        service_id: SERVICE_ID,
-        validators: [
-            '756f0bb877333e4059e785e38d72b716a2ae9981011563cf21e60ab16bec1fbc',
-            '6ce6f6501a03728d25533baf867312d6f425f48c07a1bed669b0afad5d0c136c',
-            '8917ecf39f4dc7c5289b4b9a3331c4455fcb1671b47bde39e0ea9361c5752451',
-            'a2dda8436715e8fdf6a5f865d5bdbe70b0ffb1d6267352e69a169aa6d8d368fb'
-        ]
-    };
-    var service = new CryptocurrencyService(CONFIGURATION);
     var transactionUrl = 'api/services/cryptocurrency/v1/wallets/transaction';
     var server;
+    var serverTimeout = 100;
 
     beforeEach(function() {
         server = sinon.fakeServer.create();
@@ -51,57 +36,115 @@ describe('Verify API requests', function() {
         server.restore();
     });
 
-    describe('Create Wallet', function() {
+    describe('Register', function() {
 
-        var publicKey = '03e657ae71e51be60a45b4bd20bcf79ff52f0c037ae6da0540a0e0066132b472';
-        var secretKey = '2ef1f2e2799c93b50d2a7ba207a4efebebf6fe5735339dc782e06b1c30b72abf03e657ae71e51be60a45b4bd20bcf79ff52f0c037ae6da0540a0e0066132b472';
-        var name = 'John Doe';
-        var response = {
-            tx_hash: '8616c02c8e5d74df7f6804edcc2e9980ab56c9fd660cb66a737e54f3e2b5eddf'
-        };
+        var login = 'a';
+        var password = 'a';
 
         it('should sign and submit transaction', function() {
+            var response = {
+                tx_hash: '71f134bb69f5e371ce17ec4ca46c891fae96ae1feac2e49c2e82ba046b277951'
+            };
+
             server.respondWith('POST', transactionUrl, [200, {'Content-Type': 'application/json'}, JSON.stringify(response)]);
 
-            service.createWallet(publicKey, name, secretKey);
+            service.createWallet(login, password);
 
-            server.respond();
+            setTimeout(function() {
+                server.respond();
 
-            var spyCall = $.ajax.getCall(0);
+                var spyCall = $.ajax.getCall(0);
 
-            expect(JSON.parse(spyCall.args[0].data)).to.deep.equal({
-                body: {
-                    pub_key: publicKey,
-                    name: name
-                },
-                network_id: NETWORK_ID,
-                protocol_version: PROTOCOL_VERSION,
-                service_id: SERVICE_ID,
-                message_id: 130,
-                signature: 'd62d9f5098707d4cce16e021f6c15399bcb6ff5359dd343b91d8a755b6eba76332328061234a95281d660333842d3f213d054464e20eec43c6b395d468842e0b'
-            });
+                expect(JSON.parse(spyCall.args[0].data)).to.deep.equal({
+                    "body": {
+                        "login": "a",
+                        "pub_key": "87f7bd7fe1394c57526b06565fdc5107c76a6cf703f6038b80bb10daebd57d62",
+                        "key_box": "73637279707400000000080000000001eae91bc781165d6c35aa5ac0943c08b9e233c27faadf57f3e394af5616bf952421041cbb5254745027aa35dcabe5d52784d34a9571a23ba8e32ea93fd0cf1c7df467e4bbe9d0963fde44570ee7e8bdef177e3086795c9c36e3b5a826fb7f8fdf773a66996c7f2fe8b43ae1be4e13785d"
+                    },
+                    "network_id": 0,
+                    "protocol_version": 0,
+                    "service_id": 128,
+                    "message_id": 130,
+                    "signature": "a7d3897ff209b621257b6f726215bfb5a231832f4a86c5adf970dc01cf2deafb2e203cb73c04405df25f89d77483e4afe0226403b6cd6f306bf7acf9e42b260e"
+                });
 
-            expect(JSON.parse(spyCall.returnValue.responseText)).to.deep.equal(response);
+                expect(JSON.parse(spyCall.returnValue.responseText)).to.deep.equal(response);
+            }, serverTimeout);
         });
 
         it('should throw error on server error', function() {
             server.respondWith('POST', transactionUrl, [404, {'Content-Type': 'application/json'}, '']);
 
-            service.createWallet(publicKey, name, secretKey);
+            service.createWallet(login, password);
 
-            expect(function(){
-                server.respond();
-            }).to.throw();
+            setTimeout(function() {
+                expect(function(){
+                    server.respond();
+                }).to.throw();
+            }, serverTimeout);
         });
 
         it('should throw error on wrong format of server response', function() {
             server.respondWith('POST', transactionUrl, [200, {'Content-Type': 'application/json'}, '']);
 
-            service.createWallet(publicKey, name, secretKey);
+            service.createWallet(login, password);
 
-            expect(function(){
+            setTimeout(function() {
+                expect(function(){
+                    server.respond();
+                }).to.throw();
+            }, serverTimeout);
+        });
+
+    });
+
+    describe('Login', function() {
+
+        var login = 'a';
+        var password = 'a';
+        var url = 'api/services/cryptocurrency/v1/wallets/find/';
+
+        it('should sign and submit transaction', function() {
+            var response = {
+                "key_box": "73637279707400000000080000000001726ee990c698946b540c5d5a77efc887fc4baff92d889d63a490d703118ac8cf2ff3f18fb5ca2d9b18ae29ee3af06c535116f03c4a36ab1c648ddc585630291022f7fca68c01f7c9bf0e1d3a082a2c3a2769da06c9fa988ecbc60e213e296bc16914d2b97443a542bae1630b60d8e434",
+                "pub_key": "2fc4c29755938792d36382adbe2850026e266eb256b125c756e784eaec29174f"
+            };
+
+            server.respondWith('GET', url + login, [200, {'Content-Type': 'application/json'}, JSON.stringify(response)]);
+
+            service.login(login, password, function() {});
+
+            setTimeout(function() {
                 server.respond();
-            }).to.throw();
+
+                var spyCall = $.ajax.getCall(0);
+
+                expect(JSON.parse(spyCall.returnValue.responseText)).to.deep.equal(response);
+            }, serverTimeout);
+        });
+
+        it('should throw error on server error', function() {
+            server.respondWith('GET', url + login, [404, {'Content-Type': 'application/json'}, '']);
+
+            service.login(login, password, function() {});
+
+            setTimeout(function() {
+                expect(function(){
+                    server.respond();
+                }).to.throw();
+            }, serverTimeout);
+        });
+
+        it('should throw error on wrong format of server response', function() {
+            server.respondWith('GET', url + login, [200, {'Content-Type': 'application/json'}, '']);
+
+            service.login(login, password, function() {});
+
+            setTimeout(function() {
+                expect(function(){
+                    server.respond();
+                }).to.throw();
+            }, serverTimeout);
         });
 
     });
@@ -209,463 +252,114 @@ describe('Verify API requests', function() {
 
 });
 
-// describe('Wallet query validation', function() {
-//
-//     var service;
-//     var url = 'api/services/cryptocurrency/v1/wallets/info?pubkey=';
-//
-//     before(function(done) {
-//         $.ajax({
-//             url: 'test_data/validators.json',
-//             method: 'GET',
-//             success: function(response) {
-//                 var CONFIGURATION = {
-//                     network_id: NETWORK_ID,
-//                     protocol_version: PROTOCOL_VERSION,
-//                     service_id: SERVICE_ID,
-//                     validators: response
-//                 };
-//                 service = new CryptocurrencyService(CONFIGURATION);
-//                 done();
-//             }
-//         });
-//     });
-//
-//     it('should return expected parameters on valid wallet query validation', function(done) {
-//         var publicKey = '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a';
-//         var txs = [
-//             {
-//                 'body': {
-//                     'name': 'Jane Doe',
-//                     'pub_key': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 130,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': 'f2c9575b32221cba2de2fe38d37b8ceac312eb74e2bb5ec50e455af39411052fb829846f89f9a724dcd224804e99b768ba74611218d205e470d4075637fc2700',
-//                 'execution_status': true,
-//                 'tx_hash': '097b9c36f115cd415aabf6c6c5861792b54319e2038c0a6239e31bb75a21b8b4'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '6000',
-//                     'seed': '1000',
-//                     'wallet': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 129,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': '1e6caf3290b33efd2b62ddbc190fb2793de2b52ca1ce2f6e518779f141e0c66f1530667d0f859ac6a0743f40532d97497b011cf1cf3e0fa99a9e1a459618c208',
-//                 'execution_status': true,
-//                 'tx_hash': '3012664984624c846f10f11fe41db9498167aa7c1feab0cd13633954589b9497'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '3000',
-//                     'from': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a',
-//                     'seed': '2000',
-//                     'to': '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d'
-//                 },
-//                 'message_id': 128,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': '51a142df1654bf28a3bb251ca4b1c18b78c569dbfdb29b7f2b2e70d43295d1a3731cf0dd1da15c8bf39abd9c7d84791edb4a592423870a1fe94b9ff2cc22c405',
-//                 'execution_status': true,
-//                 'tx_hash': '48ce786b1fd365038836cb512ce22d589f6896c3188af1f0841cf06d869c6b59'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '1000',
-//                     'from': '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d',
-//                     'seed': '3000',
-//                     'to': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 128,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': 'de3164d461ee455c3360bdf54e3d0004f8c1dbe7e6371787c328710db55243bb77e77a7e71bdd64ca3ad205acf95d8d1cdb7e2c37f95b91c8ddaa9f1337de806',
-//                 'execution_status': true,
-//                 'tx_hash': 'c44759951d9cfc30de58e891bd842efec8e11d38fdbfb4875fb93ad0f3752fb2'
-//             }
-//         ];
-//
-//         $.ajax({
-//             url: 'test_data/wallet1_query.json',
-//             method: 'GET',
-//             success: function(response) {
-//                 var server = sinon.fakeServer.create();
-//
-//                 sinon.spy(jQuery, 'ajax');
-//
-//                 server.respondWith('GET', url + publicKey, [200, {'Content-Type': 'application/json'}, JSON.stringify(response)]);
-//
-//                 service.getWallet(publicKey, function(error, block, wallet, transactions) {
-//                     expect(block).to.deep.equal({
-//                         'height': '4',
-//                         'prev_hash': '2e933eba2887a1d9bb38c396577be23db58ea5f414761f6dda939d660b323140',
-//                         'proposer_id': 0,
-//                         'schema_version': 0,
-//                         'state_hash': 'da5ae8362137d3e4acae0917e30388959b6d2a91760d25bb5eca832b449550ce',
-//                         'tx_count': 1,
-//                         'tx_hash': '759de4b2df16488e1c13c20cb9a356487204abcedd97177f2fe773c187beb29e',
-//                         'time': '0'
-//                     });
-//
-//                     expect(wallet).to.deep.equal({
-//                         'balance': '4000',
-//                         'history_hash': 'b83df3e53e8623884024c72e3bcc6c5251b1ee7fc1ff2682464e53f58eb61de7',
-//                         'history_len': '4',
-//                         'name': 'Jane Doe',
-//                         'pub_key': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                     });
-//
-//                     expect(transactions.length).to.equal(2);
-//
-//                     for (var i = 0; i < transactions.length; i++) {
-//                         expect(transactions[i]).to.deep.equal(txs[i]);
-//                     }
-//
-//                     jQuery.ajax.restore();
-//
-//                     server.restore();
-//
-//                     done();
-//                 });
-//
-//                 server.respond();
-//             }
-//         });
-//     });
-//
-//     it('should return expected parameters on valid wallet query validation', function(done) {
-//         var publicKey = '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a';
-//         var txs = [
-//             {
-//                 'body': {
-//                     'name': 'Jane Doe',
-//                     'pub_key': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 130,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': 'f2c9575b32221cba2de2fe38d37b8ceac312eb74e2bb5ec50e455af39411052fb829846f89f9a724dcd224804e99b768ba74611218d205e470d4075637fc2700',
-//                 'execution_status': true,
-//                 'tx_hash': '097b9c36f115cd415aabf6c6c5861792b54319e2038c0a6239e31bb75a21b8b4'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '6000',
-//                     'seed': '1000',
-//                     'wallet': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 129,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': '1e6caf3290b33efd2b62ddbc190fb2793de2b52ca1ce2f6e518779f141e0c66f1530667d0f859ac6a0743f40532d97497b011cf1cf3e0fa99a9e1a459618c208',
-//                 'execution_status': true,
-//                 'tx_hash': '3012664984624c846f10f11fe41db9498167aa7c1feab0cd13633954589b9497'
-//             }
-//         ];
-//
-//         $.ajax({
-//             url: 'test_data/wallet1_query1.json',
-//             method: 'GET',
-//             success: function(response) {
-//                 var server = sinon.fakeServer.create();
-//
-//                 sinon.spy(jQuery, 'ajax');
-//
-//                 server.respondWith('GET', url + publicKey, [200, {'Content-Type': 'application/json'}, JSON.stringify(response)]);
-//
-//                 service.getWallet(publicKey, function(error, block, wallet, transactions) {
-//                     expect(block).to.deep.equal({
-//                         'height': '2',
-//                         'prev_hash': '4c1542370f9b97bfe99e671b68fc970317e9b0dfa25a8fc23856da59a1e35b2a',
-//                         'proposer_id': 0,
-//                         'schema_version': 0,
-//                         'state_hash': 'c73c4b61b05865db98d77db22032fe35c174775c57faa6f5c5e0b430bae3e6ed',
-//                         'tx_count': 1,
-//                         'tx_hash': 'de134bb9ad5c643f2cc57f4fce5f97a93bb8aaabac5197b5f72136df88171299',
-//                         'time': '0'
-//                     });
-//
-//                     expect(wallet).to.deep.equal({
-//                         'balance': '6000',
-//                         'history_hash': '12edfa5a5508993c0b3d2adf142a3e0042a9607d5dd831689c04f200e6682cd9',
-//                         'history_len': '2',
-//                         'name': 'Jane Doe',
-//                         'pub_key': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                     });
-//
-//                     expect(transactions.length).to.equal(4);
-//
-//                     for (var i = 0; i < transactions.length; i++) {
-//                         expect(transactions[i]).to.deep.equal(txs[i]);
-//                     }
-//
-//                     jQuery.ajax.restore();
-//
-//                     server.restore();
-//
-//                     done();
-//                 });
-//
-//                 server.respond();
-//             }
-//         });
-//     });
-//
-//     it('should return expected parameters on valid wallet query validation', function(done) {
-//         var publicKey = '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d';
-//         var txs = [
-//             {
-//                 'body': {
-//                     'name': 'Dillinger Escape Plan',
-//                     'pub_key': '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d'
-//                 },
-//                 'message_id': 130,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': '16ed1d1fb4402ea6b5d920ef4ea8878e1a6dffc0b120542c5c7834212553c2a838df4857be061b5c6cda326e78698ff8d73d8a66576507850337df5dd4fb5107',
-//                 'execution_status': true,
-//                 'tx_hash': '334045918808103ea8d23b9f31628cb265ebcdb4ef3f60ea9788ddca76aa7b78'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '3000',
-//                     'from': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a',
-//                     'seed': '2000',
-//                     'to': '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d'
-//                 },
-//                 'message_id': 128,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': '51a142df1654bf28a3bb251ca4b1c18b78c569dbfdb29b7f2b2e70d43295d1a3731cf0dd1da15c8bf39abd9c7d84791edb4a592423870a1fe94b9ff2cc22c405',
-//                 'execution_status': true,
-//                 'tx_hash': '48ce786b1fd365038836cb512ce22d589f6896c3188af1f0841cf06d869c6b59'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '1000',
-//                     'from': '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d',
-//                     'seed': '3000',
-//                     'to': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 128,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': 'de3164d461ee455c3360bdf54e3d0004f8c1dbe7e6371787c328710db55243bb77e77a7e71bdd64ca3ad205acf95d8d1cdb7e2c37f95b91c8ddaa9f1337de806',
-//                 'execution_status': true,
-//                 'tx_hash': 'c44759951d9cfc30de58e891bd842efec8e11d38fdbfb4875fb93ad0f3752fb2'
-//             }
-//         ];
-//
-//         $.ajax({
-//             url: 'test_data/wallet2_query.json',
-//             method: 'GET',
-//             success: function(response) {
-//                 var server = sinon.fakeServer.create();
-//
-//                 sinon.spy(jQuery, 'ajax');
-//
-//                 server.respondWith('GET', url + publicKey, [200, {'Content-Type': 'application/json'}, JSON.stringify(response)]);
-//
-//                 service.getWallet(publicKey, function(error, block, wallet, transactions) {
-//                     expect(block).to.deep.equal({
-//                         'height': '4',
-//                         'prev_hash': '2e933eba2887a1d9bb38c396577be23db58ea5f414761f6dda939d660b323140',
-//                         'proposer_id': 0,
-//                         'schema_version': 0,
-//                         'state_hash': 'da5ae8362137d3e4acae0917e30388959b6d2a91760d25bb5eca832b449550ce',
-//                         'tx_count': 1,
-//                         'tx_hash': '759de4b2df16488e1c13c20cb9a356487204abcedd97177f2fe773c187beb29e',
-//                         'time': '0'
-//                     });
-//
-//                     expect(wallet).to.deep.equal({
-//                         'balance': '2000',
-//                         'history_hash': '207799f4a3fa412890614d6c513c82ad2bd4ffca5fd9d5392b68b1a8c85d7e6c',
-//                         'history_len': '3',
-//                         'name': 'Dillinger Escape Plan',
-//                         'pub_key': '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d'
-//                     });
-//
-//                     expect(transactions.length).to.equal(3);
-//
-//                     for (var i = 0; i < transactions.length; i++) {
-//                         expect(transactions[i]).to.deep.equal(txs[i]);
-//                     }
-//
-//                     jQuery.ajax.restore();
-//
-//                     server.restore();
-//
-//                     done();
-//                 });
-//
-//                 server.respond();
-//             }
-//         });
-//     });
-//
-//     it('should return expected parameters on valid wallet query validation with tx of false execution status', function(done) {
-//         var publicKey = '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a';
-//         var txs = [
-//             {
-//                 'body': {
-//                     'name': 'Jane Doe',
-//                     'pub_key': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 130,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': 'f2c9575b32221cba2de2fe38d37b8ceac312eb74e2bb5ec50e455af39411052fb829846f89f9a724dcd224804e99b768ba74611218d205e470d4075637fc2700',
-//                 'execution_status': true,
-//                 'tx_hash': '097b9c36f115cd415aabf6c6c5861792b54319e2038c0a6239e31bb75a21b8b4'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '6000',
-//                     'seed': '1000',
-//                     'wallet': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 129,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': '1e6caf3290b33efd2b62ddbc190fb2793de2b52ca1ce2f6e518779f141e0c66f1530667d0f859ac6a0743f40532d97497b011cf1cf3e0fa99a9e1a459618c208',
-//                 'execution_status': true,
-//                 'tx_hash': '3012664984624c846f10f11fe41db9498167aa7c1feab0cd13633954589b9497'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '3000',
-//                     'from': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a',
-//                     'seed': '2000',
-//                     'to': '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d'
-//                 },
-//                 'message_id': 128,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': '51a142df1654bf28a3bb251ca4b1c18b78c569dbfdb29b7f2b2e70d43295d1a3731cf0dd1da15c8bf39abd9c7d84791edb4a592423870a1fe94b9ff2cc22c405',
-//                 'execution_status': true,
-//                 'tx_hash': '48ce786b1fd365038836cb512ce22d589f6896c3188af1f0841cf06d869c6b59'
-//             },
-//             {
-//                 'body': {
-//                     'amount': '1000',
-//                     'from': '0b513ad9b4924015ca0902ed079044d3ac5dbec2306f06948c10da8eb6e39f2d',
-//                     'seed': '3000',
-//                     'to': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 128,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': 'de3164d461ee455c3360bdf54e3d0004f8c1dbe7e6371787c328710db55243bb77e77a7e71bdd64ca3ad205acf95d8d1cdb7e2c37f95b91c8ddaa9f1337de806',
-//                 'execution_status': true,
-//                 'tx_hash': 'c44759951d9cfc30de58e891bd842efec8e11d38fdbfb4875fb93ad0f3752fb2'
-//             },
-//             {
-//                 'body': {
-//                     'name': 'Change name of existing wallet',
-//                     'pub_key': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                 },
-//                 'message_id': 130,
-//                 'network_id': 0,
-//                 'protocol_version': 0,
-//                 'service_id': 128,
-//                 'signature': 'ebbb8335103dbfabde282c7fc3ef8a01d2dee93d6da3179982cb3e690ed43cfb3dbfeae69c27fd9bc517760fbb260ea9ec8ff8ea86e5834a1308003f49e73b0d',
-//                 'execution_status': false,
-//                 'tx_hash': 'dac9d0dd7ca71ad85a14a9f189f31b3ba534005b26f95091b60119da38714b62'
-//             }
-//         ];
-//
-//         $.ajax({
-//             url: 'test_data/tx_create_wallet_false_execution_status.json',
-//             method: 'GET',
-//             success: function(response) {
-//                 var server = sinon.fakeServer.create();
-//
-//                 sinon.spy(jQuery, 'ajax');
-//
-//                 server.respondWith('GET', url + publicKey, [200, {'Content-Type': 'application/json'}, JSON.stringify(response)]);
-//
-//                 service.getWallet(publicKey, function(error, block, wallet, transactions) {
-//                     expect(block).to.deep.equal({
-//                         'height': '5',
-//                         'prev_hash': '1a1b6bf4c9f7543809e1011b1d5e4ad0b76eab14924d8ff00ba1a79f0466ce6b',
-//                         'proposer_id': 0,
-//                         'schema_version': 0,
-//                         'state_hash': 'e637fdd5e748f44be52a89d8ace6c1da54cc97f0ebdb53a9e8ab04b17eaa2a2f',
-//                         'tx_count': 1,
-//                         'tx_hash': 'cb63c0d72909e1f51be6601df23aa1a5d291aec1f13dc7f65997a7cbd97899ba',
-//                         'time': '0'
-//                     });
-//
-//                     expect(wallet).to.deep.equal({
-//                         'balance': '4000',
-//                         'history_hash': 'af70b9f0e5937e3ef8b80e39d733a81bab01a495afcd1c960552f81b213d22b8',
-//                         'history_len': '5',
-//                         'name': 'Jane Doe',
-//                         'pub_key': '66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a'
-//                     });
-//
-//                     expect(transactions.length).to.equal(5);
-//
-//                     for (var i = 0; i < transactions.length; i++) {
-//                         expect(transactions[i]).to.deep.equal(txs[i]);
-//                     }
-//
-//                     jQuery.ajax.restore();
-//
-//                     server.restore();
-//
-//                     done();
-//                 });
-//
-//                 server.respond();
-//             }
-//         });
-//     });
-//
-//     it('should return undefined on absent wallet', function(done) {
-//         var publicKey = 'bdbbc4edb3f589728bb954f10867332ffd9dac8e933fc6b3607ef552e4ed84d3';
-//
-//         $.ajax({
-//             url: 'test_data/response_absent_wallet.json',
-//             method: 'GET',
-//             success: function(response) {
-//                 var server = sinon.fakeServer.create();
-//
-//                 sinon.spy(jQuery, 'ajax');
-//
-//                 server.respondWith('GET', url + publicKey, [200, {'Content-Type': 'application/json'}, JSON.stringify(response)]);
-//
-//                 service.getWallet(publicKey, function(error, block, wallet, transactions) {
-//                     expect(wallet).to.equal(undefined);
-//
-//                     jQuery.ajax.restore();
-//
-//                     server.restore();
-//
-//                     done();
-//                 });
-//
-//                 server.respond();
-//             }
-//         });
-//     });
-//
-// });
+describe('Wallet query validation', function() {
+
+    var server;
+    var url = 'api/services/cryptocurrency/v1/wallets/info?pubkey=';
+    var publicKey = '2fc4c29755938792d36382adbe2850026e266eb256b125c756e784eaec29174f';
+    var walletNew = readJSON('test_data/wallet_new.json');
+    var walletOnAddFunds = readJSON('test_data/wallet_on_add_funds.json');
+    var walletOnTransfer = readJSON('test_data/wallet_on_transfer.json');
+
+    beforeEach(function() {
+        server = sinon.fakeServer.create();
+    });
+
+    afterEach(function() {
+        server.restore();
+    });
+
+    it('should return expected parameters on valid new wallet', function(done) {
+        server.respondWith('GET', url + publicKey, [200, {'Content-Type': 'application/json'}, JSON.stringify(walletNew)]);
+
+        service.getWallet(publicKey, function(error, block, wallet, transactions) {
+            expect(block).to.deep.equal({
+                height: '63636',
+                prev_hash: '055f18a41e82d106c830ed8140b09e885daaddab8b429364369a0fb34be2586f',
+                proposer_id: 1,
+                schema_version: 0,
+                state_hash: 'cfa66326b4865b1b396e916909f9af7fa22d231ced57a8fc575c611adf15a5bd',
+                tx_count: 0,
+                tx_hash: '0000000000000000000000000000000000000000000000000000000000000000',
+                time: '1512914676062495000'
+            });
+
+            expect(wallet).to.deep.equal({
+                "balance": "0",
+                "history_hash": "1f4482e6ff3299dc2dda01f7635513c082c53e167535b690c2724090a65a4c19",
+                "history_len": "1",
+                "login": "abcd",
+                "pub_key": "2fc4c29755938792d36382adbe2850026e266eb256b125c756e784eaec29174f"
+            });
+
+            expect(transactions.length).to.equal(1);
+
+            done();
+        });
+
+        server.respond();
+    });
+
+    it('should return expected parameters on valid wallet after add funds', function(done) {
+        server.respondWith('GET', url + publicKey, [200, {'Content-Type': 'application/json'}, JSON.stringify(walletOnAddFunds)]);
+
+        service.getWallet(publicKey, function(error, block, wallet, transactions) {
+            expect(block).to.deep.equal({
+                height: '66060',
+                prev_hash: '217d773050a3663e5c7e8fe83776a057a5e5c4782d420cb0536ba1684785be34',
+                proposer_id: 1,
+                schema_version: 0,
+                state_hash: '6349ee85951d89c91ced99e02df728a2d76a31641a25c671a7bb9306e1322f6b',
+                tx_count: 0,
+                tx_hash: '0000000000000000000000000000000000000000000000000000000000000000',
+                time: '1512915918506001000'
+            });
+
+            expect(wallet).to.deep.equal({
+                "balance": "50",
+                "history_hash": "e755cacedd370092c6da89bf4ccd3095486ea94214ccf75e6deef9bcb1616a04",
+                "history_len": "2",
+                "login": "abcd",
+                "pub_key": "2fc4c29755938792d36382adbe2850026e266eb256b125c756e784eaec29174f"
+            });
+
+            expect(transactions.length).to.equal(2);
+
+            done();
+        });
+
+        server.respond();
+    });
+
+    it('should return expected parameters on valid wallet after transfer funds', function(done) {
+        server.respondWith('GET', url + publicKey, [200, {'Content-Type': 'application/json'}, JSON.stringify(walletOnTransfer)]);
+
+        service.getWallet(publicKey, function(error, block, wallet, transactions) {
+            expect(block).to.deep.equal({
+                height: '66399',
+                prev_hash: 'd71582601dd20fbfe7175890fa2816a97f76c0fbd6397edb5c51a8573886a4df',
+                proposer_id: 4,
+                schema_version: 0,
+                state_hash: '2cf4f5fec47b570f33b6c9b40e3fd271b1cf3d8ff5c24809df1cbaa41c0e8473',
+                tx_count: 0,
+                tx_hash: '0000000000000000000000000000000000000000000000000000000000000000',
+                time: '1512916094279146000'
+            });
+
+            expect(wallet).to.deep.equal({
+                "balance": "40",
+                "history_hash": "1818a63b9eca2d82829ddb709b08ee23be0edc30d09a0ad1c09016b09018ea9f",
+                "history_len": "3",
+                "login": "abcd",
+                "pub_key": "2fc4c29755938792d36382adbe2850026e266eb256b125c756e784eaec29174f"
+            });
+
+            expect(transactions.length).to.equal(3);
+
+            done();
+        });
+
+        server.respond();
+    });
+
+});

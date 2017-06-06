@@ -44,7 +44,7 @@ install() {
     ${destdir}/backend/target/debug/cryptocurrency generate-testnet -p 9000 6 --output_dir ${destdir}/etc
     validators=$(cat ${destdir}/etc/validators/0.toml | ${sed_program} -n -e 's/consensus_key = //p' | ${sed_program} -e 's/$/,/' | ${sed_program} -e '1s/^/[/' | ${sed_program} -e '$ s/,/]/g' | tr -d '\n')
     echo "Use validators: $validators"
-    cat ${destdir}/frontend/config-example.json | ${sed_program} -r "s/(\"validators\": )(\[\])/\1${validators}/" > ${destdir}/etc/frontend.json
+    cat ${destdir}/frontend/config-example.json | ${sed_program} -r "s/(\"validators\": )(\[\])/\1${validators}/" > ${destdir}/frontend/config.json
 }
 
 enable() {
