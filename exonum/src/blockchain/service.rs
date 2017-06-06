@@ -24,14 +24,14 @@ use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
 /// A trait that describes transaction processing rules for the given message type.
 pub trait Transaction: Message + 'static {
     /// Checks the formal correctness of the transaction.
-    /// That can be usefull for signature verification.
+    /// That can be useful for signature verification.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
     fn verify(&self) -> bool;
     /// Defines the rules for executing transactions, during which the state of 
     /// `View` can be changed.
     fn execute(&self, view: &View) -> Result<(), StorageError>;
-    /// Returns transaction representation in json.
+    /// Returns transaction representation in `JSON`.
     fn info(&self) -> Value {
         Value::Null
     }
@@ -39,7 +39,6 @@ pub trait Transaction: Message + 'static {
 
 /// The main extension point for the `Exonum` framework. Like smart contracts in some other 
 /// blockchain platforms, `Exonum` services encapsulate business logic of the blockchain application.
-/// TODO
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
     /// Unique service identification for database schema and service messages.
@@ -49,8 +48,13 @@ pub trait Service: Send + Sync + 'static {
     fn service_name(&self) -> &'static str;
 
     /// Returns a list of root hashes of tables that determine the current state
-    /// of the service database.
-    /// TODO
+    /// of the service database. These lests are collected from all services in a common
+    ///  `MerklePatriciaTable` that named [`state_hash_aggregator`][1].
+    ///
+    /// See also [`service_table_unique_key`][2].
+    ///
+    /// [1]: struct.Schema.html#method.state_hash_aggregator
+    /// [2]: struct.Blockchain.html#method.service_table_unique_key
     fn state_hash(&self, view: &View) -> Result<Vec<Hash>, StorageError> {
         Ok(Vec::new())
     }
@@ -161,7 +165,7 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 
     /// Adds transaction to the queue.
-    /// After the services handle commit event these transactions will be broadcasted by node.
+    /// After the services handle commit event these transactions will be broadcast by node.
     pub fn add_transaction<T: Transaction>(&mut self, tx: T) {
         assert!(tx.verify());
         self.txs.push(Box::new(tx));
