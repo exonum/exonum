@@ -3,24 +3,28 @@
 if [ -z "$TESTNET_DESTDIR" ]; then
     echo "Need to set TESTNET_DESTDIR"
     exit 1
-fi 
+fi
 
 destdir=$TESTNET_DESTDIR
 scriptdir=`dirname "$BASH_SOURCE"`
 supervisor_conf=${destdir}/etc/supervisord.conf
 
-enable() {
+install() {
     mkdir -p ${destdir}/log/supervisor
     mkdir ${destdir}/run
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc || exit 1
+    ln -s ${scriptdir}/../../frontend ${destdir}/frontend
+    ln -s ${scriptdir}/../../target/debug ${destdir}/backend
+}
 
+enable() {
     cd ${destdir}
     if [ -e /tmp/supervisord.sock ]
     then
         supervisorctl reload || exit 1
     else
         supervisord || exit 1
-    fi 
+    fi
 }
 
 disable() {
@@ -28,7 +32,7 @@ disable() {
     if [ -e /tmp/supervisord.sock ]
     then
         supervisorctl shutdown || exit 1
-    fi 
+    fi
 }
 
 update() {
@@ -74,32 +78,35 @@ generate() {
     port=$3
 
     test -e ${destdir}/${template} && exit 1
-    exonumctl generate -o ${destdir}/${template} $count -p $port
+    ${destdir}/backend/cryptocurrency generate -o ${destdir}/${template} $count -p $port
 }
 
 case "$1" in
     start)
         start $2
         ;;
-    stop) 
+    stop)
         stop $2
         ;;
     restart)
         restart $2
         ;;
-    enable) 
+    install)
+        install $2
+        ;;
+    enable)
         enable $2
         ;;
-    disable) 
+    disable)
         disable $2
         ;;
-    update) 
+    update)
         update $2
         ;;
-    clear) 
+    clear)
         clear $2
         ;;
-    generate) 
+    generate)
         generate $2 $3 $4
         ;;
 esac
