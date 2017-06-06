@@ -4,6 +4,7 @@ use mio::util::Slab;
 
 use std::borrow::Borrow;
 use std::io;
+use std::fmt;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::cmp::min;
@@ -429,5 +430,10 @@ impl Network {
     }
 }
 
-#[cfg(test)]
-mod tests {}
+impl fmt::Debug for Network {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Network {{ listen_address: {:?}, listener: {:?}, incoming: {:?}, \
+        outgoing: {:?}, addresses: {:?}, reconnects: {{ .. }} }}",
+               self.listen_address, self.listener, self.incoming, self.outgoing, self.addresses)
+    }
+}

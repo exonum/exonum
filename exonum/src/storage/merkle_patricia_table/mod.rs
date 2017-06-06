@@ -312,6 +312,7 @@ impl StorageValue for BranchNode {
 
 type Entry<V> = (Vec<u8>, Node<V>);
 
+#[derive(Debug)]
 pub struct MerklePatriciaTable<T: Map<[u8], Vec<u8>>, K: ?Sized, V> {
     map: T,
     _k: PhantomData<K>,
