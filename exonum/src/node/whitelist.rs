@@ -19,7 +19,7 @@ pub struct Whitelist {
 
 impl Whitelist {
     /// is this `peer` can connect or not
-    pub fn contains(&self, peer: &PublicKey) -> bool {
+    pub fn allow(&self, peer: &PublicKey) -> bool {
         !self.whitelist_on || self.validators_list.contains(peer) ||
         self.whitelisted_peers.contains(peer)
     }
@@ -30,7 +30,7 @@ impl Whitelist {
     }
 
     /// get list of peers in whitelist
-    pub fn collect_whitelist(&self) -> Vec<&PublicKey> {
+    pub fn collect_allowed(&self) -> Vec<&PublicKey> {
         self.whitelisted_peers
             .iter()
             .chain(self.validators_list.iter())
@@ -44,8 +44,8 @@ impl Whitelist {
     }
 
     /// check if we support whitelist, or keep connection politics open
-    /// if it return true, everybody can connect to us
-    pub fn is_whitelist_disabled(&self) -> bool {
+    /// if it return false, everybody can connect to us
+    pub fn is_enabled(&self) -> bool {
         !self.whitelist_on
     }
 }
@@ -85,10 +85,10 @@ mod test {
                           in_whitelist: &[usize],
                           not_in_whitelist: &[usize]) {
         for i in in_whitelist {
-            assert_eq!(whitelist.contains(&keys[*i]), true);
+            assert_eq!(whitelist.allow(&keys[*i]), true);
         }
         for i in not_in_whitelist {
-            assert_eq!(whitelist.contains(&keys[*i]), false);
+            assert_eq!(whitelist.allow(&keys[*i]), false);
         }
     }
 
@@ -103,7 +103,7 @@ mod test {
         check_in_whitelist(&whitelist, &regular, &[0], &[1, 2, 3]);
         whitelist.add(regular[2]);
         check_in_whitelist(&whitelist, &regular, &[0, 2], &[1, 3]);
-        assert_eq!(whitelist.collect_whitelist().len(), 2);
+        assert_eq!(whitelist.collect_allowed().len(), 2);
     }
 
     #[test]
@@ -112,7 +112,7 @@ mod test {
 
         let whitelist = Whitelist::default();
         check_in_whitelist(&whitelist, &regular, &[0, 1, 2, 3], &[]);
-        assert_eq!(whitelist.collect_whitelist().len(), 0);
+        assert_eq!(whitelist.collect_allowed().len(), 0);
     }
 
     #[test]
@@ -123,9 +123,9 @@ mod test {
         whitelist.whitelist_on = true;
         check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
         check_in_whitelist(&whitelist, &validators, &[], &[0, 1]);
-        assert_eq!(whitelist.collect_whitelist().len(), 0);
+        assert_eq!(whitelist.collect_allowed().len(), 0);
         whitelist.set_validators(validators.clone());
-        assert_eq!(whitelist.collect_whitelist().len(), 2);
+        assert_eq!(whitelist.collect_allowed().len(), 2);
         check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
         check_in_whitelist(&whitelist, &validators, &[0, 1], &[]);
     }
@@ -136,13 +136,13 @@ mod test {
         let validators1 = make_keys(&VALIDATORS[1]);
         let mut whitelist = Whitelist::default();
         whitelist.whitelist_on = true;
-        assert_eq!(whitelist.collect_whitelist().len(), 0);
+        assert_eq!(whitelist.collect_allowed().len(), 0);
         whitelist.set_validators(validators0.clone());
-        assert_eq!(whitelist.collect_whitelist().len(), 2);
+        assert_eq!(whitelist.collect_allowed().len(), 2);
         check_in_whitelist(&whitelist, &validators0, &[0, 1], &[]);
         check_in_whitelist(&whitelist, &validators1, &[], &[0, 1]);
         whitelist.set_validators(validators1.clone());
-        assert_eq!(whitelist.collect_whitelist().len(), 2);
+        assert_eq!(whitelist.collect_allowed().len(), 2);
         check_in_whitelist(&whitelist, &validators0, &[], &[0, 1]);
         check_in_whitelist(&whitelist, &validators1, &[0, 1], &[]);
     }

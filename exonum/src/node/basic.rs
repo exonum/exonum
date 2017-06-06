@@ -51,7 +51,7 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        if !self.state.whitelist().contains(message.pub_key()) {
+        if !self.state.whitelist().allow(message.pub_key()) {
             error!("Received connect message from peer = {:?} which not in whitelist.", message.pub_key());
             return;
         }
