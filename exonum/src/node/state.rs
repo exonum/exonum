@@ -369,7 +369,7 @@ impl State {
         &self.whitelist
     }
 
-    pub fn validators(&self) -> &[PublicKey] {
+pub fn validators(&self) -> &[(PublicKey, PublicKey)] {
         &self.config.validators
     }
 
@@ -377,10 +377,10 @@ impl State {
         &self.config
     }
 
-    pub fn find_validator(&self, peer: &PublicKey) -> Option<ValidatorId> {
+    pub fn find_validator(&self, peer: PublicKey) -> Option<ValidatorId> {
         self.validators()
             .iter()
-            .position(|pk| pk == peer)
+            .position(|pk| pk.0 == peer)
             .map(|id| id as ValidatorId)
     }
 
@@ -396,7 +396,7 @@ impl State {
         trace!("Updating node config={:#?}", config);
         let validator_id = config.validators
                             .iter()
-                            .position(|pk| pk == self.consensus_public_key())
+                            .position(|pk| pk.0 == *self.consensus_public_key())
                             .map(|id| id as ValidatorId);
         self.whitelist.set_validators(config.validators.iter().cloned());
         self.renew_validator_id(validator_id);
@@ -421,7 +421,7 @@ impl State {
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
         if let Some(pubkey) = self.connections.remove(addr) {
             self.peers.remove(&pubkey);
-            return self.config.validators.contains(&pubkey);
+            return self.config.validators.iter().any(|x| x.0 == pubkey);
         }
         false
     }
@@ -430,8 +430,8 @@ impl State {
         &self.peers
     }
 
-    pub fn public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
-        self.validators().get(id as usize)
+    pub fn public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
+        self.validators().get(id as usize).map(|x| x.0)
     }
 
     pub fn consensus_public_key(&self) -> &PublicKey {

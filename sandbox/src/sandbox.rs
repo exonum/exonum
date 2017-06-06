@@ -240,7 +240,7 @@ impl Sandbox {
     }
 
     pub fn p(&self, id: usize) -> PublicKey {
-        self.validators()[id]
+        self.validators()[id].0
     }
 
     pub fn s(&self, id: usize) -> &SecretKey {
@@ -252,7 +252,7 @@ impl Sandbox {
         self.addresses[id]
     }
 
-    pub fn validators(&self) -> Vec<PublicKey> {
+    pub fn validators(&self) -> Vec<(PublicKey, PublicKey)> {
         let conf = self.cfg();
         conf.validators.clone()
     }
@@ -593,7 +593,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let config = Configuration {
         listener: ListenerConfig {
             address: addresses[0],
-            consensus_public_key: validators[0].0.clone(),
+            consensus_public_key: validators[0].0,
             consensus_secret_key: validators[0].1.clone(),
             service_public_key: service_keys.0,
             service_secret_key: service_keys.1,

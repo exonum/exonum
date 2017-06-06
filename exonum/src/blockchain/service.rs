@@ -80,7 +80,7 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.state.round()
     }
 
-    pub fn validators(&self) -> &[PublicKey] {
+    pub fn validators(&self) -> &[(PublicKey, PublicKey)] {
         self.state.validators()
     }
 

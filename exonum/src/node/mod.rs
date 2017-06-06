@@ -140,7 +140,7 @@ impl<S> NodeHandler<S>
         let validator_id = stored
             .validators
             .iter()
-            .position(|pk| pk == &config.listener.consensus_public_key)
+            .position(|pk| pk.0 == config.listener.consensus_public_key)
             .map(|id| id as ValidatorId);
         info!("Validator={:#?}", validator_id);
         let connect = Connect::new(&config.listener.consensus_public_key,
@@ -224,7 +224,7 @@ impl<S> NodeHandler<S>
 
     pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
         // TODO: check validator id
-        let public_key = self.state.validators()[id as usize];
+        let public_key = self.state.validators()[id as usize].0;
         self.send_to_peer(public_key, message);
     }
 

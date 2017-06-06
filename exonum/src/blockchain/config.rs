@@ -10,7 +10,8 @@ use crypto::{hash, PublicKey, Hash};
 pub struct StoredConfiguration {
     pub previous_cfg_hash: Hash, 
     pub actual_from: u64,
-    pub validators: Vec<PublicKey>,
+    /// List of validator's consensus and service public keys.
+    pub validators: Vec<(PublicKey, PublicKey)>,
     pub consensus: ConsensusConfig,
     pub services: BTreeMap<String, serde_json::Value>,
 }
@@ -42,7 +43,9 @@ impl StoredConfiguration {
     }
 
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, serde_json::error::Error> {
-        serde_json::from_slice(serialized)
+        let config = serde_json::from_slice(serialized)?;
+        // TODO: FIXME.
+        Ok(config)
     }
 }
 
