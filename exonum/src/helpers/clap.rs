@@ -10,6 +10,7 @@ use node::NodeConfig;
 use storage::Storage;
 use helpers::generate_testnet_config;
 
+#[derive(Debug)]
 pub struct GenerateCommand<'a, 'b>
     where 'a: 'b
 {
@@ -72,6 +73,7 @@ impl<'a, 'b> GenerateCommand<'a, 'b>
     }
 }
 
+#[derive(Debug)]
 pub struct RunCommand<'a, 'b>
     where 'a: 'b
 {
