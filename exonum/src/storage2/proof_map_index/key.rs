@@ -119,19 +119,19 @@ impl StorageKey for ProofMapKey {
         DB_KEY_SIZE
     }
 
-    fn write(&self, buffer: &mut Vec<u8>) {
+    fn write(&self, buffer: &mut [u8]) {
         if self.is_leaf() {
-            buffer.push(LEAF_KEY_PREFIX);
-            buffer.extend_from_slice(&self.data);
-            buffer.push(0)
+            buffer[0] = LEAF_KEY_PREFIX;
+            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.data)
+            buffer[KEY_SIZE + 1] = 0;
         } else {
-            buffer.push(BRANCH_KEY_PREFIX);
-            buffer.extend_from_slice(&self.data);
-            buffer.push(self.to as u8)
+            buffer[0] = BRANCH_KEY_PREFIX;
+            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.data)
+            buffer[KEY_SIZE + 1] = self.to as u8;
         }
     }
 
-    fn from_slice(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self {
         let mut data = [0; KEY_SIZE];
         data[..].copy_from_slice(&buffer[1..KEY_SIZE + 1]);
         let to = match buffer[0] {

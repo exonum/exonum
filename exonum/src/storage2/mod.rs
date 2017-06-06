@@ -37,7 +37,7 @@ mod list_index;
 mod key_set_index;
 mod value_set_index;
 mod proof_list_index;
-// mod proof_map_index;
+mod proof_map_index;
 
 pub fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
     let mut v = [0; HASH_SIZE * 2];
