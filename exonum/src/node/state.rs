@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
@@ -93,8 +93,7 @@ struct RequestState {
 pub struct ProposeState {
     hash: Hash,
     propose: Propose,
-    // FIXME: use HashSet here
-    unknown_txs: BTreeSet<Hash>,
+    unknown_txs: HashSet<Hash>,
 }
 
 #[derive(Clone)]
@@ -238,7 +237,7 @@ impl ProposeState {
         &self.propose
     }
 
-    pub fn unknown_txs(&self) -> &BTreeSet<Hash> {
+    pub fn unknown_txs(&self) -> &HashSet<Hash> {
         &self.unknown_txs
     }
 
@@ -595,7 +594,7 @@ impl State {
                              ProposeState {
                                  hash: propose_hash,
                                  propose: msg,
-                                 unknown_txs: BTreeSet::new(),
+                                 unknown_txs: HashSet::new(),
                              });
 
         propose_hash
@@ -611,7 +610,7 @@ impl State {
                     .iter()
                     .filter(|tx| !txs.contains_key(tx))
                     .cloned()
-                    .collect::<BTreeSet<Hash>>();
+                    .collect::<HashSet<Hash>>();
                 for tx in &unknown_txs {
                     self.unknown_txs
                         .entry(*tx)
