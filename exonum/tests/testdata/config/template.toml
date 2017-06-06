@@ -1,0 +1,12 @@
+count = 4
+
+[consensus_cfg]
+peers_timeout = 10000
+propose_timeout = 500
+round_timeout = 3000
+status_timeout = 5000
+txs_block_limit = 1000
+
+[services]
+
+[validators]

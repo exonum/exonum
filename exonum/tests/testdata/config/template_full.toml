@@ -1,0 +1,37 @@
+count = 4
+
+[consensus_cfg]
+peers_timeout = 10000
+propose_timeout = 500
+round_timeout = 3000
+status_timeout = 5000
+txs_block_limit = 1000
+
+[services]
+[validators.0dd27a711d90dc7aa0057fbc72b7647fc03de242540cfd1b96fe1776779f6973]
+addr = "127.0.0.1:6333"
+
+[validators.0dd27a711d90dc7aa0057fbc72b7647fc03de242540cfd1b96fe1776779f6973.keys]
+
+[validators.0dd27a711d90dc7aa0057fbc72b7647fc03de242540cfd1b96fe1776779f6973.variables]
+
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0]
+addr = "127.0.0.1:6333"
+
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.keys]
+
+[validators.43efb02f51771bf9f8c932fc2b1d77ad8a90bbc635c6d6486ebc9f956b229fd0.variables]
+
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb]
+addr = "127.0.0.1:6333"
+
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.keys]
+
+[validators.abf79faa19d2f7ee00f10e91de2ad98da4d887fc53fbcbfc1c259c54eaf248eb.variables]
+
+[validators.efa67f8eb63ff7060823d3228a6e38e2d61a6b7c0332932ae00a62e2b21ece9f]
+addr = "127.0.0.1:6333"
+
+[validators.efa67f8eb63ff7060823d3228a6e38e2d61a6b7c0332932ae00a62e2b21ece9f.keys]
+
+[validators.efa67f8eb63ff7060823d3228a6e38e2d61a6b7c0332932ae00a62e2b21ece9f.variables]
