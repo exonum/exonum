@@ -1,11 +1,11 @@
 #!/bin/bash
 
-if [ -z "$TESTNET_DESTDIR" ]; then
-    echo "Need to set TESTNET_DESTDIR"
+if [ -z "$SERVICE_ROOT" ]; then
+    echo "Need to set SERVICE_ROOT"
     exit 1
 fi
 
-destdir=$TESTNET_DESTDIR
+destdir=$SERVICE_ROOT
 scriptdir=`dirname "$BASH_SOURCE"`
 supervisor_conf=${destdir}/etc/supervisord.conf
 
@@ -14,7 +14,15 @@ install() {
     mkdir ${destdir}/run
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc || exit 1
     ln -s ${scriptdir}/../../frontend ${destdir}/frontend
-    ln -s ${scriptdir}/../../target/debug ${destdir}/backend
+    cd ${destdir}/frontend
+    npm install
+    bower install
+    cd -
+    ln -s ${scriptdir}/../../backend ${destdir}/backend
+    cd ${destdir}/backend
+    cargo build -p cryptocurrency
+    cd -
+    generate $1 6 2000
 }
 
 enable() {
@@ -78,7 +86,7 @@ generate() {
     port=$3
 
     test -e ${destdir}/${template} && exit 1
-    ${destdir}/backend/cryptocurrency generate -o ${destdir}/${template} $count -p $port
+    ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/${template} $count -p $port
 }
 
 case "$1" in
