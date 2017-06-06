@@ -631,21 +631,3 @@ impl<'a> Field<'a> for BitVec {
         <&[u8] as Field>::write(&slice, buffer, from, to);
     }
 }
-
-// impl<'a, T> SegmentField<'a> for &'a [T] where T: Field<'a> {
-//     fn item_size() -> usize {
-//         T::field_size()
-//     }
-
-//     fn from_slice(slice: &'a [u8]) -> Self {
-//         unsafe { ::std::slice::from_raw_parts(slice.as_ptr() as *const T, slice.len() / Self::item_size()) }
-//     }
-
-//     fn as_slice(&self) -> &'a [u8] {
-//         unsafe { ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size()) }
-//     }
-
-//     fn count(&self) -> u32 {
-//         self.len() as u32
-//     }
-// }

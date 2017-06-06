@@ -127,9 +127,7 @@ fn test_query_state_hash() {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_root_hash().unwrap();
         let configs_key = Blockchain::service_table_unique_key(CONSENSUS, 0);
-        // let timestamp_t1_rh = FIRST_TABLE_HASH;
         let timestamp_t1_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 0);
-        // let timestamp_t2_rh = SECOND_TABLE_HASH;
         let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
 
         let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0).unwrap();
@@ -193,13 +191,8 @@ fn test_retrieve_block_and_precommits() {
                     .raw()
                     .verify_signature(&sandbox.p(precommit.validator() as usize)));
     }
-    // let json_str = serde_json::to_string(&bl_proof_option.unwrap()).unwrap();
-    // println!("{}", &json_str);
     let bl_proof_option = sandbox.block_and_precommits(target_height).unwrap();
     assert!(bl_proof_option.is_none());
-
-    // let validators = sandbox.validators.iter().map(|pair| pair.0 ).collect::<Vec<_>>();
-    // println!("validators public keys: {}", &serde_json::to_string(&validators).unwrap());
 }
 
 #[test]
@@ -283,7 +276,7 @@ fn test_queue_propose_message_from_next_height() {
     // get some tx
     let tx = gen_timestamping_tx();
 
-    // this commented code is saved because it may be used later
+    // TODO: this commented code is saved because it may be used later
     //    let block_at_first_height = Block::new(HEIGHT_ZERO, ROUND_FOUR, future_propose_time,
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
@@ -2389,7 +2382,7 @@ fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
     sandbox.add_time(Duration::from_millis(0));
 }
 
-// - exclude validator from consensus
+/// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus
 /// - node continues as `fullnode`
 #[test]
@@ -2418,7 +2411,7 @@ fn test_exclude_validator_from_consensus() {
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
 }
 
-// - Check following_configuration method in schema
+/// - Check `following_configuration` method in schema
 /// - idea of the test is check configurations method from schema
 #[test]
 fn test_schema_config_changes() {
