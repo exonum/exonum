@@ -1,18 +1,16 @@
-use serde_json::Value as JValue;
+use std::num::ParseIntError;
+use std::str::ParseBoolError;
+
 use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
-use blockchain::Blockchain;
+use blockchain::{Blockchain, Block};
 use crypto::{Hash, HexValue};
-use explorer::{BlockInfo, BlockchainExplorer};
+use explorer::{TxInfo, BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct BlocksRequest {
-    pub from: Option<u64>,
-    pub count: u64,
-}
+const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
 #[derive(Clone, Debug)]
 pub struct ExplorerApi {
@@ -26,29 +24,23 @@ impl ExplorerApi {
         }
     }
 
-    fn get_blocks(&self, blocks_request: BlocksRequest) -> Result<Vec<BlockInfo>, ApiError> {
-        let explorer = BlockchainExplorer::new(&self.blockchain);
-        match explorer.blocks_range(blocks_request.count, blocks_request.from) {
-            Ok(blocks) => Ok(blocks),
-            Err(e) => Err(ApiError::Storage(e)),
+    fn get_blocks(&self, count: u64, from: Option<u64>, skip_empty_blocks: bool) -> Result<Vec<Block>, ApiError> {
+        if count > MAX_BLOCKS_PER_REQUEST {
+             return Err(ApiError::IncorrectRequest("Max block count per request exceeded".into()))
         }
+        let explorer = BlockchainExplorer::new(&self.blockchain);
+        Ok(explorer.blocks_range(count, from, skip_empty_blocks)?)
     }
 
     fn get_block(&self, height: u64) -> Result<Option<BlockInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
-        match explorer.block_info_with_height(height) {
-            Ok(block_info) => Ok(block_info),
-            Err(e) => Err(ApiError::Storage(e)),
-        }
+        Ok(explorer.block_info(height)?)
     }
 
-    fn get_transaction(&self, hash_str: &str) -> Result<Option<JValue>, ApiError> {
+    fn get_transaction(&self, hash_str: &str) -> Result<Option<TxInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         let hash = Hash::from_hex(hash_str)?;
-        match explorer.tx_info(&hash) {
-            Ok(tx_info) => Ok(tx_info),
-            Err(e) => Err(ApiError::Storage(e)),
-        }
+        explorer.tx_info(&hash)
     }
 }
 
@@ -58,27 +50,28 @@ impl Api for ExplorerApi {
         let _self = self.clone();
         let blocks = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
-            let count: u64;
-            let from: Option<u64>;
-            count = match map.find(&["count"]) {
+            let count: u64 = match map.find(&["count"]) {
                 Some(&Value::String(ref count_str)) => {
-                    count_str.parse().map_err(|_| ApiError::IncorrectRequest)?
+                    count_str.parse().map_err(|e: ParseIntError| ApiError::IncorrectRequest(Box::new(e)))?
                 }
                 _ => {
-                    return Err(ApiError::IncorrectRequest)?;
+                    return Err(ApiError::IncorrectRequest("Required parameter of blocks 'count' is missing".into()))?;
                 }
             };
-            from = match map.find(&["from"]) {
+            let from: Option<u64> = match map.find(&["from"]) {
                 Some(&Value::String(ref from_str)) => {
-                    Some(from_str.parse().map_err(|_| ApiError::IncorrectRequest)?)
+                    Some(from_str.parse().map_err(|e: ParseIntError| ApiError::IncorrectRequest(Box::new(e)))?)
                 }
                 _ => None,
             };
+            let skip_empty_blocks: bool = match map.find(&["skip_empty_blocks"]) {
+                Some(&Value::String(ref skip_str)) => {
+                    skip_str.parse().map_err(|e: ParseBoolError| ApiError::IncorrectRequest(Box::new(e)))?
+                }
+                _ => false,
+            };
             let info = _self
-                .get_blocks(BlocksRequest {
-                                count: count,
-                                from: from,
-                            })?;
+                .get_blocks(count, from, skip_empty_blocks)?;
             _self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
@@ -87,11 +80,11 @@ impl Api for ExplorerApi {
             let params = req.extensions.get::<Router>().unwrap();
             match params.find("height") {
                 Some(height_str) => {
-                    let height: u64 = height_str.parse().map_err(|_| ApiError::IncorrectRequest)?;
+                    let height: u64 = height_str.parse().map_err(|e: ParseIntError| ApiError::IncorrectRequest(Box::new(e)))?;
                     let info = _self.get_block(height)?;
                     _self.ok_response(&::serde_json::to_value(info).unwrap())
                 }
-                None => Err(ApiError::IncorrectRequest)?,
+                None => Err(ApiError::IncorrectRequest("Required parameter of block 'height' is missing".into()))?,
             }
         };
 
@@ -103,7 +96,7 @@ impl Api for ExplorerApi {
                     let info = _self.get_transaction(hash_str)?;
                     _self.ok_response(&::serde_json::to_value(info).unwrap())
                 }
-                None => Err(ApiError::IncorrectRequest)?,
+                None => Err(ApiError::IncorrectRequest("Required parameter of transaction 'hash' is missing".into()))?,
             }
         };
 
