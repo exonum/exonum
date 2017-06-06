@@ -14,7 +14,7 @@ pub struct BlocksRequest {
     pub count: u64,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExplorerApi {
     blockchain: Blockchain,
 }

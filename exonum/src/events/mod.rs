@@ -1,7 +1,7 @@
 use mio;
 
 use std::io;
-use std::fmt::Display;
+use std::fmt::{self, Display};
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
@@ -85,6 +85,7 @@ pub trait Reactor<H: EventHandler> {
     fn channel(&self) -> Self::Channel;
 }
 
+#[derive(Debug)]
 pub struct MioAdapter<H: EventHandler> {
     network: Network,
     handler: H,
@@ -95,6 +96,7 @@ pub struct Events<H: EventHandler> {
     event_loop: EventLoop<H>,
 }
 
+#[derive(Debug)]
 pub struct MioChannel<E: Send, T: Send> {
     address: SocketAddr,
     inner: mio::Sender<InternalEvent<E, T>>,
@@ -190,6 +192,12 @@ impl<H: EventHandler> Events<H> {
 
     pub fn handler_mut(&mut self) -> &mut H {
         &mut self.inner.handler
+    }
+}
+
+impl<H: EventHandler> fmt::Debug for Events<H> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("Events { .. }")
     }
 }
 
