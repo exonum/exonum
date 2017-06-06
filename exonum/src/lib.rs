@@ -1,3 +1,9 @@
+//! Exonum blockchain framework.
+//!
+//! For more information see the project readme.
+
+#![deny(missing_debug_implementations)]
+
 #![cfg_attr(all(feature = "nightly", test), feature(test))]
 
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]

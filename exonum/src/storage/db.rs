@@ -16,7 +16,7 @@ pub trait Fork: Map<[u8], Vec<u8>> + Sized {
     fn merge(&self, patch: &Patch);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Change {
     Put(Vec<u8>),
     Delete,
