@@ -70,7 +70,7 @@ impl Blockchain {
             .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
-    /// Commit changes from the `StorageView` to the blockchain storage.
+    /// Commits changes from the `StorageView` to the blockchain storage.
     /// See [`Fork`](../storage/trait.Fork.html) for details.
     pub fn merge(&self, patch: &Patch) -> Result<(), Error> {
         self.db.merge(patch)
@@ -123,7 +123,7 @@ impl Blockchain {
     }
 
     /// Helper function to map tuple (`u16`, `u16`) of service table coordinates
-    /// to 32 byte value for use as `MerklePatriciatable` key (it currently
+    /// to 32 byte value for use as `MerklePatriciaTable` key (it currently
     /// supports only fixed size keys). `hash` function is used to distribute
     /// keys uniformly (compared to padding).
     /// # Arguments
@@ -200,7 +200,7 @@ impl Blockchain {
         Ok((block_hash, fork.changes()))
     }
 
-    /// Commit block that proposes by node `State`.
+    /// Commits block that proposes by node `State`.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I>(&self,
                          state: &mut State,

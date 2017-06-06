@@ -130,7 +130,7 @@ impl<'a> Schema<'a> {
         Schema { view: view }
     }
 
-    /// Return block hash for the given height.
+    /// Returns block hash for the given height.
     pub fn block_hash_by_height(&self, height: u64) -> Result<Option<Hash>, Error> {
         self.block_hashes_by_height().get(height)
     }
@@ -208,7 +208,7 @@ impl<'a> Schema<'a> {
         res
     }
 
-    /// Returns the nearest following configuration if it exist.
+    /// Returns the nearest following configuration if it exists.
     pub fn following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
         let current_height = self.current_height()?;
         let idx = self.find_configurations_index_by_height(current_height)?;
