@@ -10,6 +10,7 @@ pub use self::explorer_api::{ExplorerApi, BlocksRequest};
 
 mod explorer_api;
 
+#[derive(Debug)]
 pub struct BlockchainExplorer<'a> {
     blockchain: &'a Blockchain,
 }

@@ -28,6 +28,7 @@ pub type ValidatorId = u32;
 pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
 
+#[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Connect,
@@ -83,6 +84,7 @@ pub enum RequestData {
     Block(Height),
 }
 
+#[derive(Debug)]
 struct RequestState {
     // Number of attempts made.
     retries: u16,
@@ -90,12 +92,13 @@ struct RequestState {
     known_nodes: HashSet<PublicKey>,
 }
 
+#[derive(Debug)]
 pub struct ProposeState {
     propose: Propose,
     unknown_txs: HashSet<Hash>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlockState {
     hash: Hash,
     // Changes that should be made for block committing.
@@ -120,6 +123,7 @@ impl VoteMessage for Prevote {
     }
 }
 
+#[derive(Debug)]
 pub struct Votes<T: VoteMessage> {
     messages: Vec<T>,
     validators: BitVec,
@@ -127,7 +131,6 @@ pub struct Votes<T: VoteMessage> {
 }
 
 impl ValidatorState {
-
     pub fn new(id: ValidatorId) -> ValidatorState {
         ValidatorState {
             id: id,
