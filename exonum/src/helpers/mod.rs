@@ -26,7 +26,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
     let validators = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))
         .collect::<Vec<_>>();
-    let genesis = GenesisConfig::new(validators.iter().map(|x| (x.0).0));
+    let genesis = GenesisConfig::new(validators.iter().map(|x| ((x.0).0, (x.1).0)));
     let peers = (0..validators.len())
         .map(|x| {
                  format!("127.0.0.1:{}", start_port + x as u16)
