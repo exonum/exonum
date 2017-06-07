@@ -38,7 +38,6 @@ pub const INCORRECT_VALIDATOR_ID: u32 = 999_999;
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
 // default data from sandbox and, possibly, update few fields with custom data.
 pub struct BlockBuilder<'a> {
-    network_id: Option<u8>,
     proposer_id: Option<u32>,
     height: Option<u64>,
     duration_since_sandbox_time: Option<Milliseconds>,
@@ -53,7 +52,6 @@ pub struct BlockBuilder<'a> {
 impl<'a> BlockBuilder<'a> {
     pub fn new(sandbox: &'a TimestampingSandbox) -> Self {
         BlockBuilder {
-            network_id: None,
             proposer_id: None,
             height: None,
             duration_since_sandbox_time: None,
@@ -64,11 +62,6 @@ impl<'a> BlockBuilder<'a> {
 
             sandbox: sandbox,
         }
-    }
-
-    pub fn with_network_id(mut self, network_id: u8) -> Self {
-        self.network_id = Some(network_id);
-        self
     }
 
     pub fn with_proposer_id(mut self, proposer_id: u32) -> Self {
@@ -119,7 +112,6 @@ impl<'a> BlockBuilder<'a> {
 
     pub fn build(&self) -> Block {
         Block::new(SCHEMA_MAJOR_VERSION,
-                   self.network_id.unwrap_or_else(|| 0),
                    self.proposer_id
                        .unwrap_or_else(|| self.sandbox.current_leader()),
                    self.height.unwrap_or_else(|| self.sandbox.current_height()),

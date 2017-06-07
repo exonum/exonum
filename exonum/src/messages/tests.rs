@@ -278,7 +278,6 @@ fn test_block() {
 
     let content = blockchain::Block::new(blockchain::SCHEMA_MAJOR_VERSION,
                                          0,
-                                         0,
                                          500,
                                          tx_count,
                                          &hash(&[1]),
@@ -342,7 +341,6 @@ fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
 
     let content = blockchain::Block::new(blockchain::SCHEMA_MAJOR_VERSION,
-                                         0,
                                          0,
                                          200,
                                          1,

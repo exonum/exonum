@@ -48,7 +48,6 @@ fn test_get_lock_and_send_precommit() {
     let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
 
     let block = Block::new(SCHEMA_MAJOR_VERSION,
-                           0,
                            2,
                            1,
                            0,
@@ -78,7 +77,6 @@ fn test_commit() {
     let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
 
     let block = Block::new(SCHEMA_MAJOR_VERSION,
-                           0,
                            2,
                            1,
                            0,
