@@ -23,15 +23,16 @@ use storage::{Result as StorageResult, Error as StorageError};
 
 #[derive(Debug)]
 pub enum ApiError {
+    Service(Box<::std::error::Error + Send + Sync>),
     Storage(StorageError),
     Events(EventsError),
     FromHex(FromHexError),
     Io(::std::io::Error),
     FileNotFound(Hash),
     NotFound,
-    FileToBig,
+    FileTooBig,
     FileExists(Hash),
-    IncorrectRequest,
+    IncorrectRequest(Box<::std::error::Error + Send + Sync>),
     Unauthorized,
 }
 
@@ -44,15 +45,16 @@ impl ::std::fmt::Display for ApiError {
 impl ::std::error::Error for ApiError {
     fn description(&self) -> &str {
         match *self {
-            ApiError::Storage(_) => "Storage",
-            ApiError::Events(_) => "Events",
-            ApiError::FromHex(_) => "FromHex",
-            ApiError::Io(_) => "Io",
+            ApiError::Service(ref error) |
+            ApiError::IncorrectRequest(ref error) => error.description(),
+            ApiError::Storage(ref error) => error.description(),
+            ApiError::Events(ref error) => error.description(),
+            ApiError::FromHex(ref error) => error.description(),
+            ApiError::Io(ref error) => error.description(),
             ApiError::FileNotFound(_) => "FileNotFound",
             ApiError::NotFound => "NotFound",
-            ApiError::FileToBig => "FileToBig",
+            ApiError::FileTooBig => "FileToBig",
             ApiError::FileExists(_) => "FileExists",
-            ApiError::IncorrectRequest => "IncorrectRequest",
             ApiError::Unauthorized => "Unauthorized",
         }
     }
@@ -87,7 +89,8 @@ impl From<ApiError> for IronError {
         use std::error::Error;
 
         let mut body = BTreeMap::new();
-        body.insert("type", e.description().into());
+        body.insert("debug", format!("{:?}", e));
+        body.insert("description", e.description().to_string());
         let code = match e {
             ApiError::FileExists(hash) |
             ApiError::FileNotFound(hash) => {

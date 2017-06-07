@@ -3,6 +3,7 @@ use std::cell::Cell;
 
 use super::{Map, Error, StorageValue, List};
 
+#[derive(Debug)]
 pub struct ListTable<T: Map<[u8], Vec<u8>>, V> {
     map: T,
     count: Cell<Option<u64>>,
