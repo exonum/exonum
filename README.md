@@ -72,10 +72,11 @@ bower install
 
 #### Run
 
-Run application:
+To run application:
 
 ```
-node frontend/app.js
+cd frontend
+npm start
 ```
 
 Application is served on [http://127.0.0.1:3000](http://127.0.0.1:3000).
