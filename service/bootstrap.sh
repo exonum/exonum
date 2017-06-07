@@ -6,7 +6,7 @@ if [ -z "$SERVICE_ROOT" ]; then
 fi
 
 destdir=$SERVICE_ROOT
-scriptdir=`dirname "$BASH_SOURCE"`
+scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 supervisor_conf=${destdir}/etc/supervisord.conf
 
 install() {
@@ -14,12 +14,12 @@ install() {
     mkdir ${destdir}/run
     mkdir ${destdir}/var
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc || exit 1
-    ln -s ${scriptdir}/../../frontend ${destdir}/frontend
+    ln -s ${scriptdir}/../frontend ${destdir}/frontend
     cd ${destdir}/frontend
     npm install
     bower install
     cd -
-    ln -s ${scriptdir}/../../backend ${destdir}/backend
+    ln -s ${scriptdir}/../backend ${destdir}/backend
     cd ${destdir}/backend
     cargo build -p cryptocurrency
     cd -
