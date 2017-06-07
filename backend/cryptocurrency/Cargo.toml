@@ -26,7 +26,7 @@ params = "0.6.0"
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "3a4c74df9f9fe0787b60612018190fa0f0a6f7ad"
+rev = "7c3d449015a11703330aeb54bf7c50204b273710"
 
 # [dependencies.configuration_service]
 # git = "ssh://git@github.com/exonum/exonum-configuration.git"
