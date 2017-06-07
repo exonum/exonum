@@ -411,7 +411,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         let validator_id = prev_cfg
             .validators
             .iter()
-            .position(|pk| pk == from)
+            .position(|pk| pk.1 == *from)
             .expect(&format!("See !prev_cfg.validators.contains(self.from()) for \
                               TxConfigVote:{:?}",
                              &tx_vote));
@@ -465,7 +465,7 @@ impl Transaction for TxConfigPropose {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.validators.contains(self.from()) {
+        if !actual_config.validators.iter().any(|x| x.1 == *self.from()) {
             error!("Discarding TxConfigPropose:{} from unknown validator. ",
                    serde_json::to_string(self).unwrap());
             return;
@@ -535,7 +535,7 @@ impl Transaction for TxConfigVote {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.validators.contains(self.from()) {
+        if !actual_config.validators.iter().any(|x| x.1 == *self.from()) {
             error!("Discarding TxConfigVote:{:?} from unknown validator. ",
                    self);
             return;

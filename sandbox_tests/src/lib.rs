@@ -190,11 +190,12 @@ mod tests {
         sandbox.assert_state(1, 1);
 
         let new_keypairs = (40..44)
-            .map(|seed_num| gen_keypair_from_seed(&Seed::new([seed_num; SEED_LENGTH])))
+            .map(|seed_num| (gen_keypair_from_seed(&Seed::new([seed_num; SEED_LENGTH])),
+                             gen_keypair_from_seed(&Seed::new([seed_num; SEED_LENGTH]))))
             .collect::<Vec<_>>();
         let mut validators = sandbox.validators();
         let old_len = validators.len();
-        validators.extend(new_keypairs.iter().map(|el| el.0));
+        validators.extend(new_keypairs.iter().map(|el| ((el.0).0, (el.1).0)));
         let new_len = validators.len();
 
         let actual_from = 3;
@@ -230,7 +231,9 @@ mod tests {
             sandbox.assert_state(3, 1);
         }
         {
-            sandbox.set_validators_map(new_len as u8, new_keypairs);
+            let consensus_keys: Vec<_> = new_keypairs.iter().map(|x| ((x.0).0, (x.0).1.clone()))
+                .collect();
+            sandbox.set_validators_map(new_len as u8, consensus_keys);
             sandbox.initialize(start_time, old_len, new_len);
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
             sandbox.assert_state(4, 1);
@@ -272,7 +275,8 @@ mod tests {
         sandbox.assert_state(1, 1);
 
         let new_public_keys = (40..44)
-            .map(|seed_num| gen_keypair_from_seed(&Seed::new([seed_num; SEED_LENGTH])).0)
+            .map(|seed| (gen_keypair_from_seed(&Seed::new([seed; SEED_LENGTH])).0,
+                         gen_keypair_from_seed(&Seed::new([seed * 2; SEED_LENGTH])).0))
             .collect::<Vec<_>>();
 
         let actual_from = 3;
