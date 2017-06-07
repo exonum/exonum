@@ -171,7 +171,7 @@ fn test_connect() {
 
 #[test]
 fn test_propose() {
-    let validator = 123_123;
+    let validator = 65_123;
     let height = 123_123_123;
     let round = 321_321_312;
     let prev_hash = hash(&[1, 2, 3]);
@@ -199,7 +199,7 @@ fn test_propose() {
 
 #[test]
 fn test_prevote() {
-    let validator = 123_123;
+    let validator = 65_123;
     let height = 123_123_123;
     let round = 321_321_312;
     let propose_hash = hash(&[1, 2, 3]);
@@ -224,7 +224,7 @@ fn test_prevote() {
 
 #[test]
 fn test_precommit() {
-    let validator = 123_123;
+    let validator = 65_123;
     let height = 123_123_123;
     let round = 321_321_312;
     let propose_hash = hash(&[1, 2, 3]);
