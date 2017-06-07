@@ -274,7 +274,7 @@ fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
     let ts = SystemTime::now();
     let txs = [2];
-    let tx_count = txs.len() as u64;
+    let tx_count = txs.len() as u32;
 
     let content = blockchain::Block::new(blockchain::SCHEMA_MAJOR_VERSION,
                                          0,

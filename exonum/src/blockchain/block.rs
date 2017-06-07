@@ -1,7 +1,7 @@
 use crypto::Hash;
 
 
-pub const BLOCK_SIZE: usize = 118;
+pub const BLOCK_SIZE: usize = 114;
 
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
@@ -12,10 +12,10 @@ storage_value!(
         field schema_version:         u16         [00 => 02]
         field proposer_id:            u32         [02 => 06]
         field height:                 u64         [06 => 14]
-        field tx_count:               u64         [14 => 22]
-        field prev_hash:              &Hash       [22 => 54]
-        field tx_hash:                &Hash       [54 => 86]
-        field state_hash:             &Hash       [86 => 118]
+        field tx_count:               u32         [14 => 18]
+        field prev_hash:              &Hash       [18 => 50]
+        field tx_hash:                &Hash       [50 => 82]
+        field state_hash:             &Hash       [82 => 114]
     }
 );
 
@@ -33,7 +33,7 @@ mod tests {
         let height = 123_345;
         let prev_hash = hash(&[1, 2, 3]);
         let tx_hash = hash(&txs);
-        let tx_count = txs.len() as u64;
+        let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
         let block = Block::new(SCHEMA_MAJOR_VERSION,
                                proposer_id,
