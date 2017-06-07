@@ -133,7 +133,9 @@ impl<S> NodeHandler<S>
 
         // Check block content
         if block.prev_hash() != &self.last_block_hash() {
-            error!("Weird block received, block={:?}", msg);
+            error!("Received block prev_hash is distinct from the one in db, \
+                    block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
+                   msg, *block.prev_hash(), self.last_block_hash());
             return;
         }
 
