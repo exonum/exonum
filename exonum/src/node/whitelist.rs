@@ -15,8 +15,6 @@ pub struct Whitelist {
     validators_list: BTreeSet<PublicKey>,
 }
 
-
-
 impl Whitelist {
     /// is this `peer` can connect or not
     pub fn allow(&self, peer: &PublicKey) -> bool {
