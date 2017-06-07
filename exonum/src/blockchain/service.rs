@@ -48,6 +48,7 @@ pub trait Service: Send + Sync + 'static {
     }
 }
 
+#[derive(Debug)]
 pub struct NodeState<'a, 'b> {
     state: &'a mut State,
     view: &'b View,
@@ -129,6 +130,7 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 }
 
+#[derive(Debug)]
 pub struct ApiContext {
     blockchain: Blockchain,
     node_channel: TxSender<NodeChannel>,

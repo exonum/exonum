@@ -18,15 +18,17 @@ impl<S> NodeHandler<S>
         //         return;
         //     }
         
-        
-        let msg = Any::from_raw(raw).unwrap();
-        match msg {
-            Any::Connect(msg) => self.handle_connect(msg),
-            Any::Status(msg) => self.handle_status(msg),
-            Any::Consensus(msg) => self.handle_consensus(msg),
-            Any::Request(msg) => self.handle_request(msg),
-            Any::Block(msg) => self.handle_block(msg),
-            Any::Transaction(msg) => self.handle_tx(msg),
+        match Any::from_raw(raw) {
+            Ok(Any::Connect(msg)) => self.handle_connect(msg),
+            Ok(Any::Status(msg)) => self.handle_status(msg),
+            Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
+            Ok(Any::Request(msg)) => self.handle_request(msg),
+            Ok(Any::Block(msg)) => self.handle_block(msg),
+            Ok(Any::Transaction(msg)) => self.handle_tx(msg),
+            Err(err) => {
+                // TODO: Replace by `err.description()` after #103 is merged.
+                error!("Invalid message received: {:?}", err);
+            }
         }
     }
 

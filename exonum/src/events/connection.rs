@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 
 use messages::{RawMessage, MessageBuffer, HEADER_SIZE};
 
-const MAX_MESSAGE_LEN: usize = 1024 * 1024; //1 MB
+const MAX_MESSAGE_LEN: usize = 1024 * 1024; // 1 MB
 
 #[derive(Debug, PartialEq)]
 pub struct MessageReader {

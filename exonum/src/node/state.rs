@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
@@ -29,6 +29,7 @@ pub type ValidatorId = u32;
 pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
 
+#[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Connect,
@@ -65,7 +66,7 @@ pub struct State {
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    // maximum of node heigt in consensus messages
+    // maximum of node height in consensus messages
     nodes_max_height: BTreeMap<PublicKey, Height>,
 }
 
@@ -85,6 +86,7 @@ pub enum RequestData {
     Block(Height),
 }
 
+#[derive(Debug)]
 struct RequestState {
     // Number of attempts made.
     retries: u16,
@@ -92,14 +94,13 @@ struct RequestState {
     known_nodes: HashSet<PublicKey>,
 }
 
+#[derive(Debug)]
 pub struct ProposeState {
-    hash: Hash,
     propose: Propose,
-    // FIXME: use HashSet here
-    unknown_txs: BTreeSet<Hash>,
+    unknown_txs: HashSet<Hash>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlockState {
     hash: Hash,
     // Changes that should be made for block committing.
@@ -124,6 +125,7 @@ impl VoteMessage for Prevote {
     }
 }
 
+#[derive(Debug)]
 pub struct Votes<T: VoteMessage> {
     messages: Vec<T>,
     validators: BitVec,
@@ -131,7 +133,6 @@ pub struct Votes<T: VoteMessage> {
 }
 
 impl ValidatorState {
-
     pub fn new(id: ValidatorId) -> ValidatorState {
         ValidatorState {
             id: id,
@@ -233,14 +234,14 @@ impl RequestState {
 
 impl ProposeState {
     pub fn hash(&self) -> Hash {
-        self.hash
+        self.propose.hash()
     }
 
     pub fn message(&self) -> &Propose {
         &self.propose
     }
 
-    pub fn unknown_txs(&self) -> &BTreeSet<Hash> {
+    pub fn unknown_txs(&self) -> &HashSet<Hash> {
         &self.unknown_txs
     }
 
@@ -451,8 +452,6 @@ impl State {
     }
 
     pub fn majority_count(&self) -> usize {
-        // FIXME: What if validators count < 4?
-        //self.validators().len() * 2 / 3 + 1
         State::byzantine_majority_count(self.validators().len())
     }
 
@@ -602,9 +601,8 @@ impl State {
         let propose_hash = msg.hash();
         self.proposes.insert(propose_hash,
                              ProposeState {
-                                 hash: propose_hash,
                                  propose: msg,
-                                 unknown_txs: BTreeSet::new(),
+                                 unknown_txs: HashSet::new(),
                              });
 
         propose_hash
@@ -620,7 +618,7 @@ impl State {
                     .iter()
                     .filter(|tx| !txs.contains_key(tx))
                     .cloned()
-                    .collect::<BTreeSet<Hash>>();
+                    .collect::<HashSet<Hash>>();
                 for tx in &unknown_txs {
                     self.unknown_txs
                         .entry(*tx)
@@ -628,7 +626,6 @@ impl State {
                         .push(propose_hash);
                 }
                 Some(e.insert(ProposeState {
-                    hash: propose_hash,
                     propose: msg.clone(),
                     unknown_txs: unknown_txs,
                 }))
