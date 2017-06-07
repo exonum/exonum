@@ -5,6 +5,9 @@
   "description": "Cryptocurrency solution on Exonum private blockchain",
   "license": "",
   "author": "BitFury Group Limited",
+  "scripts": {
+    "start": "node app.js"
+  },
   "dependencies": {
     "body-parser": "^1.17.1",
     "bower": "^1.8.0",
