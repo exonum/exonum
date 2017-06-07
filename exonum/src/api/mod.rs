@@ -229,8 +229,11 @@ mod tests {
     #[test]
     fn test_json_response_for_complex_val() {
         let str_val = "sghdkgskgskldghshgsd";
+        let txs = [34, 32];
+        let txs_length = txs.len() as u64;
         let complex_val = Block::new(24,
                                      2,
+                                     txs_length,
                                      &Hash::new([24; 32]),
                                      &Hash::new([34; 32]),
                                      &Hash::new([38; 32]));
