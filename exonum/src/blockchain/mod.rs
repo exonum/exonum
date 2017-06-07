@@ -5,6 +5,7 @@ use mount::Mount;
 use std::sync::Arc;
 use std::collections::BTreeMap;
 use std::mem;
+use std::fmt;
 
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
@@ -95,10 +96,8 @@ impl Blockchain {
             // Commit actual configuration
             {
                 let schema = Schema::new(&view);
-                if let Some(block_hash) = schema.block_hash_by_height(0)? {
+                if schema.block_hash_by_height(0)?.is_some() {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
-                    // panic!("Genesis block is already created");
-                    let _ = block_hash;
                     return Ok(());
                 }
                 schema.commit_configuration(config_propose)?;
@@ -236,6 +235,12 @@ impl Blockchain {
     }
 }
 
+impl fmt::Debug for Blockchain {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Blockchain {{ db: {:?}, service_map: {{ .. }} }}", self.db)
+    }
+}
+
 #[cfg(test)]
 mod test {
     #[test]
@@ -269,6 +274,4 @@ mod test {
         let data = ::serialize::json::reexport::to_string(&test).unwrap();
         assert_eq!(data, test_data);
     }
-
-
 }
