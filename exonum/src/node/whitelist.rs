@@ -6,7 +6,7 @@ use crypto::PublicKey;
 /// `Whitelist` is special set to keep peers that can connect to us.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Whitelist {
-    whitelist_on: bool,
+    whitelist_enabled: bool,
     whitelisted_peers: BTreeSet<PublicKey>,
 
     #[serde(default)]
@@ -20,7 +20,7 @@ pub struct Whitelist {
 impl Whitelist {
     /// is this `peer` can connect or not
     pub fn allow(&self, peer: &PublicKey) -> bool {
-        !self.whitelist_on || self.validators_list.contains(peer) ||
+        !self.whitelist_enabled || self.validators_list.contains(peer) ||
         self.whitelisted_peers.contains(peer)
     }
 
@@ -46,7 +46,7 @@ impl Whitelist {
     /// check if we support whitelist, or keep connection politics open
     /// if it return false, everybody can connect to us
     pub fn is_enabled(&self) -> bool {
-        !self.whitelist_on
+        !self.whitelist_enabled
     }
 }
 
@@ -55,28 +55,16 @@ impl Whitelist {
 mod test {
     use super::Whitelist;
     use crypto::PublicKey;
+    use rand::{Rand, SeedableRng, XorShiftRng};
 
-    static VALIDATORS: [[[u8; 32]; 2]; 2] = [[[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-                                              [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2]],
-                                             [[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
-                                              [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2]]];
-    static REGULAR_PEERS: [[u8; 32]; 4] = [[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-                                           [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2],
-                                           [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3],
-                                           [2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]];
+    static VALIDATORS: [[u32; 4]; 2] = [[123, 45, 67, 89], [223, 45, 67, 98]];
+    static REGULAR_PEERS: [u32; 4] = [5, 6, 7, 9];
 
-    fn make_keys(source: &[[u8; 32]]) -> Vec<PublicKey> {
-        source
-            .iter()
-            .map(|k| PublicKey::from_slice(k).unwrap())
+    fn make_keys(source: [u32; 4], count: usize) -> Vec<PublicKey> {
+        let mut rng = XorShiftRng::from_seed(source);
+        (0..count)
+            .into_iter()
+            .map(|_| PublicKey::from_slice(&<[u8;32] as Rand>::rand(&mut rng)).unwrap())
             .collect()
     }
 
@@ -94,10 +82,10 @@ mod test {
 
     #[test]
     fn test_whitelist() {
-        let regular = make_keys(&REGULAR_PEERS);
+        let regular = make_keys(REGULAR_PEERS, 4);
 
         let mut whitelist = Whitelist::default();
-        whitelist.whitelist_on = true;
+        whitelist.whitelist_enabled = true;
         check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
         whitelist.add(regular[0]);
         check_in_whitelist(&whitelist, &regular, &[0], &[1, 2, 3]);
@@ -108,7 +96,7 @@ mod test {
 
     #[test]
     fn test_wildcard() {
-        let regular = make_keys(&REGULAR_PEERS);
+        let regular = make_keys(REGULAR_PEERS, 4);
 
         let whitelist = Whitelist::default();
         check_in_whitelist(&whitelist, &regular, &[0, 1, 2, 3], &[]);
@@ -117,10 +105,10 @@ mod test {
 
     #[test]
     fn test_validators_in_whitelist() {
-        let regular = make_keys(&REGULAR_PEERS);
-        let validators = make_keys(&VALIDATORS[0]);
+        let regular = make_keys(REGULAR_PEERS, 4);
+        let validators = make_keys(VALIDATORS[0], 2);
         let mut whitelist = Whitelist::default();
-        whitelist.whitelist_on = true;
+        whitelist.whitelist_enabled = true;
         check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
         check_in_whitelist(&whitelist, &validators, &[], &[0, 1]);
         assert_eq!(whitelist.collect_allowed().len(), 0);
@@ -132,10 +120,10 @@ mod test {
 
     #[test]
     fn test_update_validators() {
-        let validators0 = make_keys(&VALIDATORS[0]);
-        let validators1 = make_keys(&VALIDATORS[1]);
+        let validators0 = make_keys(VALIDATORS[0], 2);
+        let validators1 = make_keys(VALIDATORS[1], 2);
         let mut whitelist = Whitelist::default();
-        whitelist.whitelist_on = true;
+        whitelist.whitelist_enabled = true;
         assert_eq!(whitelist.collect_allowed().len(), 0);
         whitelist.set_validators(validators0.clone());
         assert_eq!(whitelist.collect_allowed().len(), 2);
