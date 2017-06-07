@@ -569,10 +569,15 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 }
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
-    let validators = vec![gen_keypair_from_seed(&Seed::new([12; 32])),
-                          gen_keypair_from_seed(&Seed::new([13; 32])),
-                          gen_keypair_from_seed(&Seed::new([16; 32])),
-                          gen_keypair_from_seed(&Seed::new([19; 32]))];
+    let validators = vec![gen_keypair_from_seed(&Seed::new([01; 32])),
+                          gen_keypair_from_seed(&Seed::new([02; 32])),
+                          gen_keypair_from_seed(&Seed::new([03; 32])),
+                          gen_keypair_from_seed(&Seed::new([04; 32]))];
+    let service_keys = vec![gen_keypair_from_seed(&Seed::new([11; 32])),
+                            gen_keypair_from_seed(&Seed::new([12; 32])),
+                            gen_keypair_from_seed(&Seed::new([13; 32])),
+                            gen_keypair_from_seed(&Seed::new([14; 32]))];
+
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
     let db = MemoryDB::new();
@@ -585,18 +590,18 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         propose_timeout: 200,
         txs_block_limit: 1000,
     };
-    let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
+    let genesis = GenesisConfig::new_with_consensus(consensus,
+                                                    validators.iter().zip(service_keys.iter())
+                                                        .map(|x| ((x.0).0, (x.1).0)));
     blockchain.create_genesis_block(genesis).unwrap();
-
-    let service_keys = gen_keypair_from_seed(&Seed::new([24; 32]));
 
     let config = Configuration {
         listener: ListenerConfig {
             address: addresses[0],
             consensus_public_key: validators[0].0,
             consensus_secret_key: validators[0].1.clone(),
-            service_public_key: service_keys.0,
-            service_secret_key: service_keys.1,
+            service_public_key: service_keys[0].0,
+            service_secret_key: service_keys[0].1.clone(),
             whitelist: Default::default(),
         },
         network: NetworkConfiguration::default(),
