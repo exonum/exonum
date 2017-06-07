@@ -1,6 +1,6 @@
 use serde_json;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 
 use storage::StorageValue;
 use events::Milliseconds;
@@ -43,8 +43,15 @@ impl StoredConfiguration {
     }
 
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, serde_json::error::Error> {
-        let config = serde_json::from_slice(serialized)?;
-        // TODO: FIXME.
+        let config: StoredConfiguration = serde_json::from_slice(serialized)?;
+
+        // Check that there are no duplicated keys.
+        let mut keys: HashSet<_> = config.validators.iter().map(|x| x.0).collect();
+        keys.extend(config.validators.iter().map(|x| x.1));
+        if keys.len() != config.validators.len() * 2 {
+            panic!("Duplicated validator keys are found");
+        }
+
         Ok(config)
     }
 }
