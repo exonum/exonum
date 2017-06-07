@@ -12,6 +12,7 @@ supervisor_conf=${destdir}/etc/supervisord.conf
 install() {
     mkdir -p ${destdir}/log/supervisor
     mkdir ${destdir}/run
+    mkdir ${destdir}/var
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc || exit 1
     ln -s ${scriptdir}/../../frontend ${destdir}/frontend
     cd ${destdir}/frontend
@@ -22,7 +23,7 @@ install() {
     cd ${destdir}/backend
     cargo build -p cryptocurrency
     cd -
-    generate $1 6 2000
+    ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/etc 6 -p 2000
 }
 
 enable() {
@@ -58,35 +59,26 @@ clear() {
 start() {
     test -e /tmp/supervisord.sock || exit 1
 
-    template=$1
+    svcgroup=$1
     cd ${destdir}
-    supervisorctl update ${template}
-    supervisorctl start ${template}:* || exit 1
+    supervisorctl update ${svcgroup}
+    supervisorctl start ${svcgroup}:* || exit 1
 }
 
 restart() {
     test -e /tmp/supervisord.sock || exit 1
 
-    template=$1
+    svcgroup=$1
     cd ${destdir}
-    supervisorctl restart ${template}:* || exit 1
+    supervisorctl restart ${svcgroup}:* || exit 1
 }
 
 stop() {
     test -e /tmp/supervisord.sock || exit 1
 
-    template=$1
+    svcgroup=$1
     cd ${destdir}
-    supervisorctl stop ${template}:* || exit 1
-}
-
-generate() {
-    template=$1
-    count=$2
-    port=$3
-
-    test -e ${destdir}/${template} && exit 1
-    ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/${template} $count -p $port
+    supervisorctl stop ${svcgroup}:* || exit 1
 }
 
 case "$1" in
