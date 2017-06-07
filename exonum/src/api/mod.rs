@@ -230,7 +230,6 @@ mod tests {
         let tx_count = txs.len() as u64;
         let complex_val = Block::new(SCHEMA_MAJOR_VERSION,
                                      0,
-                                     0,
                                      24,
                                      tx_count,
                                      &Hash::new([24; 32]),

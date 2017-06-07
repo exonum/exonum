@@ -104,7 +104,7 @@ impl Blockchain {
                 schema.commit_configuration(config_propose)?;
             };
             self.merge(&view.changes())?;
-            self.create_patch(0, 0, 0, &[], &BTreeMap::new())?.1
+            self.create_patch(0, 0, &[], &BTreeMap::new())?.1
         };
         self.merge(&patch)?;
         Ok(())
@@ -120,7 +120,6 @@ impl Blockchain {
     }
 
     pub fn create_patch(&self,
-                        network_id: u8,
                         proposer_id: u32,
                         height: u64,
                         tx_hashes: &[Hash],
@@ -166,7 +165,6 @@ impl Blockchain {
 
         // Create block
         let block = Block::new(SCHEMA_MAJOR_VERSION,
-                               network_id,
                                proposer_id,
                                height,
                                tx_count,

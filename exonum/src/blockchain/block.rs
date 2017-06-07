@@ -1,7 +1,7 @@
 use crypto::Hash;
 
 
-pub const BLOCK_SIZE: usize = 119;
+pub const BLOCK_SIZE: usize = 118;
 
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
@@ -10,13 +10,12 @@ storage_value!(
         const SIZE = BLOCK_SIZE;
 
         field schema_version:         u16         [00 => 02]
-        field network_id:             u8          [02 => 03]
-        field proposer_id:            u32         [03 => 07]
-        field height:                 u64         [07 => 15]
-        field tx_count:               u64         [15 => 23]
-        field prev_hash:              &Hash       [23 => 55]
-        field tx_hash:                &Hash       [55 => 87]
-        field state_hash:             &Hash       [87 => 119]
+        field proposer_id:            u32         [02 => 06]
+        field height:                 u64         [06 => 14]
+        field tx_count:               u64         [14 => 22]
+        field prev_hash:              &Hash       [22 => 54]
+        field tx_hash:                &Hash       [54 => 86]
+        field state_hash:             &Hash       [86 => 118]
     }
 );
 
@@ -29,7 +28,6 @@ mod tests {
 
     #[test]
     fn test_block() {
-        let network_id = 123;
         let proposer_id = 1024;
         let txs = [4, 5, 6];
         let height = 123_345;
@@ -38,7 +36,6 @@ mod tests {
         let tx_count = txs.len() as u64;
         let state_hash = hash(&[7, 8, 9]);
         let block = Block::new(SCHEMA_MAJOR_VERSION,
-                               network_id,
                                proposer_id,
                                height,
                                tx_count,
@@ -47,7 +44,6 @@ mod tests {
                                &state_hash);
 
         assert_eq!(block.schema_version(), SCHEMA_MAJOR_VERSION);
-        assert_eq!(block.network_id(), network_id);
         assert_eq!(block.proposer_id(), proposer_id);
         assert_eq!(block.height(), height);
         assert_eq!(block.tx_count(), tx_count);
