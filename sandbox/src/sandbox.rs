@@ -519,7 +519,7 @@ impl Sandbox {
         self.reactor.borrow().handler.state().height()
     }
 
-    pub fn current_leader(&self) -> Round {
+    pub fn current_leader(&self) -> ValidatorId {
         self.reactor
             .borrow()
             .handler

@@ -120,7 +120,7 @@ impl Blockchain {
     }
 
     pub fn create_patch(&self,
-                        proposer_id: u32,
+                        proposer_id: u16,
                         height: u64,
                         tx_hashes: &[Hash],
                         pool: &TxPool)

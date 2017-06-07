@@ -29,16 +29,16 @@ pub const ROUND_TWO: u32 = 2;
 pub const ROUND_THREE: u32 = 3;
 pub const ROUND_FOUR: u32 = 4;
 pub const ROUND_FIVE: u32 = 5;
-pub const VALIDATOR_0: u32 = 0;
-pub const VALIDATOR_1: u32 = 1;
-pub const VALIDATOR_2: u32 = 2;
-pub const VALIDATOR_3: u32 = 3;
-pub const INCORRECT_VALIDATOR_ID: u32 = 999_999;
+pub const VALIDATOR_0: u16 = 0;
+pub const VALIDATOR_1: u16 = 1;
+pub const VALIDATOR_2: u16 = 2;
+pub const VALIDATOR_3: u16 = 3;
+pub const INCORRECT_VALIDATOR_ID: u16 = 64_999;
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
 // default data from sandbox and, possibly, update few fields with custom data.
 pub struct BlockBuilder<'a> {
-    proposer_id: Option<u32>,
+    proposer_id: Option<u16>,
     height: Option<u64>,
     duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<Hash>,
@@ -64,7 +64,7 @@ impl<'a> BlockBuilder<'a> {
         }
     }
 
-    pub fn with_proposer_id(mut self, proposer_id: u32) -> Self {
+    pub fn with_proposer_id(mut self, proposer_id: u16) -> Self {
         self.proposer_id = Some(proposer_id);
         self
     }
@@ -129,7 +129,7 @@ impl<'a> BlockBuilder<'a> {
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Propose with
 // default data from sandbox and, possibly, update few fields with custom data.
 pub struct ProposeBuilder<'a> {
-    validator_id: Option<u32>,
+    validator_id: Option<u16>,
     height: Option<u64>,
     round: Option<u32>,
     duration_since_sandbox_time: Option<Milliseconds>,
@@ -152,7 +152,7 @@ impl<'a> ProposeBuilder<'a> {
         }
     }
 
-    pub fn with_validator(mut self, validator_id: u32) -> Self {
+    pub fn with_validator(mut self, validator_id: u16) -> Self {
         self.validator_id = Some(validator_id);
         self
     }
@@ -336,7 +336,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
 
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
-                sandbox.recv(Prevote::new(val_idx as u32,
+                sandbox.recv(Prevote::new(val_idx as u16,
                                           initial_height,
                                           round,
                                           &propose.hash(),
@@ -369,7 +369,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
             sandbox.assert_lock(round, Some(propose.hash()));
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
-                sandbox.recv(Precommit::new(val_idx as u32,
+                sandbox.recv(Precommit::new(val_idx as u16,
                                             initial_height,
                                             round,
                                             &propose.hash(),
@@ -441,7 +441,7 @@ pub fn add_one_height_with_transactions_from_other_validator(sandbox: &Timestamp
             }*/
             sandbox.recv(propose.clone());
             for val_idx in 0..sandbox.majority_count(n_validators) {
-                sandbox.recv(Prevote::new(val_idx as u32,
+                sandbox.recv(Prevote::new(val_idx as u16,
                                           initial_height,
                                           round,
                                           &propose.hash(),
@@ -463,7 +463,7 @@ pub fn add_one_height_with_transactions_from_other_validator(sandbox: &Timestamp
             sandbox.assert_state(initial_height, round);
 
             for val_idx in 0..sandbox.majority_count(n_validators) {
-                sandbox.recv(Precommit::new(val_idx as u32,
+                sandbox.recv(Precommit::new(val_idx as u16,
                                             initial_height,
                                             round,
                                             &propose.hash(),

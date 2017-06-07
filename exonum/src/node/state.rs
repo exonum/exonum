@@ -23,7 +23,7 @@ pub const REQUEST_BLOCK_TIMEOUT: Milliseconds = 100;
 
 pub type Round = u32;
 pub type Height = u64;
-pub type ValidatorId = u32;
+pub type ValidatorId = u16;
 // TODO replace by persistent TxPool
 pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
@@ -371,7 +371,7 @@ impl State {
         let validator_id = config.validators
                             .iter()
                             .position(|pk| pk == self.public_key())
-                            .map(|id| id as u32);
+                            .map(|id| id as u16);
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
         self.config = config;
