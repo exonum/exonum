@@ -39,8 +39,8 @@ impl Blockchain {
         for service in services {
             let id = service.service_id() as usize;
             if service_map.contains_key(id) {
-                panic!("Services have already contain service with id={}, please change it.",
-                       id);
+                warn!("Blockchain already contains service with id={}, skip it.", id);
+                continue;
             }
             service_map.insert(id, service);
         }
