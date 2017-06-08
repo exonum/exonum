@@ -1,8 +1,44 @@
 use tempdir::TempDir;
+use byteorder::{BigEndian, ByteOrder};
 use leveldb::options::Options;
 use storage::db::Fork;
 
 use super::{Map, List, MapTable, MerkleTable, Database, StorageValue, Error, MemoryDB, LevelDB};
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Number([u8; 8]);
+
+impl From<u64> for Number {
+    fn from(v: u64) -> Number {
+        let mut bytes = [0; 8];
+        BigEndian::write_u64(&mut bytes, v);
+        Number(bytes)
+    }
+}
+
+impl From<Number> for u64 {
+    fn from(v: Number) -> u64 {
+        BigEndian::read_u64(&v.0)
+    }
+}
+
+impl AsRef<[u8]> for Number {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl Number {
+    pub fn from_bytes(bytes: Vec<u8>) -> Number {
+        let mut buf = [0; 8];
+        buf.copy_from_slice(&bytes);
+        Number(buf)
+    }
+
+    pub fn to_bytes(self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+}
 
 fn leveldb_database() -> LevelDB {
     let mut options = Options::new();
@@ -121,8 +157,33 @@ fn test_map_table_different_prefixes<T: Database>(db: &T) {
     let map1 = MapTable::new(b"bcd".to_vec(), db);
     map1.put(&b"baca".to_vec(), b"1".to_vec()).unwrap();
 
-    assert_eq!(map1.find_key(&b"abd".to_vec()).unwrap(), None);
+    assert_eq!(map1.find_key(&b"abd".to_vec()).unwrap(),
+               Some(b"baca".to_vec()));
 }
+
+fn test_map_table_number_keys_find<T: Database>(db: &T) {
+    let map = MapTable::new(b"abacd".to_vec(), db);
+    map.put(&Number::from(100), b"1".to_vec()).unwrap();
+    map.put(&Number::from(110), b"12".to_vec()).unwrap();
+    map.put(&Number::from(1100), b"123".to_vec()).unwrap();
+    map.put(&Number::from(500), b"1234".to_vec()).unwrap();
+    map.put(&Number::from(9000), b"12345".to_vec()).unwrap();
+
+    assert_eq!(map.find_key(&Number::from(0)).unwrap(),
+               Some(Number::from(100).to_bytes()));
+    assert_eq!(map.find_key(&Number::from(100)).unwrap(),
+               Some(Number::from(100).to_bytes()));
+    assert_eq!(map.find_key(&Number::from(101)).unwrap(),
+               Some(Number::from(110).to_bytes()));
+    assert_eq!(map.find_key(&Number::from(111)).unwrap(),
+               Some(Number::from(500).to_bytes()));
+    assert_eq!(map.find_key(&Number::from(501)).unwrap(),
+               Some(Number::from(1100).to_bytes()));
+    assert_eq!(map.find_key(&Number::from(1200)).unwrap(),
+               Some(Number::from(9000).to_bytes()));
+    assert_eq!(map.find_key(&Number::from(10000)).unwrap(), None);
+}
+
 
 #[test]
 fn serializer() {
@@ -229,6 +290,18 @@ fn leveldb_map_table_different_prefixes() {
 fn memorydb_map_table_different_prefixes() {
     let db = MemoryDB::new();
     test_map_table_different_prefixes(&db);
+}
+
+#[test]
+fn leveldb_map_table_number_keys_find() {
+    let db = leveldb_database();
+    test_map_table_number_keys_find(&db);
+}
+
+#[test]
+fn memorydb_map_table_number_keys_find() {
+    let db = MemoryDB::new();
+    test_map_table_number_keys_find(&db);
 }
 
 // TODO add tests for changes
