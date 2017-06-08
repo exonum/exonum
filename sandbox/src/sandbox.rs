@@ -197,7 +197,7 @@ pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
     pub validators_map: HashMap<PublicKey, SecretKey>,
-    pub services_map:  HashMap<PublicKey, SecretKey>,
+    pub services_map: HashMap<PublicKey, SecretKey>,
     addresses: Vec<SocketAddr>,
 }
 
@@ -221,11 +221,13 @@ impl Sandbox {
 
     pub fn set_validators_map(&mut self,
                               new_addresses_len: u8,
-                              validators: Vec<(PublicKey, SecretKey)>) {
+                              validators: Vec<(PublicKey, SecretKey)>,
+                              services :Vec<(PublicKey, SecretKey)>) {
         self.addresses = (1..(new_addresses_len + 1) as u8)
             .map(gen_primitive_socket_addr)
             .collect::<Vec<_>>();
         self.validators_map.extend(validators);
+        self.services_map.extend(services);
     }
 
     fn check_unexpected_message(&self) {
@@ -579,10 +581,10 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 }
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
-    let validators = vec![gen_keypair_from_seed(&Seed::new([01; 32])),
-                          gen_keypair_from_seed(&Seed::new([02; 32])),
-                          gen_keypair_from_seed(&Seed::new([03; 32])),
-                          gen_keypair_from_seed(&Seed::new([04; 32]))];
+    let validators = vec![gen_keypair_from_seed(&Seed::new([1; 32])),
+                          gen_keypair_from_seed(&Seed::new([2; 32])),
+                          gen_keypair_from_seed(&Seed::new([3; 32])),
+                          gen_keypair_from_seed(&Seed::new([4; 32]))];
     let service_keys = vec![gen_keypair_from_seed(&Seed::new([11; 32])),
                             gen_keypair_from_seed(&Seed::new([12; 32])),
                             gen_keypair_from_seed(&Seed::new([13; 32])),
@@ -601,7 +603,9 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         txs_block_limit: 1000,
     };
     let genesis = GenesisConfig::new_with_consensus(consensus,
-                                                    validators.iter().zip(service_keys.iter())
+                                                    validators
+                                                        .iter()
+                                                        .zip(service_keys.iter())
                                                         .map(|x| ((x.0).0, (x.1).0)));
     blockchain.create_genesis_block(genesis).unwrap();
 
