@@ -197,6 +197,7 @@ pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
     pub validators_map: HashMap<PublicKey, SecretKey>,
+    pub services_map:  HashMap<PublicKey, SecretKey>,
     addresses: Vec<SocketAddr>,
 }
 
@@ -246,6 +247,15 @@ impl Sandbox {
     pub fn s(&self, id: usize) -> &SecretKey {
         let p = self.p(id);
         &self.validators_map[&p]
+    }
+
+    pub fn service_public_key(&self, id: usize) -> PublicKey {
+        self.validators()[id].1
+    }
+
+    pub fn service_secret_key(&self, id: usize) -> &SecretKey {
+        let public_key = self.service_public_key(id);
+        &self.services_map[&public_key]
     }
 
     pub fn a(&self, id: usize) -> SocketAddr {
@@ -626,13 +636,12 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         inner: inner.clone(),
         handler: node,
     };
-    let mut validators_map = HashMap::new();
-    validators_map.extend(validators.clone());
     reactor.handler.initialize();
     let sandbox = Sandbox {
         inner: inner.clone(),
         reactor: RefCell::new(reactor),
-        validators_map: validators_map,
+        validators_map: HashMap::from_iter(validators.clone()),
+        services_map: HashMap::from_iter(service_keys),
         addresses: addresses,
     };
 
