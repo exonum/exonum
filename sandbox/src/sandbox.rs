@@ -222,7 +222,7 @@ impl Sandbox {
     pub fn set_validators_map(&mut self,
                               new_addresses_len: u8,
                               validators: Vec<(PublicKey, SecretKey)>,
-                              services :Vec<(PublicKey, SecretKey)>) {
+                              services: Vec<(PublicKey, SecretKey)>) {
         self.addresses = (1..(new_addresses_len + 1) as u8)
             .map(gen_primitive_socket_addr)
             .collect::<Vec<_>>();
