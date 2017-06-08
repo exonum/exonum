@@ -167,7 +167,8 @@ impl<S> NodeHandler<S>
                 }
             }
 
-            let (block_hash, patch) = self.create_block(block.height(),
+            let (block_hash, patch) = self.create_block(block.proposer_id(),
+                                                        block.height(),
                                                         tx_hashes.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
@@ -606,10 +607,10 @@ impl<S> NodeHandler<S>
     }
 
     pub fn create_block(&mut self,
+                        proposer_id: u16,
                         height: Height,
                         tx_hashes: &[Hash])
                         -> (Hash, Patch) {
-        let proposer_id = self.state.leader(self.state.round());
         self.blockchain
             .create_patch(proposer_id, height, tx_hashes, self.state.transactions())
             .unwrap()
@@ -626,7 +627,8 @@ impl<S> NodeHandler<S>
 
         let tx_hashes = propose.transactions().to_vec();
 
-        let (block_hash, patch) = self.create_block(propose.height(),
+        let (block_hash, patch) = self.create_block(propose.validator(),
+                                                    propose.height(),
                                                     tx_hashes.as_slice());
         // Save patch
         self.state.add_block(block_hash, patch, tx_hashes);

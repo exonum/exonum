@@ -916,6 +916,8 @@ fn lock_to_past_round_broadcast_prevote() {
 
     let propose = ProposeBuilder::new(&sandbox).build();
 
+    let block = BlockBuilder::new(&sandbox).build();
+
     sandbox.recv(propose.clone());
     sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
 
@@ -937,8 +939,6 @@ fn lock_to_past_round_broadcast_prevote() {
                               LOCK_ZERO,
                               sandbox.s(VALIDATOR_2 as usize)));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
-
-    let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.broadcast(Precommit::new(VALIDATOR_0,
                                      HEIGHT_ONE,
@@ -1082,17 +1082,17 @@ fn lock_to_propose_and_send_prevote() {
         .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
         .with_tx_hashes(&[tx.hash()])
         .build();
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
+        .with_tx_hash(&tx.hash())
+        .build();
 
     sandbox.recv(propose.clone());
 
     // inc round
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
 
-    // block, expected in this round
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
-        .with_tx_hash(&tx.hash())
-        .build();
+
 
     sandbox.recv(Prevote::new(VALIDATOR_1,
                               HEIGHT_ONE,
