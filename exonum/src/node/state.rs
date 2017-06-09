@@ -104,6 +104,7 @@ pub struct BlockState {
     // Changes that should be made for block committing.
     patch: Patch,
     txs: Vec<Hash>,
+    proposer_id: ValidatorId,
 }
 
 pub trait VoteMessage: Message + Clone {
@@ -248,11 +249,16 @@ impl ProposeState {
 }
 
 impl BlockState {
-    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>) -> BlockState {
+    pub fn new(hash: Hash,
+               patch: Patch,
+               txs: Vec<Hash>,
+               proposer_id: ValidatorId)
+               -> BlockState {
         BlockState {
-            hash: hash,
-            patch: patch,
-            txs: txs,
+            hash,
+            patch,
+            txs,
+            proposer_id,
         }
     }
 
@@ -266,6 +272,10 @@ impl BlockState {
 
     pub fn txs(&self) -> &Vec<Hash> {
         &self.txs
+    }
+
+    pub fn proposer_id(&self) -> ValidatorId {
+        self.proposer_id
     }
 }
 
@@ -621,15 +631,17 @@ impl State {
     pub fn add_block(&mut self,
                      block_hash: Hash,
                      patch: Patch,
-                     txs: Vec<Hash>)
+                     txs: Vec<Hash>,
+                     proposer_id: ValidatorId)
                      -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => {
                 Some(e.insert(BlockState {
                     hash: block_hash,
-                    patch: patch,
-                    txs: txs,
+                    patch,
+                    txs,
+                    proposer_id,
                 }))
             }
         }
