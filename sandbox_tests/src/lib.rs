@@ -42,7 +42,8 @@ fn generate_config_with_message(prev_cfg_hash: Hash,
     StoredConfiguration {
         previous_cfg_hash: prev_cfg_hash,
         actual_from: actual_from,
-        validators: sandbox.validators(),
+        validator_keys: sandbox.validators(),
+        service_keys: sandbox.services(),
         consensus: sandbox.cfg().consensus,
         services: services,
     }
@@ -108,6 +109,7 @@ mod tests {
         assert_eq!(sandbox.is_validator(), true);
 
         let validators = sandbox.validators();
+        let service_keys = sandbox.services();
 
         let mut services: BTreeMap<String, Value> = BTreeMap::new();
         let tmstmp_id = TimestampingService::new().service_id();
@@ -118,7 +120,8 @@ mod tests {
         let full_node_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: 4,
-            validators: validators[1..].iter().cloned().collect(),
+            validator_keys: validators[1..].iter().cloned().collect(),
+            service_keys: service_keys[1..].iter().cloned().collect(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
         };
@@ -151,7 +154,8 @@ mod tests {
         let validator_cfg = StoredConfiguration {
             previous_cfg_hash: full_node_cfg.hash(),
             actual_from: 6,
-            validators: validators[0..].iter().cloned().collect(),
+            validator_keys: validators[0..].iter().cloned().collect(),
+            service_keys: service_keys[0..].iter().cloned().collect(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
         };
@@ -189,15 +193,17 @@ mod tests {
         let start_time = sandbox.time();
         sandbox.assert_state(1, 1);
 
-        let new_keypairs = (40..44)
-            .map(|seed_num| {
-                     (gen_keypair_from_seed(&Seed::new([seed_num; SEED_LENGTH])),
-                      gen_keypair_from_seed(&Seed::new([seed_num * 2; SEED_LENGTH])))
-                 })
-            .collect::<Vec<_>>();
+        let new_validator_keypairs: Vec<_> = (40..44)
+            .map(|seed_num| gen_keypair_from_seed(&Seed::new([seed_num; SEED_LENGTH])))
+            .collect();
+        let new_service_keypairs: Vec<_> = (40..44)
+            .map(|seed_num| gen_keypair_from_seed(&Seed::new([seed_num * 2; SEED_LENGTH])))
+            .collect();
         let mut validators = sandbox.validators();
+        let mut service_keys = sandbox.services();
         let old_len = validators.len();
-        validators.extend(new_keypairs.iter().map(|el| ((el.0).0, (el.1).0)));
+        validators.extend(new_validator_keypairs.iter().map(|el| el.0));
+        service_keys.extend(new_service_keypairs.iter().map(|el| el.0));
         let new_len = validators.len();
 
         let actual_from = 3;
@@ -205,7 +211,8 @@ mod tests {
         let added_keys_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: actual_from,
-            validators: validators.clone(),
+            validator_keys: validators.clone(),
+            service_keys: service_keys.clone(),
             consensus: sandbox.cfg().consensus,
             services: services,
         };
@@ -233,7 +240,8 @@ mod tests {
             sandbox.assert_state(3, 1);
         }
         {
-            let (consensus_keys, service_keys) = new_keypairs.iter().cloned().unzip();
+            let consensus_keys = new_validator_keypairs.iter().cloned().collect();
+            let service_keys = new_service_keypairs.iter().cloned().collect();
             sandbox.set_validators_map(new_len as u8, consensus_keys, service_keys);
             sandbox.initialize(start_time, old_len, new_len);
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
@@ -289,7 +297,8 @@ mod tests {
         let excluding_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: actual_from,
-            validators: new_public_keys,
+            validator_keys: new_public_keys.iter().map(|x| x.0).collect(),
+            service_keys: new_public_keys.iter().map(|x| x.1).collect(),
             consensus: sandbox.cfg().consensus,
             services: services,
         };

@@ -12,7 +12,8 @@
 //! `Exonum` blockchain configuration is composed of:
 //!
 //! - consensus algorithm parameters
-//! - list of validators' public key pairs - list of identities of consensus participants
+//! - list of validators' public keys - list of identities of consensus participants
+//! - list of services public keys
 //! - configuration of all services, plugged in for a specific blockchain instance.
 //!
 //! It also contains auxiliary fields:
@@ -409,9 +410,9 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         //    if config_candidate_body.previous_cfg_hash != actual_config_hash {
         let from: &PublicKey = tx_vote.from();
         let validator_id = prev_cfg
-            .validators
+            .service_keys
             .iter()
-            .position(|pk| pk.1 == *from)
+            .position(|pk| pk == from)
             .expect(&format!("See !prev_cfg.validators.contains(self.from()) for \
                               TxConfigVote:{:?}",
                              &tx_vote));
@@ -465,7 +466,7 @@ impl Transaction for TxConfigPropose {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.validators.iter().any(|x| x.1 == *self.from()) {
+        if !actual_config.service_keys.contains(self.from()) {
             error!("Discarding TxConfigPropose:{} from unknown validator. ",
                    serde_json::to_string(self).unwrap());
             return;
@@ -535,7 +536,7 @@ impl Transaction for TxConfigVote {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.validators.iter().any(|x| x.1 == *self.from()) {
+        if !actual_config.service_keys.contains(self.from()) {
             error!("Discarding TxConfigVote:{:?} from unknown validator. ",
                    self);
             return;
