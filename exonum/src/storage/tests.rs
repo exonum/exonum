@@ -1,44 +1,9 @@
 use tempdir::TempDir;
-use byteorder::{BigEndian, ByteOrder};
 use leveldb::options::Options;
 use storage::db::Fork;
 
-use super::{Map, List, MapTable, MerkleTable, Database, StorageValue, Error, MemoryDB, LevelDB};
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct Number([u8; 8]);
-
-impl From<u64> for Number {
-    fn from(v: u64) -> Number {
-        let mut bytes = [0; 8];
-        BigEndian::write_u64(&mut bytes, v);
-        Number(bytes)
-    }
-}
-
-impl From<Number> for u64 {
-    fn from(v: Number) -> u64 {
-        BigEndian::read_u64(&v.0)
-    }
-}
-
-impl AsRef<[u8]> for Number {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_ref()
-    }
-}
-
-impl Number {
-    pub fn from_bytes(bytes: Vec<u8>) -> Number {
-        let mut buf = [0; 8];
-        buf.copy_from_slice(&bytes);
-        Number(buf)
-    }
-
-    pub fn to_bytes(self) -> Vec<u8> {
-        self.0.to_vec()
-    }
-}
+use super::{Map, List, MapTable, MerkleTable, Database, StorageValue, Error, MemoryDB, LevelDB,
+            U64Key};
 
 fn leveldb_database() -> LevelDB {
     let mut options = Options::new();
@@ -162,26 +127,77 @@ fn test_map_table_different_prefixes<T: Database>(db: &T) {
 }
 
 fn test_map_table_number_keys_find<T: Database>(db: &T) {
-    let map = MapTable::new(b"abacd".to_vec(), db);
-    map.put(&Number::from(100), b"1".to_vec()).unwrap();
-    map.put(&Number::from(110), b"12".to_vec()).unwrap();
-    map.put(&Number::from(1100), b"123".to_vec()).unwrap();
-    map.put(&Number::from(500), b"1234".to_vec()).unwrap();
-    map.put(&Number::from(9000), b"12345".to_vec()).unwrap();
+    let find_u64_key = |map: &Map<U64Key, Vec<u8>>, key: u64| {
+        map.find_key(&U64Key::from(key))
+            .unwrap()
+            .map(|x| u64::from(U64Key::from_vec(x)))
+    };
 
-    assert_eq!(map.find_key(&Number::from(0)).unwrap(),
-               Some(Number::from(100).to_bytes()));
-    assert_eq!(map.find_key(&Number::from(100)).unwrap(),
-               Some(Number::from(100).to_bytes()));
-    assert_eq!(map.find_key(&Number::from(101)).unwrap(),
-               Some(Number::from(110).to_bytes()));
-    assert_eq!(map.find_key(&Number::from(111)).unwrap(),
-               Some(Number::from(500).to_bytes()));
-    assert_eq!(map.find_key(&Number::from(501)).unwrap(),
-               Some(Number::from(1100).to_bytes()));
-    assert_eq!(map.find_key(&Number::from(1200)).unwrap(),
-               Some(Number::from(9000).to_bytes()));
-    assert_eq!(map.find_key(&Number::from(10000)).unwrap(), None);
+    let map = MapTable::new(b"abacd".to_vec(), db);
+    map.put(&U64Key::from(100), b"1".to_vec()).unwrap();
+    map.put(&U64Key::from(110), b"12".to_vec()).unwrap();
+    map.put(&U64Key::from(1100), b"123".to_vec()).unwrap();
+    map.put(&U64Key::from(500), b"1234".to_vec()).unwrap();
+    map.put(&U64Key::from(9000), b"12345".to_vec()).unwrap();
+
+    assert_eq!(find_u64_key(&map, 0), Some(100));
+    assert_eq!(find_u64_key(&map, 100), Some(100));
+    assert_eq!(find_u64_key(&map, 101), Some(110));
+    assert_eq!(find_u64_key(&map, 111), Some(500));
+    assert_eq!(find_u64_key(&map, 501), Some(1100));
+    assert_eq!(find_u64_key(&map, 1200), Some(9000));
+    assert_eq!(find_u64_key(&map, 10000), None);
+}
+
+
+fn test_map_table_number_keys_find_fork<T>(db: &T) 
+    where T: Database 
+{
+    let find_u64_key = |map: &Map<[u8], Vec<u8>>, key: u64| {
+        map.find_key(U64Key::from(key).as_ref())
+            .unwrap()
+            .map(|x| u64::from(U64Key::from_vec(x)))
+    };
+
+    db.put(U64Key::from(100).as_ref(), b"1".to_vec()).unwrap();
+    db.put(U64Key::from(110).as_ref(), b"12".to_vec()).unwrap();
+    db.put(U64Key::from(1100).as_ref(), b"123".to_vec())
+        .unwrap();
+
+    let patch = {
+        let fork = db.fork();
+
+        fork.put(U64Key::from(500).as_ref(), b"1234".to_vec())
+            .unwrap();
+        fork.put(U64Key::from(9000).as_ref(), b"12345".to_vec())
+            .unwrap();
+        fork.delete(U64Key::from(110).as_ref()).unwrap();
+
+        assert_eq!(find_u64_key(&fork, 0), Some(100));
+        assert_eq!(find_u64_key(&fork, 101), Some(500));
+        assert_eq!(find_u64_key(&fork, 111), Some(500));
+        assert_eq!(find_u64_key(&fork, 501), Some(1100));
+        assert_eq!(find_u64_key(&fork, 1200), Some(9000));
+        assert_eq!(find_u64_key(&fork, 10000), None);
+
+        fork.changes()
+    };
+
+    assert_eq!(find_u64_key(db, 0), Some(100));
+    assert_eq!(find_u64_key(db, 100), Some(100));
+    assert_eq!(find_u64_key(db, 101), Some(110));
+    assert_eq!(find_u64_key(db, 111), Some(1100));
+    assert_eq!(find_u64_key(db, 501), Some(1100));
+    assert_eq!(find_u64_key(db, 1200), None);
+
+    db.merge(&patch).unwrap();
+
+    assert_eq!(find_u64_key(db, 0), Some(100));
+    assert_eq!(find_u64_key(db, 101), Some(500));
+    assert_eq!(find_u64_key(db, 111), Some(500));
+    assert_eq!(find_u64_key(db, 501), Some(1100));
+    assert_eq!(find_u64_key(db, 1200), Some(9000));
+    assert_eq!(find_u64_key(db, 10000), None);
 }
 
 
@@ -303,5 +319,18 @@ fn memorydb_map_table_number_keys_find() {
     let db = MemoryDB::new();
     test_map_table_number_keys_find(&db);
 }
+
+#[test]
+fn leveldb_map_table_number_keys_find_fork() {
+    let db = leveldb_database();
+    test_map_table_number_keys_find_fork(&db);
+}
+
+#[test]
+fn memorydb_map_table_number_keys_find_fork() {
+    let db = MemoryDB::new();
+    test_map_table_number_keys_find_fork(&db);
+}
+
 
 // TODO add tests for changes
