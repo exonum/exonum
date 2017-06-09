@@ -139,15 +139,21 @@ impl<'a> Schema<'a> {
 
     pub fn commit_configuration(&self, config_data: StoredConfiguration) -> Result<(), Error> {
         let actual_from = config_data.actual_from;
-        if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
-            let last_actual_from = last_cfg_reference.actual_from();
-            if actual_from <= last_actual_from {
-                return Err(Error::new(format!("Attempting to commit configuration \
-                                               with actual_from {:?} less than \
-                                              the last committed actual_from {:?}",
-                                              actual_from, last_actual_from)));
+        if let Some(last_cfg) = self.configs_actual_from().last()? {
+            if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
+                return Err(Error::new(format!("Attempting to commit configuration with incorrect \
+                                               previous hash: {:?}, expected: {:?}",
+                                              config_data.previous_cfg_hash, last_cfg.cfg_hash())));
+            }
+
+            if actual_from <= last_cfg.actual_from() {
+                return Err(Error::new(format!("Attempting to commit configuration with \
+                                               actual_from {} less than the last committed \
+                                              the last committed actual_from {}",
+                                              actual_from, last_cfg.actual_from())));
             }
         }
+
         let cfg_hash = config_data.hash();
         self.configs().put(&cfg_hash, config_data.clone())?;
 

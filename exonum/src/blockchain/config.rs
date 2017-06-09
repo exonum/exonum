@@ -1,4 +1,5 @@
-use serde_json;
+use serde::de::Error;
+use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
@@ -38,18 +39,18 @@ impl Default for ConsensusConfig {
 }
 
 impl StoredConfiguration {
-    pub fn try_serialize(&self) -> Result<Vec<u8>, serde_json::error::Error> {
+    pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
         serde_json::to_vec(&self)
     }
 
-    pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, serde_json::error::Error> {
+    pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
 
         // Check that there are no duplicated keys.
         let mut keys: HashSet<_> = config.validators.iter().map(|x| x.0).collect();
         keys.extend(config.validators.iter().map(|x| x.1));
         if keys.len() != config.validators.len() * 2 {
-            panic!("Duplicated validator keys are found");
+            return Err(JsonError::custom("Duplicated validator keys are found"));
         }
 
         Ok(config)
