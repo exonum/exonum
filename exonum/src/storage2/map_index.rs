@@ -43,27 +43,27 @@ impl<T, K, V> MapIndex<T, K, V> where T: AsRef<Snapshot>,
     }
 
     pub fn iter(&self) -> MapIndexIter<K, V> {
-        MapIndexIter { base_iter: self.base.iter() }
+        MapIndexIter { base_iter: self.base.iter(&()) }
     }
 
     pub fn keys(&self) -> MapIndexKeys<K> {
-        MapIndexKeys { base_iter: self.base.iter() }
+        MapIndexKeys { base_iter: self.base.iter(&()) }
     }
 
     pub fn values(&self) -> MapIndexValues<V> {
-        MapIndexValues { base_iter: self.base.iter() }
+        MapIndexValues { base_iter: self.base.iter(&()) }
     }
 
     pub fn iter_from(&self, from: &K) -> MapIndexIter<K, V> {
-        MapIndexIter { base_iter: self.base.iter_from(from) }
+        MapIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
 
     pub fn keys_from(&self, from: &K) -> MapIndexKeys<K> {
-        MapIndexKeys { base_iter: self.base.iter_from(from) }
+        MapIndexKeys { base_iter: self.base.iter_from(&(), from) }
     }
 
     pub fn values_from(&self, from: &K) -> MapIndexValues<V> {
-        MapIndexValues { base_iter: self.base.iter_from(from) }
+        MapIndexValues { base_iter: self.base.iter_from(&(), from) }
     }
 }
 

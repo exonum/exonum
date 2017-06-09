@@ -9,7 +9,7 @@ pub struct BaseIndex<T> {
 
 pub struct BaseIndexIter<'a, K, V> {
     base_iter: Iter<'a>,
-    prefix: &'a [u8],
+    prefix: Vec<u8>,
     ended: bool,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
@@ -41,25 +41,28 @@ impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
         self.view.as_ref().contains(&self.prefixed_key(key))
     }
 
-    // FIXME: add prefix argument for iter() and iter_fom()
-
-    pub fn iter<K, V>(&self) -> BaseIndexIter<K, V> where K: StorageKey,
-                                                          V: StorageValue {
+    pub fn iter<P, K, V>(&self, prefix: &P) -> BaseIndexIter<K, V> where P: StorageKey,
+                                                                         K: StorageKey,
+                                                                         V: StorageValue {
+        let iter_prefix = self.prefixed_key(prefix);
         BaseIndexIter {
-            base_iter: self.view.as_ref().iter(&self.prefix),
-            prefix: &self.prefix,
+            base_iter: self.view.as_ref().iter(&iter_prefix),
+            prefix: iter_prefix,
             ended: false,
             _k: PhantomData,
             _v: PhantomData
         }
     }
 
-    pub fn iter_from<F, K, V>(&self, from: &F) -> BaseIndexIter<K, V> where F: StorageKey,
-                                                                            K: StorageKey,
-                                                                            V: StorageValue {
+    pub fn iter_from<P, F, K, V>(&self, prefix: &P, from: &F) -> BaseIndexIter<K, V> where P: StorageKey,
+                                                                                           F: StorageKey,
+                                                                                           K: StorageKey,
+                                                                                           V: StorageValue {
+        let iter_prefix = self.prefixed_key(prefix);
+        let iter_from = self.prefixed_key(from)
         BaseIndexIter {
-            base_iter: self.view.as_ref().iter(&self.prefixed_key(from)),
-            prefix: &self.prefix,
+            base_iter: self.view.as_ref().iter(&iter_from),
+            prefix: iter_prefix,
             ended: false,
             _k: PhantomData,
             _v: PhantomData
@@ -93,7 +96,7 @@ impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,
             return None
         }
         if let Some((ref k, ref v)) = self.base_iter.next() {
-            if k.starts_with(self.prefix) {
+            if k.starts_with(&self.prefix) {
                 return Some((K::read(&k[self.prefix.len()..]), V::from_slice(v)))
             }
         }

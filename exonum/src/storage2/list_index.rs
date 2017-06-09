@@ -50,11 +50,11 @@ impl<T, V> ListIndex<T, V> where T: AsRef<Snapshot>,
     }
 
     pub fn iter(&self) -> ListIndexIter<V> {
-        ListIndexIter { base_iter: self.base.iter() }
+        ListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
     pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
-        ListIndexIter { base_iter: self.base.iter_from(&from) }
+        ListIndexIter { base_iter: self.base.iter_from(&(), &from) }
     }
 }
 

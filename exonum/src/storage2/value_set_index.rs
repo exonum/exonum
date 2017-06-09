@@ -37,19 +37,19 @@ impl<T, V> ValueSetIndex<T, V> where T: AsRef<Snapshot>,
     }
 
     pub fn iter(&self) -> ValueSetIndexIter<V> {
-        ValueSetIndexIter { base_iter: self.base.iter() }
+        ValueSetIndexIter { base_iter: self.base.iter(&()) }
     }
 
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
-        ValueSetIndexIter { base_iter: self.base.iter_from(from) }
+        ValueSetIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
 
     pub fn hashes(&self) -> ValueSetIndexHashes {
-        ValueSetIndexHashes { base_iter: self.base.iter() }
+        ValueSetIndexHashes { base_iter: self.base.iter(&()) }
     }
 
     pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes {
-        ValueSetIndexHashes { base_iter: self.base.iter_from(from) }
+        ValueSetIndexHashes { base_iter: self.base.iter_from(&(), from) }
     }
 }
 
