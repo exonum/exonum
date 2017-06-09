@@ -130,7 +130,7 @@ impl<S> NodeHandler<S>
 
         let snapshot = blockchain.snapshot();
 
-        let stored = Schema::new(snapshot).actual_configuration();
+        let stored = Schema::new(&snapshot).actual_configuration();
         info!("Create node with config={:#?}", stored);
 
         let validator_id = stored
@@ -383,10 +383,8 @@ impl<T> fmt::Debug for TxSender<T>
 
 impl Node {
     /// Creates node for the given blockchain and node configuration
-    pub fn new(blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
-        blockchain
-            .create_genesis_block(node_cfg.genesis.clone())
-            .unwrap();
+    pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
+        blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
 
         let config = Configuration {
             listener: ListenerConfig {

@@ -43,32 +43,32 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
         Schema { view: view }
     }
 
-    pub fn transactions(&self) -> MapIndex<T, Hash, RawMessage> {
-        MapIndex::new(gen_prefix(CONSENSUS, 0, &()), self.view)
+    pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
+        MapIndex::new(gen_prefix(CONSENSUS, 0, &()), &self.view)
     }
 
-    pub fn tx_location_by_tx_hash(&self) -> MapIndex<T, Hash, TxLocation> {
-        MapIndex::new(gen_prefix(CONSENSUS, 1, &()), self.view)
+    pub fn tx_location_by_tx_hash(&self) -> MapIndex<&T, Hash, TxLocation> {
+        MapIndex::new(gen_prefix(CONSENSUS, 1, &()), &self.view)
     }
 
-    pub fn blocks(&self) -> MapIndex<T, Hash, Block> {
-        MapIndex::new(gen_prefix(CONSENSUS, 2, &()), self.view)
+    pub fn blocks(&self) -> MapIndex<&T, Hash, Block> {
+        MapIndex::new(gen_prefix(CONSENSUS, 2, &()), &self.view)
     }
 
-    pub fn block_hashes_by_height(&self) -> ListIndex<T, Hash> {
-        ListIndex::new(gen_prefix(CONSENSUS, 3, &()), self.view)
+    pub fn block_hashes_by_height(&self) -> ListIndex<&T, Hash> {
+        ListIndex::new(gen_prefix(CONSENSUS, 3, &()), &self.view)
     }
 
     pub fn block_hash_by_height(&self, height: u64) -> Option<Hash> {
         self.block_hashes_by_height().get(height)
     }
 
-    pub fn block_txs(&self, height: u64) -> ProofListIndex<T, Hash> {
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), self.view)
+    pub fn block_txs(&self, height: u64) -> ProofListIndex<&T, Hash> {
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), &self.view)
     }
 
-    pub fn precommits(&self, hash: &Hash) -> ListIndex<T, Precommit> {
-        ListIndex::new(gen_prefix(CONSENSUS, 5, hash), self.view)
+    pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
+        ListIndex::new(gen_prefix(CONSENSUS, 5, hash), &self.view)
     }
 
     pub fn block_and_precommits(&self, height: u64) -> Option<BlockProof> {
@@ -86,18 +86,18 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
         Some(res)
     }
 
-    pub fn configs(&self) -> ProofMapIndex<T, Hash, StoredConfiguration> {
+    pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
         // configs patricia merkletree <block height> json
-        ProofMapIndex::new(gen_prefix(CONSENSUS, 6, &()), self.view)
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 6, &()), &self.view)
     }
 
     // TODO: consider List index to reduce storage volume
-    pub fn configs_actual_from(&self) -> ListIndex<T, ConfigReference> {
-        ListIndex::new(gen_prefix(CONSENSUS, 7, &()), self.view)
+    pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
+        ListIndex::new(gen_prefix(CONSENSUS, 7, &()), &self.view)
     }
 
-    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, Hash, Hash> {
-        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), self.view)
+    pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &self.view)
     }
 
     pub fn last_block(&self) -> Option<Block> {
@@ -198,6 +198,48 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
 }
 
 impl<'a> Schema<&'a mut Fork> {
+    pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
+        MapIndex::new(gen_prefix(CONSENSUS, 0, &()), &mut self.view)
+    }
+
+    pub fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
+        MapIndex::new(gen_prefix(CONSENSUS, 1, &()), &mut self.view)
+    }
+
+    pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
+        MapIndex::new(gen_prefix(CONSENSUS, 2, &()), &mut self.view)
+    }
+
+    pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
+        ListIndex::new(gen_prefix(CONSENSUS, 3, &()), &mut self.view)
+    }
+
+    pub fn block_hash_by_height_mut(&mut self, height: u64) -> Option<Hash> {
+        self.block_hashes_by_height().get(height)
+    }
+
+    pub fn block_txs_mut(&mut self, height: u64) -> ProofListIndex<&mut Fork, Hash> {
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), &mut self.view)
+    }
+
+    pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
+        ListIndex::new(gen_prefix(CONSENSUS, 5, hash), &mut self.view)
+    }
+
+    pub fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
+        // configs patricia merkletree <block height> json
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 6, &()), &mut self.view)
+    }
+
+    // TODO: consider List index to reduce storage volume
+    pub fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
+        ListIndex::new(gen_prefix(CONSENSUS, 7, &()), &mut self.view)
+    }
+
+    pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &mut self.view)
+    }
+
     pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg_reference) = self.configs_actual_from().last() {
@@ -210,10 +252,10 @@ impl<'a> Schema<&'a mut Fork> {
             }
         }
         let cfg_hash = config_data.hash();
-        self.configs().put(&cfg_hash, config_data.clone());
+        self.configs_mut().put(&cfg_hash, config_data.clone());
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
-        self.configs_actual_from().push(cfg_ref);
+        self.configs_actual_from_mut().push(cfg_ref);
         info!("Scheduled the following configuration for acceptance: {:?}", config_data);
         // TODO: clear storages
     }

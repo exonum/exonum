@@ -66,7 +66,7 @@ impl Blockchain {
             .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
-    pub fn merge(&self, patch: Patch) -> Result<(), Error> {
+    pub fn merge(&mut self, patch: Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
 
@@ -81,7 +81,7 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block().unwrap()
     }
 
-    pub fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
+    pub fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: 0,
@@ -99,7 +99,7 @@ impl Blockchain {
             }
             // Commit actual configuration
             {
-                let schema = Schema::new(&mut fork);
+                let mut schema = Schema::new(&mut fork);
                 if schema.block_hash_by_height(0).is_some() {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
                     return Ok(());
@@ -130,55 +130,84 @@ impl Blockchain {
                         -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
-        // Create database schema
-        let schema = Schema::new(&mut fork);
-        // Get last hash
-        let last_hash = self.last_hash();
-        // Save & execute transactions
-        for (index, hash) in tx_hashes.iter().enumerate() {
-            let tx = &pool[hash];
-            tx.execute(&mut fork);
-            schema.transactions().put(hash, tx.raw().clone());
-            schema.block_txs(height).push(*hash);
-            let location = TxLocation::new(height, index as u64);
-            schema.tx_location_by_tx_hash().put(hash, location);
-        }
-        // Get tx hash
-        let tx_hash = schema.block_txs(height).root_hash();
-        // Get state hash
-        let state_hash = {
-            let sum_table = schema.state_hash_aggregator();
-            let vec_core_state = schema.core_state_hash();
-            for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
-                let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
-                sum_table.put(&key, core_table_hash);
+
+        let block_hash = {
+            // Get last hash
+            let last_hash = self.last_hash();
+            // Save & execute transactions
+            for (index, hash) in tx_hashes.iter().enumerate() {
+                let tx = &pool[hash];
+                tx.execute(&mut fork);
+                let mut schema = Schema::new(&mut fork);
+                schema.transactions_mut().put(hash, tx.raw().clone());
+                schema.block_txs_mut(height).push(*hash);
+                let location = TxLocation::new(height, index as u64);
+                schema.tx_location_by_tx_hash_mut().put(hash, location);
             }
-            for service in self.service_map.values() {
-                let service_id = service.service_id();
-                let vec_service_state = service.state_hash(&mut fork);
-                for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
-                    let key = Blockchain::service_table_unique_key(service_id, idx);
-                    sum_table.put(&key, service_table_hash);
-                }
-            }
-            sum_table.root_hash()
+
+            // Get tx & state hash
+            let (tx_hash, state_hash) = {
+
+                let state_hashes = {
+                    let mut schema = Schema::new(&fork);
+
+                    let vec_core_state = schema.core_state_hash();
+                    let mut state_hashes = Vec::new();
+
+                    for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
+                        let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
+                        state_hashes.push((key, core_table_hash));
+                    }
+
+                    for service in self.service_map.values() {
+                        let service_id = service.service_id();
+                        let vec_service_state = service.state_hash(&fork);
+                        for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
+                            let key = Blockchain::service_table_unique_key(service_id, idx);
+                            state_hashes.push((key, service_table_hash));
+                        }
+                    }
+
+                    state_hashes
+                };
+
+                let mut schema = Schema::new(&mut fork);
+
+                let state_hash = {
+                    let mut sum_table = schema.state_hash_aggregator_mut();
+                    for (key, hash) in state_hashes {
+                        sum_table.put(&key, hash)
+                    }
+                    sum_table.root_hash()
+                };
+
+                let tx_hash = schema.block_txs(height).root_hash();
+
+                (tx_hash, state_hash)
+            };
+
+            // Create block
+            let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
+            trace!("execute block = {:?}", block);
+            // Eval block hash
+            let block_hash = block.hash();
+            // Update height
+            // TODO: check that height == propose.height
+
+            let mut schema = Schema::new(&mut fork);
+
+            schema.block_hashes_by_height_mut().push(block_hash);
+            // Save block
+            schema.blocks_mut().put(&block_hash, block);
+
+            block_hash
         };
 
-        // Create block
-        let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
-        trace!("execute block = {:?}", block);
-        // Eval block hash
-        let block_hash = block.hash();
-        // Update height
-        // TODO: check that height == propose.height
-        schema.block_hashes_by_height().push(block_hash);
-        // Save block
-        schema.blocks().put(&block_hash, block);
         (block_hash, fork.into_patch())
     }
 
     #[cfg_attr(feature="flame_profile", flame)]
-    pub fn commit<'a, I>(&self,
+    pub fn commit<'a, I>(&mut self,
                          state: &mut State,
                          block_hash: Hash,
                          precommits: I)
@@ -193,18 +222,25 @@ impl Blockchain {
                 fork
             };
 
-            let schema = Schema::new(&mut fork);
-            for precommit in precommits {
-                schema.precommits(&block_hash).push(precommit.clone());
+            {
+                let mut schema = Schema::new(&mut fork);
+                for precommit in precommits {
+                    schema.precommits_mut(&block_hash).push(precommit.clone());
+                }
+
+                state.update_config(schema.actual_configuration());
+
             }
 
-            state.update_config(schema.actual_configuration());
+            let transactions = {
+                let mut node_state = NodeState::new(state, &fork);
+                for service in self.service_map.values() {
+                    service.handle_commit(&mut node_state);
+                };
+                node_state.transactions()
+            };
 
-            let mut node_state = NodeState::new(state, &fork);
-            for service in self.service_map.values() {
-                service.handle_commit(&mut node_state);
-            }
-            (fork.into_patch(), node_state.transactions())
+            (fork.into_patch(), transactions)
         };
         self.merge(patch)?;
         Ok(txs)
