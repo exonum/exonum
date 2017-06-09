@@ -66,9 +66,9 @@ impl Database for LevelDB {
 
     fn snapshot(&self) -> Box<Snapshot> {
         Box::new(LevelDBSnapshot {
-            _db: self.db.clone(),
-            snapshot: unsafe { mem::transmute(self.db.snapshot()) }
-        })
+                     _db: self.db.clone(),
+                     snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+                 })
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
@@ -76,10 +76,12 @@ impl Database for LevelDB {
         for (key, change) in patch {
             match change {
                 Change::Put(ref v) => batch.put(key, v),
-                Change::Delete => batch.delete(key)
+                Change::Delete => batch.delete(key),
             }
         }
-        self.db.write(LEVELDB_WRITE_OPTIONS, &batch).map_err(Into::into)
+        self.db
+            .write(LEVELDB_WRITE_OPTIONS, &batch)
+            .map_err(Into::into)
     }
 }
 
@@ -87,7 +89,7 @@ impl Snapshot for LevelDBSnapshot {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         match self.snapshot.get(LEVELDB_READ_OPTIONS, key) {
             Ok(value) => value,
-            Err(err) => panic!(err)
+            Err(err) => panic!(err),
         }
     }
 
@@ -109,4 +111,3 @@ impl ::std::fmt::Debug for LevelDBSnapshot {
         write!(f, "LevelDBSnapshot(..)")
     }
 }
-

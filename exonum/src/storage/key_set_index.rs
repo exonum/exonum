@@ -10,7 +10,7 @@ pub struct KeySetIndex<T, K> {
 
 #[derive(Debug)]
 pub struct KeySetIndexIter<'a, K> {
-    base_iter: BaseIndexIter<'a, K, ()>
+    base_iter: BaseIndexIter<'a, K, ()>,
 }
 
 impl<T, K> KeySetIndex<T, K> {
@@ -22,8 +22,10 @@ impl<T, K> KeySetIndex<T, K> {
     }
 }
 
-impl<T, K> KeySetIndex<T, K> where T: AsRef<Snapshot>,
-                                   K: StorageKey {
+impl<T, K> KeySetIndex<T, K>
+    where T: AsRef<Snapshot>,
+          K: StorageKey
+{
     pub fn contains(&self, item: &K) -> bool {
         self.base.contains(item)
     }
@@ -37,7 +39,9 @@ impl<T, K> KeySetIndex<T, K> where T: AsRef<Snapshot>,
     }
 }
 
-impl<'a, K> KeySetIndex<&'a mut Fork, K> where K: StorageKey {
+impl<'a, K> KeySetIndex<&'a mut Fork, K>
+    where K: StorageKey
+{
     pub fn insert(&mut self, item: K) {
         self.base.put(&item, ())
     }
@@ -51,8 +55,10 @@ impl<'a, K> KeySetIndex<&'a mut Fork, K> where K: StorageKey {
     }
 }
 
-impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K> where T: AsRef<Snapshot>,
-                                                                         K: StorageKey {
+impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
+    where T: AsRef<Snapshot>,
+          K: StorageKey
+{
     type Item = K;
     type IntoIter = KeySetIndexIter<'a, K>;
 
@@ -61,7 +67,9 @@ impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K> where T: AsRe
     }
 }
 
-impl<'a, K> Iterator for KeySetIndexIter<'a, K> where K: StorageKey {
+impl<'a, K> Iterator for KeySetIndexIter<'a, K>
+    where K: StorageKey
+{
     type Item = K;
 
     fn next(&mut self) -> Option<Self::Item> {

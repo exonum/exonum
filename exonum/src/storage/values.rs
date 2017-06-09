@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use crypto::{Hash, hash, PublicKey};
 use messages::{RawMessage, MessageBuffer, Message};
 
-pub trait StorageValue : Sized {
+pub trait StorageValue: Sized {
     fn hash(&self) -> Hash;
     fn into_vec(self) -> Vec<u8>;
     fn from_bytes(value: Cow<[u8]>) -> Self;

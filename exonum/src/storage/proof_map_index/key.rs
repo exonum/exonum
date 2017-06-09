@@ -10,7 +10,7 @@ pub const LEAF_KEY_PREFIX: u8 = 01;
 pub const KEY_SIZE: usize = HASH_SIZE;
 pub const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 
-pub trait ProofMapKey : StorageKey {}
+pub trait ProofMapKey: StorageKey {}
 
 impl ProofMapKey for Hash {}
 impl ProofMapKey for PublicKey {}
@@ -64,7 +64,11 @@ impl DBKey {
 
         let mut data = [0; KEY_SIZE];
         key.write(&mut data);
-        DBKey { data: data, from: 0, to: (KEY_SIZE * 8) as u16 }
+        DBKey {
+            data: data,
+            from: 0,
+            to: (KEY_SIZE * 8) as u16,
+        }
     }
 
     pub fn from(&self) -> u16 {
@@ -107,21 +111,33 @@ impl DBKey {
 
     /// Shortens this DBKey to the specified length.
     pub fn prefix(&self, mid: u16) -> DBKey {
-        DBKey { data: self.data, from: self.from, to: self.from + mid }
+        DBKey {
+            data: self.data,
+            from: self.from,
+            to: self.from + mid,
+        }
     }
 
     /// Return object which represents a view on to this slice (further) offset by `i` bits.
     pub fn suffix(&self, mid: u16) -> DBKey {
         debug_assert!(self.from + mid <= self.to);
 
-        DBKey { data: self.data, from: self.from + mid, to: self.to }
+        DBKey {
+            data: self.data,
+            from: self.from + mid,
+            to: self.to,
+        }
     }
 
     /// Shortens this DBKey to the specified length.
     pub fn truncate(&self, size: u16) -> DBKey {
         debug_assert!(self.from + size <= self.to);
 
-        DBKey { data: self.data, from: self.from, to: self.from + size }
+        DBKey {
+            data: self.data,
+            from: self.from,
+            to: self.from + size,
+        }
     }
 
     /// Returns how many bits at the beginning matches with `other`
@@ -186,7 +202,7 @@ impl StorageKey for DBKey {
             if self.to % 8 != 0 {
                 buffer[right] &= !(255u8 >> (self.to % 8));
             }
-            for i in right + 1 .. KEY_SIZE + 1 {
+            for i in right + 1..KEY_SIZE + 1 {
                 buffer[i] = 0
             }
             buffer[KEY_SIZE + 1] = self.to as u8;
@@ -199,9 +215,13 @@ impl StorageKey for DBKey {
         let to = match buffer[0] {
             LEAF_KEY_PREFIX => KEY_SIZE as u16 * 8,
             BRANCH_KEY_PREFIX => buffer[DB_KEY_SIZE - 1] as u16,
-            _ => unreachable!("wrong key prefix")
+            _ => unreachable!("wrong key prefix"),
         };
-        DBKey { data: data, from: 0, to: to }
+        DBKey {
+            data: data,
+            from: 0,
+            to: to,
+        }
     }
 }
 
@@ -215,10 +235,12 @@ impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "DBKey(")?;
         for i in 0..self.len() {
-            write!(f, "{}", match self.get(i) {
-                ChildKind::Left => '0',
-                ChildKind::Right => '1'
-            })?;
+            write!(f,
+                   "{}",
+                   match self.get(i) {
+                       ChildKind::Left => '0',
+                       ChildKind::Right => '1',
+                   })?;
         }
         write!(f, ")")
     }

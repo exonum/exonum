@@ -1,5 +1,5 @@
 use byteorder::{ByteOrder, BigEndian};
-use ::crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
+use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
 
 pub trait StorageKey {
