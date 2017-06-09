@@ -93,6 +93,13 @@ impl DBKey {
         DBKey { data: self.data, from: self.from + mid, to: self.to }
     }
 
+    /// Shortens this DBKey to the specified length.
+    pub fn truncate(&self, size: u16) -> DBKey {
+        debug_assert!(self.from + size <= self.to);
+
+        DBKey { data: self.data, from: self.from, to: self.from + size }
+    }
+
     /// Returns how many bits at the beginning matches with `other`
     pub fn common_prefix(&self, other: &Self) -> u16 {
         // We assume that all slices created from byte arrays with the same length
