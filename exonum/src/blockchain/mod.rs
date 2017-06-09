@@ -1,9 +1,11 @@
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
+use mount::Mount;
 
 use std::sync::Arc;
 use std::collections::BTreeMap;
 use std::mem;
+use std::fmt;
 
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
@@ -11,10 +13,10 @@ use node::{State, TxPool};
 use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
 
 pub use self::block::Block;
-pub use self::schema::Schema;
+pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction, NodeState};
+pub use self::service::{Service, Transaction, NodeState, ApiContext};
 
 #[macro_use]
 mod spec;
@@ -55,7 +57,9 @@ impl Blockchain {
 
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
         let id = raw.service_id() as usize;
-        self.service_map.get(id).and_then(|service| service.tx_from_raw(raw).ok())
+        self.service_map
+            .get(id)
+            .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
     pub fn merge(&self, patch: &Patch) -> Result<(), Error> {
@@ -64,9 +68,9 @@ impl Blockchain {
 
     pub fn last_hash(&self) -> Result<Hash, Error> {
         Ok(Schema::new(&self.view())
-            .block_hashes_by_height()
-            .last()?
-            .unwrap_or_else(Hash::default))
+               .block_hashes_by_height()
+               .last()?
+               .unwrap_or_else(Hash::default))
     }
 
     pub fn last_block(&self) -> Result<Block, Error> {
@@ -92,13 +96,11 @@ impl Blockchain {
             // Commit actual configuration
             {
                 let schema = Schema::new(&view);
-                if let Some(block_hash) = schema.block_hash_by_height(0)? {
+                if schema.block_hash_by_height(0)?.is_some() {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
-                    // panic!("Genesis block is already created");
-                    let _ = block_hash;
                     return Ok(());
                 }
-                schema.commit_actual_configuration(config_propose)?;
+                schema.commit_configuration(config_propose)?;
             };
             self.merge(&view.changes())?;
             self.create_patch(0, 0, &[], &BTreeMap::new())?.1
@@ -112,7 +114,7 @@ impl Blockchain {
         let size = mem::size_of::<u16>();
         let mut vec = vec![0; 2 * size];
         LittleEndian::write_u16(&mut vec[0..size], service_id);
-        LittleEndian::write_u16(&mut vec[size..2*size], table_idx as u16);
+        LittleEndian::write_u16(&mut vec[size..2 * size], table_idx as u16);
         crypto::hash(&vec)
     }
 
@@ -129,15 +131,13 @@ impl Blockchain {
         // Get last hash
         let last_hash = self.last_hash()?;
         // Save & execute transactions
-        for hash in tx_hashes {
+        for (index, hash) in tx_hashes.iter().enumerate() {
             let tx = &pool[hash];
             tx.execute(&fork)?;
-            schema.transactions()
-                .put(hash, tx.raw().clone())
-                .unwrap();
-            schema.block_txs(height)
-                .append(*hash)
-                .unwrap();
+            schema.transactions().put(hash, tx.raw().clone()).unwrap();
+            schema.block_txs(height).append(*hash).unwrap();
+            let location = TxLocation::new(height, index as u64);
+            schema.tx_location_by_tx_hash().put(hash, location).unwrap();
         }
         // Get tx hash
         let tx_hash = schema.block_txs(height).root_hash()?;
@@ -149,7 +149,7 @@ impl Blockchain {
                 let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
                 sum_table.put(&key, core_table_hash)?;
             }
-            for service in self.service_map.values(){
+            for service in self.service_map.values() {
                 let service_id = service.service_id();
                 let vec_service_state = service.state_hash(&fork)?;
                 for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
@@ -162,7 +162,7 @@ impl Blockchain {
 
         // Create block
         let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
-        trace!("execute block = {:?}", block );
+        trace!("execute block = {:?}", block);
         // Eval block hash
         let block_hash = block.hash();
         // Update height
@@ -194,6 +194,8 @@ impl Blockchain {
                 schema.precommits(&block_hash).append(precommit.clone())?;
             }
 
+            state.update_config(schema.actual_configuration()?);
+
             let mut node_state = NodeState::new(state, &view);
             for service in self.service_map.values() {
                 service.handle_commit(&mut node_state)?;
@@ -202,5 +204,66 @@ impl Blockchain {
         };
         self.merge(&patch)?;
         Ok(txs)
+    }
+
+    pub fn mount_public_api(&self, context: &ApiContext) -> Mount {
+        let mut mount = Mount::new();
+        for service in self.service_map.values() {
+            if let Some(handler) = service.public_api_handler(context) {
+                mount.mount(service.service_name(), handler);
+            }
+        }
+        mount
+    }
+
+    pub fn mount_private_api(&self, context: &ApiContext) -> Mount {
+        let mut mount = Mount::new();
+        for service in self.service_map.values() {
+            if let Some(handler) = service.private_api_handler(context) {
+                mount.mount(service.service_name(), handler);
+            }
+        }
+        mount
+    }
+}
+
+impl fmt::Debug for Blockchain {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Blockchain {{ db: {:?}, service_map: {{ .. }} }}", self.db)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_u64() {
+        storage_value! {
+            struct Test {
+                const SIZE = 8;
+                field some_test:u64 [0 => 8]
+            }
+        }
+        let test_data = r##"{"some_test":"1234"}"##;
+        let test = Test::new(1234);
+        let data = ::serialize::json::reexport::to_string(&test).unwrap();
+        println!("{:?}", data);
+        assert_eq!(data, test_data);
+    }
+
+    #[test]
+    fn test_system_time() {
+    use std::time::{SystemTime, UNIX_EPOCH};
+        storage_value! {
+            struct Test {
+                const SIZE = 12;
+                field some_test:SystemTime [0 => 12]
+            }
+        }
+        let test_data = r##"{"some_test":{"secs":"0","nanos":0}}"##;
+
+
+        let test = Test::new(UNIX_EPOCH);
+        let data = ::serialize::json::reexport::to_string(&test).unwrap();
+        assert_eq!(data, test_data);
     }
 }

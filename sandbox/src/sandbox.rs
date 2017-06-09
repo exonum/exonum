@@ -12,12 +12,13 @@ use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
+use exonum::helpers::init_logger;
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
@@ -42,7 +43,7 @@ impl Ord for TimerPair {
 pub struct SandboxInner {
     pub address: SocketAddr,
     pub time: SystemTime,
-    pub sended: VecDeque<(SocketAddr, RawMessage)>,
+    pub sent: VecDeque<(SocketAddr, RawMessage)>,
     pub events: VecDeque<SandboxEvent>,
     pub timers: BinaryHeap<TimerPair>,
 }
@@ -61,8 +62,8 @@ impl SandboxChannel {
         self.inner
             .lock()
             .unwrap()
-            .sended
-            .push_back((address.clone(), message));
+            .sent
+            .push_back((*address, message));
     }
 }
 
@@ -165,13 +166,13 @@ impl SandboxReactor {
     pub fn actual_config(&self) -> Result<StoredConfiguration, StorageError> {
         let view = self.handler.blockchain.view();
         let schema = Schema::new(&view);
-        schema.get_actual_configuration()
+        schema.actual_configuration()
     }
 
     pub fn following_config(&self) -> Result<Option<StoredConfiguration>, StorageError> {
         let view = self.handler.blockchain.view();
         let schema = Schema::new(&view);
-        schema.get_following_configuration()
+        schema.following_configuration()
     }
 
     pub fn handle_message(&mut self, msg: RawMessage) {
@@ -182,12 +183,19 @@ impl SandboxReactor {
     pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
         self.handler.handle_timeout(timeout);
     }
+
+    pub fn public_key(&self) -> &PublicKey {
+        self.handler.state().public_key()
+    }
+
+    pub fn secret_key(&self) -> &SecretKey {
+        self.handler.state().secret_key()
+    }
 }
 
 pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
-    // pub validators: Vec<(PublicKey, SecretKey)>,
     pub validators_map: HashMap<PublicKey, SecretKey>,
     addresses: Vec<SocketAddr>,
 }
@@ -220,8 +228,7 @@ impl Sandbox {
     }
 
     fn check_unexpected_message(&self) {
-        let sended = self.inner.lock().unwrap().sended.pop_front();
-        if let Some((addr, msg)) = sended {
+        if let Some((addr, msg)) = self.inner.lock().unwrap().sent.pop_front() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
@@ -234,17 +241,15 @@ impl Sandbox {
 
     pub fn p(&self, id: usize) -> PublicKey {
         self.validators()[id]
-        // &self.validators[id].0
     }
 
     pub fn s(&self, id: usize) -> &SecretKey {
         let p = self.p(id);
         &self.validators_map[&p]
-        // &self.validators[id].1
     }
 
     pub fn a(&self, id: usize) -> SocketAddr {
-        self.addresses[id].clone()
+        self.addresses[id]
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
@@ -273,7 +278,7 @@ impl Sandbox {
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let sended = self.inner.lock().unwrap().sended.pop_front();
+        let sended = self.inner.lock().unwrap().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
@@ -290,13 +295,22 @@ impl Sandbox {
         }
     }
 
-    // TODO: add self-test for broadcasting?
     pub fn broadcast<T: Message>(&self, msg: T) {
+        self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
+    }
+
+    // TODO: add self-test for broadcasting?
+    pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: T, addresses: I)
+        where I: IntoIterator<Item = &'a SocketAddr>
+    {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let mut set: HashSet<SocketAddr> =
-            HashSet::from_iter(self.addresses.iter().skip(1).cloned());
-        for _ in 0..self.n_validators() - 1 {
-            let sended = self.inner.lock().unwrap().sended.pop_front();
+
+        // If node is excluded from validators, then it still will broadcast messages.
+        // So in that case we should not skip addresses and validators count.
+        let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
+
+        for _ in 0..expected_set.len() {
+            let sended = self.inner.lock().unwrap().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
@@ -305,33 +319,40 @@ impl Sandbox {
                            any_real_msg,
                            real_addr)
                 }
-                if !set.contains(&real_addr) {
+                if !expected_set.contains(&real_addr) {
                     panic!("Double send the same message {:?} to {:?} during broadcasting",
                            any_expected_msg,
                            real_addr)
                 } else {
-                    set.remove(&real_addr);
+                    expected_set.remove(&real_addr);
                 }
             } else {
                 panic!("Expected to broadcast the message {:?} but someone don't recieve \
                         messages: {:?}",
                        any_expected_msg,
-                       set);
+                       expected_set);
             }
         }
+    }
+
+    pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
+        self.broadcast(Status::new(&self.node_public_key(),
+                                   height,
+                                   block_hash,
+                                   &self.node_secret_key()));
     }
 
     pub fn add_time(&self, duration: Duration) {
         self.check_unexpected_message();
         let now = {
             let mut inner = self.inner.lock().unwrap();
-            inner.time = inner.time + duration;
+            inner.time += duration;
             inner.time
         };
         // handle timeouts if occurs
         loop {
             let timeout = {
-                let ref mut timers = self.inner.lock().unwrap().timers;
+                let timers = &mut self.inner.lock().unwrap().timers;
                 if let Some(TimerPair(time, timeout)) = timers.pop() {
                     if time > now {
                         timers.push(TimerPair(time, timeout));
@@ -386,7 +407,7 @@ impl Sandbox {
         let view = self.reactor.borrow().handler.blockchain.view();
         let schema = Schema::new(&view);
         let schema_transactions = schema.transactions();
-        let res: Vec<RawTransaction> = txs.into_iter()
+        txs.into_iter()
             .filter(|elem| {
                 let hash_elem = elem.hash();
                 if unique_set.contains(&hash_elem) {
@@ -398,15 +419,14 @@ impl Sandbox {
                 }
                 true
             })
-            .map(|elem| elem.clone())
-            .collect::<Vec<_>>();
-        res
+            .cloned()
+            .collect()
     }
     /// Extract state_hash from fake block
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
         where I: IntoIterator<Item = &'a RawTransaction>
     {
-        let ref blockchain = self.reactor.borrow().handler.blockchain;
+        let blockchain = &self.reactor.borrow().handler.blockchain;
         let (hashes, tx_pool) = {
             let mut pool = TxPool::new();
             let mut hashes = Vec::new();
@@ -430,12 +450,11 @@ impl Sandbox {
             db.merge(&patch);
             db
         };
-        Schema::new(&view)
-            .last_block()
-            .unwrap()
-            .unwrap()
-            .state_hash()
-            .clone()
+        *Schema::new(&view)
+             .last_block()
+             .unwrap()
+             .unwrap()
+             .state_hash()
     }
 
     pub fn get_proof_to_service_table(&self,
@@ -508,36 +527,34 @@ impl Sandbox {
             .leader(self.current_round())
     }
 
-    pub fn assert_state(&self, height: Height, round: Round) {
+    pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
         let reactor = self.reactor.borrow();
-        let ref state = reactor.handler.state();
+        let state = &reactor.handler.state();
 
         let achual_height = state.height();
         let actual_round = state.round();
-        assert!(achual_height == height,
-                "Incorrect height, actual={}, expected={}",
-                achual_height,
-                height);
-        assert!(actual_round == round,
-                "Incorrect round, actual={}, expected={}",
-                actual_round,
-                round);
+        assert_eq!(achual_height, expected_height);
+        assert_eq!(actual_round, expected_round);
     }
 
-    pub fn assert_lock(&self, round: Round, hash: Option<Hash>) {
+    pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
         let reactor = self.reactor.borrow();
         let state = reactor.handler.state();
 
         let actual_round = state.locked_round();
         let actual_hash = state.locked_propose();
-        assert!(actual_round == round,
-                "Incorrect round, actual={}, expected={}",
-                actual_round,
-                round);
-        assert!(actual_hash == hash,
-                "Incorrect hash, actual={:?}, expected={:?}",
-                actual_hash,
-                hash);
+        assert_eq!(actual_round, expected_round);
+        assert_eq!(actual_hash, expected_hash);
+    }
+
+    fn node_public_key(&self) -> PublicKey {
+        let reactor = self.reactor.borrow();
+        *reactor.public_key()
+    }
+
+    fn node_secret_key(&self) -> SecretKey {
+        let reactor = self.reactor.borrow();
+        reactor.secret_key().clone()
     }
 }
 
@@ -576,9 +593,10 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let config = Configuration {
         listener: ListenerConfig {
-            address: addresses[0].clone(),
-            public_key: validators[0].0.clone(),
+            address: addresses[0],
+            public_key: validators[0].0,
             secret_key: validators[0].1.clone(),
+            whitelist: Default::default(),
         },
         network: NetworkConfiguration::default(),
         events: EventsConfiguration::new(),
@@ -588,9 +606,9 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     // TODO use factory or other solution like set_handler or run
 
     let inner = Arc::new(Mutex::new(SandboxInner {
-                                        address: addresses[0].clone(),
+                                        address: addresses[0],
                                         time: UNIX_EPOCH + Duration::new(1486720340, 0),
-                                        sended: VecDeque::new(),
+                                        sent: VecDeque::new(),
                                         events: VecDeque::new(),
                                         timers: BinaryHeap::new(),
                                     }));
@@ -619,6 +637,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
+    let _ = init_logger();
     sandbox_with_services(vec![Box::new(TimestampingService::new()),
                                Box::new(ConfigUpdateService::new())])
 }

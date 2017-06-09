@@ -6,7 +6,6 @@ use hyper::header::{ContentType, SetCookie};
 use cookie::Cookie as CookiePair;
 use router::Router;
 use serde_json;
-use serde_json::value::ToJson;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 
@@ -14,22 +13,26 @@ use std::ops::Deref;
 use std::marker::PhantomData;
 use std::io;
 use std::collections::BTreeMap;
+use std::fmt;
 
-use exonum::events::Error as EventsError;
-use exonum::crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash, ToHex};
-use exonum::storage::{Result as StorageResult, Error as StorageError};
+use events::Error as EventsError;
+use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
+use serialize::ToHex;
+use storage::{Result as StorageResult, Error as StorageError};
+
 
 #[derive(Debug)]
 pub enum ApiError {
+    Service(Box<::std::error::Error + Send + Sync>),
     Storage(StorageError),
     Events(EventsError),
     FromHex(FromHexError),
     Io(::std::io::Error),
     FileNotFound(Hash),
     NotFound,
-    FileToBig,
+    FileTooBig,
     FileExists(Hash),
-    IncorrectRequest,
+    IncorrectRequest(Box<::std::error::Error + Send + Sync>),
     Unauthorized,
 }
 
@@ -42,15 +45,16 @@ impl ::std::fmt::Display for ApiError {
 impl ::std::error::Error for ApiError {
     fn description(&self) -> &str {
         match *self {
-            ApiError::Storage(_) => "Storage",
-            ApiError::Events(_) => "Events",
-            ApiError::FromHex(_) => "FromHex",
-            ApiError::Io(_) => "Io",
+            ApiError::Service(ref error) |
+            ApiError::IncorrectRequest(ref error) => error.description(),
+            ApiError::Storage(ref error) => error.description(),
+            ApiError::Events(ref error) => error.description(),
+            ApiError::FromHex(ref error) => error.description(),
+            ApiError::Io(ref error) => error.description(),
             ApiError::FileNotFound(_) => "FileNotFound",
             ApiError::NotFound => "NotFound",
-            ApiError::FileToBig => "FileToBig",
+            ApiError::FileTooBig => "FileToBig",
             ApiError::FileExists(_) => "FileExists",
-            ApiError::IncorrectRequest => "IncorrectRequest",
             ApiError::Unauthorized => "Unauthorized",
         }
     }
@@ -85,12 +89,10 @@ impl From<ApiError> for IronError {
         use std::error::Error;
 
         let mut body = BTreeMap::new();
-        body.insert("type", e.description().into());
+        body.insert("debug", format!("{:?}", e));
+        body.insert("description", e.description().to_string());
         let code = match e {
-            ApiError::FileExists(hash) => {
-                body.insert("hash", ToHex::to_hex(&hash));
-                status::Conflict
-            }
+            ApiError::FileExists(hash) |
             ApiError::FileNotFound(hash) => {
                 body.insert("hash", ToHex::to_hex(&hash));
                 status::Conflict
@@ -99,7 +101,7 @@ impl From<ApiError> for IronError {
         };
         IronError {
             error: Box::new(e),
-            response: Response::with((code, body.to_json().to_string())),
+            response: Response::with((code, ::serde_json::to_string_pretty(&body).unwrap())),
         }
     }
 }
@@ -120,7 +122,7 @@ impl<T> Deref for HexField<T>
 impl<T> Serialize for HexField<T>
     where T: AsRef<[u8]> + Clone
 {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
         ser.serialize_str(&self.0.as_ref().to_hex())
@@ -133,12 +135,16 @@ struct HexVisitor<T>
     _p: PhantomData<T>,
 }
 
-impl<T> Visitor for HexVisitor<T>
+impl<'v, T> Visitor<'v> for HexVisitor<T>
     where T: AsRef<[u8]> + HexValue + Clone
 {
     type Value = HexField<T>;
 
-    fn visit_str<E>(&mut self, s: &str) -> Result<HexField<T>, E>
+    fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(fmt, "expected hex represented string")
+    }
+
+    fn visit_str<E>(self, s: &str) -> Result<HexField<T>, E>
         where E: de::Error
     {
         let v = T::from_hex(s)
@@ -147,11 +153,11 @@ impl<T> Visitor for HexVisitor<T>
     }
 }
 
-impl<T> Deserialize for HexField<T>
+impl<'de, T> Deserialize<'de> for HexField<T>
     where T: AsRef<[u8]> + HexValue + Clone
 {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
-        where D: Deserializer
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where D: Deserializer<'de>
     {
         deserializer.deserialize_str(HexVisitor { _p: PhantomData })
     }
@@ -164,15 +170,12 @@ pub trait Api {
                                       -> StorageResult<Vec<u8>> {
         if let Some(&Cookie(ref cookies)) = request.headers.get() {
             for cookie in cookies.iter() {
-                match CookiePair::parse(cookie.as_str()) {
-                    Ok(c) => {
-                        if c.name() == key {
-                            if let Ok(value) = HexValue::from_hex(c.value()) {
-                                return Ok(value);
-                            }
+                if let Ok(c) = CookiePair::parse(cookie.as_str()) {
+                    if c.name() == key {
+                        if let Ok(value) = HexValue::from_hex(c.value()) {
+                            return Ok(value);
                         }
                     }
-                    Err(_) => {}
                 }
             }
         }
@@ -182,10 +185,10 @@ pub trait Api {
     fn load_keypair_from_cookies(&self,
                                  request: &Request)
                                  -> Result<(PublicKey, SecretKey), ApiError> {
-        let public_key = PublicKey::from_slice(self.load_hex_value_from_cookie(&request,
+        let public_key = PublicKey::from_slice(self.load_hex_value_from_cookie(request,
                                                                                "public_key")?
                                                    .as_ref());
-        let secret_key = SecretKey::from_slice(self.load_hex_value_from_cookie(&request,
+        let secret_key = SecretKey::from_slice(self.load_hex_value_from_cookie(request,
                                                                                "secret_key")?
                                                    .as_ref());
 
@@ -218,8 +221,8 @@ mod tests {
     use router::Router;
     use serde_json;
 
-    use exonum::blockchain::Block;
-    use exonum::crypto::Hash;
+    use blockchain::Block;
+    use crypto::Hash;
 
     use super::*;
 
@@ -238,9 +241,9 @@ mod tests {
             }
         }
         let stub = SampleAPI;
-        let result = stub.ok_response(&serde_json::to_value(str_val));
+        let result = stub.ok_response(&serde_json::to_value(str_val).unwrap());
         assert!(result.is_ok());
-        let result = stub.ok_response(&serde_json::to_value(complex_val));
+        let result = stub.ok_response(&serde_json::to_value(&complex_val).unwrap());
         assert!(result.is_ok());
         print!("{:?}", result);
     }

@@ -1,11 +1,17 @@
 #[macro_export]
 macro_rules! storage_value {
-    ($name:ident {
+    (
+    $(#[$attr:meta])*
+    struct $name:ident {
         const SIZE = $body:expr;
 
-        $($field_name:ident : $field_type:ty [$from:expr => $to:expr])*
+        $(
+        $(#[$field_attr:meta])*
+        field $field_name:ident : $field_type:ty [$from:expr => $to:expr]
+        )*
     }) => (
         #[derive(Clone, PartialEq)]
+        $(#[$attr])*
         pub struct $name {
             raw: Vec<u8>
         }
@@ -20,7 +26,9 @@ macro_rules! storage_value {
                 $crate::messages::Field::write(&self.raw, buffer, from, to);
             }
 
-            fn check(buffer: &'a [u8], from_st_val: usize, to_st_val: usize) -> Result<(), $crate::messages::Error> {
+            fn check(buffer: &'a [u8], from_st_val: usize, to_st_val: usize)
+                -> Result<(), $crate::messages::Error>
+            {
 
                 <Vec<u8> as $crate::messages::Field>::check(buffer, from_st_val, to_st_val)?;
                 let vec: Vec<u8> = $crate::messages::Field::read(buffer, from_st_val, to_st_val);
@@ -45,7 +53,7 @@ macro_rules! storage_value {
                 }
             }
 
-            fn hash(&self) -> Hash {
+            fn hash(&self) -> $crate::crypto::Hash {
                 $name::hash(self)
             }
         }
@@ -59,16 +67,19 @@ macro_rules! storage_value {
                 $name { raw: buf }
             }
 
+            #[allow(dead_code)]
             pub fn from_raw(raw: Vec<u8>) -> $name {
                 debug_assert_eq!(raw.len(), $body);
                 $ name { raw: raw }
             }
 
-            pub fn hash(&self) -> Hash {
-                hash(self.raw.as_ref())
+            pub fn hash(&self) -> $crate::crypto::Hash {
+                $crate::crypto::hash(self.raw.as_ref())
             }
 
-            $(pub fn $field_name(&self) -> $field_type {
+            $(
+            $(#[$field_attr])*
+            pub fn $field_name(&self) -> $field_type {
                 use $crate::messages::Field;
                 Field::read(&self.raw, $from, $to)
             })*
@@ -81,6 +92,71 @@ macro_rules! storage_value {
                  $(.field(stringify!($field_name), &self.$field_name()))*
                    .finish()
             }
+        }
+
+        impl $crate::serialize::json::ExonumJsonSerialize for $name {
+                fn serialize<S>(&self, serializer: S)
+                    -> Result<S::Ok, S::Error> where S: ::serde::Serializer
+                {
+                    use ::serde::ser::SerializeStruct;
+                    let mut structure = serializer.serialize_struct(stringify!($name),
+                                                    counter!($($field_name)*))?;
+                    $(
+                        structure.serialize_field(stringify!($field_name),
+                            &$crate::serialize::json::wrap(&self.$field_name()))?;
+                    )*
+                    structure.end()
+                }
+        }
+
+        impl $crate::serialize::json::ExonumJsonDeserializeField for $name {
+            fn deserialize_field<B> (value: &$crate::serialize::json::reexport::Value,
+                                        buffer: & mut B, from: usize, _to: usize )
+                -> Result<(), Box<::std::error::Error>>
+                where B: $crate::serialize::json::WriteBufferWrapper
+            {
+                use $crate::serialize::json::ExonumJsonDeserializeField;
+                let obj = value.as_object().ok_or("Can't cast json as object.")?;
+                $(
+                let val = obj.get(stringify!($field_name)).ok_or("Can't get object from json.")?;
+
+                <$field_type as ExonumJsonDeserializeField>::deserialize_field(val, buffer,
+                                                                from + $from, from + $to )?;
+
+                )*
+                Ok(())
+            }
+        }
+        impl $crate::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &::serde_json::Value) -> Result<Self, Box<::std::error::Error>> {
+                let to = $body;
+                let from = 0;
+                use $crate::serialize::json::ExonumJsonDeserializeField;
+
+                let mut buf = vec![0; $body];
+                <Self as ExonumJsonDeserializeField>::deserialize_field(value, &mut buf, from, to)?;
+                Ok($name { raw: buf })
+            }
+        }
+
+        //\TODO: Rewrite Deserialize and Serializa implementation
+        impl<'de> $crate::serialize::json::reexport::Deserialize<'de> for $name {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where D: $crate::serialize::json::reexport::Deserializer<'de>
+            {
+                use $crate::serialize::json::reexport::{Error, Deserialize, Value};
+                let value = <Value as Deserialize>::deserialize(deserializer)?;
+                <Self as $crate::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
+                .map_err(|_| D::Error::custom("Can not deserialize value."))
+            }
+        }
+
+        impl $crate::serialize::json::reexport::Serialize for $name {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where S: $crate::serialize::json::reexport::Serializer
+                {
+                    $crate::serialize::json::wrap(self).serialize(serializer)
+                }
         }
     )
 }

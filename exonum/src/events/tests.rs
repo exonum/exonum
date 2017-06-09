@@ -177,7 +177,7 @@ impl TestEvents {
 }
 
 pub fn gen_message(id: u16, len: usize) -> RawMessage {
-    let writer = MessageWriter::new(0, id, len);
+    let writer = MessageWriter::new(::messages::PROTOCOL_MAJOR_VERSION, ::messages::TEST_NETWORK_ID, 0, id, len);
     RawMessage::new(writer.sign(&gen_keypair().1))
 }
 
@@ -262,27 +262,27 @@ fn reconnect() {
                 let mut e = e1;
                 e.wait_for_connect(&addrs[1]).unwrap();
 
-                debug!("t1: connection opened");
-                debug!("t1: send m1 to t2");
+                trace!("t1: connection opened");
+                trace!("t1: send m1 to t2");
                 e.send_to(&addrs[1], m1);
-                debug!("t1: wait for m2");
+                trace!("t1: wait for m2");
                 assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m2));
-                debug!("t1: received m2 from t2");
+                trace!("t1: received m2 from t2");
             }
-            debug!("t1: connection closed");
+            trace!("t1: connection closed");
             {
                 let mut e = TestEvents::with_addr(addrs[0]);
                 e.wait_for_bind(&addrs[1]).unwrap();
 
-                debug!("t1: connection reopened");
-                debug!("t1: send m3 to t2");
+                trace!("t1: connection reopened");
+                trace!("t1: send m3 to t2");
                 e.send_to(&addrs[1], m3.clone());
-                debug!("t1: wait for m3");
+                trace!("t1: wait for m3");
                 assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m3));
-                debug!("t1: received m3 from t2");
+                trace!("t1: received m3 from t2");
                 e.process_events().unwrap();
             }
-            debug!("t1: finished");
+            trace!("t1: finished");
         });
     }
 
@@ -296,28 +296,28 @@ fn reconnect() {
                 let mut e = e2;
                 e.wait_for_connect(&addrs[0]).unwrap();
 
-                debug!("t2: connection opened");
-                debug!("t2: send m2 to t1");
+                trace!("t2: connection opened");
+                trace!("t2: send m2 to t1");
                 e.send_to(&addrs[0], m2);
-                debug!("t2: wait for m1");
+                trace!("t2: wait for m1");
                 assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m1));
-                debug!("t2: received m1 from t1");
-                debug!("t2: wait for m3");
+                trace!("t2: received m1 from t1");
+                trace!("t2: wait for m3");
                 assert_eq!(e.wait_for_message(Duration::from_millis(5000)),
                            Some(m3.clone()));
-                debug!("t2: received m3 from t1");
+                trace!("t2: received m3 from t1");
             }
-            debug!("t2: connection closed");
+            trace!("t2: connection closed");
             {
-                debug!("t2: connection reopened");
+                trace!("t2: connection reopened");
                 let mut e = TestEvents::with_addr(addrs[1]);
                 e.wait_for_bind(&addrs[0]).unwrap();
 
-                debug!("t2: send m3 to t1");
+                trace!("t2: send m3 to t1");
                 e.send_to(&addrs[0], m3.clone());
                 e.wait_for_disconnect(Duration::from_millis(5000)).unwrap();
             }
-            debug!("t2: finished");
+            trace!("t2: finished");
         });
     }
 

@@ -1,10 +1,12 @@
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(test, feature(test))]
+//! Exonum blockchain framework.
+//!
+//! For more information see the project readme.
 
-#![cfg_attr(feature="clippy", allow(zero_prefixed_literal))]
+#![deny(missing_debug_implementations)]
 
-#![feature(inclusive_range_syntax)]
+#![cfg_attr(all(feature = "nightly", test), feature(test))]
+
+#![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
 #![cfg_attr(feature="flame_profile",feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_profile",plugin(flamer))]
@@ -16,7 +18,6 @@ extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
 extern crate leveldb;
-extern crate num;
 extern crate rand;
 extern crate serde;
 #[macro_use]
@@ -28,11 +29,22 @@ extern crate bit_vec;
 extern crate vec_map;
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(test)]
+#[cfg(all(feature = "nightly", test))]
 extern crate test;
-#[cfg(test)]
 extern crate env_logger;
+extern crate colored;
+extern crate term;
+extern crate clap;
+extern crate hyper;
+extern crate iron;
+extern crate router;
+extern crate bodyparser;
+extern crate params;
+extern crate cookie;
+extern crate mount;
 
+#[macro_use]
+pub mod serialize;
 #[macro_use]
 pub mod messages;
 pub mod events;
@@ -41,6 +53,10 @@ pub mod node;
 pub mod storage;
 pub mod blockchain;
 pub mod config;
+pub mod explorer;
+pub mod helpers;
+pub mod api;
+
 
 // TODO: temp module
 pub mod storage2;

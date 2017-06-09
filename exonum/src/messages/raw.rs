@@ -83,10 +83,10 @@ pub struct MessageWriter {
 }
 
 impl MessageWriter {
-    pub fn new(service_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
+    pub fn new(protocol_version: u8, network_id: u8, service_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
         let mut raw = MessageWriter { raw: vec![0; HEADER_SIZE + payload_length] };
-        raw.set_network_id(TEST_NETWORK_ID);
-        raw.set_version(PROTOCOL_MAJOR_VERSION);
+        raw.set_network_id(network_id);
+        raw.set_version(protocol_version);
         raw.set_service_id(service_id);
         raw.set_message_type(message_type);
         raw
@@ -162,30 +162,3 @@ impl Message for RawMessage {
         verify(self.signature(), self.body(), pub_key)
     }
 }
-
-// #[test]
-// fn test_empty_message() {
-//     let raw = MessageBuffer::empty();
-//     assert_eq!(raw.network_id(), 0);
-//     assert_eq!(raw.version(), 0);
-//     assert_eq!(raw.message_type(), 0);
-//     assert_eq!(raw.payload_length(), 0);
-// }
-
-// #[test]
-// fn test_as_mut() {
-//     let mut raw = MessageBuffer::empty();
-//     {
-//         let bytes = raw.as_mut();
-//         bytes[0] = 1;
-//         bytes[1] = 2;
-//         bytes[2] = 3;
-//         bytes[3] = 0;
-//         bytes[4] = 5;
-//         bytes[5] = 6;
-//     }
-//     assert_eq!(raw.network_id(), 1);
-//     assert_eq!(raw.version(), 2);
-//     assert_eq!(raw.message_type(), 3);
-//     assert_eq!(raw.payload_length(), 1541);
-// }

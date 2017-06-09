@@ -1,18 +1,24 @@
+extern crate rand;
 extern crate exonum;
 extern crate sandbox;
 #[macro_use]
 extern crate log;
+extern crate env_logger;
+
+use rand::{thread_rng, Rng};
 
 use std::time::Duration;
+use std::collections::BTreeMap;
 
-use exonum::messages::{Message, Propose, Prevote, Precommit, RequestPropose, RequestTransactions,
-                       RequestPrevotes, BitVec, CONSENSUS};
-use exonum::crypto::{Hash, gen_keypair};
-use exonum::blockchain::{Block, Blockchain};
+use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, RequestPropose,
+                       RequestTransactions, RequestPrevotes, BitVec, CONSENSUS};
+use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
+use exonum::blockchain::{Block, Blockchain, Schema};
 use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
                           REQUEST_TRANSACTIONS_TIMEOUT};
+use exonum::storage::Map;
 
-use sandbox::timestamping::{TimestampTx, TIMESTAMPING_SERVICE};
+use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox_tests_helper::*;
 use sandbox::config_updater::TxConfig;
@@ -43,7 +49,7 @@ fn test_queue_message_from_future_round() {
                                    sandbox.s(VALIDATOR_0 as usize)));
 }
 
-/// idea of the test is to verify that at certain periodic rounds we (validator_0) become a leader
+/// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
 /// assumption: in some loops current node becomes a leader
 #[test]
 fn test_check_leader() {
@@ -97,7 +103,7 @@ fn test_reach_one_height_repeatable() {
 }
 
 /// idea of the test is to reach some height
-/// assumptions: status timeout and request_peers timeout are not handled in thi stest,
+/// assumptions: status timeout and `request_peers` timeout are not handled in this test,
 /// so, according timeouts should be big enough not to occur
 #[test]
 fn test_reach_thirteen_height() {
@@ -121,9 +127,7 @@ fn test_query_state_hash() {
         let state_hash = sandbox.last_state_hash();
         let configs_rh = sandbox.get_configs_root_hash().unwrap();
         let configs_key = Blockchain::service_table_unique_key(CONSENSUS, 0);
-        // let timestamp_t1_rh = FIRST_TABLE_HASH;
         let timestamp_t1_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 0);
-        // let timestamp_t2_rh = SECOND_TABLE_HASH;
         let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
 
         let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0).unwrap();
@@ -187,13 +191,45 @@ fn test_retrieve_block_and_precommits() {
                     .raw()
                     .verify_signature(&sandbox.p(precommit.validator() as usize)));
     }
-    // let json_str = serde_json::to_string(&bl_proof_option.unwrap()).unwrap();
-    // println!("{}", &json_str);
     let bl_proof_option = sandbox.block_and_precommits(target_height).unwrap();
     assert!(bl_proof_option.is_none());
+}
 
-    // let validators = sandbox.validators.iter().map(|pair| pair.0 ).collect::<Vec<_>>();
-    // println!("validators public keys: {}", &serde_json::to_string(&validators).unwrap());
+#[test]
+fn test_store_txs_positions() {
+    let mut rng = thread_rng();
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    let data_size = 20;
+    let generator = TimestampingTxGenerator::with_keypair(data_size,
+                                                          gen_keypair_from_seed(&Seed::new([11;
+                                                                                            32])));
+
+    let committed_height = rng.gen_range(2, 30u64);
+    {
+        for _ in 1..committed_height {
+            add_one_height(&sandbox, &sandbox_state)
+        }
+    }
+    let num_txs = rng.gen_range(3, 100);
+    let committed_block1 = generator
+        .take(num_txs)
+        .map(|tx| (tx.hash(), tx.raw().clone()))
+        .collect::<BTreeMap<Hash, RawMessage>>();
+    let hashes = committed_block1.keys().collect::<Vec<_>>();
+
+    add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
+    sandbox.assert_state(committed_height + 1, ROUND_ONE);
+
+    let view = sandbox.blockchain_ref().view();
+    let schema = Schema::new(&view);
+    let locations = schema.tx_location_by_tx_hash();
+    for (expected_idx, hash) in hashes.iter().enumerate() {
+        let location = locations.get(hash).unwrap().unwrap();
+        assert_eq!(expected_idx as u64, location.position_in_block());
+        assert_eq!(committed_height, location.block_height());
+    }
 }
 
 /// idea of the scenario is to:
@@ -201,7 +237,7 @@ fn test_retrieve_block_and_precommits() {
 /// - queue it
 /// - reach that first height
 /// - handle queued Prevote
-/// - and observe RequestPropose for queued Prevote
+/// - and observe `RequestPropose` for queued `Prevote`
 #[test]
 #[should_panic(expected = "Send unexpected message Request(RequestPropose")]
 fn test_queue_prevote_message_from_next_height() {
@@ -227,18 +263,20 @@ fn test_queue_prevote_message_from_next_height() {
 /// - reach that first height
 /// - handle queued Propose
 /// - and observe Prevote for queued Propose
-/// check line from NodeHandler.handle_consensus()
-/// case msg.height() == self.state.height() + 1
+/// check line from `NodeHandler.handle_consensus()`
+/// case `msg.height() == self.state.height() + 1`
 #[test]
 #[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
+    let _ = env_logger::init();
+
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
     // get some tx
     let tx = gen_timestamping_tx();
 
-    // this commented code is saved because it may be used later
+    // TODO: this commented code is saved because it may be used later
     //    let block_at_first_height = Block::new(HEIGHT_ZERO, ROUND_FOUR, future_propose_time,
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
@@ -258,20 +296,20 @@ fn test_queue_propose_message_from_next_height() {
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
 
-    println!("last_block={:#?}, hash={:?}",
-             sandbox.last_block(),
-             sandbox.last_block().hash());
-    println!("proposed_block={:#?}, hash={:?}",
-             block_at_first_height,
-             block_at_first_height.hash());
+    info!("last_block={:#?}, hash={:?}",
+          sandbox.last_block(),
+          sandbox.last_block().hash());
+    info!("proposed_block={:#?}, hash={:?}",
+          block_at_first_height,
+          block_at_first_height.hash());
 
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     sandbox.add_time(Duration::from_millis(0));
 }
 
 /// idea of scenario is to check line // Ignore messages from previous and future height
-/// from NodeHandler.handle_consensus()
-/// case msg.height() > self.state.height() + 1
+/// from `NodeHandler.handle_consensus()`
+/// case `msg.height() > self.state.height() + 1`
 #[test]
 fn test_ignore_message_from_far_height() {
     let sandbox = timestamping_sandbox();
@@ -285,8 +323,8 @@ fn test_ignore_message_from_far_height() {
 }
 
 /// idea of scenario is to check line // Ignore messages from previous and future height
-/// from NodeHandler.handle_consensus()
-/// case msg.height() < self.state.height()
+/// from `NodeHandler.handle_consensus()`
+/// case `msg.height() < self.state.height()`
 #[test]
 fn test_ignore_message_from_prev_height() {
     let sandbox = timestamping_sandbox();
@@ -309,6 +347,8 @@ fn test_ignore_message_from_prev_height() {
 /// - send prevote when lock=0 for known propose
 #[test]
 fn positive_get_propose_send_prevote() {
+    let _ = env_logger::init();
+
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -327,7 +367,7 @@ fn positive_get_propose_send_prevote() {
                                    LOCK_ZERO,
                                    sandbox.s(VALIDATOR_0 as usize)));
 
-    println!("time: {:?}", sandbox.time());
+    info!("time: {:?}", sandbox.time());
 }
 
 #[test]
@@ -530,9 +570,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
         .build();
 
-    let block = BlockBuilder::new(&sandbox)
-        .with_tx_hash(&tx.hash())
-        .build();
+    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
 
     let precommit_1 = Precommit::new(VALIDATOR_1,
                                      HEIGHT_ONE,
@@ -607,6 +645,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
     sandbox.recv(precommit_2.clone());
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
 
     {
         // respond to RequestTransactions
@@ -870,7 +909,7 @@ fn lock_to_propose_when_get_2_3_prevote_positive() {
 /// idea: lock to propose from past round and observe broadcast Prevote
 /// LOCK
 /// - Send prevote
-///     - round < current_round
+///     - round < `current_round`
 #[test]
 fn lock_to_past_round_broadcast_prevote() {
     let sandbox = timestamping_sandbox();
@@ -945,11 +984,11 @@ fn lock_to_past_round_broadcast_prevote() {
 
 /// HANDLE PRECOMMIT //all are done
 /// - Request prevotes
-///     - if msg.round > locked round    //covered in handle_precommit_remove_request_prevotes()
+///     - if `msg.round` > locked round    // covered in `handle_precommit_remove_request_prevotes`
 /// idea of the scenario:
 ///   - obtain lock
 ///   - receive precommit in same round
-///   - verify that RequestPrevotes are absent
+///   - verify that `RequestPrevotes` are absent
 #[test]
 fn handle_precommit_remove_request_prevotes() {
     let sandbox = timestamping_sandbox();
@@ -1105,8 +1144,8 @@ fn lock_to_propose_and_send_prevote() {
 ///         - remove prevote request
 /// idea of the scenario:
 ///  - just obtain lock
-///  - wait REQUEST_PREVOTES_WAIT
-///  - verify that RequestPrevotes request is absent (it would have been observed without
+///  - wait `REQUEST_PREVOTES_TIMEOUT`
+///  - verify that `RequestPrevotes` request is absent (it would have been observed without
 ///    last block with appropriate comment)
 #[test]
 fn lock_remove_request_prevotes() {
@@ -1165,7 +1204,7 @@ fn lock_remove_request_prevotes() {
 }
 
 /// scenario: // HANDLE PRECOMMIT positive scenario
-///         - Our block_hash different from precommits one.
+///         - Our `block_hash` is different from the precommits one.
 #[test]
 #[should_panic(expected = "Our block_hash different from precommits one.")]
 fn handle_precommit_different_block_hash() {
@@ -1208,9 +1247,9 @@ fn handle_precommit_different_block_hash() {
     sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
     sandbox.recv(propose.clone());
     sandbox.recv(tx.clone());
     sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
@@ -1262,9 +1301,9 @@ fn handle_precommit_positive_scenario_commit() {
     sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
 
 
     sandbox.recv(precommit_2.clone());
@@ -1272,9 +1311,9 @@ fn handle_precommit_positive_scenario_commit() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_2));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_2));
     sandbox.recv(propose.clone());
     sandbox.recv(tx.clone());
     sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
@@ -1284,16 +1323,17 @@ fn handle_precommit_positive_scenario_commit() {
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
     sandbox.add_time(Duration::from_millis(0));
 }
 
 /// LOCK
-/// - Send precommit when get lock   //covered in lock_to_propose_when_get_2_3_prevote_positive()
+/// - Send precommit when get lock   // covered in `lock_to_propose_when_get_2_3_prevote_positive`
 /// - if haven’t incompatible prevotes
 ///     - if has +2/3 precommits
 ///         - remove precommit request //todo this idea is unreachable because there are no
-///           any places in the code where RequestPrecommit is added
-///         - COMMIT //covered in test_reach_one_height
+///           any places in the code where `RequestPrecommit` is added
+///         - COMMIT // covered in `test_reach_one_height`
 ///         -> not send prevotes after commit
 ///
 /// idea of the scenario:
@@ -1304,7 +1344,7 @@ fn handle_precommit_positive_scenario_commit() {
 ///  - increment round
 ///  - observe absence of broadcast prevote(because lock is committed already) message
 /// idea of alternate scenario
-/// (this scenario will occur if comment block of code with precommit_2 and uncomment
+/// (this scenario will occur if comment block of code with `precommit_2` and uncomment
 /// last broadcast of Prevote):
 ///  - receive single precommit
 ///  - receive prevotes => make lock
@@ -1343,9 +1383,9 @@ fn lock_not_send_prevotes_after_commit() {
         sandbox.recv(precommit_1.clone());
         sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
         sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                     make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                     make_request_propose_from_precommit(&sandbox, &precommit_1));
         sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                     make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                     make_request_prevote_from_precommit(&sandbox, &precommit_1));
     }
 
     {
@@ -1356,9 +1396,9 @@ fn lock_not_send_prevotes_after_commit() {
         // because this condition is checked at node/mod.rs->actual_round()
         sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
         sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                     make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                     make_request_propose_from_precommit(&sandbox, &precommit_2));
         sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                     make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                     make_request_prevote_from_precommit(&sandbox, &precommit_2));
     }
 
 
@@ -1389,6 +1429,7 @@ fn lock_not_send_prevotes_after_commit() {
                                          &block.hash(),
                                          sandbox.time(),
                                          sandbox.s(VALIDATOR_0 as usize)));
+        sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
     }
 
 
@@ -1452,9 +1493,9 @@ fn do_not_commit_if_propose_is_unknown() {
     sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
 
 
     sandbox.recv(precommit_2.clone());
@@ -1462,9 +1503,9 @@ fn do_not_commit_if_propose_is_unknown() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_2));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_2));
     // !! if this propose would be received, commit would occur and last assert will
     // require height one
     //    sandbox.recv(propose.clone());
@@ -1522,9 +1563,9 @@ fn do_not_commit_if_tx_is_unknown() {
     sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
 
 
     sandbox.recv(precommit_2.clone());
@@ -1532,9 +1573,9 @@ fn do_not_commit_if_tx_is_unknown() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_2));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_2));
 
     sandbox.recv(propose.clone());
     // !! if this tx would be received, commit would occur and last assert will require height one
@@ -1548,16 +1589,16 @@ fn do_not_commit_if_tx_is_unknown() {
 }
 
 /// scenario: // HANDLE PRECOMMIT
-///         - purpose of the test is to check add_unknown_propose_with_precommits()
+///         - purpose of the test is to check `add_unknown_propose_with_precommits()`
 ///         - scenario:
 ///             - get 3 precommits => majority precommits are observed =>
-///               add_unknown_propose_with_precommits() is called
-///             - then receive valid tx and Propose in order to call has_full_propose() =>
-///               commit using state.unknown_propose_with_precommits
-///         - it appeared that this test is almost same as handle_precommit_positive_scenario_commit
-///         the only difference that is in handle_precommit_positive_scenario_commit propose and
-///         tx are received after second precommit and here propose and tx are received
-///         after third precommit
+///               `add_unknown_propose_with_precommits()` is called
+///             - then receive valid tx and Propose in order to call `has_full_propose()` =>
+///               commit using `state.unknown_propose_with_precommits`
+///         - it appeared that this test is almost the same as
+///         `handle_precommit_positive_scenario_commit` the only difference that is in
+///         `handle_precommit_positive_scenario_commit` propose and tx are received after second
+///         precommit and here propose and tx are received after third precommit
 #[test]
 fn commit_using_unknown_propose_with_precommits() {
     let sandbox = timestamping_sandbox();
@@ -1601,9 +1642,9 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
 
 
     sandbox.recv(precommit_2.clone());
@@ -1611,17 +1652,17 @@ fn commit_using_unknown_propose_with_precommits() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_2));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_2));
 
     //here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_3.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_3));
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_3.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_3));
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
 
@@ -1634,23 +1675,23 @@ fn commit_using_unknown_propose_with_precommits() {
                                    &propose.hash(),
                                    LOCK_ZERO,
                                    sandbox.s(VALIDATOR_0 as usize)));
-
+    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
 
     sandbox.add_time(Duration::from_millis(0));
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 }
 
 /// scenario: // HANDLE PRECOMMIT
-///         - purpose of the test is to check add_unknown_propose_with_precommits()
+///         - purpose of the test is to check `add_unknown_propose_with_precommits()`
 ///         - scenario:
 ///             - get 3 precommits (!! with block with wrong state hash) => majority precommits
-///               are observed => add_unknown_propose_with_precommits() is called
-///             - then receive valid tx and Propose in order to call has_full_propose() =>
+///               are observed => `add_unknown_propose_with_precommits()` is called
+///             - then receive valid tx and Propose in order to call `has_full_propose()` =>
 ///               fall with "Full propose: wrong state hash"
-///         - it appeared that this test is almost same as handle_precommit_positive_scenario_commit
-///         the only difference that is in handle_precommit_positive_scenario_commit propose and
-///         tx are received after second precommit and here propose and tx are received
-///         after third precommit
+///         - it appeared that this test is almost the same as
+///         `handle_precommit_positive_scenario_commit` the only difference that is in
+///         `handle_precommit_positive_scenario_commit` propose and tx are received after second
+///         precommit and here propose and tx are received after third precommit
 #[test]
 #[should_panic(expected = "Full propose: wrong state hash")]
 fn has_full_propose_wrong_state_hash() {
@@ -1696,9 +1737,9 @@ fn has_full_propose_wrong_state_hash() {
     sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
 
 
     sandbox.recv(precommit_2.clone());
@@ -1706,17 +1747,17 @@ fn has_full_propose_wrong_state_hash() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_2));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_2));
 
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_3.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_3));
     sandbox.send(sandbox.a(VALIDATOR_3 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_3.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_3));
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
     //    let tmp_propose = ProposeBuilder::new(&sandbox)
@@ -1799,14 +1840,14 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
 /// - same as positive scenario, but
 ///     - start from 1 height
 ///     - one precommit get from 0 round and queue it
-/// - code is based on handle_precommit_positive_scenario_commit()
+/// - code is based on `handle_precommit_positive_scenario_commit()`
 /// with folowing updates:
 ///     - use manually created tx because we need to know which tx will be used
-///       in add_one_height() function
-///         - take into account that in add_one_height() tx will be generated
-///         and in add_one_height_with_transaction tx is taken as param
+///       in `add_one_height()` function
+///         - take into account that in `add_one_height()` tx will be generated
+///         and in `add_one_height_with_transaction` tx is taken as param
 ///     - predict & calculate blocks which would be created in
-///       handle_precommit_positive_scenario_commit() on zero and one heights
+///       `handle_precommit_positive_scenario_commit()` on zero and one heights
 ///     - if we know block from 1st height we can construct valid precommit for 1st height and
 ///       receive it earlier: on zero height.
 ///     this early precommit will be queued and will be used after 1st height will be achieved
@@ -1884,9 +1925,9 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     //    sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
 
 
     sandbox.recv(precommit_2.clone());
@@ -1894,9 +1935,9 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_2));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_2));
 
     sandbox.recv(height_one_propose.clone());
     sandbox.broadcast(Prevote::new(VALIDATOR_0,
@@ -1910,6 +1951,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
     sandbox.assert_state(HEIGHT_THREE, ROUND_ONE);
+    sandbox.check_broadcast_status(HEIGHT_THREE, &second_block.hash());
     sandbox.add_time(Duration::from_millis(0));
 
     // update blockchain with new block
@@ -1984,18 +2026,18 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
 
     sandbox.recv(precommit_2.clone());
     // second addition is required in order to make sandbox time >= propose time because
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_2));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_2));
 
     {
         // get propose and appropriate transaction
@@ -2010,7 +2052,11 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.assert_state(current_height, current_round);
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
-    sandbox.assert_state(current_height + 1, ROUND_ONE);
+
+    let new_height = current_height + 1;
+    sandbox.assert_state(new_height, ROUND_ONE);
+    sandbox.check_broadcast_status(new_height, &block.hash());
+
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         //        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
@@ -2030,7 +2076,7 @@ fn commit_as_leader_send_propose_round_timeout() {
 /// idea of test is:
 /// - to receive propose with unknown tx
 /// - receive that tx, so, all required txs are present
-/// - call node/consensus.rs->has_full_propose() => broadcast prevote
+/// - call `node/consensus.rs->has_full_propose()` => broadcast prevote
 #[test]
 fn handle_tx_has_full_propose() {
     let sandbox = timestamping_sandbox();
@@ -2130,7 +2176,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
 /// - Ignore if height and round are not the same
 /// scenario:
 ///  - make commit at first round
-///  - and verify that at moment when first round_timeout is triggered, round remains the same
+///  - and verify that at moment when first `round_timeout` is triggered, round remains the same
 #[test]
 fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     let sandbox = timestamping_sandbox();
@@ -2174,9 +2220,9 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     sandbox.recv(precommit_1.clone());
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_1));
     sandbox.send(sandbox.a(VALIDATOR_1 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_1.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_1));
 
 
     sandbox.recv(precommit_2.clone());
@@ -2184,9 +2230,9 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     // this condition is checked at node/mod.rs->actual_round()
     sandbox.add_time(Duration::from_millis(REQUEST_PROPOSE_TIMEOUT));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_propose_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_propose_from_precommit(&sandbox, &precommit_2));
     sandbox.send(sandbox.a(VALIDATOR_2 as usize),
-                 make_request_prevote_from_precommit(&sandbox, precommit_2.clone()));
+                 make_request_prevote_from_precommit(&sandbox, &precommit_2));
     sandbox.recv(propose.clone());
     sandbox.recv(tx.clone());
     sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
@@ -2195,6 +2241,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
     sandbox.recv(precommit_3.clone());
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
     sandbox.add_time(Duration::from_millis(0));
 
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 2 * REQUEST_PROPOSE_TIMEOUT));
@@ -2248,7 +2295,7 @@ fn test_send_propose_and_prevote_when_we_are_leader() {
 /// - send prevote if locked to propose
 /// idea:
 ///  - lock to propose
-///  - trigger round_timeout
+///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
 #[test]
 fn handle_round_timeout_send_prevote_if_locked_to_propose() {
@@ -2313,7 +2360,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - handle queued messages
 /// idea:
 ///  - lock to propose
-///  - trigger round_timeout
+///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
 #[test]
 #[should_panic(expected = "Send unexpected message Request(RequestPropose")]
@@ -2335,7 +2382,7 @@ fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
     sandbox.add_time(Duration::from_millis(0));
 }
 
-// - exclude validator from consensus
+/// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus
 /// - node continues as `fullnode`
 #[test]
@@ -2355,7 +2402,7 @@ fn test_exclude_validator_from_consensus() {
         TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
                       &consensus_cfg.clone().serialize(),
                       consensus_cfg.actual_from,
-                      &sandbox.s(VALIDATOR_0 as usize))
+                      sandbox.s(VALIDATOR_0 as usize))
     };
 
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
@@ -2364,6 +2411,72 @@ fn test_exclude_validator_from_consensus() {
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
 }
 
+/// - Check `following_configuration` method in schema
+/// - idea of the test is check configurations method from schema
+#[test]
+fn test_schema_config_changes() {
+    use exonum::storage::StorageValue;
+
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    add_one_height(&sandbox, &sandbox_state);
+
+    let (tx_cfg, following_cfg) = {
+        let mut consensus_cfg = sandbox.cfg();
+        consensus_cfg.consensus.txs_block_limit = 2000;
+        consensus_cfg.actual_from = sandbox.current_height() + 2;
+
+        let tx = TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
+                               &consensus_cfg.clone().serialize(),
+                               consensus_cfg.actual_from,
+                               sandbox.s(VALIDATOR_0 as usize));
+        (tx, consensus_cfg)
+    };
+    let prev_cfg = sandbox.cfg();
+
+    // Check configuration from genesis block
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .actual_configuration()
+                   .unwrap(),
+               prev_cfg);
+    // Try to get configuration from non exists height
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .configuration_by_height(HEIGHT_FOUR)
+                   .unwrap(),
+               prev_cfg);
+    // Commit a new configuration
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    // Check that following configuration is visible
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .following_configuration()
+                   .unwrap(),
+               Some(following_cfg.clone()));
+    // Make following configuration actual
+    add_one_height(&sandbox, &sandbox_state);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
+    // Check that following configuration becomes actual
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .actual_configuration()
+                   .unwrap(),
+               following_cfg);
+    // Check previous configuration
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .previous_configuration()
+                   .unwrap()
+                   .unwrap(),
+               prev_cfg);
+
+    // Finally check configuration for some heights
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .configuration_by_height(HEIGHT_ZERO)
+                   .unwrap(),
+               prev_cfg);
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+                   .configuration_by_height(sandbox.current_height())
+                   .unwrap(),
+               following_cfg);
+}
 
 // - lock to propose when get +2/3 prevote
 //     - only if propose is known     - covered in request_propose_when_get_prevote()
