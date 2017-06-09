@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
                        RequestPrevotes, BitVec};
 use exonum::blockchain::Block;
-use exonum::crypto::{Hash, HASH_SIZE, hash};
+use exonum::crypto::{Hash, HASH_SIZE};
 use exonum::events::Milliseconds;
 use exonum::node::ValidatorId;
 use exonum::storage::Database;

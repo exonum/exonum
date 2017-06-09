@@ -225,7 +225,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                     // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
             }
-            None => return MapProof::Empty,
+            None => MapProof::Empty,
         }
     }
 
