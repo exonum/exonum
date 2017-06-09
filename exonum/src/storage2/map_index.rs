@@ -2,6 +2,7 @@ use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
 
+
 pub struct MapIndex<T, K, V> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,

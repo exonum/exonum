@@ -1,28 +1,28 @@
 use crypto::{Hash, hash, HASH_SIZE};
 
 use super::super::{StorageKey, StorageValue};
-use super::key::{ProofMapKey, ChildKind, KEY_SIZE, DB_KEY_SIZE};
+use super::key::{DBKey, ChildKind, KEY_SIZE, DB_KEY_SIZE};
 
-// TODO: implement Field for ProofMapKey and define BranchNode as StorageValue
+// TODO: implement Field for DBKey and define BranchNode as StorageValue
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
 
-enum Node<T: StorageValue> {
+pub enum Node<T: StorageValue> {
     Leaf(T),
     Branch(BranchNode),
 }
 
 #[derive(Clone)]
-struct BranchNode {
+pub struct BranchNode {
     raw: Vec<u8>,
 }
 
 impl BranchNode {
-    fn empty() -> BranchNode {
+    pub fn empty() -> BranchNode {
         BranchNode { raw: vec![0; BRANCH_NODE_SIZE] }
     }
 
-    fn child_hash(&self, kind: ChildKind) -> &Hash {
+    pub fn child_hash(&self, kind: ChildKind) -> &Hash {
         unsafe {
             let from = match kind {
                 ChildKind::Right => HASH_SIZE,
@@ -32,15 +32,15 @@ impl BranchNode {
         }
     }
 
-    fn child_slice(&self, kind: ChildKind) -> ProofMapKey {
+    pub fn child_slice(&self, kind: ChildKind) -> DBKey {
         let from = match kind {
             ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
         };
-        ProofMapKey::read(&self.raw[from..from + DB_KEY_SIZE])
+        DBKey::read(&self.raw[from..from + DB_KEY_SIZE])
     }
 
-    fn set_child_slice(&mut self, kind: ChildKind, prefix: &ProofMapKey) {
+    pub fn set_child_slice(&mut self, kind: ChildKind, prefix: &DBKey) {
         let from = match kind {
             ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
@@ -48,7 +48,7 @@ impl BranchNode {
         prefix.write(&mut self.raw[from..from + DB_KEY_SIZE]);
     }
 
-    fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
+    pub fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
         unsafe {
             let from = match kind {
                 ChildKind::Right => HASH_SIZE,
@@ -58,7 +58,7 @@ impl BranchNode {
         }
     }
 
-    fn set_child(&mut self, kind: ChildKind, prefix: &ProofMapKey, hash: &Hash) {
+    pub fn set_child(&mut self, kind: ChildKind, prefix: &DBKey, hash: &Hash) {
         self.set_child_slice(kind, prefix);
         self.set_child_hash(kind, hash);
     }

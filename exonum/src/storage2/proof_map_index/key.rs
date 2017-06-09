@@ -1,6 +1,6 @@
 use std::cmp::min;
 
-use crypto::HASH_SIZE;
+use crypto::{Hash, PublicKey, HASH_SIZE};
 
 use super::super::StorageKey;
 
@@ -10,13 +10,18 @@ pub const LEAF_KEY_PREFIX: u8 = 01;
 pub const KEY_SIZE: usize = HASH_SIZE;
 pub const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 
+pub trait ProofMapKey : StorageKey {}
+
+impl ProofMapKey for Hash {}
+impl ProofMapKey for PublicKey {}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ChildKind {
     Left,
     Right,
 }
 
-pub struct ProofMapKey {
+pub struct DBKey {
     data: [u8; KEY_SIZE],
     from: u16,
     to: u16,
@@ -33,28 +38,36 @@ impl ::std::ops::Not for ChildKind {
     }
 }
 
-impl ProofMapKey {
+impl DBKey {
     /// Create a new bit slice from the given binary data.
-    fn from_bytes(bytes: &[u8]) -> ProofMapKey {
-        debug_assert!(bytes.len() <= KEY_SIZE);
+    pub fn leaf<K: ProofMapKey>(key: &K) -> DBKey {
+        debug_assert!(K::size() == KEY_SIZE);
 
         let mut data = [0; KEY_SIZE];
-        data[0..bytes.len()].copy_from_slice(bytes);
-        ProofMapKey { data: data, from: 0, to: (bytes.len() * 8) as u16 }
+        key.write(&mut data);
+        DBKey { data: data, from: 0, to: KEY_SIZE as u16 }
     }
 
-    /// Length of the `ProofMapKey`
-    fn len(&self) -> u16 {
+    pub fn from(&self) -> u16 {
+        self.from
+    }
+
+    pub fn to(&self) -> u16 {
+        self.to
+    }
+
+    /// Length of the `DBKey`
+    pub fn len(&self) -> u16 {
         self.to - self.from
     }
 
-    /// Returns true if `ProofMapKey` has zero length
-    fn is_empty(&self) -> bool {
+    /// Returns true if `DBKey` has zero length
+    pub fn is_empty(&self) -> bool {
         self.to == self.from
     }
 
     /// Get bit at position `idx`.
-    fn get(&self, idx: u16) -> ChildKind {
+    pub fn get(&self, idx: u16) -> ChildKind {
         debug_assert!(!self.is_empty() && idx < self.to);
 
         let pos = self.from + idx;
@@ -68,20 +81,20 @@ impl ProofMapKey {
         }
     }
 
-    /// Shortens this ProofMapKey to the specified length.
-    fn prefix(&self, mid: u16) -> ProofMapKey {
-        ProofMapKey { data: self.data, from: self.from, to: self.from + mid }
+    /// Shortens this DBKey to the specified length.
+    pub fn prefix(&self, mid: u16) -> DBKey {
+        DBKey { data: self.data, from: self.from, to: self.from + mid }
     }
 
     /// Return object which represents a view on to this slice (further) offset by `i` bits.
-    fn suffix(&self, mid: u16) -> ProofMapKey {
+    pub fn suffix(&self, mid: u16) -> DBKey {
         debug_assert!(self.from + mid <= self.to);
 
-        ProofMapKey { data: self.data, from: self.from + mid, to: self.to }
+        DBKey { data: self.data, from: self.from + mid, to: self.to }
     }
 
     /// Returns how many bits at the beginning matches with `other`
-    fn common_prefix(&self, other: &Self) -> u16 {
+    pub fn common_prefix(&self, other: &Self) -> u16 {
         // We assume that all slices created from byte arrays with the same length
         if self.from != other.from {
             0
@@ -102,19 +115,25 @@ impl ProofMapKey {
     }
 
     /// Returns true if we starts with the same prefix at the whole of `Other`
-    fn starts_with(&self, other: &Self) -> bool {
+    pub fn starts_with(&self, other: &Self) -> bool {
         self.common_prefix(other) == other.len()
     }
 
     /// Returns true if self.to not changed
-    fn is_leaf(&self) -> bool {
+    pub fn is_leaf(&self) -> bool {
         debug_assert!(self.from == 0);
 
         self.to == KEY_SIZE as u16
     }
 }
 
-impl StorageKey for ProofMapKey {
+impl AsRef<[u8]> for DBKey {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl StorageKey for DBKey {
     fn size() -> usize {
         DB_KEY_SIZE
     }
@@ -139,19 +158,19 @@ impl StorageKey for ProofMapKey {
             BRANCH_KEY_PREFIX => buffer[DB_KEY_SIZE - 1] as u16,
             _ => unreachable!("wrong key prefix")
         };
-        ProofMapKey { data: data, from: 0, to: to }
+        DBKey { data: data, from: 0, to: to }
     }
 }
 
-impl PartialEq for ProofMapKey {
+impl PartialEq for DBKey {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.starts_with(other)
     }
 }
 
-impl ::std::fmt::Debug for ProofMapKey {
+impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "ProofMapKey(")?;
+        write!(f, "DBKey(")?;
         for i in self.to..self.from {
             write!(f, "{}", match self.get(i) {
                 ChildKind::Left => '0',
