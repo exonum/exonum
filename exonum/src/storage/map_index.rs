@@ -11,17 +11,17 @@ pub struct MapIndex<T, K, V> {
 
 #[derive(Debug)]
 pub struct MapIndexIter<'a, K, V> {
-    base_iter: BaseIndexIter<'a, K, V>
+    base_iter: BaseIndexIter<'a, K, V>,
 }
 
 #[derive(Debug)]
 pub struct MapIndexKeys<'a, K> {
-    base_iter: BaseIndexIter<'a, K, ()>
+    base_iter: BaseIndexIter<'a, K, ()>,
 }
 
 #[derive(Debug)]
 pub struct MapIndexValues<'a, V> {
-    base_iter: BaseIndexIter<'a, (), V>
+    base_iter: BaseIndexIter<'a, (), V>,
 }
 
 impl<T, K, V> MapIndex<T, K, V> {
@@ -34,9 +34,11 @@ impl<T, K, V> MapIndex<T, K, V> {
     }
 }
 
-impl<T, K, V> MapIndex<T, K, V> where T: AsRef<Snapshot>,
-                                      K: StorageKey,
-                                      V: StorageValue {
+impl<T, K, V> MapIndex<T, K, V>
+    where T: AsRef<Snapshot>,
+          K: StorageKey,
+          V: StorageValue
+{
     pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(key)
     }
@@ -70,8 +72,10 @@ impl<T, K, V> MapIndex<T, K, V> where T: AsRef<Snapshot>,
     }
 }
 
-impl<'a, K, V> MapIndex<&'a mut Fork, K, V> where K: StorageKey,
-                                                  V: StorageValue {
+impl<'a, K, V> MapIndex<&'a mut Fork, K, V>
+    where K: StorageKey,
+          V: StorageValue
+{
     pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value)
     }
@@ -85,9 +89,11 @@ impl<'a, K, V> MapIndex<&'a mut Fork, K, V> where K: StorageKey,
     }
 }
 
-impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V> where T: AsRef<Snapshot>,
-                                                                            K: StorageKey,
-                                                                            V: StorageValue {
+impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
+    where T: AsRef<Snapshot>,
+          K: StorageKey,
+          V: StorageValue
+{
     type Item = (K, V);
     type IntoIter = MapIndexIter<'a, K, V>;
 
@@ -96,8 +102,10 @@ impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V> where T: A
     }
 }
 
-impl<'a, K, V> Iterator for MapIndexIter<'a, K, V> where K: StorageKey,
-                                                         V: StorageValue, {
+impl<'a, K, V> Iterator for MapIndexIter<'a, K, V>
+    where K: StorageKey,
+          V: StorageValue
+{
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -105,7 +113,9 @@ impl<'a, K, V> Iterator for MapIndexIter<'a, K, V> where K: StorageKey,
     }
 }
 
-impl<'a, K> Iterator for MapIndexKeys<'a, K> where K: StorageKey {
+impl<'a, K> Iterator for MapIndexKeys<'a, K>
+    where K: StorageKey
+{
     type Item = K;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -113,11 +123,12 @@ impl<'a, K> Iterator for MapIndexKeys<'a, K> where K: StorageKey {
     }
 }
 
-impl<'a, V> Iterator for MapIndexValues<'a, V> where V: StorageValue {
+impl<'a, V> Iterator for MapIndexValues<'a, V>
+    where V: StorageValue
+{
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(.., v)| v)
     }
 }
-

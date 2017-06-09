@@ -35,7 +35,7 @@ pub struct ProofListIndex<T, V> {
 
 #[derive(Debug)]
 pub struct ProofListIndexIter<'a, V> {
-    base_iter: BaseIndexIter<'a, ProofListKey, V>
+    base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
 impl<T, V> ProofListIndex<T, V> {
@@ -43,7 +43,7 @@ impl<T, V> ProofListIndex<T, V> {
         ProofListIndex {
             base: BaseIndex::new(prefix, base),
             length: Cell::new(None),
-            _v: PhantomData
+            _v: PhantomData,
         }
     }
 }
@@ -55,8 +55,10 @@ pub fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
     hash(&v)
 }
 
-impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
-                                      V: StorageValue {
+impl<T, V> ProofListIndex<T, V>
+    where T: AsRef<Snapshot>,
+          V: StorageValue
+{
     fn has_branch(&self, key: ProofListKey) -> bool {
         debug_assert!(key.height() > 0);
 
@@ -83,7 +85,7 @@ impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
 
     fn construct_proof(&self, key: ProofListKey, from: u64, to: u64) -> ListProof<V> {
         if key.height() == 1 {
-            return ListProof::Leaf(self.get(key.index()).unwrap())
+            return ListProof::Leaf(self.get(key.index()).unwrap());
         }
         let middle = key.first_right_leaf_index();
         if to <= middle {
@@ -105,7 +107,7 @@ impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
     pub fn last(&self) -> Option<V> {
         match self.len() {
             0 => None,
-            l => self.get(l - 1)
+            l => self.get(l - 1),
         }
     }
 
@@ -115,7 +117,7 @@ impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
 
     pub fn len(&self) -> u64 {
         if let Some(len) = self.length.get() {
-            return len
+            return len;
         }
         let len = self.base.get(&()).unwrap_or(0);
         self.length.set(Some(len));
@@ -137,11 +139,15 @@ impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
     pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
         if to > self.len() {
             panic!("illegal range boundaries: \
-                    the len is {:?}, but the range end is {:?}", self.len(), to)
+                    the len is {:?}, but the range end is {:?}",
+                   self.len(),
+                   to)
         }
         if to <= from {
             panic!("illegal range boundaries: \
-                    the range start is {:?}, but the range end is {:?}", from, to)
+                    the range start is {:?}, but the range end is {:?}",
+                   from,
+                   to)
         }
 
         self.construct_proof(self.root_key(), from, to)
@@ -156,7 +162,9 @@ impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
     }
 }
 
-impl<'a, V> ProofListIndex<&'a mut Fork, V> where V: StorageValue {
+impl<'a, V> ProofListIndex<&'a mut Fork, V>
+    where V: StorageValue
+{
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
         self.length.set(Some(len));
@@ -186,7 +194,9 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V> where V: StorageValue {
         }
     }
 
-    pub fn extend<I>(&mut self, iter: I) where I: IntoIterator<Item=V> {
+    pub fn extend<I>(&mut self, iter: I)
+        where I: IntoIterator<Item = V>
+    {
         for value in iter {
             self.push(value)
         }
@@ -195,7 +205,9 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V> where V: StorageValue {
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
             panic!("index out of bounds: \
-                    the len is {} but the index is {}", self.len(), index);
+                    the len is {} but the index is {}",
+                   self.len(),
+                   index);
         }
         let mut key = ProofListKey::new(1, index);
         self.base.put(&key, value.hash());
@@ -219,8 +231,10 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V> where V: StorageValue {
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V> where T: AsRef<Snapshot>,
-                                                                            V: StorageValue {
+impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
+    where T: AsRef<Snapshot>,
+          V: StorageValue
+{
     type Item = V;
     type IntoIter = ProofListIndexIter<'a, V>;
 
@@ -229,11 +243,12 @@ impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V> where T: A
     }
 }
 
-impl<'a, V> Iterator for ProofListIndexIter<'a, V> where V: StorageValue {
+impl<'a, V> Iterator for ProofListIndexIter<'a, V>
+    where V: StorageValue
+{
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(_, v)| v)
     }
 }
-

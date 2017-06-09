@@ -36,9 +36,7 @@ fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
         (k, v)
     };
 
-    (0..len)
-        .map(kv_generator)
-        .collect::<Vec<_>>()
+    (0..len).map(kv_generator).collect::<Vec<_>>()
 }
 
 // Makes large data set with unique keys
@@ -60,9 +58,7 @@ fn generate_fully_random_data_keys(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)>
         (new_key, v)
     };
 
-    (0..len)
-        .map(kv_generator)
-        .collect::<Vec<_>>()
+    (0..len).map(kv_generator).collect::<Vec<_>>()
 }
 
 #[test]
@@ -282,8 +278,8 @@ fn build_proof_in_empty_tree() {
     let mut storage = MemoryDB::new().fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
 
-    table.put(&[230;32], vec![1]); //just to notify the compiler of the types used; same key is added and then removed from tree
-    table.remove(&[230;32]);
+    table.put(&[230; 32], vec![1]); //just to notify the compiler of the types used; same key is added and then removed from tree
+    table.remove(&[230; 32]);
 
     let search_res = table.get_proof(&[244; 32]);
     match search_res {
@@ -309,7 +305,9 @@ fn build_proof_in_leaf_tree() {
     let proof_path = table.get_proof(&searched_key);
 
     {
-        let check_res = proof_path.verify_root_proof_consistency(&searched_key, table_root).unwrap();
+        let check_res = proof_path
+            .verify_root_proof_consistency(&searched_key, table_root)
+            .unwrap();
         assert!(check_res.is_none());
     }
 
@@ -324,7 +322,9 @@ fn build_proof_in_leaf_tree() {
     let proof_path = table.get_proof(&root_key);
     assert_eq!(table_root, proof_path.compute_proof_root());
     {
-        let check_res = proof_path.verify_root_proof_consistency(&root_key, table_root).unwrap();
+        let check_res = proof_path
+            .verify_root_proof_consistency(&root_key, table_root)
+            .unwrap();
         assert_eq!(check_res.unwrap(), &root_val);
     }
     match proof_path {
@@ -338,10 +338,13 @@ fn build_proof_in_leaf_tree() {
 
 #[test]
 fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
-    let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(100).into_iter().map(|el| {
-        let (key, val) = el;
-        (hash(&key), hash(&val))
-    }).collect::<Vec<_>>();
+    let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(100)
+        .into_iter()
+        .map(|el| {
+                 let (key, val) = el;
+                 (hash(&key), hash(&val))
+             })
+        .collect::<Vec<_>>();
 
     let mut storage = MemoryDB::new().fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);

@@ -5,7 +5,7 @@ use super::{Database, Snapshot, Patch, Change, Iter, Result};
 
 #[derive(Default, Clone, Debug)]
 pub struct MemoryDB {
-    map: BTreeMap<Vec<u8>, Vec<u8>>
+    map: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
 impl MemoryDB {
@@ -26,8 +26,12 @@ impl Database for MemoryDB {
     fn merge(&mut self, patch: Patch) -> Result<()> {
         for (key, change) in patch {
             match change {
-                Change::Put(value) => { self.map.insert(key, value); },
-                Change::Delete => { self.map.remove(&key); }
+                Change::Put(value) => {
+                    self.map.insert(key, value);
+                }
+                Change::Delete => {
+                    self.map.remove(&key);
+                }
             }
         }
         Ok(())
@@ -46,6 +50,8 @@ impl Snapshot for MemoryDB {
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         use std::collections::Bound::*;
         let range = (Included(from), Unbounded);
-        Box::new(self.map.range::<[u8], _>(range).map(|(k, v)| (k.as_slice(), v.as_slice())))
+        Box::new(self.map
+                     .range::<[u8], _>(range)
+                     .map(|(k, v)| (k.as_slice(), v.as_slice())))
     }
 }

@@ -12,7 +12,7 @@ pub struct ListIndex<T, V> {
 
 #[derive(Debug)]
 pub struct ListIndexIter<'a, V> {
-    base_iter: BaseIndexIter<'a, u64, V>
+    base_iter: BaseIndexIter<'a, u64, V>,
 }
 
 impl<T, V> ListIndex<T, V> {
@@ -20,13 +20,15 @@ impl<T, V> ListIndex<T, V> {
         ListIndex {
             base: BaseIndex::new(prefix, base),
             length: Cell::new(None),
-            _v: PhantomData
+            _v: PhantomData,
         }
     }
 }
 
-impl<T, V> ListIndex<T, V> where T: AsRef<Snapshot>,
-                                 V: StorageValue {
+impl<T, V> ListIndex<T, V>
+    where T: AsRef<Snapshot>,
+          V: StorageValue
+{
     pub fn get(&self, index: u64) -> Option<V> {
         self.base.get(&index)
     }
@@ -34,7 +36,7 @@ impl<T, V> ListIndex<T, V> where T: AsRef<Snapshot>,
     pub fn last(&self) -> Option<V> {
         match self.len() {
             0 => None,
-            l => self.get(l - 1)
+            l => self.get(l - 1),
         }
     }
 
@@ -44,7 +46,7 @@ impl<T, V> ListIndex<T, V> where T: AsRef<Snapshot>,
 
     pub fn len(&self) -> u64 {
         if let Some(len) = self.length.get() {
-            return len
+            return len;
         }
         let len = self.base.get(&()).unwrap_or(0);
         self.length.set(Some(len));
@@ -60,7 +62,9 @@ impl<T, V> ListIndex<T, V> where T: AsRef<Snapshot>,
     }
 }
 
-impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
+impl<'a, V> ListIndex<&'a mut Fork, V>
+    where V: StorageValue
+{
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
         self.length.set(Some(len));
@@ -85,7 +89,9 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
         }
     }
 
-    pub fn extend<I>(&mut self, iter: I) where I: IntoIterator<Item=V> {
+    pub fn extend<I>(&mut self, iter: I)
+        where I: IntoIterator<Item = V>
+    {
         let mut len = self.len();
         for value in iter {
             self.base.put(&len, value);
@@ -105,7 +111,9 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
             panic!("index out of bounds: \
-                    the len is {} but the index is {}", self.len(), index);
+                    the len is {} but the index is {}",
+                   self.len(),
+                   index);
         }
         self.base.put(&index, value)
     }
@@ -116,8 +124,10 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V> where T: AsRef<Snapshot>,
-                                                                       V: StorageValue {
+impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
+    where T: AsRef<Snapshot>,
+          V: StorageValue
+{
     type Item = V;
     type IntoIter = ListIndexIter<'a, V>;
 
@@ -126,7 +136,9 @@ impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V> where T: AsRef<
     }
 }
 
-impl<'a, V> Iterator for ListIndexIter<'a, V> where V: StorageValue {
+impl<'a, V> Iterator for ListIndexIter<'a, V>
+    where V: StorageValue
+{
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {

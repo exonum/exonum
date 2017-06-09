@@ -1,18 +1,21 @@
 use super::super::StorageKey;
 
-const HEIGHT_SHIFT : u64 = 56;
-const MAX_INDEX : u64 = 72057594037927935; // 2 ** 56 - 1
+const HEIGHT_SHIFT: u64 = 56;
+const MAX_INDEX: u64 = 72057594037927935; // 2 ** 56 - 1
 
 #[derive(Debug, Copy, Clone)]
 pub struct ProofListKey {
     index: u64,
-    height: u8
+    height: u8,
 }
 
 impl ProofListKey {
     pub fn new(height: u8, index: u64) -> Self {
         debug_assert!(height <= 58 && index <= MAX_INDEX);
-        Self { height: height, index: index }
+        Self {
+            height: height,
+            index: index,
+        }
     }
 
     pub fn height(&self) -> u8 {

@@ -1,4 +1,4 @@
-use ::crypto::{Hash, hash};
+use crypto::{Hash, hash};
 use super::super::{Database, MemoryDB, StorageValue};
 use super::{ProofListIndex, ListProof, pair_hash};
 
@@ -103,38 +103,86 @@ fn test_list_index_proof() {
 
     assert_eq!(index.root_hash(), h0);
     assert_eq!(index.get_proof(0), Leaf(2));
-    assert_eq!(index.get_proof(0).validate(index.root_hash(), index.len()).unwrap(), [(0, &2)]);
+    assert_eq!(index
+                   .get_proof(0)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(0, &2)]);
 
     index.push(4u64);
     assert_eq!(index.root_hash(), h01);
     assert_eq!(index.get_proof(0), Left(Box::new(Leaf(2)), Some(h1)));
-    assert_eq!(index.get_proof(0).validate(index.root_hash(), index.len()).unwrap(), [(0, &2)]);
+    assert_eq!(index
+                   .get_proof(0)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(0, &2)]);
     assert_eq!(index.get_proof(1), Right(h0, Box::new(Leaf(4))));
-    assert_eq!(index.get_proof(1).validate(index.root_hash(), index.len()).unwrap(), [(1, &4)]);
+    assert_eq!(index
+                   .get_proof(1)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(1, &4)]);
 
-    assert_eq!(index.get_range_proof(0, 2), Full(Box::new(Leaf(2)), Box::new(Leaf(4))));
-    assert_eq!(index.get_range_proof(0, 2).validate(index.root_hash(), index.len()).unwrap(), [(0, &2), (1, &4)]);
+    assert_eq!(index.get_range_proof(0, 2),
+               Full(Box::new(Leaf(2)), Box::new(Leaf(4))));
+    assert_eq!(index
+                   .get_range_proof(0, 2)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(0, &2), (1, &4)]);
 
     index.push(6u64);
     assert_eq!(index.root_hash(), h012);
-    assert_eq!(index.get_proof(0), Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22)));
-    assert_eq!(index.get_proof(0).validate(index.root_hash(), index.len()).unwrap(), [(0, &2)]);
-    assert_eq!(index.get_proof(1), Left(Box::new(Right(h0, Box::new(Leaf(4)))), Some(h22)));
-    assert_eq!(index.get_proof(1).validate(index.root_hash(), index.len()).unwrap(), [(1, &4)]);
-    assert_eq!(index.get_proof(2), Right(h01, Box::new(Left(Box::new(Leaf(6)), None))));
-    assert_eq!(index.get_proof(2).validate(index.root_hash(), index.len()).unwrap(), [(2, &6)]);
+    assert_eq!(index.get_proof(0),
+               Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22)));
+    assert_eq!(index
+                   .get_proof(0)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(0, &2)]);
+    assert_eq!(index.get_proof(1),
+               Left(Box::new(Right(h0, Box::new(Leaf(4)))), Some(h22)));
+    assert_eq!(index
+                   .get_proof(1)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(1, &4)]);
+    assert_eq!(index.get_proof(2),
+               Right(h01, Box::new(Left(Box::new(Leaf(6)), None))));
+    assert_eq!(index
+                   .get_proof(2)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(2, &6)]);
 
 
-    assert_eq!(index.get_range_proof(0, 2), Left(Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))), Some(h22)));
-    assert_eq!(index.get_range_proof(0, 2).validate(index.root_hash(), index.len()).unwrap(), [(0, &2), (1, &4)]);
+    assert_eq!(index.get_range_proof(0, 2),
+               Left(Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
+                    Some(h22)));
+    assert_eq!(index
+                   .get_range_proof(0, 2)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(0, &2), (1, &4)]);
 
-    assert_eq!(index.get_range_proof(1, 3), Full(Box::new(Right(h0, Box::new(Leaf(4)))),
-                                                 Box::new(Left(Box::new(Leaf(6)), None))));
-    assert_eq!(index.get_range_proof(1, 3).validate(index.root_hash(), index.len()).unwrap(), [(1, &4), (2, &6)]);
+    assert_eq!(index.get_range_proof(1, 3),
+               Full(Box::new(Right(h0, Box::new(Leaf(4)))),
+                    Box::new(Left(Box::new(Leaf(6)), None))));
+    assert_eq!(index
+                   .get_range_proof(1, 3)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(1, &4), (2, &6)]);
 
-    assert_eq!(index.get_range_proof(0, 3), Full(Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
-                                                 Box::new(Left(Box::new(Leaf(6)), None))));
-    assert_eq!(index.get_range_proof(0, 3).validate(index.root_hash(), index.len()).unwrap(), [(0, &2), (1, &4), (2, &6)]);
+    assert_eq!(index.get_range_proof(0, 3),
+               Full(Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
+                    Box::new(Left(Box::new(Leaf(6)), None))));
+    assert_eq!(index
+                   .get_range_proof(0, 3)
+                   .validate(index.root_hash(), index.len())
+                   .unwrap(),
+               [(0, &2), (1, &4), (2, &6)]);
 }
 
 // #[test]

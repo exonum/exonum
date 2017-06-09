@@ -19,8 +19,10 @@ impl<T, V> Entry<T, V> {
     }
 }
 
-impl<T, V> Entry<T, V> where T: AsRef<Snapshot>,
-                             V: StorageValue {
+impl<T, V> Entry<T, V>
+    where T: AsRef<Snapshot>,
+          V: StorageValue
+{
     pub fn get(&self) -> Option<V> {
         self.base.get(&())
     }
@@ -30,11 +32,16 @@ impl<T, V> Entry<T, V> where T: AsRef<Snapshot>,
     }
 
     pub fn hash(&self) -> Hash {
-        self.base.get::<(), V>(&()).map(|v| v.hash()).unwrap_or_default()
+        self.base
+            .get::<(), V>(&())
+            .map(|v| v.hash())
+            .unwrap_or_default()
     }
 }
 
-impl<'a, V> Entry<&'a mut Fork, V> where V: StorageValue {
+impl<'a, V> Entry<&'a mut Fork, V>
+    where V: StorageValue
+{
     pub fn set(&mut self, value: V) {
         self.base.put(&(), value)
     }
