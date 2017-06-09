@@ -1,6 +1,6 @@
 use serde_json::Value;
 
-use std::collections::{BTreeMap, HashMap, HashSet, BTreeSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
@@ -10,6 +10,7 @@ use crypto::{PublicKey, SecretKey, Hash};
 use storage::Patch;
 use events::Milliseconds;
 use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
+use node::whitelist::Whitelist;
 
 // TODO: replace by in disk tx pool
 const TX_POOL_LIMIT: usize = 20000;
@@ -28,6 +29,7 @@ pub type ValidatorId = u32;
 pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
 
+#[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Connect,
@@ -35,6 +37,7 @@ pub struct State {
     public_key: PublicKey,
     secret_key: SecretKey,
     config: StoredConfiguration,
+    whitelist: Whitelist,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -63,7 +66,7 @@ pub struct State {
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    // maximum of node heigt in consensus messages
+    // maximum of node height in consensus messages
     nodes_max_height: BTreeMap<PublicKey, Height>,
 }
 
@@ -83,6 +86,7 @@ pub enum RequestData {
     Block(Height),
 }
 
+#[derive(Debug)]
 struct RequestState {
     // Number of attempts made.
     retries: u16,
@@ -90,14 +94,13 @@ struct RequestState {
     known_nodes: HashSet<PublicKey>,
 }
 
+#[derive(Debug)]
 pub struct ProposeState {
-    hash: Hash,
     propose: Propose,
-    // FIXME: use HashSet here
-    unknown_txs: BTreeSet<Hash>,
+    unknown_txs: HashSet<Hash>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlockState {
     hash: Hash,
     // Changes that should be made for block committing.
@@ -122,6 +125,7 @@ impl VoteMessage for Prevote {
     }
 }
 
+#[derive(Debug)]
 pub struct Votes<T: VoteMessage> {
     messages: Vec<T>,
     validators: BitVec,
@@ -129,7 +133,6 @@ pub struct Votes<T: VoteMessage> {
 }
 
 impl ValidatorState {
-
     pub fn new(id: ValidatorId) -> ValidatorState {
         ValidatorState {
             id: id,
@@ -192,7 +195,7 @@ impl<T> Votes<T>
 
 impl RequestData {
     pub fn timeout(&self) -> Duration {
-        #![cfg_attr(feature="clippy", allow(match_same_arms))]
+        #![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => REQUEST_PROPOSE_TIMEOUT,
             RequestData::Transactions(..) => REQUEST_TRANSACTIONS_TIMEOUT,
@@ -231,14 +234,14 @@ impl RequestState {
 
 impl ProposeState {
     pub fn hash(&self) -> Hash {
-        self.hash
+        self.propose.hash()
     }
 
     pub fn message(&self) -> &Propose {
         &self.propose
     }
 
-    pub fn unknown_txs(&self) -> &BTreeSet<Hash> {
+    pub fn unknown_txs(&self) -> &HashSet<Hash> {
         &self.unknown_txs
     }
 
@@ -275,10 +278,11 @@ impl BlockState {
 }
 
 impl State {
-    #![cfg_attr(feature="clippy", allow(too_many_arguments))]
+    #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     pub fn new(validator_id: Option<ValidatorId>,
                public_key: PublicKey,
                secret_key: SecretKey,
+               whitelist: Whitelist,
                stored: StoredConfiguration,
                connect: Connect,
                last_hash: Hash,
@@ -290,6 +294,7 @@ impl State {
             validator_state: validator_id.map(ValidatorState::new),
             public_key: public_key,
             secret_key: secret_key,
+            whitelist: whitelist,
             peers: HashMap::new(),
             connections: HashMap::new(),
             height: last_height,
@@ -349,6 +354,10 @@ impl State {
                       .unwrap_or(false)
     }
 
+    pub fn whitelist(&self) -> &Whitelist {
+        &self.whitelist
+    }
+
     pub fn validators(&self) -> &[PublicKey] {
         &self.config.validators
     }
@@ -378,6 +387,7 @@ impl State {
                             .iter()
                             .position(|pk| pk == self.public_key())
                             .map(|id| id as u32);
+        self.whitelist.set_validators(config.validators.iter().cloned());
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
         self.config = config;
@@ -442,8 +452,6 @@ impl State {
     }
 
     pub fn majority_count(&self) -> usize {
-        // FIXME: What if validators count < 4?
-        //self.validators().len() * 2 / 3 + 1
         State::byzantine_majority_count(self.validators().len())
     }
 
@@ -541,17 +549,27 @@ impl State {
 
     pub fn add_transaction(&mut self, tx_hash: Hash, msg: Box<Transaction>) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
+        // if tx is in some of propose, we should add it, or we can stuck on some state
+        let mut high_priority_tx = false;
         for (propose_hash, propose_state) in &mut self.proposes {
-            propose_state.unknown_txs.remove(&tx_hash);
+            high_priority_tx |= propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
                 full_proposes.push((*propose_hash, propose_state.message().round()));
             }
         }
-        self.transactions.insert(tx_hash, msg);
+
         if self.transactions.len() >= TX_POOL_LIMIT {
-            panic!("Too many transactions in pool, txs={}",
-                   self.transactions.len());
+            // but make warn about pool exceeded, even if we should add tx
+            warn!("Too many transactions in pool, txs={}, high_priority={}",
+                  self.transactions.len(),
+                  high_priority_tx);
+            if !high_priority_tx {
+                return full_proposes;
+            }
         }
+
+        self.transactions.insert(tx_hash, msg);
+
         full_proposes
     }
 
@@ -583,9 +601,8 @@ impl State {
         let propose_hash = msg.hash();
         self.proposes.insert(propose_hash,
                              ProposeState {
-                                 hash: propose_hash,
                                  propose: msg,
-                                 unknown_txs: BTreeSet::new(),
+                                 unknown_txs: HashSet::new(),
                              });
 
         propose_hash
@@ -601,7 +618,7 @@ impl State {
                     .iter()
                     .filter(|tx| !txs.contains_key(tx))
                     .cloned()
-                    .collect::<BTreeSet<Hash>>();
+                    .collect::<HashSet<Hash>>();
                 for tx in &unknown_txs {
                     self.unknown_txs
                         .entry(*tx)
@@ -609,7 +626,6 @@ impl State {
                         .push(propose_hash);
                 }
                 Some(e.insert(ProposeState {
-                    hash: propose_hash,
                     propose: msg.clone(),
                     unknown_txs: unknown_txs,
                 }))
@@ -642,7 +658,7 @@ impl State {
             if validator_state.id == msg.validator() {
                 if let Some(other) = validator_state.our_prevotes.insert(msg.round(), msg.clone()) {
                     if &other != msg {
-                        panic!("Trying to send different prevotes for same round, old={:?}, new={:?}",
+                        panic!("Trying to send different prevotes for the same round, old={:?}, new={:?}",
                                 other,
                                 msg);
                     }
@@ -724,7 +740,7 @@ impl State {
     }
 
     pub fn have_incompatible_prevotes(&self) -> bool {
-        for round in self.locked_round + 1...self.round {
+        for round in self.locked_round + 1..self.round + 1 {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {

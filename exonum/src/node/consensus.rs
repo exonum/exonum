@@ -121,6 +121,11 @@ impl<S> NodeHandler<S>
             return;
         }
 
+        if !self.state.whitelist().allow(msg.from()) {
+            error!("Received request message from peer = {:?} which not in whitelist.", msg.from());
+            return;
+        }
+
         trace!("Handle block");
 
         let block = msg.block();
@@ -133,7 +138,9 @@ impl<S> NodeHandler<S>
 
         // Check block content
         if block.prev_hash() != &self.last_block_hash() {
-            error!("Weird block received, block={:?}", msg);
+            error!("Received block prev_hash is distinct from the one in db, \
+                    block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
+                   msg, *block.prev_hash(), self.last_block_hash());
             return;
         }
 
@@ -151,7 +158,7 @@ impl<S> NodeHandler<S>
                 if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                     let hash = tx.hash();
                     if schema.transactions().get(&hash).unwrap().is_some() {
-                        error!("Received block with already commited transaction, block={:?}",
+                        error!("Received block with already committed transaction, block={:?}",
                                msg);
                         return;
                     }
@@ -195,7 +202,7 @@ impl<S> NodeHandler<S>
         // Lock to propose
         // TODO: avoid loop here
         let start_round = ::std::cmp::max(self.state.locked_round() + 1, propose_round);
-        for round in start_round...self.state.round() {
+        for round in start_round..self.state.round() + 1 {
             if self.state.has_majority_prevotes(round, hash) {
                 self.has_majority_prevotes(round, &hash);
             }
@@ -212,9 +219,7 @@ impl<S> NodeHandler<S>
 
             let precommits = self.state
                 .precommits(round, our_block_hash)
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>();
+                .to_vec();
             self.commit(our_block_hash, precommits.iter());
         }
     }
@@ -282,15 +287,13 @@ impl<S> NodeHandler<S>
         // Commit.
         let precommits = self.state
             .precommits(round, our_block_hash)
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+            .to_vec();
         self.commit(our_block_hash, precommits.iter());
     }
 
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
-        for round in prevote_round...self.state.round() {
+        for round in prevote_round..self.state.round() + 1 {
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
                     self.broadcast_prevote(round, &propose_hash);
@@ -363,11 +366,6 @@ impl<S> NodeHandler<S>
             (propose_round, txs_count, txs)
         };
 
-        for tx in new_txs {
-            assert!(tx.verify());
-            self.handle_incoming_tx(tx);
-        }
-
         let height = self.state.height();
         let proposer = self.state.leader(propose_round);
 
@@ -382,6 +380,19 @@ impl<S> NodeHandler<S>
               self.state.transactions().len(),
               block_hash.to_hex(),
               );
+
+        // TODO: reset status timeout.
+        self.broadcast_status();
+        self.add_status_timeout();
+           
+        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, self.blockchain.view());
+        self.state.set_propose_timeout(timeout);
+
+        // Handle queued transactions from services
+        for tx in new_txs {
+            assert!(tx.verify());
+            self.handle_incoming_tx(tx);
+        }
 
         // Add timeout for first round
         self.add_round_timeout();

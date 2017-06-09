@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use crypto::{Hash, PublicKey};
+use crypto::{Hash, PublicKey, Signature};
 use super::{Error, RawMessage, MessageBuffer, BitVec, FromRaw};
 
 pub trait Field<'a> {
@@ -122,6 +122,20 @@ impl<'a> Field<'a> for &'a Hash {
     }
 
     fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Hash {
+        unsafe { mem::transmute(&buffer[from]) }
+    }
+
+    fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
+        buffer[from..to].copy_from_slice(self.as_ref());
+    }
+}
+
+impl<'a> Field<'a> for &'a Signature {
+    fn field_size() -> usize {
+        32
+    }
+
+    fn read(buffer: &'a [u8], from: usize, _: usize) -> &'a Signature {
         unsafe { mem::transmute(&buffer[from]) }
     }
 
@@ -617,21 +631,3 @@ impl<'a> Field<'a> for BitVec {
         <&[u8] as Field>::write(&slice, buffer, from, to);
     }
 }
-
-// impl<'a, T> SegmentField<'a> for &'a [T] where T: Field<'a> {
-//     fn item_size() -> usize {
-//         T::field_size()
-//     }
-
-//     fn from_slice(slice: &'a [u8]) -> Self {
-//         unsafe { ::std::slice::from_raw_parts(slice.as_ptr() as *const T, slice.len() / Self::item_size()) }
-//     }
-
-//     fn as_slice(&self) -> &'a [u8] {
-//         unsafe { ::std::slice::from_raw_parts(self.as_ptr() as *const u8, self.len() * Self::item_size()) }
-//     }
-
-//     fn count(&self) -> u32 {
-//         self.len() as u32
-//     }
-// }

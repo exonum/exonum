@@ -4,7 +4,8 @@ use std::fmt;
 
 use crypto::PublicKey;
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_SIZE};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw,
+                     HEADER_SIZE, TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
 pub use self::error::Error;
 pub use self::fields::{Field, SegmentField};
 pub use self::protocol::*;
@@ -193,7 +194,9 @@ impl Any {
                     REQUEST_BLOCK_MESSAGE_ID => {
                         Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
                     }
-                    _ => panic!("Wrong consensus message type"),
+                    message_type => {
+                        return Err(Error::IncorrectMessageType{ message_type });
+                    }
                 }
             } else {
                 Any::Transaction(raw)

@@ -1,7 +1,7 @@
 extern crate rand;
-extern crate serde;
 #[macro_use]
 extern crate log;
+extern crate env_logger;
 extern crate clap;
 #[macro_use]
 extern crate exonum;

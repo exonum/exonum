@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 
 use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
 use events::Channel;
-use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
 
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
@@ -18,16 +18,17 @@ impl<S> NodeHandler<S>
         //         return;
         //     }
         
-        //FIXME: add whitelist verify public_key
-        
-        let msg = Any::from_raw(raw).unwrap();
-        match msg {
-            Any::Connect(msg) => self.handle_connect(msg),
-            Any::Status(msg) => self.handle_status(msg),
-            Any::Consensus(msg) => self.handle_consensus(msg),
-            Any::Request(msg) => self.handle_request(msg),
-            Any::Block(msg) => self.handle_block(msg),
-            Any::Transaction(msg) => self.handle_tx(msg),
+        match Any::from_raw(raw) {
+            Ok(Any::Connect(msg)) => self.handle_connect(msg),
+            Ok(Any::Status(msg)) => self.handle_status(msg),
+            Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
+            Ok(Any::Request(msg)) => self.handle_request(msg),
+            Ok(Any::Block(msg)) => self.handle_block(msg),
+            Ok(Any::Transaction(msg)) => self.handle_tx(msg),
+            Err(err) => {
+                // TODO: Replace by `err.description()` after #103 is merged.
+                error!("Invalid message received: {:?}", err);
+            }
         }
     }
 
@@ -51,6 +52,12 @@ impl<S> NodeHandler<S>
         if address == self.state.our_connect_message().addr() {
             return;
         }
+
+        if !self.state.whitelist().allow(message.pub_key()) {
+            error!("Received connect message from peer = {:?} which not in whitelist.", message.pub_key());
+            return;
+        }
+
         // Check if we have another connect message from peer with the given public_key
         let public_key = *message.pub_key();
         let mut need_connect = true;
@@ -78,11 +85,16 @@ impl<S> NodeHandler<S>
 
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
+        trace!("HANDLE STATUS: current height = {}, msg height = {}", height, msg.height());
 
-        let peer = msg.from();
+        if !self.state.whitelist().allow(msg.from()) {
+            error!("Received status message from peer = {:?} which not in whitelist.", msg.from());
+            return;
+        }
 
         // Handle message from future height
         if msg.height() > height {
+            let peer = msg.from();
 
             //verify message
             if !msg.verify_signature(peer) {
@@ -102,22 +114,18 @@ impl<S> NodeHandler<S>
 
     pub fn handle_request_peers(&mut self, msg: RequestPeers) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
+        trace!("HANDLE REQUEST PEERS: Sending {:?} peers to {:?}", peers, msg.from());
+
         for peer in peers {
             self.send_to_peer(*msg.from(), peer.raw());
         }
     }
 
-    pub fn handle_status_timeout(&mut self) {
-        let hash = self.blockchain.last_hash().unwrap();
-        // Send status
-        let status = Status::new(self.state.public_key(),
-                                 self.state.height(),
-                                 &hash,
-                                 self.state.secret_key());
-        trace!("Broadcast status: {:?}", status);
-        self.broadcast(status.raw());
-
-        self.add_status_timeout();
+    pub fn handle_status_timeout(&mut self, height: Height) {
+        if self.state.height() == height {
+            self.broadcast_status();
+            self.add_status_timeout();
+        }
     }
 
     pub fn handle_peer_exchange_timeout(&mut self) {
@@ -142,5 +150,15 @@ impl<S> NodeHandler<S>
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
         self.add_peer_exchange_timeout();
+    }
+
+    pub fn broadcast_status(&mut self) {
+        let hash = self.blockchain.last_hash().unwrap();
+        let status = Status::new(self.state.public_key(),
+                                 self.state.height(),
+                                 &hash,
+                                 self.state.secret_key());
+        trace!("Broadcast status: {:?}", status);
+        self.broadcast(status.raw());
     }
 }

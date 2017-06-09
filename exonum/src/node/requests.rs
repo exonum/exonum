@@ -1,6 +1,3 @@
-// FIXME avoiding a bug in clippy.
-#![cfg_attr(feature="clippy", allow(map_clone))]
-
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
                RequestBlock, Block};
 use blockchain::Schema;
@@ -17,6 +14,11 @@ impl<S> NodeHandler<S>
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
         if msg.to() != self.state.public_key() {
+            return;
+        }
+
+        if !self.state.whitelist().allow(msg.from()) {
+            error!("Received request message from peer = {:?} which not in whitelist.", msg.from());
             return;
         }
 
@@ -105,9 +107,7 @@ impl<S> NodeHandler<S>
         let precommits = schema.precommits(&block_hash)
             .values()
             .unwrap()
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+            .to_vec();
         let transactions = schema.block_txs(height)
             .values()
             .unwrap()

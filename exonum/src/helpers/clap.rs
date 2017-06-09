@@ -1,20 +1,16 @@
 use clap::{SubCommand, App, Arg, ArgMatches};
-use log::{LogRecord, LogLevel, SetLoggerError};
-use env_logger::LogBuilder;
-use colored::*;
 
 use std::path::Path;
 use std::marker::PhantomData;
 use std::fs;
-use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::net::SocketAddr;
 
-use exonum::config::ConfigFile;
-use exonum::blockchain::GenesisConfig;
-use exonum::node::NodeConfig;
-use exonum::crypto::gen_keypair;
-use exonum::storage::Storage;
+use config::ConfigFile;
+use node::NodeConfig;
+use storage::Storage;
+use helpers::generate_testnet_config;
 
+#[derive(Debug)]
 pub struct GenerateCommand<'a, 'b>
     where 'a: 'b
 {
@@ -56,9 +52,7 @@ impl<'a, 'b> GenerateCommand<'a, 'b>
     }
 
     pub fn start_port(matches: &'a ArgMatches<'a>) -> Option<u16> {
-        matches
-            .value_of("START_PORT")
-            .map(|p| p.parse().unwrap())
+        matches.value_of("START_PORT").map(|p| p.parse().unwrap())
     }
 
     pub fn execute(matches: &'a ArgMatches<'a>) {
@@ -79,6 +73,7 @@ impl<'a, 'b> GenerateCommand<'a, 'b>
     }
 }
 
+#[derive(Debug)]
 pub struct RunCommand<'a, 'b>
     where 'a: 'b
 {
@@ -90,6 +85,7 @@ impl<'a, 'b> RunCommand<'a, 'b>
 {
     pub fn new() -> App<'a, 'b> {
         SubCommand::with_name("run")
+            .about("Run node with given configuration")
             .arg(Arg::with_name("NODE_CONFIG_PATH")
                      .short("c")
                      .long("node-config")
@@ -100,19 +96,51 @@ impl<'a, 'b> RunCommand<'a, 'b>
             .arg(Arg::with_name("LEVELDB_PATH")
                      .short("d")
                      .long("leveldb-path")
-                     .value_name("LEVELDB_PATH")
                      .help("Use leveldb database with the given path")
+                     .required(false)
+                     .takes_value(true))
+            .arg(Arg::with_name("PUBLIC_API_ADDRESS")
+                     .long("public-api-address")
+                     .help("Listen address for public api")
+                     .required(false)
+                     .takes_value(true))
+            .arg(Arg::with_name("PRIVATE_API_ADDRESS")
+                     .long("private-api-address")
+                     .help("Listen address for private api")
                      .required(false)
                      .takes_value(true))
     }
 
     pub fn node_config_path(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("NODE_CONFIG_PATH").unwrap())
+        matches
+            .value_of("NODE_CONFIG_PATH")
+            .map(Path::new)
+            .expect("Path to node configuration is no setted")
     }
 
     pub fn node_config(matches: &'a ArgMatches<'a>) -> NodeConfig {
         let path = Self::node_config_path(matches);
-        ConfigFile::load(path).unwrap()
+        let mut cfg: NodeConfig = ConfigFile::load(path).unwrap();
+        // Override api options
+        if let Some(addr) = Self::public_api_address(matches) {
+            cfg.api.public_api_address = Some(addr);
+        }
+        if let Some(addr) = Self::private_api_address(matches) {
+            cfg.api.private_api_address = Some(addr);
+        }
+        cfg
+    }
+
+    pub fn public_api_address(matches: &'a ArgMatches<'a>) -> Option<SocketAddr> {
+        matches
+            .value_of("PUBLIC_API_ADDRESS")
+            .map(|s| s.parse().expect("Public api address has incorrect format"))
+    }
+
+    pub fn private_api_address(matches: &'a ArgMatches<'a>) -> Option<SocketAddr> {
+        matches
+            .value_of("PRIVATE_API_ADDRESS")
+            .map(|s| s.parse().expect("Private api address has incorrect format"))
     }
 
     pub fn leveldb_path(matches: &'a ArgMatches<'a>) -> Option<&'a Path> {
@@ -121,7 +149,7 @@ impl<'a, 'b> RunCommand<'a, 'b>
 
     #[cfg(not(feature="memorydb"))]
     pub fn db(matches: &'a ArgMatches<'a>) -> Storage {
-        use exonum::storage::{LevelDB, LevelDBOptions};
+        use storage::{LevelDB, LevelDBOptions};
 
         let path = Self::leveldb_path(matches).unwrap();
         let mut options = LevelDBOptions::new();
@@ -131,85 +159,7 @@ impl<'a, 'b> RunCommand<'a, 'b>
 
     #[cfg(feature="memorydb")]
     pub fn db(_: &'a ArgMatches<'a>) -> Storage {
-        use exonum::storage::MemoryDB;
+        use storage::MemoryDB;
         MemoryDB::new()
     }
-}
-
-fn has_colors() -> bool {
-    use term::terminfo::TerminfoTerminal;
-    use term::Terminal;
-    use std::io;
-
-    let out = io::stderr();
-    if let Some(term) = TerminfoTerminal::new(out) {
-        term.supports_color()
-    } else {
-        false
-    }
-}
-
-pub fn init_logger() -> Result<(), SetLoggerError> {
-    let format = |record: &LogRecord| {
-        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-        let now = (ts.as_secs() * 1000 + ts.subsec_nanos() as u64 / 1000000).to_string();
-
-        if has_colors() {
-            let level = match record.level() {
-                LogLevel::Error => "ERROR".red(),
-                LogLevel::Warn => "WARN".yellow(),
-                LogLevel::Info => "INFO".green(),
-                LogLevel::Debug => "DEBUG".cyan(),
-                LogLevel::Trace => "TRACE".white(),
-            };
-            format!("{} - [ {} ] - {}", now.bold(), level, record.args())
-        } else {
-            let level = match record.level() {
-                LogLevel::Error => "ERROR",
-                LogLevel::Warn => "WARN",
-                LogLevel::Info => "INFO",
-                LogLevel::Debug => "DEBUG",
-                LogLevel::Trace => "TRACE",
-            };
-            format!("{} - [ {} ] - {}", now, level, record.args())
-        }
-    };
-
-    let mut builder = LogBuilder::new();
-    builder.format(format);
-
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
-
-    builder.init()
-}
-
-pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
-    let validators = (0..count as usize)
-        .map(|_| gen_keypair())
-        .collect::<Vec<_>>();
-    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0));
-    let peers = (0..validators.len())
-        .map(|x| {
-                 format!("127.0.0.1:{}", start_port + x as u16)
-                     .parse()
-                     .unwrap()
-             })
-        .collect::<Vec<_>>();
-
-    validators
-        .into_iter()
-        .enumerate()
-        .map(|(idx, validator)| {
-            NodeConfig {
-                listen_address: peers[idx],
-                network: Default::default(),
-                peers: peers.clone(),
-                public_key: validator.0,
-                secret_key: validator.1,
-                genesis: genesis.clone(),
-            }
-        })
-        .collect::<Vec<_>>()
 }

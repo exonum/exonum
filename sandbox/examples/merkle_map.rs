@@ -1,5 +1,4 @@
 extern crate exonum;
-extern crate blockchain_explorer;
 extern crate rand;
 #[macro_use]
 extern crate clap;
@@ -12,13 +11,13 @@ use exonum::storage::{LevelDB, LevelDBOptions};
 use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Fork};
 
 /// usage
-/// path  - Directory where database is situated
-/// count - Total amount of data items to write
-/// data_len - Length of data chunk
-/// seed - seed for rng
+/// `path`  - Directory where database is situated
+/// `count` - Total amount of data items to write
+/// `data_len` - Length of data chunk
+/// `seed` - seed for rng
 
 fn main() {
-    blockchain_explorer::helpers::init_logger().unwrap();
+    exonum::helpers::init_logger().unwrap();
 
     let matches = clap_app!(merkle_map =>
         (version: "0.1")
@@ -33,21 +32,13 @@ fn main() {
             .get_matches();
 
     let path = matches.value_of("DIR").unwrap();
-    let count: usize = matches
-        .value_of("count")
-        .unwrap_or("100")
-        .parse()
-        .unwrap();
+    let count: usize = matches.value_of("count").unwrap_or("100").parse().unwrap();
     let data_len: usize = matches
         .value_of("data_len")
         .unwrap_or("64")
         .parse()
         .unwrap();
-    let seed_part: u32 = matches
-        .value_of("seed")
-        .unwrap_or("0")
-        .parse()
-        .unwrap();
+    let seed_part: u32 = matches.value_of("seed").unwrap_or("0").parse().unwrap();
     let use_fork: bool = matches.is_present("fork");
     // TODO get them from command line
     let prefix = vec![1];
@@ -65,13 +56,13 @@ fn main() {
 
     let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
-    let mut db = LevelDB::new(&Path::new(&path), options).unwrap();
+    let db = LevelDB::new(Path::new(&path), options).unwrap();
     if use_fork {
         let patch;
         {
-            let mut fork = db.fork();
+            let fork = db.fork();
             {
-                let map = MerklePatriciaTable::new(MapTable::new(prefix, &mut fork));
+                let map = MerklePatriciaTable::new(MapTable::new(prefix, &fork));
                 for item in (0..count).map(kv_generator) {
                     map.put(&item.0, item.1.clone()).unwrap();
                 }
@@ -80,7 +71,7 @@ fn main() {
         }
         db.merge(&patch).unwrap();
     } else {
-        let map = MerklePatriciaTable::new(MapTable::new(prefix, &mut db));
+        let map = MerklePatriciaTable::new(MapTable::new(prefix, &db));
         for item in (0..count).map(kv_generator) {
             map.put(&item.0, item.1.clone()).unwrap();
         }

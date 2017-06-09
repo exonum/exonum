@@ -8,23 +8,23 @@ pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 
 message! {
-    TxConfig {
+    struct TxConfig {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
         const SIZE = 48;
 
-        from:               &PublicKey  [00 => 32]
-        config:             &[u8]       [32 => 40]
-        actual_from_height: u64         [40 => 48]
+        field from:               &PublicKey  [00 => 32]
+        field config:             &[u8]       [32 => 40]
+        field actual_from_height: u64         [40 => 48]
     }
 }
 
-
+#[derive(Default)]
 pub struct ConfigUpdateService {}
 
 impl ConfigUpdateService {
-    pub fn new() -> ConfigUpdateService {
-        ConfigUpdateService {}
+    pub fn new() -> Self {
+        ConfigUpdateService::default()
     }
 }
 
@@ -35,12 +35,15 @@ impl Transaction for TxConfig {
 
     fn execute(&self, view: &View) -> Result<(), StorageError> {
         let schema = Schema::new(view);
-        schema.commit_actual_configuration(StoredConfiguration::try_deserialize(self.config())
-                                               .unwrap())
+        schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap())
     }
 }
 
 impl Service for ConfigUpdateService {
+    fn service_name(&self) -> &'static str {
+        "sandbox_config_updater"
+    }
+
     fn service_id(&self) -> u16 {
         CONFIG_SERVICE
     }
