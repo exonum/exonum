@@ -10,6 +10,7 @@ use exonum::blockchain::Block;
 use exonum::crypto::{Hash, HASH_SIZE, hash};
 use exonum::events::Milliseconds;
 use exonum::node::ValidatorId;
+use exonum::storage::Database;
 
 use sandbox::Sandbox;
 use timestamping::{TimestampTx, TimestampingTxGenerator};
@@ -219,12 +220,12 @@ pub fn empty_hash() -> Hash {
 
 pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
     // TODO use special function
-    use exonum::storage::{MemoryDB, List, MerkleTable};
+    use exonum::storage::{MemoryDB, ProofListIndex};
 
-    let db = MemoryDB::new();
-    let hashes: MerkleTable<MemoryDB, Hash> = MerkleTable::new(db);
-    hashes.extend(txs.iter().cloned()).unwrap();
-    hashes.root_hash().unwrap()
+    let mut fork = MemoryDB::new().fork();
+    let mut hashes = ProofListIndex::new(vec![], &mut fork);
+    hashes.extend(txs.iter().cloned());
+    hashes.root_hash()
 }
 
 pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,

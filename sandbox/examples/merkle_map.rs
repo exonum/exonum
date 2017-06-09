@@ -8,7 +8,7 @@ use rand::{SeedableRng, XorShiftRng, Rng};
 use std::path::Path;
 
 use exonum::storage::{LevelDB, LevelDBOptions};
-use exonum::storage::{Database, Map, MerklePatriciaTable, MapTable, Fork};
+use exonum::storage::{Database, ProofMapIndex};
 
 /// usage
 /// `path`  - Directory where database is situated
@@ -27,7 +27,6 @@ fn main() {
         (@arg count: -c --count +takes_value "Total amount of data items to write")
         (@arg data_len: -l --len +takes_value "Length of data chunk")
         (@arg seed: -s --seed +takes_value "Seed for rng")
-        (@arg fork: -f --fork "Use fork to write data in one transaction")
     )
             .get_matches();
 
@@ -39,7 +38,6 @@ fn main() {
         .parse()
         .unwrap();
     let seed_part: u32 = matches.value_of("seed").unwrap_or("0").parse().unwrap();
-    let use_fork: bool = matches.is_present("fork");
     // TODO get them from command line
     let prefix = vec![1];
     let seed = [seed_part, 168, 56, 1];
@@ -47,7 +45,7 @@ fn main() {
     let mut rng = XorShiftRng::from_seed(seed);
     let kv_generator = |_| {
         let mut v = vec![0; data_len];
-        let mut k: Vec<u8> = vec![0; 32];
+        let mut k: [u8; 32] = [0; 32];
 
         rng.fill_bytes(&mut v);
         rng.fill_bytes(&mut k);
@@ -56,24 +54,18 @@ fn main() {
 
     let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
-    let db = LevelDB::new(Path::new(&path), options).unwrap();
-    if use_fork {
-        let patch;
+    let mut db = LevelDB::open(Path::new(&path), options).unwrap();
+
+    let patch;
+    {
+        let mut fork = db.fork();
         {
-            let fork = db.fork();
-            {
-                let map = MerklePatriciaTable::new(MapTable::new(prefix, &fork));
-                for item in (0..count).map(kv_generator) {
-                    map.put(&item.0, item.1.clone()).unwrap();
-                }
+            let mut map = ProofMapIndex::new(prefix, &mut fork);
+            for item in (0..count).map(kv_generator) {
+                map.put(&item.0, item.1.clone());
             }
-            patch = fork.changes();
         }
-        db.merge(&patch).unwrap();
-    } else {
-        let map = MerklePatriciaTable::new(MapTable::new(prefix, &db));
-        for item in (0..count).map(kv_generator) {
-            map.put(&item.0, item.1.clone()).unwrap();
-        }
+        patch = fork.into_patch();
     }
+    db.merge(patch).unwrap();
 }
