@@ -1,4 +1,4 @@
-//\TODO don't reload whitelisted_peers if path the same
+// TODO: don't reload whitelisted_peers if path the same
 use std::collections::BTreeSet;
 
 use crypto::PublicKey;
@@ -16,18 +16,18 @@ pub struct Whitelist {
 }
 
 impl Whitelist {
-    /// is this `peer` can connect or not
+    /// Returns `true` if a peer with the given public key can connect.
     pub fn allow(&self, peer: &PublicKey) -> bool {
         !self.whitelist_enabled || self.validators_list.contains(peer) ||
         self.whitelisted_peers.contains(peer)
     }
 
-    /// append `peer` to whitelist
+    /// Adds peer to the whitelist.
     pub fn add(&mut self, peer: PublicKey) {
         self.whitelisted_peers.insert(peer);
     }
 
-    /// get list of peers in whitelist
+    /// Returns list of whitelisted peers.
     pub fn collect_allowed(&self) -> Vec<&PublicKey> {
         self.whitelisted_peers
             .iter()
@@ -35,14 +35,14 @@ impl Whitelist {
             .collect()
     }
 
+    /// Resets list of validators with the given public keys.
     pub fn set_validators<I>(&mut self, list: I)
         where I: IntoIterator<Item = PublicKey>
     {
         self.validators_list = list.into_iter().collect();
     }
 
-    /// check if we support whitelist, or keep connection politics open
-    /// if it return false, everybody can connect to us
+    /// Returns `true` if whitelist is enabled, otherwise everyone can connect.
     pub fn is_enabled(&self) -> bool {
         self.whitelist_enabled
     }

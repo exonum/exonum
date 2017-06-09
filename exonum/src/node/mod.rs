@@ -89,6 +89,7 @@ pub struct ListenerConfig {
     pub public_key: PublicKey,
     /// Secret key.
     pub secret_key: SecretKey,
+    /// Whitelist.
     pub whitelist: Whitelist,
     /// Socket address.
     pub address: SocketAddr,
@@ -130,6 +131,7 @@ pub struct NodeConfig {
     pub public_key: PublicKey,
     /// Secret key of the node.
     pub secret_key: SecretKey,
+    /// Node's whitelist.
     pub whitelist: Whitelist,
     /// Api configuration.
     pub api: NodeApiConfig,
