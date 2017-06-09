@@ -72,11 +72,25 @@ bower install
 
 #### Run
 
-To run application:
+Before start check backend endpoint url in the [frontend/config.json](frontend/config.json) and update the list of validators, example:
+
+```
+{
+  ...
+  "validators": [
+    "756f0bb877333e4059e785e38d72b716a2ae9981011563cf21e60ab16bec1fbc",
+    "6ce6f6501a03728d25533baf867312d6f425f48c07a1bed669b0afad5d0c136c",
+    "8917ecf39f4dc7c5289b4b9a3331c4455fcb1671b47bde39e0ea9361c5752451",
+    "a2dda8436715e8fdf6a5f865d5bdbe70b0ffb1d6267352e69a169aa6d8d368fb"
+  ] 
+}
+```
+
+Now run application:
 
 ```
 cd frontend
 npm start
 ```
 
-Application is served on [http://127.0.0.1:3000](http://127.0.0.1:3000).
+Application is served on [http://127.0.0.1:3000](http://127.0.0.1:3000). Port can be changred in the [frontend/app.js](frontend/app.js).
