@@ -1,12 +1,7 @@
 /**
  * Business logic
  */
-function CryptocurrencyService(params) {
-
-    this.id = params.id;
-
-    this.validators = params.validators;
-
+function CryptocurrencyService(configuration) {
     this.Wallet = Exonum.newType({
         size: 88,
         fields: {
@@ -22,7 +17,6 @@ function CryptocurrencyService(params) {
 
     this.AddFundsTransactionParams = {
         size: 48,
-        service_id: params.id,
         message_id: 129,
         fields: {
             wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -35,7 +29,6 @@ function CryptocurrencyService(params) {
         // TODO revert later
         // size: 144,
         size: 40,
-        service_id: params.id,
         message_id: 130,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -49,7 +42,6 @@ function CryptocurrencyService(params) {
 
     this.TransferTransactionParams = {
         size: 80,
-        service_id: params.id,
         message_id: 128,
         fields: {
             from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -102,8 +94,10 @@ function CryptocurrencyService(params) {
             contentType: 'application/json',
             data: JSON.stringify({
                 body: data,
+                network_id: configuration.network_id,
+                protocol_version: configuration.protocol_version,
+                service_id: configuration.service_id,
                 message_id: type.message_id,
-                service_id: type.service_id,
                 signature: type.signature
             }),
             success: function(response, textStatus, jqXHR) {
@@ -148,7 +142,7 @@ function CryptocurrencyService(params) {
         }
 
         // validate block
-        if (!Exonum.verifyBlock(data.block_info, params.validators)) {
+        if (!Exonum.verifyBlock(data.block_info, configuration.validators)) {
             return;
         }
 
@@ -164,7 +158,7 @@ function CryptocurrencyService(params) {
             }
         });
         var tableKeyData = {
-            service_id: params.id,
+            service_id: configuration.service_id,
             table_index: 0
         };
         var tableKey = TableKey.hash(tableKeyData);
@@ -219,7 +213,6 @@ function CryptocurrencyService(params) {
 
         return [data.block_info.block, wallet, transactions];
     }
-
 }
 
 CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
