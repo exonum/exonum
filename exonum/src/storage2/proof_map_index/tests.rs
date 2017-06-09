@@ -8,7 +8,7 @@ use crypto::{hash, Hash};
 use super::super::{Database, MemoryDB};
 
 use super::{DBKey, ProofMapIndex};
-use super::proof::RootProofNode;
+use super::proof::MapProof;
 use super::key::{KEY_SIZE, LEAF_KEY_PREFIX};
 
 // Makes large data set with unique keys
@@ -287,7 +287,7 @@ fn build_proof_in_empty_tree() {
 
     let search_res = table.get_proof(&[244; 32]);
     match search_res {
-        RootProofNode::Empty => {}
+        MapProof::Empty => {}
         _ => assert!(false),
     }
     {
@@ -314,7 +314,7 @@ fn build_proof_in_leaf_tree() {
     }
 
     match proof_path {
-        RootProofNode::LeafRootExclusive(key, hash_val) => {
+        MapProof::LeafRootExclusive(key, hash_val) => {
             assert_eq!(key, DBKey::leaf(&root_key));
             assert_eq!(hash_val, hash(&root_val));
         }
@@ -328,7 +328,7 @@ fn build_proof_in_leaf_tree() {
         assert_eq!(check_res.unwrap(), &root_val);
     }
     match proof_path {
-        RootProofNode::LeafRootInclusive(key, val) => {
+        MapProof::LeafRootInclusive(key, val) => {
             assert_eq!(key, DBKey::leaf(&root_key));
             assert_eq!(val, root_val);
         }

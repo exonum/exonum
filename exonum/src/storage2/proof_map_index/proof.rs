@@ -25,7 +25,7 @@ impl Serialize for DBKey {
     }
 }
 
-pub enum RootProofNode<V> {
+pub enum MapProof<V> {
     /// to match a leaf root with found key; (root_db_key= searched_db_key, value)
     LeafRootInclusive(DBKey, V),
     /// to prove exclusion for a leaf root when root_db_key != searched db_key
@@ -65,9 +65,9 @@ pub enum BranchProofNode<V> {
     },
 }
 
-impl<V: StorageValue> RootProofNode<V> {
+impl<V: StorageValue> MapProof<V> {
     pub fn compute_proof_root(&self) -> Hash {
-        use self::RootProofNode::*;
+        use self::MapProof::*;
         match *self {
             Empty => Hash::zero(),
             LeafRootInclusive(ref root_key, ref root_val) => {
@@ -123,11 +123,11 @@ impl<V: StorageValue> BranchProofNode<V> {
 }
 
 
-impl<V: Serialize> Serialize for RootProofNode<V> {
+impl<V: Serialize> Serialize for MapProof<V> {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        use self::RootProofNode::*;
+        use self::MapProof::*;
         let mut state;
         match *self {
             Empty => {
@@ -233,13 +233,13 @@ impl<V: Serialize> Serialize for ProofNode<V> {
 //     }
 // }
 
-impl<V: fmt::Debug + StorageValue> RootProofNode<V> {
+impl<V: fmt::Debug + StorageValue> MapProof<V> {
     pub fn verify_root_proof_consistency<K: ProofMapKey>(&self,
                                                          searched_key: &K,
                                                          root_hash: Hash)
                                                          -> Result<Option<&V>, Error> {
         let searched_slice = DBKey::leaf(searched_key);
-        use self::RootProofNode::*;
+        use self::MapProof::*;
 
         // if we inspect the topmost level of a proof
         let res: Option<&V> = match *self {
@@ -428,9 +428,9 @@ impl<V: fmt::Debug> ProofNode<V> {
     }
 }
 
-impl<V: fmt::Debug> fmt::Debug for RootProofNode<V> {
+impl<V: fmt::Debug> fmt::Debug for MapProof<V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use self::RootProofNode::*;
+        use self::MapProof::*;
         match *self {
             LeafRootInclusive(ref db_key, ref val) => {
                 write!(f, "{{\"slice\":{:?},{:?}}}", db_key, val)

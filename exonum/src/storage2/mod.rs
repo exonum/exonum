@@ -46,13 +46,13 @@ pub fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
     hash(&v)
 }
 
-pub fn merkle_hash(hashes: &[Hash]) -> Hash {
-    match hashes.len() {
-        0 => Hash::default(),
-        1 => hashes[0],
-        n => {
-            let (l, r) = hashes.split_at(n.next_power_of_two() / 2);
-            pair_hash(&merkle_hash(l), &merkle_hash(r))
-        }
-    }
-}
+// pub fn merkle_hash(hashes: &[Hash]) -> Hash {
+//     match hashes.len() {
+//         0 => Hash::default(),
+//         1 => hashes[0],
+//         n => {
+//             let (l, r) = hashes.split_at(n.next_power_of_two() / 2);
+//             pair_hash(&merkle_hash(l), &merkle_hash(r))
+//         }
+//     }
+// }

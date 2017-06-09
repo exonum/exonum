@@ -4,7 +4,8 @@ use serde_json::{Error as SerdeJsonError, Value, from_value};
 
 use crypto::{Hash, hash};
 
-use super::super::{StorageValue, pair_hash};
+use super::pair_hash;
+use super::super::{StorageValue};
 use super::key::ProofListKey;
 
 use self::ListProof::*;
