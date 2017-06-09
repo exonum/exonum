@@ -1,11 +1,12 @@
+use router::Router;
+use mount::Mount;
+use iron::{Chain, Iron};
+
 use std::io;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 use std::thread;
-
-use router::Router;
-use mount::Mount;
-use iron::{Chain, Iron};
+use std::fmt;
 
 use crypto::{PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
@@ -111,6 +112,7 @@ pub struct Configuration {
 
 pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
 
+#[derive(Debug)]
 pub struct Node {
     reactor: Events<NodeHandler<NodeChannel>>,
     api_options: NodeApiConfig,
@@ -338,6 +340,15 @@ impl<S> EventHandler for NodeHandler<S>
     }
 }
 
+impl<S> fmt::Debug for NodeHandler<S>
+    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, \
+            peer_discovery: {:?}, timeout_adjuster: Box<TimeoutAdjuster> }}",
+               self.blockchain, self.peer_discovery)
+    }
+}
+
 pub trait TransactionSend: Send + Sync {
     fn send<T: Transaction>(&self, tx: T) -> EventsResult<()>;
 }
@@ -360,6 +371,13 @@ impl<S> TransactionSend for TxSender<S>
         }
         let msg = ExternalMessage::Transaction(Box::new(tx));
         self.inner.post_event(msg)
+    }
+}
+
+impl<T> fmt::Debug for TxSender<T>
+    where T: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("TxSender { .. }")
     }
 }
 

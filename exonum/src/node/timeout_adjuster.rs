@@ -2,9 +2,6 @@ use events::Milliseconds;
 use node::State;
 use storage::View;
 
-/// Timeout value used in the `Default` implementation for the `Constant` timeout adjuster.
-const DEFAULT_CONSTANT_TIMEOUT: Milliseconds = 200;
-
 /// `TimeoutAdjuster` trait can be used to dynamically change propose timeout.
 ///
 /// # Examples
@@ -37,31 +34,18 @@ pub trait TimeoutAdjuster: Send {
     fn adjust_timeout(&mut self, state: &State, view: View) -> Milliseconds;
 }
 
-/// `Adjuster` implementation that always returns the same value.
-pub struct Constant {
-    timeout: Milliseconds,
-}
-
-impl Constant {
-    /// Creates `Constant` with given timeout value.
-    pub fn new(timeout: Milliseconds) -> Self {
-        Constant { timeout: timeout }
-    }
-}
-
-impl Default for Constant {
-    fn default() -> Self {
-        Constant{ timeout: DEFAULT_CONSTANT_TIMEOUT }
-    }
-}
+/// `Adjuster` implementation that returns value of `propose_timeout` field from `ConsensusConfig`.
+#[derive(Default, Debug)]
+pub struct Constant;
 
 impl TimeoutAdjuster for Constant {
-    fn adjust_timeout(&mut self, _: &State, _: View) -> Milliseconds {
-        self.timeout
+    fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
+        state.consensus_config().propose_timeout
     }
 }
 
 /// Moving average timeout calculation. Initial timeout is equal to `min_timeout`.
+#[derive(Debug)]
 pub struct MovingAverage {
     adjustment_speed: f64,
     optimal_block_load: f64,
