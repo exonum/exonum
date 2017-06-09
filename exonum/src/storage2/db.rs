@@ -105,12 +105,12 @@ impl Fork {
                              self.changes.insert(key, Change::Put(value))))
     }
 
-    pub fn delete(&mut self, key: Vec<u8>) {
+    pub fn remove(&mut self, key: Vec<u8>) {
         self.changelog.push((key.clone(),
                              self.changes.insert(key, Change::Delete)));
     }
 
-    pub fn delete_by_prefix(&mut self, prefix: &[u8]) {
+    pub fn remove_by_prefix(&mut self, prefix: &[u8]) {
         for (k, _) in self.snapshot.iter(prefix) {
             if !k.starts_with(prefix) {
                 return
@@ -137,13 +137,6 @@ impl AsRef<Snapshot + 'static> for Fork {
         &*self
     }
 }
-
-impl AsMut<Fork> for Fork {
-    fn as_mut<'a>(&'a mut self) -> &'a mut Fork {
-        self
-    }
-}
-
 
 impl<'a> NextIterValue<'a> {
     fn skip_changes(&self) -> bool {

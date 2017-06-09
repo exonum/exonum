@@ -384,7 +384,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
         if i == child_slice.len() {
             match self.get_node_unchecked(&child_slice) {
                 Node::Leaf(_) => {
-                    self.base.delete(key_slice);
+                    self.base.remove(key_slice);
                     return RemoveResult::Leaf
                 }
                 Node::Branch(mut branch) => {
@@ -395,7 +395,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
                             let key = branch.child_slice(child);
                             let hash = branch.child_hash(child);
 
-                            self.base.delete(&child_slice);
+                            self.base.remove(&child_slice);
 
                             return RemoveResult::Branch((key, *hash))
                         }
@@ -424,14 +424,14 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
         RemoveResult::KeyNotFound
     }
 
-    pub fn delete(&mut self, key: &K) {
+    pub fn remove(&mut self, key: &K) {
         let key_slice = DBKey::leaf(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
                 let key = key_slice;
                 if key == prefix {
-                    self.base.delete(&key);
+                    self.base.remove(&key);
                 }
             },
             Some((prefix, Node::Branch(mut branch))) => {
@@ -440,7 +440,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
                 if i == prefix.len() {
                     let suffix_slice = key_slice.suffix(i);
                     match self.remove_node(&branch, &suffix_slice) {
-                        RemoveResult::Leaf => self.base.delete(&prefix),
+                        RemoveResult::Leaf => self.base.remove(&prefix),
                         RemoveResult::Branch((key, hash)) => {
                             let mut new_child_slice = key.clone();
                             new_child_slice.set_from(suffix_slice.from());

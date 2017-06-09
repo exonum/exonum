@@ -38,7 +38,7 @@ impl<'a, V> Entry<&'a mut Fork, V> where V: StorageValue {
         self.base.put(&(), value)
     }
 
-    pub fn delete(&mut self) {
-        self.base.delete(&())
+    pub fn remove(&mut self) {
+        self.base.remove(&())
     }
 }

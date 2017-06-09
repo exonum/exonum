@@ -35,14 +35,13 @@ impl<T, K> KeySetIndex<T, K> where T: AsRef<Snapshot>,
     }
 }
 
-impl<T, K> KeySetIndex<T, K> where T: AsMut<Fork>,
-                                   K: StorageKey {
+impl<'a, K> KeySetIndex<&'a mut Fork, K> where K: StorageKey {
     pub fn insert(&mut self, item: K) {
         self.base.put(&item, ())
     }
 
-    pub fn delete(&mut self, item: &K) {
-        self.base.delete(item)
+    pub fn remove(&mut self, item: &K) {
+        self.base.remove(item)
     }
 
     pub fn clear(&mut self) {
