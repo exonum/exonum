@@ -402,6 +402,7 @@ impl State {
                       .unwrap_or(false)
     }
 
+    /// Returns node's whitelist.
     pub fn whitelist(&self) -> &Whitelist {
         &self.whitelist
     }
