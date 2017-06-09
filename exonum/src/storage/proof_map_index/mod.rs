@@ -159,7 +159,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
     pub fn get_proof(&self, key: &K) -> MapProof<V> {
         let searched_slice = DBKey::leaf(key);
 
-        let res: MapProof<V> = match self.get_root_node() {
+        match self.get_root_node() {
             Some((root_db_key, Node::Leaf(root_value))) => {
                 if searched_slice == root_db_key {
                     MapProof::LeafRootInclusive(root_db_key,
@@ -226,8 +226,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                 }
             }
             None => return MapProof::Empty,
-        };
-        res
+        }
     }
 
     pub fn iter(&self) -> ProofMapIndexIter<K, V> {
