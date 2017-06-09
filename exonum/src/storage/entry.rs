@@ -4,6 +4,7 @@ use crypto::Hash;
 
 use super::{BaseIndex, Snapshot, Fork, StorageValue};
 
+#[derive(Debug)]
 pub struct Entry<T, V> {
     base: BaseIndex<T>,
     _v: PhantomData<V>,

@@ -2,21 +2,24 @@ use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
 
-
+#[derive(Debug)]
 pub struct MapIndex<T, K, V> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
 
+#[derive(Debug)]
 pub struct MapIndexIter<'a, K, V> {
     base_iter: BaseIndexIter<'a, K, V>
 }
 
+#[derive(Debug)]
 pub struct MapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, K, ()>
 }
 
+#[derive(Debug)]
 pub struct MapIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>
 }

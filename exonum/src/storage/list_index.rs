@@ -3,12 +3,14 @@ use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
+#[derive(Debug)]
 pub struct ListIndex<T, V> {
     base: BaseIndex<T>,
     length: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
 
+#[derive(Debug)]
 pub struct ListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, u64, V>
 }

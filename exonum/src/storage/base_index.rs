@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 
 use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 
+#[derive(Debug)]
 pub struct BaseIndex<T> {
     prefix: Vec<u8>,
     view: T,
@@ -108,3 +109,10 @@ impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,
         None
     }
 }
+
+impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "BaseIndexIter(..)")
+    }
+}
+

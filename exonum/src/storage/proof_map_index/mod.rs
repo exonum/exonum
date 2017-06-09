@@ -16,22 +16,26 @@ mod key;
 mod node;
 mod proof;
 
+#[derive(Debug)]
 pub struct ProofMapIndex<T, K, V> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
 
+#[derive(Debug)]
 pub struct ProofMapIndexIter<'a, K, V> {
     base_iter: BaseIndexIter<'a, DBKey, V>,
     _k: PhantomData<K>
 }
 
+#[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, DBKey, ()>,
     _k: PhantomData<K>
 }
 
+#[derive(Debug)]
 pub struct ProofMapIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, DBKey, V>
 }

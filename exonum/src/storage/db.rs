@@ -8,7 +8,7 @@ use self::NextIterValue::*;
 
 
 pub type Patch = BTreeMap<Vec<u8>, Change>;
-pub type Iter<'a> = Box<Iterator<Item=(&'a [u8], &'a [u8])> + 'a>;
+pub type Iter<'a> = Box<Iterator<Item=(&'a [u8], &'a [u8])> + 'a >;
 
 #[derive(Debug, Clone)]
 pub enum Change {
@@ -147,6 +147,12 @@ impl AsRef<Snapshot> for Snapshot {
 impl AsRef<Snapshot + 'static> for Fork {
     fn as_ref<'a>(&'a self) -> &'a (Snapshot + 'static) {
         &*self
+    }
+}
+
+impl ::std::fmt::Debug for Fork {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "Fork(..)")
     }
 }
 

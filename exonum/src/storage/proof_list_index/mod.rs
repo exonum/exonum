@@ -26,12 +26,14 @@ mod proof;
 /// |>1| Merkle tree node, where at position `(h, i) = Hash((h - 1, 2i) + (h - 1, 2i + 1))` |
 ///
 /// `+` operation is concatenation of byte arrays.
+#[derive(Debug)]
 pub struct ProofListIndex<T, V> {
     base: BaseIndex<T>,
     length: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
 
+#[derive(Debug)]
 pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>
 }

@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 use super::{Database, Snapshot, Patch, Change, Iter, Result};
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct MemoryDB {
     map: BTreeMap<Vec<u8>, Vec<u8>>
 }
