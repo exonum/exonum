@@ -121,6 +121,11 @@ impl<S> NodeHandler<S>
             return;
         }
 
+        if !self.state.whitelist().allow(msg.from()) {
+            error!("Received request message from peer = {:?} which not in whitelist.", msg.from());
+            return;
+        }
+
         trace!("Handle block");
 
         let block = msg.block();
@@ -133,7 +138,9 @@ impl<S> NodeHandler<S>
 
         // Check block content
         if block.prev_hash() != &self.last_block_hash() {
-            error!("Weird block received, block={:?}", msg);
+            error!("Received block prev_hash is distinct from the one in db, \
+                    block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
+                   msg, *block.prev_hash(), self.last_block_hash());
             return;
         }
 

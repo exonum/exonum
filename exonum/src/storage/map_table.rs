@@ -45,7 +45,7 @@ impl<'a, T, K: ?Sized, V> Map<K, V> for MapTable<'a, T, K, V>
         let key = [&self.prefix, origin_key.as_ref()].concat();
         let result = match self.storage.find_key(&key)? {
             Some(x) => {
-                if !x.starts_with(&key) {
+                if !x.starts_with(&self.prefix) {
                     None
                 } else {
                     Some(x[self.prefix.len()..].to_vec())

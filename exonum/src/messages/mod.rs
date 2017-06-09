@@ -194,7 +194,9 @@ impl Any {
                     REQUEST_BLOCK_MESSAGE_ID => {
                         Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
                     }
-                    _ => panic!("Wrong consensus message type"),
+                    message_type => {
+                        return Err(Error::IncorrectMessageType{ message_type });
+                    }
                 }
             } else {
                 Any::Transaction(raw)
