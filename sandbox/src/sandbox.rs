@@ -442,24 +442,17 @@ impl Sandbox {
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) = blockchain
-                .create_patch(self.current_height(),
-                              self.current_round(),
-                              &hashes,
-                              &tx_pool);
+            let (_, patch) = blockchain.create_patch(self.current_height(),
+                                                     self.current_round(),
+                                                     &hashes,
+                                                     &tx_pool);
             fork.merge(patch);
             fork
         };
-        *Schema::new(&fork)
-             .last_block()
-             .unwrap()
-             .state_hash()
+        *Schema::new(&fork).last_block().unwrap().state_hash()
     }
 
-    pub fn get_proof_to_service_table(&self,
-                                      service_id: u16,
-                                      table_idx: usize)
-                                      -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
