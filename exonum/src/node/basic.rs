@@ -18,8 +18,6 @@ impl<S> NodeHandler<S>
         //         return;
         //     }
         
-        //FIXME: add whitelist verify public_key
-
         match Any::from_raw(raw) {
             Ok(Any::Connect(msg)) => self.handle_connect(msg),
             Ok(Any::Status(msg)) => self.handle_status(msg),
@@ -54,6 +52,12 @@ impl<S> NodeHandler<S>
         if address == self.state.our_connect_message().addr() {
             return;
         }
+
+        if !self.state.whitelist().allow(message.pub_key()) {
+            error!("Received connect message from peer = {:?} which not in whitelist.", message.pub_key());
+            return;
+        }
+
         // Check if we have another connect message from peer with the given public_key
         let public_key = *message.pub_key();
         let mut need_connect = true;
@@ -82,6 +86,11 @@ impl<S> NodeHandler<S>
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
         trace!("HANDLE STATUS: current height = {}, msg height = {}", height, msg.height());
+
+        if !self.state.whitelist().allow(msg.from()) {
+            error!("Received status message from peer = {:?} which not in whitelist.", msg.from());
+            return;
+        }
 
         // Handle message from future height
         if msg.height() > height {
