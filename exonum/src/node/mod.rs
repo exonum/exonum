@@ -149,7 +149,7 @@ impl<S> NodeHandler<S>
                                    &config.listener.consensus_secret_key);
 
         let mut whitelist = config.listener.whitelist;
-        whitelist.set_validators(stored.validators.iter().cloned()); 
+        whitelist.set_validators(stored.validators.iter().map(|x| x.0));
         let mut state = State::new(validator_id,
                                config.listener.consensus_public_key,
                                config.listener.consensus_secret_key,
