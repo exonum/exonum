@@ -67,15 +67,14 @@ impl<T, K, V> MapIndex<T, K, V> where T: AsRef<Snapshot>,
     }
 }
 
-impl<T, K, V> MapIndex<T, K, V> where T: AsMut<Fork>,
-                                      K: StorageKey,
-                                      V: StorageValue {
+impl<'a, K, V> MapIndex<&'a mut Fork, K, V> where K: StorageKey,
+                                                  V: StorageValue {
     pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value)
     }
 
-    pub fn delete(&mut self, key: &K) {
-        self.base.delete(key)
+    pub fn remove(&mut self, key: &K) {
+        self.base.remove(key)
     }
 
     pub fn clear(&mut self) {

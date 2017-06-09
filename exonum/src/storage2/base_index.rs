@@ -73,20 +73,20 @@ impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
     }
 }
 
-impl<T> BaseIndex<T> where T: AsMut<Fork> {
+impl<'a> BaseIndex<&'a mut Fork> {
     pub fn put<K, V>(&mut self, key: &K, value: V) where K: StorageKey,
                                                          V: StorageValue {
         let key = self.prefixed_key(key);
-        self.view.as_mut().put(key, value.into_vec());
+        self.view.put(key, value.into_vec());
     }
 
-    pub fn delete<K>(&mut self, key: &K) where K: StorageKey {
+    pub fn remove<K>(&mut self, key: &K) where K: StorageKey {
         let key = self.prefixed_key(key);
-        self.view.as_mut().delete(key);
+        self.view.remove(key);
     }
 
     pub fn clear(&mut self) {
-        self.view.as_mut().delete_by_prefix(&self.prefix)
+        self.view.remove_by_prefix(&self.prefix)
     }
 }
 

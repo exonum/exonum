@@ -76,7 +76,7 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
             0 => None,
             l => {
                 let v = self.base.get(&(l - 1));
-                self.base.delete(&(l - 1));
+                self.base.remove(&(l - 1));
                 self.set_len(l - 1);
                 v
             }

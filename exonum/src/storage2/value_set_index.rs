@@ -53,18 +53,17 @@ impl<T, V> ValueSetIndex<T, V> where T: AsRef<Snapshot>,
     }
 }
 
-impl<T, V> ValueSetIndex<T, V> where T: AsMut<Fork>,
-                                     V: StorageValue {
+impl<'a, V> ValueSetIndex<&'a mut Fork, V> where V: StorageValue {
     pub fn insert(&mut self, item: V) {
         self.base.put(&item.hash(), item)
     }
 
-    pub fn delete(&mut self, item: &V) {
-        self.delete_by_hash(&item.hash())
+    pub fn remove(&mut self, item: &V) {
+        self.remove_by_hash(&item.hash())
     }
 
-    pub fn delete_by_hash(&mut self, hash: &Hash) {
-        self.base.delete(hash)
+    pub fn remove_by_hash(&mut self, hash: &Hash) {
+        self.base.remove(hash)
     }
 
     pub fn clear(&mut self) {
