@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
-use crypto::Hash;
+use crypto::{hash, Hash};
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
 
-use self::key::{ProofMapKey, DBKey, ChildKind, LEAF_KEY_PREFIX};
+use self::key::{ProofMapKey, DBKey, ChildKind, DB_KEY_SIZE, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 use self::proof::{RootProofNode, ProofNode, BranchProofNode};
 
@@ -54,31 +54,18 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
 impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                                            K: ProofMapKey,
                                            V: StorageValue {
-    fn root_prefix(&self) -> Option<Vec<u8>> {
-        unimplemented!();
+    fn get_root_key(&self) -> Option<DBKey> {
+        self.base.iter(&()).next().map(|(k, _): (DBKey, ())| k)
     }
 
-    pub fn root_hash(&self) -> Hash {
-        unimplemented!();
-        // match self.root_node()? {
-        //     Some((root_db_key, Node::Leaf(value))) => {
-        //         Ok(hash(&[root_db_key.as_slice(), value.hash().as_ref()].concat()))
-        //     }
-        //     Some((_, Node::Branch(branch))) => Ok(branch.hash()),
-        //     None => Ok(Hash::zero()),
-        // }
-    }
-
-    fn root_node(&self) -> Option<(DBKey, Node<V>)> {
-        unimplemented!();
-        // let out = match self.root_prefix()? {
-        //     Some(db_key) => {
-        //         let node = self.get_node_unchecked(&db_key)?;
-        //         Some((db_key, node))
-        //     }
-        //     None => None,
-        // };
-        // Ok(out)
+    fn get_root_node(&self) -> Option<(DBKey, Node<V>)> {
+        match self.get_root_key() {
+            Some(key) => {
+                let node = self.get_node_unchecked(&key);
+                Some((key, node))
+            }
+            None => None
+        }
     }
 
     fn get_node_unchecked(&self, key: &DBKey) -> Node<V> {
@@ -93,8 +80,8 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                        current_branch: &BranchNode,
                        searched_slice: &DBKey) -> Option<ProofNode<V>> {
 
-        let child_slice = current_branch.child_slice(searched_slice.get(0));
-        // FIXME: child_slice.from = searched_slice.from;
+        let mut child_slice = current_branch.child_slice(searched_slice.get(0));
+        child_slice.set_from(searched_slice.from());
         let c_pr_l = child_slice.common_prefix(searched_slice);
         debug_assert!(c_pr_l > 0);
         if c_pr_l < child_slice.len() {
@@ -147,10 +134,31 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
         Some(res)
     }
 
+    pub fn root_hash(&self) -> Hash {
+        match self.get_root_node() {
+            Some((k, Node::Leaf(v))) => {
+                let mut buffer = vec![0u8; DB_KEY_SIZE];
+                k.write(&mut buffer);
+                buffer.extend_from_slice(v.hash().as_ref());
+                hash(&buffer)
+            },
+            Some((_, Node::Branch(branch))) => branch.hash(),
+            None => Hash::zero()
+        }
+    }
+
+    pub fn get(&self, key: &K) -> Option<V> {
+        self.base.get(&DBKey::leaf(key))
+    }
+
+    pub fn contains(&self, key: &K) -> bool {
+        self.base.contains(&DBKey::leaf(key))
+    }
+
     pub fn get_proof(&self, key: &K) -> RootProofNode<V> {
         let searched_slice = DBKey::leaf(key);
 
-        let res: RootProofNode<V> = match self.root_node() {
+        let res: RootProofNode<V> = match self.get_root_node() {
             Some((root_db_key, Node::Leaf(root_value))) => {
                 if searched_slice == root_db_key {
                     RootProofNode::LeafRootInclusive(root_db_key,
@@ -221,14 +229,6 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
         res
     }
 
-    pub fn get(&self, key: &K) -> Option<V> {
-        self.base.get(&DBKey::leaf(key))
-    }
-
-    pub fn contains(&self, key: &K) -> bool {
-        self.base.contains(&DBKey::leaf(key))
-    }
-
     pub fn iter(&self) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
             base_iter: self.base.iter(&LEAF_KEY_PREFIX),
@@ -285,8 +285,8 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
                      parent: &BranchNode,
                      key_slice: &DBKey,
                      value: V) -> (Option<u16>, Hash) {
-        let child_slice = parent.child_slice(key_slice.get(0));
-        // FIXME: child_slice.from = key_slice.from;
+        let mut child_slice = parent.child_slice(key_slice.get(0));
+        child_slice.set_from(key_slice.from());
         // If the slice is fully fit in key then there is a two cases
         let i = child_slice.common_prefix(key_slice);
         if child_slice.len() == i {
@@ -335,7 +335,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
 
     pub fn put(&mut self, key: &K, value: V) {
         let key_slice = DBKey::leaf(key);
-        match self.root_node() {
+        match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_slice = prefix;
                 let i = prefix_slice.common_prefix(&key_slice);
@@ -382,8 +382,8 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
     }
 
     fn remove_node(&mut self, parent: &BranchNode, key_slice: &DBKey) -> RemoveResult {
-        let child_slice = parent.child_slice(key_slice.get(0));
-        // FIXME: child_slice.from = key_slice.from;
+        let mut child_slice = parent.child_slice(key_slice.get(0));
+        child_slice.set_from(key_slice.from());
         let i = child_slice.common_prefix(key_slice);
 
         if i == child_slice.len() {
@@ -405,10 +405,10 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
                             return RemoveResult::Branch((key, *hash))
                         }
                         RemoveResult::Branch((key, hash)) => {
-                            // FIXME: let mut new_child_slice = DBKey::from_db_key(key.as_ref());
-                            // FIXME: new_child_slice.from = suffix_slice.from;
+                            let mut new_child_slice = key.clone();
+                            new_child_slice.set_from(suffix_slice.from());
 
-                            branch.set_child(suffix_slice.get(0), &key, &hash);
+                            branch.set_child(suffix_slice.get(0), &new_child_slice, &hash);
                             let h = branch.hash();
                             self.base.put(&child_slice, branch);
                             return RemoveResult::UpdateHash(h)
@@ -431,7 +431,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
 
     pub fn delete(&mut self, key: &K) {
         let key_slice = DBKey::leaf(key);
-        match self.root_node() {
+        match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
                 let key = key_slice;
@@ -447,9 +447,9 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
                     match self.remove_node(&branch, &suffix_slice) {
                         RemoveResult::Leaf => self.base.delete(&prefix),
                         RemoveResult::Branch((key, hash)) => {
-                            // FIXME let mut new_child_slice = DBKey::from_db_key(key.as_ref());
-                            // FIXME new_child_slice.from = suffix_slice.from;
-                            branch.set_child(suffix_slice.get(0), &key, &hash);
+                            let mut new_child_slice = key.clone();
+                            new_child_slice.set_from(suffix_slice.from());
+                            branch.set_child(suffix_slice.get(0), &new_child_slice, &hash);
                             self.base.put(&prefix, branch);
                         }
                         RemoveResult::UpdateHash(hash) => {

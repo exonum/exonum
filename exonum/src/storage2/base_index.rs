@@ -9,6 +9,7 @@ pub struct BaseIndex<T> {
 
 pub struct BaseIndexIter<'a, K, V> {
     base_iter: Iter<'a>,
+    base_prefix_len: usize,
     prefix: Vec<u8>,
     ended: bool,
     _k: PhantomData<K>,
@@ -41,12 +42,13 @@ impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
         self.view.as_ref().contains(&self.prefixed_key(key))
     }
 
-    pub fn iter<P, K, V>(&self, prefix: &P) -> BaseIndexIter<K, V> where P: StorageKey,
-                                                                         K: StorageKey,
-                                                                         V: StorageValue {
-        let iter_prefix = self.prefixed_key(prefix);
+    pub fn iter<P, K, V>(&self, subprefix: &P) -> BaseIndexIter<K, V> where P: StorageKey,
+                                                                            K: StorageKey,
+                                                                            V: StorageValue {
+        let iter_prefix = self.prefixed_key(subprefix);
         BaseIndexIter {
             base_iter: self.view.as_ref().iter(&iter_prefix),
+            base_prefix_len: self.prefix.len(),
             prefix: iter_prefix,
             ended: false,
             _k: PhantomData,
@@ -54,14 +56,15 @@ impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
         }
     }
 
-    pub fn iter_from<P, F, K, V>(&self, prefix: &P, from: &F) -> BaseIndexIter<K, V> where P: StorageKey,
-                                                                                           F: StorageKey,
-                                                                                           K: StorageKey,
-                                                                                           V: StorageValue {
-        let iter_prefix = self.prefixed_key(prefix);
-        let iter_from = self.prefixed_key(from)
+    pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> BaseIndexIter<K, V> where P: StorageKey,
+                                                                                              F: StorageKey,
+                                                                                              K: StorageKey,
+                                                                                              V: StorageValue {
+        let iter_prefix = self.prefixed_key(subprefix);
+        let iter_from = self.prefixed_key(from);
         BaseIndexIter {
             base_iter: self.view.as_ref().iter(&iter_from),
+            base_prefix_len: self.prefix.len(),
             prefix: iter_prefix,
             ended: false,
             _k: PhantomData,
@@ -97,7 +100,7 @@ impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,
         }
         if let Some((ref k, ref v)) = self.base_iter.next() {
             if k.starts_with(&self.prefix) {
-                return Some((K::read(&k[self.prefix.len()..]), V::from_slice(v)))
+                return Some((K::read(&k[self.base_prefix_len..]), V::from_slice(v)))
             }
         }
         self.ended = true;
