@@ -43,7 +43,7 @@ macro_rules! storage_value {
         }
 
         impl $crate::storage::StorageValue for $name {
-            fn hash(&self) -> Hash {
+            fn hash(&self) -> $crate::crypto::Hash {
                 $name::hash(self)
             }
 

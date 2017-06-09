@@ -268,22 +268,22 @@ mod tests {
 
         // Deleted
         let mut fork = db.fork();
-        fork.delete(vec![20]);
+        fork.remove(vec![20]);
         assert_iter(&fork, 0, &[(10, 10), (30, 30)]);
-        fork.delete(vec![10]);
+        fork.remove(vec![10]);
         assert_iter(&fork, 0, &[(30, 30)]);
         fork.put(vec![10], vec![11]);
         assert_iter(&fork, 0, &[(10, 11), (30, 30)]);
-        fork.delete(vec![10]);
+        fork.remove(vec![10]);
         assert_iter(&fork, 0, &[(30, 30)]);
 
         // MissDeleted
         let mut fork = db.fork();
-        fork.delete(vec![5]);
+        fork.remove(vec![5]);
         assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
-        fork.delete(vec![15]);
+        fork.remove(vec![15]);
         assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
-        fork.delete(vec![35]);
+        fork.remove(vec![35]);
         assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
     }
 }
