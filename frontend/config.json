@@ -1,3 +1,7 @@
 {
-  "endpoint": "http://127.0.0.1:8000"
+  "endpoint": "http://127.0.0.1:8000",
+  "network_id": 0,
+  "protocol_version": 0,
+  "service_id": 128,
+  "validators": []
 }

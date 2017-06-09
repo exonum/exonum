@@ -1,64 +1,8 @@
 /**
  * Business logic
  */
-function CryptocurrencyService(configuration) {
-    this.Wallet = Exonum.newType({
-        size: 88,
-        fields: {
-            pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            // TODO revert later
-            // login: {type: Exonum.String, size: 8, from: 32, to: 40},
-            name: {type: Exonum.String, size: 8, from: 32, to: 40},
-            balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
-            history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
-            history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
-        }
-    });
-
-    this.AddFundsTransactionParams = {
-        size: 48,
-        network_id: configuration.network_id,
-        protocol_version: configuration.protocol_version,
-        service_id: configuration.service_id,
-        message_id: 129,
-        fields: {
-            wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
-            seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-        }
-    };
-
-    this.CreateWalletTransactionParams = {
-        // TODO revert later
-        // size: 144,
-        size: 40,
-        network_id: configuration.network_id,
-        protocol_version: configuration.protocol_version,
-        service_id: configuration.service_id,
-        message_id: 130,
-        fields: {
-            pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            name: {type: Exonum.String, size: 8, from: 32, to: 40}
-            // TODO revert later
-            // login: {type: Exonum.String, size: 8, from: 32, to: 40},
-            // sec_key_enc: {type: Exonum.String, size: 80, from: 40, to: 120},
-            // nonce: {type: Exonum.Nonce, size: 24, from: 120, to: 144}
-        }
-    };
-
-    this.TransferTransactionParams = {
-        size: 80,
-        network_id: configuration.network_id,
-        protocol_version: configuration.protocol_version,
-        service_id: configuration.service_id,
-        message_id: 128,
-        fields: {
-            from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-            amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
-            seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-        }
-    };
+function CryptocurrencyService() {
+    var self = this;
 
     this.getTransactionTypeParams = function(id) {
         switch (id) {
@@ -103,9 +47,9 @@ function CryptocurrencyService(configuration) {
             contentType: 'application/json',
             data: JSON.stringify({
                 body: data,
-                network_id: configuration.network_id,
-                protocol_version: configuration.protocol_version,
-                service_id: configuration.service_id,
+                network_id: self.configuration.network_id,
+                protocol_version: self.configuration.protocol_version,
+                service_id: self.configuration.service_id,
                 message_id: type.message_id,
                 signature: type.signature
             }),
@@ -151,7 +95,7 @@ function CryptocurrencyService(configuration) {
         }
 
         // validate block
-        if (!Exonum.verifyBlock(data.block_info, configuration.validators)) {
+        if (!Exonum.verifyBlock(data.block_info, self.configuration.validators, self.configuration.network_id)) {
             return;
         }
 
@@ -167,7 +111,7 @@ function CryptocurrencyService(configuration) {
             }
         });
         var tableKeyData = {
-            service_id: configuration.service_id,
+            service_id: self.configuration.service_id,
             table_index: 0
         };
         var tableKey = TableKey.hash(tableKeyData);
@@ -204,7 +148,7 @@ function CryptocurrencyService(configuration) {
             var transaction = data.wallet_history.values[i];
             var type = this.getTransactionTypeParams(transaction.message_id);
             var publicKeyOfTransaction = getPublicKeyOfTransaction(transaction.message_id, transaction.body);
-            
+
             type.signature = transaction.signature;
             transaction.hash = type.hash(transaction.body);
             transaction.status = hashes[i].execution_status;
@@ -221,7 +165,76 @@ function CryptocurrencyService(configuration) {
         }
 
         return [data.block_info.block, wallet, transactions];
-    }
+    };
+
+    $.ajax({
+        method: 'GET',
+        url: '/configuration',
+        success: function(response) {
+            self.configuration = response;
+
+            self.Wallet = Exonum.newType({
+                size: 88,
+                fields: {
+                    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                    // TODO revert later
+                    // login: {type: Exonum.String, size: 8, from: 32, to: 40},
+                    name: {type: Exonum.String, size: 8, from: 32, to: 40},
+                    balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
+                    history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
+                    history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
+                }
+            });
+
+            self.AddFundsTransactionParams = {
+                size: 48,
+                network_id: self.configuration.network_id,
+                protocol_version: self.configuration.protocol_version,
+                service_id: self.configuration.service_id,
+                message_id: 129,
+                fields: {
+                    wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                    amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
+                    seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
+                }
+            };
+
+            self.CreateWalletTransactionParams = {
+                // TODO revert later
+                // size: 144,
+                size: 40,
+                network_id: self.configuration.network_id,
+                protocol_version: self.configuration.protocol_version,
+                service_id: self.configuration.service_id,
+                message_id: 130,
+                fields: {
+                    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                    name: {type: Exonum.String, size: 8, from: 32, to: 40}
+                    // TODO revert later
+                    // login: {type: Exonum.String, size: 8, from: 32, to: 40},
+                    // sec_key_enc: {type: Exonum.String, size: 80, from: 40, to: 120},
+                    // nonce: {type: Exonum.Nonce, size: 24, from: 120, to: 144}
+                }
+            };
+
+            self.TransferTransactionParams = {
+                size: 80,
+                network_id: self.configuration.network_id,
+                protocol_version: self.configuration.protocol_version,
+                service_id: self.configuration.service_id,
+                message_id: 128,
+                fields: {
+                    from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                    to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
+                    amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
+                    seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
+                }
+            };
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error(textStatus);
+        }
+    });
 }
 
 CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
