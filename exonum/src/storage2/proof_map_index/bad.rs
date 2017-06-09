@@ -32,13 +32,6 @@ enum RemoveResult {
 
 // TODO avoid reallocations where is possible.
 impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
-    pub fn new(prefix: Vec<u8>, view: &'a View) -> Self {
-        MerklePatriciaTable {
-            base: BaseTable::new(prefix, view),
-            _k: PhantomData,
-            _v: PhantomData,
-        }
-    }
 
     pub fn root_hash(&self) -> Hash {
         match self.root_node()? {
@@ -53,7 +46,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
     fn root_node(&self) -> Option<Entry<V>> {
         let out = match self.root_prefix()? {
             Some(db_key) => {
-                let node = self.read_node(&db_key)?;
+                let node = self.get_node_unchecked(&db_key)?;
                 Some((db_key, node))
             }
             None => None,
@@ -134,7 +127,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
                 let hash = self.insert_leaf(key_slice, value)?;
                 Ok((None, hash))
             } else {
-                match self.read_node(child_slice.to_db_key())? {
+                match self.get_node_unchecked(child_slice.to_db_key())? {
                     Node::Leaf(_) => {
                         unreachable!("Something went wrong!");
                     }
@@ -221,7 +214,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
         let i = child_slice.common_prefix(key_slice);
 
         if i == child_slice.len() {
-            match self.read_node(child_slice.to_db_key())? {
+            match self.get_node_unchecked(child_slice.to_db_key())? {
                 Node::Leaf(_) => {
                     self.base.delete(&key_slice.to_db_key())?;
                     return Ok(RemoveResult::Leaf);
@@ -359,7 +352,7 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
             return Ok(None);
         }
 
-        let res: ProofNode<V> = match self.read_node(child_slice.to_db_key())? {
+        let res: ProofNode<V> = match self.get_node_unchecked(child_slice.to_db_key())? {
             Node::Leaf(child_value) => ProofNode::Leaf(child_value),
             Node::Branch(child_branch) => {
                 let l_s = child_branch.child_slice(ChildKind::Left);
@@ -407,25 +400,6 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
         Ok(Some(res))
     }
 
-    fn root_prefix(&self) -> Option<Vec<u8>> {
-        self.base.find_key(&[])
-    }
-
-    fn read_node<A: AsRef<[u8]>>(&self, key: A) -> Node<V> {
-        let db_key = key.as_ref();
-        // FIXME: dirty hack, avoid to_vec
-        match self.base.get(&db_key.to_vec())? {
-            Some(data) => {
-                match db_key[0] {
-                    LEAF_KEY_PREFIX => Ok(Node::Leaf(StorageValue::deserialize(data))),
-                    BRANCH_KEY_PREFIX => Ok(Node::Branch(BranchNode::from_bytes(data))),
-                    other => Err(Error::new(format!("Wrong key prefix: {}", other))),
-                }
-            }
-            None => Err(Error::new(format!("Unable to find node with db_key {:?}", db_key))),
-        }
-    }
-
     fn insert_leaf(&self, key: &BitSlice, value: V) -> Hash {
         debug_assert!(key.is_leaf_key());
 
@@ -439,34 +413,5 @@ impl<'a, K: StorageKey, V: StorageValue> MerklePatriciaTable<'a, K, V> {
     fn insert_branch(&self, key: &BitSlice, branch: BranchNode) -> () {
         let db_key = key.to_db_key();
         self.base.put(&db_key, branch.serialize())
-    }
-}
-
-impl<'a, K, V> Map<K, V> for MerklePatriciaTable<'a, K, V>
-    where K: StorageKey,
-          V: StorageValue
-{
-    fn get(&self, key: &K) -> Option<V> {
-        // FIXME: temporary hack, avoid reallocation here
-        let mut v = Vec::new();
-        key.write(&mut v);
-        let db_key = BitSlice::from_bytes(&v).to_db_key();
-        let v = self.base.get(&db_key)?;
-        Ok(v.map(StorageValue::deserialize))
-    }
-
-    fn put(&self, key: &K, value: V) -> () {
-        // FIXME: temporary hack, avoid reallocation here
-        let mut v = Vec::new();
-        key.write(&mut v);
-        self.insert(&v, value)
-    }
-
-    fn delete(&self, key: &K) -> () {
-        // FIXME: temporary hack, avoid reallocation here
-        let mut v = Vec::new();
-        key.write(&mut v);
-
-        self.remove(BitSlice::from_bytes(&v))
     }
 }
