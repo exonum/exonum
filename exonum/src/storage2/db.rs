@@ -26,6 +26,7 @@ pub struct ForkIter<'a> {
     changes: Peekable<Range<'a, Vec<u8>, Change>>
 }
 
+#[derive(Debug)]
 enum NextIterValue<'a> {
     Stored(&'a [u8], &'a [u8]),
     Replaced(&'a [u8], &'a [u8]),
@@ -208,5 +209,76 @@ impl<'a> Iterator for ForkIter<'a> {
                 return Some(value)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{MemoryDB, Database, Snapshot, Fork};
+
+    #[test]
+    fn fork_iter() {
+        let mut db = MemoryDB::new();
+        let mut fork = db.fork();
+
+        fork.put(vec![10], vec![10]);
+        fork.put(vec![20], vec![20]);
+        fork.put(vec![30], vec![30]);
+
+        db.merge(fork.into_patch()).unwrap();
+
+        let mut fork = db.fork();
+
+        fn assert_iter(fork: &Fork, from: u8, assumed: &[(u8, u8)]) {
+            assert_eq!(fork.iter(&[from]).map(|(k, v)| (k[0], v[0])).collect::<Vec<_>>(), assumed);
+        }
+
+        // Stored
+        assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
+        assert_iter(&fork, 5, &[(10, 10), (20, 20), (30, 30)]);
+        assert_iter(&fork, 10, &[(10, 10), (20, 20), (30, 30)]);
+        assert_iter(&fork, 11, &[(20, 20), (30, 30)]);
+        assert_iter(&fork, 31, &[]);
+
+        // Inserted
+        fork.put(vec![5], vec![5]);
+        assert_iter(&fork, 0, &[(5, 5), (10, 10), (20, 20), (30, 30)]);
+        fork.put(vec![25], vec![25]);
+        assert_iter(&fork, 0, &[(5, 5), (10, 10), (20, 20), (25, 25), (30, 30)]);
+        fork.put(vec![35], vec![35]);
+        assert_iter(&fork, 0, &[(5, 5), (10, 10), (20, 20), (25, 25), (30, 30), (35, 35)]);
+
+        // Double inserted
+        fork.put(vec![25], vec![23]);
+        assert_iter(&fork, 0, &[(5, 5), (10, 10), (20, 20), (25, 23), (30, 30), (35, 35)]);
+        fork.put(vec![26], vec![26]);
+        assert_iter(&fork, 0, &[(5, 5), (10, 10), (20, 20), (25, 23), (26, 26), (30, 30), (35, 35)]);
+
+        // Replaced
+        let mut fork = db.fork();
+        fork.put(vec![10], vec![11]);
+        assert_iter(&fork, 0, &[(10, 11), (20, 20), (30, 30)]);
+        fork.put(vec![30], vec![31]);
+        assert_iter(&fork, 0, &[(10, 11), (20, 20), (30, 31)]);
+
+        // Deleted
+        let mut fork = db.fork();
+        fork.delete(vec![20]);
+        assert_iter(&fork, 0, &[(10, 10), (30, 30)]);
+        fork.delete(vec![10]);
+        assert_iter(&fork, 0, &[(30, 30)]);
+        fork.put(vec![10], vec![11]);
+        assert_iter(&fork, 0, &[(10, 11), (30, 30)]);
+        fork.delete(vec![10]);
+        assert_iter(&fork, 0, &[(30, 30)]);
+
+        // MissDeleted
+        let mut fork = db.fork();
+        fork.delete(vec![5]);
+        assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
+        fork.delete(vec![15]);
+        assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
+        fork.delete(vec![35]);
+        assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
     }
 }
