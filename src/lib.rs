@@ -12,7 +12,7 @@
 //! `Exonum` blockchain configuration is composed of:
 //!
 //! - consensus algorithm parameters
-//! - list of validators' public keys - list of identities of consensus participants
+//! - list of validators' public key pairs - list of identities of consensus participants
 //! - configuration of all services, plugged in for a specific blockchain instance.
 //!
 //! It also contains auxiliary fields:
