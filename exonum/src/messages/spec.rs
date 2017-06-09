@@ -87,7 +87,7 @@ macro_rules! message {
 
         impl $crate::storage::StorageValue for $name {
             fn hash(&self) -> Hash {
-                $name::hash(self)
+                $crate::messages::Message::hash(self)
             }
 
             fn into_vec(self) -> Vec<u8> {

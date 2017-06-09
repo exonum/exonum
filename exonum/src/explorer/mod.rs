@@ -2,7 +2,6 @@ use serde_json::Value;
 
 use std::cmp;
 
-use storage::{Result as StorageResult};
 use storage::ListProof;
 use crypto::Hash;
 use blockchain::{Schema, Blockchain, Block, TxLocation};
