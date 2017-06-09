@@ -71,6 +71,17 @@ impl<'a, V> ValueSetIndex<&'a mut Fork, V> where V: StorageValue {
     }
 }
 
+impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V> where T: AsRef<Snapshot>,
+                                                                           V: StorageValue {
+    type Item = (Hash, V);
+    type IntoIter = ValueSetIndexIter<'a, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+
 impl<'a, V> Iterator for ValueSetIndexIter<'a, V> where V: StorageValue {
     type Item = (Hash, V);
 

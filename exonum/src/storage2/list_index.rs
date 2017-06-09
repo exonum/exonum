@@ -114,6 +114,16 @@ impl<'a, V> ListIndex<&'a mut Fork, V> where V: StorageValue {
     }
 }
 
+impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V> where T: AsRef<Snapshot>,
+                                                                       V: StorageValue {
+    type Item = V;
+    type IntoIter = ListIndexIter<'a, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<'a, V> Iterator for ListIndexIter<'a, V> where V: StorageValue {
     type Item = V;
 

@@ -49,6 +49,16 @@ impl<'a, K> KeySetIndex<&'a mut Fork, K> where K: StorageKey {
     }
 }
 
+impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K> where T: AsRef<Snapshot>,
+                                                                         K: StorageKey {
+    type Item = K;
+    type IntoIter = KeySetIndexIter<'a, K>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<'a, K> Iterator for KeySetIndexIter<'a, K> where K: StorageKey {
     type Item = K;
 

@@ -209,6 +209,16 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V> where V: StorageValue {
     }
 }
 
+impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V> where T: AsRef<Snapshot>,
+                                                                            V: StorageValue {
+    type Item = V;
+    type IntoIter = ProofListIndexIter<'a, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<'a, V> Iterator for ProofListIndexIter<'a, V> where V: StorageValue {
     type Item = V;
 
