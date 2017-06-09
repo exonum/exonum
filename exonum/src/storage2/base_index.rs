@@ -41,6 +41,8 @@ impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
         self.view.as_ref().contains(&self.prefixed_key(key))
     }
 
+    // FIXME: add prefix argument for iter() and iter_fom()
+
     pub fn iter<K, V>(&self) -> BaseIndexIter<K, V> where K: StorageKey,
                                                           V: StorageValue {
         BaseIndexIter {
