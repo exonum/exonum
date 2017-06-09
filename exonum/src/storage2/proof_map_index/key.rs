@@ -92,7 +92,7 @@ impl DBKey {
 
     /// Get bit at position `idx`.
     pub fn get(&self, idx: u16) -> ChildKind {
-        debug_assert!(!self.is_empty() && idx < self.to);
+        debug_assert!(self.from + idx < self.to);
 
         let pos = self.from + idx;
         let chunk = self.data[(pos / 8) as usize];
@@ -154,6 +154,12 @@ impl DBKey {
     pub fn is_leaf(&self) -> bool {
         self.to == (KEY_SIZE * 8) as u16
     }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut buffer = vec![0u8; DB_KEY_SIZE as usize];
+        self.write(&mut buffer);
+        buffer
+    }
 }
 
 impl AsRef<[u8]> for DBKey {
@@ -207,7 +213,7 @@ impl PartialEq for DBKey {
 impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "DBKey(")?;
-        for i in self.from..self.to {
+        for i in 0..self.len() {
             write!(f, "{}", match self.get(i) {
                 ChildKind::Left => '0',
                 ChildKind::Right => '1'

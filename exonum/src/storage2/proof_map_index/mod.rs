@@ -2,9 +2,9 @@ use std::marker::PhantomData;
 
 use crypto::{hash, Hash};
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
-use self::key::{ProofMapKey, DBKey, ChildKind, DB_KEY_SIZE, LEAF_KEY_PREFIX};
+use self::key::{ProofMapKey, DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 use self::proof::{RootProofNode, ProofNode, BranchProofNode};
 
@@ -136,12 +136,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
 
     pub fn root_hash(&self) -> Hash {
         match self.get_root_node() {
-            Some((k, Node::Leaf(v))) => {
-                let mut buffer = vec![0u8; DB_KEY_SIZE];
-                k.write(&mut buffer);
-                buffer.extend_from_slice(v.hash().as_ref());
-                hash(&buffer)
-            },
+            Some((k, Node::Leaf(v))) => hash(&[&k.to_vec(), v.hash().as_ref()].concat()),
             Some((_, Node::Branch(branch))) => branch.hash(),
             None => Hash::zero()
         }
