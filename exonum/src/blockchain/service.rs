@@ -25,19 +25,18 @@ pub trait Service: Send + Sync + 'static {
     /// Unique human readable service name.
     fn service_name(&self) -> &'static str;
 
-    fn state_hash(&self, _: &Snapshot) -> Result<Vec<Hash>, StorageError> {
-        Ok(Vec::new())
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        Vec::new()
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    fn handle_genesis_block(&self, view: &Snapshot) -> Result<Value, StorageError> {
-        Ok(Value::Null)
+    fn handle_genesis_block(&self, view: &Snapshot) -> Value {
+        Value::Null
     }
 
-    fn handle_commit(&self, context: &mut NodeState) -> Result<(), StorageError> {
-        Ok(())
-    }
+    fn handle_commit(&self, context: &mut NodeState) { }
+
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None

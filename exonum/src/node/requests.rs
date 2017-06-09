@@ -53,8 +53,8 @@ impl<S> NodeHandler<S>
 
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
         trace!("HANDLE TRANSACTIONS REQUEST!!!");
-        let view = self.blockchain.view();
-        let schema = Schema::new(&view);
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
             let tx = self.state
                 .transactions()
@@ -106,7 +106,7 @@ impl<S> NodeHandler<S>
         let precommits = schema.precommits(&block_hash).iter().collect();
         let transactions = schema.block_txs(height)
             .iter()
-            .map(|tx_hash| schema.transactions().get(tx_hash).unwrap())
+            .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
             .collect::<Vec<_>>();
 
         let block_msg = Block::new(self.state.public_key(),

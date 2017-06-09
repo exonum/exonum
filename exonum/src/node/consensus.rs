@@ -150,14 +150,14 @@ impl<S> NodeHandler<S>
         }
 
         if self.state.block(&block_hash).is_none() {
-            let view = &self.blockchain.view();
-            let schema = Schema::new(view);
+            let snapshot = self.blockchain.snapshot();
+            let schema = Schema::new(&snapshot);
             // Verify transactions
             let mut tx_hashes = Vec::new();
             for raw in msg.transactions() {
                 if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                     let hash = tx.hash();
-                    if schema.transactions().get(&hash).unwrap().is_some() {
+                    if schema.transactions().contains(&hash) {
                         error!("Received block with already committed transaction, block={:?}",
                                msg);
                         return;
@@ -385,7 +385,7 @@ impl<S> NodeHandler<S>
         self.broadcast_status();
         self.add_status_timeout();
 
-        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, &self.blockchain.snapshot());
+        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, &*self.blockchain.snapshot());
         self.state.set_propose_timeout(timeout);
 
         // Handle queued transactions from services
@@ -621,9 +621,7 @@ impl<S> NodeHandler<S>
                         round: Round,
                         tx_hashes: &[Hash])
                         -> (Hash, Patch) {
-        self.blockchain
-            .create_patch(height, round, tx_hashes, self.state.transactions())
-            .unwrap()
+        self.blockchain.create_patch(height, round, tx_hashes, self.state.transactions())
     }
 
     // FIXME: remove this bull shit

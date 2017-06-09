@@ -63,7 +63,7 @@ macro_rules! storage_value {
             pub fn new($($field_name: $field_type,)*) -> $name {
                 use $crate::messages::{Field};
                 let mut buf = vec![0; $body];
-                $($field_name.write(&mut buf, $from, $to);)*
+                $($crate::messages::Field::write(&$field_name, &mut buf, $from, $to);)*
                 $name { raw: buf }
             }
 

@@ -75,7 +75,7 @@ mod tests {
                         table.put(&item.0, item.1.clone()).unwrap();
                     }
                 }
-                patch = fork.changes();
+                patch = fork.into_patch();
             }
             db.merge(&patch).unwrap();
         });
