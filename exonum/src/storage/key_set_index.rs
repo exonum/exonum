@@ -2,11 +2,13 @@ use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
 
+#[derive(Debug)]
 pub struct KeySetIndex<T, K> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,
 }
 
+#[derive(Debug)]
 pub struct KeySetIndexIter<'a, K> {
     base_iter: BaseIndexIter<'a, K, ()>
 }

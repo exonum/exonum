@@ -128,6 +128,12 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 }
 
+impl<'a, 'b> ::std::fmt::Debug for NodeState<'a, 'b> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "NodeState(state: {:?}, txs: {:?})", self.state, self.txs)
+    }
+}
+
 #[derive(Debug)]
 pub struct ApiContext {
     blockchain: Blockchain,

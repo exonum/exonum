@@ -4,15 +4,18 @@ use crypto::Hash;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
+#[derive(Debug)]
 pub struct ValueSetIndex<T, V> {
     base: BaseIndex<T>,
     _v: PhantomData<V>,
 }
 
+#[derive(Debug)]
 pub struct ValueSetIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, Hash, V>
 }
 
+#[derive(Debug)]
 pub struct ValueSetIndexHashes<'a> {
     base_iter: BaseIndexIter<'a, Hash, ()>
 }

@@ -97,3 +97,16 @@ impl Snapshot for LevelDBSnapshot {
         Box::new(iter)
     }
 }
+
+impl ::std::fmt::Debug for LevelDB {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "LevelDB(..)")
+    }
+}
+
+impl ::std::fmt::Debug for LevelDBSnapshot {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "LevelDBSnapshot(..)")
+    }
+}
+
