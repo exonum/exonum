@@ -137,18 +137,16 @@ fn test_query_state_hash() {
             .unwrap();
         assert_eq!(configs_rh, *opt_configs_h.unwrap());
 
-        let proof_configs = sandbox
-            .get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
+        let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
         assert_eq!(state_hash, proof_configs.compute_proof_root());
-        let opt_configs_h = proof_configs
-            .verify_root_proof_consistency(&timestamp_t1_key, state_hash);
+        let opt_configs_h =
+            proof_configs.verify_root_proof_consistency(&timestamp_t1_key, state_hash);
         assert_eq!(&[127; 32], opt_configs_h.unwrap().unwrap().as_ref());
 
-        let proof_configs = sandbox
-            .get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
+        let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
         assert_eq!(state_hash, proof_configs.compute_proof_root());
-        let opt_configs_h = proof_configs
-            .verify_root_proof_consistency(&timestamp_t2_key, state_hash);
+        let opt_configs_h =
+            proof_configs.verify_root_proof_consistency(&timestamp_t2_key, state_hash);
         assert_eq!(&[128; 32], opt_configs_h.unwrap().unwrap().as_ref());
 
         add_one_height(&sandbox, &sandbox_state)
@@ -565,7 +563,9 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
         .build();
 
-    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
+    let block = BlockBuilder::new(&sandbox)
+        .with_tx_hash(&tx.hash())
+        .build();
 
     let precommit_1 = Precommit::new(VALIDATOR_1,
                                      HEIGHT_ONE,
@@ -2431,8 +2431,7 @@ fn test_schema_config_changes() {
     let prev_cfg = sandbox.cfg();
 
     // Check configuration from genesis block
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())
-                   .actual_configuration(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
                prev_cfg);
     // Try to get configuration from non exists height
     assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())
@@ -2441,15 +2440,13 @@ fn test_schema_config_changes() {
     // Commit a new configuration
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
     // Check that following configuration is visible
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())
-                   .following_configuration(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot()).following_configuration(),
                Some(following_cfg.clone()));
     // Make following configuration actual
     add_one_height(&sandbox, &sandbox_state);
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     // Check that following configuration becomes actual
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())
-                   .actual_configuration(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
                following_cfg);
     // Check previous configuration
     assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())

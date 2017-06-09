@@ -70,7 +70,7 @@ impl Transaction for TimestampTx {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, _: &mut Fork) { }
+    fn execute(&self, _: &mut Fork) {}
 }
 
 impl Service for TimestampingService {
