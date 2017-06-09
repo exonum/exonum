@@ -86,12 +86,7 @@ impl<'a> BlockBuilder<'a> {
     }
 
     pub fn with_tx_hash(mut self, individual_transaction_hash: &'a Hash) -> Self {
-        // root of merkle table, containing this single transaction
-        // exonum::storage::merkle_table
-        // see how hash(&self) changed in exonum::storage::fields::StorageValue for Hash,
-        // it's _hash(self.as_ref())_ as of now instead of _*self_ as it used to be
-        let merkle_root = hash(individual_transaction_hash.as_ref());
-        self.tx_hash = Some(merkle_root);
+        self.tx_hash = Some(*individual_transaction_hash);
         self
     }
 
