@@ -52,8 +52,8 @@ impl StoredConfiguration {
                 JsonError::custom("The amount of validator and service keys should be equal"));
         }
 
+        // Check that there are no duplicated keys.
         {
-            // Check that there are no duplicated keys.
             let keys: HashSet<_> = config
                 .validator_keys
                 .iter()
@@ -86,21 +86,58 @@ impl StorageValue for StoredConfiguration {
 #[cfg(test)]
 mod tests {
     use toml;
+    use crypto::{Seed, gen_keypair_from_seed};
     use super::*;
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]
     fn stored_configuration_toml() {
-        let original = StoredConfiguration {
-            previous_cfg_hash: Hash::zero(),
-            actual_from: 42,
-            validator_keys: vec![PublicKey::zero()],
-            service_keys: vec![PublicKey::zero()],
-            consensus: ConsensusConfig::default(),
-            services: BTreeMap::new(),
-        };
+        let original = create_test_configuration();
         let toml = toml::to_string(&original).unwrap();
         let deserialized: StoredConfiguration = toml::from_str(&toml).unwrap();
         assert_eq!(original, deserialized);
+    }
+
+    #[test]
+    fn stored_configuration_serialize_deserialize() {
+        let configuration = create_test_configuration();
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "The amount of validator and service keys should be equal")]
+    fn stored_configuration_different_keys_amount() {
+        let mut configuration = create_test_configuration();
+        configuration.service_keys.push(PublicKey::zero());
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "Duplicated validator keys are found")]
+    fn stored_configuration_duplicated_keys() {
+        let mut configuration = create_test_configuration();
+        configuration.validator_keys.push(PublicKey::zero());
+        configuration.service_keys.push(PublicKey::zero());
+        serialize_deserialize(&configuration);
+    }
+
+    fn create_test_configuration() -> StoredConfiguration {
+        let validator_keys = vec![gen_keypair_from_seed(&Seed::new([1; 32])).0,
+                                  gen_keypair_from_seed(&Seed::new([2; 32])).0];
+        let service_keys = vec![gen_keypair_from_seed(&Seed::new([3; 32])).0,
+                                gen_keypair_from_seed(&Seed::new([4; 32])).0];
+        StoredConfiguration {
+            previous_cfg_hash: Hash::zero(),
+            actual_from: 42,
+            validator_keys,
+            service_keys,
+            consensus: ConsensusConfig::default(),
+            services: BTreeMap::new(),
+        }
+    }
+
+    fn serialize_deserialize(configuration: &StoredConfiguration) {
+        let serialized = configuration.try_serialize().unwrap();
+        let _ = StoredConfiguration::try_deserialize(&serialized).unwrap();
     }
 }
