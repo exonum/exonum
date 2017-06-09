@@ -398,7 +398,7 @@ pub fn validators(&self) -> &[(PublicKey, PublicKey)] {
                             .iter()
                             .position(|pk| pk.0 == *self.consensus_public_key())
                             .map(|id| id as ValidatorId);
-        self.whitelist.set_validators(config.validators.iter().cloned());
+        self.whitelist.set_validators(config.validators.iter().map(|x| x.0));
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
         self.config = config;
