@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
@@ -35,7 +36,7 @@ impl<T> BaseIndex<T> {
 impl<T> BaseIndex<T> where T: AsRef<Snapshot> {
     pub fn get<K, V>(&self, key: &K) -> Option<V> where K: StorageKey,
                                                         V: StorageValue {
-        self.view.as_ref().get(&self.prefixed_key(key)).map(StorageValue::from_vec)
+        self.view.as_ref().get(&self.prefixed_key(key)).map(|v| StorageValue::from_bytes(Cow::Owned(v)))
     }
 
     pub fn contains<K>(&self, key: &K) -> bool where K: StorageKey {
@@ -100,7 +101,7 @@ impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V> where K: StorageKey,
         }
         if let Some((ref k, ref v)) = self.base_iter.next() {
             if k.starts_with(&self.prefix) {
-                return Some((K::read(&k[self.base_prefix_len..]), V::from_slice(v)))
+                return Some((K::read(&k[self.base_prefix_len..]), V::from_bytes(Cow::Borrowed(v))))
             }
         }
         self.ended = true;

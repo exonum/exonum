@@ -2,6 +2,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use std::mem;
 use std::sync::Arc;
+use std::borrow::Cow;
 
 use crypto::{Hash, hash, PublicKey};
 use messages::{RawMessage, MessageBuffer, Message};
@@ -9,10 +10,7 @@ use messages::{RawMessage, MessageBuffer, Message};
 pub trait StorageValue : Sized {
     fn hash(&self) -> Hash;
     fn into_vec(self) -> Vec<u8>;
-    fn from_slice(value: &[u8]) -> Self;
-    fn from_vec(value: Vec<u8>) -> Self {
-        Self::from_slice(&value)
-    }
+    fn from_bytes(value: Cow<[u8]>) -> Self;
 }
 
 impl StorageValue for () {
@@ -20,7 +18,7 @@ impl StorageValue for () {
         Vec::new()
     }
 
-    fn from_slice(_value: &[u8]) -> Self {
+    fn from_bytes(_value: Cow<[u8]>) -> Self {
         ()
     }
 
@@ -34,7 +32,7 @@ impl StorageValue for u8 {
         vec![self]
     }
 
-    fn from_slice(value: &[u8]) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Self {
         value[0]
     }
 
@@ -50,8 +48,8 @@ impl StorageValue for u16 {
         v
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        LittleEndian::read_u16(value)
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        LittleEndian::read_u16(value.as_ref())
     }
 
     fn hash(&self) -> Hash {
@@ -68,8 +66,8 @@ impl StorageValue for u32 {
         v
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        LittleEndian::read_u32(value)
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        LittleEndian::read_u32(value.as_ref())
     }
 
     fn hash(&self) -> Hash {
@@ -86,8 +84,8 @@ impl StorageValue for u64 {
         v
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        LittleEndian::read_u64(value)
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        LittleEndian::read_u64(value.as_ref())
     }
 
     fn hash(&self) -> Hash {
@@ -102,7 +100,7 @@ impl StorageValue for i8 {
         vec![self as u8]
     }
 
-    fn from_slice(value: &[u8]) -> Self {
+    fn from_bytes(value: Cow<[u8]>) -> Self {
         value[0] as i8
     }
 
@@ -118,8 +116,8 @@ impl StorageValue for i16 {
         v
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        LittleEndian::read_i16(value)
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        LittleEndian::read_i16(value.as_ref())
     }
 
     fn hash(&self) -> Hash {
@@ -136,8 +134,8 @@ impl StorageValue for i32 {
         v
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        LittleEndian::read_i32(value)
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        LittleEndian::read_i32(value.as_ref())
     }
 
     fn hash(&self) -> Hash {
@@ -154,8 +152,8 @@ impl StorageValue for i64 {
         v
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        LittleEndian::read_i64(value)
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        LittleEndian::read_i64(value.as_ref())
     }
 
     fn hash(&self) -> Hash {
@@ -170,8 +168,8 @@ impl StorageValue for Hash {
         self.as_ref().to_vec()
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        Hash::from_slice(value).unwrap()
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        Self::from_slice(value.as_ref()).unwrap()
     }
 
     fn hash(&self) -> Hash {
@@ -184,8 +182,8 @@ impl StorageValue for PublicKey {
         self.as_ref().to_vec()
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        PublicKey::from_slice(value).unwrap()
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        PublicKey::from_slice(value.as_ref()).unwrap()
     }
 
     fn hash(&self) -> Hash {
@@ -198,12 +196,8 @@ impl StorageValue for RawMessage {
         self.as_ref().as_ref().to_vec()
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        Self::from_vec(value.to_vec())
-    }
-
-    fn from_vec(value: Vec<u8>) -> Self {
-        Arc::new(MessageBuffer::from_vec(value))
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        Arc::new(MessageBuffer::from_vec(value.into_owned()))
     }
 
     fn hash(&self) -> Hash {
@@ -216,12 +210,8 @@ impl StorageValue for Vec<u8> {
         self
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        value.to_vec()
-    }
-
-    fn from_vec(value: Vec<u8>) -> Self {
-        value
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        value.into_owned()
     }
 
     fn hash(&self) -> Hash {
@@ -234,12 +224,8 @@ impl StorageValue for String {
         String::into_bytes(self)
     }
 
-    fn from_slice(value: &[u8]) -> Self {
-        Self::from_vec(value.to_vec())
-    }
-
-    fn from_vec(value: Vec<u8>) -> Self {
-        String::from_utf8(value).unwrap()
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        String::from_utf8(value.into_owned()).unwrap()
     }
 
     fn hash(&self) -> Hash {
