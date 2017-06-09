@@ -122,11 +122,11 @@ impl StorageKey for ProofMapKey {
     fn write(&self, buffer: &mut [u8]) {
         if self.is_leaf() {
             buffer[0] = LEAF_KEY_PREFIX;
-            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.data)
+            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.data);
             buffer[KEY_SIZE + 1] = 0;
         } else {
             buffer[0] = BRANCH_KEY_PREFIX;
-            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.data)
+            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.data);
             buffer[KEY_SIZE + 1] = self.to as u8;
         }
     }

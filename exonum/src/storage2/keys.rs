@@ -1,5 +1,5 @@
 use byteorder::{ByteOrder, BigEndian};
-use ::crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_SIZE};
+use ::crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
 
 pub trait StorageKey {
@@ -150,7 +150,7 @@ impl StorageKey for Hash {
 
 impl StorageKey for PublicKey {
     fn size() -> usize {
-        PUBLIC_KEY_SIZE
+        PUBLIC_KEY_LENGTH
     }
 
     fn write(&self, buffer: &mut [u8]) {
