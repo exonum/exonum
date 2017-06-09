@@ -1,6 +1,7 @@
 use std::fmt;
 
 use serde::{Serialize, Serializer};
+use serde::ser::SerializeMap;
 
 use crypto::{hash, Hash};
 

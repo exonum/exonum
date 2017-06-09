@@ -124,15 +124,13 @@ impl<S> NodeHandler<S>
     pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
-            let block = blockchain.last_block().unwrap();
+            let block = blockchain.last_block();
             (block.hash(), block.height() + 1)
         };
 
         let snapshot = blockchain.snapshot();
 
-        let stored = Schema::new(snapshot)
-            .actual_configuration()
-            .unwrap();
+        let stored = Schema::new(snapshot).actual_configuration();
         info!("Create node with config={:#?}", stored);
 
         let validator_id = stored
@@ -159,7 +157,7 @@ impl<S> NodeHandler<S>
                                sender.get_time());
 
         let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
-        let timeout = timeout_adjuster.adjust_timeout(&state, &snapshot);
+        let timeout = timeout_adjuster.adjust_timeout(&state, &*snapshot);
         state.set_propose_timeout(timeout);
 
         NodeHandler {
@@ -299,7 +297,7 @@ impl<S> NodeHandler<S>
     }
 
     pub fn last_block_hash(&self) -> Hash {
-        self.blockchain.last_block().unwrap().hash()
+        self.blockchain.last_block().hash()
     }
 
     pub fn round_start_time(&self, round: Round) -> SystemTime {

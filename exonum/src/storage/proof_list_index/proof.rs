@@ -1,4 +1,5 @@
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::ser::SerializeStruct;
 use serde::de::Error;
 use serde_json::{Error as SerdeJsonError, Value, from_value};
 
@@ -96,7 +97,7 @@ impl<V: Serialize> Serialize for ListProof<V> {
         state.end()
     }
 }
-impl<'a, V: Deserialize<'a>> Deserialize<'a> for ListProof<V> {
+impl<'a, V> Deserialize<'a> for ListProof<V> where for<'de> V: Deserialize<'de> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'a> {
         fn format_err_string(type_str: &str, value: Value, err: SerdeJsonError) -> String {
             format!("Couldn't deserialize {} from serde_json::Value: {}, error: {}",

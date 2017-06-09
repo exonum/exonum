@@ -10,7 +10,7 @@ use self::NextIterValue::*;
 pub type Patch = BTreeMap<Vec<u8>, Change>;
 pub type Iter<'a> = Box<Iterator<Item=(&'a [u8], &'a [u8])> + 'a>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Change {
     Put(Vec<u8>),
     Delete,
@@ -47,6 +47,12 @@ pub trait Database: Send + Sync + 'static {
         }
     }
     fn merge(&mut self, patch: Patch) -> Result<()>;
+}
+
+impl Clone for Box<Database> {
+    fn clone(&self) -> Self {
+        Self::clone(self)
+    }
 }
 
 pub trait Snapshot {
@@ -123,6 +129,10 @@ impl Fork {
 
     pub fn into_patch(self) -> Patch {
         self.changes
+    }
+
+    pub fn merge(&mut self, patch: Patch) {
+        self.changes.extend(patch)
     }
 }
 
