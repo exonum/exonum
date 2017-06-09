@@ -10,6 +10,7 @@ use crypto::{PublicKey, SecretKey, Hash};
 use storage::Patch;
 use events::Milliseconds;
 use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
+use node::whitelist::Whitelist;
 
 // TODO: replace by in disk tx pool
 const TX_POOL_LIMIT: usize = 20000;
@@ -36,6 +37,7 @@ pub struct State {
     public_key: PublicKey,
     secret_key: SecretKey,
     config: StoredConfiguration,
+    whitelist: Whitelist,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -280,6 +282,7 @@ impl State {
     pub fn new(validator_id: Option<ValidatorId>,
                public_key: PublicKey,
                secret_key: SecretKey,
+               whitelist: Whitelist,
                stored: StoredConfiguration,
                connect: Connect,
                last_hash: Hash,
@@ -291,6 +294,7 @@ impl State {
             validator_state: validator_id.map(ValidatorState::new),
             public_key: public_key,
             secret_key: secret_key,
+            whitelist: whitelist,
             peers: HashMap::new(),
             connections: HashMap::new(),
             height: last_height,
@@ -350,6 +354,10 @@ impl State {
                       .unwrap_or(false)
     }
 
+    pub fn whitelist(&self) -> &Whitelist {
+        &self.whitelist
+    }
+
     pub fn validators(&self) -> &[PublicKey] {
         &self.config.validators
     }
@@ -379,6 +387,7 @@ impl State {
                             .iter()
                             .position(|pk| pk == self.public_key())
                             .map(|id| id as u32);
+        self.whitelist.set_validators(config.validators.iter().cloned());
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
         self.config = config;
