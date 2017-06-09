@@ -1,6 +1,6 @@
 use ::crypto::{Hash, hash};
-use super::super::{Database, MemoryDB, StorageValue, pair_hash};
-use super::{ProofListIndex, ListProof};
+use super::super::{Database, MemoryDB, StorageValue};
+use super::{ProofListIndex, ListProof, pair_hash};
 
 use self::ListProof::*;
 

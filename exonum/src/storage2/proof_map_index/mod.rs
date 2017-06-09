@@ -6,7 +6,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 use self::key::{ProofMapKey, DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
-use self::proof::{RootProofNode, ProofNode, BranchProofNode};
+use self::proof::{MapProof, ProofNode, BranchProofNode};
 
 #[cfg(test)]
 mod tests;
@@ -150,16 +150,16 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
         self.base.contains(&DBKey::leaf(key))
     }
 
-    pub fn get_proof(&self, key: &K) -> RootProofNode<V> {
+    pub fn get_proof(&self, key: &K) -> MapProof<V> {
         let searched_slice = DBKey::leaf(key);
 
-        let res: RootProofNode<V> = match self.get_root_node() {
+        let res: MapProof<V> = match self.get_root_node() {
             Some((root_db_key, Node::Leaf(root_value))) => {
                 if searched_slice == root_db_key {
-                    RootProofNode::LeafRootInclusive(root_db_key,
+                    MapProof::LeafRootInclusive(root_db_key,
                                                      root_value)
                 } else {
-                    RootProofNode::LeafRootExclusive(root_db_key,
+                    MapProof::LeafRootExclusive(root_db_key,
                                                      root_value.hash())
                 }
             }
@@ -179,7 +179,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                         let neighbour_child_hash = *branch.child_hash(!child_proof_pos);
                         match child_proof_pos {
                             ChildKind::Left => {
-                                RootProofNode::Branch(BranchProofNode::LeftBranch {
+                                MapProof::Branch(BranchProofNode::LeftBranch {
                                     left_hash: Box::new(child_proof),
                                     right_hash: neighbour_child_hash,
                                     left_key: l_s,
@@ -187,7 +187,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                                 })
                             }
                             ChildKind::Right => {
-                                RootProofNode::Branch(BranchProofNode::RightBranch {
+                                MapProof::Branch(BranchProofNode::RightBranch {
                                     left_hash: neighbour_child_hash,
                                     right_hash: Box::new(child_proof),
                                     left_key: l_s,
@@ -198,7 +198,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                     } else {
                         let l_h = *branch.child_hash(ChildKind::Left); //copy
                         let r_h = *branch.child_hash(ChildKind::Right);//copy
-                        RootProofNode::Branch(BranchProofNode::BranchKeyNotFound {
+                        MapProof::Branch(BranchProofNode::BranchKeyNotFound {
                             left_hash: l_h,
                             right_hash: r_h,
                             left_key: l_s,
@@ -210,7 +210,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                     // if common prefix length with root_slice is less than root_slice length
                     let l_h = *branch.child_hash(ChildKind::Left); //copy
                     let r_h = *branch.child_hash(ChildKind::Right);//copy
-                    RootProofNode::Branch(BranchProofNode::BranchKeyNotFound {
+                    MapProof::Branch(BranchProofNode::BranchKeyNotFound {
                         left_hash: l_h,
                         right_hash: r_h,
                         left_key: l_s,
@@ -219,7 +219,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                     // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
             }
-            None => return RootProofNode::Empty,
+            None => return MapProof::Empty,
         };
         res
     }
