@@ -12,7 +12,8 @@ pub struct StoredConfiguration {
     pub previous_cfg_hash: Hash, 
     pub actual_from: u64,
     /// List of validator's consensus and service public keys.
-    pub validators: Vec<(PublicKey, PublicKey)>,
+    pub validator_keys: Vec<PublicKey>,
+    pub service_keys: Vec<PublicKey>,
     pub consensus: ConsensusConfig,
     pub services: BTreeMap<String, serde_json::Value>,
 }
@@ -46,11 +47,21 @@ impl StoredConfiguration {
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
 
-        // Check that there are no duplicated keys.
-        let mut keys: HashSet<_> = config.validators.iter().map(|x| x.0).collect();
-        keys.extend(config.validators.iter().map(|x| x.1));
-        if keys.len() != config.validators.len() * 2 {
-            return Err(JsonError::custom("Duplicated validator keys are found"));
+        if config.validator_keys.len() != config.service_keys.len() {
+            return Err(
+                JsonError::custom("The amount of validator and service keys should be equal"));
+        }
+
+        {
+            // Check that there are no duplicated keys.
+            let keys: HashSet<_> = config
+                .validator_keys
+                .iter()
+                .chain(config.service_keys.iter())
+                .collect();
+            if keys.len() != config.validator_keys.len() * 2 {
+                return Err(JsonError::custom("Duplicated validator keys are found"));
+            }
         }
 
         Ok(config)
@@ -70,5 +81,26 @@ impl StorageValue for StoredConfiguration {
         let vec_bytes = self.try_serialize().unwrap();
         hash(&vec_bytes)
     }
+}
 
+#[cfg(test)]
+mod tests {
+    use toml;
+    use super::*;
+
+    // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
+    #[test]
+    fn stored_configuration_toml() {
+        let original = StoredConfiguration {
+            previous_cfg_hash: Hash::zero(),
+            actual_from: 42,
+            validator_keys: vec![PublicKey::zero()],
+            service_keys: vec![PublicKey::zero()],
+            consensus: ConsensusConfig::default(),
+            services: BTreeMap::new(),
+        };
+        let toml = toml::to_string(&original).unwrap();
+        let deserialized: StoredConfiguration = toml::from_str(&toml).unwrap();
+        assert_eq!(original, deserialized);
+    }
 }

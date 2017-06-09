@@ -81,7 +81,8 @@ impl Blockchain {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: 0,
-            validators: cfg.validators,
+            validator_keys: cfg.validators,
+            service_keys: cfg.services,
             consensus: cfg.consensus,
             services: BTreeMap::new(),
         };

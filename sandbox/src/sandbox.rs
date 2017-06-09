@@ -243,7 +243,7 @@ impl Sandbox {
     }
 
     pub fn p(&self, id: usize) -> PublicKey {
-        self.validators()[id].0
+        self.validators()[id]
     }
 
     pub fn s(&self, id: usize) -> &SecretKey {
@@ -252,7 +252,7 @@ impl Sandbox {
     }
 
     pub fn service_public_key(&self, id: usize) -> PublicKey {
-        self.validators()[id].1
+        self.services()[id]
     }
 
     pub fn service_secret_key(&self, id: usize) -> &SecretKey {
@@ -264,9 +264,12 @@ impl Sandbox {
         self.addresses[id]
     }
 
-    pub fn validators(&self) -> Vec<(PublicKey, PublicKey)> {
-        let conf = self.cfg();
-        conf.validators.clone()
+    pub fn validators(&self) -> Vec<PublicKey> {
+        self.cfg().validator_keys.clone()
+    }
+
+    pub fn services(&self) -> Vec<PublicKey> {
+        self.cfg().service_keys.clone()
     }
 
     pub fn n_validators(&self) -> usize {
@@ -603,10 +606,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         txs_block_limit: 1000,
     };
     let genesis = GenesisConfig::new_with_consensus(consensus,
-                                                    validators
-                                                        .iter()
-                                                        .zip(service_keys.iter())
-                                                        .map(|x| ((x.0).0, (x.1).0)));
+                                                    validators.iter().map(|x| x.0),
+                                                    service_keys.iter().map(|x| x.0));
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
