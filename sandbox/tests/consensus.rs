@@ -2394,7 +2394,8 @@ fn test_exclude_validator_from_consensus() {
 
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
-        consensus_cfg.validators.swap_remove(0);
+        consensus_cfg.validator_keys.swap_remove(0);
+        consensus_cfg.service_keys.swap_remove(0);
         consensus_cfg.actual_from = sandbox.current_height() + 2;
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
