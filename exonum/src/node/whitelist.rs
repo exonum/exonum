@@ -44,7 +44,7 @@ impl Whitelist {
     /// check if we support whitelist, or keep connection politics open
     /// if it return false, everybody can connect to us
     pub fn is_enabled(&self) -> bool {
-        !self.whitelist_enabled
+        self.whitelist_enabled
     }
 }
 
@@ -96,8 +96,12 @@ mod test {
     fn test_wildcard() {
         let regular = make_keys(REGULAR_PEERS, 4);
 
-        let whitelist = Whitelist::default();
+        let mut whitelist = Whitelist::default();
+        assert_eq!(whitelist.is_enabled(), false);
         check_in_whitelist(&whitelist, &regular, &[0, 1, 2, 3], &[]);
+        whitelist.whitelist_enabled = true;
+        assert_eq!(whitelist.is_enabled(), true);
+        check_in_whitelist(&whitelist, &regular, &[], &[0, 1, 2, 3]);
         assert_eq!(whitelist.collect_allowed().len(), 0);
     }
 
