@@ -4,9 +4,11 @@ use crypto::{hash, Hash};
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
-use self::key::{ProofMapKey, DBKey, ChildKind, LEAF_KEY_PREFIX};
+use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
-use self::proof::{MapProof, ProofNode, BranchProofNode};
+
+pub use self::key::ProofMapKey;
+pub use self::proof::{MapProof, ProofNode, BranchProofNode};
 
 #[cfg(test)]
 mod tests;

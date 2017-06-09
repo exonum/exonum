@@ -4,8 +4,7 @@ use std::mem;
 
 use crypto::{Hash};
 use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
-use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
-              List, RootProofNode, View};
+use storage::{Snapshot, Fork, StorageValue, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, Error, MapProof};
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
@@ -41,42 +40,41 @@ storage_value! (
 );
 
 #[derive(Debug)]
-pub struct Schema<'a> {
-    view: &'a View,
+pub struct Schema<T> {
+    view: T,
 }
 
-impl<'a> Schema<'a> {
-    pub fn new(view: &'a View) -> Schema {
+impl<T> Schema<T> where T: AsRef<Snapshot> {
+    pub fn new(view: T) -> Schema<T> {
         Schema { view: view }
     }
 
-    pub fn transactions(&self) -> MapTable<View, Hash, RawMessage> {
-        MapTable::new(gen_prefix(CONSENSUS, 0, None), self.view)
+    pub fn transactions(&self) -> MapIndex<T, Hash, RawMessage> {
+        MapIndex::new(gen_prefix(CONSENSUS, 0, None), self.view)
     }
 
-    pub fn tx_location_by_tx_hash(&self) -> MapTable<View, Hash, TxLocation> {
-        MapTable::new(gen_prefix(CONSENSUS, 1, None), self.view)
+    pub fn tx_location_by_tx_hash(&self) -> MapIndex<T, Hash, TxLocation> {
+        MapIndex::new(gen_prefix(CONSENSUS, 1, None), self.view)
     }
 
-    pub fn blocks(&self) -> MapTable<View, Hash, Block> {
-        MapTable::new(gen_prefix(CONSENSUS, 2, None), self.view)
+    pub fn blocks(&self) -> MapIndex<T, Hash, Block> {
+        MapIndex::new(gen_prefix(CONSENSUS, 2, None), self.view)
     }
 
-    pub fn block_hashes_by_height(&self) -> ListTable<View, Hash> {
-        ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 3, None), self.view))
+    pub fn block_hashes_by_height(&self) -> ListIndex<T, Hash> {
+        ListIndex::new(gen_prefix(CONSENSUS, 3, None), self.view)
     }
 
     pub fn block_hash_by_height(&self, height: u64) -> Result<Option<Hash>, Error> {
         self.block_hashes_by_height().get(height)
     }
 
-    pub fn block_txs(&self, height: u64) -> MerkleTable<View, Hash> {
-        MerkleTable::new(MapTable::new(gen_prefix(CONSENSUS, 4, Some(&height.serialize())),
-                                       self.view))
+    pub fn block_txs(&self, height: u64) -> ProofListIndex<T, Hash> {
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, Some(&height.serialize())), self.view)
     }
 
-    pub fn precommits(&self, hash: &Hash) -> ListTable<View, Precommit> {
-        ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 5, Some(hash.as_ref())), self.view))
+    pub fn precommits(&self, hash: &Hash) -> ListIndex<T, Precommit> {
+        ListIndex::new(gen_prefix(CONSENSUS, 5, Some(hash.as_ref())), self.view)
     }
 
     pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
@@ -86,7 +84,7 @@ impl<'a> Schema<'a> {
         };
         let block = self.blocks().get(&block_hash)?.unwrap();
         let precommits_table = self.precommits(&block_hash);
-        let precommits = precommits_table.values()?;
+        let precommits = precommits_table.iter().collect();
         let res = BlockProof {
             block: block,
             precommits: precommits,
@@ -94,48 +92,43 @@ impl<'a> Schema<'a> {
         Ok(Some(res))
     }
 
-    pub fn configs(&self) -> MerklePatriciaTable<'a, Hash, StoredConfiguration> {
+    pub fn configs(&self) -> ProofMapIndex<T, Hash, StoredConfiguration> {
         // configs patricia merkletree <block height> json
-        MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 6, None), self.view))
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 6, None), self.view)
     }
 
     // TODO: consider List index to reduce storage volume
-    pub fn configs_actual_from
-        (&self)
-         -> ListTable<MapTable<View, [u8], Vec<u8>>, ConfigReference> {
-        ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
+    pub fn configs_actual_from(&self) -> ListIndex<T, ConfigReference> {
+        ListIndex::new(gen_prefix(CONSENSUS, 7, None), self.view)
     }
 
-    pub fn state_hash_aggregator
-        (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Hash> {
-        MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 8, None), self.view))
+    pub fn state_hash_aggregator(&self) -> ProofMapIndex<T, Hash, Hash> {
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, None), self.view)
     }
 
-    pub fn last_block(&self) -> Result<Option<Block>, Error> {
-        Ok(match self.block_hashes_by_height().last()? {
-               Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
-               None => None,
-           })
+    pub fn last_block(&self) -> Option<Block> {
+        match self.block_hashes_by_height().last() {
+           Some(hash) => Some(self.blocks().get(&hash)),
+           None => None,
+        }
     }
 
-    pub fn last_height(&self) -> Result<Option<u64>, Error> {
-        let block_opt = self.last_block()?;
-        Ok(block_opt.map(|block| block.height()))
+    pub fn last_height(&self) -> Option<u64> {
+        let block_opt = self.last_block();
+        block_opt.map(|block| block.height())
     }
 
-    pub fn current_height(&self) -> Result<u64, Error> {
-        let last_height = self.last_height()?;
-        let res = match last_height {
+    pub fn current_height(&self) -> u64 {
+        let last_height = self.last_height();
+        match last_height {
             Some(last_height) => last_height + 1,
             None => 0,
-        };
-        Ok(res)
+        }
     }
 
-    pub fn commit_configuration(&self, config_data: StoredConfiguration) -> Result<(), Error> {
+    pub fn commit_configuration(&self, config_data: StoredConfiguration) {
         let actual_from = config_data.actual_from;
-        if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
+        if let Some(last_cfg_reference) = self.configs_actual_from().last() {
             let last_actual_from = last_cfg_reference.actual_from();
             if actual_from <= last_actual_from {
                 return Err(Error::new(format!("Attempting to commit configuration \
@@ -145,35 +138,33 @@ impl<'a> Schema<'a> {
             }
         }
         let cfg_hash = config_data.hash();
-        self.configs().put(&cfg_hash, config_data.clone())?;
+        self.configs().put(&cfg_hash, config_data.clone());
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
-        self.configs_actual_from().append(cfg_ref)?;
+        self.configs_actual_from().append(cfg_ref);
         info!("Scheduled the following configuration for acceptance: {:?}", config_data);
         // TODO: clear storages
-        Ok(())
     }
 
-    pub fn actual_configuration(&self) -> Result<StoredConfiguration, Error> {
-        let current_height = self.current_height()?;
+    pub fn actual_configuration(&self) -> StoredConfiguration {
+        let current_height = self.current_height();
         let res = self.configuration_by_height(current_height);
         trace!("Retrieved actual_config: {:?}", res);
         res
     }
 
-    pub fn following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
-        let current_height = self.current_height()?;
-        let idx = self.find_configurations_index_by_height(current_height)?;
-        let res = match self.configs_actual_from().get(idx + 1)? {
+    pub fn following_configuration(&self) -> Option<StoredConfiguration> {
+        let current_height = self.current_height();
+        let idx = self.find_configurations_index_by_height(current_height);
+        match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.configuration_by_hash(cfg_hash)?
+                let cfg = self.configuration_by_hash(cfg_hash)
                     .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
                 Some(cfg)
             }
             None => None,
-        };
-        Ok(res)
+        }
     }
 
     pub fn previous_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
@@ -181,7 +172,7 @@ impl<'a> Schema<'a> {
         let idx = self.find_configurations_index_by_height(current_height)?;
         let res = if idx > 0 {
             let cfg_ref = self.configs_actual_from()
-                .get(idx - 1)?
+                .get(idx - 1)
                 .expect(&format!("Configuration at index {} not found", idx));
             let cfg_hash = cfg_ref.cfg_hash();
             let cfg =
@@ -197,7 +188,7 @@ impl<'a> Schema<'a> {
     pub fn configuration_by_height(&self, height: u64) -> Result<StoredConfiguration, Error> {
         let idx = self.find_configurations_index_by_height(height)?;
         let cfg_ref = self.configs_actual_from()
-            .get(idx)?
+            .get(idx)
             .expect(&format!("Configuration at index {} not found", idx));
         let cfg_hash = cfg_ref.cfg_hash();
         let cfg =
@@ -210,14 +201,14 @@ impl<'a> Schema<'a> {
         self.configs().get(hash)
     }
 
-    pub fn core_state_hash(&self) -> Result<Vec<Hash>, Error> {
-        Ok(vec![self.configs().root_hash()?])
+    pub fn core_state_hash(&self) -> Vec<Hash> {
+        Ok(vec![self.configs().root_hash()])
     }
 
     pub fn get_proof_to_service_table(&self,
                                       service_id: u16,
                                       table_idx: usize)
-                                      -> Result<RootProofNode<Hash>, Error> {
+                                      -> MapProof<Hash> {
         let key = Blockchain::service_table_unique_key(service_id, table_idx);
         let sum_table = self.state_hash_aggregator();
         sum_table.construct_path_to_key(key.as_ref())

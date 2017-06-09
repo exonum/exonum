@@ -56,7 +56,3 @@ pub mod config;
 pub mod explorer;
 pub mod helpers;
 pub mod api;
-
-
-// TODO: temp module
-pub mod storage2;

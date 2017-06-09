@@ -128,7 +128,9 @@ impl<S> NodeHandler<S>
             (block.hash(), block.height() + 1)
         };
 
-        let stored = Schema::new(&blockchain.view())
+        let snapshot = blockchain.snapshot();
+
+        let stored = Schema::new(snapshot)
             .actual_configuration()
             .unwrap();
         info!("Create node with config={:#?}", stored);
@@ -145,7 +147,7 @@ impl<S> NodeHandler<S>
                                    &config.listener.secret_key);
 
         let mut whitelist = config.listener.whitelist;
-        whitelist.set_validators(stored.validators.iter().cloned()); 
+        whitelist.set_validators(stored.validators.iter().cloned());
         let mut state = State::new(validator_id,
                                config.listener.public_key,
                                config.listener.secret_key,
@@ -157,7 +159,7 @@ impl<S> NodeHandler<S>
                                sender.get_time());
 
         let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
-        let timeout = timeout_adjuster.adjust_timeout(&state, blockchain.view());
+        let timeout = timeout_adjuster.adjust_timeout(&state, &snapshot);
         state.set_propose_timeout(timeout);
 
         NodeHandler {

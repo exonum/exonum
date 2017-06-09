@@ -4,7 +4,7 @@ use crypto::{Hash, PublicKey, HexValue};
 use blockchain::{Schema, Transaction};
 use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
                RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
-use storage::{Map, Patch};
+use storage::Patch;
 use events::Channel;
 use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout};
 
@@ -75,10 +75,10 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let view = self.blockchain.view();
+        let snapshot = self.blockchain.snapshot();
         // Check that transactions are not commited yet
         for hash in msg.transactions() {
-            if Schema::new(&view).transactions().get(hash).unwrap().is_some() {
+            if Schema::new(&snapshot).transactions().contains(hash) {
                 error!("Received propose with already commited transaction, msg={:?}",
                        msg);
                 return;
@@ -298,7 +298,7 @@ impl<S> NodeHandler<S>
             if self.state.is_validator() && !self.state.have_prevote(round) {
                     self.broadcast_prevote(round, &propose_hash);
             }
-            
+
             // Change lock
             if self.state.has_majority_prevotes(round, propose_hash) {
                 self.state.lock(round, propose_hash);
@@ -384,8 +384,8 @@ impl<S> NodeHandler<S>
         // TODO: reset status timeout.
         self.broadcast_status();
         self.add_status_timeout();
-           
-        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, self.blockchain.view());
+
+        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, &self.blockchain.snapshot());
         self.state.set_propose_timeout(timeout);
 
         // Handle queued transactions from services
@@ -427,8 +427,8 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let view = self.blockchain.view();
-        if Schema::new(&view).transactions().get(&hash).unwrap().is_some() {
+        let snapshot = self.blockchain.snapshot();
+        if Schema::new(&snapshot).transactions().contains(&hash) {
             return;
         }
 
@@ -453,8 +453,8 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let view = self.blockchain.view();
-        if Schema::new(&view).transactions().get(&hash).unwrap().is_some() {
+        let snapshot = self.blockchain.snapshot();
+        if Schema::new(&snapshot).transactions().contains(&hash) {
             return;
         }
 
@@ -485,7 +485,7 @@ impl<S> NodeHandler<S>
 
         // Add timeout for this round
         self.add_round_timeout();
-        
+
         if !self.state.is_validator() {
             return;
         }
@@ -522,7 +522,7 @@ impl<S> NodeHandler<S>
         let validator_id = self.state.validator_state().as_ref().map(|validator_state| {
             validator_state.id()
         });
-        if let Some(validator_id) = validator_id { 
+        if let Some(validator_id) = validator_id {
             if self.state.have_prevote(round) {
                 return;
             }

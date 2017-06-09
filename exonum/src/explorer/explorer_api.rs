@@ -29,12 +29,12 @@ impl ExplorerApi {
              return Err(ApiError::IncorrectRequest("Max block count per request exceeded".into()))
         }
         let explorer = BlockchainExplorer::new(&self.blockchain);
-        Ok(explorer.blocks_range(count, from, skip_empty_blocks)?)
+        Ok(explorer.blocks_range(count, from, skip_empty_blocks))
     }
 
     fn get_block(&self, height: u64) -> Result<Option<BlockInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
-        Ok(explorer.block_info(height)?)
+        Ok(explorer.block_info(height))
     }
 
     fn get_transaction(&self, hash_str: &str) -> Result<Option<TxInfo>, ApiError> {

@@ -64,39 +64,40 @@ impl<V: StorageValue> ListProof<V> {
 }
 
 impl<V: Serialize> Serialize for ListProof<V> {
-    fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error> where S: Serializer {
+    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        use self::ListProof::*;
         let mut state;
         match *self {
             Full(ref left_proof, ref right_proof) => {
                 state = ser.serialize_struct("Full", 2)?;
-                ser.serialize_struct_elt(&mut state, "left", left_proof)?;
-                ser.serialize_struct_elt(&mut state, "right", right_proof)?;
+                state.serialize_field("left", left_proof)?;
+                state.serialize_field("right", right_proof)?;
             }
             Left(ref left_proof, ref option_hash) => {
                 if let Some(ref hash) = *option_hash {
                     state = ser.serialize_struct("Left", 2)?;
-                    ser.serialize_struct_elt(&mut state, "left", left_proof)?;
-                    ser.serialize_struct_elt(&mut state, "right", hash)?;
+                    state.serialize_field("left", left_proof)?;
+                    state.serialize_field("right", hash)?;
                 } else {
                     state = ser.serialize_struct("Left", 1)?;
-                    ser.serialize_struct_elt(&mut state, "left", left_proof)?;
+                    state.serialize_field("left", left_proof)?;
                 }
             }
             Right(ref hash, ref right_proof) => {
                 state = ser.serialize_struct("Right", 2)?;
-                ser.serialize_struct_elt(&mut state, "left", hash)?;
-                ser.serialize_struct_elt(&mut state, "right", right_proof)?;
+                state.serialize_field("left", hash)?;
+                state.serialize_field("right", right_proof)?;
             }
             Leaf(ref val) => {
                 state = ser.serialize_struct("Leaf", 1)?;
-                ser.serialize_struct_elt(&mut state, "val", val)?;
+                state.serialize_field("val", val)?;
             }
         }
-        ser.serialize_struct_end(state)
+        state.end()
     }
 }
-impl<V: Deserialize> Deserialize for ListProof<V> {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error> where D: Deserializer {
+impl<'a, V: Deserialize<'a>> Deserialize<'a> for ListProof<V> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'a> {
         fn format_err_string(type_str: &str, value: Value, err: SerdeJsonError) -> String {
             format!("Couldn't deserialize {} from serde_json::Value: {}, error: {}",
                     type_str,

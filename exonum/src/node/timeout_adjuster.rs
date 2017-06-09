@@ -1,6 +1,6 @@
 use events::Milliseconds;
 use node::State;
-use storage::View;
+use storage::Snapshot;
 
 /// `TimeoutAdjuster` trait can be used to dynamically change propose timeout.
 ///
@@ -31,7 +31,7 @@ use storage::View;
 /// For more examples see `Constant` and `MovingAverage` implementations.
 pub trait TimeoutAdjuster: Send {
     /// Called during node initialization and after accepting a new height.
-    fn adjust_timeout(&mut self, state: &State, view: View) -> Milliseconds;
+    fn adjust_timeout(&mut self, state: &State, view: &Snapshot) -> Milliseconds;
 }
 
 /// `Adjuster` implementation that returns value of `propose_timeout` field from `ConsensusConfig`.
@@ -39,7 +39,7 @@ pub trait TimeoutAdjuster: Send {
 pub struct Constant;
 
 impl TimeoutAdjuster for Constant {
-    fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
+    fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
         state.consensus_config().propose_timeout
     }
 }
@@ -89,7 +89,7 @@ impl MovingAverage {
 }
 
 impl TimeoutAdjuster for MovingAverage {
-    fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
+    fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
         self.adjust_timeout_impl(state.config().consensus.txs_block_limit as f64,
                                  state.transactions().len() as f64)
     }
