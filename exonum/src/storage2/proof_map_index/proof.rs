@@ -5,7 +5,7 @@ use serde::{Serialize, Serializer};
 use crypto::{hash, Hash};
 
 use super::super::{StorageValue, Error};
-use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE, DB_KEY_SIZE};
+use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
 
 impl Serialize for DBKey {
     fn serialize<S>(&self, ser: &mut S) -> Result<(), S::Error> where S: Serializer {
@@ -235,10 +235,10 @@ impl<V: Serialize> Serialize for ProofNode<V> {
 
 impl<V: fmt::Debug + StorageValue> RootProofNode<V> {
     pub fn verify_root_proof_consistency<K: ProofMapKey>(&self,
-                                                         searched_key: K,
+                                                         searched_key: &K,
                                                          root_hash: Hash)
                                                          -> Result<Option<&V>, Error> {
-        let searched_slice = DBKey::leaf(&searched_key);
+        let searched_slice = DBKey::leaf(searched_key);
         use self::RootProofNode::*;
 
         // if we inspect the topmost level of a proof
@@ -477,27 +477,4 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
             }
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::DBKey;
-    use ::storage::merkle_patricia_table::DBKey;
-
-    #[test]
-    fn test_DBKey_repr() {
-        let bytes = [253; 2];
-        let db_key = DBKey::from_bytes(&bytes).to_db_key();
-        let mut bit_vec = DBKey {
-            db_key_data: db_key.clone(),
-            from: 0,
-            to: 256,
-        };
-        assert_eq!(&bit_vec.repr(),
-                   "1111110111111101000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
-        bit_vec.from = 6;
-        bit_vec.to = 16;
-        assert_eq!(&bit_vec.repr(), "0111111101");
-    }
-
 }

@@ -1,9 +1,8 @@
-use std::cell::Cell;
 use std::marker::PhantomData;
 
-use crypto::{Hash, hash};
+use crypto::Hash;
 
-use super::{pair_hash, BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
+use super::{BaseIndex, Snapshot, Fork, StorageValue};
 
 use self::key::{ProofMapKey, DBKey, ChildKind};
 use self::node::{Node, BranchNode};
@@ -80,7 +79,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
                        current_branch: &BranchNode,
                        searched_slice: &DBKey) -> Option<ProofNode<V>> {
 
-        let mut child_slice = current_branch.child_slice(searched_slice.get(0));
+        let child_slice = current_branch.child_slice(searched_slice.get(0));
         // FIXME: child_slice.from = searched_slice.from;
         let c_pr_l = child_slice.common_prefix(searched_slice);
         debug_assert!(c_pr_l > 0);
@@ -233,7 +232,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
                      parent: &BranchNode,
                      key_slice: &DBKey,
                      value: V) -> (Option<u16>, Hash) {
-        let mut child_slice = parent.child_slice(key_slice.get(0));
+        let child_slice = parent.child_slice(key_slice.get(0));
         // FIXME: child_slice.from = key_slice.from;
         // If the slice is fully fit in key then there is a two cases
         let i = child_slice.common_prefix(key_slice);
@@ -330,7 +329,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
     }
 
     fn remove_node(&mut self, parent: &BranchNode, key_slice: &DBKey) -> RemoveResult {
-        let mut child_slice = parent.child_slice(key_slice.get(0));
+        let child_slice = parent.child_slice(key_slice.get(0));
         // FIXME: child_slice.from = key_slice.from;
         let i = child_slice.common_prefix(key_slice);
 

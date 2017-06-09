@@ -17,7 +17,7 @@ pub use self::list_index::ListIndex;
 pub use self::key_set_index::KeySetIndex;
 pub use self::value_set_index::ValueSetIndex;
 pub use self::proof_list_index::ProofListIndex;
-// pub use self::proof_map_index::ProofMapIndex;
+pub use self::proof_map_index::ProofMapIndex;
 
 pub type Result<T> = ::std::result::Result<T, Error>;
 

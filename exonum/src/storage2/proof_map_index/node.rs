@@ -1,7 +1,7 @@
 use crypto::{Hash, hash, HASH_SIZE};
 
 use super::super::{StorageKey, StorageValue};
-use super::key::{DBKey, ChildKind, KEY_SIZE, DB_KEY_SIZE};
+use super::key::{DBKey, ChildKind, DB_KEY_SIZE};
 
 // TODO: implement Field for DBKey and define BranchNode as StorageValue
 
@@ -49,13 +49,11 @@ impl BranchNode {
     }
 
     pub fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
-        unsafe {
-            let from = match kind {
-                ChildKind::Right => HASH_SIZE,
-                ChildKind::Left => 0,
-            };
-            self.raw[from..from + HASH_SIZE].copy_from_slice(hash.as_ref());
-        }
+        let from = match kind {
+            ChildKind::Right => HASH_SIZE,
+            ChildKind::Left => 0,
+        };
+        self.raw[from..from + HASH_SIZE].copy_from_slice(hash.as_ref());
     }
 
     pub fn set_child(&mut self, kind: ChildKind, prefix: &DBKey, hash: &Hash) {
@@ -94,3 +92,35 @@ impl StorageValue for BranchNode {
 //             .finish()
 //     }
 // }
+
+#[cfg(test)]
+mod tests {
+    // #[test]
+    // fn branch_node() {
+    //     let mut rng = thread_rng();
+    //     let mut gen_seq = || rng.gen_iter::<u8>().take(32).collect::<Vec<u8>>();
+
+    //     let lh = Hash::from_slice(&gen_seq()).unwrap();
+    //     let rh = Hash::from_slice(&gen_seq()).unwrap();
+    //     let lp = DBKey {
+    //         data: &gen_seq(),
+    //         from: 0,
+    //         to: 16,
+    //     };
+    //     let rp = DBKey {
+    //         data: &gen_seq(),
+    //         from: 31,
+    //         to: 64,
+    //     };
+    //     let node = BranchNode::new([&lh, &rh], [&lp, &rp]);
+
+    //     assert_eq!(node.child_hash(Left), &lh);
+    //     assert_eq!(node.child_hash(Right), &rh);
+    //     assert_eq!(node.child_slice(Left).to_db_key(), lp.to_db_key());
+    //     assert_eq!(node.child_slice(Left).to, lp.to);
+    //     assert_eq!(node.child_slice(Right).to_db_key(), rp.to_db_key());
+    //     assert_eq!(node.child_slice(Right).to, rp.to);
+    //     // assert_eq!(node.child_db_key(Left), lp.to_db_key().as_slice());
+    //     // assert_eq!(node.child_db_key(Right), rp.to_db_key().as_slice());
+    // }
+}
