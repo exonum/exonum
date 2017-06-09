@@ -103,17 +103,18 @@ impl<S> NodeHandler<S>
         let block_hash = schema.block_hash_by_height(height).unwrap();
 
         let block = schema.blocks().get(&block_hash).unwrap();
-        let precommits = schema.precommits(&block_hash).iter().collect();
-        let transactions = schema.block_txs(height)
-            .iter()
-            .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
-            .collect::<Vec<_>>();
+        let precommits = schema.precommits(&block_hash);
+        let transactions = schema.block_txs(height);
+
 
         let block_msg = Block::new(self.state.public_key(),
                                    msg.from(),
                                    block,
-                                   precommits,
-                                   transactions,
+                                   precommits.iter().collect(),
+                                   transactions
+                                        .iter()
+                                        .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
+                                        .collect(),
                                    self.state.secret_key());
         self.send_to_peer(*msg.from(), block_msg.raw());
     }
