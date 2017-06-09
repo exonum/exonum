@@ -176,9 +176,9 @@ impl<S> NodeHandler<S>
             }
 
             // Commit block
-            self.state.add_block(block_hash, patch, tx_hashes);
+            self.state.add_block(block_hash, patch, tx_hashes, block.proposer_id());
         }
-        self.commit(block_hash, msg.precommits().iter());
+        self.commit(block_hash, msg.precommits().iter(), None);
         self.request_next_block();
     }
 
@@ -213,7 +213,7 @@ impl<S> NodeHandler<S>
             let precommits = self.state
                 .precommits(round, our_block_hash)
                 .to_vec();
-            self.commit(our_block_hash, precommits.iter());
+            self.commit(our_block_hash, precommits.iter(), Some(propose_round));
         }
     }
 
@@ -281,7 +281,7 @@ impl<S> NodeHandler<S>
         let precommits = self.state
             .precommits(round, our_block_hash)
             .to_vec();
-        self.commit(our_block_hash, precommits.iter());
+        self.commit(our_block_hash, precommits.iter(), Some(round));
     }
 
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
@@ -342,21 +342,22 @@ impl<S> NodeHandler<S>
     // FIXME: push precommits into storage
     pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
                                                          block_hash: Hash,
-                                                         precommits: I) {
+                                                         precommits: I,
+                                                         round: Option<Round>) {
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (commited_txs, new_txs) = {
-            let txs_count = {
+        let (commited_txs, new_txs, proposer) = {
+            let (txs_count, proposer) = {
                 let block_state = self.state.block(&block_hash).unwrap();
-                block_state.txs().len()
+                (block_state.txs().len(), block_state.proposer_id())
             };
 
             let txs = self.blockchain
                 .commit(&mut self.state, block_hash, precommits)
                 .unwrap();
 
-            (txs_count, txs)
+            (txs_count, txs, proposer)
         };
 
         let height = self.state.height();
@@ -364,8 +365,10 @@ impl<S> NodeHandler<S>
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
 
-        info!("COMMIT ====== height={}, commited={}, pool={}, hash={}",
+        info!("COMMIT ====== height={}, proposer={}, round={}, commited={}, pool={}, hash={}",
               height,
+              proposer,
+              round.map(|x| x.to_string()).unwrap_or_else(|| "?".into()),
               commited_txs,
               self.state.transactions().len(),
               block_hash.to_hex(),
@@ -631,7 +634,7 @@ impl<S> NodeHandler<S>
                                                     propose.height(),
                                                     tx_hashes.as_slice());
         // Save patch
-        self.state.add_block(block_hash, patch, tx_hashes);
+        self.state.add_block(block_hash, patch, tx_hashes, propose.validator());
         block_hash
     }
 
