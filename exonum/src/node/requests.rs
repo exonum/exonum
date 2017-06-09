@@ -1,7 +1,6 @@
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
                RequestBlock, Block};
 use blockchain::Schema;
-use storage::Map;
 use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
@@ -62,7 +61,7 @@ impl<S> NodeHandler<S>
                 .get(hash)
                 .map(|tx| tx.raw())
                 .cloned()
-                .or_else(|| schema.transactions().get(hash).unwrap());
+                .or_else(|| schema.transactions().get(hash));
 
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), &tx);
@@ -97,22 +96,17 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let view = self.blockchain.view();
-        let schema = Schema::new(&view);
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
 
         let height = msg.height();
-        let block_hash = schema.block_hash_by_height(height).unwrap().unwrap();
+        let block_hash = schema.block_hash_by_height(height).unwrap();
 
-        let block = schema.blocks().get(&block_hash).unwrap().unwrap();
-        let precommits = schema.precommits(&block_hash)
-            .values()
-            .unwrap()
-            .to_vec();
+        let block = schema.blocks().get(&block_hash).unwrap();
+        let precommits = schema.precommits(&block_hash).iter().collect();
         let transactions = schema.block_txs(height)
-            .values()
-            .unwrap()
             .iter()
-            .map(|tx_hash| schema.transactions().get(tx_hash).unwrap().unwrap())
+            .map(|tx_hash| schema.transactions().get(tx_hash).unwrap())
             .collect::<Vec<_>>();
 
         let block_msg = Block::new(self.state.public_key(),

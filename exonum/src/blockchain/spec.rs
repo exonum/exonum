@@ -19,7 +19,7 @@ macro_rules! storage_value {
         impl<'a> $crate::messages::Field<'a> for $name {
             fn read(buffer: &'a [u8], from: usize, to: usize) -> Self {
                 let vec: Vec<u8> = $crate::messages::Field::read(buffer, from, to);
-                $crate::storage::StorageValue::deserialize(vec)
+                $crate::storage::StorageValue::from_bytes(::std::borrow::Cow::Owned(vec))
             }
 
             fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
@@ -43,18 +43,18 @@ macro_rules! storage_value {
         }
 
         impl $crate::storage::StorageValue for $name {
-            fn serialize(self) -> Vec<u8> {
+            fn hash(&self) -> Hash {
+                $name::hash(self)
+            }
+
+            fn into_vec(self) -> Vec<u8> {
                 self.raw
             }
 
-            fn deserialize(v: Vec<u8>) -> Self {
+            fn from_bytes(value: ::std::borrow::Cow<[u8]>) -> Self {
                 $name {
-                    raw: v
+                    raw: value.into_owned()
                 }
-            }
-
-            fn hash(&self) -> $crate::crypto::Hash {
-                $name::hash(self)
             }
         }
 

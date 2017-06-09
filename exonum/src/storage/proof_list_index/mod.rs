@@ -5,8 +5,9 @@ use crypto::{Hash, hash, HASH_SIZE};
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
-use self::proof::ListProof;
 use self::key::ProofListKey;
+
+pub use self::proof::ListProof;
 
 #[cfg(test)]
 mod tests;

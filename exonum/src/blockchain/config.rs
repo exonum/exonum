@@ -8,7 +8,7 @@ use crypto::{hash, PublicKey, Hash};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
-    pub previous_cfg_hash: Hash, 
+    pub previous_cfg_hash: Hash,
     pub actual_from: u64,
     pub validators: Vec<PublicKey>,
     pub consensus: ConsensusConfig,
@@ -47,12 +47,12 @@ impl StoredConfiguration {
 }
 
 impl StorageValue for StoredConfiguration {
-    fn serialize(self) -> Vec<u8> {
+    fn into_vec(self) -> Vec<u8> {
         self.try_serialize().unwrap()
     }
 
-    fn deserialize(v: Vec<u8>) -> Self {
-        StoredConfiguration::try_deserialize(&v).unwrap()
+    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
+        StoredConfiguration::try_deserialize(v.as_ref()).unwrap()
     }
 
     fn hash(&self) -> Hash {

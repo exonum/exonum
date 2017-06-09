@@ -3,7 +3,7 @@ use iron::Handler;
 use mount::Mount;
 
 use crypto::{Hash, PublicKey, SecretKey};
-use storage::{View, Error as StorageError};
+use storage::{Snapshot, Fork, Error as StorageError};
 use messages::{Message, RawTransaction, Error as MessageError};
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
@@ -12,7 +12,7 @@ use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
-    fn execute(&self, view: &View) -> Result<(), StorageError>;
+    fn execute(&self, view: &mut Fork) -> Result<(), StorageError>;
     fn info(&self) -> Value {
         Value::Null
     }
@@ -25,13 +25,13 @@ pub trait Service: Send + Sync + 'static {
     /// Unique human readable service name.
     fn service_name(&self) -> &'static str;
 
-    fn state_hash(&self, _: &View) -> Result<Vec<Hash>, StorageError> {
+    fn state_hash(&self, _: &Snapshot) -> Result<Vec<Hash>, StorageError> {
         Ok(Vec::new())
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    fn handle_genesis_block(&self, view: &View) -> Result<Value, StorageError> {
+    fn handle_genesis_block(&self, view: &Snapshot) -> Result<Value, StorageError> {
         Ok(Value::Null)
     }
 
@@ -42,21 +42,20 @@ pub trait Service: Send + Sync + 'static {
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
-    /// Returns api handler for maintainers. 
+    /// Returns api handler for maintainers.
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
 }
 
-#[derive(Debug)]
 pub struct NodeState<'a, 'b> {
     state: &'a mut State,
-    view: &'b View,
+    view: &'b Snapshot,
     txs: Vec<Box<Transaction>>,
 }
 
 impl<'a, 'b> NodeState<'a, 'b> {
-    pub fn new(state: &'a mut State, view: &'b View) -> NodeState<'a, 'b> {
+    pub fn new(state: &'a mut State, view: &'b Snapshot) -> NodeState<'a, 'b> {
         NodeState {
             state: state,
             view: view,
@@ -68,7 +67,7 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.validator_state()
     }
 
-    pub fn view(&self) -> &View {
+    pub fn view(&self) -> &Snapshot {
         self.view
     }
 
@@ -156,7 +155,7 @@ impl ApiContext {
     pub fn node_channel(&self) -> &TxSender<NodeChannel> {
         &self.node_channel
     }
-    
+
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
     }

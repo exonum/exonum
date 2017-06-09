@@ -10,7 +10,7 @@ use std::fmt;
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::{State, TxPool};
-use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
+use storage::{Patch, Database, Snapshot, Fork, Error};
 
 pub use self::block::Block;
 pub use self::schema::{Schema, TxLocation, gen_prefix};
@@ -29,12 +29,12 @@ pub mod config;
 
 #[derive(Clone)]
 pub struct Blockchain {
-    db: Storage,
+    db: Box<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
 }
 
 impl Blockchain {
-    pub fn new(db: Storage, services: Vec<Box<Service>>) -> Blockchain {
+    pub fn new(db: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
             let id = service.service_id() as usize;
@@ -51,7 +51,11 @@ impl Blockchain {
         }
     }
 
-    pub fn view(&self) -> StorageView {
+    pub fn snapshot(&self) -> Box<Snapshot> {
+        self.db.snapshot()
+    }
+
+    pub fn fork(&self) -> Fork {
         self.db.fork()
     }
 
@@ -67,14 +71,14 @@ impl Blockchain {
     }
 
     pub fn last_hash(&self) -> Result<Hash, Error> {
-        Ok(Schema::new(&self.view())
+        Ok(Schema::new(&self.snapshot())
                .block_hashes_by_height()
                .last()?
                .unwrap_or_else(Hash::default))
     }
 
     pub fn last_block(&self) -> Result<Block, Error> {
-        Ok(Schema::new(&self.view()).last_block()?.unwrap())
+        Ok(Schema::new(&self.snapshot()).last_block()?.unwrap())
     }
 
     pub fn create_genesis_block(&self, cfg: GenesisConfig) -> Result<(), Error> {
@@ -87,23 +91,23 @@ impl Blockchain {
         };
 
         let patch = {
-            let view = self.view();
+            let snapshot = self.snapshot();
             // Update service tables
             for (id, service) in self.service_map.iter() {
-                let cfg = service.handle_genesis_block(&view)?;
+                let cfg = service.handle_genesis_block(&snapshot);
                 config_propose.services.insert(format!("{}", id), cfg);
             }
             // Commit actual configuration
             {
-                let schema = Schema::new(&view);
-                if schema.block_hash_by_height(0)?.is_some() {
+                let schema = Schema::new(&snapshot);
+                if schema.block_hash_by_height(0).is_some() {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
                     return Ok(());
                 }
-                schema.commit_configuration(config_propose)?;
+                schema.commit_configuration(config_propose);
             };
-            self.merge(&view.changes())?;
-            self.create_patch(0, 0, &[], &BTreeMap::new())?.1
+            self.merge(&snapshot.changes())?;
+            self.create_patch(0, 0, &[], &BTreeMap::new()).1
         };
         self.merge(&patch)?;
         Ok(())
@@ -125,39 +129,39 @@ impl Blockchain {
                         pool: &TxPool)
                         -> Result<(Hash, Patch), Error> {
         // Create fork
-        let fork = self.view();
+        let mut fork = self.fork();
         // Create database schema
-        let schema = Schema::new(&fork);
+        let schema = Schema::new(&mut fork);
         // Get last hash
-        let last_hash = self.last_hash()?;
+        let last_hash = self.last_hash();
         // Save & execute transactions
         for (index, hash) in tx_hashes.iter().enumerate() {
             let tx = &pool[hash];
             tx.execute(&fork)?;
-            schema.transactions().put(hash, tx.raw().clone()).unwrap();
-            schema.block_txs(height).append(*hash).unwrap();
+            schema.transactions().put(hash, tx.raw().clone());
+            schema.block_txs(height).append(*hash);
             let location = TxLocation::new(height, index as u64);
-            schema.tx_location_by_tx_hash().put(hash, location).unwrap();
+            schema.tx_location_by_tx_hash().put(hash, location);
         }
         // Get tx hash
-        let tx_hash = schema.block_txs(height).root_hash()?;
+        let tx_hash = schema.block_txs(height).root_hash();
         // Get state hash
         let state_hash = {
             let sum_table = schema.state_hash_aggregator();
-            let vec_core_state = schema.core_state_hash()?;
+            let vec_core_state = schema.core_state_hash();
             for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
                 let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
                 sum_table.put(&key, core_table_hash)?;
             }
             for service in self.service_map.values() {
                 let service_id = service.service_id();
-                let vec_service_state = service.state_hash(&fork)?;
+                let vec_service_state = service.state_hash(&mut fork);
                 for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
                     let key = Blockchain::service_table_unique_key(service_id, idx);
-                    sum_table.put(&key, service_table_hash)?;
+                    sum_table.put(&key, service_table_hash);
                 }
             }
-            sum_table.root_hash()?
+            sum_table.root_hash()
         };
 
         // Create block
@@ -167,9 +171,9 @@ impl Blockchain {
         let block_hash = block.hash();
         // Update height
         // TODO: check that height == propose.height
-        schema.block_hashes_by_height().append(block_hash).is_ok();
+        schema.block_hashes_by_height().append(block_hash);
         // Save block
-        schema.blocks().put(&block_hash, block).is_ok();
+        schema.blocks().put(&block_hash, block);
         Ok((block_hash, fork.changes()))
     }
 
