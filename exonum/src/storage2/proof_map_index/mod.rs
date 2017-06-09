@@ -2,9 +2,9 @@ use std::marker::PhantomData;
 
 use crypto::Hash;
 
-use super::{BaseIndex, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
-use self::key::{ProofMapKey, DBKey, ChildKind};
+use self::key::{ProofMapKey, DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 use self::proof::{RootProofNode, ProofNode, BranchProofNode};
 
@@ -18,6 +18,23 @@ pub struct ProofMapIndex<T, K, V> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
+}
+
+pub struct ProofMapIndexIter<'a, K, V> {
+    ended: bool,
+    base_iter: BaseIndexIter<'a, DBKey, V>,
+    _k: PhantomData<K>
+}
+
+pub struct ProofMapIndexKeys<'a, K> {
+    ended: bool,
+    base_iter: BaseIndexIter<'a, DBKey, ()>,
+    _k: PhantomData<K>
+}
+
+pub struct ProofMapIndexValues<'a, V> {
+    ended: bool,
+    base_iter: BaseIndexIter<'a, DBKey, V>
 }
 
 enum RemoveResult {
@@ -215,6 +232,51 @@ impl<T, K, V> ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
         self.base.contains(&DBKey::leaf(key))
     }
 
+    pub fn iter(&self) -> ProofMapIndexIter<K, V> {
+        ProofMapIndexIter {
+            ended: false,
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX),
+            _k: PhantomData
+        }
+    }
+
+    pub fn keys(&self) -> ProofMapIndexKeys<K> {
+        ProofMapIndexKeys {
+            ended: false,
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX),
+            _k: PhantomData
+        }
+    }
+
+    pub fn values(&self) -> ProofMapIndexValues<V> {
+        ProofMapIndexValues {
+            ended: false,
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX)
+        }
+    }
+
+    pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
+        ProofMapIndexIter {
+            ended: false,
+            base_iter: self.base.iter_from(&DBKey::leaf(from)),
+            _k: PhantomData,
+        }
+    }
+
+    pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
+        ProofMapIndexKeys {
+            ended: false,
+            base_iter: self.base.iter_from(&DBKey::leaf(from)),
+            _k: PhantomData
+        }
+    }
+
+    pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
+        ProofMapIndexValues {
+            ended: false,
+            base_iter: self.base.iter_from(&DBKey::leaf(from))
+        }
+    }
 }
 
 impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
@@ -413,5 +475,58 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
 
     pub fn clear(&mut self) {
         self.base.clear()
+    }
+}
+
+impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V> where K: ProofMapKey,
+                                                              V: StorageValue {
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.ended {
+            return None
+        }
+        if let Some((k, v)) = self.base_iter.next() {
+            if k.is_leaf() {
+                return Some((K::read(k.as_ref()), v))
+            }
+        }
+        self.ended = true;
+        None
+    }
+}
+
+
+impl<'a, K> Iterator for ProofMapIndexKeys<'a, K> where K: ProofMapKey {
+    type Item = K;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.ended {
+            return None
+        }
+        if let Some((k, ..)) = self.base_iter.next() {
+            if k.is_leaf() {
+                return Some(K::read(k.as_ref()))
+            }
+        }
+        self.ended = true;
+        None
+    }
+}
+
+impl<'a, V> Iterator for ProofMapIndexValues<'a, V> where V: StorageValue {
+    type Item = V;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.ended {
+            return None
+        }
+        if let Some((k, v)) = self.base_iter.next() {
+            if k.is_leaf() {
+                return Some(v)
+            }
+        }
+        self.ended = true;
+        None
     }
 }
