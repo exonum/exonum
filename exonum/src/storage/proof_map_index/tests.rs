@@ -152,12 +152,12 @@ fn remove_trivial() {
     let mut storage1 = MemoryDB::new().fork();
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     index1.put(&[255; 32], vec![6]);
-    index1.delete(&[255; 32]);
+    index1.remove(&[255; 32]);
 
     let mut storage2 = MemoryDB::new().fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
     index2.put(&[255; 32], vec![6]);
-    index2.delete(&[255; 32]);
+    index2.remove(&[255; 32]);
 
     assert_eq!(index1.root_hash(), Hash::zero());
     assert_eq!(index2.root_hash(), Hash::zero());
@@ -171,8 +171,8 @@ fn remove_simple() {
     index1.put(&[250; 32], vec![2]);
     index1.put(&[245; 32], vec![3]);
 
-    index1.delete(&[255; 32]);
-    index1.delete(&[245; 32]);
+    index1.remove(&[255; 32]);
+    index1.remove(&[245; 32]);
 
     let mut storage2 = MemoryDB::new().fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
@@ -180,8 +180,8 @@ fn remove_simple() {
     index2.put(&[255; 32], vec![1]);
     index2.put(&[245; 32], vec![3]);
 
-    index2.delete(&[255; 32]);
-    index2.delete(&[245; 32]);
+    index2.remove(&[255; 32]);
+    index2.remove(&[245; 32]);
 
     assert_eq!(index2.get(&[250; 32]), Some(vec![2]));
     assert_eq!(index1.get(&[250; 32]), Some(vec![2]));
@@ -204,12 +204,12 @@ fn remove_reverse() {
     index1.put(&[250; 32], vec![5]);
     index1.put(&[255; 32], vec![6]);
 
-    index1.delete(&[255; 32]);
-    index1.delete(&[250; 32]);
-    index1.delete(&[245; 32]);
-    index1.delete(&[240; 32]);
-    index1.delete(&[64; 32]);
-    index1.delete(&[42; 32]);
+    index1.remove(&[255; 32]);
+    index1.remove(&[250; 32]);
+    index1.remove(&[245; 32]);
+    index1.remove(&[240; 32]);
+    index1.remove(&[64; 32]);
+    index1.remove(&[42; 32]);
 
     let mut storage2 = MemoryDB::new().fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
@@ -220,12 +220,12 @@ fn remove_reverse() {
     index2.put(&[64; 32], vec![2]);
     index2.put(&[42; 32], vec![1]);
 
-    index2.delete(&[42; 32]);
-    index2.delete(&[64; 32]);
-    index2.delete(&[240; 32]);
-    index2.delete(&[245; 32]);
-    index2.delete(&[250; 32]);
-    index2.delete(&[255; 32]);
+    index2.remove(&[42; 32]);
+    index2.remove(&[64; 32]);
+    index2.remove(&[240; 32]);
+    index2.remove(&[245; 32]);
+    index2.remove(&[250; 32]);
+    index2.remove(&[255; 32]);
 
     assert_eq!(index2.root_hash(), index1.root_hash());
 }
@@ -283,7 +283,7 @@ fn build_proof_in_empty_tree() {
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
 
     table.put(&[230;32], vec![1]); //just to notify the compiler of the types used; same key is added and then removed from tree
-    table.delete(&[230;32]);
+    table.remove(&[230;32]);
 
     let search_res = table.get_proof(&[244; 32]);
     match search_res {
@@ -397,7 +397,7 @@ fn fuzz_delete_build_proofs() {
 
     rng.shuffle(&mut keys_to_remove);
     for key in &keys_to_remove {
-        index1.delete(key);
+        index1.remove(key);
     }
     let table_root_hash = index1.root_hash();
     for key in &keys_to_remove {
@@ -437,11 +437,11 @@ fn fuzz_delete() {
 
     rng.shuffle(&mut keys_to_remove);
     for key in &keys_to_remove {
-        index1.delete(key);
+        index1.remove(key);
     }
     rng.shuffle(&mut keys_to_remove);
     for key in &keys_to_remove {
-        index2.delete(key);
+        index2.remove(key);
     }
 
     for key in &keys_to_remove {
@@ -485,7 +485,7 @@ fn fuzz_insert_after_delete() {
         index1.put(&item.0, item.1.clone());
     }
     for item in &data[50..] {
-        index1.delete(&item.0);
+        index1.remove(&item.0);
     }
 
     for item in &data[0..50] {

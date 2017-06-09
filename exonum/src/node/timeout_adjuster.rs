@@ -12,13 +12,13 @@ use storage::Snapshot;
 /// use exonum::node::State;
 /// use exonum::node::timeout_adjuster::TimeoutAdjuster;
 /// use exonum::events::Milliseconds;
-/// use exonum::storage::View;
+/// use exonum::storage::Snapshot;
 ///
 /// # #[allow(dead_code)]
 /// struct CustomAdjuster {}
 ///
 /// impl TimeoutAdjuster for CustomAdjuster {
-///     fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
+///     fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
 ///         // Simply increase propose time after empty blocks.
 ///         if state.transactions().is_empty() {
 ///             1000
