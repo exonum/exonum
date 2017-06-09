@@ -32,7 +32,6 @@ pub struct ProofListIndex<T, V> {
 }
 
 pub struct ProofListIndexIter<'a, V> {
-    ended: bool,
     base_iter: BaseIndexIter<'a, ProofListKey, V>
 }
 
@@ -139,17 +138,11 @@ impl<T, V> ProofListIndex<T, V> where T: AsRef<Snapshot>,
     }
 
     pub fn iter(&self) -> ProofListIndexIter<V> {
-        ProofListIndexIter {
-            ended: false,
-            base_iter: self.base.iter()
-        }
+        ProofListIndexIter { base_iter: self.base.iter(&0u8) }
     }
 
     pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
-        ProofListIndexIter {
-            ended: false,
-            base_iter: self.base.iter_from(&ProofListKey::leaf(from))
-        }
+        ProofListIndexIter { base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)) }
     }
 }
 
@@ -220,16 +213,7 @@ impl<'a, V> Iterator for ProofListIndexIter<'a, V> where V: StorageValue {
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.ended {
-            return None
-        }
-        if let Some((k, v)) = self.base_iter.next() {
-            if k.height() == 0 {
-                return Some(v)
-            }
-        }
-        self.ended = true;
-        None
+        self.base_iter.next().map(|(_, v)| v)
     }
 }
 

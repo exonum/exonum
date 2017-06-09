@@ -27,11 +27,11 @@ impl<T, K> KeySetIndex<T, K> where T: AsRef<Snapshot>,
     }
 
     pub fn iter(&self) -> KeySetIndexIter<K> {
-        KeySetIndexIter { base_iter: self.base.iter() }
+        KeySetIndexIter { base_iter: self.base.iter(&()) }
     }
 
     pub fn iter_from(&self, from: &K) -> KeySetIndexIter<K> {
-        KeySetIndexIter { base_iter: self.base.iter_from(from) }
+        KeySetIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
 }
 
