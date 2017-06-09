@@ -82,6 +82,17 @@ impl<'a, K, V> MapIndex<&'a mut Fork, K, V> where K: StorageKey,
     }
 }
 
+impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V> where T: AsRef<Snapshot>,
+                                                                            K: StorageKey,
+                                                                            V: StorageValue {
+    type Item = (K, V);
+    type IntoIter = MapIndexIter<'a, K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<'a, K, V> Iterator for MapIndexIter<'a, K, V> where K: StorageKey,
                                                          V: StorageValue, {
     type Item = (K, V);

@@ -464,6 +464,17 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V> where K: ProofMapKey,
     }
 }
 
+impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V> where T: AsRef<Snapshot>,
+                                                                                 K: ProofMapKey,
+                                                                                 V: StorageValue {
+    type Item = (K, V);
+    type IntoIter = ProofMapIndexIter<'a, K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V> where K: ProofMapKey,
                                                               V: StorageValue {
     type Item = (K, V);
