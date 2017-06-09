@@ -17,6 +17,9 @@ function CryptocurrencyService(configuration) {
 
     this.AddFundsTransactionParams = {
         size: 48,
+        network_id: configuration.network_id,
+        protocol_version: configuration.protocol_version,
+        service_id: configuration.service_id,
         message_id: 129,
         fields: {
             wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -29,6 +32,9 @@ function CryptocurrencyService(configuration) {
         // TODO revert later
         // size: 144,
         size: 40,
+        network_id: configuration.network_id,
+        protocol_version: configuration.protocol_version,
+        service_id: configuration.service_id,
         message_id: 130,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -42,6 +48,9 @@ function CryptocurrencyService(configuration) {
 
     this.TransferTransactionParams = {
         size: 80,
+        network_id: configuration.network_id,
+        protocol_version: configuration.protocol_version,
+        service_id: configuration.service_id,
         message_id: 128,
         fields: {
             from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
@@ -54,20 +63,20 @@ function CryptocurrencyService(configuration) {
     this.getTransactionTypeParams = function(id) {
         switch (id) {
             case 128:
-                return new Exonum.newMessage(this.TransferTransactionParams);
+                return Exonum.newMessage(this.TransferTransactionParams);
                 break;
             case 129:
-                return new Exonum.newMessage(this.AddFundsTransactionParams);
+                return Exonum.newMessage(this.AddFundsTransactionParams);
                 break;
             case 130:
-                return new Exonum.newMessage(this.CreateWalletTransactionParams);
+                return Exonum.newMessage(this.CreateWalletTransactionParams);
                 break;
         }
     };
 
     this.submitTransaction = function(typeParams, data, publicKey, secretKey, callback) {
         var self = this;
-        var type = new Exonum.newMessage(typeParams);
+        var type = Exonum.newMessage(typeParams);
 
         type.signature = type.sign(secretKey, data);
 
