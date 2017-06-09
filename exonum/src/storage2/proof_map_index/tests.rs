@@ -7,10 +7,9 @@ use rand::{thread_rng, Rng};
 use crypto::{hash, Hash};
 use super::super::{Database, MemoryDB};
 
-use super::{DBKey, BranchNode, ProofMapIndex};
+use super::{DBKey, ProofMapIndex};
 use super::proof::RootProofNode;
 use super::key::{KEY_SIZE, LEAF_KEY_PREFIX};
-use super::key::ChildKind::*;
 
 // Makes large data set with unique keys
 fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {

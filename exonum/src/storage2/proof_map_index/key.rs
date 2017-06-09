@@ -39,6 +39,7 @@ pub enum ChildKind {
     Right,
 }
 
+#[derive(Clone)]
 pub struct DBKey {
     data: [u8; KEY_SIZE],
     from: u16,
@@ -63,11 +64,16 @@ impl DBKey {
 
         let mut data = [0; KEY_SIZE];
         key.write(&mut data);
-        DBKey { data: data, from: 0, to: KEY_SIZE as u16 }
+        DBKey { data: data, from: 0, to: (KEY_SIZE * 8) as u16 }
     }
 
     pub fn from(&self) -> u16 {
         self.from
+    }
+
+    // FIXME: terrible hack, try to remove this
+    pub fn set_from(&mut self, from: u16) {
+        self.from = from
     }
 
     pub fn to(&self) -> u16 {
@@ -146,9 +152,7 @@ impl DBKey {
 
     /// Returns true if self.to not changed
     pub fn is_leaf(&self) -> bool {
-        debug_assert!(self.from == 0);
-
-        self.to == KEY_SIZE as u16
+        self.to == (KEY_SIZE * 8) as u16
     }
 }
 
@@ -196,7 +200,7 @@ impl PartialEq for DBKey {
 impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "DBKey(")?;
-        for i in self.to..self.from {
+        for i in self.from..self.to {
             write!(f, "{}", match self.get(i) {
                 ChildKind::Left => '0',
                 ChildKind::Right => '1'
