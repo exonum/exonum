@@ -20,11 +20,12 @@ use api::Api;
 use self::timeout_adjuster::TimeoutAdjuster;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
+pub use self::whitelist::Whitelist;
 
 mod basic;
 mod consensus;
 mod requests;
-
+mod whitelist;
 pub mod state; // TODO: temporary solution to get access to WAIT consts
 pub mod timeout_adjuster;
 
@@ -64,6 +65,7 @@ pub struct NodeHandler<S>
 pub struct ListenerConfig {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
+    pub whitelist: Whitelist,
     pub address: SocketAddr,
 }
 
@@ -96,6 +98,7 @@ pub struct NodeConfig {
     pub peers: Vec<SocketAddr>,
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
+    pub whitelist: Whitelist,
     pub api: NodeApiConfig,
 }
 
@@ -141,15 +144,17 @@ impl<S> NodeHandler<S>
                                    sender.get_time(),
                                    &config.listener.secret_key);
 
-
+        let mut whitelist = config.listener.whitelist;
+        whitelist.set_validators(stored.validators.iter().cloned()); 
         let mut state = State::new(validator_id,
-                                   config.listener.public_key,
-                                   config.listener.secret_key,
-                                   stored,
-                                   connect,
-                                   last_hash,
-                                   last_height,
-                                   sender.get_time());
+                               config.listener.public_key,
+                               config.listener.secret_key,
+                               whitelist,
+                               stored,
+                               connect,
+                               last_hash,
+                               last_height,
+                               sender.get_time());
 
         let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
         let timeout = timeout_adjuster.adjust_timeout(&state, blockchain.view());
@@ -387,6 +392,7 @@ impl Node {
             listener: ListenerConfig {
                 public_key: node_cfg.public_key,
                 secret_key: node_cfg.secret_key,
+                whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
             },
             network: node_cfg.network,

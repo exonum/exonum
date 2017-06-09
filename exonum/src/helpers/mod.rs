@@ -46,6 +46,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 public_key: validator.0,
                 secret_key: validator.1,
                 genesis: genesis.clone(),
+                whitelist: Default::default(),
                 api: Default::default(),
             }
         })

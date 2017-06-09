@@ -4,6 +4,8 @@ use std::fmt;
 use std::error::Error as ErrorTrait;
 use std::convert;
 
+use byteorder::{BigEndian, ByteOrder};
+
 pub use leveldb::options::Options as LevelDBOptions;
 pub use leveldb::database::cache::Cache as LevelDBCache;
 
@@ -125,3 +127,50 @@ mod details {
 
 pub type Storage = details::Storage;
 pub type View = details::View;
+
+/// Rules to serialize unsigned integers as storage keys.
+macro_rules! implement_unsigned_integer_key {
+    ($name:ident; $uint_type:ident; $uint_size:expr; $fn_read:expr; $fn_write:expr) => (
+        /// Serialized key for `$int_type` that can be used in storage keys.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub struct $name([u8; $uint_size]);
+
+        impl From<$uint_type> for $name {
+            fn from(v: $uint_type) -> $name {
+                let mut bytes = [0; $uint_size];
+                $fn_write(&mut bytes, v);
+                $name(bytes)
+            }
+        }
+
+        impl From<$name> for $uint_type {
+            fn from(v: $name) -> $uint_type {
+                $fn_read(&v.0)
+            }
+        }
+
+        impl AsRef<[u8]> for $name {
+            fn as_ref(&self) -> &[u8] {
+                self.0.as_ref()
+            }
+        }
+
+        impl $name {
+            /// Creates key from the raw bytes vec.
+            pub fn from_vec(bytes: Vec<u8>) -> $name {
+                let mut buf = [0; $uint_size];
+                buf.copy_from_slice(&bytes[0..$uint_size]);
+                $name(buf)
+            }
+
+            /// Serializes the key as bytes vec.
+            pub fn to_vec(self) -> Vec<u8> {
+                self.0.to_vec()
+            }
+        }
+    )
+}
+
+implement_unsigned_integer_key! { U16Key; u16; 2; BigEndian::read_u16; BigEndian::write_u16 }
+implement_unsigned_integer_key! { U32Key; u32; 4; BigEndian::read_u32; BigEndian::write_u32 }
+implement_unsigned_integer_key! { U64Key; u64; 8; BigEndian::read_u64; BigEndian::write_u64 }

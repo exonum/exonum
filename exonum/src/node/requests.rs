@@ -17,6 +17,11 @@ impl<S> NodeHandler<S>
             return;
         }
 
+        if !self.state.whitelist().allow(msg.from()) {
+            error!("Received request message from peer = {:?} which not in whitelist.", msg.from());
+            return;
+        }
+
         if !msg.verify(msg.from()) {
             return;
         }
