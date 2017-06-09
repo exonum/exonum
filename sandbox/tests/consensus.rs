@@ -2396,6 +2396,7 @@ fn test_exclude_validator_from_consensus() {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.validators.swap_remove(0);
         consensus_cfg.actual_from = sandbox.current_height() + 2;
+        consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
                       &consensus_cfg.clone().serialize(),
@@ -2424,6 +2425,7 @@ fn test_schema_config_changes() {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.txs_block_limit = 2000;
         consensus_cfg.actual_from = sandbox.current_height() + 2;
+        consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         let tx = TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
                                &consensus_cfg.clone().serialize(),
