@@ -3,7 +3,7 @@ use iron::Handler;
 use mount::Mount;
 
 use crypto::{Hash, PublicKey, SecretKey};
-use storage::{Snapshot, Fork, Error as StorageError};
+use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction, Error as MessageError};
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
@@ -12,7 +12,7 @@ use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
-    fn execute(&self, view: &mut Fork) -> Result<(), StorageError>;
+    fn execute(&self, view: &mut Fork);
     fn info(&self) -> Value {
         Value::Null
     }

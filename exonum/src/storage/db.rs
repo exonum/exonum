@@ -49,12 +49,6 @@ pub trait Database: Send + Sync + 'static {
     fn merge(&mut self, patch: Patch) -> Result<()>;
 }
 
-impl Clone for Box<Database> {
-    fn clone(&self) -> Self {
-        Self::clone(self)
-    }
-}
-
 pub trait Snapshot {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
     fn contains(&self, key: &[u8]) -> bool {

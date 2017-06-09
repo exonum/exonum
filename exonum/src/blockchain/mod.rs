@@ -27,7 +27,6 @@ mod service;
 
 pub mod config;
 
-#[derive(Clone)]
 pub struct Blockchain {
     db: Box<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
@@ -149,7 +148,7 @@ impl Blockchain {
             let (tx_hash, state_hash) = {
 
                 let state_hashes = {
-                    let mut schema = Schema::new(&fork);
+                    let schema = Schema::new(&fork);
 
                     let vec_core_state = schema.core_state_hash();
                     let mut state_hashes = Vec::new();
@@ -270,6 +269,15 @@ impl Blockchain {
 impl fmt::Debug for Blockchain {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Blockchain(..)")
+    }
+}
+
+impl Clone for Blockchain {
+    fn clone(&self) -> Blockchain {
+        Blockchain {
+            db: self.db.clone(),
+            service_map: self.service_map.clone()
+        }
     }
 }
 

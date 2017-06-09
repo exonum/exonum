@@ -4,7 +4,7 @@ use std::mem;
 
 use crypto::{Hash};
 use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
-use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, Error, MapProof};
+use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, MapProof};
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 

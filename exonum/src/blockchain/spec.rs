@@ -61,7 +61,6 @@ macro_rules! storage_value {
         // TODO extract some fields like hash and from_raw into trait
         impl $name {
             pub fn new($($field_name: $field_type,)*) -> $name {
-                use $crate::messages::{Field};
                 let mut buf = vec![0; $body];
                 $($crate::messages::Field::write(&$field_name, &mut buf, $from, $to);)*
                 $name { raw: buf }

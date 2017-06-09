@@ -76,8 +76,6 @@ macro_rules! implement_public_sodium_wrapper {
 
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let inner = &self.0;
-            let slice = &inner.0;
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             for i in &self[0..BYTES_IN_DEBUG] {
@@ -111,8 +109,6 @@ macro_rules! implement_private_sodium_wrapper {
     }
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let inner = &self.0;
-            let slice = &inner.0;
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             for i in &self[0..BYTES_IN_DEBUG] {
