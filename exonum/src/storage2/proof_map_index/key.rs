@@ -174,7 +174,14 @@ impl StorageKey for DBKey {
             buffer[KEY_SIZE + 1] = 0;
         } else {
             buffer[0] = BRANCH_KEY_PREFIX;
-            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.data);
+            let right = (self.to as usize + 7) / 8;
+            buffer[1..right + 1].copy_from_slice(&self.data[0..right]);
+            if self.to % 8 != 0 {
+                buffer[right] &= !(255u8 >> (self.to % 8));
+            }
+            for i in right + 1 .. KEY_SIZE + 1 {
+                buffer[i] = 0
+            }
             buffer[KEY_SIZE + 1] = self.to as u8;
         }
     }

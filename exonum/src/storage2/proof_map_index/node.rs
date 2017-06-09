@@ -7,6 +7,7 @@ use super::key::{DBKey, ChildKind, DB_KEY_SIZE};
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
 
+#[derive(Debug)]
 pub enum Node<T: StorageValue> {
     Leaf(T),
     Branch(BranchNode),
@@ -80,18 +81,17 @@ impl StorageValue for BranchNode {
     }
 }
 
-// impl ::std::fmt::Debug for BranchNode {
-//     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-//         f.debug_struct("BranchNode")
-//             .field("left_prefix", &self.child_slice(ChildKind::Left))
-//             .field("left_hash", &bytes_to_hex(self.child_hash(ChildKind::Left)))
-//             .field("right_prefix", &self.child_slice(ChildKind::Right))
-//             .field("right_hash",
-//                    &bytes_to_hex(self.child_hash(ChildKind::Right)))
-//             .field("hash", &bytes_to_hex(&self.hash()))
-//             .finish()
-//     }
-// }
+impl ::std::fmt::Debug for BranchNode {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        f.debug_struct("BranchNode")
+            .field("left_prefix", &self.child_slice(ChildKind::Left))
+            .field("left_hash", &self.child_hash(ChildKind::Left))
+            .field("right_prefix", &self.child_slice(ChildKind::Right))
+            .field("right_hash", &self.child_hash(ChildKind::Right))
+            .field("hash", &self.hash())
+            .finish()
+    }
+}
 
 #[cfg(test)]
 mod tests {
