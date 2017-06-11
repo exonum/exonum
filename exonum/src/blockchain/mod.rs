@@ -18,8 +18,6 @@ pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, NodeState, ApiContext};
 
-#[macro_use]
-mod spec;
 mod block;
 mod schema;
 mod genesis;

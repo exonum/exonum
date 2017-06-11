@@ -41,7 +41,7 @@
 /// ```
 ///
 /// For additionall reference about data layout see also 
-/// *[ `stream_struct` documentation](./stream_struct/index.html).*
+/// *[ `encoding` documentation](./encoding/index.html).*
 ///
 /// `message!` internaly use `ident_count!`, be sure to add this macro to namespace.
 #[macro_export]
@@ -70,46 +70,46 @@ macro_rules! message {
             }
         }
 
-        impl<'a> $crate::stream_struct::Field<'a> for $name {
+        impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
-                           from: $crate::stream_struct::Offset,
-                           to: $crate::stream_struct::Offset) -> Self {
-                let raw_message: $crate::messages::RawMessage = $crate::stream_struct::Field::read(buffer, from, to);
+                           from: $crate::encoding::Offset,
+                           to: $crate::encoding::Offset) -> Self {
+                let raw_message: $crate::messages::RawMessage = $crate::encoding::Field::read(buffer, from, to);
                 $crate::messages::FromRaw::from_raw(raw_message).unwrap()
             }
 
             fn write(&self,
                             buffer: &mut Vec<u8>,
-                            from: $crate::stream_struct::Offset,
-                            to: $crate::stream_struct::Offset) {
-                $crate::stream_struct::Field::write(&self.raw, buffer, from, to);
+                            from: $crate::encoding::Offset,
+                            to: $crate::encoding::Offset) {
+                $crate::encoding::Field::write(&self.raw, buffer, from, to);
             }
 
             fn check(buffer: &'a [u8],
-                     from: $crate::stream_struct::CheckedOffset,
-                     to: $crate::stream_struct::CheckedOffset) -> $crate::stream_struct::Result {
+                     from: $crate::encoding::CheckedOffset,
+                     to: $crate::encoding::CheckedOffset) -> $crate::encoding::Result {
                 let check = <$crate::messages::RawMessage as
-                                $crate::stream_struct::Field>::check(buffer,
+                                $crate::encoding::Field>::check(buffer,
                                                                 from,
                                                                 to)?;
                 let raw_message: $crate::messages::RawMessage = 
-                                    unsafe { $crate::stream_struct::Field::read(buffer,
+                                    unsafe { $crate::encoding::Field::read(buffer,
                                                                 from.unchecked_offset(),
                                                                 to.unchecked_offset())};
                 <Self>::check_fields(&raw_message)?;
                 Ok(check)
             }
 
-            fn field_size() -> $crate::stream_struct::Offset {
+            fn field_size() -> $crate::encoding::Offset {
                 // We write message as regular buffer,
                 // so real `field_size` is 8.
-                8 as $crate::stream_struct::Offset
+                8 as $crate::encoding::Offset
             }
         }
 
         impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
-                -> Result<$name, $crate::stream_struct::Error> {
+                -> Result<$name, $crate::encoding::Error> {
                 <Self>::check_fields(&raw)?;
                 Ok($name { raw: raw })
             }
@@ -140,12 +140,12 @@ macro_rules! message {
 
             }
 
-            fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::stream_struct::Result {
+            fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::encoding::Result {
                 let mut last_data = (($body + $crate::messages::HEADER_SIZE)
-                                        as $crate::stream_struct::Offset).into();
+                                        as $crate::encoding::Offset).into();
                 $(
-                    let field_from: $crate::stream_struct::Offset = $from;
-                    let field_to: $crate::stream_struct::Offset = $to;
+                    let field_from: $crate::encoding::Offset = $from;
+                    let field_to: $crate::encoding::Offset = $to;
                     raw_message.check::<$field_type>(field_from.into(),field_to.into())?
                         .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
                 )*
@@ -168,62 +168,55 @@ macro_rules! message {
             }
         }
 
-        impl $crate::stream_struct::serialize::json::ExonumJsonSerialize for $name {
-                fn serialize<S>(&self, serializer: S) ->
-                    Result<S::Ok, S::Error>
-                where S: $crate::stream_struct::serialize::reexport::Serializer
-                {
-                    use $crate::stream_struct::serialize::reexport::SerializeStruct;
-                    use $crate::stream_struct::serialize::json;
-
-                    pub struct Body<'a>{_self: &'a $name};
-                    impl<'a> $crate::stream_struct::serialize::reexport::Serialize for Body<'a> {
-                        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                            where S: $crate::stream_struct::serialize::reexport::Serializer
-                        {
-                            let mut structure = serializer.serialize_struct(stringify!($name),
-                                                            idents_count!($($field_name)*) )?;
-                            $(structure.serialize_field(stringify!($field_name),
-                                            &json::wrap(&self._self.$field_name()))?;)*
-
-                            structure.end()
-                        }
-                    }
-
-                    let mut structure = serializer.serialize_struct(stringify!($name), 6 )?;
-                    structure.serialize_field("body", &Body{_self: &self})?;
-                    structure.serialize_field("signature", &json::wrap(self.raw.signature()))?;
-                    structure.serialize_field("message_id", &json::wrap(&self.raw.message_type()))?;
-                    structure.serialize_field("service_id", &json::wrap(&self.raw.service_id()))?;
-                    structure.serialize_field("network_id", &json::wrap(&self.raw.network_id()))?;
-                    structure.serialize_field("protocol_version",&json::wrap(&self.raw.version()))?;
-                    structure.end()
-                }
-        }
-
-        impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
-            fn deserialize_field<B> (value: &$crate::stream_struct::serialize::json::reexport::Value,
+        impl $crate::encoding::serialize::json::ExonumJson for $name {
+            fn deserialize_field<B> (value: &$crate::encoding::serialize::json::reexport::Value,
                                         buffer: & mut B,
-                                        from: $crate::stream_struct::Offset,
-                                        to: $crate::stream_struct::Offset )
+                                        from: $crate::encoding::Offset,
+                                        to: $crate::encoding::Offset )
                 -> Result<(), Box<::std::error::Error>>
-            where B: $crate::stream_struct::serialize::WriteBufferWrapper
+            where B: $crate::encoding::serialize::WriteBufferWrapper
             {
-                use $crate::stream_struct::serialize::json::ExonumJsonDeserialize;
+                use $crate::encoding::serialize::json::ExonumJsonDeserialize;
                 // deserialize full field
                 let structure = <Self as ExonumJsonDeserialize>::deserialize(value)?;
                 // then write it
                 buffer.write(from, to, structure);
                 Ok(())
             }
+                        
+            fn serialize_field(&self) 
+                -> Result<$crate::encoding::serialize::json::reexport::Value,
+                            Box<::std::error::Error>>
+            {
+                use $crate::encoding::serialize::json::reexport::Value;
+                use $crate::encoding::serialize::json::reexport::Map;
+                let mut body = Map::new();
+                $(
+                    body.insert(stringify!($field_name).to_string(),
+                        self.$field_name().serialize_field()?);
+                )*
+                let mut structure = Map::new();
+                structure.insert("body".to_string(), Value::Object(body));
+                structure.insert("signature".to_string(),
+                                    self.raw.signature().serialize_field()?);
+                structure.insert("message_id".to_string(),
+                                    self.raw.message_type().serialize_field()?);
+                structure.insert("service_id".to_string(),
+                                    self.raw.service_id().serialize_field()?);
+                structure.insert("network_id".to_string(),
+                                    self.raw.network_id().serialize_field()?);
+                structure.insert("protocol_version".to_string(),
+                                    self.raw.version().serialize_field()?);
+                Ok(Value::Object(structure))
+            }
         }
 
-        impl $crate::stream_struct::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::stream_struct::serialize::json::reexport::Value)
+        impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>>
             {
-                use $crate::stream_struct::serialize::json::ExonumJsonDeserializeField;
-                use $crate::stream_struct::serialize::json::reexport::from_value;
+                use $crate::encoding::serialize::json::ExonumJson;
+                use $crate::encoding::serialize::json::reexport::from_value;
                 use $crate::messages::{RawMessage, MessageWriter};
 
                 // if we could deserialize values, try append signature
@@ -257,7 +250,7 @@ macro_rules! message {
                 $(
                     let val = obj.get(stringify!($field_name))
                                     .ok_or("Can't get object from json.")?;
-                    <$field_type as ExonumJsonDeserializeField>::deserialize_field(val,
+                    <$field_type as ExonumJson>::deserialize_field(val,
                                                                     &mut writer, $from, $to )?;
                 )*
 
@@ -266,24 +259,29 @@ macro_rules! message {
         }
 
         // TODO: Rewrite Deserialize and Serialize implementation
-        impl<'de> $crate::stream_struct::serialize::reexport::Deserialize<'de> for $name {
+        impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where D: $crate::stream_struct::serialize::reexport::Deserializer<'de>
+                where D: $crate::encoding::serialize::reexport::Deserializer<'de>
             {
-                use $crate::stream_struct::serialize::json::reexport::Value;
-                use $crate::stream_struct::serialize::reexport::{Error, Deserialize};
+                use $crate::encoding::serialize::json::reexport::Value;
+                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::stream_struct::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
+                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
                 .map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 
-        impl $crate::stream_struct::serialize::reexport::Serialize for $name {
+        impl $crate::encoding::serialize::reexport::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: $crate::stream_struct::serialize::reexport::Serializer
-                {
-                    $crate::stream_struct::serialize::json::wrap(self).serialize(serializer)
-                }
+                where S: $crate::encoding::serialize::reexport::Serializer
+           {
+               use $crate::encoding::serialize::reexport::SerError;
+                use $crate::encoding::serialize::json::ExonumJson;
+                self.serialize_field()
+                    .map_err(|_| S::Error::custom(
+                                concat!("Can not serialize structure: ", stringify!($name))))?
+                    .serialize(serializer)
+            }
         }
 
     )

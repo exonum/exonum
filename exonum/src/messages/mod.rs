@@ -3,7 +3,7 @@ use bit_vec;
 use std::fmt;
 
 use crypto::PublicKey;
-use stream_struct::Error;
+use encoding::Error;
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw,
                     HEADER_SIZE, PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};

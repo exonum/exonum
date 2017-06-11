@@ -5,9 +5,6 @@
 // TODO refer to difference between json serialization and exonum_json
 // TODO implement Field for float
 // TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage
-// TODO implement owned ExonumJsonDeserialize for big ints
-
-use serde::{Serializer, Serialize};
 
 use serde_json::value::Value;
 use bit_vec::BitVec;
@@ -18,18 +15,19 @@ use std::sync::Arc;
 use std::net::SocketAddr;
 use std::error::Error;
 
-use crypto::{Hash, PublicKey, SecretKey, Seed, Signature};
+use crypto::{Hash, PublicKey, Signature };
+// TODO: should we implement serilize for: `SecretKey`, `Seed` ?
 
-use stream_struct::{Field, Offset};
+use encoding::{Field, Offset};
 use super::HexValue;
 use super::WriteBufferWrapper;
 
 macro_rules! impl_default_deserialize_owned {
     (@impl $name:ty) => {
-        impl $crate::stream_struct::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::stream_struct::serialize::json::reexport::Value)
+        impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
                                                         -> Result<Self, Box<::std::error::Error>> {
-                use $crate::stream_struct::serialize::json::reexport::from_value;
+                use $crate::encoding::serialize::json::reexport::from_value;
                 Ok(from_value(value.clone())?)
             }
         }
@@ -38,41 +36,20 @@ macro_rules! impl_default_deserialize_owned {
         ($(impl_default_deserialize_owned!{@impl $name})*);
 }
 
-macro_rules! propagate_deserialize_to_owned {
-    (@impl $name:ty) => {
-        impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
-            fn deserialize_field<B: WriteBufferWrapper>(
-                value: &$crate::stream_struct::serialize::json::reexport::Value,
-                                                        buffer: &mut B,
-                                                        from: Offset,
-                                                        to: Offset)
-                                                        -> Result<(), Box<::std::error::Error>> {
-                use $crate::stream_struct::serialize::json::ExonumJsonDeserialize;
-                // deserialize full field
-                let structure = <Self as ExonumJsonDeserialize>::deserialize(value)?;
-                // then write it
-                buffer.write(from, to, structure);
-                Ok(())
-            }
-        }
-
-    };
-    ($($name:ty);*) =>
-        ($(propagate_deserialize_to_owned!{@impl $name})*);
-}
-
-/// `ExonumJsonDeserializeField` is trait for object
-/// that can be serialized "in-place".
+/// `ExonumJson` is trait for object
+/// that can be serialized and deserialize "in-place".
 ///
 /// This trait is important for field types that could not be
 /// deserialized directly, for example: borrowed array.
-pub trait ExonumJsonDeserializeField {
+pub trait ExonumJson {
     /// write deserialized field in buffer on place.
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
                                                 to: Offset)
                                                 -> Result<(), Box<Error>>;
+    /// serialize field as `json::Value`
+    fn serialize_field(&self) -> Result<Value, Box<Error>>;
 }
 
 /// `ExonumJsonDeserialize` is trait for objects that could be constructed from exonum json.
@@ -81,120 +58,15 @@ pub trait ExonumJsonDeserialize {
     fn deserialize(value: &Value) -> Result<Self, Box<Error>> where Self: Sized;
 }
 
-/// `ExonumJsonSerialize` is trait for object that
-/// could be serialized as json with exonum protocol specific aspects.
-pub trait ExonumJsonSerialize {
-    /// serialize value with specific apsects.
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error>;
-}
-
-/// Helper function, for wrapping value that should be serialized as `ExonumJsonSerialize`
-pub fn wrap<T: ExonumJsonSerialize>(val: &T) -> ExonumJsonSerializeWrapper<T> {
-    ExonumJsonSerializeWrapper(val)
-}
-
-/// Wrapping struct that allows implementing custom serializing aspects in json.
-#[derive(Debug)]
-pub struct ExonumJsonSerializeWrapper<'a, T: ExonumJsonSerialize + 'a>(&'a T);
-
 #[derive(Serialize, Deserialize, Debug)]
 struct DurationHelper {
     secs: String,
     nanos: u32,
 }
-
-impl<'a, T: ExonumJsonSerialize + 'a> Serialize for ExonumJsonSerializeWrapper<'a, T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        self.0.serialize(serializer)
-    }
-}
-
-impl_default_serialize!{ExonumJsonSerialize =>
-    u8; u16; u32; i8; i16; i32; bool;
-    Signature; SocketAddr}
-
-impl_default_serialize_deref!{ExonumJsonSerialize =>
-    Hash; PublicKey; SecretKey; Seed}
-
-impl ExonumJsonSerialize for u64 {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&format!("{}", self))
-    }
-}
-
-impl ExonumJsonSerialize for i64 {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&format!("{}", self))
-    }
-}
-
-impl<'a> ExonumJsonSerialize for &'a [u8] {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_hex())
-    }
-}
-
-impl<'a> ExonumJsonSerialize for &'a str {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(self)
-    }
-}
-
-impl ExonumJsonSerialize for BitVec {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut out = String::new();
-        for i in self.iter() {
-            if i {
-                out.push('1');
-            } else {
-                out.push('0');
-            }
-        }
-        serializer.serialize_str(&out)
-    }
-}
-
-impl ExonumJsonSerialize for Arc<::messages::MessageBuffer> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let slice = self.as_ref();
-        serializer.serialize_str(&slice.to_hex())
-    }
-}
-
-impl<'a> ExonumJsonSerialize for &'a [Hash] {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let vec: Vec<_> = self.iter().collect();
-        serializer.collect_seq(vec.iter().map(|v| wrap(v)))
-    }
-}
-
-impl<T> ExonumJsonSerialize for Vec<T>
-    where T: ExonumJsonSerialize
-{
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.collect_seq(self.iter().map(|v| wrap(v)))
-    }
-}
-
-impl ExonumJsonSerialize for SystemTime {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        use serde::ser::Error;
-        let duration = self.duration_since(UNIX_EPOCH).map_err(S::Error::custom)?;
-        let duration = DurationHelper {
-            secs: duration.as_secs().to_string(),
-            nanos: duration.subsec_nanos(),
-        };
-        <DurationHelper as Serialize>::serialize(&duration, serializer)
-    }
-}
-
 // implementation of deserialization
-
 macro_rules! impl_deserialize_int {
     (@impl $typename:ty) => {
-        impl ExonumJsonDeserializeField for $typename {
+        impl ExonumJson for $typename {
             fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                          buffer: &mut B,
                                                          from: Offset,
@@ -205,6 +77,10 @@ macro_rules! impl_deserialize_int {
                 buffer.write(from, to, number as $typename);
                 Ok(())
             }
+
+            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+                Ok(Value::Number((*self).into()))
+            }
         }
     };
     ($($name:ty);*) => ($(impl_deserialize_int!{@impl $name})*);
@@ -212,7 +88,7 @@ macro_rules! impl_deserialize_int {
 
 macro_rules! impl_deserialize_bigint {
     (@impl $typename:ty) => {
-        impl ExonumJsonDeserializeField for $typename {
+        impl ExonumJson for $typename {
             fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                         buffer: & mut B,
                                                         from: Offset,
@@ -224,6 +100,10 @@ macro_rules! impl_deserialize_bigint {
                 buffer.write(from, to, val);
                 Ok(())
             }
+
+            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+                Ok(Value::String(self.to_string()))
+            }
         }
     };
     ($($name:ty);*) => ($(impl_deserialize_bigint!{@impl $name})*);
@@ -232,13 +112,17 @@ macro_rules! impl_deserialize_bigint {
 /*
 macro_rules! impl_deserialize_float {
     (@impl $traitname:ident $typename:ty) => {
-        impl<'a> ExonumJsonDeserialize for $typename {
+        impl<'a> ExonumJson for $typename {
             fn deserialize(value: &Value, buffer: &'a mut Vec<u8>,
                             from: usize, to: usize ) -> bool {
                     value.as_f64()
                          .map(|v| v as $typename)
                          .map(|val| val.write(buffer, from, to))
                          .is_some()
+            }
+
+            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+                Value::Number(self.into())
             }
         }
     };
@@ -249,7 +133,7 @@ impl_deserialize_int!{ f32; f64 }
 
 macro_rules! impl_deserialize_hex_segment {
     (@impl $typename:ty) => {
-        impl<'a> ExonumJsonDeserializeField for &'a $typename {
+        impl<'a> ExonumJson for &'a $typename {
             fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                         buffer: & mut B,
                                                         from: Offset,
@@ -260,6 +144,10 @@ macro_rules! impl_deserialize_hex_segment {
                 let val = <$typename as HexValue>:: from_hex(stri)?;
                 buffer.write(from, to, &val);
                 Ok(())
+            }
+
+            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+                Ok(Value::String(self.to_hex()))
             }
         }
     };
@@ -274,7 +162,7 @@ impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
 impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
                                 Hash; PublicKey; Signature; bool}
 
-impl ExonumJsonDeserializeField for bool {
+impl ExonumJson for bool {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
@@ -284,9 +172,13 @@ impl ExonumJsonDeserializeField for bool {
         buffer.write(from, to, val);
         Ok(())
     }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::Bool(*self))
+    }
 }
 
-impl<'a> ExonumJsonDeserializeField for &'a str {
+impl<'a> ExonumJson for &'a str {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
@@ -296,9 +188,13 @@ impl<'a> ExonumJsonDeserializeField for &'a str {
         buffer.write(from, to, val);
         Ok(())
     }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::String(self.to_string()))
+    }
 }
 
-impl ExonumJsonDeserializeField for SystemTime {
+impl ExonumJson for SystemTime {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
@@ -310,9 +206,18 @@ impl ExonumJsonDeserializeField for SystemTime {
         buffer.write(from, to, system_time);
         Ok(())
     }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        let duration = self.duration_since(UNIX_EPOCH)?;
+        let duration = DurationHelper {
+            secs: duration.as_secs().to_string(),
+            nanos: duration.subsec_nanos(),
+        };
+        Ok(::serde_json::to_value(&duration)?)
+    }
 }
 
-impl ExonumJsonDeserializeField for SocketAddr {
+impl ExonumJson for SocketAddr {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
@@ -322,9 +227,13 @@ impl ExonumJsonDeserializeField for SocketAddr {
         buffer.write(from, to, addr);
         Ok(())
     }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(::serde_json::to_value(&self)?)
+    }
 }
 
-impl<'a> ExonumJsonDeserializeField for &'a [Hash] {
+impl<'a> ExonumJson for &'a [Hash] {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
@@ -339,10 +248,17 @@ impl<'a> ExonumJsonDeserializeField for &'a [Hash] {
         }
         buffer.write(from, to, vec.as_slice());
         Ok(())
+    }
 
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        let mut vec = Vec::new();
+        for hash in self.iter() {
+            vec.push(hash.serialize_field()?)
+        }
+        Ok(Value::Array(vec))
     }
 }
-impl<'a> ExonumJsonDeserializeField for &'a [u8] {
+impl<'a> ExonumJson for &'a [u8] {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
@@ -353,9 +269,13 @@ impl<'a> ExonumJsonDeserializeField for &'a [u8] {
         buffer.write(from, to, arr.as_slice());
         Ok(())
     }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::String(self.to_hex()))
+    }
 }
 
-impl ExonumJsonDeserializeField for Vec<Arc<::messages::MessageBuffer>> {
+impl ExonumJson for Vec<Arc<::messages::MessageBuffer>> {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
@@ -372,8 +292,15 @@ impl ExonumJsonDeserializeField for Vec<Arc<::messages::MessageBuffer>> {
         buffer.write(from, to, vec);
         Ok(())
     }
-}
 
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        let vec = self.iter()
+                      .map(|slice| Value::String(slice.as_ref()
+                                        .to_hex()))
+                      .collect();
+        Ok(Value::Array(vec))
+    }
+}
 
 impl<T> ExonumJsonDeserialize for Vec<T>
     where T: ExonumJsonDeserialize,
@@ -391,8 +318,10 @@ impl<T> ExonumJsonDeserialize for Vec<T>
     }
 }
 
-impl<T> ExonumJsonDeserializeField for Vec<T>
-    where T: ExonumJsonDeserialize,
+//\TODO remove `ExonumJsonDeserialize` needs,
+// after it remove impl `ExonumJsonDeserialize` for all types expect struct
+impl<T> ExonumJson for Vec<T>
+    where T: ExonumJsonDeserialize + ExonumJson,
           for<'a> Vec<T>: Field<'a>
 {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
@@ -409,9 +338,17 @@ impl<T> ExonumJsonDeserializeField for Vec<T>
         buffer.write(from, to, vec);
         Ok(())
     }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        let mut vec = Vec::new();
+        for item in self {
+            vec.push(item.serialize_field()?);
+        }
+        Ok(Value::Array(vec))
+    }
 }
 
-impl ExonumJsonDeserializeField for BitVec {
+impl ExonumJson for BitVec {
     fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                 buffer: &mut B,
                                                 from: Offset,
@@ -432,11 +369,23 @@ impl ExonumJsonDeserializeField for BitVec {
         buffer.write(from, to, vec);
         Ok(())
     }
-}
 
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        let mut out = String::new();
+        for i in self.iter() {
+            if i {
+                out.push('1');
+            } else {
+                out.push('0');
+            }
+        }
+        Ok(Value::String(out))
+    }
+}
 
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.
 pub mod reexport {
     pub use serde_json::{Value, to_value, from_value, to_string, from_str};
+    pub use serde_json::map::Map;
 }

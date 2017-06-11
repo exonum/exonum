@@ -7,6 +7,30 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use crypto::{Hash, PublicKey, Signature};
 use super::{Error, SegmentReference, CheckedOffset, Offset};
 
+/// Trait for all types that could be a field in `encoding`.
+pub trait Field<'a> {
+    // TODO: use Read and Cursor
+    // TODO: debug_assert_eq!(to-from == size of Self)
+
+    /// Read Field from buffer, with given position,
+    /// beware of memory unsafety,
+    /// you should `check` `Field` before `read`.
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self;
+
+    /// Write Field to buffer, in given position
+    /// `write` doesn't lead to memory unsafety.
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset);
+    /// Field's header size
+    fn field_size() -> Offset;
+
+    /// Checks if data in the buffer could be deserialized.
+    /// Returns an optional segment reference, if it should consume some.
+    #[allow(unused_variables)]
+    fn check(buffer: &'a [u8],
+             from: CheckedOffset,
+             to: CheckedOffset)
+             -> Result<Option<SegmentReference>, Error>;
+}
 
 /// implement field for all types that has writer and reader functions
 ///
@@ -16,29 +40,29 @@ use super::{Error, SegmentReference, CheckedOffset, Offset};
 macro_rules! implement_std_field {
     ($name:ident $fn_read:expr; $fn_write:expr) => (
         impl<'a> Field<'a> for $name {
-            fn field_size() -> $crate::stream_struct::Offset {
-                mem::size_of::<$name>() as $crate::stream_struct::Offset
+            fn field_size() -> $crate::encoding::Offset {
+                mem::size_of::<$name>() as $crate::encoding::Offset
             }
 
             unsafe fn read(buffer: &'a [u8],
-                           from: $crate::stream_struct::Offset,
-                           to: $crate::stream_struct::Offset) -> $name {
+                           from: $crate::encoding::Offset,
+                           to: $crate::encoding::Offset) -> $name {
                 $fn_read(&buffer[from as usize..to as usize])
             }
 
             fn write(&self,
                         buffer: &mut Vec<u8>,
-                        from: $crate::stream_struct::Offset,
-                        to: $crate::stream_struct::Offset) {
+                        from: $crate::encoding::Offset,
+                        to: $crate::encoding::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
 
             fn check(buffer: &'a [u8],
-                        from: $crate::stream_struct::CheckedOffset,
-                        to: $crate::stream_struct::CheckedOffset)
-            ->  $crate::stream_struct::Result
+                        from: $crate::encoding::CheckedOffset,
+                        to: $crate::encoding::CheckedOffset)
+            ->  $crate::encoding::Result
             {
-                use $crate::stream_struct::Error;
+                use $crate::encoding::Error;
                 let len = buffer.len();
                 if len < to.unchecked_offset() as usize {
                     return Err(Error::UnexpectedlyShortPayload {
@@ -66,21 +90,21 @@ macro_rules! implement_std_field {
 macro_rules! implement_pod_as_ref_field {
     ($name:ident) => (
         impl<'a> Field<'a> for &'a $name {
-            fn field_size() ->  $crate::stream_struct::Offset {
-                ::std::mem::size_of::<$name>() as $crate::stream_struct::Offset
+            fn field_size() ->  $crate::encoding::Offset {
+                ::std::mem::size_of::<$name>() as $crate::encoding::Offset
             }
 
             unsafe fn read(buffer: &'a [u8],
-                            from: $crate::stream_struct::Offset,
-                            _: $crate::stream_struct::Offset) -> &'a $name
+                            from: $crate::encoding::Offset,
+                            _: $crate::encoding::Offset) -> &'a $name
             {
                 ::std::mem::transmute(&buffer[from as usize])
             }
 
             fn write(&self,
                         buffer: &mut Vec<u8>,
-                        from: $crate::stream_struct::Offset,
-                        to: $crate::stream_struct::Offset)
+                        from: $crate::encoding::Offset,
+                        to: $crate::encoding::Offset)
             {
                 let ptr: *const $name = *self as *const $name;
                 let slice = unsafe {
@@ -90,15 +114,15 @@ macro_rules! implement_pod_as_ref_field {
             }
 
             fn check(buffer: &'a [u8],
-                        from:  $crate::stream_struct::CheckedOffset,
-                        to:  $crate::stream_struct::CheckedOffset)
-            ->  $crate::stream_struct::Result
+                        from:  $crate::encoding::CheckedOffset,
+                        to:  $crate::encoding::CheckedOffset)
+            ->  $crate::encoding::Result
             {
-                use $crate::stream_struct::Error;
+                use $crate::encoding::Error;
                 let len = buffer.len();
                 if len < to.unchecked_offset() as usize {
                     return Err(Error::UnexpectedlyShortPayload {
-                        actual_size: len as $crate::stream_struct::Offset,
+                        actual_size: len as $crate::encoding::Offset,
                         minimum_size: to.unchecked_offset(),
                     });
                 }
@@ -137,31 +161,6 @@ macro_rules! check_field_size {
         }
         }
     }
-}
-
-/// Trait for all types that could be a field in `stream_struct`.
-pub trait Field<'a> {
-    // TODO: use Read and Cursor
-    // TODO: debug_assert_eq!(to-from == size of Self)
-
-    /// Read Field from buffer, with given position,
-    /// beware of memory unsafety,
-    /// you should `check` `Field` before `read`.
-    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self;
-
-    /// Write Field to buffer, in given position
-    /// `write` doesn't lead to memory unsafety.
-    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset);
-    /// Field's header size
-    fn field_size() -> Offset;
-
-    /// Checks if data in the buffer could be deserialized.
-    /// Returns an optional segment reference, if it should consume some.
-    #[allow(unused_variables)]
-    fn check(buffer: &'a [u8],
-             from: CheckedOffset,
-             to: CheckedOffset)
-             -> Result<Option<SegmentReference>, Error>;
 }
 
 impl<'a> Field<'a> for bool {

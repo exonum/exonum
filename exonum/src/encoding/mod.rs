@@ -1,5 +1,5 @@
 #![deny(missing_docs)]
-//! `stream_struct` is a lazy serialization library,
+//! `encoding` is a lazy serialization library,
 //! it allows to keep struct serialized in place, and deserialize fields on demand.
 //!
 //! Binary representation of structure is split into two main parts:
@@ -8,7 +8,7 @@
 //! - Body - dynamic sized, known only after parsing header, part.
 //!
 //! For easy creating this structures,
-//! in exonum you can use macros `message!` and `storage_value!`
+//! in exonum you can use macros `message!` and `encoding_struct!`
 //! #Examples
 //! Imagine structure with just two field's
 //!
@@ -21,14 +21,14 @@
 //! We know that `u64` [took 8 bytes](#primitive-types),
 //! and string took [8 segment bytes](#segment-fields).
 //!
-//! Then to create, for example [storage value](../macro.storage_value.html),
+//! Then to create, for example [storage value](../macro.encoding_struct.html),
 //! you need to use macros like this:
 //!
 //! ```
 //! # #[macro_use] extern crate exonum;
 //! # extern crate serde;
 //! # extern crate serde_json;
-//! storage_value! {
+//! encoding_struct! {
 //!     struct MyAwesomeStructure {
 //!         const SIZE = 16;
 //!
@@ -101,6 +101,9 @@ mod error;
 #[macro_use]
 mod fields;
 mod segments;
+#[macro_use]
+mod spec;
+
 
 #[cfg(test)]
 mod tests;
