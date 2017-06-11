@@ -6,7 +6,7 @@ use super::Offset;
 
 
 #[derive( Debug)]
-/// This structure represent `stream_struct` specific errors.
+/// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
     // TODO: Check this message after refactor buffer.

@@ -1,16 +1,16 @@
-/// `storage_value!` implement structure that could be saved in blockchain.
+/// `encoding_struct!` implement structure that could be saved in blockchain.
 ///
 /// Storage value unlike message, could be mapped on buffers without any checks.
-/// For now it's required to set `storage_value` fixed part size as `const SIZE`.
+/// For now it's required to set `encoding_struct` fixed part size as `const SIZE`.
 ///
-/// For each field, it's required to set exact position in `storage_value`.
+/// For each field, it's required to set exact position in `encoding_struct`.
 /// # Usage Example:
 /// ```
 /// #[macro_use] extern crate exonum;
 /// # extern crate serde;
 /// # extern crate serde_json;
 ///
-/// storage_value! {
+/// encoding_struct! {
 ///     struct SaveTwoInteger {
 ///         const SIZE = 16;
 ///         
@@ -27,11 +27,11 @@
 /// ```
 ///
 /// For additional reference about data layout see also 
-/// *[ `stream_struct` documentation](./stream_struct/index.html).*
+/// *[ `encoding` documentation](./encoding/index.html).*
 ///
-/// `storage_value!` internaly use `ident_count!`, be sure to add this macro to namespace.
+/// `encoding_struct!` internaly use `ident_count!`, be sure to add this macro to namespace.
 #[macro_export]
-macro_rules! storage_value {
+macro_rules! encoding_struct {
     (
     $(#[$attr:meta])*
     struct $name:ident {
@@ -48,33 +48,33 @@ macro_rules! storage_value {
             raw: Vec<u8>
         }
 
-        impl<'a> $crate::stream_struct::Field<'a> for $name {
+        impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
-                            from: $crate::stream_struct::Offset,
-                            to: $crate::stream_struct::Offset) -> Self {
-                let vec: Vec<u8> = $crate::stream_struct::Field::read(buffer, from, to);
+                            from: $crate::encoding::Offset,
+                            to: $crate::encoding::Offset) -> Self {
+                let vec: Vec<u8> = $crate::encoding::Field::read(buffer, from, to);
                 $crate::storage::StorageValue::deserialize(vec)
             }
 
             fn write(&self,
                             buffer: &mut Vec<u8>,
-                            from: $crate::stream_struct::Offset,
-                            to: $crate::stream_struct::Offset) {
-                $crate::stream_struct::Field::write(&self.raw, buffer, from, to);
+                            from: $crate::encoding::Offset,
+                            to: $crate::encoding::Offset) {
+                $crate::encoding::Field::write(&self.raw, buffer, from, to);
             }
 
             fn check(buffer: &'a [u8],
-                        from_st_val: $crate::stream_struct::CheckedOffset,
-                        to_st_val: $crate::stream_struct::CheckedOffset)
-                -> $crate::stream_struct::Result
+                        from_st_val: $crate::encoding::CheckedOffset,
+                        to_st_val: $crate::encoding::CheckedOffset)
+                -> $crate::encoding::Result
             {
-                let ret = <Vec<u8> as $crate::stream_struct::Field>::check(buffer, from_st_val, to_st_val)?;
-                let vec: Vec<u8> = unsafe{ $crate::stream_struct::Field::read(buffer, 
+                let ret = <Vec<u8> as $crate::encoding::Field>::check(buffer, from_st_val, to_st_val)?;
+                let vec: Vec<u8> = unsafe{ $crate::encoding::Field::read(buffer, 
                                                                         from_st_val.unchecked_offset(),
                                                                         to_st_val.unchecked_offset())};
-                let mut last_data = ($body as $crate::stream_struct::Offset).into();
+                let mut last_data = ($body as $crate::encoding::Offset).into();
                 $(
-                    <$field_type as $crate::stream_struct::Field>::check(&vec,
+                    <$field_type as $crate::encoding::Field>::check(&vec,
                                                                         $from.into(),
                                                                         $to.into())?
                         .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
@@ -82,16 +82,16 @@ macro_rules! storage_value {
                 Ok(ret)
             }
 
-            fn field_size() -> $crate::stream_struct::Offset {
-                // We write `storage_value` as regular buffer,
+            fn field_size() -> $crate::encoding::Offset {
+                // We write `encoding_struct` as regular buffer,
                 // so real `field_size` is 8.
                 // TODO: maybe we should write it as sub structure in place?
                 // We could get benefit from it: we limit indirection
                 // in deserializing sub fields, by only one calculation.
 
-                // $body as $crate::stream_struct::Offset
+                // $body as $crate::encoding::Offset
 
-                8 as $crate::stream_struct::Offset
+                8 as $crate::encoding::Offset
             }
         }
 
@@ -116,7 +116,7 @@ macro_rules! storage_value {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             /// Create `$name`.
             pub fn new($($field_name: $field_type,)*) -> $name {
-                use $crate::stream_struct::{Field};
+                use $crate::encoding::{Field};
                 let mut buf = vec![0; $body];
                 $($field_name.write(&mut buf, $from, $to);)*
                 $name { raw: buf }
@@ -135,7 +135,7 @@ macro_rules! storage_value {
             $(
             $(#[$field_attr])*
             pub fn $field_name(&self) -> $field_type {
-                use $crate::stream_struct::Field;
+                use $crate::encoding::Field;
                 unsafe {
                     Field::read(&self.raw, $from, $to)
                 }
@@ -151,72 +151,75 @@ macro_rules! storage_value {
             }
         }
 
-        impl $crate::stream_struct::serialize::json::ExonumJsonSerialize for $name {
-                fn serialize<S>(&self, serializer: S)
-                    -> Result<S::Ok, S::Error> where S: ::serde::Serializer
-                {
-                    use ::serde::ser::SerializeStruct;
-                    let mut structure = serializer.serialize_struct(stringify!($name),
-                                                    idents_count!($($field_name)*))?;
-                    $(
-                        structure.serialize_field(stringify!($field_name),
-                            &$crate::stream_struct::serialize::json::wrap(&self.$field_name()))?;
-                    )*
-                    structure.end()
-                }
-        }
-
-        impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
-            fn deserialize_field<B> (value: &$crate::stream_struct::serialize::json::reexport::Value,
+        impl $crate::encoding::serialize::json::ExonumJson for $name {
+            fn deserialize_field<B> (value: &$crate::encoding::serialize::json::reexport::Value,
                                         buffer: & mut B,
-                                        from: $crate::stream_struct::Offset,
-                                        _to: $crate::stream_struct::Offset )
+                                        from: $crate::encoding::Offset,
+                                        _to: $crate::encoding::Offset )
                 -> Result<(), Box<::std::error::Error>>
-                where B: $crate::stream_struct::serialize::WriteBufferWrapper
+                where B: $crate::encoding::serialize::WriteBufferWrapper
             {
-                use $crate::stream_struct::serialize::json::ExonumJsonDeserializeField;
+                use $crate::encoding::serialize::json::ExonumJson;
                 let obj = value.as_object().ok_or("Can't cast json as object.")?;
                 $(
                 let val = obj.get(stringify!($field_name)).ok_or("Can't get object from json.")?;
 
-                <$field_type as ExonumJsonDeserializeField>::deserialize_field(val, buffer,
+                <$field_type as ExonumJson>::deserialize_field(val, buffer,
                                                                 from + $from, from + $to )?;
 
                 )*
                 Ok(())
             }
+
+            fn serialize_field(&self) 
+                -> Result<$crate::encoding::serialize::json::reexport::Value,
+                            Box<::std::error::Error>>
+            {
+                use $crate::encoding::serialize::json::reexport::Value;
+                let mut map = $crate::encoding::serialize::json::reexport::Map::new();
+                $(
+                    map.insert(stringify!($field_name).to_string(),
+                        self.$field_name().serialize_field()?);
+                )*
+                Ok(Value::Object(map))
+            }
         }
-        impl $crate::stream_struct::serialize::json::ExonumJsonDeserialize for $name {
+        impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
             fn deserialize(value: &::serde_json::Value) -> Result<Self, Box<::std::error::Error>> {
-                let to = $body as $crate::stream_struct::Offset;
+                let to = $body as $crate::encoding::Offset;
                 let from = 0;
-                use $crate::stream_struct::serialize::json::ExonumJsonDeserializeField;
+                use $crate::encoding::serialize::json::ExonumJson;
 
                 let mut buf = vec![0; $body];
-                <Self as ExonumJsonDeserializeField>::deserialize_field(value, &mut buf, from, to)?;
+                <Self as ExonumJson>::deserialize_field(value, &mut buf, from, to)?;
                 Ok($name { raw: buf })
             }
         }
 
         // TODO: Rewrite Deserialize and Serialize implementation
-        impl<'de> $crate::stream_struct::serialize::reexport::Deserialize<'de> for $name {
+        impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where D: $crate::stream_struct::serialize::reexport::Deserializer<'de>
+                where D: $crate::encoding::serialize::reexport::Deserializer<'de>
             {
-                use $crate::stream_struct::serialize::json::reexport::Value;
-                use $crate::stream_struct::serialize::reexport::{Error, Deserialize};
+                use $crate::encoding::serialize::json::reexport::Value;
+                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::stream_struct::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
+                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
                 .map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 
-        impl $crate::stream_struct::serialize::reexport::Serialize for $name {
+        impl $crate::encoding::serialize::reexport::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: $crate::stream_struct::serialize::reexport::Serializer
-                {
-                    $crate::stream_struct::serialize::json::wrap(self).serialize(serializer)
-                }
+                where S: $crate::encoding::serialize::reexport::Serializer
+            {
+                use $crate::encoding::serialize::reexport::SerError;
+                use $crate::encoding::serialize::json::ExonumJson;
+                self.serialize_field()
+                    .map_err(|_| S::Error::custom(
+                                concat!("Can not serialize structure: ", stringify!($name))))?
+                    .serialize(serializer)
+            }
         }
     )
 }

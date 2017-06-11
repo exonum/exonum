@@ -2,7 +2,7 @@
 
 #[test]
 fn test_u64() {
-    storage_value! {
+    encoding_struct! {
         struct Test {
             const SIZE = 8;
             field some_test:u64 [0 => 8]
@@ -17,13 +17,13 @@ fn test_u64() {
 #[test]
 fn test_system_time() {
     use std::time::{SystemTime, UNIX_EPOCH};
-    storage_value! {
+    encoding_struct! {
         struct Test {
             const SIZE = 12;
             field some_test:SystemTime [0 => 12]
         }
     }
-    let test_data = r##"{"some_test":{"secs":"0","nanos":0}}"##;
+    let test_data = r##"{"some_test":{"nanos":0,"secs":"0"}}"##;
 
 
     let test = Test::new(UNIX_EPOCH);
@@ -31,9 +31,9 @@ fn test_system_time() {
     assert_eq!(data, test_data);
 }
 
-use stream_struct::Field;
+use encoding::Field;
 
-storage_value! {
+encoding_struct! {
     struct StructWithTwoSegments {
         const SIZE = 16;
         field first:  &[u8]     [0 => 8]
@@ -42,7 +42,7 @@ storage_value! {
 }
 
 #[test]
-fn test_correct_storage_value() {
+fn test_correct_encoding_struct() {
     let dat: Vec<u8> = vec![8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0,
                             0, 0, 1, 2];
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];

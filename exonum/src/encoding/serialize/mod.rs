@@ -3,15 +3,25 @@
 //! This module is a pack of superstructures over serde `Serializer's`\\`Deserializer's`
 
 pub use hex::{FromHexError, ToHex, FromHex};
-use stream_struct::Field;
+use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
+
+#[macro_export]
+/// Calculate num of idents in macro call.
+/// Used by `message!` and `encoding_struct!`
+macro_rules! idents_count {
+    () => (0usize);
+    ($head:ident $($tail:ident)*) => (1usize + idents_count!($($tail)*))
+}
+
+
 // for all internal serializers, implement default realization
 macro_rules! impl_default_serialize {
     (@impl $traitname:ty; $typename:ty) => {
         impl $traitname for $typename {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: $crate::stream_struct::serialize::reexport::Serializer
+            where S: $crate::encoding::serialize::reexport::Serializer
             {
                 <Self as ::serde::Serialize>::serialize(self, serializer)
             }
@@ -25,7 +35,7 @@ macro_rules! impl_default_serialize_deref {
     (@impl $traitname:ident $typename:ty) => {
         impl<'a> $traitname for &'a $typename {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: $crate::stream_struct::serialize::reexport::Serializer
+            where S: $crate::encoding::serialize::reexport::Serializer
             {
                 <$typename as ::serde::Serialize>::serialize(*self, serializer)
             }
@@ -41,43 +51,41 @@ macro_rules! impl_default_serialize_deref {
 ///
 /// - `serde::Serialize`
 /// - `serde::Deserialize`
-/// - `exonum::stream_struct::Field`
+/// - `exonum::encoding::Field`
 ///
 /// **Beware, this macros probably implement traits in not optimal way.**
 #[macro_export]
 macro_rules! implement_exonum_serializer {
     ($name:ident) => {
-        impl $crate::stream_struct::serialize::json::ExonumJsonSerialize for $name {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: $crate::stream_struct::serialize::reexport::Serializer
-            {
-                <$name as ::serde::Serialize>::serialize(self, serializer)
-            }
-        }
-
-        impl $crate::stream_struct::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::stream_struct::serialize::json::reexport::Value)
+        impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
                                                         -> Result<$name, Box<::std::error::Error>> {
-                use $crate::stream_struct::serialize::json::reexport::from_value;
+                use $crate::encoding::serialize::json::reexport::from_value;
                 Ok(from_value(value.clone())?)
             }
         }
 
-        impl $crate::stream_struct::serialize::json::ExonumJsonDeserializeField for $name {
+        impl $crate::encoding::serialize::json::ExonumJson for $name {
             fn deserialize_field<B>(
-                value: &$crate::stream_struct::serialize::json::reexport::Value,
+                value: &$crate::encoding::serialize::json::reexport::Value,
                                                         buffer: &mut B,
-                                                        from: $crate::stream_struct::Offset,
-                                                        to: $crate::stream_struct::Offset)
+                                                        from: $crate::encoding::Offset,
+                                                        to: $crate::encoding::Offset)
                                                         -> Result<(), Box<::std::error::Error>> 
-            where B: $crate::stream_struct::serialize::WriteBufferWrapper
+            where B: $crate::encoding::serialize::WriteBufferWrapper
             {
-                use $crate::stream_struct::serialize::json::reexport::from_value;
+                use $crate::encoding::serialize::json::reexport::from_value;
                 let value: $name = from_value(value.clone())?;
                 buffer.write(from, to, value);
                 Ok(())
             }
+
+            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+                use $crate::encoding::serialize::json::reexport::to_value;
+                Ok(to_value(self)?)
+            }
         }
+
 
     };
 }
@@ -115,14 +123,11 @@ impl WriteBufferWrapper for Vec<u8> {
     }
 }
 
-#[macro_use]
-mod utils;
-
-
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde` version.
 pub mod reexport {
     pub use serde::{Serializer, Deserializer, Serialize, Deserialize};
-    pub use serde::de::Error;
+    pub use serde::de::Error as DeError;
+    pub use serde::ser::Error as SerError;
     pub use serde::ser::SerializeStruct;
 }
