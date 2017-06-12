@@ -7,14 +7,6 @@ use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
 
-#[macro_export]
-/// Calculate num of idents in macro call.
-/// Used by `message!` and `encoding_struct!`
-macro_rules! idents_count {
-    () => (0usize);
-    ($head:ident $($tail:ident)*) => (1usize + idents_count!($($tail)*))
-}
-
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///
 /// Item should implement:
@@ -50,7 +42,10 @@ macro_rules! implement_exonum_serializer {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+            fn serialize_field(&self) -> 
+                Result<$crate::encoding::serialize::json::reexport::Value,
+                        Box<::std::error::Error>>
+            {
                 use $crate::encoding::serialize::json::reexport::to_value;
                 Ok(to_value(self)?)
             }

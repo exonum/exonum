@@ -54,7 +54,6 @@ impl<'a, T> Field<'a> for T
              pointer_to: CheckedOffset,
              latest_segment: CheckedOffset)
              -> Result {
-        println!("check {:?} {:?} {:?}", pointer_from, pointer_to, latest_segment);
         debug_assert_eq!((pointer_to - pointer_from)?.unchecked_offset(), Self::field_size());
         let pointer_count_start: Offset = (pointer_from + 4)?.unchecked_offset();
         let segment_start: CheckedOffset = LittleEndian::read_u32(
@@ -227,11 +226,9 @@ impl<'a, T> SegmentField<'a> for Vec<T>
         let mut latest_segment = latest_segment;
         
         for _ in 0..count.unchecked_offset() {
-            println!("last segment = {:?} {:?} {:?}", start, (start + Self::item_size())?, latest_segment);
             latest_segment = T::check(buffer, start, (start + Self::item_size())?, latest_segment)?;
             start = (start + Self::item_size())?;
         }
-        println!("last segment = {:?}", latest_segment);
         Ok(latest_segment)
     }
 }
