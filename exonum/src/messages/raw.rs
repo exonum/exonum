@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
 use encoding::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset};
 
-pub const HEADER_SIZE: usize = 10; // TODO: rename to HEADER_LENGTH?
+pub const HEADER_LENGTH: usize = 10; // TODO: rename to HEADER_LENGTH?
 
 pub const TEST_NETWORK_ID: u8 = 0;
 pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
@@ -24,7 +24,7 @@ pub struct MessageBuffer {
 
 impl MessageBuffer {
     pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
-        // TODO: check that size >= HEADER_SIZE
+        // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
         MessageBuffer { raw: raw }
     }
@@ -57,12 +57,15 @@ impl MessageBuffer {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
-    pub fn check<'a, F: Field<'a>>(&'a self, from: CheckedOffset, to: CheckedOffset) -> StreamStructResult {
-        F::check(self.body(), (from + HEADER_SIZE as u32)?, (to + HEADER_SIZE as u32)?)
+    pub fn check<'a, F: Field<'a>>(&'a self,
+                                    from: CheckedOffset,
+                                    to: CheckedOffset,
+                                    latest_segment: CheckedOffset) -> StreamStructResult {
+        F::check(self.body(), (from + HEADER_LENGTH as u32)?, (to + HEADER_LENGTH as u32)?, latest_segment)
     }
 
     pub unsafe fn read<'a, F: Field<'a>>(&'a self, from: Offset, to: Offset) -> F {
-        F::read(self.body(), from + HEADER_SIZE as u32, to + HEADER_SIZE as u32)
+        F::read(self.body(), from + HEADER_LENGTH as u32, to + HEADER_LENGTH as u32)
     }
 
     pub fn signature(&self) -> &Signature {
@@ -84,7 +87,7 @@ pub struct MessageWriter {
 
 impl MessageWriter {
     pub fn new(protocol_version: u8, network_id: u8, service_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
-        let mut raw = MessageWriter { raw: vec![0; HEADER_SIZE + payload_length] };
+        let mut raw = MessageWriter { raw: vec![0; HEADER_LENGTH + payload_length] };
         raw.set_network_id(network_id);
         raw.set_version(protocol_version);
         raw.set_service_id(service_id);
@@ -113,7 +116,7 @@ impl MessageWriter {
     }
 
     pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
-        field.write(&mut self.raw, from + HEADER_SIZE as Offset, to + HEADER_SIZE as Offset);
+        field.write(&mut self.raw, from + HEADER_LENGTH as Offset, to + HEADER_LENGTH as Offset);
     }
 
     pub fn sign(mut self, secret_key: &SecretKey) -> MessageBuffer {

@@ -5,7 +5,7 @@ use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use crypto::{Hash, PublicKey, Signature};
-use super::{Error, SegmentReference, CheckedOffset, Offset};
+use super::{Error, CheckedOffset, Offset, Result};
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
@@ -24,12 +24,13 @@ pub trait Field<'a> {
     fn field_size() -> Offset;
 
     /// Checks if data in the buffer could be deserialized.
-    /// Returns an optional segment reference, if it should consume some.
+    /// Returns an index of latest data seen.
     #[allow(unused_variables)]
     fn check(buffer: &'a [u8],
              from: CheckedOffset,
-             to: CheckedOffset)
-             -> Result<Option<SegmentReference>, Error>;
+             to: CheckedOffset,
+             latest_segment: CheckedOffset)
+             -> ::std::result::Result<CheckedOffset, Error>;
 }
 
 /// implement field for all types that has writer and reader functions
@@ -59,9 +60,12 @@ macro_rules! implement_std_field {
 
             fn check(buffer: &'a [u8],
                         from: $crate::encoding::CheckedOffset,
-                        to: $crate::encoding::CheckedOffset)
+                        to: $crate::encoding::CheckedOffset,
+                        latest_segment: CheckedOffset)
             ->  $crate::encoding::Result
             {
+                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+                
                 use $crate::encoding::Error;
                 let len = buffer.len();
                 if len < to.unchecked_offset() as usize {
@@ -76,7 +80,7 @@ macro_rules! implement_std_field {
                         expected_size: Self::field_size(),
                     });
                 }
-                Ok(None)
+                Ok(latest_segment)
             }
         }
     )
@@ -115,9 +119,12 @@ macro_rules! implement_pod_as_ref_field {
 
             fn check(buffer: &'a [u8],
                         from:  $crate::encoding::CheckedOffset,
-                        to:  $crate::encoding::CheckedOffset)
+                        to:  $crate::encoding::CheckedOffset,
+                        latest_segment: CheckedOffset)
             ->  $crate::encoding::Result
             {
+                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+                
                 use $crate::encoding::Error;
                 let len = buffer.len();
                 if len < to.unchecked_offset() as usize {
@@ -132,7 +139,7 @@ macro_rules! implement_pod_as_ref_field {
                         expected_size: Self::field_size(),
                     });
                 }
-                Ok(None)
+                Ok(latest_segment)
             }
         }
 
@@ -140,28 +147,6 @@ macro_rules! implement_pod_as_ref_field {
     )
 }
 
-
-// TODO this check should be rewritted as part of buffer implementation.
-macro_rules! check_field_size {
-    ($buffer:ident $from:expr; $to:expr) => {
-        {
-        let len = $buffer.len();
-        if len < $to.unchecked_offset() as usize {
-            return Err(Error::UnexpectedlyShortPayload {
-                actual_size: len as Offset,
-                minimum_size: $to.unchecked_offset(),
-            });
-        }
-
-        if ($to - $from)?.unchecked_offset() != Self::field_size() {
-            return Err(Error::FieldSizeMismatch {
-                actual_size: ($to - $from)?.unchecked_offset(),
-                expected_size: Self::field_size(),
-            });
-        }
-        }
-    }
-}
 
 impl<'a> Field<'a> for bool {
     fn field_size() -> Offset {
@@ -178,9 +163,11 @@ impl<'a> Field<'a> for bool {
 
     fn check(buffer: &'a [u8],
              from: CheckedOffset,
-             to: CheckedOffset)
-             -> Result<Option<SegmentReference>, Error> {
-        check_field_size!{buffer from; to};
+             to: CheckedOffset,
+             latest_segment: CheckedOffset)
+             -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+
         let from: Offset = from.unchecked_offset();
         if buffer[from as usize] != 0 && buffer[from as usize] != 1 {
             Err(Error::IncorrectBoolean {
@@ -188,7 +175,7 @@ impl<'a> Field<'a> for bool {
                     value: buffer[from as usize],
                 })
         } else {
-            Ok(None)
+            Ok(latest_segment)
         }
     }
 }
@@ -206,12 +193,13 @@ impl<'a> Field<'a> for u8 {
         buffer[from as usize] = *self;
     }
 
-    fn check(buffer: &'a [u8],
+    fn check(_: &'a [u8],
              from: CheckedOffset,
-             to: CheckedOffset)
-             -> Result<Option<SegmentReference>, Error> {
-        check_field_size!{buffer from; to};
-        Ok(None)
+             to: CheckedOffset,
+             latest_segment: CheckedOffset)
+             -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+        Ok(latest_segment)
     }
 
 }
@@ -231,12 +219,13 @@ impl<'a> Field<'a> for i8 {
         buffer[from as usize] = *self as u8;
     }
 
-    fn check(buffer: &'a [u8],
+    fn check(_: &'a [u8],
              from: CheckedOffset,
-             to: CheckedOffset)
-             -> Result<Option<SegmentReference>, Error> {
-        check_field_size!{buffer from; to};
-        Ok(None)
+             to: CheckedOffset,
+             latest_segment: CheckedOffset)
+             -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+        Ok(latest_segment)
     }
 }
 
@@ -274,12 +263,13 @@ impl<'a> Field<'a> for SystemTime {
                                 nanos);
     }
 
-    fn check(buffer: &'a [u8],
+    fn check(_: &'a [u8],
              from: CheckedOffset,
-             to: CheckedOffset)
-             -> Result<Option<SegmentReference>, Error> {
-        check_field_size!{buffer from; to};
-        Ok(None)
+             to: CheckedOffset,
+             latest_segment: CheckedOffset)
+             -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+        Ok(latest_segment)
     }
 }
 
@@ -312,11 +302,12 @@ impl<'a> Field<'a> for SocketAddr {
         LittleEndian::write_u16(&mut buffer[to as usize - 2..to as usize], self.port());
     }
 
-    fn check(buffer: &'a [u8],
+    fn check(_: &'a [u8],
              from: CheckedOffset,
-             to: CheckedOffset)
-             -> Result<Option<SegmentReference>, Error> {
-        check_field_size!{buffer from; to};
-        Ok(None)
+             to: CheckedOffset,
+             latest_segment: CheckedOffset)
+             -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+        Ok(latest_segment)
     }
 }

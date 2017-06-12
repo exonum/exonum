@@ -62,24 +62,26 @@ macro_rules! encoding_struct {
                             to: $crate::encoding::Offset) {
                 $crate::encoding::Field::write(&self.raw, buffer, from, to);
             }
-
+            
+            #[allow(unused_variables)]
             fn check(buffer: &'a [u8],
                         from_st_val: $crate::encoding::CheckedOffset,
-                        to_st_val: $crate::encoding::CheckedOffset)
+                        to_st_val: $crate::encoding::CheckedOffset,
+                        latest_segment: $crate::encoding::CheckedOffset)
                 -> $crate::encoding::Result
             {
-                let ret = <Vec<u8> as $crate::encoding::Field>::check(buffer, from_st_val, to_st_val)?;
-                let vec: Vec<u8> = unsafe{ $crate::encoding::Field::read(buffer, 
+                let latest_segment_origin = <&[u8] as $crate::encoding::Field>::check(buffer, from_st_val, to_st_val, latest_segment)?;
+                let vec: &[u8] = unsafe{ $crate::encoding::Field::read(buffer, 
                                                                         from_st_val.unchecked_offset(),
                                                                         to_st_val.unchecked_offset())};
-                let mut last_data = ($body as $crate::encoding::Offset).into();
+                let latest_segment = ($body as $crate::encoding::Offset).into();
                 $(
-                    <$field_type as $crate::encoding::Field>::check(&vec,
+                let latest_segment = <$field_type as $crate::encoding::Field>::check(&vec,
                                                                         $from.into(),
-                                                                        $to.into())?
-                        .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
+                                                                        $to.into(),
+                                                                        latest_segment)?;
                 )*
-                Ok(ret)
+                Ok(latest_segment_origin)
             }
 
             fn field_size() -> $crate::encoding::Offset {
@@ -120,12 +122,6 @@ macro_rules! encoding_struct {
                 let mut buf = vec![0; $body];
                 $($field_name.write(&mut buf, $from, $to);)*
                 $name { raw: buf }
-            }
-
-            #[allow(dead_code)]
-            pub fn from_raw(raw: Vec<u8>) -> $name {
-                debug_assert_eq!(raw.len(), $body);
-                $ name { raw: raw }
             }
 
             pub fn hash(&self) -> $crate::crypto::Hash {

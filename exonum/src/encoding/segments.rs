@@ -1,9 +1,9 @@
 use byteorder::{ByteOrder, LittleEndian};
 
-use messages::{BitVec, RawMessage, HEADER_SIZE, MessageBuffer};
+use messages::{BitVec, RawMessage, HEADER_LENGTH, MessageBuffer};
 use crypto::Hash;
 
-use super::{Result, Error, Field, SegmentReference, Offset, CheckedOffset};
+use super::{Result, Error, Field, Offset, CheckedOffset};
 
 pub trait SegmentField<'a>: Sized {
     fn item_size() -> Offset;
@@ -12,11 +12,11 @@ pub trait SegmentField<'a>: Sized {
     fn extend_buffer(&self, buffer: &mut Vec<u8>);
 
     #[allow(unused_variables)]
-    fn check_data(buffer: &'a [u8], from: CheckedOffset, count: CheckedOffset) -> Result {
-        let size: CheckedOffset = (count * Self::item_size())?;
-        let to: CheckedOffset = (from + size)?;
-        Ok(Some(SegmentReference::new(from, to)))
-    }
+    fn check_data(buffer: &'a [u8],
+                    from: CheckedOffset,
+                    count: CheckedOffset,
+                    latest_segment: CheckedOffset)
+             -> Result;
 }
 
 impl<'a, T> Field<'a> for T
@@ -42,26 +42,28 @@ impl<'a, T> Field<'a> for T
     }
 
     fn check(buffer: &'a [u8],
-             header_from: CheckedOffset,
-             header_to: CheckedOffset) -> Result {
-        check_field_size!{buffer header_from; header_to};
-        let header_count_start: Offset = (header_from + 4)?.unchecked_offset();
+             pointer_from: CheckedOffset,
+             pointer_to: CheckedOffset,
+             latest_segment: CheckedOffset)
+             -> Result {
+        debug_assert_eq!((pointer_to - pointer_from)?.unchecked_offset(), Self::field_size());
+        let pointer_count_start: Offset = (pointer_from + 4)?.unchecked_offset();
         let segment_start: CheckedOffset = LittleEndian::read_u32(
-                                &buffer[header_from.unchecked_offset() as usize
-                                            ..header_count_start as usize])
+                                &buffer[pointer_from.unchecked_offset() as usize
+                                            ..pointer_count_start as usize])
                 .into();
         let count: CheckedOffset = LittleEndian::read_u32(
-                                &buffer[header_count_start as usize
-                                            ..header_to.unchecked_offset() as usize])
+                                &buffer[pointer_count_start as usize
+                                            ..pointer_to.unchecked_offset() as usize])
                 .into();
 
         if count.unchecked_offset() == 0 {
-            return Ok(None);
+            return Ok(latest_segment);
         }
 
-        if segment_start < header_to {
+        if segment_start < pointer_to {
             return Err(Error::IncorrectSegmentReference {
-                           position: header_from.unchecked_offset(),
+                           position: pointer_from.unchecked_offset(),
                            value: segment_start.unchecked_offset(),
                        });
         }
@@ -69,12 +71,24 @@ impl<'a, T> Field<'a> for T
         let segment_end = (segment_start + (count * Self::item_size())?)?;
         if segment_end.unchecked_offset() > buffer.len() as u32 {
             return Err(Error::IncorrectSegmentSize {
-                           position: header_count_start,
+                           position: pointer_count_start,
                            value: count.unchecked_offset(),
                        });
         }
+        if segment_start < latest_segment {
+            return Err(Error::OverlappingSegment {
+                    last_end: latest_segment.unchecked_offset(),
+                    start: segment_start.unchecked_offset(),
+                })
+        } else if segment_start > latest_segment {
+            return Err(Error::SpaceBetweenSegments {
+                    last_end: latest_segment.unchecked_offset(),
+                    start: segment_start.unchecked_offset(),
+                })
+        }
+        let latest_segment = segment_end;
 
-        Self::check_data(buffer, segment_start, count)
+        Self::check_data(buffer, segment_start, count, latest_segment)
     }
 }
 
@@ -97,7 +111,10 @@ impl<'a> SegmentField<'a> for &'a str {
         buffer.extend_from_slice(self.as_bytes())
     }
 
-    fn check_data(buffer: &'a [u8], from: CheckedOffset, count: CheckedOffset) -> Result {
+    fn check_data(buffer: &'a [u8],
+                    from: CheckedOffset,
+                    count: CheckedOffset,
+                    latest_segment: CheckedOffset) -> Result {
         let size: CheckedOffset = (count * Self::item_size())?;
         let to: CheckedOffset = (from + size)?;
         let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
@@ -107,7 +124,7 @@ impl<'a> SegmentField<'a> for &'a str {
                            error: e,
                        });
         }
-        Ok(Some(SegmentReference::new(from, to)))
+        Ok(latest_segment)
     }
 }
 
@@ -131,11 +148,14 @@ impl<'a> SegmentField<'a> for RawMessage {
         buffer.extend_from_slice(self.as_ref().as_ref())
     }
 
-    fn check_data(buffer: &'a [u8], from: CheckedOffset, count: CheckedOffset) -> Result {
+    fn check_data(buffer: &'a [u8],
+                    from: CheckedOffset,
+                    count: CheckedOffset,
+                    latest_segment: CheckedOffset) -> Result {
         let size: CheckedOffset = (count * Self::item_size())?;
         let to: CheckedOffset = (from + size)?;
         let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
-        if slice.len() < HEADER_SIZE {
+        if slice.len() < HEADER_LENGTH {
             return Err(Error::UnexpectedlyShortRawMessage {
                            position: from.unchecked_offset(),
                            size: slice.len() as Offset,
@@ -150,7 +170,7 @@ impl<'a> SegmentField<'a> for RawMessage {
                            declared_size: declared_size,
                        });
         }
-        Ok(Some(SegmentReference::new(from, to)))
+        Ok(latest_segment)
     }
 }
 
@@ -190,18 +210,17 @@ impl<'a, T> SegmentField<'a> for Vec<T>
         }
     }
 
-    fn check_data(buffer: &'a [u8], from: CheckedOffset, count: CheckedOffset) -> Result {
+    fn check_data(buffer: &'a [u8],
+                    from: CheckedOffset,
+                    count: CheckedOffset,
+                    latest_segment: CheckedOffset) -> Result {
         let mut start = from;
-        let size: CheckedOffset = (count * Self::item_size())?;
-        let header = (start + size)?;
-        let mut last_data = header;
-
+        let mut latest_segment = latest_segment;
         for _ in 0..count.unchecked_offset() {
-            T::check(buffer, start, (start + Self::item_size())?)?
-                .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
+            latest_segment = T::check(buffer, start, (start + Self::item_size())?, latest_segment)?;
             start = (start + Self::item_size())?;
         }
-        Ok(Some(SegmentReference::new(from, last_data)))
+        Ok(latest_segment)
     }
 }
 
@@ -226,6 +245,13 @@ impl<'a> SegmentField<'a> for BitVec {
         let slice = &self.to_bytes();
         buffer.extend_from_slice(slice);
     }
+
+    fn check_data(_: &'a [u8],
+                    _: CheckedOffset,
+                    _: CheckedOffset,
+                    latest_segment: CheckedOffset) -> Result {
+        Ok(latest_segment)
+    }
 }
 
 impl<'a> SegmentField<'a> for &'a [u8] {
@@ -244,6 +270,13 @@ impl<'a> SegmentField<'a> for &'a [u8] {
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
         buffer.extend_from_slice(self)
+    }
+
+    fn check_data(_: &'a [u8],
+                    _: CheckedOffset,
+                    _: CheckedOffset,
+                    latest_segment: CheckedOffset) -> Result {
+        Ok(latest_segment)
     }
 }
 
@@ -278,6 +311,13 @@ macro_rules! implement_pod_array_field {
                                                 self.len() * Self::item_size() as usize)
                 };
                 buffer.extend_from_slice(slice)
+            }
+
+            fn check_data(_: &'a [u8],
+                        _: CheckedOffset,
+                        _: CheckedOffset,
+                        latest_segment: CheckedOffset) -> Result {
+                Ok(latest_segment)
             }
         }
     )
