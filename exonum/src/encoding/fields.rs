@@ -105,7 +105,7 @@ macro_rules! implement_pod_as_ref_field {
             fn check(_: &'a [u8],
                         from:  $crate::encoding::CheckedOffset,
                         to:  $crate::encoding::CheckedOffset,
-                        latest_segment: CheckedOffset)
+                        latest_segment: $crate::encoding::CheckedOffset)
             ->  $crate::encoding::Result
             {
                 debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
