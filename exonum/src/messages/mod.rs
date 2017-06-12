@@ -6,7 +6,7 @@ use crypto::PublicKey;
 use encoding::Error;
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw,
-                    HEADER_SIZE, PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
+                    HEADER_LENGTH, PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
 pub use self::protocol::*;
 
 

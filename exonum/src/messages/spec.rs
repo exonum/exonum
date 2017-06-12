@@ -87,17 +87,21 @@ macro_rules! message {
 
             fn check(buffer: &'a [u8],
                      from: $crate::encoding::CheckedOffset,
-                     to: $crate::encoding::CheckedOffset) -> $crate::encoding::Result {
-                let check = <$crate::messages::RawMessage as
+                     to: $crate::encoding::CheckedOffset,
+                     latest_segment: $crate::encoding::CheckedOffset) -> $crate::encoding::Result {
+                let latest_segment_origin = <$crate::messages::RawMessage as
                                 $crate::encoding::Field>::check(buffer,
                                                                 from,
-                                                                to)?;
+                                                                to,
+                                                                latest_segment)?;
+                // TODO: remove this allication,
+                // by allowing creating message from borrowed data
                 let raw_message: $crate::messages::RawMessage = 
                                     unsafe { $crate::encoding::Field::read(buffer,
                                                                 from.unchecked_offset(),
                                                                 to.unchecked_offset())};
                 <Self>::check_fields(&raw_message)?;
-                Ok(check)
+                Ok(latest_segment_origin)
             }
 
             fn field_size() -> $crate::encoding::Offset {
@@ -110,7 +114,21 @@ macro_rules! message {
         impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::encoding::Error> {
-                <Self>::check_fields(&raw)?;
+
+                if raw.len() < $body as usize {
+                    return Err($crate::encoding::Error::UnexpectedlyShortPayload {
+                        actual_size: raw.len() as $crate::encoding::Offset,
+                        minimum_size: $body,
+                    });
+                }
+
+                let len = <Self>::check_fields(&raw)?;
+
+                if len.unchecked_offset() as usize +
+                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
+                   return Err("Incorrect raw message length.".into())
+                }
+
                 Ok($name { raw: raw })
             }
         }
@@ -141,15 +159,16 @@ macro_rules! message {
             }
 
             fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::encoding::Result {
-                let mut last_data = (($body + $crate::messages::HEADER_SIZE)
+                let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
                                         as $crate::encoding::Offset).into();
                 $(
                     let field_from: $crate::encoding::Offset = $from;
                     let field_to: $crate::encoding::Offset = $to;
-                    raw_message.check::<$field_type>(field_from.into(),field_to.into())?
-                        .map_or(Ok(()), |mut e| e.check_segment(&mut last_data))?;
+                    let latest_segment = raw_message.check::<$field_type>(field_from.into(), 
+                                                    field_to.into(),
+                                                    latest_segment)?;
                 )*
-                Ok(None)
+                Ok(latest_segment)
             }
 
             $(

@@ -49,7 +49,7 @@ fn test_correct_encoding_struct() {
     let mut buffer = vec![0;8];
     test.write(&mut buffer, 0, 8);
     assert_eq!(buffer, dat);
-    <StructWithTwoSegments as Field>::check(&dat, 0.into(), 8.into()).unwrap();
+    <StructWithTwoSegments as Field>::check(&dat, 0.into(), 8.into(), 8.into()).unwrap();
     let strukt = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 8) };
     assert_eq!(strukt.first(), &[1u8]);
     assert_eq!(strukt.second(), &[2u8]);
@@ -61,7 +61,7 @@ fn test_overlap_segments() {
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 1, 2];
     let mut buffer = vec![0;8];
     test.write(&mut buffer, 0, 8);
-    <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into()).unwrap();
+    <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }
 
 
@@ -75,5 +75,5 @@ fn test_segments_has_spaces_between() {
         2];
     let mut buffer = vec![0;8];
     test.write(&mut buffer, 0, 8);
-    <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into()).unwrap();
+    <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }

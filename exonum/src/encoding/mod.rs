@@ -112,46 +112,7 @@ mod tests;
 pub type Offset = u32;
 
 /// Type alias that should be returned in `check` method of `Field`
-pub type Result = ::std::result::Result<Option<SegmentReference>, Error>;
-
-/// A helper structure used to refer to some data range in buffer.
-/// Currently used only by `check` method
-/// and indicates what bytes in buffer we already checked.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct SegmentReference {
-    /// position in buffer where data begin
-    pub from: CheckedOffset,
-    /// position in buffer where data ended
-    pub to: CheckedOffset,
-}
-
-impl SegmentReference {
-    /// creates new reference
-    pub fn new(from: CheckedOffset, to: CheckedOffset) -> SegmentReference {
-        SegmentReference { from: from, to: to }
-    }
-
-    /// Checks sequence of segments, for overlapping 
-    /// and whether illegal spaces between segments are present.
-    pub fn check_segment(&mut self,
-                         last_data: &mut CheckedOffset)
-                         -> ::std::result::Result<(), Error> {
-        if self.from < *last_data {
-            Err(Error::OverlappingSegment {
-                    last_end: last_data.unchecked_offset(),
-                    start: self.from.unchecked_offset(),
-                })
-        } else if self.from > *last_data {
-            Err(Error::SpaceBetweenSegments {
-                    last_end: last_data.unchecked_offset(),
-                    start: self.from.unchecked_offset(),
-                })
-        } else {
-            *last_data = self.to;
-            Ok(())
-        }
-    }
-}
+pub type Result = ::std::result::Result<CheckedOffset, Error>;
 
 // TODO replace by more generic type
 /// `CheckedOffset` is a type that take control over overflow,
