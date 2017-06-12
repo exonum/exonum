@@ -9,9 +9,17 @@
     "start": "node app.js"
   },
   "dependencies": {
+    "big-integer": "^1.6.17",
     "body-parser": "^1.17.1",
-    "bower": "^1.8.0",
+    "bootstrap": "^3.3.7",
+    "exonum-client": "git+ssh://git@github.com/exonum/exonum-client.git",
     "express": "^4.15.2",
-    "request": "^2.81.0"
+    "jquery": "^3.1.1",
+    "request": "^2.81.0",
+    "riot": "^3.3.1",
+    "riot-route": "^3.1.0",
+    "moment": "^2.17.1",
+    "numeral": "^2.0.4",
+    "noty": "^2.4.1"
   }
 }
