@@ -24,7 +24,6 @@ install() {
     cargo build -p cryptocurrency
     cd -
     ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/etc 6 -p 2000
-    sed 's/\[api\]/[api]\npublic_api_address = "127.0.0.1:8500"/' -i ${destdir}/etc/validators/0.toml
 }
 
 enable() {
