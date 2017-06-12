@@ -92,6 +92,7 @@ use std::convert::From;
 use std::ops::{Add, Sub, Mul, Div};
 
 pub use self::fields::Field;
+pub use self::segments::SegmentField;
 pub use self::error::Error;
 
 #[macro_use]
