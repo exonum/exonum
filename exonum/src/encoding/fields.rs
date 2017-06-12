@@ -58,28 +58,13 @@ macro_rules! implement_std_field {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
 
-            fn check(buffer: &'a [u8],
+            fn check(_: &'a [u8],
                         from: $crate::encoding::CheckedOffset,
                         to: $crate::encoding::CheckedOffset,
                         latest_segment: CheckedOffset)
             ->  $crate::encoding::Result
             {
                 debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                
-                use $crate::encoding::Error;
-                let len = buffer.len();
-                if len < to.unchecked_offset() as usize {
-                    return Err(Error::UnexpectedlyShortPayload {
-                        actual_size: len as Offset,
-                        minimum_size: to.unchecked_offset(),
-                    });
-                }
-                if (to - from)?.unchecked_offset() != Self::field_size() {
-                    return Err(Error::FieldSizeMismatch {
-                        actual_size: (to - from)?.unchecked_offset(),
-                        expected_size: Self::field_size(),
-                    });
-                }
                 Ok(latest_segment)
             }
         }
@@ -117,28 +102,13 @@ macro_rules! implement_pod_as_ref_field {
                 buffer[from as usize..to as usize].copy_from_slice(slice);
             }
 
-            fn check(buffer: &'a [u8],
+            fn check(_: &'a [u8],
                         from:  $crate::encoding::CheckedOffset,
                         to:  $crate::encoding::CheckedOffset,
                         latest_segment: CheckedOffset)
             ->  $crate::encoding::Result
             {
                 debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                
-                use $crate::encoding::Error;
-                let len = buffer.len();
-                if len < to.unchecked_offset() as usize {
-                    return Err(Error::UnexpectedlyShortPayload {
-                        actual_size: len as $crate::encoding::Offset,
-                        minimum_size: to.unchecked_offset(),
-                    });
-                }
-                if (to - from)?.unchecked_offset() != Self::field_size() {
-                    return Err(Error::FieldSizeMismatch {
-                        actual_size: (to - from)?.unchecked_offset(),
-                        expected_size: Self::field_size(),
-                    });
-                }
                 Ok(latest_segment)
             }
         }

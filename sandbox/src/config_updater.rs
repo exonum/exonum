@@ -56,9 +56,7 @@ impl Service for ConfigUpdateService {
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         if raw.message_type() != CONFIG_PROPOSE_MESSAGE_ID {
             return Err(MessageError::IncorrectMessageType {
-                           position: 0,
-                           actual_message_type: raw.message_type(),
-                           declared_message_type: CONFIG_PROPOSE_MESSAGE_ID,
+                           message_type: raw.message_type(),
                        });
         }
         TxConfig::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)

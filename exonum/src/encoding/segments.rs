@@ -5,13 +5,21 @@ use crypto::Hash;
 
 use super::{Result, Error, Field, Offset, CheckedOffset};
 
+/// Trait for fields, that has unknown `compile-time` size.
+/// Usually important for arrays,
+/// or other types that in rust is always at `HEAP`
 pub trait SegmentField<'a>: Sized {
+    /// size of item fixed part that this `Field` collect.
     fn item_size() -> Offset;
+    /// count of items in collection
     fn count(&self) -> Offset;
+    /// create collection from buffer
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self;
+    /// extend buffer with this collection
     fn extend_buffer(&self, buffer: &mut Vec<u8>);
 
     #[allow(unused_variables)]
+    /// check collection data
     fn check_data(buffer: &'a [u8],
                     from: CheckedOffset,
                     count: CheckedOffset,
@@ -46,6 +54,7 @@ impl<'a, T> Field<'a> for T
              pointer_to: CheckedOffset,
              latest_segment: CheckedOffset)
              -> Result {
+        println!("check {:?} {:?} {:?}", pointer_from, pointer_to, latest_segment);
         debug_assert_eq!((pointer_to - pointer_from)?.unchecked_offset(), Self::field_size());
         let pointer_count_start: Offset = (pointer_from + 4)?.unchecked_offset();
         let segment_start: CheckedOffset = LittleEndian::read_u32(
@@ -216,10 +225,13 @@ impl<'a, T> SegmentField<'a> for Vec<T>
                     latest_segment: CheckedOffset) -> Result {
         let mut start = from;
         let mut latest_segment = latest_segment;
+        
         for _ in 0..count.unchecked_offset() {
+            println!("last segment = {:?} {:?} {:?}", start, (start + Self::item_size())?, latest_segment);
             latest_segment = T::check(buffer, start, (start + Self::item_size())?, latest_segment)?;
             start = (start + Self::item_size())?;
         }
+        println!("last segment = {:?}", latest_segment);
         Ok(latest_segment)
     }
 }

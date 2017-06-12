@@ -15,36 +15,6 @@ macro_rules! idents_count {
     ($head:ident $($tail:ident)*) => (1usize + idents_count!($($tail)*))
 }
 
-
-// for all internal serializers, implement default realization
-macro_rules! impl_default_serialize {
-    (@impl $traitname:ty; $typename:ty) => {
-        impl $traitname for $typename {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: $crate::encoding::serialize::reexport::Serializer
-            {
-                <Self as ::serde::Serialize>::serialize(self, serializer)
-            }
-        }
-    };
-    ($traitname:ty => $($name:ty);*) => ($(impl_default_serialize!{@impl $traitname; $name})*);
-}
-
-// for all internal serializers, implement default realization-deref
-macro_rules! impl_default_serialize_deref {
-    (@impl $traitname:ident $typename:ty) => {
-        impl<'a> $traitname for &'a $typename {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-            where S: $crate::encoding::serialize::reexport::Serializer
-            {
-                <$typename as ::serde::Serialize>::serialize(*self, serializer)
-            }
-        }
-    };
-    ($traitname:ident => $($name:ty);*) =>
-        ($(impl_default_serialize_deref!{@impl $traitname $name})*);
-}
-
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///
 /// Item should implement:

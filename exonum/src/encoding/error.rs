@@ -17,14 +17,6 @@ pub enum Error {
         /// expected size of fixed part
         minimum_size: Offset,
     },
-    // TODO: Remove `to` from `Field` signature, it's a bit redurant.
-    /// Expected field size is different from the field size in buffer.
-    FieldSizeMismatch {
-        /// real field size
-        actual_size: Offset,
-        /// expected size of field
-        expected_size: Offset,
-    },
     /// Boolean value is incorrect
     IncorrectBoolean {
         /// position in buffer where error apears
@@ -64,12 +56,8 @@ pub enum Error {
     },
     /// Incorrect `message_id` found in buffer.
     IncorrectMessageType {
-        /// position in buffer where error apears
-        position: Offset,
-        /// parsed `message_id`
-        actual_message_type: u16,
         /// expected `message_id`
-        declared_message_type: u16,
+        message_type: u16,
     },
     /// Different segments overlaps
     OverlappingSegment {
@@ -109,7 +97,6 @@ impl fmt::Display for Error {
 impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
-            Error::FieldSizeMismatch { .. } => "Field size mismatch from the given one.",
             Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
             Error::IncorrectBoolean { .. } => "Incorrect bool.",
             Error::IncorrectSegmentReference { .. } => "Incorrect segment reference.",

@@ -70,44 +70,48 @@ macro_rules! message {
             }
         }
 
-        impl<'a> $crate::encoding::Field<'a> for $name {
-            unsafe fn read(buffer: &'a [u8],
-                           from: $crate::encoding::Offset,
-                           to: $crate::encoding::Offset) -> Self {
-                let raw_message: $crate::messages::RawMessage = $crate::encoding::Field::read(buffer, from, to);
+        impl<'a> $crate::encoding::SegmentField<'a> for $name {
+            
+            fn item_size() -> $crate::encoding::Offset {
+                1
+            }
+
+            fn count(&self) -> $crate::encoding::Offset {
+                self.raw.len() as $crate::encoding::Offset
+            }
+
+            fn extend_buffer(&self, buffer: &mut Vec<u8>) {
+                buffer.extend_from_slice(self.raw.as_ref().as_ref())
+            }
+
+            unsafe fn from_buffer(buffer: &'a [u8],
+                                    from: $crate::encoding::Offset,
+                                    count: $crate::encoding::Offset) -> Self {
+                let raw_message: $crate::messages::RawMessage = 
+                                    $crate::encoding::SegmentField::from_buffer(buffer,
+                                                                from,
+                                                                count);
                 $crate::messages::FromRaw::from_raw(raw_message).unwrap()
             }
 
-            fn write(&self,
-                            buffer: &mut Vec<u8>,
-                            from: $crate::encoding::Offset,
-                            to: $crate::encoding::Offset) {
-                $crate::encoding::Field::write(&self.raw, buffer, from, to);
-            }
-
-            fn check(buffer: &'a [u8],
-                     from: $crate::encoding::CheckedOffset,
-                     to: $crate::encoding::CheckedOffset,
-                     latest_segment: $crate::encoding::CheckedOffset) -> $crate::encoding::Result {
+            fn check_data(buffer: &'a [u8],
+                    from: $crate::encoding::CheckedOffset,
+                    count: $crate::encoding::CheckedOffset,
+                    latest_segment: $crate::encoding::CheckedOffset)
+              -> $crate::encoding::Result {
                 let latest_segment_origin = <$crate::messages::RawMessage as
-                                $crate::encoding::Field>::check(buffer,
+                                $crate::encoding::SegmentField>::check_data(buffer,
                                                                 from,
-                                                                to,
+                                                                count,
                                                                 latest_segment)?;
                 // TODO: remove this allication,
                 // by allowing creating message from borrowed data
                 let raw_message: $crate::messages::RawMessage = 
-                                    unsafe { $crate::encoding::Field::read(buffer,
+                                    unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from.unchecked_offset(),
-                                                                to.unchecked_offset())};
-                <Self>::check_fields(&raw_message)?;
+                                                                count.unchecked_offset())};
+                let _: $name = $crate::messages::FromRaw::from_raw(raw_message)?;
                 Ok(latest_segment_origin)
-            }
-
-            fn field_size() -> $crate::encoding::Offset {
-                // We write message as regular buffer,
-                // so real `field_size` is 8.
-                8 as $crate::encoding::Offset
             }
         }
 
