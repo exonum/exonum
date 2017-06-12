@@ -23,8 +23,8 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 }
 
 pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
-    let validators = vec![gen_keypair(); count as usize];
-    let services = vec![gen_keypair(); count as usize];
+    let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
+        .map(|_| (gen_keypair(), gen_keypair())).unzip();
     let genesis = GenesisConfig::new(validators.iter().map(|x| x.0), services.iter().map(|x| x.0));
     let peers = (0..validators.len())
         .map(|x| {
