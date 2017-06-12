@@ -17,7 +17,6 @@ install() {
     ln -s ${scriptdir}/../frontend ${destdir}/frontend
     cd ${destdir}/frontend
     npm install
-    bower install
     cd -
     ln -s ${scriptdir}/../backend ${destdir}/backend
     cd ${destdir}/backend
