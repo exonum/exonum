@@ -30,9 +30,9 @@ storage_value! (
     /// Configuration index.
     struct ConfigReference {
         const SIZE = 40;
-        /// The heights with which a configuration becomes an actual.
+        /// The height, starting from which this configuration becomes actual.
         field actual_from: u64    [00 => 08]
-        /// Hash of the configuration contents.
+        /// Hash of the configuration contents that serialized as raw bytes vec.
         field cfg_hash:    &Hash  [08 => 40]
     }
 );
@@ -41,7 +41,7 @@ storage_value! (
     /// Transaction location in block.
     struct TxLocation {
         const SIZE = 16;
-        /// Height of block.
+        /// Height of block in the blockchain.
         field block_height:         u64  [00 => 08]
         /// Index in block.
         field position_in_block:    u64  [08 => 16]
@@ -61,7 +61,7 @@ impl<'a> Schema<'a> {
         MapTable::new(gen_prefix(CONSENSUS, 0, None), self.view)
     }
 
-    /// Returns table that keeps the block height and tx position inside block for every 
+    /// Returns table that keeps the block height and tx position inside block for every
     /// transaction hash.
     pub fn tx_location_by_tx_hash(&self) -> MapTable<View, Hash, TxLocation> {
         MapTable::new(gen_prefix(CONSENSUS, 1, None), self.view)
@@ -72,7 +72,7 @@ impl<'a> Schema<'a> {
         MapTable::new(gen_prefix(CONSENSUS, 2, None), self.view)
     }
 
-    /// Returns table that saves a list of block hashes that had the requested height.
+    /// Returns table that keeps block hash for the corresponding height.
     pub fn block_hashes_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, Hash> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 3, None), self.view))
     }
@@ -96,7 +96,8 @@ impl<'a> Schema<'a> {
         MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 6, None), self.view))
     }
 
-    /// Returns table that builds an index to get config starting height quickly.
+    /// Returns auxiliary table that keeps hash references to configurations in order
+    /// of increasing their `actual_from` height.
     pub fn configs_actual_from(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, ConfigReference> {
         ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
     }
@@ -104,7 +105,7 @@ impl<'a> Schema<'a> {
     /// Returns the accessory `MerklePatriciaTable` for calculating
     /// patches in the DBView layer.
     ///
-    /// Table calculates "sum" of root hashes of individual
+    /// Table calculates "aggregation" of root hashes of individual
     /// service tables, in effect summing the state of various entities,
     /// scattered across distinct services and their tables. Sum is performed by
     /// means of computing root hash of this table.
@@ -115,7 +116,7 @@ impl<'a> Schema<'a> {
     /// to the resulting block's `state_hash`.
     ///
     /// Core tables participate in resulting state_hash with `CORE_SERVICE`
-    /// service_id. Their vector is returned by `core_state_hash` method. 
+    /// service_id. Their vector is returned by `core_state_hash` method.
     pub fn state_hash_aggregator
         (&self)
          -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Hash> {
@@ -151,7 +152,7 @@ impl<'a> Schema<'a> {
         Ok(Some(res))
     }
 
-    /// Returns latest commited block.
+    /// Returns latest committed block.
     pub fn last_block(&self) -> Result<Option<Block>, Error> {
         Ok(match self.block_hashes_by_height().last()? {
                Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
@@ -159,7 +160,7 @@ impl<'a> Schema<'a> {
            })
     }
 
-    /// Returns height of the latest commited block.
+    /// Returns height of the latest committed block.
     pub fn last_height(&self) -> Result<Option<u64>, Error> {
         let block_opt = self.last_block()?;
         Ok(block_opt.map(|block| block.height()))
@@ -175,7 +176,7 @@ impl<'a> Schema<'a> {
         Ok(res)
     }
 
-    /// Adds a new configuration to the blockchain, which will become an actual at 
+    /// Adds a new configuration to the blockchain, which will become an actual at
     /// the `actual_from` height in `config_data`.
     pub fn commit_configuration(&self, config_data: StoredConfiguration) -> Result<(), Error> {
         let actual_from = config_data.actual_from;
@@ -258,7 +259,7 @@ impl<'a> Schema<'a> {
         Ok(cfg)
     }
 
-    /// Returns configuration for given hash.
+    /// Returns configuration for given configuration hash.
     pub fn configuration_by_hash(&self, hash: &Hash) -> Result<Option<StoredConfiguration>, Error> {
         self.configs().get(hash)
     }
@@ -268,12 +269,12 @@ impl<'a> Schema<'a> {
         Ok(vec![self.configs().root_hash()?])
     }
 
-    /// Construct proof of inclusion of root hash of a specific service
+    /// Constructs a proof of inclusion of root hash of a specific service
     /// table into block's `state_hash`.
     ///
     /// Searched key for proof is uniquely identified by (`u16`, `u16`) tuple
     /// of table's coordinates.
-    /// 
+    ///
     /// If found, root hash is returned as a value of proof's leaf
     /// corresponding to searched key. Otherwise, partial path to searched key
     /// is returned, which proves its exclusion.

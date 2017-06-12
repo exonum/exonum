@@ -100,13 +100,13 @@ def update_data_with_node_log(data, node_log):
             entry = str(entry.decode("utf8"))
         except AttributeError:
             pass
-        m = re.search(r"^(\d+).*commited=(\d+).*", entry)
+        m = re.search(r"^(\d+).*committed=(\d+).*", entry)
         # print(entry, end='')
         if m is not None:
             # print(entry, end='')
             ts = int(m.group(1))
             cnt = int(m.group(2))
-            data.append({"ts": ts, "commited": cnt, "sended": None})
+            data.append({"ts": ts, "committed": cnt, "sended": None})
     return data
 
 def get_txs_from_tx_gen_log_and_update_data(tx_gen_log, data):
@@ -123,7 +123,7 @@ def get_txs_from_tx_gen_log_and_update_data(tx_gen_log, data):
             ts = int(m.group(1))
             cnt = int(m.group(2))
             tx_hash = str(m.group(3))
-            data.append({"ts": ts, "commited": None, "sended": cnt, "tx_hash": tx_hash})
+            data.append({"ts": ts, "committed": None, "sended": cnt, "tx_hash": tx_hash})
             txs.append(tx_hash)
     return txs
 
@@ -140,9 +140,9 @@ def print_output_to_bench_file(node_number, node_log, tx_gen_log):
         out.write("number of lines in node_log: {}\n".format(str(len(node_log))))
         current_block_size = 0
         last_committed = 0
-        commited = 0
+        committed = 0
         sended = 0
-        out.write("timestamp (ms),sended,commited,current_block_size,tx_hash,is_tx_hash_found_in_node\n")
+        out.write("timestamp (ms),sended,committed,current_block_size,tx_hash,is_tx_hash_found_in_node\n")
         data.sort(key=lambda x: x['ts'])
         for value in data:
             if value["sended"] is not None:
@@ -153,14 +153,14 @@ def print_output_to_bench_file(node_number, node_log, tx_gen_log):
             else:
                 tx_hash = "None"
                 is_tx_hash_found_in_node_var = "None"
-            if value["commited"] is not None:
-                commited = value["commited"]
-                current_block_size = commited - last_committed
-                last_committed = commited
+            if value["committed"] is not None:
+                committed = value["committed"]
+                current_block_size = committed - last_committed
+                last_committed = committed
             else:
                 current_block_size = None
-                commited = None
-            out.write("{},{},{},{},{},{}\n".format(value["ts"], sended, commited, current_block_size, tx_hash, is_tx_hash_found_in_node_var))
+                committed = None
+            out.write("{},{},{},{},{},{}\n".format(value["ts"], sended, committed, current_block_size, tx_hash, is_tx_hash_found_in_node_var))
 
         out.write("len(txs): {}\n".format(str(len(txs))))
         out.write("array_of_unfound_txs: {}\n".format(str(array_of_unfound_txs)))
@@ -284,18 +284,18 @@ print_output_to_bench_file(3, tx_gen_log, tx_gen_log)
 # with open(output_file, 'w+') as out:
 #     current_block_size = 0
 #     last_committed = 0
-#     commited = 0
+#     committed = 0
 #     sended = 0
-#     out.write("timestamp (ms),sended,commited,current_block_size\n")
+#     out.write("timestamp (ms),sended,committed,current_block_size\n")
 #     data.sort(key=lambda x: x['ts'])
 #     for value in data:
 #         if value["sended"] is not None:
 #             sended = value["sended"]
-#         if value["commited"] is not None:
-#             commited = value["commited"]
-#             current_block_size = commited - last_committed
-#             last_committed = commited
-#         out.write("{},{},{},{}\n".format(value["ts"], sended, commited, current_block_size))
+#         if value["committed"] is not None:
+#             committed = value["committed"]
+#             current_block_size = committed - last_committed
+#             last_committed = committed
+#         out.write("{},{},{},{}\n".format(value["ts"], sended, committed, current_block_size))
 #
 #     out.write("len(txs): {}\n".format(str(len(txs))))
 #     out.write("array_of_unfound_txs: {}\n".format(str(array_of_unfound_txs)))
