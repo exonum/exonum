@@ -70,13 +70,13 @@ impl Blockchain {
             .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
-    /// Commits changes from the `StorageView` to the blockchain storage.
+    /// Commits changes from the patch to the blockchain storage. 
     /// See [`Fork`](../storage/trait.Fork.html) for details.
     pub fn merge(&self, patch: &Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
 
-    /// Returns the hash of latest commited block.
+    /// Returns the hash of latest committed block.
     pub fn last_hash(&self) -> Result<Hash, Error> {
         Ok(Schema::new(&self.view())
                .block_hashes_by_height()
@@ -84,7 +84,7 @@ impl Blockchain {
                .unwrap_or_else(Hash::default))
     }
 
-    /// Returns the latest commited block.
+    /// Returns the latest committed block.
     pub fn last_block(&self) -> Result<Block, Error> {
         Ok(Schema::new(&self.view()).last_block()?.unwrap())
     }
@@ -142,7 +142,7 @@ impl Blockchain {
         crypto::hash(&vec)
     }
 
-    /// This method executes the given transactions from pool.
+    /// Executes the given transactions from pool.
     /// Then it collects the resulting changhes from the current storage state and returns them
     /// with the hash of resulting block.
     pub fn create_patch(&self,
@@ -200,7 +200,8 @@ impl Blockchain {
         Ok((block_hash, fork.changes()))
     }
 
-    /// Commits block that proposes by node `State`.
+    /// Commits to the storage block that proposes by node `State`. 
+    /// After that invokes `handle_commit` for each service and returns the list of transactions.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I>(&self,
                          state: &mut State,

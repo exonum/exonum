@@ -15,7 +15,7 @@ pub struct StoredConfiguration {
     /// Link to the previous configuration. 
     /// For configuration in genesis block `hash` is just an array of zeroes.
     pub previous_cfg_hash: Hash, 
-    /// The height with which this configuration becomes an actual.
+    /// The height, starting from which this configuration becomes actual.
     pub actual_from: u64,
     /// List of validator's public keys
     pub validators: Vec<PublicKey>,
@@ -35,7 +35,7 @@ pub struct ConsensusConfig {
     pub status_timeout: Milliseconds,
     /// Peer exchange timeout.
     pub peers_timeout: Milliseconds,
-    /// Proposal timeout after the new height beginning.
+    /// Proposal timeout after committing a block.
     pub propose_timeout: Milliseconds,
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,

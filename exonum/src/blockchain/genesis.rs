@@ -2,7 +2,7 @@ use crypto::PublicKey;
 
 use super::config::ConsensusConfig;
 
-/// The initial `exonum-core` configuration which is commited into the genesis block.
+/// The initial `exonum-core` configuration which is committed into the genesis block.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GenesisConfig {
     /// Configuration of consensus.

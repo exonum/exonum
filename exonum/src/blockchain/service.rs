@@ -23,7 +23,7 @@ use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
 
 /// A trait that describes transaction processing rules for the given message type.
 pub trait Transaction: Message + 'static {
-    /// Checks the formal correctness of the transaction.
+    /// Checks the internal correctness of the transaction.
     /// That can be useful for signature verification.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
@@ -48,7 +48,7 @@ pub trait Service: Send + Sync + 'static {
     fn service_name(&self) -> &'static str;
 
     /// Returns a list of root hashes of tables that determine the current state
-    /// of the service database. These lests are collected from all services in a common
+    /// of the service database. These hashes are collected from all services in a common
     ///  `MerklePatriciaTable` that named [`state_hash_aggregator`][1].
     ///
     /// See also [`service_table_unique_key`][2].
@@ -120,7 +120,7 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.view
     }
 
-    /// Returns the current blockchain height. This height is 'height of last commited block` + 1.
+    /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
     pub fn height(&self) -> u64 {
         self.state.height()
     }
@@ -150,7 +150,7 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.state.config()
     }
 
-    /// Returns the config of consensus.
+    /// Returns the consensus parameters
     pub fn consensus_config(&self) -> &ConsensusConfig {
         self.state.consensus_config()
     }
