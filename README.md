@@ -61,27 +61,23 @@ Find detailed [step-by-step tutorial](http://exonum.com/doc/home/cryptocurrency/
 Install npm dependencies:
 
 ```
+cd frontend
 npm install
-```
-
-Install bower dependencies:
-
-```
-bower install
 ```
 
 #### Run
 
-Before start check backend endpoint url in the [frontend/config.json](frontend/config.json) and update the list of validators, example:
+Before start check backend configuration at [frontend/config.json](frontend/config.json):
 
 ```
 {
-  ...
+  "endpoint": "http://127.0.0.1:8000",
+  "network_id": 0,
+  "protocol_version": 0,
+  "service_id": 128,
   "validators": [
     "756f0bb877333e4059e785e38d72b716a2ae9981011563cf21e60ab16bec1fbc",
-    "6ce6f6501a03728d25533baf867312d6f425f48c07a1bed669b0afad5d0c136c",
-    "8917ecf39f4dc7c5289b4b9a3331c4455fcb1671b47bde39e0ea9361c5752451",
-    "a2dda8436715e8fdf6a5f865d5bdbe70b0ffb1d6267352e69a169aa6d8d368fb"
+    ...
   ] 
 }
 ```
@@ -89,7 +85,6 @@ Before start check backend endpoint url in the [frontend/config.json](frontend/c
 Now run application:
 
 ```
-cd frontend
 npm start
 ```
 
