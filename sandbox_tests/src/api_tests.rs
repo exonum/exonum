@@ -23,7 +23,7 @@ use exonum::events::Error as EventsError;
 use exonum::messages::{FromRaw, Message, RawMessage};
 use exonum::api::Api;
 use exonum::helpers::init_logger;
-use exonum::stream_struct::serialize::json::reexport as serde_json;
+use exonum::encoding::serialize::json::reexport as serde_json;
 use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 

@@ -123,8 +123,8 @@ use exonum::crypto::{Signature, PublicKey, Hash, HASH_SIZE};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
-use exonum::stream_struct::{Field, Error as StreamStructError};
-use exonum::stream_struct::serialize::json::reexport as serde_json;
+use exonum::encoding::{Field, Error as StreamStructError};
+use exonum::encoding::serialize::json::reexport as serde_json;
 
 /// Configuration service http api.
 pub mod config_api;
@@ -148,7 +148,7 @@ It is used as placeholder in database for votes of validators, which didn't cast
     &Hash::zero(), &Signature::zero());
 }
 
-storage_value! {
+encoding_struct! {
     struct StorageValueConfigProposeData {
         const SIZE = 48;
 
@@ -253,9 +253,7 @@ impl FromRaw for ConfigTx {
             CONFIG_VOTE_MESSAGE_ID => Ok(ConfigTx::ConfigVote(TxConfigVote::from_raw(raw)?)),
             _ => {
                 Err(StreamStructError::IncorrectMessageType {
-                        position: 2,
-                        actual_message_type: raw.message_type(),
-                        declared_message_type: CONFIG_PROPOSE_MESSAGE_ID,
+                        message_type: raw.message_type(),
                     })
             }
         }

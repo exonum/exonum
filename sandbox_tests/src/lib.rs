@@ -20,7 +20,7 @@ use std::collections::BTreeMap;
 use exonum::crypto::Hash;
 use exonum::blockchain::config::StoredConfiguration;
 use exonum::blockchain::Service;
-use exonum::stream_struct::serialize::json::reexport as serde_json;
+use exonum::encoding::serialize::json::reexport as serde_json;
 use sandbox::sandbox::Sandbox;
 use sandbox::timestamping::TimestampingService;
 
