@@ -251,11 +251,7 @@ impl FromRaw for ConfigTx {
                 Ok(ConfigTx::ConfigPropose(TxConfigPropose::from_raw(raw)?))
             }
             CONFIG_VOTE_MESSAGE_ID => Ok(ConfigTx::ConfigVote(TxConfigVote::from_raw(raw)?)),
-            _ => {
-                Err(StreamStructError::IncorrectMessageType {
-                        message_type: raw.message_type(),
-                    })
-            }
+            _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
         }
     }
 }
