@@ -10,23 +10,35 @@ scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 supervisor_conf=${destdir}/etc/supervisord.conf
 
 install() {
+    echo "Installing to: ${destdir}"
     if [ -d "${destdir}/etc" ]; then
         echo "Already installed here"
         return
     fi
+
+    echo "Build frontend..."
     cd ${scriptdir}/../frontend
     npm install
     cd -
+
+    echo "Build backend..."
     cd ${scriptdir}/../backend
     cargo build -p cryptocurrency
     cd -
+
+    echo "Create supervisor environment..."
     mkdir -p ${destdir}/log/supervisor
     mkdir ${destdir}/run
     mkdir ${destdir}/var
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc || exit 1
     ln -s ${scriptdir}/../frontend ${destdir}/frontend
     ln -s ${scriptdir}/../backend ${destdir}/backend
+
+    echo "Generate new configuration for nodes..."
     ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/etc 6 -p 2000
+    validators=$(cat ${destdir}/etc/validators/0.toml | sed -n -e 's/validators = //p')
+    echo "Use validators: $validators"
+    cat ${destdir}/frontend/config-example.json | sed -r "s/(\"validators\": )(\[\])/\1${validators}/" > ${destdir}/frontend/config.json
 }
 
 enable() {
@@ -111,5 +123,9 @@ case "$1" in
         ;;
     generate)
         generate $2 $3 $4
+        ;;
+    *)
+        echo "Exonum cryptocurrency demo bootstrap script"
+        echo "Usage: ./bootstrap.sh [start|stop|restart|install|enable|disable|update|clear|generate]"
         ;;
 esac
