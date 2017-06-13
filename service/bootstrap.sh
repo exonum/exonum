@@ -10,18 +10,22 @@ scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 supervisor_conf=${destdir}/etc/supervisord.conf
 
 install() {
+    if [ -d "${destdir}/etc" ]; then
+        echo "Already installed here"
+        return
+    fi
+    cd ${scriptdir}/../frontend
+    npm install
+    cd -
+    cd ${scriptdir}/../backend
+    cargo build -p cryptocurrency
+    cd -
     mkdir -p ${destdir}/log/supervisor
     mkdir ${destdir}/run
     mkdir ${destdir}/var
     rsync -rt ${scriptdir}/supervisord/etc/ ${destdir}/etc || exit 1
     ln -s ${scriptdir}/../frontend ${destdir}/frontend
-    cd ${destdir}/frontend
-    npm install
-    cd -
     ln -s ${scriptdir}/../backend ${destdir}/backend
-    cd ${destdir}/backend
-    cargo build -p cryptocurrency
-    cd -
     ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/etc 6 -p 2000
 }
 
