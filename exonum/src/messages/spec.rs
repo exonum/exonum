@@ -175,6 +175,16 @@ macro_rules! message {
                 Ok(latest_segment)
             }
 
+            /// return `$name`s `message_id` useable for matching.
+            pub fn message_id() -> u16 {
+                $id
+            }
+
+            /// return `$name`s `service_id` useable for matching.
+            pub fn service_id() -> u16 {
+                $extension
+            }
+
             $(
             $(#[$field_attr])*
             pub fn $field_name(&self) -> $field_type {
