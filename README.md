@@ -92,24 +92,28 @@ cd frontend
 npm install
 ```
 
-### Run
+### Config
 
-Before start check backend configuration at [frontend/config.json](frontend/config.json):
+Frontend needs a basic configuration in `frontend/config.json`.
+But there isn't any default, because you should add own validators to the configuration file before start.
+For example, copy [frontend/config-example.json](frontend/config-example.json) to `frontend/config.json` and add your validators there:
 
 ```
 {
-  "endpoint": "http://127.0.0.1:8000",
+  "endpoint": "http://127.0.0.1:8200",
   "network_id": 0,
   "protocol_version": 0,
   "service_id": 128,
   "validators": [
     "756f0bb877333e4059e785e38d72b716a2ae9981011563cf21e60ab16bec1fbc",
     ...
-  ] 
+  ]
 }
 ```
 
-Now run application:
+### Run
+
+To run the application:
 
 ```
 npm start
