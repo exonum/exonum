@@ -15,22 +15,27 @@
     <div class="panel-body">
         <div class="custom-table custom-table-hover">
             <div class="row">
-                <div class="col-xs-4 custom-table-header-column">Hash</div>
-                <div class="col-xs-4 custom-table-header-column">Height</div>
-                <div class="col-xs-4 custom-table-header-column">
-                    <span class="hidden-xs">Transactions</span>
-                    <span class="visible-xs">Txs</span>
-                </div>
+                <div class="col-xs-4 col-md-2 custom-table-header-column">Height</div>
+                <div class="col-xs-4 col-md-3 custom-table-header-column">Prev.hash</div>
+                <div class="col-sm-3 hidden-xs hidden-sm custom-table-header-column">State hash</div>
+                <div class="col-sm-2 hidden-xs hidden-sm custom-table-header-column">Tx.hash</div>
+                <div class="col-xs-4 col-md-2 custom-table-header-column">Round</div>
             </div>
             <div class="row" each={ blocks } onclick={ rowClick.bind(this, height) }>
-                <div class="col-xs-4 custom-table-column">
-                    <truncate val={ hash }></truncate>
-                </div>
-                <div class="col-xs-4 custom-table-column">
+                <div class="col-xs-4 col-md-2 custom-table-column">
                     { height }
                 </div>
-                <div class="col-xs-4 custom-table-column">
-                    { tx_count }
+                <div class="col-xs-4 col-md-3 custom-table-column">
+                    <truncate val={ prev_hash }></truncate>
+                </div>
+                <div class="col-sm-3 hidden-xs hidden-sm custom-table-column">
+                    <truncate val={ state_hash }></truncate>
+                </div>
+                <div class="col-sm-2 hidden-xs hidden-sm custom-table-column">
+                    <truncate val={ tx_hash }></truncate>
+                </div>
+                <div class="col-xs-4 col-md-2 custom-table-column text-center">
+                    { propose_round }
                 </div>
             </div>
         </div>

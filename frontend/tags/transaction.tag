@@ -1,65 +1,66 @@
 <transaction>
     <div class="panel-heading">
-        <button class="btn btn-default pull-right page-nav" onclick={ refresh }>
+        <button class="btn btn-default pull-right page-nav" if={ !transaction } onclick={ refresh }>
             <i class="glyphicon glyphicon-refresh"></i>
             <span class="hidden-xs">Refresh</span>
         </button>
-        <button class="btn btn-default pull-left page-nav" onclick={ back }>
+        <button class="btn btn-default pull-left page-nav" if={ transaction } onclick={ back }>
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
         </button>
         <div class="panel-title page-title text-center">
-            <div class="h4">{ title }</div>
+            <div class="h4" if={ transaction }>{ title } transaction</div>
+            <div class="h4" if={ !transaction }>Transaction not found</div>
         </div>
     </div>
     <div class="panel-body">
-        <virtual if={ transaction }>
-            <virtual if={ transaction.message_id === 128 }>
+        <virtual if={ transaction && transaction.content }>
+            <virtual if={ transaction.content.message_id === 128 }>
                 <div class="custom-table text-center">
                     <div class="row">
                         <div class="col-xs-6 custom-table-header-column">From</div>
                         <div class="col-xs-6 custom-table-header-column">To</div>
                     </div>
                     <div class="row">
-                        <div class="col-xs-6 custom-table-column monospace expanded">
-                            <a href="#user/{ transaction.body.from }">{ transaction.body.from }</a>
+                        <div class="col-xs-6 custom-table-column">
+                            <truncate class="truncate" val={ transaction.content.body.from }></truncate>
                         </div>
-                        <div class="col-xs-6 custom-table-column monospace expanded">
-                            <a href="#user/{ transaction.body.to }">{ transaction.body.to }</a>
+                        <div class="col-xs-6 custom-table-column">
+                            <truncate class="truncate" val={ transaction.content.body.to }></truncate>
                         </div>
                     </div>
                 </div>
 
                 <div class="text-center">
-                    <h2>{ numeral(transaction.body.amount).format('$0,0.00') }</h2>
+                    <h2>{ numeral(transaction.content.body.amount).format('$0,0.00') }</h2>
                 </div>
             </virtual>
 
-            <virtual if={ transaction.message_id === 129 }>
+            <virtual if={ transaction.content.message_id === 129 }>
                 <div class="custom-table text-center">
                     <div class="row">
                         <div class="col-sm-12 custom-table-header-column">To</div>
                     </div>
                     <div class="row">
-                        <div class="col-sm-12 custom-table-column monospace expanded">
-                            <a href="#user/{ transaction.body.wallet }">{ transaction.body.wallet }</a>
+                        <div class="col-sm-12 custom-table-column">
+                            <truncate class="truncate" val={ transaction.content.body.wallet }></truncate>
                         </div>
                     </div>
                 </div>
 
                 <div class="text-center">
-                    <h2>{ numeral(transaction.body.amount).format('$0,0.00') }</h2>
+                    <h2>{ numeral(transaction.content.body.amount).format('$0,0.00') }</h2>
                 </div>
             </virtual>
 
-            <virtual if={ transaction.message_id === 130 }>
+            <virtual if={ transaction.content.message_id === 130 }>
                 <div class="custom-table text-center">
                     <div class="row">
                         <div class="col-sm-12 custom-table-header-column">Name</div>
                     </div>
                     <div class="row">
                         <div class="col-sm-12 custom-table-column">
-                            <a href="#user/{ transaction.body.pub_key }">{ transaction.body.name }</a>
+                            { transaction.content.body.name }
                         </div>
                     </div>
                 </div>
@@ -75,30 +76,29 @@
         var self = this;
 
         this.toggleLoading(true);
-        this.service.getTransaction(this.opts.hash, function(transaction) {
-            if (transaction) {
-                switch(transaction.message_id) {
+        this.service.getTransaction(this.opts.hash, function(response) {
+            if (response.content) {
+                switch(response.content.message_id) {
                     case 128:
-                        self.title = 'Transfer Transaction';
+                        self.title = 'Transfer';
                         break;
                     case 129:
-                        self.title = 'Add Funds Transaction';
+                        self.title = 'Add Funds';
                         break;
                     case 130:
-                        self.title = 'Create Wallet Transaction';
+                        self.title = 'Create Wallet';
                         break;
                 }
-                self.transaction = transaction;
-            } else  {
-                self.title = 'Transaction not found';
+                self.transaction = response;
+                self.update();
             }
-            self.update();
+
             self.toggleLoading(false);
         });
 
         back(e) {
             e.preventDefault();
-            history.back();
+            route('/blockchain/block/' + self.transaction.location.block_height);
         }
 
         refresh(e) {
