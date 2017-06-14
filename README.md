@@ -31,7 +31,7 @@ Clone this project to a local folder, bootstrap and start it:
 ```sh
 git clone https://github.com/exonum/cryptocurrency
 cd cryptocurrency
-SERVICE_ROOT=$(pwd)/currency_root
+export SERVICE_ROOT=$(pwd)/currency_root
 ./service/bootstrap.sh install
 ./service/bootstrap.sh enable
 ./service/bootstrap.sh start cryptocurrency
