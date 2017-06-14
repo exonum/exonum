@@ -318,16 +318,7 @@ CryptocurrencyService.prototype.getBlock = function(height, callback) {
     $.ajax({
         method: 'GET',
         url: '/api/explorer/v1/blocks/' + height,
-        success: function(data, textStatus, jqXHR) {
-            if (data && data.txs) {
-                for (var i in data.txs) {
-                    var type = self.getTransactionTypeParams(data.txs[i].message_id);
-                    type.signature = data.txs[i].signature;
-                    data.txs[i].hash = type.hash(data.txs[i].body);
-                }
-            }
-            callback(data);
-        },
+        success: callback,
         error: function(jqXHR, textStatus, errorThrown) {
             console.error(textStatus);
         }
@@ -337,7 +328,7 @@ CryptocurrencyService.prototype.getBlock = function(height, callback) {
 CryptocurrencyService.prototype.getTransaction = function(hash, callback) {
     $.ajax({
         method: 'GET',
-        url: this.baseUrl + '/blockchain/transactions/' + hash,
+        url: '/api/explorer/v1/transactions/' + hash,
         success: callback,
         error: function(jqXHR, textStatus, errorThrown) {
             console.error(textStatus);
