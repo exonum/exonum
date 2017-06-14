@@ -43,7 +43,7 @@ function CryptocurrencyService() {
 
         $.ajax({
             method: 'POST',
-            url: '/api/services/cryptocurrency/v1/wallets/transaction',
+            url: 'api/services/cryptocurrency/v1/wallets/transaction',
             contentType: 'application/json',
             data: JSON.stringify({
                 body: data,
@@ -169,7 +169,7 @@ function CryptocurrencyService() {
 
     $.ajax({
         method: 'GET',
-        url: '/configuration',
+        url: 'configuration',
         success: function(response) {
             self.configuration = response;
 
@@ -241,7 +241,7 @@ CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
     var self = this;
     $.ajax({
         method: 'GET',
-        url: '/api/services/cryptocurrency/v1/wallets/info?pubkey=' + publicKey,
+        url: 'api/services/cryptocurrency/v1/wallets/info?pubkey=' + publicKey,
         success: function(response, textStatus, jqXHR) {
             callback.apply(this, self.validateWallet(publicKey, response));
         },
@@ -305,7 +305,7 @@ CryptocurrencyService.prototype.getBlocks = function(height, callback) {
     }
     $.ajax({
         method: 'GET',
-        url: '/api/explorer/v1/blocks?count=10' + suffix,
+        url: 'api/explorer/v1/blocks?count=10' + suffix,
         success: callback,
         error: function(jqXHR, textStatus, errorThrown) {
             console.error(textStatus);
@@ -317,7 +317,7 @@ CryptocurrencyService.prototype.getBlock = function(height, callback) {
     var self = this;
     $.ajax({
         method: 'GET',
-        url: '/api/explorer/v1/blocks/' + height,
+        url: 'api/explorer/v1/blocks/' + height,
         success: callback,
         error: function(jqXHR, textStatus, errorThrown) {
             console.error(textStatus);
@@ -328,7 +328,7 @@ CryptocurrencyService.prototype.getBlock = function(height, callback) {
 CryptocurrencyService.prototype.getTransaction = function(hash, callback) {
     $.ajax({
         method: 'GET',
-        url: '/api/explorer/v1/transactions/' + hash,
+        url: 'api/explorer/v1/transactions/' + hash,
         success: callback,
         error: function(jqXHR, textStatus, errorThrown) {
             console.error(textStatus);
