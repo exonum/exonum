@@ -6,7 +6,7 @@ extern crate exonum;
 #[cfg(test)]
 mod tests {
     use test::Bencher;
-    use exonum::crypto::{gen_keypair, sign, verify, hash, HashStream, SignStream};
+    use exonum::crypto::{gen_keypair, sign, verify, hash};
 
     #[bench]
     fn bench_sign_64(b: &mut Bencher) {
