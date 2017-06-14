@@ -11,8 +11,8 @@ It implements basic operations:
 
 ## Demo
 
-Because of blockchain is a distributed kind of software you should to run
-multiple nodes which handle the transactions and keep the data safely.
+Since blockchain is a distributed kind of software you should run
+multiple nodes which handle the transactions and keep the data safe.
 
 ### Requirements
 
@@ -92,11 +92,12 @@ cd frontend
 npm install
 ```
 
-### Config
+### Configure
 
-Frontend needs a basic configuration in `frontend/config.json`.
-But there isn't any default, because you should add own validators to the configuration file before start.
-For example, copy [frontend/config-example.json](frontend/config-example.json) to `frontend/config.json` and add your validators there:
+Frontend needs configuration file `./frontend/config.json`.
+Use [frontend/config-example.json](frontend/config-example.json) as template.
+
+Check url of backend endpoint and fill the list of validators.
 
 ```
 {
