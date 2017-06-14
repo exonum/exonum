@@ -1,0 +1,34 @@
+[package]
+name = "cryptocurrency"
+version = "0.1.0"
+authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re"]
+
+[dependencies]
+env_logger = "0.3"
+clap = {version="2.14", features=["unstable"]}
+
+time = "0.1"
+rand = "0.3"
+log = "0.3"
+byteorder = "0.5"
+serde = "1.0.0"
+serde_derive = "1.0.0"
+jsonway = "1.0"
+iron = "0.5.1"
+bodyparser = "0.7.0"
+router = "0.5.1"
+headers = "0.1.0"
+hyper = "0.10.4"
+cookie = "0.6.0"
+tempdir = "0.3.5"
+params = "0.6.0"
+
+[dependencies.exonum]
+git = "ssh://git@github.com/exonum/exonum-core.git"
+version = "0.1.0"
+rev = "7c3d449015a11703330aeb54bf7c50204b273710"
+
+# [dependencies.configuration_service]
+# git = "ssh://git@github.com/exonum/exonum-configuration.git"
+# version = "0.1.0"
+# rev = "fd753203427ffd95362839b7f166891f5ca097d0"

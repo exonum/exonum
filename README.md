@@ -1,23 +1,50 @@
 # Cryptocurrency demo
 
-This is demo of cryptocurrency implemented on Exonum blockchain.
+This project demonstrates how to bootstrap own cryptocurrency
+with [Exonum](http://exonum.com/) blockchain.
 
-It demonstrates the very basic operations:
-
+It implements basic operations:
 - create a new wallet
-
 - add funds into a wallet
-
 - transfer funds from the one wallet to another
-
 - monitor blocks status
+
+## Demo
+
+Since blockchain is a distributed kind of software you should run
+multiple nodes which handle the transactions and keep the data safe.
+
+### Requirements
+
+We prepared a minimal configuration that helps you start and test cryptocurrency
+right now. Be sure you installed necessary packages:
+* git
+* supervisord
+* node (with npm)
+* bower
+* Rust compiler
+
+### Run
+
+Clone this project to a local folder, bootstrap and start it:
+
+```sh
+git clone https://github.com/exonum/cryptocurrency
+cd cryptocurrency
+export SERVICE_ROOT=$(pwd)/currency_root
+./service/bootstrap.sh install
+./service/bootstrap.sh enable
+./service/bootstrap.sh start cryptocurrency
+```
+
+Ready! Open the [wallet manager](http://127.0.0.1:3000) in your browser.
 
 ## Backend
 
 Backend keeps balances of wallets and handles secure transactions between them.
 It consists of nodes which interact with each other. Distributed nodes ensure the reliability.
 
-#### Build
+### Build
 
 To build the backend, use cargo:
 
@@ -25,7 +52,7 @@ To build the backend, use cargo:
 cargo build --manifest-path=backend/Cargo.toml
 ```
 
-#### Run
+### Run
 
 When backend was built, you should declare all nodes to run.
 There is a special command `generate` which does it automatically:
@@ -52,11 +79,11 @@ It communicates with the backend via REST API and uses [Exonum client](https://g
 
 All business logic is can be found in [cryptocurrency.js](frontend/js/cryptocurrency.js).
 
-#### How it works?
+### How it works?
 
 Find detailed [step-by-step tutorial](http://exonum.com/doc/home/cryptocurrency/intro/) how to set up all this demo functionality from the very beginning.
 
-#### Build
+### Build
 
 Install npm dependencies:
 
@@ -65,24 +92,29 @@ cd frontend
 npm install
 ```
 
-#### Run
+### Configure
 
-Before start check backend configuration at [frontend/config.json](frontend/config.json):
+Frontend needs configuration file `./frontend/config.json`.
+Use [frontend/config-example.json](frontend/config-example.json) as template.
+
+Check url of backend endpoint and fill the list of validators.
 
 ```
 {
-  "endpoint": "http://127.0.0.1:8000",
+  "endpoint": "http://127.0.0.1:8200",
   "network_id": 0,
   "protocol_version": 0,
   "service_id": 128,
   "validators": [
     "756f0bb877333e4059e785e38d72b716a2ae9981011563cf21e60ab16bec1fbc",
     ...
-  ] 
+  ]
 }
 ```
 
-Now run application:
+### Run
+
+To run the application:
 
 ```
 npm start

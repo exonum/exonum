@@ -18,14 +18,15 @@ before_install:
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 script:
+- cd backend
 - cargo fmt -p cryptocurrency -- --write-mode=diff
 - cargo fmt -p cryptocurrency_api_tests -- --write-mode=diff
-- cd backend
+- cd cryptocurrency
 - cargo +$NIGHTLY_RUST clippy -- -D warnings
 - cd ..
-- cargo build --release --manifest-path backend/Cargo.toml
-- RUST_LOG=off cargo test --release --manifest-path backend/Cargo.toml
-- RUST_LOG=off cargo test --release --manifest-path backend/cryptocurrency_api_tests/Cargo.toml
+- cargo build --release --manifest-path cryptocurrency/Cargo.toml
+- RUST_LOG=off cargo test --release --manifest-path cryptocurrency/Cargo.toml
+- RUST_LOG=off cargo test --release --manifest-path cryptocurrency_api_tests/Cargo.toml
 notifications:
   slack:
     rooms:

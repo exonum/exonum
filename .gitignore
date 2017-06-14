@@ -8,6 +8,9 @@ target
 */target
 *.rs.bk
 
+# frontend
+frontend/config.json
+
 # IDE files
 .idea
 .vscode
