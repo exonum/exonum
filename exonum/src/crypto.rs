@@ -1,9 +1,9 @@
 use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
-                                         Signature as SignatureSodium, sign_detached,
-                                         verify_detached, gen_keypair as gen_keypair_sodium,
-                                         keypair_from_seed};
-use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
+                                         Signature as SignatureSodium, State as SignState,
+                                         sign_detached, keypair_from_seed,
+                                         verify_detached, gen_keypair as gen_keypair_sodium};
+use sodiumoxide::crypto::hash::sha256::{Digest, State as HashState, hash as hash_sodium};
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 use hex::{ToHex, FromHex};
@@ -50,6 +50,59 @@ pub fn hash(m: &[u8]) -> Hash {
     Hash(dig)
 }
 
+#[derive(Debug)]
+pub struct HashStream(HashState);
+
+impl HashStream {
+
+    pub fn new() -> Self {
+        HashStream(HashState::init())
+    }
+
+    pub fn update(&mut self, m: &[u8]) {
+        self.0.update(&m);
+    }
+
+    pub fn update_chain(mut self, m: &[u8]) -> Self {
+        self.0.update(&m);
+        self
+    }
+
+    pub fn finalize(self) -> Hash {
+        let dig = self.0.finalize();
+        Hash(dig)
+    }
+
+}
+
+#[derive(Debug)]
+pub struct SignStream(SignState);
+
+impl SignStream {
+
+    pub fn new() -> Self {
+        SignStream(SignState::init())
+    }
+
+    pub fn update(&mut self, m: &[u8]) {
+        self.0.update(m);
+    }
+
+    pub fn update_chain(mut self, m: &[u8]) -> Self {
+        self.0.update(m);
+        self
+    }
+
+    pub fn finalize(&mut self, secret_key: &SecretKey) -> Signature {
+        Signature(self.0.finalize(&secret_key.0))
+    }
+
+    pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
+        self.0.verify(&sig.0, &public_key.0)
+    }
+
+}
+
 macro_rules! implement_public_sodium_wrapper {
     ($name:ident, $name_from:ident, $size:expr) => (
     #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
@@ -70,6 +123,7 @@ macro_rules! implement_public_sodium_wrapper {
             $name_from::from_slice(bs).map($name)
         }
     }
+
     impl AsRef<[u8]> for $name {
         fn as_ref(&self) -> &[u8] {
             self.0.as_ref()
@@ -108,6 +162,7 @@ macro_rules! implement_private_sodium_wrapper {
             $name_from::from_slice(bs).map($name)
         }
     }
+
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             let inner = &self.0; 
@@ -125,8 +180,6 @@ implement_public_sodium_wrapper! {Hash, Digest, HASH_SIZE}
 implement_public_sodium_wrapper! {Signature, SignatureSodium, SIGNATURE_LENGTH}
 implement_private_sodium_wrapper! {SecretKey, SecretKeySodium, SECRET_KEY_LENGTH}
 implement_private_sodium_wrapper! {Seed, SeedSodium, SEED_LENGTH}
-
-
 
 macro_rules! implement_serde {
 ($name:ident) => (
@@ -238,9 +291,10 @@ impl Default for Hash {
 
 #[cfg(test)]
 mod tests {
-    use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature};
+    use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature, HashStream, SignStream};
     use super::HexValue;
     use serde_json;
+
     #[test]
     fn test_hash() {
         let h = hash(&[]);
@@ -293,5 +347,50 @@ mod tests {
         let sub_range = &h[10..20];
         assert_eq!(&[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228],
                    sub_range);
+    }
+
+    #[test]
+    fn test_hash_streaming_zero() {
+        let h1 = hash(&[]);
+        let mut state = HashStream::new();
+        state.update(&[]);
+        let h2 = state.finalize();
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_streaming_chunks() {
+        let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+        let h1 = hash(&data);
+        let mut state = HashStream::new();
+        state.update(&data[..5]);
+        state.update(&data[5..]);
+        let h2 = state.finalize();
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_sign_streaming_zero() {
+        let (pk, sk) = gen_keypair();
+        let mut creation_stream = SignStream::new();
+        creation_stream.update(&[]);
+        let sig = creation_stream.finalize(&sk);
+        let mut verified_stream = SignStream::new();
+        verified_stream.update(&[]);
+        assert!(verified_stream.verify(&sig, &pk));
+    }
+
+    #[test]
+    fn test_sign_streaming_chunks() {
+        let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+        let (pk, sk) = gen_keypair();
+        let mut creation_stream = SignStream::new();
+        creation_stream.update(&data[..5]);
+        creation_stream.update(&data[5..]);
+        let sig = creation_stream.finalize(&sk);
+        let mut verified_stream = SignStream::new();
+        verified_stream.update(&data[..5]);
+        verified_stream.update(&data[5..]);
+        assert!(verified_stream.verify(&sig, &pk));
     }
 }

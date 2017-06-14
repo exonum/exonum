@@ -3,6 +3,7 @@
 members = [
     "3rdparty/leveldb-sys",
     "3rdparty/leveldb",
+    "3rdparty/sodiumoxide",
     "exonum",
     "sandbox",
     "3rdparty/flamer",

@@ -6,7 +6,7 @@ extern crate exonum;
 #[cfg(test)]
 mod tests {
     use test::Bencher;
-    use exonum::crypto::{gen_keypair, sign, verify, hash};
+    use exonum::crypto::{gen_keypair, sign, verify, hash, HashStream, SignStream};
 
     #[bench]
     fn bench_sign_64(b: &mut Bencher) {
@@ -106,4 +106,52 @@ mod tests {
             .collect::<Vec<_>>();
         b.iter(|| hash(&data))
     }
+
+    // const FILE: &'static str = "path_to_file_for_hashing";
+
+    // #[bench]
+    // fn bench_hash_file(b: &mut Bencher) {
+    //     use std::io::{BufReader, Read, Seek, SeekFrom};
+    //     use std::fs::File;
+    //     use std::process::Command;
+
+    //     let mut reader = BufReader::new(File::open(FILE).unwrap());
+    //     let mut buffer = [0; 1024];
+
+    //     b.iter(|| {
+    //         let mut stream = HashStream::new();
+    //         loop {
+    //             let len = reader.read(&mut buffer).unwrap();
+    //             if len == 0 {
+    //                 break;
+    //             }
+    //             stream.update(&buffer[..len]);
+    //         }
+    //         let _ = stream.finalize();
+    //         let _ = reader.seek(SeekFrom::Start(0));
+    //     });
+    // }
+
+    // #[bench]
+    // fn bench_sign_file(b: &mut Bencher) {
+    //     use std::io::{BufReader, Read, Seek, SeekFrom};
+    //     use std::fs::File;
+
+    //     let mut reader = BufReader::new(File::open(FILE).unwrap());
+    //     let mut buffer = [0; 1024];
+
+    //     b.iter(|| {
+    //         let mut create_stream = SignStream::new();
+    //         let (_, sk) = gen_keypair();
+    //         loop {
+    //             let len = reader.read(&mut buffer).unwrap();
+    //             if len == 0 {
+    //                 break;
+    //             }
+    //             create_stream.update(&buffer[..len]);
+    //         }
+    //         let _ = create_stream.finalize(&sk);
+    //         let _ = reader.seek(SeekFrom::Start(0));
+    //     });
+    // }
 }
