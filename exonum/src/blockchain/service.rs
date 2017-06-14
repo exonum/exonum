@@ -101,10 +101,10 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 
     pub fn service_config(&self, service: &Service) -> &Value {
-        let id = service.service_id();
+        let name = service.service_name();
         self.state
             .services_config()
-            .get(&format!("{}", id))
+            .get(name)
             .unwrap()
     }
 
