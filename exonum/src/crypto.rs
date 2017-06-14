@@ -50,7 +50,7 @@ pub fn hash(m: &[u8]) -> Hash {
     Hash(dig)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct HashStream(HashState);
 
 impl HashStream {
@@ -59,12 +59,12 @@ impl HashStream {
         HashStream(HashState::init())
     }
 
-    pub fn update(&mut self, m: &[u8]) {
-        self.0.update(&m);
+    pub fn update(&mut self, chunk: &[u8]) {
+        self.0.update(chunk);
     }
 
-    pub fn update_chain(mut self, m: &[u8]) -> Self {
-        self.0.update(&m);
+    pub fn update_chain(mut self, chunk: &[u8]) -> Self {
+        self.0.update(chunk);
         self
     }
 
@@ -75,7 +75,7 @@ impl HashStream {
 
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SignStream(SignState);
 
 impl SignStream {
@@ -84,12 +84,12 @@ impl SignStream {
         SignStream(SignState::init())
     }
 
-    pub fn update(&mut self, m: &[u8]) {
-        self.0.update(m);
+    pub fn update(&mut self, chunk: &[u8]) {
+        self.0.update(chunk);
     }
 
-    pub fn update_chain(mut self, m: &[u8]) -> Self {
-        self.0.update(m);
+    pub fn update_chain(mut self, chunk: &[u8]) -> Self {
+        self.0.update(chunk);
         self
     }
 

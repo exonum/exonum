@@ -1,27 +1,3 @@
-//use std::env;
-//extern crate pkg_config;
-//
-//fn main() {
-//
-//    if let Ok(lib_dir) = env::var("SODIUM_LIB_DIR") {
-//
-//        println!("cargo:rustc-link-search=native={}", lib_dir);
-//
-//        let mode = match env::var_os("SODIUM_STATIC") {
-//            Some(_) => "static",
-//            None => "dylib",
-//        };
-//        println!("cargo:rustc-link-lib={0}=sodium", mode);
-//
-//    } else {
-//
-//        pkg_config::find_library("libsodium").unwrap();
-//
-//    }
-//
-//}
-
-
 #[macro_use]
 extern crate unwrap;
 
@@ -33,8 +9,6 @@ const VERSION: &'static str = "1.0.12";
 #[cfg(feature = "use-installed-libsodium")]
 fn main() {
     use std::env;
-
-    println!("<<<<<<<<<<< trying find libsodium >>>>>>>>>>>>>>>");
 
     if let Ok(lib_dir) = env::var("SODIUM_LIB_DIR") {
         println!("cargo:rustc-link-search=native={}", lib_dir);
