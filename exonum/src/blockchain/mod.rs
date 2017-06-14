@@ -89,9 +89,14 @@ impl Blockchain {
         let patch = {
             let view = self.view();
             // Update service tables
-            for (id, service) in self.service_map.iter() {
+            for (_, service) in self.service_map.iter() {
                 let cfg = service.handle_genesis_block(&view)?;
-                config_propose.services.insert(format!("{}", id), cfg);
+                let name = service.service_name();
+                if config_propose.services.contains_key(name) {
+                    panic!("Services have already contain service with name={}, please change it.",
+                           name);
+                }
+                config_propose.services.insert(name.into(), cfg);
             }
             // Commit actual configuration
             {
@@ -229,7 +234,9 @@ impl Blockchain {
 
 impl fmt::Debug for Blockchain {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Blockchain {{ db: {:?}, service_map: {{ .. }} }}", self.db)
+        write!(f,
+               "Blockchain {{ db: {:?}, service_map: {{ .. }} }}",
+               self.db)
     }
 }
 
@@ -252,7 +259,7 @@ mod test {
 
     #[test]
     fn test_system_time() {
-    use std::time::{SystemTime, UNIX_EPOCH};
+        use std::time::{SystemTime, UNIX_EPOCH};
         storage_value! {
             struct Test {
                 const SIZE = 12;
