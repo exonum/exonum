@@ -24,26 +24,18 @@
             <div class="custom-dd">
                 <div class="row">
                     <div class="col-xs-6 custom-dd-column">
-                        <strong>Hash</strong>
+                        <strong>Height</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        <truncate class="truncate" val={ block.hash }></truncate>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-xs-6 custom-dd-column">
-                        <strong>Proposer</strong>
-                    </div>
-                    <div class="col-xs-6 custom-dd-column">
-                        { block.proposer }
+                        { block.height }
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-xs-6 custom-dd-column">
-                        <strong>Tx hash</strong>
+                        <strong>Previous hash</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        <truncate class="truncate" val={ block.tx_hash }></truncate>
+                        <truncate class="truncate" val={ block.prev_hash }></truncate>
                     </div>
                 </div>
                 <div class="row">
@@ -56,37 +48,36 @@
                 </div>
                 <div class="row">
                     <div class="col-xs-6 custom-dd-column">
-                        <strong>Approved by</strong>
+                        <strong>Tx hash</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        { block.precommits_count } validators
+                        <truncate class="truncate" val={ block.tx_hash }></truncate>
                     </div>
                 </div>
-            </div>
-
-            <legend class="text-center no-border space-top">Transactions</legend>
-
-            <div class="custom-table">
                 <div class="row">
-                    <div class="col-xs-4 custom-table-header-column">Hash</div>
-                    <div class="col-xs-5 custom-table-header-column">Description</div>
-                    <div class="col-xs-3 custom-table-header-column text-center">Status</div>
-                </div>
-                <div class="row" each={ block.txs }>
-                    <div class="col-xs-4 custom-table-column">
-                        <truncate val={ hash }></truncate>
+                    <div class="col-xs-6 custom-dd-column">
+                        <strong>Propose round</strong>
                     </div>
-                    <div class="col-xs-8 custom-table-column" if={ message_id === 130 }>
-                        Create { body.name } wallet
-                    </div>
-                    <div class="col-xs-8 custom-table-column" if={ message_id === 129 }>
-                        <truncate val={ body.wallet }></truncate> add funds of <strong>{ numeral(body.amount).format('$0,0.00') }</strong>
-                    </div>
-                    <div class="col-xs-8 custom-table-column" if={ message_id === 128 }>
-                        <truncate val={ body.from }></truncate> send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
+                    <div class="col-xs-6 custom-dd-column">
+                        { block.propose_round }
                     </div>
                 </div>
             </div>
+
+            <virtual if={ txs && txs.length > 0 }>
+                <legend class="text-center no-border space-top">Transactions</legend>
+
+                <div class="custom-table">
+                    <div class="row">
+                        <div class="col-xs-12 custom-table-header-column">Hash</div>
+                    </div>
+                    <div class="row" each={ hash in txs } onclick={ rowClick.bind(this, hash) }>
+                        <div class="col-xs-12 custom-table-column">
+                            <truncate class="truncate" val={ hash }></truncate>
+                        </div>
+                    </div>
+                </div>
+            </virtual>
         </virtual>
 
         <virtual if={ !block }>
@@ -101,11 +92,17 @@
         var height = parseInt(this.opts.height);
 
         this.toggleLoading(true);
-        this.service.getBlock(height, function(block) {
-            self.block = block;
+        this.service.getBlock(height, function(response) {
+            self.block = response.block;
+            self.txs = response.txs;
             self.update();
             self.toggleLoading(false);
         });
+
+        rowClick(hash, e) {
+            e.preventDefault();
+            route('/blockchain/transaction/' + hash);
+        }
 
         previous(e) {
             e.preventDefault();
