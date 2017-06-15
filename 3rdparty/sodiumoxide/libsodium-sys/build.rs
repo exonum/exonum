@@ -3,6 +3,7 @@ extern crate unwrap;
 extern crate pkg_config;
 
 const VERSION: &'static str = "1.0.12";
+const MIN_VERSION: &'static str = "1.0.10";
 
 #[cfg(not(windows))]
 fn main() {
@@ -17,7 +18,7 @@ fn main() {
         println!("cargo:rustc-link-lib={0}=sodium", mode);
         println!("cargo:warning=Using unknown libsodium version. This crate is tested against \
                   {} and may not be fully compatible with other versions.", VERSION);
-    } else if let Ok(lib_details) = pkg_config::probe_library("libsodium") {
+    } else if let Ok(lib_details) = pkg_config::Config::new().atleast_version(MIN_VERSION).probe("libsodium") {
         if lib_details.version != VERSION {
             println!("cargo:warning=Using libsodium version {}. This crate is tested against {} \
                       and may not be fully compatible with {}.", lib_details.version, VERSION, 
