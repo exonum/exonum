@@ -24,7 +24,7 @@ pub const REQUEST_BLOCK_TIMEOUT: Milliseconds = 100;
 
 pub type Round = u32;
 pub type Height = u64;
-pub type ValidatorId = u32;
+pub type ValidatorId = u16;
 // TODO replace by persistent TxPool
 pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
 // TODO: reduce copying of Hash
@@ -106,7 +106,7 @@ pub struct BlockState {
     // Changes that should be made for block committing.
     patch: Patch,
     txs: Vec<Hash>,
-    propose_round: Round,
+    proposer_id: ValidatorId,
 }
 
 pub trait VoteMessage: Message + Clone {
@@ -251,12 +251,16 @@ impl ProposeState {
 }
 
 impl BlockState {
-    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, propose_round: Round) -> BlockState {
+    pub fn new(hash: Hash,
+               patch: Patch,
+               txs: Vec<Hash>,
+               proposer_id: ValidatorId)
+               -> BlockState {
         BlockState {
-            hash: hash,
-            patch: patch,
-            txs: txs,
-            propose_round: propose_round,
+            hash,
+            patch,
+            txs,
+            proposer_id,
         }
     }
 
@@ -272,8 +276,8 @@ impl BlockState {
         &self.txs
     }
 
-    pub fn propose_round(&self) -> Round {
-        self.propose_round
+    pub fn proposer_id(&self) -> ValidatorId {
+        self.proposer_id
     }
 }
 
@@ -386,7 +390,7 @@ impl State {
         let validator_id = config.validators
                             .iter()
                             .position(|pk| pk == self.public_key())
-                            .map(|id| id as u32);
+                            .map(|id| id as ValidatorId);
         self.whitelist.set_validators(config.validators.iter().cloned());
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
@@ -637,16 +641,16 @@ impl State {
                      block_hash: Hash,
                      patch: Patch,
                      txs: Vec<Hash>,
-                     propose_round: Round)
+                     proposer_id: ValidatorId)
                      -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => {
                 Some(e.insert(BlockState {
                     hash: block_hash,
-                    patch: patch,
-                    txs: txs,
-                    propose_round: propose_round,
+                    patch,
+                    txs,
+                    proposer_id,
                 }))
             }
         }

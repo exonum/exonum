@@ -17,7 +17,7 @@ use std::fmt;
 
 use events::Error as EventsError;
 use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
-use serialize::ToHex;
+use encoding::serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
 
 
@@ -221,7 +221,7 @@ mod tests {
     use router::Router;
     use serde_json;
 
-    use blockchain::Block;
+    use blockchain::{Block, SCHEMA_MAJOR_VERSION};
     use crypto::Hash;
 
     use super::*;
@@ -229,8 +229,12 @@ mod tests {
     #[test]
     fn test_json_response_for_complex_val() {
         let str_val = "sghdkgskgskldghshgsd";
-        let complex_val = Block::new(24,
-                                     2,
+        let txs = [34, 32];
+        let tx_count = txs.len() as u32;
+        let complex_val = Block::new(SCHEMA_MAJOR_VERSION,
+                                     0,
+                                     24,
+                                     tx_count,
                                      &Hash::new([24; 32]),
                                      &Hash::new([34; 32]),
                                      &Hash::new([38; 32]));
