@@ -1,6 +1,6 @@
 use exonum::crypto::Hash;
 
-storage_value! {
+encoding_struct! {
 /// Represents transaction. If `execution_status` equals to `true`, then the transaction
 /// was successful.
     struct TxMetaRecord {

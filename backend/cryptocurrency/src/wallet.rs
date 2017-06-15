@@ -1,9 +1,9 @@
 //! Wallet.
 
-use exonum::messages::Field;
+use exonum::encoding::Field;
 use exonum::crypto::{PublicKey, Hash};
 
-storage_value! {
+encoding_struct! {
 /// Wallet information stored in the database.
     struct Wallet {
         const SIZE = 88;

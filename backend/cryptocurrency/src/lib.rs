@@ -1,6 +1,6 @@
 //! Cryptocurrency implementation example using [exonum](http://exonum.com/).
 
-// TODO: Uncomment when `storage_value!` and `message!` implementation will be updated.
+// TODO: Uncomment when `encoding_struct!` and `message!` implementation will be updated.
 // #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 
@@ -13,7 +13,7 @@ extern crate byteorder;
 extern crate log;
 #[cfg(test)]
 extern crate tempdir;
-#[macro_use(message, storage_value, counter)]
+#[macro_use(message, encoding_struct)]
 extern crate exonum;
 extern crate params;
 extern crate router;
@@ -25,12 +25,13 @@ use router::Router;
 
 use std::fmt;
 
-use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message, Error as MessageError};
+use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message};
 use exonum::crypto::{PublicKey, Hash, PUBLIC_KEY_LENGTH};
 use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
                       Result as StorageResult};
 use exonum::blockchain::{Service, Transaction, ApiContext};
-use exonum::serialize::json::reexport as serde_json;
+use exonum::encoding::serialize::json::reexport as serde_json;
+use exonum::encoding::Error as StreamStructError;
 use serde_json::{Value, to_value};
 
 use wallet::Wallet;
@@ -124,12 +125,12 @@ impl Message for CurrencyTx {
 }
 
 impl FromRaw for CurrencyTx {
-    fn from_raw(raw: RawMessage) -> Result<Self, MessageError> {
+    fn from_raw(raw: RawMessage) -> Result<Self, StreamStructError> {
         match raw.message_type() {
             TX_TRANSFER_ID => Ok(CurrencyTx::Transfer(TxTransfer::from_raw(raw)?)),
             TX_ISSUE_ID => Ok(CurrencyTx::Issue(TxIssue::from_raw(raw)?)),
             TX_WALLET_ID => Ok(CurrencyTx::CreateWallet(TxCreateWallet::from_raw(raw)?)),
-            _ => Err(MessageError::IncorrectMessageType { message_type: raw.message_type() }),
+            _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
         }
     }
 }
@@ -330,7 +331,7 @@ impl Service for CurrencyService {
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
         CurrencyTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
@@ -357,7 +358,7 @@ mod tests {
     use exonum::storage::{self, Storage};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::messages::{FromRaw, Message};
-    use exonum::serialize::json::reexport as serde_json;
+    use exonum::encoding::serialize::json::reexport as serde_json;
 
     use super::{CurrencyTx, CurrencyService, CurrencySchema, TxCreateWallet, TxIssue, TxTransfer};
     use super::tx_metarecord::TxMetaRecord;

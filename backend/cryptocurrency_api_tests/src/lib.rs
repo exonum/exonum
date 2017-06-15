@@ -30,7 +30,7 @@ mod tests {
     use std::fs::File;
     use std::io::Read;
 
-    use exonum::serialize::json::reexport as serde_json;
+    use exonum::encoding::serialize::json::reexport as serde_json;
     use exonum::node::TransactionSend;
     use exonum::crypto::{Seed, Hash, PublicKey, gen_keypair, gen_keypair_from_seed};
     use exonum::blockchain::{Service, Transaction};
