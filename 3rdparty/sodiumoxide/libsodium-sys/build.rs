@@ -1,12 +1,10 @@
 #[macro_use]
 extern crate unwrap;
-
-#[cfg(feature = "use-installed-libsodium")]
 extern crate pkg_config;
 
 const VERSION: &'static str = "1.0.12";
 
-#[cfg(feature = "use-installed-libsodium")]
+#[cfg(not(windows))]
 fn main() {
     use std::env;
 
@@ -17,18 +15,172 @@ fn main() {
             None => "dylib",
         };
         println!("cargo:rustc-link-lib={0}=sodium", mode);
-        println!("cargo:warning=Using unknown libsodium version.  This crate is tested against \
-                  {} and may not be fully compatible with other versions.",
-                 VERSION);
-    } else {
-        let lib_details = unwrap!(pkg_config::probe_library("libsodium"));
+        println!("cargo:warning=Using unknown libsodium version. This crate is tested against \
+                  {} and may not be fully compatible with other versions.", VERSION);
+    } else if let Ok(lib_details) = pkg_config::probe_library("libsodium") {
         if lib_details.version != VERSION {
-            println!("cargo:warning=Using libsodium version {}.  This crate is tested against {} \
-                      and may not be fully compatible with {}.",
-                     lib_details.version,
-                     VERSION,
-                     lib_details.version);
+            println!("cargo:warning=Using libsodium version {}. This crate is tested against {} \
+                      and may not be fully compatible with {}.", lib_details.version, VERSION, 
+                      lib_details.version);
         }
+    } else {
+        use std::env;
+        use std::fs::{self, File};
+        use std::process::Command;
+        use flate2::read::GzDecoder;
+        use tar::Archive;
+
+        // Download gz tarball
+        let basename = "libsodium-".to_string() + VERSION;
+        let gz_filename = basename.clone() + ".tar.gz";
+        let url = "https://github.com/jedisct1/libsodium/releases/download/".to_string() +
+            VERSION + "/" + &gz_filename;
+        let mut install_dir = get_install_dir();
+        let mut source_dir = unwrap!(env::var("OUT_DIR")) + "/source";
+        // Avoid issues with paths containing spaces by falling back to using /tmp
+        let target = unwrap!(env::var("TARGET"));
+        if install_dir.contains(" ") {
+            let fallback_path = "/tmp/".to_string() + &basename + "/" + &target;
+            install_dir = fallback_path.clone() + "/installed";
+            source_dir = fallback_path.clone() + "/source";
+            println!("cargo:warning=The path to the usual build directory contains spaces and hence \
+                      can't be used to build libsodium.  Falling back to use {}.  If running `cargo \
+                      clean`, ensure you also delete this fallback directory",
+                     fallback_path);
+        }
+        let gz_path = source_dir.clone() + "/" + &gz_filename;
+        unwrap!(fs::create_dir_all(&install_dir));
+        unwrap!(fs::create_dir_all(&source_dir));
+
+        let mut curl_cmd = Command::new("curl");
+        let curl_output = curl_cmd
+            .arg(&url)
+            .arg("-sSLvo")
+            .arg(&gz_path)
+            .output()
+            .unwrap_or_else(|error| {
+                panic!("Failed to run curl command: {}", error);
+            });
+        if !curl_output.status.success() {
+            panic!("\n{:?}\n{}\n{}\n",
+                   curl_cmd,
+                   String::from_utf8_lossy(&curl_output.stdout),
+                   String::from_utf8_lossy(&curl_output.stderr));
+        }
+
+        // Unpack the tarball
+        let gz_archive = unwrap!(File::open(&gz_path));
+        let gz_decoder = unwrap!(GzDecoder::new(gz_archive));
+        let mut archive = Archive::new(gz_decoder);
+        unwrap!(archive.unpack(&source_dir));
+        source_dir.push_str(&format!("/{}", basename));
+
+        // Clean up
+        let _ = fs::remove_file(gz_path);
+
+        // Run `./configure`
+        let gcc = gcc::Config::new();
+        let (cc, cflags) = if target.contains("i686") {
+            (format!("{} -m32", gcc.get_compiler().path().display()),
+             env::var("CFLAGS").unwrap_or(String::from(" -march=i686 -O3")))
+        } else {
+            (format!("{}", gcc.get_compiler().path().display()),
+             env::var("CFLAGS").unwrap_or(String::from(" -march=native -O3")))
+        };
+        let prefix_arg = format!("--prefix={}", install_dir);
+        let host = unwrap!(env::var("HOST"));
+        let host_arg = format!("--host={}", target);
+        let cross_compiling = target != host;
+        let help = if cross_compiling {
+            "***********************************************************\n\
+             Possible missing dependencies.\n\
+             See https://github.com/maidsafe/rust_sodium#cross-compiling\n\
+             ***********************************************************\n\n"
+        } else {
+            ""
+        };
+
+        // Disable PIE for Ubuntu < 15.04 (see https://github.com/jedisct1/libsodium/issues/292)
+        let disable_pie_arg = match Command::new("lsb_release").arg("-irs").output() {
+            Ok(id_output) => {
+                let stdout = String::from_utf8_lossy(&id_output.stdout);
+                let mut lines = stdout.lines();
+                if lines.next() == Some("Ubuntu") {
+                    let v = unwrap!(unwrap!(unwrap!(lines.next()).split('.').next()).parse::<u32>());
+                    if v < 15 { "--disable-pie" } else { "" }
+                } else {
+                    "--disable-pie"
+                }
+            }
+            _ => "",
+        };
+
+        let mut configure_cmd = Command::new("./configure");
+        let configure_output = configure_cmd
+            .current_dir(&source_dir)
+            .env("CC", &cc)
+            .env("CFLAGS", &cflags)
+            .arg(&prefix_arg)
+            .arg(&host_arg)
+            .arg("--enable-shared=no")
+            .arg(disable_pie_arg)
+            .output()
+            .unwrap_or_else(|error| {
+                panic!("Failed to run './configure': {}\n{}", error, help);
+            });
+        if !configure_output.status.success() {
+            panic!("\n{:?}\nCFLAGS={}\nCC={}\n{}\n{}\n{}\n",
+                   configure_cmd,
+                   cflags,
+                   cc,
+                   String::from_utf8_lossy(&configure_output.stdout),
+                   String::from_utf8_lossy(&configure_output.stderr),
+                   help);
+        }
+
+        // Run `make check`, or `make all` if we're cross-compiling
+        let j_arg = format!("-j{}", unwrap!(env::var("NUM_JOBS")));
+        let make_arg = if cross_compiling { "all" } else { "check" };
+        let mut make_cmd = Command::new("make");
+        let make_output = make_cmd
+            .current_dir(&source_dir)
+            .env("V", "1")
+            .arg(make_arg)
+            .arg(&j_arg)
+            .output()
+            .unwrap_or_else(|error| {
+                panic!("Failed to run 'make {}': {}\n{}", make_arg, error, help);
+            });
+        if !make_output.status.success() {
+            panic!("\n{:?}\n{}\n{}\n{}\n{}",
+                   make_cmd,
+                   String::from_utf8_lossy(&configure_output.stdout),
+                   String::from_utf8_lossy(&make_output.stdout),
+                   String::from_utf8_lossy(&make_output.stderr),
+                   help);
+        }
+
+        // Run `make install`
+        let mut install_cmd = Command::new("make");
+        let install_output = install_cmd
+            .current_dir(&source_dir)
+            .arg("install")
+            .output()
+            .unwrap_or_else(|error| {
+                panic!("Failed to run 'make install': {}", error);
+            });
+        if !install_output.status.success() {
+            panic!("\n{:?}\n{}\n{}\n{}\n{}\n",
+                   install_cmd,
+                   String::from_utf8_lossy(&configure_output.stdout),
+                   String::from_utf8_lossy(&make_output.stdout),
+                   String::from_utf8_lossy(&install_output.stdout),
+                   String::from_utf8_lossy(&install_output.stderr));
+        }
+
+        println!("cargo:rustc-link-lib=static=sodium");
+        println!("cargo:rustc-link-search=native={}/lib", install_dir);
+        println!("cargo:include={}/include", install_dir);
     }
 }
 
@@ -218,168 +370,5 @@ fn main() {
     println!("cargo:rustc-link-lib=static=sodium");
     println!("cargo:rustc-link-search=native={}",
              lib_install_dir.display());
-    println!("cargo:include={}/include", install_dir);
-}
-
-
-
-#[cfg(all(not(windows), not(feature = "use-installed-libsodium")))]
-fn main() {
-    use std::env;
-    use std::fs::{self, File};
-    use std::process::Command;
-    use flate2::read::GzDecoder;
-    use tar::Archive;
-
-    // Download gz tarball
-    let basename = "libsodium-".to_string() + VERSION;
-    let gz_filename = basename.clone() + ".tar.gz";
-    let url = "https://github.com/jedisct1/libsodium/releases/download/".to_string() +
-        VERSION + "/" + &gz_filename;
-    let mut install_dir = get_install_dir();
-    let mut source_dir = unwrap!(env::var("OUT_DIR")) + "/source";
-    // Avoid issues with paths containing spaces by falling back to using /tmp
-    let target = unwrap!(env::var("TARGET"));
-    if install_dir.contains(" ") {
-        let fallback_path = "/tmp/".to_string() + &basename + "/" + &target;
-        install_dir = fallback_path.clone() + "/installed";
-        source_dir = fallback_path.clone() + "/source";
-        println!("cargo:warning=The path to the usual build directory contains spaces and hence \
-                  can't be used to build libsodium.  Falling back to use {}.  If running `cargo \
-                  clean`, ensure you also delete this fallback directory",
-                 fallback_path);
-    }
-    let gz_path = source_dir.clone() + "/" + &gz_filename;
-    unwrap!(fs::create_dir_all(&install_dir));
-    unwrap!(fs::create_dir_all(&source_dir));
-
-    let mut curl_cmd = Command::new("curl");
-    let curl_output = curl_cmd
-        .arg(&url)
-        .arg("-sSLvo")
-        .arg(&gz_path)
-        .output()
-        .unwrap_or_else(|error| {
-            panic!("Failed to run curl command: {}", error);
-        });
-    if !curl_output.status.success() {
-        panic!("\n{:?}\n{}\n{}\n",
-               curl_cmd,
-               String::from_utf8_lossy(&curl_output.stdout),
-               String::from_utf8_lossy(&curl_output.stderr));
-    }
-
-    // Unpack the tarball
-    let gz_archive = unwrap!(File::open(&gz_path));
-    let gz_decoder = unwrap!(GzDecoder::new(gz_archive));
-    let mut archive = Archive::new(gz_decoder);
-    unwrap!(archive.unpack(&source_dir));
-    source_dir.push_str(&format!("/{}", basename));
-
-    // Clean up
-    let _ = fs::remove_file(gz_path);
-
-    // Run `./configure`
-    let gcc = gcc::Config::new();
-    let (cc, cflags) = if target.contains("i686") {
-        (format!("{} -m32", gcc.get_compiler().path().display()),
-         env::var("CFLAGS").unwrap_or(String::from(" -march=i686 -O3")))
-    } else {
-        (format!("{}", gcc.get_compiler().path().display()),
-         env::var("CFLAGS").unwrap_or(String::from(" -march=native -O3")))
-    };
-    let prefix_arg = format!("--prefix={}", install_dir);
-    let host = unwrap!(env::var("HOST"));
-    let host_arg = format!("--host={}", target);
-    let cross_compiling = target != host;
-    let help = if cross_compiling {
-        "***********************************************************\n\
-         Possible missing dependencies.\n\
-         See https://github.com/maidsafe/rust_sodium#cross-compiling\n\
-         ***********************************************************\n\n"
-    } else {
-        ""
-    };
-
-    // Disable PIE for Ubuntu < 15.04 (see https://github.com/jedisct1/libsodium/issues/292)
-    let disable_pie_arg = match Command::new("lsb_release").arg("-irs").output() {
-        Ok(id_output) => {
-            let stdout = String::from_utf8_lossy(&id_output.stdout);
-            let mut lines = stdout.lines();
-            if lines.next() == Some("Ubuntu") {
-                let v = unwrap!(unwrap!(unwrap!(lines.next()).split('.').next()).parse::<u32>());
-                if v < 15 { "--disable-pie" } else { "" }
-            } else {
-                "--disable-pie"
-            }
-        }
-        _ => "",
-    };
-
-    let mut configure_cmd = Command::new("./configure");
-    let configure_output = configure_cmd
-        .current_dir(&source_dir)
-        .env("CC", &cc)
-        .env("CFLAGS", &cflags)
-        .arg(&prefix_arg)
-        .arg(&host_arg)
-        .arg("--enable-shared=no")
-        .arg(disable_pie_arg)
-        .output()
-        .unwrap_or_else(|error| {
-            panic!("Failed to run './configure': {}\n{}", error, help);
-        });
-    if !configure_output.status.success() {
-        panic!("\n{:?}\nCFLAGS={}\nCC={}\n{}\n{}\n{}\n",
-               configure_cmd,
-               cflags,
-               cc,
-               String::from_utf8_lossy(&configure_output.stdout),
-               String::from_utf8_lossy(&configure_output.stderr),
-               help);
-    }
-
-    // Run `make check`, or `make all` if we're cross-compiling
-    let j_arg = format!("-j{}", unwrap!(env::var("NUM_JOBS")));
-    let make_arg = if cross_compiling { "all" } else { "check" };
-    let mut make_cmd = Command::new("make");
-    let make_output = make_cmd
-        .current_dir(&source_dir)
-        .env("V", "1")
-        .arg(make_arg)
-        .arg(&j_arg)
-        .output()
-        .unwrap_or_else(|error| {
-            panic!("Failed to run 'make {}': {}\n{}", make_arg, error, help);
-        });
-    if !make_output.status.success() {
-        panic!("\n{:?}\n{}\n{}\n{}\n{}",
-               make_cmd,
-               String::from_utf8_lossy(&configure_output.stdout),
-               String::from_utf8_lossy(&make_output.stdout),
-               String::from_utf8_lossy(&make_output.stderr),
-               help);
-    }
-
-    // Run `make install`
-    let mut install_cmd = Command::new("make");
-    let install_output = install_cmd
-        .current_dir(&source_dir)
-        .arg("install")
-        .output()
-        .unwrap_or_else(|error| {
-            panic!("Failed to run 'make install': {}", error);
-        });
-    if !install_output.status.success() {
-        panic!("\n{:?}\n{}\n{}\n{}\n{}\n",
-               install_cmd,
-               String::from_utf8_lossy(&configure_output.stdout),
-               String::from_utf8_lossy(&make_output.stdout),
-               String::from_utf8_lossy(&install_output.stdout),
-               String::from_utf8_lossy(&install_output.stderr));
-    }
-
-    println!("cargo:rustc-link-lib=static=sodium");
-    println!("cargo:rustc-link-search=native={}/lib", install_dir);
     println!("cargo:include={}/include", install_dir);
 }
