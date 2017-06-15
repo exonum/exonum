@@ -109,9 +109,8 @@ mod test {
 
         let mut r = BufReader::new(File::open(file).unwrap());
         let mut s = State::init();
-        loop {
-            let mut buf = [0; 512];
-            let len = r.read(&mut buf).unwrap();
+        let mut buf = [0; 512];
+        while let Ok(len) = r.read(&mut buf) {
             if len <= 0 {
                 break;
             }
@@ -136,17 +135,12 @@ mod test {
 
         let Digest(hash_short) = test_hash_for_file("testvectors/SHA256ShortMsg.rsp");
         let Digest(hash_long) =  test_hash_for_file("testvectors/SHA256LongMsg.rsp");
-        let Digest(hash_image) =  test_hash_for_file("/Users/crocus/Desktop/image.png");
         let real_short = "aaf8115ef18263c52a7d2478d72b37dea30b25a1f7d0497136fbf7950715c587"
             .from_hex().unwrap(); // short file
         let real_long  = "b1f63358201511b72aa8e21234df37cf3287e95337dc2adb3d219968bedfa6a2"
             .from_hex().unwrap(); // long file
-        let image_hash = "98a9c15cf8ab80eafd7423670afd1d84fcc4a7c66af506886d10c96b1086b544"
-            .from_hex().unwrap();
-
+        
         assert_eq!(&hash_short[..], &real_short[..]);
         assert_eq!(&hash_long[..],  &real_long[..]);
-        assert_eq!(&hash_image[..], &image_hash[..]);
-
     }
 }
