@@ -33,7 +33,7 @@ pub type Round = u32;
 /// Blockchain's height (number of blocks).
 pub type Height = u64;
 /// Validators id.
-pub type ValidatorId = u32;
+pub type ValidatorId = u16;
 
 /// Transactions pool.
 // TODO replace by persistent TxPool
@@ -127,7 +127,7 @@ pub struct BlockState {
     // Changes that should be made for block committing.
     patch: Patch,
     txs: Vec<Hash>,
-    propose_round: Round,
+    proposer_id: ValidatorId,
 }
 
 /// `VoteMessage` trait represents voting messages such as `Precommit` and `Prevote`.
@@ -290,12 +290,16 @@ impl ProposeState {
 
 impl BlockState {
     /// Creates a new `BlockState` instance with the given parameters.
-    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, propose_round: Round) -> BlockState {
+    pub fn new(hash: Hash,
+               patch: Patch,
+               txs: Vec<Hash>,
+               proposer_id: ValidatorId)
+               -> Self {
         BlockState {
-            hash: hash,
-            patch: patch,
-            txs: txs,
-            propose_round: propose_round,
+            hash,
+            patch,
+            txs,
+            proposer_id,
         }
     }
 
@@ -314,9 +318,9 @@ impl BlockState {
         &self.txs
     }
 
-    /// Returns round number in which block was proposed.
-    pub fn propose_round(&self) -> Round {
-        self.propose_round
+    /// Returns id of the validator that proposed the block.
+    pub fn proposer_id(&self) -> ValidatorId {
+        self.proposer_id
     }
 }
 
@@ -441,7 +445,7 @@ impl State {
         let validator_id = config.validators
                             .iter()
                             .position(|pk| pk == self.public_key())
-                            .map(|id| id as u32);
+                            .map(|id| id as ValidatorId);
         self.whitelist.set_validators(config.validators.iter().cloned());
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
@@ -743,16 +747,16 @@ impl State {
                      block_hash: Hash,
                      patch: Patch,
                      txs: Vec<Hash>,
-                     propose_round: Round)
+                     proposer_id: ValidatorId)
                      -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => {
                 Some(e.insert(BlockState {
                     hash: block_hash,
-                    patch: patch,
-                    txs: txs,
-                    propose_round: propose_round,
+                    patch,
+                    txs,
+                    proposer_id,
                 }))
             }
         }

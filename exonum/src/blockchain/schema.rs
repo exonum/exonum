@@ -24,7 +24,7 @@ pub fn gen_prefix(service_id: u16, ord: u8, suf: Option<&[u8]>) -> Vec<u8> {
     res
 }
 
-storage_value! (
+encoding_struct! (
     struct ConfigReference {
         const SIZE = 40;
         field actual_from: u64    [00 => 08]
@@ -32,7 +32,7 @@ storage_value! (
     }
 );
 
-storage_value! (
+encoding_struct! (
     struct TxLocation {
         const SIZE = 16;
         field block_height:         u64  [00 => 08]
