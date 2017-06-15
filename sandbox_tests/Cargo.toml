@@ -16,11 +16,11 @@ iron-test = { git = "https://github.com/reem/iron-test" }
 configuration_service = {version="0.1.0", path="../"}
 
 [dependencies.exonum]
-git = "ssh://git@github.com/vldm/exonum-core.git"
+git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "6eb0ee84af14af7d85c2ad70d426b721bfb6ed3f"
+rev = "d17959deb4763539c23343665f94c1d469e1b4f2"
 
 [dependencies.sandbox]
-git = "ssh://git@github.com/vldm/exonum-core.git"
+git = "ssh://git@github.com/exonum/exonum-core.git"
 version = "0.1.0"
-rev = "6eb0ee84af14af7d85c2ad70d426b721bfb6ed3f"
+rev = "d17959deb4763539c23343665f94c1d469e1b4f2"
