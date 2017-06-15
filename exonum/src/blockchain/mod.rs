@@ -12,18 +12,18 @@ use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::{State, TxPool};
 use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
 
-pub use self::block::Block;
+pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, NodeState, ApiContext};
 
-#[macro_use]
-mod spec;
 mod block;
 mod schema;
 mod genesis;
 mod service;
+#[cfg(test)]
+mod tests;
 
 pub mod config;
 
@@ -124,8 +124,8 @@ impl Blockchain {
     }
 
     pub fn create_patch(&self,
+                        proposer_id: u16,
                         height: u64,
-                        round: u32,
                         tx_hashes: &[Hash],
                         pool: &TxPool)
                         -> Result<(Hash, Patch), Error> {
@@ -146,6 +146,8 @@ impl Blockchain {
         }
         // Get tx hash
         let tx_hash = schema.block_txs(height).root_hash()?;
+        // Get tx count
+        let tx_count = schema.block_txs(height).len()? as u32;
         // Get state hash
         let state_hash = {
             let sum_table = schema.state_hash_aggregator();
@@ -166,7 +168,13 @@ impl Blockchain {
         };
 
         // Create block
-        let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
+        let block = Block::new(SCHEMA_MAJOR_VERSION,
+                               proposer_id,
+                               height,
+                               tx_count,
+                               &last_hash,
+                               &tx_hash,
+                               &state_hash);
         trace!("execute block = {:?}", block);
         // Eval block hash
         let block_hash = block.hash();
@@ -237,40 +245,5 @@ impl fmt::Debug for Blockchain {
         write!(f,
                "Blockchain {{ db: {:?}, service_map: {{ .. }} }}",
                self.db)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_u64() {
-        storage_value! {
-            struct Test {
-                const SIZE = 8;
-                field some_test:u64 [0 => 8]
-            }
-        }
-        let test_data = r##"{"some_test":"1234"}"##;
-        let test = Test::new(1234);
-        let data = ::serialize::json::reexport::to_string(&test).unwrap();
-        println!("{:?}", data);
-        assert_eq!(data, test_data);
-    }
-
-    #[test]
-    fn test_system_time() {
-        use std::time::{SystemTime, UNIX_EPOCH};
-        storage_value! {
-            struct Test {
-                const SIZE = 12;
-                field some_test:SystemTime [0 => 12]
-            }
-        }
-        let test_data = r##"{"some_test":{"secs":"0","nanos":0}}"##;
-
-
-        let test = Test::new(UNIX_EPOCH);
-        let data = ::serialize::json::reexport::to_string(&test).unwrap();
-        assert_eq!(data, test_data);
     }
 }
