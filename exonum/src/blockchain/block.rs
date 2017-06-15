@@ -5,7 +5,7 @@ pub const BLOCK_SIZE: usize = 112;
 
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
-storage_value!(
+encoding_struct!(
     struct Block {
         const SIZE = BLOCK_SIZE;
 

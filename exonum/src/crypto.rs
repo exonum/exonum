@@ -21,7 +21,7 @@ pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH
                                              SEEDBYTES as SEED_LENGTH};
 pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 
-pub use serialize::{FromHexError, HexValue};
+pub use encoding::serialize::{FromHexError, HexValue};
 
 
 const BYTES_IN_DEBUG: usize = 4;
