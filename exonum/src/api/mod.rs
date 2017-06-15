@@ -17,7 +17,7 @@ use std::fmt;
 
 use events::Error as EventsError;
 use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
-use serialize::ToHex;
+use encoding::serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
 
 

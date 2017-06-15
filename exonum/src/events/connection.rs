@@ -7,7 +7,7 @@ use std::mem::swap;
 use std::net::SocketAddr;
 use std::collections::VecDeque;
 
-use messages::{RawMessage, MessageBuffer, HEADER_SIZE};
+use messages::{RawMessage, MessageBuffer, HEADER_LENGTH};
 
 const MAX_MESSAGE_LEN: usize = 1024 * 1024; // 1 MB
 
@@ -20,13 +20,13 @@ pub struct MessageReader {
 impl MessageReader {
     pub fn empty() -> MessageReader {
         MessageReader {
-            raw: vec![0; HEADER_SIZE],
+            raw: vec![0; HEADER_LENGTH],
             position: 0,
         }
     }
 
     pub fn read_finished(&self) -> bool {
-        self.position >= HEADER_SIZE && self.position == self.total_len()
+        self.position >= HEADER_LENGTH && self.position == self.total_len()
     }
 
     pub fn actual_len(&self) -> usize {
@@ -53,9 +53,9 @@ impl MessageReader {
     }
 
     pub fn read(&mut self, socket: &mut TcpStream) -> io::Result<Option<usize>> {
-        // FIXME: we shouldn't read more than HEADER_SIZE or total_length()
+        // FIXME: we shouldn't read more than HEADER_LENGTH or total_length()
         // TODO: read into growable Vec, not into [u8]
-        if self.position == HEADER_SIZE && self.actual_len() == HEADER_SIZE {
+        if self.position == HEADER_LENGTH && self.actual_len() == HEADER_LENGTH {
             self.allocate()?;
         }
         let pos = self.position;

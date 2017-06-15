@@ -4,14 +4,30 @@ use std::time::SystemTime;
 use crypto::{hash, gen_keypair};
 use blockchain;
 
-use super::{Field, RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
-            Block, BlockProof, RequestBlock, BitVec};
+use super::{Field, Offset};
+use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
+               BlockProof, RequestBlock, BitVec};
+
+#[test]
+#[should_panic(expected = "Found error in check: OffsetOverflow")]
+fn test_read_overflow_arithmetic() {
+    let pos = <u32>::max_value();
+    let count: u32 = 4;
+    let dat = vec![0xCC as u8; 4]; // u32
+    let mut buf = vec![255;8];
+    dat.write(&mut buf, 0, 8);
+    //rewrite header
+    pos.write(&mut buf, 0, 4);
+    count.write(&mut buf, 4, 8);
+
+    // let x1 = unsafe{ <Vec<u8> as Field>::read(&buf, 0, 8 )};
+    // ^ "attempt to add with overflow" in segment.rs
+
+    <Vec<u8> as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
+}
 
 #[test]
 fn test_bitvec() {
-    // TODO Think about BitVec len
-    // now if the size of the BitVec is not a multiple of eight
-    // then trailing bits will be filled-in with false.
 
     let mut b = BitVec::from_elem(14, false);
     b.set(11, true);
@@ -19,16 +35,7 @@ fn test_bitvec() {
     b.push(true);
     b.push(true);
 
-    let mut buf = vec![0; 8];
-    Field::write(&b, &mut buf, 0, 8);
-    <BitVec as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <BitVec as Field>::check(&buf2, 0, 8).unwrap();
-    let b2: BitVec = Field::read(&buf2, 0, 8);
-
-    assert_eq!(b2.len(), b.len());
-    assert_eq!(b2, b);
+    assert_write_check_read(b, 8);
 }
 
 #[test]
@@ -36,55 +43,49 @@ fn test_str_segment() {
     let mut buf = vec![0; 8];
     let s = "test юникодной строчки efw_adqq ss/adfq";
     Field::write(&s, &mut buf, 0, 8);
-    <&str as Field>::check(&buf, 0, 8).unwrap();
+    <&str as Field>::check(&buf, 0.into(), 8.into(), 8.into()).unwrap();
 
     let buf2 = buf.clone();
-    <&str as Field>::check(&buf2, 0, 8).unwrap();
-    let s2: &str = Field::read(&buf2, 0, 8);
+    <&str as Field>::check(&buf2, 0.into(), 8.into(), 8.into()).unwrap();
+    let s2: &str = unsafe { Field::read(&buf2, 0, 8) };
     assert_eq!(s2, s);
 }
 
 #[test]
 fn test_vec_segment() {
-    let mut buf = vec![0; 8];
-    let v = vec![1, 2, 3, 5, 10];
-    Field::write(&v, &mut buf, 0, 8);
-    <Vec<u8> as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <Vec<u8> as Field>::check(&buf2, 0, 8).unwrap();
-    let v2: Vec<u8> = Field::read(&buf2, 0, 8);
-    assert_eq!(v2, v);
+    let dat = vec![1u8, 2, 3, 5, 10];
+    assert_write_check_read(dat, 8);
 }
 
 #[test]
 fn test_u16_segment() {
-    let mut buf = vec![0; 8];
-    let s = [1u16, 3, 10, 15, 23, 4, 45];
-    Field::write(&s.as_ref(), &mut buf, 0, 8);
-    <&[u16] as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <&[u16] as Field>::check(&buf2, 0, 8).unwrap();
-    let s2: &[u16] = Field::read(&buf2, 0, 8);
-    assert_eq!(s2, s.as_ref());
+    let dat = vec![1u16, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
 }
 
 #[test]
 fn test_u32_segment() {
-    let mut buf = vec![0; 8];
-    let s = [1u32, 3, 10, 15, 23, 4, 45];
-    Field::write(&s.as_ref(), &mut buf, 0, 8);
-    <&[u32] as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <&[u32] as Field>::check(&buf2, 0, 8).unwrap();
-    let s2: &[u32] = Field::read(&buf2, 0, 8);
-    assert_eq!(s2, s.as_ref());
+    let dat = vec![1u32, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
 }
 
 #[test]
-fn test_segments_of_segments() {
+fn test_byte_array() {
+    let mut buf = vec![255; 8];
+    let arr = [2u8, 5, 2, 3, 56, 3];
+
+    Field::write(&arr.as_ref(), &mut buf, 0, 8);
+    <&[u8] as Field>::check(&buf, 0.into(), 8.into(), 8.into()).unwrap();
+
+    let buf2 = buf.clone();
+    <&[u8] as Field>::check(&buf2, 0.into(), 8.into(), 8.into()).unwrap();
+    let dat2: &[u8] = unsafe { Field::read(&buf2, 0, 8) };
+    assert_eq!(dat2, arr);
+    assert_eq!(buf.len(), 8 + arr.len());
+}
+
+#[test]
+fn test_segments_of_arrays() {
     let mut buf = vec![255; 64];
     let v1 = [1u8, 2, 3];
     let v2 = [1u8, 3];
@@ -92,64 +93,75 @@ fn test_segments_of_segments() {
 
     let dat = vec![v1.as_ref(), v2.as_ref(), v3.as_ref()];
     Field::write(&dat, &mut buf, 48, 56);
-    <Vec<&[u8]> as Field>::check(&buf, 48, 56).unwrap();
+    <Vec<&[u8]> as Field>::check(&buf, 48.into(), 56.into(), 64.into()).unwrap();
 
     let buf2 = buf.clone();
-    <Vec<&[u8]> as Field>::check(&buf2, 48, 56).unwrap();
-    let dat2: Vec<&[u8]> = Field::read(&buf2, 48, 56);
+    <Vec<&[u8]> as Field>::check(&buf2, 48.into(), 56.into(), 64.into()).unwrap();
+    let dat2: Vec<&[u8]> = unsafe { Field::read(&buf2, 48, 56) };
     assert_eq!(dat2, dat);
-    assert_eq!(buf.len(), 64 + v1.len() + v2.len() + v3.len() + 24);
+    //48 spaces + 8 segment of vec + 8 spaces = 64 +
+    // + v1_segment + v2_segment + v3_segment +
+    // + v1_body + v2_body + v3_body
+    assert_eq!(buf.len(), 64 + v1.len() + v2.len() + v3.len() + 3 * 8);
+}
+
+
+fn assert_write_check_read<T>(input: T, header_size: Offset)
+    where T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug
+{
+    let mut buffer = vec![0; header_size as usize];
+    Field::write(&input, &mut buffer, 0, header_size);
+    trace!("buffer ={:?}", buffer);
+    <T as Field>::check(&buffer, 0.into(), header_size.into(), header_size.into()).unwrap();
+    let new_buffer = buffer.clone();
+    //clear buffer
+    let len = buffer.len();
+    buffer.clear();
+    //and fill old buffer with zeros
+    buffer.resize(len, 0);
+
+    <T as Field>::check(&new_buffer, 0.into(), header_size.into(), header_size.into()).unwrap();
+    let output = unsafe { Field::read(&new_buffer, 0, header_size) };
+    assert_eq!(input, output);
+
+}
+
+#[test]
+fn test_segments_of_raw_buffers() {
+    let buf = vec![255u8; 1];
+
+    let input = vec![buf.clone(), buf.clone(), buf.clone()];
+    assert_write_check_read(input, 8);
 }
 
 #[test]
 fn test_segments_of_raw_messages() {
     let (pub_key, sec_key) = gen_keypair();
 
-    let mut buf = vec![255; 8];
     let m1 = Status::new(&pub_key, 2, &hash(&[]), &sec_key);
     let m2 = Status::new(&pub_key, 4, &hash(&[1]), &sec_key);
     let m3 = Status::new(&pub_key, 5, &hash(&[3]), &sec_key);
 
     let dat = vec![m1.raw().clone(), m2.raw().clone(), m3.raw().clone()];
-    Field::write(&dat, &mut buf, 0, 8);
-    <Vec<RawMessage> as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <Vec<RawMessage> as Field>::check(&buf2, 0, 8).unwrap();
-    let dat2: Vec<RawMessage> = Field::read(&buf2, 0, 8);
-    assert_eq!(dat2, dat);
+    assert_write_check_read(dat, 8);
 }
 
 #[test]
 fn test_empty_segments() {
-    let mut buf = vec![255; 8];
     let dat: Vec<RawMessage> = vec![];
-    Field::write(&dat, &mut buf, 0, 8);
-    <Vec<RawMessage> as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <Vec<RawMessage> as Field>::check(&buf2, 0, 8).unwrap();
-    let dat2: Vec<RawMessage> = Field::read(&buf2, 0, 8);
-    assert_eq!(dat2, dat);
+    assert_write_check_read(dat, 8);
 }
 
 #[test]
 fn test_segments_of_status_messages() {
     let (pub_key, sec_key) = gen_keypair();
 
-    let mut buf = vec![255; 8];
     let m1 = Status::new(&pub_key, 2, &hash(&[]), &sec_key);
     let m2 = Status::new(&pub_key, 4, &hash(&[1]), &sec_key);
     let m3 = Status::new(&pub_key, 5, &hash(&[3]), &sec_key);
 
     let dat = vec![m1, m2, m3];
-    Field::write(&dat, &mut buf, 0, 8);
-    <Vec<Status> as Field>::check(&buf, 0, 8).unwrap();
-
-    let buf2 = buf.clone();
-    <Vec<Status> as Field>::check(&buf2, 0, 8).unwrap();
-    let dat2: Vec<Status> = Field::read(&buf2, 0, 8);
-    assert_eq!(dat2, dat);
+    assert_write_check_read(dat, 8);
 }
 
 #[test]
@@ -179,12 +191,7 @@ fn test_propose() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let propose = Propose::new(validator,
-                               height,
-                               round,
-                               &prev_hash,
-                               &txs,
-                               &secret_key);
+    let propose = Propose::new(validator, height, round, &prev_hash, &txs, &secret_key);
     // read
     assert_eq!(propose.validator(), validator);
     assert_eq!(propose.height(), height);
@@ -249,8 +256,8 @@ fn test_precommit() {
     assert!(precommit.verify_signature(&public_key));
     assert_eq!(precommit.time(), time);
     let json_str = ::serde_json::to_string(&precommit).unwrap();
-    println!("{}", json_str);
-    let precommit1 : Precommit = ::serde_json::from_str(&json_str).unwrap(); 
+    trace!("{}", json_str);
+    let precommit1: Precommit = ::serde_json::from_str(&json_str).unwrap();
     assert_eq!(precommit, precommit1);
 }
 
@@ -305,9 +312,15 @@ fn test_block() {
                                          &hash(&[5, 2, 1]),
                                          ts,
                                          &secret_key)];
-    let transactions = vec![Status::new(&pub_key, 2, &hash(&[]), &secret_key).raw().clone(),
-                            Status::new(&pub_key, 4, &hash(&[2]), &secret_key).raw().clone(),
-                            Status::new(&pub_key, 7, &hash(&[3]), &secret_key).raw().clone()];
+    let transactions = vec![Status::new(&pub_key, 2, &hash(&[]), &secret_key)
+                                .raw()
+                                .clone(),
+                            Status::new(&pub_key, 4, &hash(&[2]), &secret_key)
+                                .raw()
+                                .clone(),
+                            Status::new(&pub_key, 7, &hash(&[3]), &secret_key)
+                                .raw()
+                                .clone()];
     let block = Block::new(&pub_key,
                            &pub_key,
                            content.clone(),
@@ -331,8 +344,8 @@ fn test_block() {
         block: content.clone(),
         precommits: precommits.clone(),
     };
-    let json_str = ::serialize::json::reexport::to_string(&block_proof).unwrap();
-    let block_proof_1: BlockProof = ::serialize::json::reexport::from_str(&json_str).unwrap(); 
+    let json_str = ::serde_json::to_string(&block_proof).unwrap();
+    let block_proof_1: BlockProof = ::serde_json::from_str(&json_str).unwrap();
     assert_eq!(block_proof, block_proof_1);
 }
 

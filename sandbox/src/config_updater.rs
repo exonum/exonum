@@ -1,6 +1,7 @@
 use exonum::crypto::{PublicKey, Hash};
 use exonum::blockchain::{Service, Transaction, Schema};
-use exonum::messages::{RawTransaction, Message, FromRaw, Error as MessageError};
+use exonum::messages::{RawTransaction, Message, FromRaw};
+use exonum::encoding::Error as MessageError;
 use exonum::storage::{View, Error as StorageError};
 use exonum::blockchain::StoredConfiguration;
 
