@@ -183,7 +183,7 @@ fn test_connect() {
 
 #[test]
 fn test_propose() {
-    let validator = 123_123;
+    let validator = 65_123;
     let height = 123_123_123;
     let round = 321_321_312;
     let prev_hash = hash(&[1, 2, 3]);
@@ -206,7 +206,7 @@ fn test_propose() {
 
 #[test]
 fn test_prevote() {
-    let validator = 123_123;
+    let validator = 65_123;
     let height = 123_123_123;
     let round = 321_321_312;
     let propose_hash = hash(&[1, 2, 3]);
@@ -231,7 +231,7 @@ fn test_prevote() {
 
 #[test]
 fn test_precommit() {
-    let validator = 123_123;
+    let validator = 65_123;
     let height = 123_123_123;
     let round = 321_321_312;
     let propose_hash = hash(&[1, 2, 3]);
@@ -280,8 +280,16 @@ fn test_status() {
 fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
     let ts = SystemTime::now();
+    let txs = [2];
+    let tx_count = txs.len() as u32;
 
-    let content = blockchain::Block::new(500, 1, &hash(&[1]), &hash(&[2]), &hash(&[3]));
+    let content = blockchain::Block::new(blockchain::SCHEMA_MAJOR_VERSION,
+                                         0,
+                                         500,
+                                         tx_count,
+                                         &hash(&[1]),
+                                         &hash(&txs),
+                                         &hash(&[3]));
 
     let precommits = vec![Precommit::new(123,
                                          15,
@@ -345,7 +353,13 @@ fn test_block() {
 fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
 
-    let content = blockchain::Block::new(200, 1, &hash(&[1]), &hash(&[2]), &hash(&[3]));
+    let content = blockchain::Block::new(blockchain::SCHEMA_MAJOR_VERSION,
+                                         0,
+                                         200,
+                                         1,
+                                         &hash(&[1]),
+                                         &hash(&[2]),
+                                         &hash(&[3]));
 
     let precommits = Vec::new();
     let transactions = Vec::new();
