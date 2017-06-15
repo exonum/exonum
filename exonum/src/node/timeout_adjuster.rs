@@ -45,7 +45,7 @@ use storage::Snapshot;
 ///     }
 /// }
 /// ```
-/// For more examples see `Constant` and `MovingAverage` implementations.
+/// For more examples see `Constant`, `Dynamic` and `MovingAverage` implementations.
 pub trait TimeoutAdjuster: Send {
     /// Called during node initialization and after accepting a new height.
     fn adjust_timeout(&mut self, state: &State, view: &Snapshot) -> Milliseconds;
@@ -58,6 +58,43 @@ pub struct Constant;
 impl TimeoutAdjuster for Constant {
     fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
         state.consensus_config().propose_timeout
+    }
+}
+
+/// `Adjuster` implementation that returns minimal or maximal timeout value depending on the
+/// threshold, where threshold represents percent of `txs_block_limit` value from the
+/// `ConsensusConfig`.
+///
+/// Currently minimal timeout is equal to the value of `propose_timeout` field in the
+/// `ConsensusConfig` and maximal timeout is equal to `min * 10`.
+#[derive(Debug)]
+pub struct Dynamic {
+    threshold: f64,
+}
+
+impl Dynamic {
+    /// Creates `Dynamic` timeout adjuster with given `threshold` value.
+    pub fn new(threshold: f64) -> Self {
+        Dynamic { threshold }
+    }
+
+    fn adjust_timeout_impl(&mut self,
+                           txs_block_limit: u32,
+                           current_load: usize,
+                           propose_timeout: Milliseconds) -> Milliseconds {
+        if (current_load as f64) >= self.threshold * txs_block_limit as f64 {
+            propose_timeout
+        } else {
+            propose_timeout * 10
+        }
+    }
+}
+
+impl TimeoutAdjuster for Dynamic {
+    fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
+        self.adjust_timeout_impl(state.config().consensus.txs_block_limit,
+                                 state.transactions().len(),
+                                 state.consensus_config().propose_timeout)
     }
 }
 
@@ -125,6 +162,23 @@ mod tests {
 
     use super::*;
     use events::Milliseconds;
+
+    #[test]
+    fn dynamic_timeout_adjuster() {
+        static MIN_TIMEOUT: Milliseconds = 1;
+        static MAX_TIMEOUT: Milliseconds = 10;
+        static TXS_BLOCK_LIMIT: u32 = 10;
+        static THRESHOLD: f64 = 0.2;
+
+        let test_data = [(0, MAX_TIMEOUT), (1, MAX_TIMEOUT), (2, MIN_TIMEOUT),
+                         (3, MIN_TIMEOUT), (10, MIN_TIMEOUT), (100, MIN_TIMEOUT)];
+
+        let mut adjuster = Dynamic::new(THRESHOLD);
+
+        for data in &test_data {
+            assert_eq!(data.1, adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, data.0, MIN_TIMEOUT));
+        }
+    }
 
     #[test]
     fn moving_average_timeout_adjuster() {

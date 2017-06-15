@@ -281,8 +281,10 @@ where
             sender.get_time(),
         );
 
-        let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
-        let timeout = timeout_adjuster.adjust_timeout(&state, &*snapshot);
+        // TODO: Timeout adjuster type should be be configurable by `ConsensusConfig`.
+        let mut timeout_adjuster = Box::new(timeout_adjuster::Dynamic::new(
+            state.consensus_config().txs_threshold));
+        let timeout = timeout_adjuster.adjust_timeout(&state, blockchain.view());
         state.set_propose_timeout(timeout);
 
         NodeHandler {
