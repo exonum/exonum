@@ -1,9 +1,9 @@
-use crypto::{Hash};
+use crypto::Hash;
 
 
 pub const BLOCK_SIZE: usize = 108;
 
-storage_value!(
+encoding_struct!(
     struct Block {
         const SIZE = BLOCK_SIZE;
 
