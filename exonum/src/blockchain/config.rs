@@ -21,6 +21,7 @@ pub struct ConsensusConfig {
     pub status_timeout: Milliseconds,
     pub peers_timeout: Milliseconds,
     pub propose_timeout: Milliseconds,
+    pub txs_threshold: f64,
     pub txs_block_limit: u32,
 }
 
@@ -31,6 +32,7 @@ impl Default for ConsensusConfig {
             propose_timeout: 500,
             status_timeout: 5000,
             peers_timeout: 10000,
+            txs_threshold: 0.1,
             txs_block_limit: 1000,
         }
     }

@@ -583,6 +583,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         status_timeout: 600000,
         peers_timeout: 600000,
         propose_timeout: 200,
+        // Zero threshold keeps timeout value the same regardless of transactions number.
+        txs_threshold: 0.,
         txs_block_limit: 1000,
     };
     let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
