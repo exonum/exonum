@@ -12,7 +12,7 @@ use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::{State, TxPool};
 use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageView};
 
-pub use self::block::Block;
+pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
@@ -119,8 +119,8 @@ impl Blockchain {
     }
 
     pub fn create_patch(&self,
+                        proposer_id: u16,
                         height: u64,
-                        round: u32,
                         tx_hashes: &[Hash],
                         pool: &TxPool)
                         -> Result<(Hash, Patch), Error> {
@@ -141,6 +141,8 @@ impl Blockchain {
         }
         // Get tx hash
         let tx_hash = schema.block_txs(height).root_hash()?;
+        // Get tx count
+        let tx_count = schema.block_txs(height).len()? as u32;
         // Get state hash
         let state_hash = {
             let sum_table = schema.state_hash_aggregator();
@@ -161,7 +163,13 @@ impl Blockchain {
         };
 
         // Create block
-        let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
+        let block = Block::new(SCHEMA_MAJOR_VERSION,
+                               proposer_id,
+                               height,
+                               tx_count,
+                               &last_hash,
+                               &tx_hash,
+                               &state_hash);
         trace!("execute block = {:?}", block);
         // Eval block hash
         let block_hash = block.hash();

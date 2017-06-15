@@ -104,7 +104,7 @@ impl fmt::Debug for RequestMessage {
 }
 
 impl ConsensusMessage {
-    pub fn validator(&self) -> u32 {
+    pub fn validator(&self) -> u16 {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.validator(),
             ConsensusMessage::Prevote(ref msg) => msg.validator(),
