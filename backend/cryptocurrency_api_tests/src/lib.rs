@@ -44,6 +44,16 @@ mod tests {
     use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 
     #[test]
+    fn test_sandbox_validators_list() {
+        let _ = init_logger();
+        let sandbox = CurrencySandbox::new();
+        let actual_validators = serde_json::to_value(&sandbox.sandbox.validators()).unwrap();
+        info!("{}", serde_json::to_string(&actual_validators).unwrap());
+        let expected_validators = from_file("test_data/validators.json");
+        assert_eq!(actual_validators, expected_validators, "validators.json");
+    }
+
+    #[test]
     fn test_create_wallet_correct_post() {
         let _ = init_logger();
         let sandbox = CurrencySandbox::new();
@@ -489,9 +499,9 @@ mod tests {
     }
 
     struct CurrencySandbox {
-        sandbox: Sandbox,
-        state: SandboxState,
-        transactions: Arc<Mutex<VecDeque<RawMessage>>>,
+        pub sandbox: Sandbox,
+        pub state: SandboxState,
+        pub transactions: Arc<Mutex<VecDeque<RawMessage>>>,
     }
 
 
