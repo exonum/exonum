@@ -15,27 +15,31 @@
     <div class="panel-body">
         <div class="custom-table custom-table-hover">
             <div class="row">
-                <div class="col-xs-4 col-md-2 custom-table-header-column">Height</div>
-                <div class="col-xs-4 col-md-3 custom-table-header-column">Prev.hash</div>
-                <div class="col-sm-3 hidden-xs hidden-sm custom-table-header-column">State hash</div>
-                <div class="col-sm-2 hidden-xs hidden-sm custom-table-header-column">Tx.hash</div>
-                <div class="col-xs-4 col-md-2 custom-table-header-column">Round</div>
+                <div class="col-xs-4 col-md-2 custom-table-header-column" title="Height">Height</div>
+                <div class="col-xs-4 col-md-2 custom-table-header-column" title="Tx count">Tx count</div>
+                <div class="col-xs-4 col-md-2 custom-table-header-column" title="Proposer">Proposer</div>
+                <div class="col-md-2 hidden-xs hidden-sm custom-table-header-column" title="Prev hash">Prev hash</div>
+                <div class="col-md-2 hidden-xs hidden-sm custom-table-header-column" title="Tx hash">Tx hash</div>
+                <div class="col-md-2 hidden-xs hidden-sm custom-table-header-column" title="State hash">State hash</div>
             </div>
             <div class="row" each={ blocks } onclick={ rowClick.bind(this, height) }>
                 <div class="col-xs-4 col-md-2 custom-table-column">
                     { height }
                 </div>
-                <div class="col-xs-4 col-md-3 custom-table-column">
+                <div class="col-xs-4 col-md-2 custom-table-column">
+                    { tx_count }
+                </div>
+                <div class="col-xs-4 col-md-2 custom-table-column">
+                    { proposer_id }
+                </div>
+                <div class="col-md-2 hidden-xs hidden-sm custom-table-column">
                     <truncate val={ prev_hash }></truncate>
                 </div>
-                <div class="col-sm-3 hidden-xs hidden-sm custom-table-column">
-                    <truncate val={ state_hash }></truncate>
-                </div>
-                <div class="col-sm-2 hidden-xs hidden-sm custom-table-column">
+                <div class="col-md-2 hidden-xs hidden-sm custom-table-column">
                     <truncate val={ tx_hash }></truncate>
                 </div>
-                <div class="col-xs-4 col-md-2 custom-table-column text-center">
-                    { propose_round }
+                <div class="col-md-2 hidden-xs hidden-sm custom-table-column">
+                    <truncate val={ state_hash }></truncate>
                 </div>
             </div>
         </div>
