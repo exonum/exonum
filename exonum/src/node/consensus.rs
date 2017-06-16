@@ -174,8 +174,8 @@ impl<S> NodeHandler<S>
                 }
             }
 
-            let (block_hash, patch) = self.create_block(block.height(),
-                                                        block.propose_round(),
+            let (block_hash, patch) = self.create_block(block.proposer_id(),
+                                                        block.height(),
                                                         tx_hashes.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
@@ -183,9 +183,9 @@ impl<S> NodeHandler<S>
             }
 
             // Commit block
-            self.state.add_block(block_hash, patch, tx_hashes, block.propose_round());
+            self.state.add_block(block_hash, patch, tx_hashes, block.proposer_id());
         }
-        self.commit(block_hash, msg.precommits().iter());
+        self.commit(block_hash, msg.precommits().iter(), None);
         self.request_next_block();
     }
 
@@ -220,7 +220,7 @@ impl<S> NodeHandler<S>
             let precommits = self.state
                 .precommits(round, our_block_hash)
                 .to_vec();
-            self.commit(our_block_hash, precommits.iter());
+            self.commit(our_block_hash, precommits.iter(), Some(propose_round));
         }
     }
 
@@ -288,7 +288,7 @@ impl<S> NodeHandler<S>
         let precommits = self.state
             .precommits(round, our_block_hash)
             .to_vec();
-        self.commit(our_block_hash, precommits.iter());
+        self.commit(our_block_hash, precommits.iter(), Some(round));
     }
 
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
@@ -349,33 +349,33 @@ impl<S> NodeHandler<S>
     // FIXME: push precommits into storage
     pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
                                                          block_hash: Hash,
-                                                         precommits: I) {
+                                                         precommits: I,
+                                                         round: Option<Round>) {
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (propose_round, commited_txs, new_txs) = {
-            let (txs_count, propose_round) = {
+        let (commited_txs, new_txs, proposer) = {
+            let (txs_count, proposer) = {
                 let block_state = self.state.block(&block_hash).unwrap();
-                (block_state.txs().len(), block_state.propose_round())
+                (block_state.txs().len(), block_state.proposer_id())
             };
 
             let txs = self.blockchain
                 .commit(&mut self.state, block_hash, precommits)
                 .unwrap();
 
-            (propose_round, txs_count, txs)
+            (txs_count, txs, proposer)
         };
 
         let height = self.state.height();
-        let proposer = self.state.leader(propose_round);
 
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
 
-        info!("COMMIT ====== height={}, round={}, proposer={}, committed={}, pool={}, hash={}",
+        info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
               height,
-              propose_round,
               proposer,
+              round.map(|x| x.to_string()).unwrap_or_else(|| "?".into()),
               commited_txs,
               self.state.transactions().len(),
               block_hash.to_hex(),
@@ -617,12 +617,12 @@ impl<S> NodeHandler<S>
     }
 
     pub fn create_block(&mut self,
+                        proposer_id: u16,
                         height: Height,
-                        round: Round,
                         tx_hashes: &[Hash])
                         -> (Hash, Patch) {
         self.blockchain
-            .create_patch(height, round, tx_hashes, self.state.transactions())
+            .create_patch(proposer_id, height, tx_hashes, self.state.transactions())
             .unwrap()
     }
 
@@ -636,11 +636,12 @@ impl<S> NodeHandler<S>
             .clone();
 
         let tx_hashes = propose.transactions().to_vec();
-        let (block_hash, patch) = self.create_block(propose.height(),
-                                                    propose.round(),
+
+        let (block_hash, patch) = self.create_block(propose.validator(),
+                                                    propose.height(),
                                                     tx_hashes.as_slice());
         // Save patch
-        self.state.add_block(block_hash, patch, tx_hashes, propose.round());
+        self.state.add_block(block_hash, patch, tx_hashes, propose.validator());
         block_hash
     }
 

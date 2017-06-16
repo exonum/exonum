@@ -79,13 +79,13 @@ message! {
     struct Propose {
         const TYPE = CONSENSUS;
         const ID = PROPOSE_MESSAGE_ID;
-        const SIZE = 56;
+        const SIZE = 54;
 
-        field validator:      u32         [00 => 04]
-        field height:         u64         [04 => 12]
-        field round:          u32         [12 => 16]
-        field prev_hash:      &Hash       [16 => 48]
-        field transactions:   &[Hash]     [48 => 56]
+        field validator:      u16         [00 => 02]
+        field height:         u64         [02 => 10]
+        field round:          u32         [10 => 14]
+        field prev_hash:      &Hash       [14 => 46]
+        field transactions:   &[Hash]     [46 => 54]
     }
 }
 
@@ -109,13 +109,13 @@ message! {
     struct Prevote {
         const TYPE = CONSENSUS;
         const ID = PREVOTE_MESSAGE_ID;
-        const SIZE = 52;
+        const SIZE = 50;
 
-        field validator:      u32         [00 => 04]
-        field height:         u64         [04 => 12]
-        field round:          u32         [12 => 16]
-        field propose_hash:   &Hash       [16 => 48]
-        field locked_round:   u32         [48 => 52]
+        field validator:      u16         [00 => 02]
+        field height:         u64         [02 => 10]
+        field round:          u32         [10 => 14]
+        field propose_hash:   &Hash       [14 => 46]
+        field locked_round:   u32         [46 => 50]
     }
 }
 
@@ -140,14 +140,14 @@ message! {
     struct Precommit {
         const TYPE = CONSENSUS;
         const ID = PRECOMMIT_MESSAGE_ID;
-        const SIZE = 96;
+        const SIZE = 94;
 
-        field validator:      u32         [00 => 04]
-        field height:         u64         [08 => 16]
-        field round:          u32         [16 => 20]
-        field propose_hash:   &Hash       [20 => 52]
-        field block_hash:     &Hash       [52 => 84]
-        field time:           SystemTime  [84 => 96]
+        field validator:      u16         [00 => 02]
+        field height:         u64         [06 => 14]
+        field round:          u32         [14 => 18]
+        field propose_hash:   &Hash       [18 => 50]
+        field block_hash:     &Hash       [50 => 82]
+        field time:           SystemTime  [82 => 94]
     }
 }
 

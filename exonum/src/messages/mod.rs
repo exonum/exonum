@@ -3,23 +3,17 @@ use bit_vec;
 use std::fmt;
 
 use crypto::PublicKey;
+use encoding::Error;
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw,
-                     HEADER_SIZE, TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
-pub use self::error::Error;
-pub use self::fields::{Field, SegmentField};
+                    HEADER_LENGTH, PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
 pub use self::protocol::*;
+
 
 #[macro_use]
 mod spec;
-#[cfg(test)]
-mod tests;
 mod raw;
-mod error;
-mod fields;
 mod protocol;
-
-pub mod utils;
 
 pub type BitVec = bit_vec::BitVec;
 
@@ -110,7 +104,7 @@ impl fmt::Debug for RequestMessage {
 }
 
 impl ConsensusMessage {
-    pub fn validator(&self) -> u32 {
+    pub fn validator(&self) -> u16 {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.validator(),
             ConsensusMessage::Prevote(ref msg) => msg.validator(),

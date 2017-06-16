@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
                        RequestPrevotes, BitVec};
-use exonum::blockchain::Block;
+use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::{Hash, HASH_SIZE, hash};
 use exonum::events::Milliseconds;
 use exonum::node::ValidatorId;
@@ -29,21 +29,22 @@ pub const ROUND_TWO: u32 = 2;
 pub const ROUND_THREE: u32 = 3;
 pub const ROUND_FOUR: u32 = 4;
 pub const ROUND_FIVE: u32 = 5;
-pub const VALIDATOR_0: u32 = 0;
-pub const VALIDATOR_1: u32 = 1;
-pub const VALIDATOR_2: u32 = 2;
-pub const VALIDATOR_3: u32 = 3;
-pub const INCORRECT_VALIDATOR_ID: u32 = 999_999;
+pub const VALIDATOR_0: u16 = 0;
+pub const VALIDATOR_1: u16 = 1;
+pub const VALIDATOR_2: u16 = 2;
+pub const VALIDATOR_3: u16 = 3;
+pub const INCORRECT_VALIDATOR_ID: u16 = 64_999;
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
 // default data from sandbox and, possibly, update few fields with custom data.
 pub struct BlockBuilder<'a> {
+    proposer_id: Option<u16>,
     height: Option<u64>,
-    round: Option<u32>,
     duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
     state_hash: Option<Hash>,
+    tx_count: Option<u32>,
 
     sandbox: &'a TimestampingSandbox,
 }
@@ -51,24 +52,25 @@ pub struct BlockBuilder<'a> {
 impl<'a> BlockBuilder<'a> {
     pub fn new(sandbox: &'a TimestampingSandbox) -> Self {
         BlockBuilder {
+            proposer_id: None,
             height: None,
-            round: None,
             duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hash: None,
             state_hash: None,
+            tx_count: None,
 
             sandbox: sandbox,
         }
     }
 
-    pub fn with_height(mut self, height: u64) -> Self {
-        self.height = Some(height);
+    pub fn with_proposer_id(mut self, proposer_id: u16) -> Self {
+        self.proposer_id = Some(proposer_id);
         self
     }
 
-    pub fn with_round(mut self, round: u32) -> Self {
-        self.round = Some(round);
+    pub fn with_height(mut self, height: u64) -> Self {
+        self.height = Some(height);
         self
     }
 
@@ -91,6 +93,7 @@ impl<'a> BlockBuilder<'a> {
         // it's _hash(self.as_ref())_ as of now instead of _*self_ as it used to be
         let merkle_root = hash(individual_transaction_hash.as_ref());
         self.tx_hash = Some(merkle_root);
+        self.tx_count = Some(1);
         self
     }
 
@@ -98,6 +101,7 @@ impl<'a> BlockBuilder<'a> {
         // root of merkle table, containing this array of transactions
         let merkle_root = compute_txs_root_hash(tx_hashes);
         self.tx_hash = Some(merkle_root);
+        self.tx_count = Some(tx_hashes.len() as u32);
         self
     }
 
@@ -107,8 +111,11 @@ impl<'a> BlockBuilder<'a> {
     }
 
     pub fn build(&self) -> Block {
-        Block::new(self.height.unwrap_or_else(|| self.sandbox.current_height()),
-                   self.round.unwrap_or_else(|| self.sandbox.current_round()),
+        Block::new(SCHEMA_MAJOR_VERSION,
+                   self.proposer_id
+                       .unwrap_or_else(|| self.sandbox.current_leader()),
+                   self.height.unwrap_or_else(|| self.sandbox.current_height()),
+                   self.tx_count.unwrap_or(0),
                    &self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
                    &self.tx_hash.unwrap_or_else(Hash::zero),
                    &self.state_hash
@@ -119,7 +126,7 @@ impl<'a> BlockBuilder<'a> {
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Propose with
 // default data from sandbox and, possibly, update few fields with custom data.
 pub struct ProposeBuilder<'a> {
-    validator_id: Option<u32>,
+    validator_id: Option<u16>,
     height: Option<u64>,
     round: Option<u32>,
     duration_since_sandbox_time: Option<Milliseconds>,
@@ -142,7 +149,7 @@ impl<'a> ProposeBuilder<'a> {
         }
     }
 
-    pub fn with_validator(mut self, validator_id: u32) -> Self {
+    pub fn with_validator(mut self, validator_id: u16) -> Self {
         self.validator_id = Some(validator_id);
         self
     }
@@ -323,7 +330,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
 
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
-                sandbox.recv(Prevote::new(val_idx as u32,
+                sandbox.recv(Prevote::new(val_idx as u16,
                                           initial_height,
                                           round,
                                           &propose.hash(),
@@ -356,7 +363,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
             sandbox.assert_lock(round, Some(propose.hash()));
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
-                sandbox.recv(Precommit::new(val_idx as u32,
+                sandbox.recv(Precommit::new(val_idx as u16,
                                             initial_height,
                                             round,
                                             &propose.hash(),
@@ -425,7 +432,7 @@ pub fn add_one_height_with_transactions_from_other_validator(sandbox: &Timestamp
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
             sandbox.recv(propose.clone());
             for val_idx in 0..sandbox.majority_count(n_validators) {
-                sandbox.recv(Prevote::new(val_idx as u32,
+                sandbox.recv(Prevote::new(val_idx as u16,
                                           initial_height,
                                           round,
                                           &propose.hash(),
@@ -447,7 +454,7 @@ pub fn add_one_height_with_transactions_from_other_validator(sandbox: &Timestamp
             sandbox.assert_state(initial_height, round);
 
             for val_idx in 0..sandbox.majority_count(n_validators) {
-                sandbox.recv(Precommit::new(val_idx as u32,
+                sandbox.recv(Precommit::new(val_idx as u16,
                                             initial_height,
                                             round,
                                             &propose.hash(),

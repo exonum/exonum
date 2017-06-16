@@ -26,7 +26,7 @@ pub fn gen_prefix(service_id: u16, ord: u8, suf: Option<&[u8]>) -> Vec<u8> {
     res
 }
 
-storage_value! (
+encoding_struct! (
     /// Configuration index.
     struct ConfigReference {
         const SIZE = 40;
@@ -37,7 +37,7 @@ storage_value! (
     }
 );
 
-storage_value! (
+encoding_struct! (
     /// Transaction location in block.
     struct TxLocation {
         const SIZE = 16;
@@ -307,8 +307,7 @@ impl<'a> Schema<'a> {
             .into_iter()
             .rposition(|r| r.actual_from() <= height)
             .expect(&format!("Couldn't not find any config for height {},\
-          that means that genesis block was created incorrectly.",
-                            height));
+          that means that genesis block was created incorrectly.", height));
         Ok(idx as u64)
     }
 }
