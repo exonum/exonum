@@ -51,25 +51,25 @@ pub fn hash(m: &[u8]) -> Hash {
 }
 
 
-/// This struct provide possibility to create hash for a stream of data 
+/// This structure provide possibility to calculate hash for a stream of data 
 /// # Example
 /// 
 /// ```rust
 /// use exonum::crypto::HashStream;
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
-/// let mut hash_state = HashStream::new();
+/// let mut hash_stream = HashStream::new();
 /// for chunk in data {
-///     hash_state.update(&chunk);
+///     hash_stream.update(&chunk);
 /// }
-/// let _ = hash_state.finalize();
+/// let _ = hash_stream.finalize();
 /// ```
 #[derive(Debug, Default)]
 pub struct HashStream(HashState);
 
 impl HashStream {
 
-    /// Create new instanse of `HashStream` and initializes a state
+    /// Create new instance of `HashStream`
     pub fn new() -> Self {
         HashStream(HashState::init())
     }
@@ -79,7 +79,7 @@ impl HashStream {
         self.0.update(chunk);
     }
 
-    /// Does the same as `update` but also return instanse of `HashStream`
+    /// Does the same as `update` but also return instance of `HashStream`
     pub fn update_chain(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
@@ -93,7 +93,7 @@ impl HashStream {
 
 }
 
-/// This struct provide possibility to create sign for a stream of data 
+/// This structure provide possibility to create signature for a stream of data 
 /// # Example
 /// 
 /// ```rust
@@ -101,21 +101,21 @@ impl HashStream {
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
 /// let (pk, sk) = gen_keypair();
-/// let mut create_state = SignStream::new();
-/// let mut verify_state = SignStream::new();
+/// let mut create_stream = SignStream::new();
+/// let mut verify_stream = SignStream::new();
 /// for chunk in data {
-///     create_state.update(&chunk);
-///     verify_state.update(&chunk);
+///     create_stream.update(&chunk);
+///     verify_stream.update(&chunk);
 /// }
-/// let file_sign = create_state.finalize(&sk);
-/// assert!(verify_state.verify(&file_sign, &pk));
+/// let file_sign = create_stream.finalize(&sk);
+/// assert!(verify_stream.verify(&file_sign, &pk));
 /// ```
 #[derive(Debug, Default)]
 pub struct SignStream(SignState);
 
 impl SignStream {
 
-    /// Create new instanse of `SignStream` and initializes a state
+    /// Create new instance of `SignStream`
     pub fn new() -> Self {
         SignStream(SignState::init())
     }
@@ -125,7 +125,7 @@ impl SignStream {
         self.0.update(chunk);
     }
 
-    /// Does the same as `update` but also return instanse of `SignStream`
+    /// Does the same as `update` but also return instance of `SignStream`
     pub fn update_chain(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
