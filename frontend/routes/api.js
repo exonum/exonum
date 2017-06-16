@@ -2,13 +2,11 @@ var express = require('express');
 var request = require('request');
 var router = express.Router();
 
-var config = require('../config.json');
-
 router.get('/*', function(req, res, next) {
     var query = req.params[0];
 
     request.get({
-        url: config.endpoint + '/api/' + query,
+        url: req.app.get('config').endpoint + '/api/' + query,
         qs: req.query
     }, function(err, response, body) {
         if (err) {
@@ -26,7 +24,7 @@ router.post('/*', function(req, res, next) {
     var query = req.params[0];
 
     request.post({
-            url: config.endpoint + '/api/' + query,
+            url: req.app.get('config').endpoint + '/api/' + query,
             json: req.body
         },
         function(err, response, body) {
