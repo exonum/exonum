@@ -16,7 +16,8 @@ use mount::Mount;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{View, Error as StorageError};
-use messages::{Message, RawTransaction, Error as MessageError};
+use messages::{Message, RawTransaction};
+use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
 use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
@@ -157,10 +158,10 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
 
     /// Returns service specific global variables as json value.
     pub fn service_config(&self, service: &Service) -> &Value {
-        let id = service.service_id();
+        let name = service.service_name();
         self.state
             .services_config()
-            .get(&format!("{}", id))
+            .get(name)
             .unwrap()
     }
 
