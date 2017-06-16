@@ -5,7 +5,7 @@ var path = require('path');
 var commandLineArgs = require('command-line-args');
 var optionDefinitions = [{name: 'config', type: String}];
 var options = commandLineArgs(optionDefinitions);
-var configPath = options.config || './config.json';
+var configPath = options.config ? path.join(process.cwd(), options.config) : './config.json';
 var config = require(configPath);
 app.set('config', config);
 
