@@ -38,7 +38,7 @@ install() {
     ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/etc 6 -p 2000
     validators=$(cat ${destdir}/etc/validators/0.toml | sed -n -e 's/validators = //p')
     echo "Use validators: $validators"
-    cat ${destdir}/frontend/config-example.json | sed -r "s/(\"validators\": )(\[\])/\1${validators}/" > ${destdir}/frontend/config.json
+    cat ${destdir}/frontend/config-example.json | sed -r "s/(\"validators\": )(\[\])/\1${validators}/" > ${destdir}/etc/frontend.json
 }
 
 enable() {
