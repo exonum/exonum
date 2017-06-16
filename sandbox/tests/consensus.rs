@@ -179,13 +179,11 @@ fn test_retrieve_block_and_precommits() {
     let block: Block = block_proof.block;
     let precommits: Vec<Precommit> = block_proof.precommits;
     let expected_height = target_height - 1;
-    let expected_round = block.propose_round();
     let expected_block_hash = block.hash();
 
     assert_eq!(expected_height, block.height());
     for precommit in precommits {
         assert_eq!(expected_height, precommit.height());
-        assert_eq!(expected_round, precommit.round());
         assert_eq!(expected_block_hash, *precommit.block_hash());
         assert!(precommit
                     .raw()
@@ -281,7 +279,7 @@ fn test_queue_propose_message_from_next_height() {
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
     let block_at_first_height = BlockBuilder::new(&sandbox)
-        .with_round(ROUND_THREE)
+        .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
         .build();
 
@@ -1864,9 +1862,9 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
-        .with_round(ROUND_THREE)
         .with_duration_since_sandbox_time(2 * sandbox.round_timeout() + sandbox.propose_timeout() +
                                           1)
+        .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
         .build();
 
@@ -1883,8 +1881,8 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
 
     // this block will be created during second commit while manually creating precommits
     let second_block = BlockBuilder::new(&sandbox)
+        .with_proposer_id(VALIDATOR_3)
         .with_height(HEIGHT_TWO)
-        .with_round(ROUND_ONE)
         .with_duration_since_sandbox_time(2 * sandbox.propose_timeout() +
                                           2 * sandbox.round_timeout() +
                                           1)
