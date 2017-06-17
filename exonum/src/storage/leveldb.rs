@@ -15,11 +15,10 @@ use std::mem;
 use std::path::Path;
 use std::error;
 use std::sync::Arc;
-use std::iter::Iterator;
 
 pub use leveldb::options::Options as LevelDBOptions;
 
-use super::{Database, Iter, Snapshot, Error, Patch, Change, Result};
+use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
 
 const LEVELDB_READ_OPTIONS: ReadOptions<'static> = ReadOptions {
     verify_checksums: false,
@@ -105,18 +104,21 @@ impl Snapshot for LevelDBSnapshot {
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         let _p = profiler::ProfilerSpan::new("LevelDBSnapshot::iter");
-        let iter = self.snapshot.iter(LEVELDB_READ_OPTIONS);
+        let mut iter = self.snapshot.iter(LEVELDB_READ_OPTIONS);
         iter.seek(from);
         Box::new(LevelDBIterator { iter: iter })
     }
 }
 
-impl<'a> Iterator for LevelDBIterator<'a> {
-    type Item = (&'a [u8], &'a [u8]);
-
-    fn next(&mut self) -> Option<Self::Item> {
+impl<'a> Iterator<'a> for LevelDBIterator<'a> {
+    fn next(&mut self) -> Option<(&[u8], &[u8])> {
         let _p = profiler::ProfilerSpan::new("LevelDBIterator::next");
         self.iter.next()
+    }
+
+    fn peek(&mut self) -> Option<(&[u8], &[u8])> {
+        let _p = profiler::ProfilerSpan::new("LevelDBIterator::peek");
+        self.iter.peek()
     }
 }
 

@@ -1,6 +1,6 @@
-use std::iter::{Iterator, Peekable};
 use std::collections::btree_map::{BTreeMap, Range};
 use std::cmp::Ordering::*;
+use std::iter::Peekable;
 
 use super::Result;
 
@@ -8,7 +8,7 @@ use self::NextIterValue::*;
 
 
 pub type Patch = BTreeMap<Vec<u8>, Change>;
-pub type Iter<'a> = Box<Iterator<Item = (&'a [u8], &'a [u8])> + 'a>;
+pub type Iter<'a> = Box<Iterator<'a> + 'a>;
 
 #[derive(Debug, Clone)]
 pub enum Change {
@@ -23,17 +23,18 @@ pub struct Fork {
 }
 
 pub struct ForkIter<'a> {
-    snapshot: Peekable<Iter<'a>>,
+    snapshot: Iter<'a>,
     changes: Peekable<Range<'a, Vec<u8>, Change>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum NextIterValue<'a> {
     Stored(&'a [u8], &'a [u8]),
     Replaced(&'a [u8], &'a [u8]),
     Inserted(&'a [u8], &'a [u8]),
     Deleted,
     MissDeleted,
+    Finished
 }
 
 pub trait Database: Send + Sync + 'static {
@@ -55,6 +56,11 @@ pub trait Snapshot {
         self.get(key).is_some()
     }
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
+}
+
+pub trait Iterator<'a> {
+    fn next(&mut self) -> Option<(&[u8], &[u8])>;
+    fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 
 impl Snapshot for Fork {
@@ -86,7 +92,7 @@ impl Snapshot for Fork {
         use std::collections::Bound::*;
         let range = (Included(from), Unbounded);
         Box::new(ForkIter {
-                     snapshot: self.snapshot.iter(from).peekable(),
+                     snapshot: self.snapshot.iter(from),
                      changes: self.changes.range::<[u8], _>(range).peekable(),
                  })
     }
@@ -117,10 +123,13 @@ impl Fork {
     }
 
     pub fn remove_by_prefix(&mut self, prefix: &[u8]) {
-        for (k, _) in self.snapshot.iter(prefix) {
-            if !k.starts_with(prefix) {
-                return;
-            }
+        let mut iter = self.snapshot.iter(prefix);
+
+        loop {
+            let k = match iter.next() {
+                Some((k, _)) if k.starts_with(prefix) => k,
+                _ => return
+            };
             self.changes.insert(k.to_vec(), Change::Delete);
         }
     }
@@ -161,14 +170,14 @@ impl<'a> NextIterValue<'a> {
     fn skip_changes(&self) -> bool {
         match *self {
             Replaced(..) | Inserted(..) | Deleted | MissDeleted => true,
-            Stored(..) => false,
+            Stored(..) | Finished => false,
         }
     }
 
     fn skip_snapshot(&self) -> bool {
         match *self {
             Stored(..) | Replaced(..) | Deleted => true,
-            Inserted(..) | MissDeleted => false,
+            Inserted(..) | MissDeleted | Finished => false,
         }
     }
 
@@ -177,52 +186,59 @@ impl<'a> NextIterValue<'a> {
             Stored(k, v) => Some((k, v)),
             Replaced(k, v) => Some((k, v)),
             Inserted(k, v) => Some((k, v)),
-            Deleted | MissDeleted => None,
+            Deleted | MissDeleted | Finished => None,
         }
     }
 }
 
-impl<'a> Iterator for ForkIter<'a> {
-    type Item = (&'a [u8], &'a [u8]);
+impl<'a> ForkIter<'a> {
+    fn step(&mut self) -> NextIterValue {
+        match self.changes.peek() {
+            Some(&(k, ref change)) => {
+                match self.snapshot.peek() {
+                    Some((key, ref value)) => {
+                        match **change {
+                            Change::Put(ref v) => {
+                                match k[..].cmp(key) {
+                                    Equal => Replaced(k, v),
+                                    Less => Inserted(k, v),
+                                    Greater => Stored(key, value),
+                                }
+                            }
+                            Change::Delete => {
+                                match k[..].cmp(key) {
+                                    Equal => Deleted,
+                                    Less => MissDeleted,
+                                    Greater => Stored(key, value),
+                                }
+                            }
+                        }
+                    }
+                    None => {
+                        match **change {
+                            Change::Put(ref v) => Inserted(k, v),
+                            Change::Delete => MissDeleted,
+                        }
+                    }
+                }
+            }
+            None => {
+                match self.snapshot.peek() {
+                    Some((key, ref value)) => Stored(key, value),
+                    None => Finished,
+                }
+            }
+        }
+    }
+}
 
-    fn next(&mut self) -> Option<Self::Item> {
+impl<'a> Iterator<'a> for ForkIter<'a> {
+    fn next(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
-            let next = match self.changes.peek() {
-                Some(&(k, ref change)) => {
-                    match self.snapshot.peek() {
-                        Some(&(key, ref value)) => {
-                            match **change {
-                                Change::Put(ref v) => {
-                                    match k[..].cmp(key) {
-                                        Equal => Replaced(k, v),
-                                        Less => Inserted(k, v),
-                                        Greater => Stored(key, value),
-                                    }
-                                }
-                                Change::Delete => {
-                                    match k[..].cmp(key) {
-                                        Equal => Deleted,
-                                        Less => MissDeleted,
-                                        Greater => Stored(key, value),
-                                    }
-                                }
-                            }
-                        }
-                        None => {
-                            match **change {
-                                Change::Put(ref v) => Inserted(k, v),
-                                Change::Delete => MissDeleted,
-                            }
-                        }
-                    }
-                }
-                None => {
-                    match self.snapshot.peek() {
-                        Some(&(key, ref value)) => Stored(key, value),
-                        None => return None,
-                    }
-                }
-            };
+            let next = self.step();
+            if next == Finished {
+                return None;
+            }
             if next.skip_changes() {
                 self.changes.next();
             }
@@ -231,6 +247,24 @@ impl<'a> Iterator for ForkIter<'a> {
             }
             if let Some(value) = next.value() {
                 return Some(value);
+            }
+        }
+    }
+
+    fn peek(&mut self) -> Option<(&[u8], &[u8])> {
+        loop {
+            let next = self.step();
+            if next == Finished {
+                return None;
+            }
+            if let Some(value) = next.value() {
+                return Some(value);
+            }
+            if next.skip_changes() {
+                self.changes.next();
+            }
+            if next.skip_snapshot() {
+                self.snapshot.next();
             }
         }
     }
