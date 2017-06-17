@@ -1,40 +1,29 @@
+use serde_json;
+use rand::{thread_rng, Rng};
+
 use crypto::{Hash, hash};
 use super::super::{Database, MemoryDB, StorageValue};
 use super::{ProofListIndex, ListProof, pair_hash};
 
 use self::ListProof::*;
 
-// const KEY_SIZE: usize = 10;
+fn random_values(len: usize) -> Vec<Vec<u8>> {
+    use std::collections::HashSet;
+    let mut rng = thread_rng();
+    let mut exists = HashSet::new();
+    let generator = |_| {
+        let mut new_val: Vec<u8> = vec![0; 10];
+        rng.fill_bytes(&mut new_val);
 
-// #[derive(Serialize)]
-// struct ProofInfo<V: Serialize> {
-//     root_hash: Hash,
-//     list_length: usize,
-//     proof: ListProof<V>,
-//     range_st: usize,
-//     range_end: usize,
-// }
+        while exists.contains(&new_val) {
+            rng.fill_bytes(&mut new_val);
+        }
+        exists.insert(new_val.clone());
+        new_val
+    };
 
-// fn random_values(len: usize) -> Vec<Vec<u8>> {
-//     let mut rng = thread_rng();
-
-//     let mut exists_keys = HashSet::new();
-
-//     let kv_generator = |_| {
-//         let mut new_val: Vec<u8> = vec![0; KEY_SIZE];
-//         rng.fill_bytes(&mut new_val);
-
-//         while exists_keys.contains(&new_val) {
-//             rng.fill_bytes(&mut new_val);
-//         }
-//         exists_keys.insert(new_val.clone());
-//         new_val
-//     };
-
-//     (0..len)
-//         .map(kv_generator)
-//         .collect::<Vec<_>>()
-// }
+    (0..len).map(generator).collect::<Vec<_>>()
+}
 
 #[test]
 fn test_list_methods() {
@@ -226,175 +215,122 @@ fn test_list_index_proof() {
 //     }
 // }
 
-// #[test]
-// fn randomly_generate_proofs() {
-//     let mut fork = MemoryDB::new().fork();
-//     let mut index = ProofListIndex::new(vec![255], &mut fork);
-//     let num_vals = 100;
-//     let values = random_values(num_vals as usize);
-//     let mut rng = thread_rng();
-//     for value in &values {
-//         index.push(value.clone());
-//     }
-//     index.get(0);
-//     let mut index_root_hash = index.root_hash();
-//     let mut index_len = index.len() as usize;
+#[test]
+fn randomly_generate_proofs() {
+    let mut fork = MemoryDB::new().fork();
+    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let num_vals = 100;
+    let values = random_values(num_vals as usize);
+    let mut rng = thread_rng();
+    for value in &values {
+        index.push(value.clone());
+    }
+    index.get(0);
 
-//     for _ in 0..50 {
-//         let start_range = rng.gen_range(0, num_vals);
-//         let end_range = rng.gen_range(start_range + 1, num_vals + 1);
-//         let range_proof = index.get_range_proof(start_range, end_range);
-//         assert_eq!(range_proof.compute_proof_root(), index_root_hash);
+    for _ in 0..50 {
+        let start_range = rng.gen_range(0, num_vals);
+        let end_range = rng.gen_range(start_range + 1, num_vals + 1);
+        let range_proof = index.get_range_proof(start_range, end_range);
+        {
+            let (inds, actual_vals): (Vec<_>, Vec<_>) =
+                range_proof.validate(index.root_hash(), index.len()).unwrap().into_iter().unzip();
+            assert_eq!(inds, (start_range..end_range).collect::<Vec<_>>());
 
-//         {
-//             let (inds, actual_vals): (Vec<_>, Vec<_>) =
-//                 proof_indices_values(&range_proof).into_iter().unzip();
-//             assert_eq!(inds,
-//                        (start_range as usize..end_range as usize).collect::<Vec<_>>());
-//             let expect_vals = &values[start_range as usize..end_range as usize];
-//             let paired = expect_vals.iter().zip(actual_vals);
-//             for pair in paired {
-//                 assert_eq!(*pair.0, *pair.1);
-//             }
-//         }
+            let expect_vals = &values[start_range as usize .. end_range as usize];
+            for (expected, actual) in expect_vals.iter().zip(actual_vals) {
+                assert_eq!(*expected, *actual);
+            }
+        }
 
-//         let json_repre = serde_json::to_string(&range_proof);
-//         let proof_info = ProofInfo {
-//             root_hash: index_root_hash,
-//             list_length: index_len,
-//             proof: range_proof,
-//             range_st: start_range as usize,
-//             range_end: end_range as usize,
-//         };
-//         println!("{}", serde_json::to_string(&proof_info));
+        let json_repr = serde_json::to_string(&range_proof).unwrap();
+        assert_eq!(range_proof, serde_json::from_str(&json_repr).unwrap());
+    }
+}
 
-//         // println!("{}", json_repre);
-//         let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre);
-//         assert_eq!(proof_indices_values(&deser_proof).len(),
-//                    (end_range - start_range) as usize);
-//         assert_eq!(deser_proof.compute_proof_root(), index_root_hash);
-//         // println!("{:?}", deser_proof);
-//     }
-// }
+#[test]
+fn test_index_and_proof_roots() {
+    let mut fork = MemoryDB::new().fork();
+    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    assert_eq!(index.root_hash(), Hash::zero());
 
-// #[test]
-// fn test_index_and_proof_roots() {
-//     let mut fork = MemoryDB::new().fork();
-//     let mut index = ProofListIndex::new(vec![255], &mut fork);
-//     assert_eq!(index.root_hash(), Hash::zero());
+    let h1 = hash(&[1, 2]);
+    let h2 = hash(&[2, 3]);
+    let h3 = hash(&[3, 4]);
+    let h4 = hash(&[4, 5]);
+    let h5 = hash(&[5, 6]);
+    let h6 = hash(&[6, 7]);
+    let h7 = hash(&[7, 8]);
+    let h8 = hash(&[8, 9]);
 
-//     let h1 = hash(&[1, 2]);
-//     let h2 = hash(&[2, 3]);
-//     let h3 = hash(&[3, 4]);
-//     let h4 = hash(&[4, 5]);
-//     let h5 = hash(&[5, 6]);
-//     let h6 = hash(&[6, 7]);
-//     let h7 = hash(&[7, 8]);
-//     let h8 = hash(&[8, 9]);
+    let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
+    let h3up = hash(h3.as_ref());
+    let h123 = hash(&[h12.as_ref(), h3up.as_ref()].concat());
 
-//     let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
-//     let h3up = hash(h3.as_ref());
-//     let h123 = hash(&[h12.as_ref(), h3up.as_ref()].concat());
+    let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
+    let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
 
-//     let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
-//     let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
+    let h5up = hash(h5.as_ref());
+    let h5upup = hash(h5up.as_ref());
+    let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
-//     let h5up = hash(h5.as_ref());
-//     let h5upup = hash(h5up.as_ref());
-//     let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
+    let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());
+    let h56up = hash(h56.as_ref());
+    let h123456 = hash(&[h1234.as_ref(), h56up.as_ref()].concat());
 
-//     let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());
-//     let h56up = hash(h56.as_ref());
-//     let h123456 = hash(&[h1234.as_ref(), h56up.as_ref()].concat());
+    let h7up = hash(h7.as_ref());
+    let h567 = hash(&[h56.as_ref(), h7up.as_ref()].concat());
+    let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());
 
-//     let h7up = hash(h7.as_ref());
-//     let h567 = hash(&[h56.as_ref(), h7up.as_ref()].concat());
-//     let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());
+    let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());
+    let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
+    let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
-//     let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());
-//     let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
-//     let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
+    let expected_hash_comb: Vec<(Vec<u8>, Hash, u64)> = vec![(vec![1, 2], h1, 0),
+                                                             (vec![2, 3], h12, 1),
+                                                             (vec![3, 4], h123, 2),
+                                                             (vec![4, 5], h1234, 3),
+                                                             (vec![5, 6], h12345, 4),
+                                                             (vec![6, 7], h123456, 5),
+                                                             (vec![7, 8], h1234567, 6),
+                                                             (vec![8, 9], h12345678, 7)];
 
-//     let expected_hash_comb: Vec<(Vec<u8>, Hash, )> = vec![(vec![1, 2], h1, 0),
-//                                                              (vec![2, 3], h12, 1),
-//                                                              (vec![3, 4], h123, 2),
-//                                                              (vec![4, 5], h1234, 3),
-//                                                              (vec![5, 6], h12345, 4),
-//                                                              (vec![6, 7], h123456, 5),
-//                                                              (vec![7, 8], h1234567, 6),
-//                                                              (vec![8, 9], h12345678, 7)];
+    for (inserted, exp_root, proof_ind) in expected_hash_comb {
+        index.push(inserted);
 
-//     for (inserted, exp_root, proof_ind) in expected_hash_comb {
-//         index.push(inserted);
-//         let mut index_len = index.len() as usize;
+        assert_eq!(index.root_hash(), exp_root);
+        let range_proof = index.get_range_proof(proof_ind, proof_ind + 1);
+        assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), 1);
+        let json_repre = serde_json::to_string(&range_proof).unwrap();
+        let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+        assert_eq!(deser_proof, range_proof);
+        let range_proof = index.get_range_proof(0, proof_ind + 1);
+        assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), (proof_ind + 1) as usize);
+        let json_repre = serde_json::to_string(&range_proof).unwrap();
+        let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+        assert_eq!(deser_proof, range_proof);
+        let range_proof = index.get_range_proof(0, 1);
+        assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), 1);
+        let json_repre = serde_json::to_string(&range_proof).unwrap();
+        let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+        assert_eq!(deser_proof, range_proof);
+    }
 
-//         assert_eq!(index.root_hash(), exp_root);
-//         let range_proof = index.get_range_proof(proof_ind, proof_ind + 1).validate(index.root_hash(), index.len()).unwrap();
-//         assert_eq!(range_proof.len(), 1);
+    let range_proof = index.get_range_proof(0, 8);
+    let (inds, val_refs): (Vec<_>, Vec<_>) = range_proof.validate(index.root_hash(), index.len()).unwrap().into_iter().unzip();
+    assert_eq!(inds, (0..8).collect::<Vec<_>>());
+    let expect_vals = vec![vec![1, 2], vec![2, 3], vec![3, 4], vec![4, 5], vec![5, 6],
+                           vec![6, 7], vec![7, 8], vec![8, 9]];
+    let paired = expect_vals.into_iter().zip(val_refs);
+    for pair in paired {
+        assert_eq!(pair.0, *pair.1);
+    }
 
-//         let json_repre = serde_json::to_string(&range_proof);
-//         let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre);
-//         assert_eq!(deser_proof.len(), 1);
-
-//         let proof_info = ProofInfo {
-//             root_hash: exp_root,
-//             list_length: index_len,
-//             proof: range_proof,
-//             range_st: proof_ind as usize,
-//             range_end: (proof_ind + 1) as usize,
-//         };
-//         println!("{}", serde_json::to_string(&proof_info));
-
-//         let range_proof = index.get_range_proof(0, proof_ind + 1).validate(index.root_hash(), index.len()).unwrap();
-//         assert_eq!(range_proof.len(),
-//                    (proof_ind + 1) as usize);
-
-//         let json_repre = serde_json::to_string(&range_proof);
-//         let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre);
-//         assert_eq!(deser_proof.len(),
-//                    (proof_ind + 1) as usize);
-//         let proof_info = ProofInfo {
-//             root_hash: exp_root,
-//             list_length: index_len,
-//             proof: range_proof,
-//             range_st: 0,
-//             range_end: (proof_ind + 1) as usize,
-//         };
-//         println!("{}", serde_json::to_string(&proof_info));
-//         let range_proof = index.get_range_proof(0, 1).validate(index.root_hash(), index.len()).unwrap();
-//         assert_eq!(range_proof.len(), 1);
-
-//         let json_repre = serde_json::to_string(&range_proof);
-//         let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre);
-//         assert_eq!(deser_proof.len(), 1);
-
-//         let proof_info = ProofInfo {
-//             root_hash: exp_root,
-//             list_length: index_len,
-//             proof: range_proof,
-//             range_st: 0,
-//             range_end: 1,
-//         };
-//         println!("{}", serde_json::to_string(&proof_info));
-//     }
-
-//     let range_proof = index.get_range_proof(0, 8).validate(index.root_hash(), index.len()).unwrap();
-//     let (inds, val_refs): (Vec<_>, Vec<_>) =
-//         range_proof.into_iter().unzip();
-//     assert_eq!(inds, (0usize..8).collect::<Vec<_>>());
-//     let expect_vals = vec![vec![1, 2], vec![2, 3], vec![3, 4], vec![4, 5], vec![5, 6],
-//                            vec![6, 7], vec![7, 8], vec![8, 9]];
-//     let paired = expect_vals.into_iter().zip(val_refs);
-//     for pair in paired {
-//         assert_eq!(pair.0, *pair.1);
-//     }
-
-//     let mut range_proof = index.get_range_proof(3, 5).validate(index.root_hash(), index.len()).unwrap();
-//     assert_eq!(range_proof.len(), 2);
-//     range_proof = index.get_range_proof(2, 6).validate(index.root_hash(), index.len()).unwrap();
-//     assert_eq!(range_proof.len(), 4);
-//     assert_eq!(index.get(0), Some(vec![1, 2]));
-// }
+    let mut range_proof = index.get_range_proof(3, 5);
+    assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), 2);
+    range_proof = index.get_range_proof(2, 6);
+    assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), 4);
+    assert_eq!(index.get(0), Some(vec![1, 2]));
+}
 
 #[test]
 #[should_panic]
@@ -427,53 +363,52 @@ fn test_proof_illegal_range() {
     index.get_range_proof(2, 2);
 }
 
-// #[test]
-// fn test_proof_structure() {
-//     let mut fork = MemoryDB::new().fork();
-//     let mut index = ProofListIndex::new(vec![255], &mut fork);
-//     assert_eq!(index.root_hash(), Hash::zero());
+#[test]
+fn test_proof_structure() {
+    let mut fork = MemoryDB::new().fork();
+    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    assert_eq!(index.root_hash(), Hash::zero());
 
-//     let h1 = hash(&vec![0, 1, 2]);
-//     let h2 = hash(&vec![1, 2, 3]);
-//     let h3 = hash(&vec![2, 3, 4]);
-//     let h4 = hash(&vec![3, 4, 5]);
-//     let h5 = hash(&vec![4, 5, 6]);
-//     let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
-//     let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
-//     let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
-//     let h5up = hash(h5.as_ref());
-//     let h5upup = hash(h5up.as_ref());
-//     let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
+    let h1 = hash(&vec![0, 1, 2]);
+    let h2 = hash(&vec![1, 2, 3]);
+    let h3 = hash(&vec![2, 3, 4]);
+    let h4 = hash(&vec![3, 4, 5]);
+    let h5 = hash(&vec![4, 5, 6]);
+    let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
+    let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
+    let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
+    let h5up = hash(h5.as_ref());
+    let h5upup = hash(h5up.as_ref());
+    let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
 
-//     for i in 0u8...4 {
-//         index.push(vec![i, i + 1, i + 2]);
-//     }
+    for i in 0u8..5 {
+        index.push(vec![i, i + 1, i + 2]);
+    }
 
-//     assert_eq!(index.root_hash(), h12345);
-//     let range_proof = index.get_range_proof(4, 5);
-//     assert_eq!(range_proof.compute_proof_root(), h12345);
+    assert_eq!(index.root_hash(), h12345);
+    let range_proof = index.get_range_proof(4, 5);
 
-//     assert_eq!(vec![4, 5, 6], *(proof_indices_values(&range_proof)[0].1));
-//     if let ListProof::Right(left_hash1, right_proof1) = range_proof {
-//         assert_eq!(left_hash1, h1234);
-//         let unboxed_proof = *right_proof1;
-//         if let ListProof::Left(left_proof2, right_hash2) = unboxed_proof {
-//             assert!(right_hash2.is_none());
-//             let unboxed_proof = *left_proof2;
-//             if let ListProof::Left(_, right_hash3) = unboxed_proof {
-//                 assert!(right_hash3.is_none());
-//             } else {
-//                 assert!(false);
-//             }
-//         } else {
-//             assert!(false);
-//         }
+    assert_eq!(vec![4, 5, 6], *(range_proof.validate(h12345, 5).unwrap()[0].1));
 
-//     } else {
-//         assert!(false);
-//     }
-//     index.push(vec![5, 6, 7]);
-// }
+    if let ListProof::Right(left_hash1, right_proof1) = range_proof {
+        assert_eq!(left_hash1, h1234);
+        let unboxed_proof = *right_proof1;
+        if let ListProof::Left(left_proof2, right_hash2) = unboxed_proof {
+            assert!(right_hash2.is_none());
+            let unboxed_proof = *left_proof2;
+            if let ListProof::Left(_, right_hash3) = unboxed_proof {
+                assert!(right_hash3.is_none());
+            } else {
+                assert!(false);
+            }
+        } else {
+            assert!(false);
+        }
+
+    } else {
+        assert!(false);
+    }
+}
 
 #[test]
 fn test_simple_root_hash() {
