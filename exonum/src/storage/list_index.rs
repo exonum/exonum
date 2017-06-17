@@ -161,7 +161,7 @@ mod tests {
         assert!(list_index.last().is_none());
 
         let extended_by = vec![45, 3422, 234];
-        list_index.extend(extended_by.into_iter());
+        list_index.extend(extended_by);
         assert!(!list_index.is_empty());
         assert_eq!(Some(45), list_index.get(0));
         assert_eq!(Some(3422), list_index.get(1));
@@ -184,6 +184,14 @@ mod tests {
         list_index.extend(extended_by_again);
         assert_eq!(7, list_index.len());
         assert_eq!(Some(1001), list_index.last());
+
+        assert_eq!(Some(1001), list_index.pop());
+        assert_eq!(6, list_index.len());
+
+        list_index.truncate(3);
+
+        assert_eq!(3, list_index.len());
+        assert_eq!(Some(777), list_index.last());
     }
 
 }

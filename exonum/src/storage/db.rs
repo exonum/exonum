@@ -314,4 +314,70 @@ mod tests {
         fork.remove(vec![35]);
         assert_iter(&fork, 0, &[(10, 10), (20, 20), (30, 30)]);
     }
+
+    #[test]
+    fn changelog() {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+
+        fork.put(vec![1], vec![1]);
+        fork.put(vec![2], vec![2]);
+        fork.put(vec![3], vec![3]);
+
+        assert_eq!(fork.get(&[1]), Some(vec![1]));
+        assert_eq!(fork.get(&[2]), Some(vec![2]));
+        assert_eq!(fork.get(&[3]), Some(vec![3]));
+
+        fork.checkpoint();
+
+        assert_eq!(fork.get(&[1]), Some(vec![1]));
+        assert_eq!(fork.get(&[2]), Some(vec![2]));
+        assert_eq!(fork.get(&[3]), Some(vec![3]));
+
+        fork.put(vec![1], vec![10]);
+        fork.put(vec![4], vec![40]);
+        fork.remove(vec![2]);
+
+        assert_eq!(fork.get(&[1]), Some(vec![10]));
+        assert_eq!(fork.get(&[2]), None);
+        assert_eq!(fork.get(&[3]), Some(vec![3]));
+        assert_eq!(fork.get(&[4]), Some(vec![40]));
+
+        fork.rollback();
+
+        assert_eq!(fork.get(&[1]), Some(vec![1]));
+        assert_eq!(fork.get(&[2]), Some(vec![2]));
+        assert_eq!(fork.get(&[3]), Some(vec![3]));
+        assert_eq!(fork.get(&[4]), None);
+
+        fork.put(vec![4], vec![40]);
+        fork.put(vec![4], vec![41]);
+        fork.remove(vec![2]);
+        fork.put(vec![2], vec![20]);
+
+        assert_eq!(fork.get(&[1]), Some(vec![1]));
+        assert_eq!(fork.get(&[2]), Some(vec![20]));
+        assert_eq!(fork.get(&[3]), Some(vec![3]));
+        assert_eq!(fork.get(&[4]), Some(vec![41]));
+
+        fork.rollback();
+
+        assert_eq!(fork.get(&[1]), Some(vec![1]));
+        assert_eq!(fork.get(&[2]), Some(vec![2]));
+        assert_eq!(fork.get(&[3]), Some(vec![3]));
+        assert_eq!(fork.get(&[4]), None);
+
+        fork.put(vec![2], vec![20]);
+
+        fork.checkpoint();
+
+        fork.put(vec![3], vec![30]);
+
+        fork.rollback();
+
+        assert_eq!(fork.get(&[1]), Some(vec![1]));
+        assert_eq!(fork.get(&[2]), Some(vec![20]));
+        assert_eq!(fork.get(&[3]), Some(vec![3]));
+        assert_eq!(fork.get(&[4]), None);
+    }
 }
