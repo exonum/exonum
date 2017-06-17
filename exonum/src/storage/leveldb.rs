@@ -1,7 +1,9 @@
-use leveldb::database::Database as LevelDatabase;
-use leveldb::iterator::{LevelDBIterator, Iterable};
-use leveldb::error::Error as LevelDBError;
-use leveldb::database::snapshots::Snapshot as LevelSnapshot;
+use profiler;
+
+use leveldb::database::Database as _LevelDB;
+use leveldb::iterator::{LevelDBIterator as _LevelDBIterator, Iterator as _Iterator, Iterable};
+use leveldb::error::Error as _Error;
+use leveldb::database::snapshots::Snapshot as _Snapshot;
 use leveldb::options::{WriteOptions, ReadOptions};
 use leveldb::database::batch::Writebatch;
 use leveldb::batch::Batch;
@@ -13,6 +15,7 @@ use std::mem;
 use std::path::Path;
 use std::error;
 use std::sync::Arc;
+use std::iter::Iterator;
 
 pub use leveldb::options::Options as LevelDBOptions;
 
@@ -28,16 +31,20 @@ const LEVELDB_WRITE_OPTIONS: WriteOptions = WriteOptions { sync: false };
 
 #[derive(Clone)]
 pub struct LevelDB {
-    db: Arc<LevelDatabase>,
+    db: Arc<_LevelDB>,
 }
 
 struct LevelDBSnapshot {
-    _db: Arc<LevelDatabase>,
-    snapshot: LevelSnapshot<'static>,
+    _db: Arc<_LevelDB>,
+    snapshot: _Snapshot<'static>,
 }
 
-impl From<LevelDBError> for Error {
-    fn from(err: LevelDBError) -> Self {
+struct LevelDBIterator<'a> {
+    iter: _Iterator<'a>
+}
+
+impl From<_Error> for Error {
+    fn from(err: _Error) -> Self {
         Error::new(error::Error::description(&err))
     }
 }
@@ -54,7 +61,7 @@ impl LevelDB {
         if options.create_if_missing {
             fs::create_dir_all(path)?;
         }
-        let database = LevelDatabase::open(path, options)?;
+        let database = _LevelDB::open(path, options)?;
         Ok(LevelDB { db: Arc::new(database) })
     }
 }
@@ -65,6 +72,7 @@ impl Database for LevelDB {
     }
 
     fn snapshot(&self) -> Box<Snapshot> {
+        let _p = profiler::ProfilerSpan::new("LevelDB::snapshot");
         Box::new(LevelDBSnapshot {
                      _db: self.db.clone(),
                      snapshot: unsafe { mem::transmute(self.db.snapshot()) },
@@ -72,6 +80,7 @@ impl Database for LevelDB {
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
+        let _p = profiler::ProfilerSpan::new("LevelDB::merge");
         let mut batch = Writebatch::new();
         for (key, change) in patch {
             match change {
@@ -87,6 +96,7 @@ impl Database for LevelDB {
 
 impl Snapshot for LevelDBSnapshot {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        let _p = profiler::ProfilerSpan::new("LevelDBSnapshot::get");
         match self.snapshot.get(LEVELDB_READ_OPTIONS, key) {
             Ok(value) => value,
             Err(err) => panic!(err),
@@ -94,9 +104,19 @@ impl Snapshot for LevelDBSnapshot {
     }
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
+        let _p = profiler::ProfilerSpan::new("LevelDBSnapshot::iter");
         let iter = self.snapshot.iter(LEVELDB_READ_OPTIONS);
         iter.seek(from);
-        Box::new(iter)
+        Box::new(LevelDBIterator { iter: iter })
+    }
+}
+
+impl<'a> Iterator for LevelDBIterator<'a> {
+    type Item = (&'a [u8], &'a [u8]);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let _p = profiler::ProfilerSpan::new("LevelDBIterator::next");
+        self.iter.next()
     }
 }
 
