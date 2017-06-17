@@ -47,24 +47,6 @@ impl<'a> Iterable<'a> for Database {
     }
 }
 
-#[allow(missing_docs)]
-pub trait LevelDBIterator<'a, 'b: 'a> {
-    type Item;
-
-    #[inline]
-    fn raw_iterator(&self) -> *mut leveldb_iterator_t;
-
-    #[inline]
-    fn start(&self) -> bool;
-
-    #[inline]
-    fn started(&mut self);
-
-
-    fn next(&'b mut self) -> Option<Self::Item>;
-}
-
-
 impl<'a> Iterator<'a> {
     fn new(database: &'a Database, options: ReadOptions<'a>) -> Iterator<'a> {
         unsafe {

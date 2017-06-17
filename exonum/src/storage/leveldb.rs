@@ -1,7 +1,7 @@
 use profiler;
 
 use leveldb::database::Database as _LevelDB;
-use leveldb::iterator::{LevelDBIterator as _LevelDBIterator, Iterator as _Iterator, Iterable};
+use leveldb::iterator::{Iterator as _Iterator, Iterable};
 use leveldb::error::Error as _Error;
 use leveldb::database::snapshots::Snapshot as _Snapshot;
 use leveldb::options::{WriteOptions, ReadOptions};
