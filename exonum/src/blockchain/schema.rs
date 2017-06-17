@@ -10,7 +10,7 @@ use super::config::StoredConfiguration;
 
 pub fn gen_prefix<K: StorageKey>(service_id: u16, ord: u8, suffix: &K) -> Vec<u8> {
     let pos = mem::size_of::<u16>();
-    let mut res = vec![0; pos + 1 + K::size()];
+    let mut res = vec![0; pos + 1 + suffix.size()];
     suffix.write(&mut res[pos + 1..]);
     BigEndian::write_u16(&mut res[0..pos], service_id);
     res[pos] = ord;

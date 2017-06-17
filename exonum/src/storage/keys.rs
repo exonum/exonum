@@ -3,13 +3,13 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
 
 pub trait StorageKey {
-    fn size() -> usize;
+    fn size(&self) -> usize;
     fn write(&self, buffer: &mut [u8]);
     fn read(buffer: &[u8]) -> Self;
 }
 
 impl StorageKey for () {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         0
     }
 
@@ -23,7 +23,7 @@ impl StorageKey for () {
 }
 
 impl StorageKey for u8 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         1
     }
 
@@ -37,7 +37,7 @@ impl StorageKey for u8 {
 }
 
 impl StorageKey for u16 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         2
     }
 
@@ -51,7 +51,7 @@ impl StorageKey for u16 {
 }
 
 impl StorageKey for u32 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         4
     }
 
@@ -65,7 +65,7 @@ impl StorageKey for u32 {
 }
 
 impl StorageKey for u64 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         8
     }
 
@@ -79,7 +79,7 @@ impl StorageKey for u64 {
 }
 
 impl StorageKey for i8 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         1
     }
 
@@ -93,7 +93,7 @@ impl StorageKey for i8 {
 }
 
 impl StorageKey for i16 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         2
     }
 
@@ -107,7 +107,7 @@ impl StorageKey for i16 {
 }
 
 impl StorageKey for i32 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         4
     }
 
@@ -121,7 +121,7 @@ impl StorageKey for i32 {
 }
 
 impl StorageKey for i64 {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         8
     }
 
@@ -135,7 +135,7 @@ impl StorageKey for i64 {
 }
 
 impl StorageKey for Hash {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         HASH_SIZE
     }
 
@@ -149,7 +149,7 @@ impl StorageKey for Hash {
 }
 
 impl StorageKey for PublicKey {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         PUBLIC_KEY_LENGTH
     }
 
@@ -159,5 +159,19 @@ impl StorageKey for PublicKey {
 
     fn read(buffer: &[u8]) -> Self {
         PublicKey::from_slice(buffer).unwrap()
+    }
+}
+
+impl StorageKey for Vec<u8> {
+    fn size(&self) -> usize {
+        self.len()
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(&self)
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        buffer.to_vec()
     }
 }
