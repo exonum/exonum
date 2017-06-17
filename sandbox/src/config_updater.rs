@@ -1,7 +1,8 @@
 use exonum::crypto::{PublicKey, Hash};
 use exonum::blockchain::{Service, Transaction, Schema};
-use exonum::messages::{RawTransaction, Message, FromRaw, Error as MessageError};
+use exonum::messages::{RawTransaction, Message, FromRaw};
 use exonum::storage::{Snapshot, Fork};
+use exonum::encoding::Error as MessageError;
 use exonum::blockchain::StoredConfiguration;
 
 pub const CONFIG_SERVICE: u16 = 1;

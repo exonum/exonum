@@ -70,7 +70,6 @@ impl<'a> BlockchainExplorer<'a> {
             }
         };
         Ok(res)
-
     }
 
     pub fn block_info(&self, height: u64) -> Option<BlockInfo> {

@@ -17,7 +17,7 @@ pub fn gen_prefix<K: StorageKey>(service_id: u16, ord: u8, suffix: &K) -> Vec<u8
     res
 }
 
-storage_value! (
+encoding_struct! (
     struct ConfigReference {
         const SIZE = 40;
         field actual_from: u64    [00 => 08]
@@ -25,7 +25,7 @@ storage_value! (
     }
 );
 
-storage_value! (
+encoding_struct! (
     struct TxLocation {
         const SIZE = 16;
         field block_height:         u64  [00 => 08]
