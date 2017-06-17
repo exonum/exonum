@@ -86,6 +86,20 @@ fn test_height() {
 }
 
 #[test]
+fn test_iter() {
+    let mut fork = MemoryDB::new().fork();
+    let mut list_index = ProofListIndex::new(vec![255], &mut fork);
+
+    list_index.extend(vec![1u8, 2, 3]);
+
+    assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
+
+    assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
+    assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
+    assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(), Vec::<u8>::new());
+}
+
+#[test]
 fn test_list_index_proof() {
     let mut fork = MemoryDB::new().fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
