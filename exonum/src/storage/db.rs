@@ -130,6 +130,9 @@ impl Fork {
     }
 
     pub fn merge(&mut self, patch: Patch) {
+        if !self.changelog.is_empty() {
+            panic!("merge into a fork is impossible because it has unfinalized changes");
+        }
         self.changes.extend(patch)
     }
 }
