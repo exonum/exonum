@@ -10,7 +10,7 @@ use database::kv::KV;
 
 use database::error::Error;
 use database::options::ReadOptions;
-use database::iterator::{Iterable, Iterator, KeyIterator, ValueIterator};
+use database::iterator::{Iterable, Iterator};
 
 #[allow(missing_docs)]
 struct RawSnapshot {
@@ -80,13 +80,5 @@ impl<'a> Iterable<'a> for Snapshot<'a> {
     fn iter(&'a self, mut options: ReadOptions<'a>) -> Iterator {
         options.snapshot = Some(self);
         self.database.iter(options)
-    }
-    fn keys_iter(&'a self, mut options: ReadOptions<'a>) -> KeyIterator {
-        options.snapshot = Some(self);
-        self.database.keys_iter(options)
-    }
-    fn value_iter(&'a self, mut options: ReadOptions<'a>) -> ValueIterator {
-        options.snapshot = Some(self);
-        self.database.value_iter(options)
     }
 }

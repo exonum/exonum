@@ -7,7 +7,6 @@ use leveldb_sys::{leveldb_iterator_t, leveldb_iter_seek_to_first, leveldb_iter_d
                   leveldb_iter_next, leveldb_iter_key, leveldb_iter_value,
                   leveldb_readoptions_destroy, leveldb_iter_seek};
 use libc::{size_t, c_char};
-use std::iter;
 use super::Database;
 use super::options::{ReadOptions, c_readoptions};
 use std::slice::from_raw_parts;
@@ -36,57 +35,22 @@ pub struct Iterator<'a> {
     iter: RawIterator,
 }
 
-/// An iterator over the leveldb keyspace.
-///
-/// Returns just the keys.
-pub struct KeyIterator<'a> {
-    start: bool,
-    // Iterator accesses the Database through a leveldb_iter_t pointer
-    // but needs to hold the reference for lifetime tracking
-    #[allow(dead_code)]
-    database: &'a Database,
-    iter: RawIterator,
-}
-
-/// An iterator over the leveldb keyspace.
-///
-/// Returns just the value.
-pub struct ValueIterator<'a> {
-    start: bool,
-    // Iterator accesses the Database through a leveldb_iter_t pointer
-    // but needs to hold the reference for lifetime tracking
-    #[allow(dead_code)]
-    database: &'a Database,
-    iter: RawIterator,
-}
-
-
 /// A trait to allow access to the three main iteration styles of leveldb.
 pub trait Iterable<'a> {
     /// Return an Iterator iterating over (Key,Value) pairs
     fn iter(&'a self, options: ReadOptions<'a>) -> Iterator;
-    /// Returns an Iterator iterating over Keys only.
-    fn keys_iter(&'a self, options: ReadOptions<'a>) -> KeyIterator;
-    /// Returns an Iterator iterating over Values only.
-    fn value_iter(&'a self, options: ReadOptions<'a>) -> ValueIterator;
 }
 
 impl<'a> Iterable<'a> for Database {
     fn iter(&'a self, options: ReadOptions<'a>) -> Iterator {
         Iterator::new(self, options)
     }
-
-    fn keys_iter(&'a self, options: ReadOptions<'a>) -> KeyIterator {
-        KeyIterator::new(self, options)
-    }
-
-    fn value_iter(&'a self, options: ReadOptions<'a>) -> ValueIterator {
-        ValueIterator::new(self, options)
-    }
 }
 
 #[allow(missing_docs)]
-pub trait LevelDBIterator<'a> {
+pub trait LevelDBIterator<'a, 'b: 'a> {
+    type Item;
+
     #[inline]
     fn raw_iterator(&self) -> *mut leveldb_iterator_t;
 
@@ -96,52 +60,8 @@ pub trait LevelDBIterator<'a> {
     #[inline]
     fn started(&mut self);
 
-    fn valid(&self) -> bool {
-        unsafe { leveldb_iter_valid(self.raw_iterator()) != 0 }
-    }
 
-    fn advance(&mut self) -> bool {
-        unsafe {
-            if !self.start() {
-                leveldb_iter_next(self.raw_iterator());
-            } else {
-                self.started();
-            }
-        }
-        self.valid()
-    }
-
-    fn key(&self) -> &'a [u8] {
-        unsafe {
-            let length: size_t = 0;
-            let value = leveldb_iter_key(self.raw_iterator(), &length) as *const u8;
-            from_raw_parts(value, length as usize)
-        }
-    }
-
-    fn value(&self) -> &'a [u8] {
-        unsafe {
-            let length: size_t = 0;
-            let value = leveldb_iter_value(self.raw_iterator(), &length) as *const u8;
-            from_raw_parts(value, length as usize)
-        }
-    }
-
-    fn seek_to_first(&self) {
-        unsafe { leveldb_iter_seek_to_first(self.raw_iterator()) }
-    }
-
-    fn seek_to_last(&self) {
-        unsafe { leveldb_iter_seek_to_last(self.raw_iterator()); }
-    }
-
-    fn seek(&self, key: &[u8]) {
-        unsafe {
-            leveldb_iter_seek(self.raw_iterator(),
-                              key.as_ptr() as *mut c_char,
-                              key.len() as size_t);
-        }
-    }
+    fn next(&'b mut self) -> Option<Self::Item>;
 }
 
 
@@ -160,138 +80,66 @@ impl<'a> Iterator<'a> {
         }
     }
 
-    /// return the last element of the iterator
-    pub fn last(self) -> Option<(&'a [u8], &'a [u8])> {
-        self.seek_to_last();
-        Some((self.key(), self.value()))
-    }
-}
-
-impl<'a> LevelDBIterator<'a> for Iterator<'a> {
-    #[inline]
-    fn raw_iterator(&self) -> *mut leveldb_iterator_t {
-        self.iter.ptr
-    }
-
-    #[inline]
-    fn start(&self) -> bool {
-        self.start
-    }
-
-    #[inline]
-    fn started(&mut self) {
-        self.start = false
-    }
-}
-
-impl<'a> KeyIterator<'a> {
-    fn new(database: &'a Database, options: ReadOptions<'a>) -> KeyIterator<'a> {
+    fn valid(&self) -> bool {
         unsafe {
-            let c_readoptions = c_readoptions(&options);
-            let ptr = leveldb_create_iterator(database.database.ptr, c_readoptions);
-            leveldb_readoptions_destroy(c_readoptions);
-            leveldb_iter_seek_to_first(ptr);
-            KeyIterator {
-                start: true,
-                iter: RawIterator { ptr: ptr },
-                database: database,
-            }
+            leveldb_iter_valid(self.iter.ptr) != 0
         }
     }
 
-    /// return the last element of the iterator
-    pub fn last(self) -> Option<&'a [u8]> {
-        self.seek_to_last();
-        Some(self.key())
-    }
-}
-
-impl<'a> LevelDBIterator<'a> for KeyIterator<'a> {
-    #[inline]
-    fn raw_iterator(&self) -> *mut leveldb_iterator_t {
-        self.iter.ptr
-    }
-
-    #[inline]
-    fn start(&self) -> bool {
-        self.start
-    }
-
-    #[inline]
-    fn started(&mut self) {
-        self.start = false
-    }
-}
-
-impl<'a> ValueIterator<'a> {
-    fn new(database: &'a Database, options: ReadOptions<'a>) -> ValueIterator<'a> {
+    fn advance(&mut self) -> bool {
         unsafe {
-            let c_readoptions = c_readoptions(&options);
-            let ptr = leveldb_create_iterator(database.database.ptr, c_readoptions);
-            leveldb_readoptions_destroy(c_readoptions);
-            leveldb_iter_seek_to_first(ptr);
-            ValueIterator {
-                start: true,
-                iter: RawIterator { ptr: ptr },
-                database: database,
+            if !self.start {
+                leveldb_iter_next(self.iter.ptr);
+            } else {
+                self.start = false;
             }
+        }
+        self.valid()
+    }
+
+    unsafe fn key(&self) -> &[u8] {
+        let length: size_t = 0;
+        let value = leveldb_iter_key(self.iter.ptr, &length) as *const u8;
+        from_raw_parts(value, length as usize)
+    }
+
+    unsafe fn value(&self) -> &[u8] {
+        let length: size_t = 0;
+        let value = leveldb_iter_value(self.iter.ptr, &length) as *const u8;
+        from_raw_parts(value, length as usize)
+    }
+
+    pub fn seek_to_first(&mut self) {
+        unsafe { leveldb_iter_seek_to_first(self.iter.ptr) }
+    }
+
+    pub fn seek_to_last(&mut self) {
+        unsafe { leveldb_iter_seek_to_last(self.iter.ptr); }
+    }
+
+    pub fn seek(&mut self, key: &[u8]) {
+        unsafe {
+            leveldb_iter_seek(self.iter.ptr,
+                              key.as_ptr() as *mut c_char,
+                              key.len() as size_t);
         }
     }
 
-    /// return the last element of the iterator
-    pub fn last(self) -> Option<&'a [u8]> {
-        self.seek_to_last();
-        Some(self.value())
-    }
-}
-
-impl<'a> LevelDBIterator<'a> for ValueIterator<'a> {
-    #[inline]
-    fn raw_iterator(&self) -> *mut leveldb_iterator_t {
-        self.iter.ptr
-    }
-
-    #[inline]
-    fn start(&self) -> bool {
-        self.start
-    }
-
-    #[inline]
-    fn started(&mut self) {
-        self.start = false
-    }
-}
-
-impl<'a> iter::Iterator for Iterator<'a> {
-    type Item = (&'a [u8], &'a [u8]);
-
-    fn next(&mut self) -> Option<Self::Item> {
+    pub fn next(&mut self) -> Option<(&[u8], &[u8])> {
         if self.advance() {
-            Some((self.key(), self.value()))
+            unsafe {
+                Some((self.key(), self.value()))
+            }
         } else {
             None
         }
     }
-}
 
-impl<'a> iter::Iterator for KeyIterator<'a> {
-    type Item = &'a [u8];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.advance() {
-            Some(self.key())
-        } else {
-            None
-        }
-    }
-}
-
-impl<'a> iter::Iterator for ValueIterator<'a> {
-    type Item = &'a [u8];
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.advance() {
-            Some(self.value())
+    pub fn peek(&self) -> Option<(&[u8], &[u8])> {
+        if self.valid() {
+            unsafe {
+                Some((self.key(), self.value()))
+            }
         } else {
             None
         }

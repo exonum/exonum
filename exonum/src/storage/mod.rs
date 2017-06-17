@@ -1,5 +1,5 @@
 pub use self::error::Error;
-pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iter};
+pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
 
 pub use self::leveldb::{LevelDB, LevelDBOptions};
 pub use self::memorydb::MemoryDB;
