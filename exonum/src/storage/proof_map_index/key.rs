@@ -17,7 +17,7 @@ impl ProofMapKey for PublicKey {}
 impl ProofMapKey for [u8; KEY_SIZE] {}
 
 impl StorageKey for [u8; KEY_SIZE] {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         KEY_SIZE
     }
 
@@ -60,7 +60,7 @@ impl ::std::ops::Not for ChildKind {
 impl DBKey {
     /// Create a new bit slice from the given binary data.
     pub fn leaf<K: ProofMapKey>(key: &K) -> DBKey {
-        debug_assert!(K::size() == KEY_SIZE);
+        debug_assert!(key.size() == KEY_SIZE);
 
         let mut data = [0; KEY_SIZE];
         key.write(&mut data);
@@ -186,7 +186,7 @@ impl AsRef<[u8]> for DBKey {
 }
 
 impl StorageKey for DBKey {
-    fn size() -> usize {
+    fn size(&self) -> usize {
         DB_KEY_SIZE
     }
 

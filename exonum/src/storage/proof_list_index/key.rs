@@ -80,8 +80,8 @@ impl ProofListKey {
 }
 
 impl StorageKey for ProofListKey {
-    fn size() -> usize {
-        <u64 as StorageKey>::size()
+    fn size(&self) -> usize {
+        8
     }
 
     fn write(&self, buffer: &mut [u8]) {

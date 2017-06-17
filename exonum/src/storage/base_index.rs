@@ -27,7 +27,7 @@ impl<T> BaseIndex<T> {
     }
 
     fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
-        let mut v = vec![0; self.prefix.len() + K::size()];
+        let mut v = vec![0; self.prefix.len() + key.size()];
         &mut v[..self.prefix.len()].copy_from_slice(&self.prefix);
         key.write(&mut v[self.prefix.len()..]);
         v
