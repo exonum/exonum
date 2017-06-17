@@ -9,12 +9,12 @@ use messages::{RawMessage, MessageBuffer, Message};
 
 pub trait StorageValue: Sized {
     fn hash(&self) -> Hash;
-    fn into_vec(self) -> Vec<u8>;
+    fn into_bytes(self) -> Vec<u8>;
     fn from_bytes(value: Cow<[u8]>) -> Self;
 }
 
 impl StorageValue for () {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         Vec::new()
     }
 
@@ -28,7 +28,7 @@ impl StorageValue for () {
 }
 
 impl StorageValue for u8 {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         vec![self]
     }
 
@@ -42,7 +42,7 @@ impl StorageValue for u8 {
 }
 
 impl StorageValue for u16 {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<u16>()];
         LittleEndian::write_u16(&mut v, self);
         v
@@ -60,7 +60,7 @@ impl StorageValue for u16 {
 }
 
 impl StorageValue for u32 {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<u32>()];
         LittleEndian::write_u32(&mut v, self);
         v
@@ -78,7 +78,7 @@ impl StorageValue for u32 {
 }
 
 impl StorageValue for u64 {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<u64>()];
         LittleEndian::write_u64(&mut v, self);
         v
@@ -96,7 +96,7 @@ impl StorageValue for u64 {
 }
 
 impl StorageValue for i8 {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         vec![self as u8]
     }
 
@@ -110,7 +110,7 @@ impl StorageValue for i8 {
 }
 
 impl StorageValue for i16 {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<i16>()];
         LittleEndian::write_i16(&mut v, self);
         v
@@ -128,7 +128,7 @@ impl StorageValue for i16 {
 }
 
 impl StorageValue for i32 {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<i32>()];
         LittleEndian::write_i32(&mut v, self);
         v
@@ -146,7 +146,7 @@ impl StorageValue for i32 {
 }
 
 impl StorageValue for i64 {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<i64>()];
         LittleEndian::write_i64(&mut v, self);
         v
@@ -164,7 +164,7 @@ impl StorageValue for i64 {
 }
 
 impl StorageValue for Hash {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         self.as_ref().to_vec()
     }
 
@@ -178,7 +178,7 @@ impl StorageValue for Hash {
 }
 
 impl StorageValue for PublicKey {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         self.as_ref().to_vec()
     }
 
@@ -192,7 +192,7 @@ impl StorageValue for PublicKey {
 }
 
 impl StorageValue for RawMessage {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         self.as_ref().as_ref().to_vec()
     }
 
@@ -206,7 +206,7 @@ impl StorageValue for RawMessage {
 }
 
 impl StorageValue for Vec<u8> {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         self
     }
 
@@ -220,7 +220,7 @@ impl StorageValue for Vec<u8> {
 }
 
 impl StorageValue for String {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         String::into_bytes(self)
     }
 

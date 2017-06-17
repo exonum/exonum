@@ -197,7 +197,7 @@ macro_rules! message {
                 $crate::messages::Message::hash(self)
             }
 
-            fn into_vec(self) -> Vec<u8> {
+            fn into_bytes(self) -> Vec<u8> {
                 self.raw.as_ref().as_ref().to_vec()
             }
 
