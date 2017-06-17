@@ -27,7 +27,7 @@ impl Drop for RawIterator {
 ///
 /// Returns key and value as a tuple.
 pub struct Iterator<'a> {
-    start: bool,
+    move_next: bool,
     // Iterator accesses the Database through a leveldb_iter_t pointer
     // but needs to hold the reference for lifetime tracking
     #[allow(dead_code)]
@@ -55,7 +55,7 @@ impl<'a> Iterator<'a> {
             leveldb_readoptions_destroy(c_readoptions);
             leveldb_iter_seek_to_first(ptr);
             Iterator {
-                start: true,
+                move_next: false,
                 iter: RawIterator { ptr: ptr },
                 database: database,
             }
@@ -68,15 +68,10 @@ impl<'a> Iterator<'a> {
         }
     }
 
-    fn advance(&mut self) -> bool {
+    fn advance(&mut self) {
         unsafe {
-            if !self.start {
-                leveldb_iter_next(self.iter.ptr);
-            } else {
-                self.start = false;
-            }
+            leveldb_iter_next(self.iter.ptr);
         }
-        self.valid()
     }
 
     unsafe fn key(&self) -> &[u8] {
@@ -108,7 +103,11 @@ impl<'a> Iterator<'a> {
     }
 
     pub fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        if self.advance() {
+        if self.move_next {
+            self.advance();
+        }
+        self.move_next = true;
+        if self.valid() {
             unsafe {
                 Some((self.key(), self.value()))
             }
@@ -117,7 +116,11 @@ impl<'a> Iterator<'a> {
         }
     }
 
-    pub fn peek(&self) -> Option<(&[u8], &[u8])> {
+    pub fn peek(&mut self) -> Option<(&[u8], &[u8])> {
+        if self.move_next {
+            self.advance();
+        }
+        self.move_next = false;
         if self.valid() {
             unsafe {
                 Some((self.key(), self.value()))

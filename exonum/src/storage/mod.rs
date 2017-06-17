@@ -38,3 +38,6 @@ pub mod key_set_index;
 pub mod value_set_index;
 pub mod proof_list_index;
 pub mod proof_map_index;
+
+#[cfg(test)]
+mod tests;
