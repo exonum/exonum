@@ -121,6 +121,8 @@ fn changelog<T: Database>(db: T) {
     assert_eq!(fork.get(&[3]), Some(vec![3]));
     assert_eq!(fork.get(&[4]), None);
 
+    fork.checkpoint();
+
     fork.put(vec![4], vec![40]);
     fork.put(vec![4], vec![41]);
     fork.remove(vec![2]);

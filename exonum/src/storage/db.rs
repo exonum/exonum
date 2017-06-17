@@ -16,10 +16,12 @@ pub enum Change {
     Delete,
 }
 
+// FIXME: make &mut Fork "unwind safe"
 pub struct Fork {
     snapshot: Box<Snapshot>,
     changes: Patch,
     changelog: Vec<(Vec<u8>, Option<Change>)>,
+    logged: bool
 }
 
 pub struct ForkIter<'a> {
@@ -45,6 +47,7 @@ pub trait Database: Send + Sync + 'static {
             snapshot: self.snapshot(),
             changes: Patch::new(),
             changelog: Vec::new(),
+            logged: false,
         }
     }
     fn merge(&mut self, patch: Patch) -> Result<()>;
@@ -100,26 +103,47 @@ impl Snapshot for Fork {
 
 impl Fork {
     pub fn checkpoint(&mut self) {
-        self.changelog.clear()
+        if self.logged {
+            panic!("call checkpoint before rollback or commit");
+        }
+        self.logged = true;
+    }
+
+    pub fn commit(&mut self) {
+        if !self.logged {
+            panic!("call commit before checkpoint");
+        }
+        self.changelog.clear();
+        self.logged = false;
     }
 
     pub fn rollback(&mut self) {
+        if !self.logged {
+            panic!("call rollback before checkpoint");
+        }
         for (k, c) in self.changelog.drain(..).rev() {
             match c {
                 Some(change) => self.changes.insert(k, change),
                 None => self.changes.remove(&k),
             };
         }
+        self.logged = false;
     }
 
     pub fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
-        self.changelog
-            .push((key.clone(), self.changes.insert(key, Change::Put(value))))
+        if self.logged {
+            self.changelog.push((key.clone(), self.changes.insert(key, Change::Put(value))));
+        } else {
+            self.changes.insert(key, Change::Put(value));
+        }
     }
 
     pub fn remove(&mut self, key: Vec<u8>) {
-        self.changelog
-            .push((key.clone(), self.changes.insert(key, Change::Delete)));
+        if self.logged {
+            self.changelog.push((key.clone(), self.changes.insert(key, Change::Delete)));
+        } else {
+            self.changes.insert(key, Change::Delete);
+        }
     }
 
     pub fn remove_by_prefix(&mut self, prefix: &[u8]) {
@@ -128,7 +152,10 @@ impl Fork {
             if !k.starts_with(prefix) {
                 return;
             }
-            self.changes.insert(k.to_vec(), Change::Delete);
+            let change = self.changes.insert(k.to_vec(), Change::Delete);
+            if self.logged {
+                self.changelog.push((k.to_vec(), change));
+            }
         }
     }
 
@@ -137,8 +164,8 @@ impl Fork {
     }
 
     pub fn merge(&mut self, patch: Patch) {
-        if !self.changelog.is_empty() {
-            panic!("merge into a fork is impossible because it has unfinalized changes");
+        if !self.logged {
+            panic!("call merge before commit or rollback");
         }
         self.changes.extend(patch)
     }

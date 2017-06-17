@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::collections::BTreeMap;
 use std::mem;
 use std::fmt;
+use std::panic;
 
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
@@ -141,7 +142,25 @@ impl Blockchain {
             // Save & execute transactions
             for (index, hash) in tx_hashes.iter().enumerate() {
                 let tx = &pool[hash];
-                tx.execute(&mut fork);
+
+                fork.checkpoint();
+
+                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                    tx.execute(&mut fork);
+                }));
+
+                match r {
+                    Ok(..) => fork.commit(),
+                    Err(err) => {
+                        if err.is::<Error>() {
+                            // Continue panic unwind if the reason is StorageError
+                            panic::resume_unwind(err);
+                        }
+                        fork.rollback();
+                        error!("Transaction execution failed: {:?}, reason: {:?}", tx, err);
+                    }
+                }
+
                 let mut schema = Schema::new(&mut fork);
                 schema.transactions_mut().put(hash, tx.raw().clone());
                 schema.block_txs_mut(height).push(*hash);
