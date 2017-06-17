@@ -132,3 +132,41 @@ impl<'a, V> Iterator for MapIndexValues<'a, V>
         self.base_iter.next().map(|(.., v)| v)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::super::{MemoryDB, Database};
+    use super::MapIndex;
+
+
+    #[test]
+    fn test_iter() {
+        let mut fork = MemoryDB::new().fork();
+        let mut map_index = MapIndex::new(vec![255], &mut fork);
+
+        map_index.put(&1u8, 1u8);
+        map_index.put(&2u8, 2u8);
+        map_index.put(&3u8, 3u8);
+
+        assert_eq!(map_index.iter().collect::<Vec<(u8, u8)>>(), vec![(1, 1), (2, 2), (3, 3)]);
+
+        assert_eq!(map_index.iter_from(&0).collect::<Vec<(u8, u8)>>(), vec![(1, 1), (2, 2), (3, 3)]);
+        assert_eq!(map_index.iter_from(&1).collect::<Vec<(u8, u8)>>(), vec![(1, 1), (2, 2), (3, 3)]);
+        assert_eq!(map_index.iter_from(&2).collect::<Vec<(u8, u8)>>(), vec![(2, 2), (3, 3)]);
+        assert_eq!(map_index.iter_from(&4).collect::<Vec<(u8, u8)>>(), Vec::<(u8, u8)>::new());
+
+        assert_eq!(map_index.keys().collect::<Vec<u8>>(), vec![1, 2, 3]);
+
+        assert_eq!(map_index.keys_from(&0).collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(map_index.keys_from(&1).collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(map_index.keys_from(&2).collect::<Vec<u8>>(), vec![2, 3]);
+        assert_eq!(map_index.keys_from(&4).collect::<Vec<u8>>(), Vec::<u8>::new());
+
+        assert_eq!(map_index.values().collect::<Vec<u8>>(), vec![1, 2, 3]);
+
+        assert_eq!(map_index.values_from(&0).collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(map_index.values_from(&1).collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(map_index.values_from(&2).collect::<Vec<u8>>(), vec![2, 3]);
+        assert_eq!(map_index.values_from(&4).collect::<Vec<u8>>(), Vec::<u8>::new());
+    }
+}
