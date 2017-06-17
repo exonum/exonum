@@ -100,7 +100,7 @@ macro_rules! encoding_struct {
         }
 
         impl $crate::storage::StorageValue for $name {
-            fn into_vec(self) -> Vec<u8> {
+            fn into_bytes(self) -> Vec<u8> {
                 self.raw
             }
 

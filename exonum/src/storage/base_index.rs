@@ -94,7 +94,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
               V: StorageValue
     {
         let key = self.prefixed_key(key);
-        self.view.put(key, value.into_vec());
+        self.view.put(key, value.into_bytes());
     }
 
     pub fn remove<K>(&mut self, key: &K)

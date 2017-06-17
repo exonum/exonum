@@ -66,7 +66,7 @@ impl BranchNode {
 }
 
 impl StorageValue for BranchNode {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         self.raw
     }
 

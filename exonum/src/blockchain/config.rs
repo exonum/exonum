@@ -47,7 +47,7 @@ impl StoredConfiguration {
 }
 
 impl StorageValue for StoredConfiguration {
-    fn into_vec(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         self.try_serialize().unwrap()
     }
 
