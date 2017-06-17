@@ -1,3 +1,49 @@
+/// `message!` implement structure that could be sent in exonum network.
+///
+/// Each message is a piece of data that is signed by creators key.
+/// For now it's required to set service id as `const TYPE`, message id as `const ID`, and
+/// message fixed part size as `const SIZE`.
+///
+/// - service id should be unique inside whole exonum.
+/// - message id should be unique inside each service.
+///
+/// For each field, it's required to set exact position in message.
+/// # Usage Example:
+/// ```
+/// #[macro_use] extern crate exonum;
+/// # extern crate serde;
+///
+/// const MY_SERVICE_ID: u16 = 777;
+/// const MY_NEW_MESSAGE_ID: u16 = 1;
+///
+/// message! {
+///     struct SendTwoInteger {
+///         const TYPE = MY_NEW_MESSAGE_ID;
+///         const ID   = MY_SERVICE_ID;
+///         const SIZE = 16;
+///
+///         field first: u64 [0 => 8]
+///         field second: u64 [8 => 16]
+///     }
+/// }
+///
+/// # fn main() {
+///     let (p, creators_key) = ::exonum::crypto::gen_keypair();
+/// #    let stucture = create_message(&creators_key);
+/// #    println!("Debug structure = {:?}", stucture);
+/// # }
+///
+/// # fn create_message(creators_key: &::exonum::crypto::SecretKey) -> SendTwoInteger {
+///     let first = 1u64;
+///     let second = 2u64;
+///     SendTwoInteger::new(first, second, creators_key)
+/// # }
+/// ```
+///
+/// For additionall reference about data layout see also
+/// *[ `encoding` documentation](./encoding/index.html).*
+///
+/// `message!` internaly use `ident_count!`, be sure to add this macro to namespace.
 #[macro_export]
 macro_rules! message {
     (
@@ -24,41 +70,75 @@ macro_rules! message {
             }
         }
 
-        impl<'a> $crate::messages::Field<'a> for $name {
-            fn read(buffer: &'a [u8], from: usize, to: usize) -> Self {
+        impl<'a> $crate::encoding::SegmentField<'a> for $name {
+
+            fn item_size() -> $crate::encoding::Offset {
+                1
+            }
+
+            fn count(&self) -> $crate::encoding::Offset {
+                self.raw.len() as $crate::encoding::Offset
+            }
+
+            fn extend_buffer(&self, buffer: &mut Vec<u8>) {
+                buffer.extend_from_slice(self.raw.as_ref().as_ref())
+            }
+
+            unsafe fn from_buffer(buffer: &'a [u8],
+                                    from: $crate::encoding::Offset,
+                                    count: $crate::encoding::Offset) -> Self {
                 let raw_message: $crate::messages::RawMessage =
-                                    $crate::messages::Field::read(buffer, from, to);
+                                    $crate::encoding::SegmentField::from_buffer(buffer,
+                                                                from,
+                                                                count);
                 $crate::messages::FromRaw::from_raw(raw_message).unwrap()
             }
 
-            fn write(&self, buffer: &'a mut Vec<u8>, from: usize, to: usize) {
-                $crate::messages::Field::write(&self.raw, buffer, from, to);
-            }
-
-            fn check(buffer: &'a [u8], from: usize, to: usize)
-                -> Result<(), $crate::messages::Error>
-            {
-
+            fn check_data(buffer: &'a [u8],
+                    from: $crate::encoding::CheckedOffset,
+                    count: $crate::encoding::CheckedOffset,
+                    latest_segment: $crate::encoding::CheckedOffset)
+              -> $crate::encoding::Result {
+                let latest_segment_origin = <$crate::messages::RawMessage as
+                                $crate::encoding::SegmentField>::check_data(buffer,
+                                                                from,
+                                                                count,
+                                                                latest_segment)?;
+                // TODO: remove this allication,
+                // by allowing creating message from borrowed data
                 let raw_message: $crate::messages::RawMessage =
-                                    $crate::messages::Field::read(buffer, from, to);
-                $(raw_message.check::<$field_type>($from, $to)?;)*
-                Ok(())
-            }
-
-            fn field_size() -> usize {
-                1
+                                    unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
+                                                                from.unchecked_offset(),
+                                                                count.unchecked_offset())};
+                let _: $name = $crate::messages::FromRaw::from_raw(raw_message)?;
+                Ok(latest_segment_origin)
             }
         }
 
         impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
-                -> Result<$name, $crate::messages::Error> {
-                $(raw.check::<$field_type>($from, $to)?;)*
+                -> Result<$name, $crate::encoding::Error> {
+
+                if raw.len() < $body as usize {
+                    return Err($crate::encoding::Error::UnexpectedlyShortPayload {
+                        actual_size: raw.len() as $crate::encoding::Offset,
+                        minimum_size: $body,
+                    });
+                }
+
+                let len = <Self>::check_fields(&raw)?;
+
+                if len.unchecked_offset() as usize +
+                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
+                   return Err("Incorrect raw message length.".into())
+                }
+
                 Ok($name { raw: raw })
             }
         }
         impl $name {
-            #![cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            /// Create messsage `$name` and sign it.
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
@@ -68,6 +148,9 @@ macro_rules! message {
                 $(writer.write($field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
+
+            /// Create message `$name` and append existing signature.
+            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             pub fn new_with_signature($($field_name: $field_type,)*
                        signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
@@ -78,15 +161,39 @@ macro_rules! message {
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
 
             }
+
+            fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::encoding::Result {
+                let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
+                                        as $crate::encoding::Offset).into();
+                $(
+                    let field_from: $crate::encoding::Offset = $from;
+                    let field_to: $crate::encoding::Offset = $to;
+                    let latest_segment = raw_message.check::<$field_type>(field_from.into(),
+                                                    field_to.into(),
+                                                    latest_segment)?;
+                )*
+                Ok(latest_segment)
+            }
+
+            /// return `$name`s `message_id` useable for matching.
+            pub fn message_id() -> u16 {
+                $id
+            }
+
+            /// return `$name`s `service_id` useable for matching.
+            pub fn service_id() -> u16 {
+                $extension
+            }
+
             $(
             $(#[$field_attr])*
             pub fn $field_name(&self) -> $field_type {
-                self.raw.read::<$field_type>($from, $to)
+                unsafe{ self.raw.read::<$field_type>($from, $to)}
             })*
         }
 
         impl $crate::storage::StorageValue for $name {
-            fn hash(&self) -> Hash {
+            fn hash(&self) -> $crate::crypto::Hash {
                 $crate::messages::Message::hash(self)
             }
 
@@ -110,60 +217,55 @@ macro_rules! message {
             }
         }
 
-        impl $crate::serialize::json::ExonumJsonSerialize for $name {
-                fn serialize<S>(&self, serializer: S) ->
-                    Result<S::Ok, S::Error>
-                where S: $crate::serialize::json::reexport::Serializer
-                {
-                    use $crate::serialize::json::reexport::SerializeStruct;
-                    use $crate::serialize::json;
-
-                    pub struct Body<'a>{_self: &'a $name};
-                    impl<'a> $crate::serialize::json::reexport::Serialize for Body<'a> {
-                        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                            where S: $crate::serialize::json::reexport::Serializer
-                        {
-                            let mut structure = serializer.serialize_struct(stringify!($name),
-                                                            counter!($($field_name)*) )?;
-                            $(structure.serialize_field(stringify!($field_name),
-                                            &json::wrap(&self._self.$field_name()))?;)*
-
-                            structure.end()
-                        }
-                    }
-
-                    let mut structure = serializer.serialize_struct(stringify!($name), 4 )?;
-                    structure.serialize_field("body", &Body{_self: &self})?;
-                    structure.serialize_field("signature", &json::wrap(self.raw.signature()))?;
-                    structure.serialize_field("message_id", &json::wrap(&self.raw.message_type()))?;
-                    structure.serialize_field("service_id", &json::wrap(&self.raw.service_id()))?;
-                    structure.serialize_field("network_id", &json::wrap(&self.raw.network_id()))?;
-                    structure.serialize_field("protocol_version",&json::wrap(&self.raw.version()))?;
-                    structure.end()
-                }
-        }
-
-        impl $crate::serialize::json::ExonumJsonDeserializeField for $name {
-            fn deserialize_field<B> (value: &$crate::serialize::json::reexport::Value,
-                                        buffer: & mut B, from: usize, to: usize )
+        impl $crate::encoding::serialize::json::ExonumJson for $name {
+            fn deserialize_field<B> (value: &$crate::encoding::serialize::json::reexport::Value,
+                                        buffer: & mut B,
+                                        from: $crate::encoding::Offset,
+                                        to: $crate::encoding::Offset )
                 -> Result<(), Box<::std::error::Error>>
-            where B: $crate::serialize::json::WriteBufferWrapper
+            where B: $crate::encoding::serialize::WriteBufferWrapper
             {
-                use $crate::serialize::json::ExonumJsonDeserialize;
+                use $crate::encoding::serialize::json::ExonumJsonDeserialize;
                 // deserialize full field
                 let structure = <Self as ExonumJsonDeserialize>::deserialize(value)?;
                 // then write it
                 buffer.write(from, to, structure);
                 Ok(())
             }
+
+            fn serialize_field(&self)
+                -> Result<$crate::encoding::serialize::json::reexport::Value,
+                            Box<::std::error::Error>>
+            {
+                use $crate::encoding::serialize::json::reexport::Value;
+                use $crate::encoding::serialize::json::reexport::Map;
+                let mut body = Map::new();
+                $(
+                    body.insert(stringify!($field_name).to_string(),
+                        self.$field_name().serialize_field()?);
+                )*
+                let mut structure = Map::new();
+                structure.insert("body".to_string(), Value::Object(body));
+                structure.insert("signature".to_string(),
+                                    self.raw.signature().serialize_field()?);
+                structure.insert("message_id".to_string(),
+                                    self.raw.message_type().serialize_field()?);
+                structure.insert("service_id".to_string(),
+                                    self.raw.service_id().serialize_field()?);
+                structure.insert("network_id".to_string(),
+                                    self.raw.network_id().serialize_field()?);
+                structure.insert("protocol_version".to_string(),
+                                    self.raw.version().serialize_field()?);
+                Ok(Value::Object(structure))
+            }
         }
 
-        impl $crate::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::serialize::json::reexport::Value)
+        impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>>
             {
-                use $crate::serialize::json::ExonumJsonDeserializeField;
-                use $crate::serialize::json::reexport::from_value;
+                use $crate::encoding::serialize::json::ExonumJson;
+                use $crate::encoding::serialize::json::reexport::from_value;
                 use $crate::messages::{RawMessage, MessageWriter};
 
                 // if we could deserialize values, try append signature
@@ -197,7 +299,7 @@ macro_rules! message {
                 $(
                     let val = obj.get(stringify!($field_name))
                                     .ok_or("Can't get object from json.")?;
-                    <$field_type as ExonumJsonDeserializeField>::deserialize_field(val,
+                    <$field_type as ExonumJson>::deserialize_field(val,
                                                                     &mut writer, $from, $to )?;
                 )*
 
@@ -205,24 +307,30 @@ macro_rules! message {
             }
         }
 
-        //\TODO: Rewrite Deserialize and Serializa implementation
-        impl<'de> $crate::serialize::json::reexport::Deserialize<'de> for $name {
+        // TODO: Rewrite Deserialize and Serialize implementation
+        impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where D: $crate::serialize::json::reexport::Deserializer<'de>
+                where D: $crate::encoding::serialize::reexport::Deserializer<'de>
             {
-                use $crate::serialize::json::reexport::{Error, Deserialize, Value};
+                use $crate::encoding::serialize::json::reexport::Value;
+                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
+                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
                 .map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 
-        impl $crate::serialize::json::reexport::Serialize for $name {
+        impl $crate::encoding::serialize::reexport::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: $crate::serialize::json::reexport::Serializer
-                {
-                    $crate::serialize::json::wrap(self).serialize(serializer)
-                }
+                where S: $crate::encoding::serialize::reexport::Serializer
+           {
+               use $crate::encoding::serialize::reexport::SerError;
+                use $crate::encoding::serialize::json::ExonumJson;
+                self.serialize_field()
+                    .map_err(|_| S::Error::custom(
+                                concat!("Can not serialize structure: ", stringify!($name))))?
+                    .serialize(serializer)
+            }
         }
 
     )

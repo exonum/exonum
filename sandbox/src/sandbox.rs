@@ -442,8 +442,8 @@ impl Sandbox {
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) = blockchain.create_patch(self.current_height(),
-                                                     self.current_round(),
+            let (_, patch) = blockchain.create_patch(0,
+                                                     self.current_height(),
                                                      &hashes,
                                                      &tx_pool);
             fork.merge(patch);
@@ -511,7 +511,7 @@ impl Sandbox {
         self.reactor.borrow().handler.state().height()
     }
 
-    pub fn current_leader(&self) -> Round {
+    pub fn current_leader(&self) -> ValidatorId {
         self.reactor
             .borrow()
             .handler

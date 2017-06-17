@@ -12,18 +12,18 @@ use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::{State, TxPool};
 use storage::{Patch, Database, Snapshot, Fork, Error};
 
-pub use self::block::Block;
+pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, NodeState, ApiContext};
 
-#[macro_use]
-mod spec;
 mod block;
 mod schema;
 mod genesis;
 mod service;
+#[cfg(test)]
+mod tests;
 
 pub mod config;
 
@@ -92,9 +92,14 @@ impl Blockchain {
         let patch = {
             let mut fork = self.fork();
             // Update service tables
-            for (id, service) in self.service_map.iter() {
+            for (_, service) in self.service_map.iter() {
                 let cfg = service.handle_genesis_block(&mut fork);
-                config_propose.services.insert(format!("{}", id), cfg);
+                let name = service.service_name();
+                if config_propose.services.contains_key(name) {
+                    panic!("Services have already contain service with name={}, please change it.",
+                           name);
+                }
+                config_propose.services.insert(name.into(), cfg);
             }
             // Commit actual configuration
             {
@@ -122,8 +127,8 @@ impl Blockchain {
     }
 
     pub fn create_patch(&self,
+                        proposer_id: u16,
                         height: u64,
-                        round: u32,
                         tx_hashes: &[Hash],
                         pool: &TxPool)
                         -> (Hash, Patch) {
@@ -186,15 +191,18 @@ impl Blockchain {
             };
 
             // Create block
-            let block = Block::new(height, round, &last_hash, &tx_hash, &state_hash);
+            let block = Block::new(SCHEMA_MAJOR_VERSION,
+                                   proposer_id,
+                                   height,
+                                   tx_hashes.len() as u32,
+                                   &last_hash,
+                                   &tx_hash,
+                                   &state_hash);
             trace!("execute block = {:?}", block);
             // Eval block hash
             let block_hash = block.hash();
             // Update height
-            // TODO: check that height == propose.height
-
             let mut schema = Schema::new(&mut fork);
-
             schema.block_hashes_by_height_mut().push(block_hash);
             // Save block
             schema.blocks_mut().put(&block_hash, block);
@@ -278,40 +286,5 @@ impl Clone for Blockchain {
             db: self.db.clone(),
             service_map: self.service_map.clone()
         }
-    }
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_u64() {
-        storage_value! {
-            struct Test {
-                const SIZE = 8;
-                field some_test:u64 [0 => 8]
-            }
-        }
-        let test_data = r##"{"some_test":"1234"}"##;
-        let test = Test::new(1234);
-        let data = ::serialize::json::reexport::to_string(&test).unwrap();
-        println!("{:?}", data);
-        assert_eq!(data, test_data);
-    }
-
-    #[test]
-    fn test_system_time() {
-    use std::time::{SystemTime, UNIX_EPOCH};
-        storage_value! {
-            struct Test {
-                const SIZE = 12;
-                field some_test:SystemTime [0 => 12]
-            }
-        }
-        let test_data = r##"{"some_test":{"secs":"0","nanos":0}}"##;
-
-
-        let test = Test::new(UNIX_EPOCH);
-        let data = ::serialize::json::reexport::to_string(&test).unwrap();
-        assert_eq!(data, test_data);
     }
 }
