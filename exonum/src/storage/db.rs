@@ -164,7 +164,7 @@ impl Fork {
     }
 
     pub fn merge(&mut self, patch: Patch) {
-        if !self.logged {
+        if self.logged {
             panic!("call merge before commit or rollback");
         }
         self.changes.extend(patch)
