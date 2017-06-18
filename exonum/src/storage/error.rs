@@ -1,7 +1,7 @@
 use std::fmt;
 use std::error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Error {
     message: String,
 }
