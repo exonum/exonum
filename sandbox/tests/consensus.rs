@@ -2393,7 +2393,7 @@ fn test_exclude_validator_from_consensus() {
         consensus_cfg.actual_from = sandbox.current_height() + 2;
 
         TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
-                      &consensus_cfg.clone().into_vec(),
+                      &consensus_cfg.clone().into_bytes(),
                       consensus_cfg.actual_from,
                       sandbox.s(VALIDATOR_0 as usize))
     };
@@ -2421,7 +2421,7 @@ fn test_schema_config_changes() {
         consensus_cfg.actual_from = sandbox.current_height() + 2;
 
         let tx = TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
-                               &consensus_cfg.clone().into_vec(),
+                               &consensus_cfg.clone().into_bytes(),
                                consensus_cfg.actual_from,
                                sandbox.s(VALIDATOR_0 as usize));
         (tx, consensus_cfg)
