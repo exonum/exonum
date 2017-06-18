@@ -5,7 +5,7 @@ extern crate rand;
 extern crate tempdir;
 extern crate exonum;
 
-#[cfg(all(feature = "nightly", test))]
+#[cfg(test)]
 mod tests {
     use test::Bencher;
     use rand::{SeedableRng, XorShiftRng, Rng};

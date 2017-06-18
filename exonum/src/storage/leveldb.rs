@@ -17,6 +17,7 @@ use std::error;
 use std::sync::Arc;
 
 pub use leveldb::options::Options as LevelDBOptions;
+pub use leveldb::database::cache::Cache as LevelDBCache;
 
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
 
