@@ -22,7 +22,7 @@ pub struct StoredConfiguration {
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
     /// Services specific variables.
-    /// Keys are `service_id` from `Service` trait and values are the serialized json.
+    /// Keys are `service_name` from `Service` trait and values are the serialized json.
     pub services: BTreeMap<String, serde_json::Value>,
 }
 
