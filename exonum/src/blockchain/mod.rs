@@ -1,3 +1,5 @@
+//! The module used to write your own solition on top of `Exonum` blockchain.
+
 // TODO move to lib.rs
 #![deny(missing_docs)]
 
@@ -31,7 +33,6 @@ mod tests;
 pub mod config;
 
 /// A blockchain with a given services set and data storage.
-/// TODO
 #[derive(Clone)]
 pub struct Blockchain {
     db: Storage,
@@ -238,11 +239,11 @@ impl Blockchain {
 
             state.update_config(schema.actual_configuration()?);
 
-            let mut node_state = ServiceContext::new(state, &view);
+            let mut ctx = ServiceContext::new(state, &view);
             for service in self.service_map.values() {
-                service.handle_commit(&mut node_state)?;
+                service.handle_commit(&mut ctx)?;
             }
-            (view.changes(), node_state.transactions())
+            (view.changes(), ctx.transactions())
         };
         self.merge(&patch)?;
         Ok(txs)

@@ -1,12 +1,12 @@
 //! # Introduction
-//! This module defines the `exonum` services interfaces. Like smart contracts in some other 
+//! This module defines the `exonum` services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 //!
 //! To create your own service you need to define following things:
-//!  - Define your own information schema. 
-//!  - Create one or more types of messages using a macro `message!` and implement 
+//!  - Define your own information schema.
+//!  - Create one or more types of messages using a macro `message!` and implement
 //!    `Transaction` trait for them.
-//!  - Create data structure that implements `Service` trait. 
+//!  - Create data structure that implements `Service` trait.
 //!  - Optionally you can write api handlers.
 //!
 
@@ -20,7 +20,7 @@ use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
-use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
+use blockchain::{ConsensusConfig, Blockchain};
 
 /// A trait that describes transaction processing rules for the given message type.
 pub trait Transaction: Message + 'static {
@@ -29,7 +29,7 @@ pub trait Transaction: Message + 'static {
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
     fn verify(&self) -> bool;
-    /// Defines the rules for executing transactions, during which the state of 
+    /// Defines the rules for executing transactions, during which the state of
     /// `View` can be changed.
     fn execute(&self, view: &View) -> Result<(), StorageError>;
     /// Returns transaction representation in `JSON`.
@@ -38,7 +38,7 @@ pub trait Transaction: Message + 'static {
     }
 }
 
-/// The main extension point for the `Exonum` framework. Like smart contracts in some other 
+/// The main extension point for the `Exonum` framework. Like smart contracts in some other
 /// blockchain platforms, `Exonum` services encapsulate business logic of the blockchain application.
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
@@ -63,15 +63,15 @@ pub trait Service: Send + Sync + 'static {
     /// Tries to create `Transaction` object from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    /// Handles genesis block creation event. 
-    /// By this method you can initialize information schema of service 
+    /// Handles genesis block creation event.
+    /// By this method you can initialize information schema of service
     /// and generates initial service configuration.
     fn handle_genesis_block(&self, view: &View) -> Result<Value, StorageError> {
         Ok(Value::Null)
     }
 
     /// Handles commit event. This handler is invoked for each service after commit of the block.
-    /// For example service can create some transaction if the specific condition occurred. 
+    /// For example service can create some transaction if the specific condition occurred.
     ///
     /// *Try not to perform long operations here*.
     fn handle_commit(&self, context: &mut ServiceContext) -> Result<(), StorageError> {
@@ -83,13 +83,13 @@ pub trait Service: Send + Sync + 'static {
         None
     }
 
-    /// Returns api handler for maintainers. 
+    /// Returns api handler for maintainers.
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
 }
 
-/// The current node state on which the blockchain is running, or in other words 
+/// The current node state on which the blockchain is running, or in other words
 /// execution context.
 #[derive(Debug)]
 pub struct ServiceContext<'a, 'b> {
@@ -108,14 +108,14 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         }
     }
 
-    /// If the current node is validator returns its state. 
+    /// If the current node is validator returns its state.
     /// For other nodes return `None`.
     pub fn validator_state(&self) -> &Option<ValidatorState> {
         self.state.validator_state()
     }
 
     /// Returns the current database snapshot.
-    /// You can write your changes to storage, but be very careful. 
+    /// You can write your changes to storage, but be very careful.
     /// Use the write only for caching and never change tables that affect to `state_hash`!
     pub fn view(&self) -> &View {
         self.view
@@ -147,22 +147,14 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 
     /// Returns the actual blockchain global configuration.
-    pub fn actual_config(&self) -> &StoredConfiguration {
-        self.state.config()
-    }
-
-    /// Returns the consensus parameters
-    pub fn consensus_config(&self) -> &ConsensusConfig {
+    pub fn actual_consensus_config(&self) -> &ConsensusConfig {
         self.state.consensus_config()
     }
 
     /// Returns service specific global variables as json value.
-    pub fn service_config(&self, service: &Service) -> &Value {
+    pub fn actual_service_config(&self, service: &Service) -> &Value {
         let name = service.service_name();
-        self.state
-            .services_config()
-            .get(name)
-            .unwrap()
+        self.state.services_config().get(name).unwrap()
     }
 
     /// Adds transaction to the queue.
@@ -208,7 +200,7 @@ impl ApiContext {
     pub fn node_channel(&self) -> &TxSender<NodeChannel> {
         &self.node_channel
     }
-    
+
     /// Returns the public key of current node.
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
