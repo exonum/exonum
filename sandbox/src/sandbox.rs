@@ -480,7 +480,7 @@ impl Sandbox {
     }
 
     pub fn propose_timeout(&self) -> Milliseconds {
-        self.cfg().consensus.propose_timeout
+        self.cfg().consensus.min_propose_timeout
     }
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
@@ -582,9 +582,9 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         round_timeout: 1000,
         status_timeout: 600000,
         peers_timeout: 600000,
-        propose_timeout: 200,
-        // Zero threshold keeps timeout value the same regardless of transactions number.
-        txs_threshold: 0.,
+        min_propose_timeout: 200,
+        max_propose_timeout: 200,
+        txs_propose_timeout_threshold: 0,
         txs_block_limit: 1000,
     };
     let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));

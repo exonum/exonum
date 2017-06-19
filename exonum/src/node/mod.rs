@@ -157,8 +157,7 @@ impl<S> NodeHandler<S>
                                sender.get_time());
 
         // TODO: Timeout adjuster type should be be configurable by `ConsensusConfig`.
-        let mut timeout_adjuster = Box::new(timeout_adjuster::Dynamic::new(
-            state.consensus_config().txs_threshold));
+        let mut timeout_adjuster = Box::new(timeout_adjuster::Dynamic::new());
         let timeout = timeout_adjuster.adjust_timeout(&state, blockchain.view());
         state.set_propose_timeout(timeout);
 
@@ -173,10 +172,6 @@ impl<S> NodeHandler<S>
 
     pub fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
         self.timeout_adjuster = adjuster;
-    }
-
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.state().consensus_config().propose_timeout
     }
 
     pub fn round_timeout(&self) -> Milliseconds {

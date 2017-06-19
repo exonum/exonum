@@ -327,7 +327,7 @@ impl State {
 
             requests: HashMap::new(),
 
-            propose_timeout: stored.consensus.propose_timeout,
+            propose_timeout: stored.consensus.min_propose_timeout,
             config: stored,
         }
     }
