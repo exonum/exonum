@@ -3,6 +3,7 @@ use crypto::Hash;
 
 pub const BLOCK_SIZE: usize = 112;
 
+/// Current core information schema version.
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
 encoding_struct!(
