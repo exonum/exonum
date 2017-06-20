@@ -110,9 +110,11 @@ impl<'a> BlockBuilder<'a> {
         Block::new(SCHEMA_MAJOR_VERSION,
                    self.proposer_id
                        .unwrap_or_else(|| self.sandbox.current_leader()),
-                   self.height.unwrap_or_else(|| self.sandbox.current_height()),
+                   self.height
+                       .unwrap_or_else(|| self.sandbox.current_height()),
                    self.tx_count.unwrap_or(0),
-                   &self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
+                   &self.prev_hash
+                        .unwrap_or_else(|| self.sandbox.last_hash()),
                    &self.tx_hash.unwrap_or_else(Hash::zero),
                    &self.state_hash
                         .unwrap_or_else(|| self.sandbox.last_state_hash()))

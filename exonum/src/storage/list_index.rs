@@ -205,6 +205,7 @@ mod tests {
 
         assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
-        assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(), Vec::<u8>::new());
+        assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(),
+                   Vec::<u8>::new());
     }
 }

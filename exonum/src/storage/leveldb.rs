@@ -40,7 +40,7 @@ struct LevelDBSnapshot {
 }
 
 struct LevelDBIterator<'a> {
-    iter: _Iterator<'a>
+    iter: _Iterator<'a>,
 }
 
 impl From<_Error> for Error {

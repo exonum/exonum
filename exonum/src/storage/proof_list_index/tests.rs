@@ -85,7 +85,8 @@ fn test_iter() {
 
     assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
     assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
-    assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(), Vec::<u8>::new());
+    assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(),
+               Vec::<u8>::new());
 }
 
 #[test]
@@ -232,11 +233,14 @@ fn randomly_generate_proofs() {
         let end_range = rng.gen_range(start_range + 1, num_vals + 1);
         let range_proof = index.get_range_proof(start_range, end_range);
         {
-            let (inds, actual_vals): (Vec<_>, Vec<_>) =
-                range_proof.validate(index.root_hash(), index.len()).unwrap().into_iter().unzip();
+            let (inds, actual_vals): (Vec<_>, Vec<_>) = range_proof
+                .validate(index.root_hash(), index.len())
+                .unwrap()
+                .into_iter()
+                .unzip();
             assert_eq!(inds, (start_range..end_range).collect::<Vec<_>>());
 
-            let expect_vals = &values[start_range as usize .. end_range as usize];
+            let expect_vals = &values[start_range as usize..end_range as usize];
             for (expected, actual) in expect_vals.iter().zip(actual_vals) {
                 assert_eq!(*expected, *actual);
             }
@@ -299,36 +303,60 @@ fn test_index_and_proof_roots() {
 
         assert_eq!(index.root_hash(), exp_root);
         let range_proof = index.get_range_proof(proof_ind, proof_ind + 1);
-        assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), 1);
+        assert_eq!(range_proof
+                       .validate(index.root_hash(), index.len())
+                       .unwrap()
+                       .len(),
+                   1);
         let json_repre = serde_json::to_string(&range_proof).unwrap();
         let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
         let range_proof = index.get_range_proof(0, proof_ind + 1);
-        assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), (proof_ind + 1) as usize);
+        assert_eq!(range_proof
+                       .validate(index.root_hash(), index.len())
+                       .unwrap()
+                       .len(),
+                   (proof_ind + 1) as usize);
         let json_repre = serde_json::to_string(&range_proof).unwrap();
         let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
         let range_proof = index.get_range_proof(0, 1);
-        assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), 1);
+        assert_eq!(range_proof
+                       .validate(index.root_hash(), index.len())
+                       .unwrap()
+                       .len(),
+                   1);
         let json_repre = serde_json::to_string(&range_proof).unwrap();
         let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
     }
 
     let range_proof = index.get_range_proof(0, 8);
-    let (inds, val_refs): (Vec<_>, Vec<_>) = range_proof.validate(index.root_hash(), index.len()).unwrap().into_iter().unzip();
+    let (inds, val_refs): (Vec<_>, Vec<_>) = range_proof
+        .validate(index.root_hash(), index.len())
+        .unwrap()
+        .into_iter()
+        .unzip();
     assert_eq!(inds, (0..8).collect::<Vec<_>>());
-    let expect_vals = vec![vec![1, 2], vec![2, 3], vec![3, 4], vec![4, 5], vec![5, 6],
-                           vec![6, 7], vec![7, 8], vec![8, 9]];
+    let expect_vals = vec![vec![1, 2], vec![2, 3], vec![3, 4], vec![4, 5], vec![5, 6], vec![6, 7],
+                           vec![7, 8], vec![8, 9]];
     let paired = expect_vals.into_iter().zip(val_refs);
     for pair in paired {
         assert_eq!(pair.0, *pair.1);
     }
 
     let mut range_proof = index.get_range_proof(3, 5);
-    assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), 2);
+    assert_eq!(range_proof
+                   .validate(index.root_hash(), index.len())
+                   .unwrap()
+                   .len(),
+               2);
     range_proof = index.get_range_proof(2, 6);
-    assert_eq!(range_proof.validate(index.root_hash(), index.len()).unwrap().len(), 4);
+    assert_eq!(range_proof
+                   .validate(index.root_hash(), index.len())
+                   .unwrap()
+                   .len(),
+               4);
     assert_eq!(index.get(0), Some(vec![1, 2]));
 }
 
@@ -388,7 +416,8 @@ fn test_proof_structure() {
     assert_eq!(index.root_hash(), h12345);
     let range_proof = index.get_range_proof(4, 5);
 
-    assert_eq!(vec![4, 5, 6], *(range_proof.validate(h12345, 5).unwrap()[0].1));
+    assert_eq!(vec![4, 5, 6],
+               *(range_proof.validate(h12345, 5).unwrap()[0].1));
 
     if let ListProof::Right(left_hash1, right_proof1) = range_proof {
         assert_eq!(left_hash1, h1234);
