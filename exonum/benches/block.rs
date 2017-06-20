@@ -40,7 +40,7 @@ mod tests {
                 self.verify_signature(self.from())
             }
 
-            fn execute(&self, view: &mut Fork) {}
+            fn execute(&self, _: &mut Fork) {}
         }
 
         fn prepare_txs(height: u64, count: u64) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
@@ -106,7 +106,7 @@ mod tests {
 
         let mut keys = Vec::new();
 
-        for i in 0..10_000 {
+        for _ in 0..10_000 {
             keys.push(gen_keypair());
         }
 

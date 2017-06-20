@@ -6,16 +6,14 @@ extern crate tempdir;
 extern crate exonum;
 
 #[cfg(test)]
+#[cfg(feature = "long_benchmarks")]
 mod tests {
     use test::Bencher;
     use rand::{SeedableRng, XorShiftRng, Rng};
-    #[cfg(feature = "long_benchmarks")]
     use tempdir::TempDir;
-    #[cfg(feature = "long_benchmarks")]
     use exonum::storage::{ProofListIndex, ProofMapIndex, Database, MapIndex, Fork,
                           MemoryDB, LevelDB, LevelDBOptions};
 
-    #[cfg(feature = "long_benchmarks")]
     fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
         let kv_generator = |_| {
             let mut v = vec![0; 8];
@@ -28,7 +26,6 @@ mod tests {
         (0..len).map(kv_generator).collect::<Vec<_>>()
     }
 
-    #[cfg(feature = "long_benchmarks")]
     fn merkle_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
         let map = MapIndex::new(vec![123], db);
@@ -47,7 +44,6 @@ mod tests {
         });
     }
 
-    #[cfg(feature = "long_benchmarks")]
     fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
         let data = generate_random_kv(&mut rng, 200);
@@ -59,7 +55,6 @@ mod tests {
                });
     }
 
-    #[cfg(feature = "long_benchmarks")]
     fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
         let data = generate_random_kv(&mut rng, 200);
@@ -81,7 +76,6 @@ mod tests {
         });
     }
 
-    #[cfg(feature = "long_benchmarks")]
     fn merkle_patricia_table_insertion_large_map<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 140, 52]);
         let data = generate_random_kv(&mut rng, 200);
@@ -105,14 +99,12 @@ mod tests {
                });
     }
 
-    #[cfg(feature = "long_benchmarks")]
     #[bench]
     fn bench_merkle_table_append_memorydb(b: &mut Bencher) {
         let db = MemoryDB::new();
         merkle_table_insertion(b, db);
     }
 
-    #[cfg(feature = "long_benchmarks")]
     #[bench]
     fn bench_merkle_table_append_leveldb(b: &mut Bencher) {
         let mut options = LevelDBOptions::new();
@@ -122,14 +114,12 @@ mod tests {
         merkle_table_insertion(b, db);
     }
 
-    #[cfg(feature = "long_benchmarks")]
     #[bench]
     fn bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
         let db = MemoryDB::new();
         merkle_patricia_table_insertion(b, db);
     }
 
-    #[cfg(feature = "long_benchmarks")]
     #[bench]
     fn bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
         let mut options = LevelDBOptions::new();
@@ -139,7 +129,6 @@ mod tests {
         merkle_patricia_table_insertion(b, db);
     }
 
-    #[cfg(feature = "long_benchmarks")]
     #[bench]
     fn bench_merkle_patricia_table_insertion_fork_leveldb(b: &mut Bencher) {
         let mut options = LevelDBOptions::new();
@@ -149,14 +138,12 @@ mod tests {
         merkle_patricia_table_insertion_fork(b, db);
     }
 
-    #[cfg(feature = "long_benchmarks")]
     #[bench]
     fn long_bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
         let db = MemoryDB::new();
         merkle_patricia_table_insertion_large_map(b, db);
     }
 
-    #[cfg(feature = "long_benchmarks")]
     #[bench]
     fn long_bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
         let mut options = LevelDBOptions::new();
