@@ -95,7 +95,7 @@ impl<'a, V> ListIndex<&'a mut Fork, V>
         let mut len = self.len();
         for value in iter {
             self.base.put(&len, value);
-            len = len + 1;
+            len += 1;
         }
         self.base.put(&(), len);
         self.set_len(len);

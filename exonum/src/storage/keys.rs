@@ -168,7 +168,7 @@ impl StorageKey for Vec<u8> {
     }
 
     fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(&self)
+        buffer.copy_from_slice(self)
     }
 
     fn read(buffer: &[u8]) -> Self {

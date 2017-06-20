@@ -302,7 +302,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 ..
             } => {
                 let left_slice = left_slice_key;
-                if !searched_slice.starts_with(&left_slice) {
+                if !searched_slice.starts_with(left_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
                                                   searched_slice,
@@ -317,7 +317,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 ..
             } => {
                 let right_slice = right_slice_key;
-                if !searched_slice.starts_with(&right_slice) {
+                if !searched_slice.starts_with(right_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
                                                   searched_slice,
@@ -333,8 +333,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
             } => {
                 let left_slice = left_slice_key;
                 let right_slice = right_slice_key;
-                if searched_slice.starts_with(&left_slice) ||
-                   searched_slice.starts_with(&right_slice) {
+                if searched_slice.starts_with(left_slice) ||
+                   searched_slice.starts_with(right_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
                                                   searched_slice,
@@ -346,10 +346,10 @@ impl<V: fmt::Debug> BranchProofNode<V> {
         Ok(res)
     }
 
-    fn verify_proof_consistency<'a, 'c>(&'a self,
-                                        parent_slice: &DBKey,
-                                        searched_slice: &DBKey)
-                                        -> Result<Option<&'a V>, Error> {
+    fn verify_proof_consistency<'a>(&'a self,
+                                    parent_slice: &DBKey,
+                                    searched_slice: &DBKey)
+                                    -> Result<Option<&'a V>, Error> {
         use self::BranchProofNode::*;
 
         // if we inspect sub-proofs of a proof
@@ -364,8 +364,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 left_slice.set_from(0);
                 let mut right_slice = right_slice_key.clone();
                 right_slice.set_from(0);
-                if !left_slice.starts_with(&parent_slice) ||
-                   !right_slice.starts_with(&parent_slice) {
+                if !left_slice.starts_with(parent_slice) ||
+                   !right_slice.starts_with(parent_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
                                                    {:?} . Parent slice: {:?}",
                                                   self,
@@ -390,8 +390,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 left_slice.set_from(0);
                 let mut right_slice = right_slice_key.clone();
                 right_slice.set_from(0);
-                if !left_slice.starts_with(&parent_slice) ||
-                   !right_slice.starts_with(&parent_slice) {
+                if !left_slice.starts_with(parent_slice) ||
+                   !right_slice.starts_with(parent_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
                                                    {:?} . Parent slice: {:?}",
                                                   self,
@@ -415,8 +415,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 left_slice.set_from(0);
                 let mut right_slice = right_slice_key.clone();
                 right_slice.set_from(0);
-                if !left_slice.starts_with(&parent_slice) ||
-                   !right_slice.starts_with(&parent_slice) {
+                if !left_slice.starts_with(parent_slice) ||
+                   !right_slice.starts_with(parent_slice) {
                     return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
                                                    {:?} . Parent slice: {:?}",
                                                   self,
@@ -436,10 +436,10 @@ impl<V: fmt::Debug> BranchProofNode<V> {
     }
 }
 impl<V: fmt::Debug> ProofNode<V> {
-    fn verify_proof_consistency<'a, 'c>(&'a self,
-                                        parent_slice: &DBKey,
-                                        searched_slice: &DBKey)
-                                        -> Result<Option<&'a V>, Error> {
+    fn verify_proof_consistency<'a>(&'a self,
+                                    parent_slice: &DBKey,
+                                    searched_slice: &DBKey)
+                                    -> Result<Option<&'a V>, Error> {
         use self::ProofNode::*;
 
         // if we inspect sub-proofs of a proof

@@ -28,7 +28,7 @@ impl<T> BaseIndex<T> {
 
     fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
         let mut v = vec![0; self.prefix.len() + key.size()];
-        &mut v[..self.prefix.len()].copy_from_slice(&self.prefix);
+        v[..self.prefix.len()].copy_from_slice(&self.prefix);
         key.write(&mut v[self.prefix.len()..]);
         v
     }
@@ -119,7 +119,7 @@ impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V>
         if self.ended {
             return None;
         }
-        if let Some((ref k, ref v)) = self.base_iter.next() {
+        if let Some((k, v)) = self.base_iter.next() {
             if k.starts_with(&self.prefix) {
                 return Some((K::read(&k[self.base_prefix_len..]), V::from_bytes(Cow::Borrowed(v))));
             }

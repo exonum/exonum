@@ -53,10 +53,10 @@ impl<V: StorageValue> ListProof<V> {
         Ok(hash)
     }
 
-    pub fn validate<'a>(&'a self,
-                        root_hash: Hash,
-                        len: u64)
-                        -> Result<Vec<(u64, &'a V)>, ListProofError> {
+    pub fn validate(&self,
+                     root_hash: Hash,
+                     len: u64)
+                     -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
         if self.collect(ProofListKey::new(height, 0), &mut vec)? != root_hash {
@@ -107,7 +107,7 @@ impl<'a, V> Deserialize<'a> for ListProof<V>
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer<'a>
     {
-        fn format_err_string(type_str: &str, value: Value, err: SerdeJsonError) -> String {
+        fn format_err_string(type_str: &str, value: &Value, err: &SerdeJsonError) -> String {
             format!("Couldn't deserialize {} from serde_json::Value: {}, error: {}",
                     type_str,
                     value,
@@ -145,42 +145,42 @@ impl<'a, V> Deserialize<'a> for ListProof<V>
                     let left_proof: ListProof<V> = from_value(left_value.clone())
                         .map_err(|err| {
                                      D::Error::custom(format_err_string("ListProof",
-                                                                        left_value.clone(),
-                                                                        err))
+                                                                        left_value,
+                                                                        &err))
                                  })?;
                     let right_hash: Hash = from_value(right_value.clone())
                         .map_err(|err| {
                                      D::Error::custom(format_err_string("Hash",
-                                                                        right_value.clone(),
-                                                                        err))
+                                                                        right_value,
+                                                                        &err))
                                  })?;
                     Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
                     let right_proof: ListProof<V> = from_value(right_value.clone())
                         .map_err(|err| {
                                      D::Error::custom(format_err_string("ListProof",
-                                                                        right_value.clone(),
-                                                                        err))
+                                                                        right_value,
+                                                                        &err))
                                  })?;
                     let left_hash: Hash = from_value(left_value.clone())
                         .map_err(|err| {
                                      D::Error::custom(format_err_string("Hash",
-                                                                        left_value.clone(),
-                                                                        err))
+                                                                        left_value,
+                                                                        &err))
                                  })?;
                     Right(left_hash, Box::new(right_proof))
                 } else {
                     let left_proof = from_value(left_value.clone())
                         .map_err(|err| {
                                      D::Error::custom(format_err_string("ListProof",
-                                                                        left_value.clone(),
-                                                                        err))
+                                                                        left_value,
+                                                                        &err))
                                  })?;
                     let right_proof = from_value(right_value.clone())
                         .map_err(|err| {
                                      D::Error::custom(format_err_string("ListProof",
-                                                                        right_value.clone(),
-                                                                        err))
+                                                                        right_value,
+                                                                        &err))
                                  })?;
                     Full(Box::new(left_proof), Box::new(right_proof))
                 }
@@ -197,8 +197,8 @@ impl<'a, V> Deserialize<'a> for ListProof<V>
                     let val: V = from_value(leaf_value.clone())
                         .map_err(|err| {
                                      D::Error::custom(format_err_string("V",
-                                                                        leaf_value.clone(),
-                                                                        err))
+                                                                        leaf_value,
+                                                                        &err))
                                  })?;
                     Leaf(val)
                 } else {
@@ -207,8 +207,8 @@ impl<'a, V> Deserialize<'a> for ListProof<V>
                     let left_proof: ListProof<V> = from_value(left_value.clone())
                         .map_err(|err| {
                                      D::Error::custom(format_err_string("ListProof",
-                                                                        left_value.clone(),
-                                                                        err))
+                                                                        left_value,
+                                                                        &err))
                                  })?;
                     Left(Box::new(left_proof), None)
                 }
