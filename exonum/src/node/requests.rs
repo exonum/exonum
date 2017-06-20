@@ -22,6 +22,7 @@ impl<S> NodeHandler<S>
         }
 
         if !msg.verify(msg.from()) {
+            error!("Received request with incorrect signature, msg={:?}", msg);
             return;
         }
 
