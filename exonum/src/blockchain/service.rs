@@ -8,8 +8,7 @@ use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
-use events::Milliseconds;
-use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
+use blockchain::{ConsensusConfig, Blockchain};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
@@ -36,7 +35,7 @@ pub trait Service: Send + Sync + 'static {
         Value::Null
     }
 
-    fn handle_commit(&self, context: &mut NodeState) { }
+    fn handle_commit(&self, context: &mut ServiceContext) { }
 
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
@@ -48,17 +47,17 @@ pub trait Service: Send + Sync + 'static {
     }
 }
 
-pub struct NodeState<'a, 'b> {
+pub struct ServiceContext<'a, 'b> {
     state: &'a mut State,
-    view: &'b Snapshot,
+    snapshot: &'b Snapshot,
     txs: Vec<Box<Transaction>>,
 }
 
-impl<'a, 'b> NodeState<'a, 'b> {
-    pub fn new(state: &'a mut State, view: &'b Snapshot) -> NodeState<'a, 'b> {
-        NodeState {
+impl<'a, 'b> ServiceContext<'a, 'b> {
+    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> ServiceContext<'a, 'b> {
+        ServiceContext {
             state: state,
-            view: view,
+            snapshot: snapshot,
             txs: Vec::new(),
         }
     }
@@ -67,8 +66,8 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.validator_state()
     }
 
-    pub fn view(&self) -> &'b Snapshot {
-        self.view
+    pub fn snapshot(&self) -> &'b Snapshot {
+        self.snapshot
     }
 
     pub fn height(&self) -> u64 {
@@ -91,32 +90,13 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.secret_key()
     }
 
-    pub fn actual_config(&self) -> &StoredConfiguration {
-        self.state.config()
-    }
-
-    pub fn consensus_config(&self) -> &ConsensusConfig {
+    pub fn actual_consensus_config(&self) -> &ConsensusConfig {
         self.state.consensus_config()
     }
 
-    pub fn service_config(&self, service: &Service) -> &Value {
+    pub fn actual_service_config(&self, service: &Service) -> &Value {
         let name = service.service_name();
-        self.state
-            .services_config()
-            .get(name)
-            .unwrap()
-    }
-
-    pub fn update_config(&mut self, new_config: StoredConfiguration) {
-        self.state.update_config(new_config)
-    }
-
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.state.propose_timeout()
-    }
-
-    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
-        self.state.set_propose_timeout(timeout)
+        self.state.services_config().get(name).unwrap()
     }
 
     pub fn add_transaction<T: Transaction>(&mut self, tx: T) {
@@ -129,9 +109,9 @@ impl<'a, 'b> NodeState<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ::std::fmt::Debug for NodeState<'a, 'b> {
+impl<'a, 'b> ::std::fmt::Debug for ServiceContext<'a, 'b> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "NodeState(state: {:?}, txs: {:?})", self.state, self.txs)
+        write!(f, "ServiceContext(state: {:?}, txs: {:?})", self.state, self.txs)
     }
 }
 
