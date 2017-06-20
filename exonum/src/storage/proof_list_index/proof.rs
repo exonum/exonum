@@ -222,23 +222,3 @@ impl<'a, V> Deserialize<'a> for ListProof<V>
         Ok(res)
     }
 }
-
-// impl<V: fmt::Debug> fmt::Debug for ListProof<V> {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         use self::*;
-//         match *self {
-//             Full(ref left, ref right) => write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left, right),
-//             Left(ref left_proof, ref right_hash) => {
-//                 if let Some(ref digest) = *right_hash {
-//                     write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_proof, digest)
-//                 } else {
-//                     write!(f, "{{\"left\":{:?}}}", left_proof)
-//                 }
-//             }
-//             Right(ref left_hash, ref right) => {
-//                 write!(f, "{{\"left\":{:?},\"right\":{:?}}}", left_hash, right)
-//             }
-//             Leaf(ref val) => write!(f, "{{\"val\":{:?}}}", val),
-//         }
-//     }
-// }

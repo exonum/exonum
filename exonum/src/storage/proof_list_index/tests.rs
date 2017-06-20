@@ -189,33 +189,6 @@ fn test_list_index_proof() {
                [(0, &2), (1, &4), (2, &6)]);
 }
 
-// #[test]
-// fn generate_proof_in_index_containing_hashes() {
-//     let mut fork = MemoryDB::new().fork();
-//     let mut index = ProofListIndex::new(vec![255], &mut fork);
-//     let num_vals = 10u32;
-//     let values = random_values(num_vals as usize);
-//     let hash_vals = values.into_iter().map(|el| hash(&el)).collect::<Vec<Hash>>();
-//     for value in &hash_vals {
-//         index.push(*value);
-//     }
-//     let mut index_root_hash = index.root_hash();
-//     let mut index_len = index.len() as usize;
-//     let st_r = 0;
-//     let end_r = 5;
-//     let range_proof = index.get_range_proof(st_r, end_r);
-//     {
-//         let (inds, actual_vals): (Vec<_>, Vec<&Hash>) =
-//             proof_indices_values(&range_proof).into_iter().unzip();
-//         assert_eq!(inds, (st_r as usize..end_r as usize).collect::<Vec<_>>());
-//         let expect_vals = &hash_vals[st_r as usize..end_r as usize];
-//         let paired = expect_vals.iter().zip(actual_vals);
-//         for pair in paired {
-//             assert_eq!(*pair.0, *pair.1);
-//         }
-//     }
-// }
-
 #[test]
 fn randomly_generate_proofs() {
     let mut fork = MemoryDB::new().fork();

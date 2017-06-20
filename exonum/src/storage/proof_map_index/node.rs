@@ -90,35 +90,3 @@ impl ::std::fmt::Debug for BranchNode {
             .finish()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    // #[test]
-    // fn branch_node() {
-    //     let mut rng = thread_rng();
-    //     let mut gen_seq = || rng.gen_iter::<u8>().take(32).collect::<Vec<u8>>();
-
-    //     let lh = Hash::from_slice(&gen_seq()).unwrap();
-    //     let rh = Hash::from_slice(&gen_seq()).unwrap();
-    //     let lp = DBKey {
-    //         data: &gen_seq(),
-    //         from: 0,
-    //         to: 16,
-    //     };
-    //     let rp = DBKey {
-    //         data: &gen_seq(),
-    //         from: 31,
-    //         to: 64,
-    //     };
-    //     let node = BranchNode::new([&lh, &rh], [&lp, &rp]);
-
-    //     assert_eq!(node.child_hash(Left), &lh);
-    //     assert_eq!(node.child_hash(Right), &rh);
-    //     assert_eq!(node.child_slice(Left).to_db_key(), lp.to_db_key());
-    //     assert_eq!(node.child_slice(Left).to, lp.to);
-    //     assert_eq!(node.child_slice(Right).to_db_key(), rp.to_db_key());
-    //     assert_eq!(node.child_slice(Right).to, rp.to);
-    //     // assert_eq!(node.child_db_key(Left), lp.to_db_key().as_slice());
-    //     // assert_eq!(node.child_db_key(Right), rp.to_db_key().as_slice());
-    // }
-}
