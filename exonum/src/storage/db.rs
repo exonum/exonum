@@ -174,7 +174,7 @@ impl Fork {
 }
 
 impl AsRef<Snapshot> for Fork {
-    fn as_ref<'a>(&'a self) -> &'a Snapshot {
+    fn as_ref(&self) -> &Snapshot {
         &*self
     }
 }
@@ -188,10 +188,10 @@ impl ::std::fmt::Debug for Fork {
 impl<'a> ForkIter<'a> {
     fn step(&mut self) -> NextIterValue {
         match self.changes.peek() {
-            Some(&(k, ref change)) => {
+            Some(&(k, change)) => {
                 match self.snapshot.peek() {
                     Some((key, ..)) => {
-                        match **change {
+                        match *change {
                             Change::Put(..) => {
                                 match k[..].cmp(key) {
                                     Equal => Replaced,
@@ -209,7 +209,7 @@ impl<'a> ForkIter<'a> {
                         }
                     }
                     None => {
-                        match **change {
+                        match *change {
                             Change::Put(..) => Inserted,
                             Change::Delete => MissDeleted,
                         }

@@ -78,9 +78,10 @@ impl<T, K, V> ProofMapIndex<T, K, V>
 
     fn get_node_unchecked(&self, key: &DBKey) -> Node<V> {
         // TODO: unwraps?
-        match key.is_leaf() {
-            true => Node::Leaf(self.base.get(key).unwrap()),
-            false => Node::Branch(self.base.get(key).unwrap()),
+        if key.is_leaf() {
+            Node::Leaf(self.base.get(key).unwrap())
+        } else {
+            Node::Branch(self.base.get(key).unwrap())
         }
     }
 

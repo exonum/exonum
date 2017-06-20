@@ -45,7 +45,7 @@ impl Database for MemoryDB {
 
 impl Snapshot for MemoryDB {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.map.get(key).map(Clone::clone)
+        self.map.get(key).cloned()
     }
 
     fn contains(&self, key: &[u8]) -> bool {

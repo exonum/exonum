@@ -60,7 +60,7 @@ impl ::std::ops::Not for ChildKind {
 impl DBKey {
     /// Create a new bit slice from the given binary data.
     pub fn leaf<K: ProofMapKey>(key: &K) -> DBKey {
-        debug_assert!(key.size() == KEY_SIZE);
+        debug_assert_eq!(key.size(), KEY_SIZE);
 
         let mut data = [0; KEY_SIZE];
         key.write(&mut data);
@@ -202,8 +202,8 @@ impl StorageKey for DBKey {
             if self.to % 8 != 0 {
                 buffer[right] &= !(255u8 >> (self.to % 8));
             }
-            for i in right + 1..KEY_SIZE + 1 {
-                buffer[i] = 0
+            for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
+                *i = 0
             }
             buffer[KEY_SIZE + 1] = self.to as u8;
         }
