@@ -142,7 +142,7 @@ macro_rules! message {
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                message!(@check_first, $body, $($field_name, $field_type, $from, $to,)*);
+                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
                                                     $crate::messages::TEST_NETWORK_ID,
                                                     $extension, $id, $body);
@@ -155,7 +155,7 @@ macro_rules! message {
             pub fn new_with_signature($($field_name: $field_type,)*
                        signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                message!(@check_first, $body, $($field_name, $field_type, $from, $to,)*);
+                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
                                                     $crate::messages::TEST_NETWORK_ID,
                                                     $extension, $id, $body);
@@ -320,28 +320,4 @@ macro_rules! message {
         }
 
     );
-    (@check_first, $size:expr,
-     $first_name:ident, $first_type:ty, $first_from:expr, $first_to:expr,
-     $($next_name:ident, $next_type:ty, $next_from:expr, $next_to:expr,)*
-     ) => {
-        use $crate::encoding::Field;
-        debug_assert!($first_from == 0);
-        debug_assert!($first_to - $first_from == <$first_type as Field>::field_size());
-        message!(@check_next, $size, $first_to, $($next_name, $next_type, $next_from, $next_to,)*);
-    };
-    (@check_next, $size:expr, $prev_to:expr,
-     $field_name:ident, $field_type:ty, $field_from:expr, $field_to:expr,
-     $($next_name:ident, $next_type:ty, $next_from:expr, $next_to:expr,)+
-     ) => {
-        debug_assert!($prev_to == $field_from);
-        debug_assert!($field_to - $field_from == <$field_type as Field>::field_size());
-        message!(@check_next, $size, $field_to, $($next_name, $next_type, $next_from, $next_to,)+);
-    };
-    (@check_next, $size:expr, $prev_to:expr,
-     $last_name:ident, $last_type:ty, $last_from:expr, $last_to:expr,
-     ) => {
-        debug_assert!($prev_to == $last_from);
-        debug_assert!($last_to == $size);
-        debug_assert!($last_to - $last_from == <$last_type as Field>::field_size());
-    };
 }

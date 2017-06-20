@@ -120,7 +120,8 @@ macro_rules! encoding_struct {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             /// Create `$name`.
             pub fn new($($field_name: $field_type,)*) -> $name {
-                use $crate::encoding::{Field};
+                use $crate::encoding::Field;
+                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut buf = vec![0; $body];
                 $($field_name.write(&mut buf, $from, $to);)*
                 $name { raw: buf }
@@ -220,4 +221,41 @@ macro_rules! encoding_struct {
             }
         }
     )
+}
+
+/// This macro checks bounds of fields for structs with custom layout.
+#[macro_export]
+macro_rules! check_bounds {
+    (@deep $size:expr, $prev_to:expr,
+     $field_name:ident : $field_type:ty [$field_from:expr => $field_to:expr],
+     $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)+
+     ) => {
+        debug_assert!($prev_to == $field_from);
+        debug_assert!($field_to - $field_from == <$field_type as Field>::field_size());
+        check_bounds!(@deep $size, $field_to, $($next_name : $next_type [$next_from => $next_to],)+);
+    };
+    (@deep $size:expr, $prev_to:expr,
+     $last_name:ident : $last_type:ty [$last_from:expr => $last_to:expr],
+     ) => {
+        debug_assert!($prev_to == $last_from);
+        debug_assert!($last_to == $size);
+        debug_assert!($last_to - $last_from == <$last_type as Field>::field_size());
+    };
+    ($size:expr,
+     $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
+     ) => {{
+        use $crate::encoding::Field;
+        debug_assert!($first_from == 0);
+        debug_assert!($first_to == $size);
+        debug_assert!($first_to - $first_from == <$first_type as Field>::field_size());
+    }};
+    ($size:expr,
+     $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
+     $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)*
+     ) => {{
+        use $crate::encoding::Field;
+        debug_assert!($first_from == 0);
+        debug_assert!($first_to - $first_from == <$first_type as Field>::field_size());
+        check_bounds!(@deep $size, $first_to, $($next_name : $next_type [$next_from => $next_to],)*);
+    }};
 }
