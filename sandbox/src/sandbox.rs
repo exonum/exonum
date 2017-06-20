@@ -271,7 +271,7 @@ impl Sandbox {
 
     pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
         RefMut::map(self.reactor.borrow_mut(),
-                 |reactor| &mut reactor.handler.blockchain)
+                    |reactor| &mut reactor.handler.blockchain)
     }
 
     pub fn recv<T: Message>(&self, msg: T) {

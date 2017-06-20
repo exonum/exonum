@@ -21,7 +21,7 @@ pub struct Fork {
     snapshot: Box<Snapshot>,
     changes: Patch,
     changelog: Vec<(Vec<u8>, Option<Change>)>,
-    logged: bool
+    logged: bool,
 }
 
 pub struct ForkIter<'a> {
@@ -36,7 +36,7 @@ enum NextIterValue {
     Inserted,
     Deleted,
     MissDeleted,
-    Finished
+    Finished,
 }
 
 pub trait Database: Send + Sync + 'static {
@@ -132,7 +132,8 @@ impl Fork {
 
     pub fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
         if self.logged {
-            self.changelog.push((key.clone(), self.changes.insert(key, Change::Put(value))));
+            self.changelog
+                .push((key.clone(), self.changes.insert(key, Change::Put(value))));
         } else {
             self.changes.insert(key, Change::Put(value));
         }
@@ -140,7 +141,8 @@ impl Fork {
 
     pub fn remove(&mut self, key: Vec<u8>) {
         if self.logged {
-            self.changelog.push((key.clone(), self.changes.insert(key, Change::Delete)));
+            self.changelog
+                .push((key.clone(), self.changes.insert(key, Change::Delete)));
         } else {
             self.changes.insert(key, Change::Delete);
         }
@@ -228,31 +230,37 @@ impl<'a> Iterator<'a> for ForkIter<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.step() {
-                Stored => {
-                    return self.snapshot.next()
-                },
+                Stored => return self.snapshot.next(),
                 Replaced => {
                     self.snapshot.next();
-                    return self.changes.next()
-                                       .map(|(key, change)| (key.as_slice(), match *change {
-                                            Change::Put(ref value) => value.as_slice(),
-                                            Change::Delete => unreachable!()
-                                       }))
-                },
+                    return self.changes
+                               .next()
+                               .map(|(key, change)| {
+                                        (key.as_slice(),
+                                         match *change {
+                                             Change::Put(ref value) => value.as_slice(),
+                                             Change::Delete => unreachable!(),
+                                         })
+                                    });
+                }
                 Inserted => {
-                    return self.changes.next()
-                                       .map(|(key, change)| (key.as_slice(), match *change {
-                                            Change::Put(ref value) => value.as_slice(),
-                                            Change::Delete => unreachable!()
-                                       }))
-                },
+                    return self.changes
+                               .next()
+                               .map(|(key, change)| {
+                                        (key.as_slice(),
+                                         match *change {
+                                             Change::Put(ref value) => value.as_slice(),
+                                             Change::Delete => unreachable!(),
+                                         })
+                                    })
+                }
                 Deleted => {
                     self.changes.next();
                     self.snapshot.next();
-                },
+                }
                 MissDeleted => {
                     self.changes.next();
-                },
+                }
                 Finished => return None,
             }
         }
@@ -261,23 +269,25 @@ impl<'a> Iterator<'a> for ForkIter<'a> {
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.step() {
-                Stored | Replaced => {
-                    return self.snapshot.peek()
-                },
+                Stored | Replaced => return self.snapshot.peek(),
                 Inserted => {
-                    return self.changes.peek()
-                                       .map(|&(key, change)| (key.as_slice(), match *change {
-                                            Change::Put(ref value) => value.as_slice(),
-                                            Change::Delete => unreachable!()
-                                       }))
-                },
+                    return self.changes
+                               .peek()
+                               .map(|&(key, change)| {
+                                        (key.as_slice(),
+                                         match *change {
+                                             Change::Put(ref value) => value.as_slice(),
+                                             Change::Delete => unreachable!(),
+                                         })
+                                    })
+                }
                 Deleted => {
                     self.changes.next();
                     self.snapshot.next();
-                },
+                }
                 MissDeleted => {
                     self.changes.next();
-                },
+                }
                 Finished => return None,
             }
         }
