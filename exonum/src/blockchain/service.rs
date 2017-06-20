@@ -67,7 +67,7 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.validator_state()
     }
 
-    pub fn view(&self) -> &Snapshot {
+    pub fn view(&self) -> &'b Snapshot {
         self.view
     }
 
