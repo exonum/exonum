@@ -1,4 +1,5 @@
 #![feature(test)]
+#![allow(dead_code)]
 
 extern crate test;
 extern crate tempdir;
@@ -11,8 +12,8 @@ mod tests {
 
     use tempdir::TempDir;
 
-    use exonum::storage::{ProofMapIndex, Database, MapIndex, Fork,
-                          MemoryDB, LevelDB, LevelDBOptions, LevelDBCache, StorageValue, Patch};
+    use exonum::storage::{ProofMapIndex, Database, Fork,
+                          LevelDB, LevelDBOptions, LevelDBCache, StorageValue, Patch};
 
     use std::collections::BTreeMap;
     use exonum::blockchain::{Blockchain, Transaction};
