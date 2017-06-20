@@ -171,16 +171,8 @@ impl Fork {
     }
 }
 
-// TODO: Does we needed this AsRef / AsMut impls?
-
-impl<'b> AsRef<Snapshot + 'b> for Snapshot {
-    fn as_ref<'a>(&'a self) -> &'a (Snapshot + 'b) {
-        self
-    }
-}
-
-impl<'b> AsRef<Snapshot + 'b> for Fork {
-    fn as_ref<'a>(&'a self) -> &'a (Snapshot + 'b) {
+impl AsRef<Snapshot> for Fork {
+    fn as_ref<'a>(&'a self) -> &'a Snapshot {
         &*self
     }
 }
