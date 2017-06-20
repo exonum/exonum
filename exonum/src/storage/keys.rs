@@ -175,3 +175,17 @@ impl StorageKey for Vec<u8> {
         buffer.to_vec()
     }
 }
+
+impl StorageKey for String {
+    fn size(&self) -> usize {
+        self.len()
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self.as_bytes())
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        unsafe { ::std::str::from_utf8_unchecked(buffer).to_string() }
+    }
+}
