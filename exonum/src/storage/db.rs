@@ -53,7 +53,7 @@ pub trait Database: Send + Sync + 'static {
     fn merge(&mut self, patch: Patch) -> Result<()>;
 }
 
-pub trait Snapshot {
+pub trait Snapshot: 'static {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
     fn contains(&self, key: &[u8]) -> bool {
         self.get(key).is_some()

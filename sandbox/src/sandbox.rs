@@ -1,6 +1,6 @@
 use std::collections::{VecDeque, BinaryHeap, HashSet, HashMap};
 use std::iter::FromIterator;
-use std::cell::{RefCell, Ref};
+use std::cell::{RefCell, Ref, RefMut};
 use std::sync::{Arc, Mutex};
 use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 use std::ops::Drop;
@@ -269,6 +269,11 @@ impl Sandbox {
         Ref::map(self.reactor.borrow(), |reactor| &reactor.handler.blockchain)
     }
 
+    pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
+        RefMut::map(self.reactor.borrow_mut(),
+                 |reactor| &mut reactor.handler.blockchain)
+    }
+
     pub fn recv<T: Message>(&self, msg: T) {
         self.check_unexpected_message();
         let mut reactor = self.reactor.borrow_mut();
@@ -442,10 +447,7 @@ impl Sandbox {
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) = blockchain.create_patch(0,
-                                                     self.current_height(),
-                                                     &hashes,
-                                                     &tx_pool);
+            let (_, patch) = blockchain.create_patch(0, self.current_height(), &hashes, &tx_pool);
             fork.merge(patch);
             fork
         };

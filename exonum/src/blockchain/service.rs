@@ -32,7 +32,7 @@ pub trait Service: Send + Sync + 'static {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    fn handle_genesis_block(&self, view: &Snapshot) -> Value {
+    fn handle_genesis_block(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
 
