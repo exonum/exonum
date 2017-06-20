@@ -1,4 +1,5 @@
-//! The module used to write your own solition on top of `Exonum` blockchain.
+//! The module containing building blocks for creating blockchains powered by the 
+//! `Exonum` framework.
 
 // TODO move to lib.rs
 #![deny(missing_docs)]
