@@ -117,12 +117,11 @@ use iron::Handler;
 use std::fmt;
 
 use exonum::api::Api;
-use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext};
+use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext, gen_prefix};
 use exonum::node::State;
-use exonum::crypto::{Signature, PublicKey, Hash, HASH_SIZE};
+use exonum::crypto::{Signature, PublicKey, Hash};
 use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction};
-use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
-                      Result as StorageResult};
+use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 use exonum::encoding::{Field, Error as StreamStructError};
 use exonum::encoding::serialize::json::reexport as serde_json;
 
@@ -222,8 +221,8 @@ pub enum ConfigTx {
 pub struct ConfigurationService {}
 
 /// `ConfigurationService` database schema: tables and logically atomic mutation methods.
-pub struct ConfigurationSchema<'a> {
-    view: &'a View,
+pub struct ConfigurationSchema<T> {
+    view: T,
 }
 
 impl ConfigTx {
@@ -279,9 +278,11 @@ impl Message for ConfigTx {
     }
 }
 
-impl<'a> ConfigurationSchema<'a> {
-    pub fn new(view: &'a View) -> ConfigurationSchema {
-        ConfigurationSchema { view: view }
+impl<T> ConfigurationSchema<T>
+    where T: AsRef<Snapshot>
+{
+    pub fn new(snapshot: T) -> ConfigurationSchema<T> {
+        ConfigurationSchema { view: snapshot }
     }
 
     /// Returns a table of all config proposes `TxConfigPropose`, which are stored
@@ -304,10 +305,9 @@ impl<'a> ConfigurationSchema<'a> {
     /// which contains
     /// [bytes](struct.TxConfigPropose.html#method.cfg), corresponding to
     /// **key**.
-    pub fn propose_data_by_config_hash
-        (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, ProposeData> {
-        MerklePatriciaTable::new(MapTable::new(vec![4], self.view))
+    pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&T, Hash, ProposeData> {
+        let prefix = gen_prefix(CONFIG_SERVICE, 0, &());
+        ProofMapIndex::new(prefix, &self.view)
     }
 
     /// - Table **index** is propose_id - position of a proposed [hash of a configuration]
@@ -316,9 +316,11 @@ impl<'a> ConfigurationSchema<'a> {
     /// - Table **value** is [hash of a configuration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) - **key** of
     /// `propose_data_by_config_hash`
-    pub fn config_hash_by_ordinal(&self) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, Hash> {
-        MerkleTable::new(MapTable::new(vec![9], self.view))
+    pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&T, Hash> {
+        let prefix = gen_prefix(CONFIG_SERVICE, 1, &());
+        ProofListIndex::new(prefix, &self.view)
     }
+
     /// Returns a table of votes of validators for config, referenced by the
     /// queried
     /// `config_hash` - [hash of a configuration]
@@ -335,13 +337,58 @@ impl<'a> ConfigurationSchema<'a> {
     /// previous to config, referenced by the queried `config_hash`.
     /// - Table **value** is `TxConfigVote`, cast by validator with
     /// [PublicKey](struct.TxConfigVote.html#method.from), corresponding to **index**.
-    pub fn votes_by_config_hash(&self,
-                                config_hash: &Hash)
-                                -> MerkleTable<MapTable<View, [u8], Vec<u8>>, TxConfigVote> {
-        let mut prefix = vec![5; 1 + HASH_SIZE];
-        prefix[1..].copy_from_slice(config_hash.as_ref());
-        MerkleTable::new(MapTable::new(prefix, self.view))
+    pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&T, TxConfigVote> {
+        let prefix = gen_prefix(CONFIG_SERVICE, 2, config_hash);
+        ProofListIndex::new(prefix, &self.view)
     }
+
+    pub fn get_propose(&self, cfg_hash: &Hash) -> Option<TxConfigPropose> {
+        let option_propose_data_by_config_hash = self.propose_data_by_config_hash().get(cfg_hash);
+        option_propose_data_by_config_hash
+            .map(|propose_data_by_config_hash| propose_data_by_config_hash.tx_propose())
+    }
+
+    pub fn get_votes(&self, cfg_hash: &Hash) -> Vec<Option<TxConfigVote>> {
+        let votes_table = self.votes_by_config_hash(cfg_hash);
+        let votes_options = votes_table
+            .into_iter()
+            .map(|vote| if vote == ZEROVOTE.clone() {
+                     None
+                 } else {
+                     Some(vote)
+                 })
+            .collect::<Vec<_>>();
+        votes_options
+    }
+
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![self.propose_data_by_config_hash().root_hash(),
+             self.config_hash_by_ordinal().root_hash()]
+    }
+}
+
+impl<'a> ConfigurationSchema<&'a mut Fork> {
+    /// Mutable version of `propose_data_by_config_hash` index.
+    pub fn propose_data_by_config_hash_mut(&mut self)
+                                           -> ProofMapIndex<&mut Fork, Hash, ProposeData> {
+        let prefix = gen_prefix(CONFIG_SERVICE, 0, &());
+        ProofMapIndex::new(prefix, &mut self.view)
+    }
+
+    /// Mutable version of `config_hash_by_ordinal` index.
+    pub fn config_hash_by_ordinal_mut(&mut self) -> ProofListIndex<&mut Fork, Hash> {
+        let prefix = gen_prefix(CONFIG_SERVICE, 1, &());
+        ProofListIndex::new(prefix, &mut self.view)
+    }
+
+    /// Mutable version of `votes_by_config_hash` index.
+    pub fn votes_by_config_hash_mut(&mut self,
+                                    config_hash: &Hash)
+                                    -> ProofListIndex<&mut Fork, TxConfigVote> {
+        let prefix = gen_prefix(CONFIG_SERVICE, 2, config_hash);
+        ProofListIndex::new(prefix, &mut self.view)
+    }
+
 
     /// Put a new `StorageValueConfigProposeData` into `propose_data_by_config_hash` table with
     /// following fields:
@@ -356,73 +403,61 @@ impl<'a> ConfigurationSchema<'a> {
     /// If an entry with the same [hash of a configuration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is present
     /// in `propose_data_by_config_hash`, as in config inside of `tx_propose`, nothing is done.
-    pub fn put_propose(&self, tx_propose: TxConfigPropose) -> StorageResult<()> {
-        let cfg = <StoredConfiguration as StorageValue>::deserialize(tx_propose
-                                                                         .cfg()
-                                                                         .as_bytes()
-                                                                         .to_vec());
+    pub fn put_propose(&mut self, tx_propose: TxConfigPropose) {
+        let cfg =
+            <StoredConfiguration as StorageValue>::from_bytes(tx_propose.cfg().as_bytes().into());
         let cfg_hash = &StorageValue::hash(&cfg);
 
-        if let Some(old_tx_propose) = self.get_propose(cfg_hash)? {
+        if let Some(old_tx_propose) = self.get_propose(cfg_hash) {
             error!("Discarding TxConfigPropose:{} which contains an already posted config. \
                     Previous TxConfigPropose:{}",
-                   serde_json::to_string(&tx_propose)?,
-                   serde_json::to_string(&old_tx_propose)?);
-            return Ok(());
+                   serde_json::to_string(&tx_propose).unwrap(),
+                   serde_json::to_string(&old_tx_propose).unwrap());
+            return;
         }
 
-        let general_schema = Schema::new(self.view);
-        let prev_cfg = general_schema
+        let prev_cfg = Schema::new(&self.view)
             .configs()
-            .get(&cfg.previous_cfg_hash)?
+            .get(&cfg.previous_cfg_hash)
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigPropose:{:?}",
                             &cfg.previous_cfg_hash,
-                            serde_json::to_string(&tx_propose)?));
+                            serde_json::to_string(&tx_propose).unwrap()));
 
-        let votes_table = self.votes_by_config_hash(cfg_hash);
-        debug_assert!(votes_table.is_empty().unwrap());
-        let num_validators = prev_cfg.validators.len();
-        for _ in 0..num_validators {
-            votes_table.append(ZEROVOTE.clone())?;
+        let propose_data_by_config_hash = {
+            let mut votes_table = self.votes_by_config_hash_mut(cfg_hash);
+            debug_assert!(votes_table.is_empty());
+            let num_validators = prev_cfg.validators.len();
+            for _ in 0..num_validators {
+                votes_table.push(ZEROVOTE.clone());
+            }
+
+            StorageValueConfigProposeData::new(tx_propose,
+                                               &votes_table.root_hash(),
+                                               num_validators as u64)
+        };
+
+        {
+            let mut propose_data_by_config_hash_table = self.propose_data_by_config_hash_mut();
+            debug_assert!(propose_data_by_config_hash_table.get(cfg_hash).is_none());
+            propose_data_by_config_hash_table.put(cfg_hash, propose_data_by_config_hash);
         }
-        let propose_data_by_config_hash = StorageValueConfigProposeData::new(tx_propose,
-                                                                             &votes_table
-                                                                                  .root_hash()?,
-                                                                             num_validators as u64);
-        let propose_data_by_config_hash_table = self.propose_data_by_config_hash();
-        debug_assert!(propose_data_by_config_hash_table
-                          .get(cfg_hash)
-                          .unwrap()
-                          .is_none());
-        propose_data_by_config_hash_table
-            .put(cfg_hash, propose_data_by_config_hash)?;
-        self.config_hash_by_ordinal().append(*cfg_hash)
+        self.config_hash_by_ordinal_mut().push(*cfg_hash)
     }
 
-    pub fn get_propose(&self, cfg_hash: &Hash) -> StorageResult<Option<TxConfigPropose>> {
-        let option_propose_data_by_config_hash = self.propose_data_by_config_hash().get(cfg_hash)?;
-        Ok(option_propose_data_by_config_hash
-               .map(|propose_data_by_config_hash| propose_data_by_config_hash.tx_propose()))
-    }
-
-    pub fn put_vote(&self, tx_vote: TxConfigVote) -> StorageResult<()> {
+    pub fn put_vote(&mut self, tx_vote: TxConfigVote) {
         let cfg_hash = tx_vote.cfg_hash();
-        let propose_data_by_config_hash_table = self.propose_data_by_config_hash();
-        let mut propose_propose_data_by_config_hash = propose_data_by_config_hash_table
-            .get(cfg_hash)?
+        let mut propose_propose_data_by_config_hash = self.propose_data_by_config_hash()
+            .get(cfg_hash)
             .expect(&format!("Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
                             &tx_vote));
 
         let tx_propose = propose_propose_data_by_config_hash.tx_propose();
-        let prev_cfg_hash = <StoredConfiguration as StorageValue>::deserialize(tx_propose
-                                                                                   .cfg()
-                                                                                   .as_bytes()
-                                                                                   .to_vec())
+        let prev_cfg_hash =
+            <StoredConfiguration as StorageValue>::from_bytes(tx_propose.cfg().as_bytes().into())
                 .previous_cfg_hash;
-        let general_schema = Schema::new(self.view);
-        let prev_cfg = general_schema
+        let prev_cfg = Schema::new(&self.view)
             .configs()
-            .get(&prev_cfg_hash)?
+            .get(&prev_cfg_hash)
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigVote:{:?}",
                             prev_cfg_hash,
                             &tx_vote));
@@ -435,126 +470,107 @@ impl<'a> ConfigurationSchema<'a> {
                               TxConfigVote:{:?}",
                              &tx_vote));
 
-        let votes_for_cfg_table = self.votes_by_config_hash(cfg_hash);
-        if votes_for_cfg_table.get(validator_id as u64)?.unwrap() == ZEROVOTE.clone() {
-            votes_for_cfg_table
-                .set(validator_id as u64, tx_vote.clone())?;
+        {
+            let mut votes_for_cfg_table = self.votes_by_config_hash_mut(cfg_hash);
+            if votes_for_cfg_table.get(validator_id as u64).unwrap() == ZEROVOTE.clone() {
+                votes_for_cfg_table.set(validator_id as u64, tx_vote.clone());
+            }
+            propose_propose_data_by_config_hash.set_history_hash(&votes_for_cfg_table.root_hash());
         }
-        propose_propose_data_by_config_hash.set_history_hash(&votes_for_cfg_table.root_hash()?);
-        propose_data_by_config_hash_table.put(cfg_hash, propose_propose_data_by_config_hash)
+        self.propose_data_by_config_hash_mut()
+            .put(cfg_hash, propose_propose_data_by_config_hash)
     }
+}
 
-    pub fn get_votes(&self, cfg_hash: &Hash) -> StorageResult<Vec<Option<TxConfigVote>>> {
-        let votes_table = self.votes_by_config_hash(cfg_hash);
-        let votes_values = votes_table.values()?;
-        let votes_options = votes_values
-            .into_iter()
-            .map(|vote| if vote == ZEROVOTE.clone() {
-                     None
-                 } else {
-                     Some(vote)
-                 })
-            .collect::<Vec<_>>();
-        Ok(votes_options)
-    }
-
-    pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
-        Ok(vec![self.propose_data_by_config_hash().root_hash()?,
-                self.config_hash_by_ordinal().root_hash()?])
+impl<T> ConfigurationSchema<T> {
+    pub fn into_snapshot(self) -> T {
+        self.view
     }
 }
 
 impl TxConfigPropose {
-    pub fn execute(&self, view: &View) -> StorageResult<()> {
-        let blockchain_schema = Schema::new(view);
-        let config_schema = ConfigurationSchema::new(view);
-
-
-        let following_config: Option<StoredConfiguration> = blockchain_schema
-            .following_configuration()?;
+    pub fn execute(&self, fork: &mut Fork) {
+        let following_config: Option<StoredConfiguration> = Schema::new(&fork)
+            .following_configuration();
 
         if let Some(foll_cfg) = following_config {
             error!("Discarding TxConfigPropose: {} as there is an already scheduled next config: \
                     {:?} ",
-                   serde_json::to_string(self)?,
+                   serde_json::to_string(self).unwrap(),
                    foll_cfg);
-            return Ok(());
+            return;
         }
 
-        let actual_config: StoredConfiguration = blockchain_schema.actual_configuration()?;
+        let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
         if !actual_config.validators.contains(self.from()) {
             error!("Discarding TxConfigPropose:{} from unknown validator. ",
-                   serde_json::to_string(self)?);
-            return Ok(());
+                   serde_json::to_string(self).unwrap());
+            return;
         }
 
         let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes());
         if config_candidate.is_err() {
             error!("Discarding TxConfigPropose:{} which contains config, which cannot be parsed: \
                     {:?}",
-                   serde_json::to_string(self)?,
+                   serde_json::to_string(self).unwrap(),
                    config_candidate);
-            return Ok(());
+            return;
         }
 
         let actual_config_hash = actual_config.hash();
         let config_candidate_body = config_candidate.unwrap();
         if config_candidate_body.previous_cfg_hash != actual_config_hash {
             error!("Discarding TxConfigPropose:{} which does not reference actual config: {:?}",
-                   serde_json::to_string(self)?,
+                   serde_json::to_string(self).unwrap(),
                    actual_config);
-            return Ok(());
+            return;
         }
 
-        let current_height = blockchain_schema.current_height()?;
+        let current_height = Schema::new(&fork).current_height();
         let actual_from = config_candidate_body.actual_from;
         if actual_from <= current_height {
             error!("Discarding TxConfigPropose:{} which has actual_from height less than or \
                     equal to current: {:?}",
-                   serde_json::to_string(self)?,
+                   serde_json::to_string(self).unwrap(),
                    current_height);
-            return Ok(());
+            return;
         }
 
-        config_schema.put_propose(self.clone())?;
+        ConfigurationSchema::new(fork).put_propose(self.clone());
 
         trace!("Put TxConfigPropose:{} to config_proposes table",
-               serde_json::to_string(self)?);
-        Ok(())
+               serde_json::to_string(self).unwrap());
     }
 }
 
 impl TxConfigVote {
-    pub fn execute(&self, view: &View) -> StorageResult<()> {
-        let blockchain_schema = Schema::new(view);
-        let config_schema = ConfigurationSchema::new(view);
-
-        let propose_option = config_schema.get_propose(self.cfg_hash())?;
+    pub fn execute(&self, fork: &mut Fork) {
+        let propose_option = ConfigurationSchema::new(&fork).get_propose(self.cfg_hash());
         if propose_option.is_none() {
             error!("Discarding TxConfigVote:{:?} which references unknown config hash",
                    self);
-            return Ok(());
+            return;
         }
 
 
-        let following_config: Option<StoredConfiguration> = blockchain_schema
-            .following_configuration()?;
+        let following_config: Option<StoredConfiguration> = Schema::new(&fork)
+            .following_configuration();
 
         if let Some(foll_cfg) = following_config {
             error!("Discarding TxConfigVote: {:?} as there is an already scheduled next config: \
                     {:?} ",
                    self,
                    foll_cfg);
-            return Ok(());
+            return;
         }
 
-        let actual_config: StoredConfiguration = blockchain_schema.actual_configuration()?;
+        let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
         if !actual_config.validators.contains(self.from()) {
             error!("Discarding TxConfigVote:{:?} from unknown validator. ",
                    self);
-            return Ok(());
+            return;
         }
 
         let referenced_tx_propose = propose_option.unwrap();
@@ -565,38 +581,41 @@ impl TxConfigVote {
             error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} does \
                     not reference actual config: {:?}",
                    self,
-                   serde_json::to_string(&referenced_tx_propose)?,
+                   serde_json::to_string(&referenced_tx_propose).unwrap(),
                    actual_config);
-            return Ok(());
+            return;
         }
 
-        let current_height = blockchain_schema.current_height()?;
+        let current_height = Schema::new(&fork).current_height();
         let actual_from = parsed_config.actual_from;
         if actual_from <= current_height {
             error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} has \
                     actual_from height less than or equal to current: {:?}",
                    self,
-                   serde_json::to_string(&referenced_tx_propose)?,
+                   serde_json::to_string(&referenced_tx_propose).unwrap(),
                    current_height);
-            return Ok(());
+            return;
         }
 
-        config_schema.put_vote(self.clone())?;
+        let mut configuration_schema = ConfigurationSchema::new(fork);
+        configuration_schema.put_vote(self.clone());
         trace!("Put TxConfigVote:{:?} to corresponding cfg votes_by_config_hash table",
                self);
 
         let mut votes_count = 0;
 
-        for vote_option in config_schema.get_votes(self.cfg_hash())? {
-            if vote_option.is_some() {
-                votes_count += 1;
+        {
+            for vote_option in configuration_schema.get_votes(self.cfg_hash()) {
+                if vote_option.is_some() {
+                    votes_count += 1;
+                }
             }
         }
 
+        let fork = configuration_schema.into_snapshot();
         if votes_count >= State::byzantine_majority_count(actual_config.validators.len()) {
-            blockchain_schema.commit_configuration(parsed_config)?;
+            Schema::new(fork).commit_configuration(parsed_config);
         }
-        Ok(())
     }
 }
 
@@ -605,7 +624,7 @@ impl Transaction for ConfigTx {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, view: &View) -> StorageResult<()> {
+    fn execute(&self, view: &mut Fork) {
         match *self {
             ConfigTx::ConfigPropose(ref tx) => tx.execute(view),
             ConfigTx::ConfigVote(ref tx) => tx.execute(view),
@@ -642,8 +661,8 @@ impl Service for ConfigurationService {
     /// is modified. Such hash is stored in each entry of [all config proposes table]
     /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash)
     /// - `StorageValueConfigProposeData`.
-    fn state_hash(&self, view: &View) -> StorageResult<Vec<Hash>> {
-        let schema = ConfigurationSchema::new(view);
+    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+        let schema = ConfigurationSchema::new(snapshot);
         schema.state_hash()
     }
 
