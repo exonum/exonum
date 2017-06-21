@@ -4,4 +4,5 @@ version = "0.1.0"
 authors = ["Denis Kolodin <deniskolodin@gmail.com>"]
 
 [dependencies]
+serde_json = "1.0.2"
 exonum = { git = "ssh://git@github.com/exonum/exonum-core.git", features = [ "memorydb" ] }

@@ -3,6 +3,7 @@ name = "minibank"
 version = "0.1.0"
 dependencies = [
  "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum-core.git)",
+ "serde_json 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
