@@ -8,7 +8,7 @@ use std::time::{SystemTime, Duration};
 use std::thread;
 use std::fmt;
 
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
              MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
@@ -384,6 +384,7 @@ impl<T> fmt::Debug for TxSender<T>
 impl Node {
     /// Creates node for the given blockchain and node configuration
     pub fn new(blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
+        crypto::init();
         blockchain
             .create_genesis_block(node_cfg.genesis.clone())
             .unwrap();
