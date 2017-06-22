@@ -57,11 +57,11 @@ impl From<io::Error> for Error {
 
 impl LevelDB {
     // TODO: configurate LRU cache
-    pub fn open(path: &Path, options: LevelDBOptions) -> Result<LevelDB> {
+    pub fn open<P: AsRef<Path>>(path: P, options: LevelDBOptions) -> Result<LevelDB> {
         if options.create_if_missing {
-            fs::create_dir_all(path)?;
+            fs::create_dir_all(path.as_ref())?;
         }
-        let database = _LevelDB::open(path, options)?;
+        let database = _LevelDB::open(path.as_ref(), options)?;
         Ok(LevelDB { db: Arc::new(database) })
     }
 }
