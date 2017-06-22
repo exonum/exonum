@@ -114,7 +114,7 @@ impl<'a, 'b> RunCommand<'a, 'b>
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ValidatorIdent {
     pub variables: BTreeMap<String, Value>,
     pub keys: BTreeMap<String, Value>,
@@ -132,7 +132,7 @@ impl ValidatorIdent {
     }
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ConfigTemplate {
     pub validators: BTreeMap<PublicKey, ValidatorIdent>,
     pub consensus_cfg: ConsensusConfig,
@@ -155,19 +155,20 @@ impl ConfigTemplate {
 }
 
 // toml file could not save array without "field name"
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PubKeyConfig {
     pub public_key: PublicKey,
     pub services_pub_keys: BTreeMap<String, Value>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct KeyConfig {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub services_sec_keys: BTreeMap<String, Value>
 }
 
+#[derive(Debug)]
 pub struct KeyGeneratorCommand;
 
 impl KeyGeneratorCommand {
@@ -224,6 +225,7 @@ impl KeyGeneratorCommand {
 }
 
 /// implements command for template generating
+#[derive(Debug)]
 pub struct GenerateTemplateCommand;
 impl GenerateTemplateCommand {
     pub fn new<'a>() -> App<'a, 'a> {
@@ -271,6 +273,7 @@ impl GenerateTemplateCommand {
 
 /// `add-validator` - append validator to template.
 /// Automaticaly share keys from public key config.
+#[derive(Debug)]
 pub struct AddValidatorCommand;
 impl AddValidatorCommand {
     pub fn new<'a>() -> App<'a, 'a> {
@@ -353,6 +356,7 @@ impl AddValidatorCommand {
     }
 }
 
+#[derive(Debug)]
 pub struct InitCommand;
 
 impl InitCommand {
@@ -422,6 +426,7 @@ impl InitCommand {
         let config = NodeConfig {
             listen_address: validator_ident.addr,
             network: Default::default(),
+            whitelist: Default::default(),
             peers: peers,
             public_key: keychain.public_key,
             secret_key: keychain.secret_key,
@@ -436,6 +441,7 @@ impl InitCommand {
     }
 }
 
+#[derive(Debug)]
 pub struct GenerateTestnetCommand;
 
 impl GenerateTestnetCommand {

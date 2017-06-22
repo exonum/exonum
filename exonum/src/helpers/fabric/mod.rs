@@ -140,7 +140,10 @@ pub trait ServiceFactory: 'static {
     // `service_name` and `service_id` from `Service` trait into this one
     //fn name() -> &'static str;
     /// return `CommandExtension` for specific `CommandName`
-    fn command(command: CommandName) -> Box<CommandExtension>;
+    #[allow(unused_variables)]
+    fn command(command: CommandName) -> Option<Box<CommandExtension>> {
+        None
+    }
     /// create new service, from context, returned by `run` command.
     fn make_service(self, run_context: &Context) -> Box<Service>;
 }
