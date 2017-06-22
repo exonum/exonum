@@ -1,0 +1,68 @@
+use clap;
+
+use super::{Context, ArgumentType};
+use super::internal::{Feedback, CollectedCommand};
+
+pub struct ClapBackend;
+
+impl ClapBackend {
+
+    pub fn execute(commands: &[CollectedCommand]) -> Feedback {
+        let app = 
+        clap::App::new("Exonum application based on fabric configuration.")
+                .version(env!("CARGO_PKG_VERSION"))
+                .author("Vladimir M. <vladimir.motylenko@xdev.re>")
+                .about("Exonum application based on fabric configuration.");
+
+        let subcommands: Vec<_> = commands.iter().map(|command|
+            ClapBackend::into_subcommand(command)
+        ).collect();
+
+        let matches = app.subcommands(subcommands.into_iter()).get_matches();
+
+        let subcommand = matches.subcommand();
+        for command in commands {
+            if command.name() == subcommand.0 {
+                return command.execute(
+                            Context::new_from_args(
+                                command.args(),
+                                subcommand.1.expect("Arguments not found.")
+                            ))
+            }
+        }
+
+        panic!("Subcommand not found");
+    }
+
+    fn into_subcommand<'a>(command: &'a CollectedCommand) -> clap::App<'a, 'a>{
+        let mut index = 1;
+        let command_args: Vec<_> =
+            command.args()
+                .iter()
+                .map(|arg|{
+                    let clap_arg = clap::Arg::with_name(&arg.name);
+                    let clap_arg = match arg.argument.clone() {
+                        ArgumentType::Positional => {
+                            let arg = clap_arg.index(index);
+                            index += 1;
+                            arg
+                        }
+                        ArgumentType::Named(detail) => {
+                            clap_arg.long(&detail.long_name)
+                            .short(&detail.short_name)
+                            .takes_value(true)
+                        }
+                    };
+                    clap_arg.help(&arg.help)
+                            .required(arg.required)
+                    
+                    }).collect();
+
+        let mut subcommand = clap::SubCommand::with_name(command.name())
+            .about(command.about());
+
+        subcommand = subcommand.args(&command_args);
+
+        subcommand
+    }
+}
