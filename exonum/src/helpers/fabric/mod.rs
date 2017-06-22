@@ -107,7 +107,6 @@ impl Context {
     /// and can't be converted directly into int, because of `toml`
     /// parsing specifics. Use `context.get<String>(key)?.parse()` instead.
     pub fn get<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, Box<Error>> {
-        println!("iteratre over context {:?}, key: {}", self, key);
         Ok(self.values.get(key)
                    .map_or_else(
                         | | Err(::serde::de::Error::custom("Expected Some in getting context.")),

@@ -9,7 +9,8 @@ use config::ConfigFile;
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::{Context, ServiceFactory};
-use super::details::{GenerateTestnetCommand, RunCommand, KeyGeneratorCommand};
+use super::details::{GenerateTestnetCommand, RunCommand,
+                     KeyGeneratorCommand, GenerateTemplateCommand};
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
 
@@ -24,7 +25,9 @@ impl NodeBuilder {
         NodeBuilder {
             commands: vec![CollectedCommand::new(Box::new(GenerateTestnetCommand)),
                            CollectedCommand::new(Box::new(RunCommand)),
-                           CollectedCommand::new(Box::new(KeyGeneratorCommand))],
+                           CollectedCommand::new(Box::new(KeyGeneratorCommand)),
+                           CollectedCommand::new(Box::new(GenerateTemplateCommand))
+                           ],
             service_constructors: Vec::new()
         }
     }
@@ -97,7 +100,7 @@ impl NodeBuilder {
                  .expect("Public api address has incorrect format"))
     }
 
-    pub fn create_node(self) -> Option<Node> {
+    pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(self.commands.as_slice()) {
             Feedback::RunNode(ref ctx) => {
                 let db = Self::db_helper(ctx);
@@ -115,9 +118,8 @@ impl NodeBuilder {
     }
 
     pub fn run(self) {
-        self.create_node()
-            .expect("Expected run command")
-            .run()
-            .expect("Node return error")
+        if let Some(mut node) = self.parse_cmd() {
+            node.run().expect("Node return error")
+        }
     }
 }

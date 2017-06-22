@@ -61,7 +61,7 @@ impl Command for KeyGeneratorCommand {
     }
 
     fn about(&self) -> &str {
-        "Generate node secret and public keys"
+        "Generate node secret and public keys."
     }
 
     fn execute(&self, 
@@ -97,53 +97,55 @@ impl Command for KeyGeneratorCommand {
         Feedback::None
     }
 }
-/*
+
 /// implements command for template generating
 pub struct GenerateTemplateCommand;
-impl GenerateTemplateCommand {
-    pub fn new<'a>() -> App<'a, 'a> {
-        SubCommand::with_name("generate-template")
-            .about("Generate basic template.")
-            .arg(Arg::with_name("COUNT")
-                     .help("Validator total count.")
-                     .required(true)
-                     .index(1))
-            .arg(Arg::with_name("TEMPLATE")
-                     .help("Path to template config.")
-                     .required(true)
-                     .index(2))
+
+impl Command for GenerateTemplateCommand {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_positional("COUNT", true, 
+            "Validator total count."),
+            Argument::new_positional("TEMPLATE", true, 
+            "Path to template config."),
+        ]
     }
 
-    /// Path where template config should be saved
-    pub fn template_file_path<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("TEMPLATE").unwrap())
-    }
-    /// Validator total count
-    pub fn validator_count(matches: &ArgMatches) -> usize {
-        matches.value_of("COUNT").unwrap().parse().unwrap()
+    fn name(&self) -> CommandName {
+        "generate-template"
     }
 
-    /// Write default template config into `template()` path.
-    pub fn execute_default(matches: &ArgMatches) {
-        Self::execute(matches, None)
+    fn about(&self) -> &str {
+        "Generate basic config template."
     }
-    /// Write default template config into `template()` path.
-    /// You can append some values to template as second argument.
-    pub fn execute<T>(matches: &ArgMatches, values: T)
-        where T: Into<Option<BTreeMap<String, Value>>>
-    {
-        let values = values.into().unwrap_or_default();
+
+    fn execute(&self, 
+               context: Context,
+               exts: &Fn(Context) -> Context) -> Feedback {
+        let template_path = context.get::<String>("TEMPLATE")
+                                   .expect("template not found");
+        let template_path = Path::new(&template_path);
+        let count = context.get::<String>("COUNT")
+                                   .expect("template not found")
+                                   .parse()
+                                   .expect("expected count to be int");
+
+        let new_context = exts(context);
+        let values = new_context.get("VALUES").unwrap_or_default();
+
         let template = ConfigTemplate {
-            count: Self::validator_count(matches),
+            count: count,
             services: values,
             ..ConfigTemplate::default()
         };
 
-        ConfigFile::save(&template, Self::template_file_path(matches))
+        ConfigFile::save(&template, template_path)
                         .expect("Could not write template file.");
+        Feedback::None
     }
 }
 
+/*
 /// `add-validator` - append validator to template.
 /// Automaticaly share keys from public key config.
 pub struct AddValidatorCommand;
