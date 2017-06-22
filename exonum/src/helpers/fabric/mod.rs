@@ -118,12 +118,14 @@ impl Context {
                    
     }
 
-    /// write some value into context
+    /// write some value into context, return pervios value
+    /// panic if value could not be serialized as `toml`
     pub fn set<T: Serialize>(&mut self,
                          key: &'static str,
-                         value: T) -> Result<Option<Value>, Box<Error>> {
-        let value: Value = Value::try_from(value)?;
-        Ok(self.values.insert(key, value))
+                         value: T) -> Option<Value> {
+        let value: Value = Value::try_from(value)
+                            .expect("could not convert value into toml");
+        self.values.insert(key, value)
     }
 
 }

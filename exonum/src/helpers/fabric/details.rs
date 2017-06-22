@@ -1,12 +1,16 @@
 //! This module implement all core commands.
+use toml::Value;
 
 use std::fs;
 use std::path::Path;
+use std::net::SocketAddr;
 use std::collections::BTreeMap;
 
+use blockchain::GenesisConfig;
 use helpers::generate_testnet_config;
 use config::ConfigFile;
-
+use node::NodeConfig;
+use storage::Storage;
 use crypto;
 
 use super::internal::{Command, Feedback};
@@ -16,6 +20,45 @@ const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 use helpers::clap::{ValidatorIdent, ConfigTemplate, KeyConfig, PubKeyConfig};
 
 pub struct RunCommand;
+
+impl RunCommand {
+    #[cfg(not(feature="memorydb"))]
+    pub fn db_helper(ctx: &Context) -> Storage {
+        use storage::{LevelDB, LevelDBOptions};
+
+        let path = ctx.get::<String>("LEVELDB_PATH")
+                      .expect("LEVELDB_PATH not found.");
+        let mut options = LevelDBOptions::new();
+        options.create_if_missing = true;
+        LevelDB::new(Path::new(&path), options).unwrap()
+    }
+
+    #[cfg(feature="memorydb")]
+    pub fn db_helper(_: &Context) -> Storage {
+        use storage::MemoryDB;
+        MemoryDB::new()
+    }
+
+    fn node_config(ctx: &Context) -> Value {
+        let path = ctx.get::<String>("NODE_CONFIG_PATH")
+                      .expect("NODE_CONFIG_PATH not found.");
+        ConfigFile::load(Path::new(&path)).unwrap()
+    }
+
+    fn public_api_address(ctx: &Context) -> Option<SocketAddr> {
+        ctx.get::<String>("PUBLIC_API_ADDRESS").ok()
+            .map(|s|
+                s.parse()
+                 .expect("Public api address has incorrect format"))
+    }
+
+    fn private_api_address(ctx: &Context) -> Option<SocketAddr> {
+        ctx.get::<String>("PRIVATE_API_ADDRESS").ok()
+            .map(|s|
+                s.parse()
+                 .expect("Public api address has incorrect format"))
+    }
+}
 
 impl Command for RunCommand {
     fn args(&self) -> Vec<Argument> {
@@ -40,9 +83,26 @@ impl Command for RunCommand {
     }
 
     fn execute(&self, 
-               context: Context,
-               _: &Fn(Context) -> Context) -> Feedback {
-        Feedback::RunNode(context)
+               mut context: Context,
+               exts: &Fn(Context) -> Context) -> Feedback {
+        let config = Self::node_config(&context);
+        let public_addr = Self::public_api_address(&context);
+        let private_addr = Self::private_api_address(&context);
+        context.set("node_config", config);
+        let mut new_context = exts(context);
+        let mut config: NodeConfig = new_context
+                                    .get("node_config")
+                                    .expect("cant load node_config");
+        // Override api options
+        if let Some(addr) = public_addr {
+            config.api.public_api_address = Some(addr);
+        }
+        if let Some(addr) = private_addr {
+            config.api.private_api_address = Some(addr);
+        }
+        new_context.set("node_config", config);
+
+        Feedback::RunNode(new_context)
     }
 }
 
@@ -222,56 +282,41 @@ impl Command for AddValidatorCommand {
     }
 }
 
-
-/*
 pub struct InitCommand;
 
-impl InitCommand {
-    pub fn new<'a>() -> App<'a, 'a> {
-        SubCommand::with_name("init")
-            .about("Toolchain to generate configuration")
-            .arg(Arg::with_name("FULL_TEMPLATE")
-                     .help("Path to full template")
-                     .required(true)
-                     .index(1))
-            .arg(Arg::with_name("KEYCHAIN")
-                     .help("Path to keychain config.")
-                     .required(true)
-                     .index(2))
-            .arg(Arg::with_name("CONFIG_PATH")
-                     .help("Path to node config.")
-                     .required(true)
-                     .index(3))
-
+impl Command for InitCommand {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_positional("FULL_TEMPLATE", true,
+            "Path to full template."),
+            Argument::new_positional("KEYCHAIN", true,
+            "Path to keychain config."),
+            Argument::new_positional("CONFIG_PATH", true,
+            "Path to output node config."),
+        ]
     }
 
-    /// path to full template config
-    pub fn template<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("FULL_TEMPLATE").unwrap())
+    fn name(&self) -> CommandName {
+        "init"
     }
 
-    /// path to output config
-    pub fn config<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("CONFIG_PATH").unwrap())
+    fn about(&self) -> &str {
+        "Toolchain to generate configuration."
     }
 
-    /// path to keychain (public and secret keys)
-    pub fn keychain<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("KEYCHAIN").unwrap())
-    }
+    fn execute(&self, 
+               mut context: Context,
+               exts: &Fn(Context) -> Context) -> Feedback {
+        let template_path = context.get::<String>("FULL_TEMPLATE")
+                                   .expect("template not found");
+        let template_path = Path::new(&template_path);
+        let keychain_path = context.get::<String>("KEYCHAIN")
+                                   .expect("keychain path not found");
+        let keychain_path = Path::new(&keychain_path);
 
-    /// Add validator to template config.
-    pub fn execute_default(matches: &ArgMatches) {
-        Self::execute(matches, |config, _, _| Ok(Value::try_from(config)? ))
-    }
-
-    pub fn execute<F>(matches: &ArgMatches, on_init: F)
-        where F: FnOnce(NodeConfig, &ConfigTemplate, &BTreeMap<String, Value>)
-                        -> Result<Value, Box<Error>>
-    {
-        let config_path = Self::config(matches);
-        let template_path = Self::template(matches);
-        let keychain_path = Self::keychain(matches);
+        let config_path = context.get::<String>("CONFIG_PATH")
+                                   .expect("config path not found");
+        let config_path = Path::new(&config_path);
 
         let template: ConfigTemplate = ConfigFile::load(template_path)
                                                 .expect("Failed to load config template.");
@@ -288,27 +333,34 @@ impl InitCommand {
             .iter()
             .map(|(_, ident)| ident.addr)
             .collect();
-        let validator_ident = &template.validators[&keychain.public_key];
+        let config = {
+            let validator_ident = &template.validators[&keychain.public_key];
 
-        let config = NodeConfig {
-            listen_address: validator_ident.addr,
-            network: Default::default(),
-            peers: peers,
-            public_key: keychain.public_key,
-            secret_key: keychain.secret_key,
-            genesis: genesis,
-            api: Default::default(),
+            NodeConfig {
+                listen_address: validator_ident.addr,
+                network: Default::default(),
+                peers: peers,
+                public_key: keychain.public_key,
+                secret_key: keychain.secret_key,
+                genesis: genesis,
+                api: Default::default(),
+            }
         };
-        let value = on_init(config, &template, &keychain.services_sec_keys)
+
+        context.set("config", config);
+        context.set("template", template);
+        context.set("services_sec_keys", keychain.services_sec_keys);
+
+        let new_context = exts(context);
+
+        let value: Value = new_context.get("value")
             .expect("Could not create config from template, services return error");
         ConfigFile::save(&value, config_path)
                 .expect("Could not write config file.");
         
+        Feedback::None
     }
 }
-
-*/
-
 
 pub struct GenerateTestnetCommand;
 
