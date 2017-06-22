@@ -9,7 +9,7 @@ use config::ConfigFile;
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::{Context, ServiceFactory};
-use super::details::{GenerateTestnetCommand, RunCommand};
+use super::details::{GenerateTestnetCommand, RunCommand, KeyGeneratorCommand};
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
 
@@ -23,7 +23,8 @@ impl NodeBuilder {
     pub fn new() -> NodeBuilder {
         NodeBuilder {
             commands: vec![CollectedCommand::new(Box::new(GenerateTestnetCommand)),
-                           CollectedCommand::new(Box::new(RunCommand))],
+                           CollectedCommand::new(Box::new(RunCommand)),
+                           CollectedCommand::new(Box::new(KeyGeneratorCommand))],
             service_constructors: Vec::new()
         }
     }
@@ -55,8 +56,8 @@ impl NodeBuilder {
     pub fn db_helper(ctx: &Context) -> Storage {
         use storage::{LevelDB, LevelDBOptions};
 
-        let path = ctx.get::<String>("leveldb_path")
-                      .expect("leveldb_path not found.");
+        let path = ctx.get::<String>("LEVELDB_PATH")
+                      .expect("LEVELDB_PATH not found.");
         let mut options = LevelDBOptions::new();
         options.create_if_missing = true;
         LevelDB::new(Path::new(&path), options).unwrap()
@@ -69,8 +70,8 @@ impl NodeBuilder {
     }
 
     pub fn node_config(ctx: &Context) -> NodeConfig {
-        let path = ctx.get::<String>("node_config_path")
-                      .expect("node_config_path not found.");
+        let path = ctx.get::<String>("NODE_CONFIG_PATH")
+                      .expect("NODE_CONFIG_PATH not found.");
         let mut cfg: NodeConfig = ConfigFile::load(Path::new(&path)).unwrap();
         // Override api options
         if let Some(addr) = Self::public_api_address(ctx) {
