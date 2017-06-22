@@ -9,7 +9,7 @@ use config::ConfigFile;
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::{Context, ServiceFactory};
-use super::details::{GenerateTestnetCommand};
+use super::details::{GenerateTestnetCommand, RunCommand};
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
 
@@ -22,7 +22,8 @@ impl NodeBuilder {
 
     pub fn new() -> NodeBuilder {
         NodeBuilder {
-            commands: vec![CollectedCommand::new(Box::new(GenerateTestnetCommand))],
+            commands: vec![CollectedCommand::new(Box::new(GenerateTestnetCommand)),
+                           CollectedCommand::new(Box::new(RunCommand))],
             service_constructors: Vec::new()
         }
     }
@@ -82,14 +83,14 @@ impl NodeBuilder {
     }
 
     pub fn public_api_address(ctx: &Context) -> Option<SocketAddr> {
-        ctx.get::<String>("PUBLIC_API_ADDRESS")
+        ctx.get::<String>("PUBLIC_API_ADDRESS").ok()
             .map(|s|
                 s.parse()
                  .expect("Public api address has incorrect format"))
     }
 
     pub fn private_api_address(ctx: &Context) -> Option<SocketAddr> {
-        ctx.get::<String>("PRIVATE_API_ADDRESS")
+        ctx.get::<String>("PRIVATE_API_ADDRESS").ok()
             .map(|s|
                 s.parse()
                  .expect("Public api address has incorrect format"))

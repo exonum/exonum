@@ -7,8 +7,40 @@ use helpers::generate_testnet_config;
 use config::ConfigFile;
 
 use super::internal::{Command, Feedback};
-use super::{Argument, Context, ArgumentType, CommandName, NamedArgument};
+use super::{Argument, Context, CommandName};
 const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
+
+
+pub struct RunCommand;
+
+impl Command for RunCommand {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_named("NODE_CONFIG_PATH", true, 
+            "Path to node configuration file.", "c", "node-config"),
+            Argument::new_named("LEVELDB_PATH", true, 
+            "Use leveldb database with the given path.", "d", "leveldb"),
+            Argument::new_named("PUBLIC_API_ADDRESS", false, 
+            "Listen address for public api.", None, "public-api-address"),
+            Argument::new_named("PRIVATE_API_ADDRESS", false, 
+            "Listen address for private api.", None, "private-api-address"),
+        ]
+    }
+
+    fn name(&self) -> CommandName {
+        "run"
+    }
+
+    fn about(&self) -> &str {
+        "Run application"
+    }
+
+    fn execute(&self, 
+               context: Context,
+               _: &Fn(Context) -> Context) -> Feedback {
+        Feedback::RunNode(context)
+    }
+}
 /*
 pub struct RunCommand;
 impl RunCommand;
@@ -16,28 +48,7 @@ impl RunCommand;
     pub fn args() -> Vec<Argument> {
         SubCommand::with_name("run")
             .about("Run node with given configuration")
-            .arg(Arg::with_name("NODE_CONFIG_PATH")
-                     .short("c")
-                     .long("node-config")
-                     .help("Path to node configuration file")
-                     .required(true)
-                     .takes_value(true))
-            .arg(Arg::with_name("LEVELDB_PATH")
-                     .short("d")
-                     .long("leveldb-path")
-                     .help("Use leveldb database with the given path")
-                     .required(false)
-                     .takes_value(true))
-            .arg(Arg::with_name("PUBLIC_API_ADDRESS")
-                     .long("public-api-address")
-                     .help("Listen address for public api")
-                     .required(false)
-                     .takes_value(true))
-            .arg(Arg::with_name("PRIVATE_API_ADDRESS")
-                     .long("private-api-address")
-                     .help("Listen address for private api")
-                     .required(false)
-                     .takes_value(true))
+            
     }
 
     pub fn node_config_path(matches: &'a ArgMatches<'a>) -> &'a Path {
@@ -429,34 +440,14 @@ pub struct GenerateTestnetCommand;
 impl Command for GenerateTestnetCommand {
     fn args(&self) -> Vec<Argument> {
         vec![
-            Argument {
-                name: "OUTPUT_DIR",
-                argument: ArgumentType::Named (
-                    NamedArgument { 
-                        short_name: "o",
-                        long_name: "output_dir",
-                    }
-                ),
-                required: true,
-                help: "Path to directory where save configs.",
-            },
-            Argument {
-                name: "START_PORT",
-                argument: ArgumentType::Named (
-                    NamedArgument { 
-                        short_name: "p",
-                        long_name: "start-port",
-                    }
-                ),
-                required: false,
-                help: "Port number started from which should validators listen.",
-            },
-            Argument {
-                name: "COUNT",
-                argument: ArgumentType::Positional,
-                required: true,
-                help: "Count of validators in testnet.",
-            }
+            Argument::new_named("OUTPUT_DIR", true,
+                "Path to directory where save configs.",
+                "o", "output_dir"),
+            Argument::new_named("START_PORT", false,
+                "Port number started from which should validators listen.",
+                "p", "start"),
+            Argument::new_positional("COUNT", true,
+                "Count of validators in testnet."),
         ]
     }
 
@@ -472,10 +463,16 @@ impl Command for GenerateTestnetCommand {
                context: Context,
                _: &Fn(Context) -> Context) -> Feedback {
 
-        let dir = context.get::<String>("OUTPUT_DIR").unwrap();
-        let count = context.get::<u8>("COUNT").unwrap();
-        let start_port = context.get::<u16>("START_PORT")
-                                .unwrap_or_else(|| DEFAULT_EXONUM_LISTEN_PORT);
+        let dir = context.get::<String>("OUTPUT_DIR").expect("output dir");
+        let count: u8 = context.get::<String>("COUNT")
+                                .expect("COUNT")
+                                .parse()
+                                .expect("count as int");
+        let start_port = context.get::<String>("START_PORT")
+                                .ok()
+                                .map_or(DEFAULT_EXONUM_LISTEN_PORT, 
+                                        |v| v.parse::<u16>()
+                                             .expect("COUNT as int"));
         
         let dir = Path::new(&dir);
         let dir = dir.join("validators");
