@@ -34,7 +34,7 @@ impl ClapBackend {
         panic!("Subcommand not found");
     }
 
-    fn into_subcommand<'a>(command: &'a CollectedCommand) -> clap::App<'a, 'a>{
+    fn into_subcommand<'a>(command: &'a CollectedCommand) -> clap::App<'a, 'a> {
         let mut index = 1;
         let command_args: Vec<_> =
             command.args()
@@ -48,9 +48,11 @@ impl ClapBackend {
                             arg
                         }
                         ArgumentType::Named(detail) => {
-                            clap_arg.long(&detail.long_name)
-                            .short(&detail.short_name)
-                            .takes_value(true)
+                            let mut clap_arg = clap_arg.long(&detail.long_name);
+                            if let Some(short) = detail.short_name {
+                                clap_arg = clap_arg.short(&short);
+                            }
+                            clap_arg.takes_value(true)
                         }
                     };
                     clap_arg.help(&arg.help)

@@ -1,5 +1,6 @@
 use super::{Context, CommandName, Argument, CommandExtension};
 
+use std::fmt;
 
 //TODO: we could extend current feedback
 /// Used to take some additional information from executed command
@@ -69,5 +70,15 @@ impl CollectedCommand {
             };
             new_context
         })
+    }
+}
+
+
+impl fmt::Debug for CollectedCommand {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "CollectedCommand {{ args: {:?}, ext_count: {} }}",
+            self.args,
+            self.exts.len()
+        )
     }
 }
