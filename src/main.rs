@@ -1,17 +1,26 @@
+extern crate serde;
 extern crate serde_json;
+#[macro_use] extern crate serde_derive;
 #[macro_use] extern crate exonum;
+extern crate router;
+extern crate bodyparser;
+extern crate iron;
 
-use exonum::blockchain::{Blockchain, Service, GenesisConfig, Transaction};
+use exonum::blockchain::{Blockchain, Service, GenesisConfig, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, RawMessage, FromRaw, Message};
-use exonum::node::{Node, NodeConfig, NodeApiConfig};
-use exonum::storage::{self, View, MemoryDB, MerklePatriciaTable, MapTable, Map};
-use exonum::crypto::PublicKey;
+use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend};
+use exonum::storage::{Fork, MemoryDB, MapIndex};
+use exonum::crypto::{PublicKey, Hash};
 use exonum::encoding::{self, Field};
+use exonum::api::{Api, ApiError};
+use iron::prelude::*;
+use iron::Handler;
+use router::Router;
 
-pub const SERVICE_ID: u16 = 1;
-pub const TX_WALLET_ID: u16 = 1;
-pub const TX_ISSUE_ID: u16 = 2;
-pub const TX_TRANSFER_ID: u16 = 3;
+pub const SERVICE_ID: u16 = 128;
+pub const TX_WALLET_ID: u16 = 130;
+pub const TX_ISSUE_ID: u16 = 129;
+pub const TX_TRANSFER_ID: u16 = 128;
 
 encoding_struct! {
     struct Wallet {
@@ -29,7 +38,7 @@ impl Wallet {
     }
 
     pub fn transfer_to(&mut self, other: &mut Wallet, amount: u64) {
-        if self.pub_key() != other.pub_key() || self.balance() >= amount {
+        if self.pub_key() != other.pub_key() && self.balance() >= amount {
             let self_amount = self.balance() - amount;
             let other_amount = other.balance() + amount;
             self.set_balance(self_amount);
@@ -50,35 +59,37 @@ message! {
 }
 
 impl TxCreateWallet {
-    pub fn execute(&self, schema: CurrencySchema) -> Result<(), storage::Error> {
-        let found = schema.wallet(self.pub_key())?;
-        if found.is_none() {
+    pub fn execute(&self, fork: &mut Fork) {
+        let mut schema = CurrencySchema::new(fork);
+        if let None = schema.wallet(self.pub_key()) {
             let wallet = Wallet::new(self.pub_key(), self.name(), 0);
             schema.wallets().put(self.pub_key(), wallet)
-        } else {
-            Ok(())
         }
     }
 }
 
 impl TxIssue {
-    pub fn execute(&self, schema: CurrencySchema) -> Result<(), storage::Error> {
-        if let Some(mut wallet) = schema.wallet(self.wallet())? {
+    pub fn execute(&self, fork: &mut Fork) {
+        let mut schema = CurrencySchema::new(fork);
+        if let Some(mut wallet) = schema.wallet(self.wallet()) {
             let new_balance = wallet.balance() + self.amount();
             wallet.set_balance(new_balance);
+            schema.wallets().put(self.wallet(), wallet)
         }
-        Ok(())
     }
 }
 
 impl TxTransfer {
-    pub fn execute(&self, schema: CurrencySchema) -> Result<(), storage::Error> {
-        let sender = schema.wallet(self.from())?;
-        let receiver = schema.wallet(self.to())?;
+    pub fn execute(&self, fork: &mut Fork) {
+        let mut schema = CurrencySchema::new(fork);
+        let sender = schema.wallet(self.from());
+        let receiver = schema.wallet(self.to());
         if let (Some(mut sender), Some(mut receiver)) = (sender, receiver) {
             sender.transfer_to(&mut receiver, self.amount());
+            let mut wallets = schema.wallets();
+            wallets.put(self.from(), sender);
+            wallets.put(self.to(), receiver);
         }
-        Ok(())
     }
 }
 
@@ -107,7 +118,38 @@ message! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize)]
+struct TransactionResult {
+    tx_hash: Hash,
+}
+
+#[derive(Clone)]
+struct CryptocurrencyApi<T> {
+    channel: T,
+}
+
+impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
+    fn wire(&self, router: &mut Router) {
+        let self_ = self.clone();
+        let transaction = move |req: &mut Request| -> IronResult<Response> {
+            match req.get::<bodyparser::Struct<CurrencyTx>>() {
+                Ok(Some(transaction)) => {
+                    let tx_hash = transaction.hash();
+                    self_.channel.send(transaction).map_err(|e| ApiError::Events(e))?;
+                    let json = TransactionResult { tx_hash };
+                    self_.ok_response(&serde_json::to_value(&json).unwrap())
+                }
+                Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
+                Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            }
+        };
+        let route_post = "/v1/wallets/transaction";
+        router.post(&route_post, transaction, "transaction");
+    }
+}
+
+#[serde(untagged)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 enum CurrencyTx {
     Transfer(TxTransfer),
     Issue(TxIssue),
@@ -150,32 +192,33 @@ impl Transaction for CurrencyTx {
         }
     }
 
-    fn execute(&self, view: &View) -> Result<(), storage::Error> {
-        let schema = CurrencySchema::new(view);
+    fn execute(&self, view: &mut Fork) {
         match *self {
-            CurrencyTx::Transfer(ref msg) => msg.execute(schema),
-            CurrencyTx::Issue(ref msg) => msg.execute(schema),
-            CurrencyTx::CreateWallet(ref msg) => msg.execute(schema),
+            CurrencyTx::Transfer(ref msg) => msg.execute(view),
+            CurrencyTx::Issue(ref msg) => msg.execute(view),
+            CurrencyTx::CreateWallet(ref msg) => msg.execute(view),
         }
     }
 }
 
-pub struct CurrencySchema<'a> {
-    view: &'a View,
+pub struct CurrencySchema<T> {
+    view: T,
 }
 
-impl<'a> CurrencySchema<'a> {
-    pub fn new(view: &'a View) -> Self {
-        CurrencySchema { view: view }
+impl<T> CurrencySchema<T> {
+    pub fn new(view: T) -> Self {
+        CurrencySchema { view }
     }
+}
 
+impl<'a> CurrencySchema<&'a mut Fork> {
     /// Returns `MerklePatriciaTable` with wallets.
-    pub fn wallets(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, Wallet> {
-        MerklePatriciaTable::new(MapTable::new(vec![20], self.view))
+    pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
+        MapIndex::new(vec![20], self.view)
     }
 
     /// Returns wallet for the given public key.
-    pub fn wallet(&self, pub_key: &PublicKey) -> storage::Result<Option<Wallet>> {
+    pub fn wallet(&mut self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets().get(pub_key)
     }
 
@@ -200,6 +243,14 @@ impl Service for CurrencyService {
         CurrencyTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
     }
 
+    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
+        let mut router = Router::new();
+        let api = CryptocurrencyApi {
+            channel: ctx.node_channel().clone(),
+        };
+        api.wire(&mut router);
+        Some(Box::new(router))
+    }
 }
 
 fn main() {
@@ -210,13 +261,14 @@ fn main() {
     let services: Vec<Box<Service>> = vec![
         Box::new(CurrencyService::new()),
     ];
-    let blockchain = Blockchain::new(db, services);
+    let blockchain = Blockchain::new(Box::new(db), services);
 
     let (public_key, secret_key) = exonum::crypto::gen_keypair();
-    let genesis = GenesisConfig::new(vec![public_key].into_iter());
 
     let peer = "0.0.0.0:2000".parse().unwrap();
     let api = "0.0.0.0:8000".parse().unwrap();
+
+    let genesis = GenesisConfig::new(vec![public_key].into_iter());
 
     let api_cfg = NodeApiConfig {
         enable_blockchain_explorer: true,
