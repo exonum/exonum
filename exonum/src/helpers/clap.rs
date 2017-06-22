@@ -134,9 +134,9 @@ impl ValidatorIdent {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct ConfigTemplate {
-    validators: BTreeMap<PublicKey, ValidatorIdent>,
-    consensus_cfg: ConsensusConfig,
-    count: usize,
+    pub validators: BTreeMap<PublicKey, ValidatorIdent>,
+    pub consensus_cfg: ConsensusConfig,
+    pub count: usize,
     pub services: BTreeMap<String, Value>,
 }
 
@@ -156,16 +156,16 @@ impl ConfigTemplate {
 
 // toml file could not save array without "field name"
 #[derive(Serialize, Deserialize)]
-struct PubKeyConfig {
-    public_key: PublicKey,
-    services_pub_keys: BTreeMap<String, Value>
+pub struct PubKeyConfig {
+    pub public_key: PublicKey,
+    pub services_pub_keys: BTreeMap<String, Value>
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct KeyConfig {
-    public_key: PublicKey,
-    secret_key: SecretKey,
-    services_sec_keys: BTreeMap<String, Value>
+    pub public_key: PublicKey,
+    pub secret_key: SecretKey,
+    pub services_sec_keys: BTreeMap<String, Value>
 }
 
 pub struct KeyGeneratorCommand;

@@ -6,10 +6,13 @@ use std::path::Path;
 use helpers::generate_testnet_config;
 use config::ConfigFile;
 
+use crypto;
+
 use super::internal::{Command, Feedback};
 use super::{Argument, Context, CommandName};
-const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 
+const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
+use helpers::clap::{ValidatorIdent, ConfigTemplate, KeyConfig, PubKeyConfig};
 
 pub struct RunCommand;
 
@@ -41,168 +44,43 @@ impl Command for RunCommand {
         Feedback::RunNode(context)
     }
 }
-/*
-pub struct RunCommand;
-impl RunCommand;
-{
-    pub fn args() -> Vec<Argument> {
-        SubCommand::with_name("run")
-            .about("Run node with given configuration")
-            
-    }
 
-    pub fn node_config_path(matches: &'a ArgMatches<'a>) -> &'a Path {
-        matches
-            .value_of("NODE_CONFIG_PATH")
-            .map(Path::new)
-            .expect("Path to node configuration is no setted")
-    }
-
-    pub fn node_config(matches: &'a ArgMatches<'a>) -> NodeConfig {
-        let path = Self::node_config_path(matches);
-        let mut cfg: NodeConfig = ConfigFile::load(path).unwrap();
-        // Override api options
-        if let Some(addr) = Self::public_api_address(matches) {
-            cfg.api.public_api_address = Some(addr);
-        }
-        if let Some(addr) = Self::private_api_address(matches) {
-            cfg.api.private_api_address = Some(addr);
-        }
-        cfg
-    }
-
-    pub fn public_api_address(matches: &'a ArgMatches<'a>) -> Option<SocketAddr> {
-        matches
-            .value_of("PUBLIC_API_ADDRESS")
-            .map(|s| {
-                     s.parse()
-                         .expect("Public api address has incorrect format")
-                 })
-    }
-
-    pub fn private_api_address(matches: &'a ArgMatches<'a>) -> Option<SocketAddr> {
-        matches
-            .value_of("PRIVATE_API_ADDRESS")
-            .map(|s| {
-                     s.parse()
-                         .expect("Private api address has incorrect format")
-                 })
-    }
-
-    pub fn leveldb_path(matches: &'a ArgMatches<'a>) -> Option<&'a Path> {
-        matches.value_of("LEVELDB_PATH").map(Path::new)
-    }
-
-    #[cfg(not(feature="memorydb"))]
-    pub fn db(matches: &'a ArgMatches<'a>) -> Storage {
-        use storage::{LevelDB, LevelDBOptions};
-
-        let path = Self::leveldb_path(matches).unwrap();
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        LevelDB::new(path, options).unwrap()
-    }
-
-    #[cfg(feature="memorydb")]
-    pub fn db(_: &'a ArgMatches<'a>) -> Storage {
-        use storage::MemoryDB;
-        MemoryDB::new()
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct ValidatorIdent {
-    pub variables: BTreeMap<String, Value>,
-    keys: BTreeMap<String, Value>,
-    addr: SocketAddr,
-}
-
-impl ValidatorIdent {
-
-    pub fn addr(&self) -> SocketAddr {
-        self.addr
-    }
-
-    pub fn keys(&self) -> &BTreeMap<String, Value> {
-        &self.keys
-    }
-}
-
-#[derive(Serialize, Deserialize, Default)]
-pub struct ConfigTemplate {
-    validators: BTreeMap<PublicKey, ValidatorIdent>,
-    consensus_cfg: ConsensusConfig,
-    count: usize,
-    pub services: BTreeMap<String, Value>,
-}
-
-impl ConfigTemplate {
-    pub fn count(&self) -> usize {
-        self.count
-    }
-
-    pub fn validators(&self) -> &BTreeMap<PublicKey, ValidatorIdent> {
-        &self.validators
-    }
-
-    pub fn consensus_cfg(&self) -> &ConsensusConfig {
-        &self.consensus_cfg
-    }
-}
-
-// toml file could not save array without "field name"
-#[derive(Serialize, Deserialize)]
-struct PubKeyConfig {
-    public_key: PublicKey,
-    services_pub_keys: BTreeMap<String, Value>
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct KeyConfig {
-    public_key: PublicKey,
-    secret_key: SecretKey,
-    services_sec_keys: BTreeMap<String, Value>
-}
 
 pub struct KeyGeneratorCommand;
 
-impl KeyGeneratorCommand {
-    /// Creates basic keygen subcommand.
-    pub fn new<'a>() -> App<'a, 'a> {
-        SubCommand::with_name("keygen")
-            .about("Generate basic node secret key.")
-            .arg(Arg::with_name("KEYCHAIN")
-                     .help("Path to key config.")
-                     .required(true)
-                     .index(1))
+impl Command for KeyGeneratorCommand {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_positional("KEYCHAIN", true, 
+            "Path to key config."),
+        ]
     }
 
-    /// Path where keychain config should be saved
-    pub fn keychain_filee<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("KEYCHAIN").unwrap())
+    fn name(&self) -> CommandName {
+        "keygen"
     }
 
-    /// Generates and writes key config to `keychain()` path.
-    pub fn execute_default(matches: &ArgMatches) {
-        Self::execute(matches, None, None)
+    fn about(&self) -> &str {
+        "Generate node secret and public keys"
     }
 
-    /// Generates and writes key config to `keychain()` path.
-    /// Append `services_sec_keys` to keychain.
-    /// Append `services_pub_keys` to public key config. 
-    /// `add-validator` command autmaticaly share public key config.
-    pub fn execute<X, Y>(matches: &ArgMatches,
-                    services_sec_keys: X,
-                    services_pub_keys: Y)
-    where X: Into<Option<BTreeMap<String, Value>>>,
-          Y: Into<Option<BTreeMap<String, Value>>>
-    {
+    fn execute(&self, 
+               context: Context,
+               exts: &Fn(Context) -> Context) -> Feedback {
         let (pub_key, sec_key) = crypto::gen_keypair();
-        let keyconfig = Self::keychain_filee(matches);
+        let keyconfig = context.get::<String>("KEYCHAIN")
+                              .expect("expected keychain path");
+        let keyconfig = Path::new(&keyconfig);
+
         let pub_key_path = keyconfig.with_extension("pub");
+
+        let new_context = exts(context);
+        let services_pub_keys = new_context.get("services_pub_keys");
+        let services_sec_keys = new_context.get("services_sec_keys");
+
         let pub_key_config: PubKeyConfig = PubKeyConfig {
             public_key: pub_key,
-            services_pub_keys: services_pub_keys.into().unwrap_or_default(),
+            services_pub_keys: services_pub_keys.ok().unwrap_or_default(),
         };
         // save pub_key seperately
         ConfigFile::save(&pub_key_config, &pub_key_path)
@@ -211,14 +89,15 @@ impl KeyGeneratorCommand {
         let config = KeyConfig {
             public_key: pub_key,
             secret_key: sec_key,
-            services_sec_keys: services_sec_keys.into().unwrap_or_default(),
+            services_sec_keys: services_sec_keys.ok().unwrap_or_default(),
         };
 
-        ConfigFile::save(&config, Self::keychain_filee(matches))
+        ConfigFile::save(&config, keyconfig)
                     .expect("Could not write keychain file.");
+        Feedback::None
     }
 }
-
+/*
 /// implements command for template generating
 pub struct GenerateTemplateCommand;
 impl GenerateTemplateCommand {
