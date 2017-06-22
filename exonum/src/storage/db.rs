@@ -173,6 +173,12 @@ impl Fork {
     }
 }
 
+impl AsRef<Snapshot> for Snapshot + 'static {
+    fn as_ref(&self) -> &Snapshot {
+        self
+    }
+}
+
 impl AsRef<Snapshot> for Fork {
     fn as_ref(&self) -> &Snapshot {
         &*self
