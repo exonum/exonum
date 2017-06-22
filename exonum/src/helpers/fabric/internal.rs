@@ -52,10 +52,12 @@ impl CollectedCommand {
         self.command.about()
     }
 
-    pub fn extend(&mut self, extender: Box<CommandExtension>) {
-        let args = extender.args();
-        self.args.extend(args.into_iter());
-        self.exts.push(extender);
+    pub fn extend(&mut self, extender: Option<Box<CommandExtension>>) {
+        if let Some(extender) = extender {
+            let args = extender.args();
+            self.args.extend(args.into_iter());
+            self.exts.push(extender);
+        }
     }
 
     pub fn execute(&self, context: Context) -> Feedback {

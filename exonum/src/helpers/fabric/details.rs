@@ -339,6 +339,7 @@ impl Command for InitCommand {
             NodeConfig {
                 listen_address: validator_ident.addr,
                 network: Default::default(),
+                whitelist: Default::default(),
                 peers: peers,
                 public_key: keychain.public_key,
                 secret_key: keychain.secret_key,

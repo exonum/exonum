@@ -1,3 +1,5 @@
+use std::fmt;
+
 use blockchain::{Service, Blockchain};
 use node::{Node, NodeConfig};
 
@@ -74,5 +76,15 @@ impl NodeBuilder {
         if let Some(mut node) = self.parse_cmd() {
             node.run().expect("Node return error")
         }
+    }
+}
+
+
+impl fmt::Debug for NodeBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "NodeBuilder {{ commands: {:?}, services_count: {} }}",
+            self.commands,
+            self.service_constructors.len()
+        )
     }
 }
