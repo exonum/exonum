@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::collections::BTreeMap;
 
 use helpers::generate_testnet_config;
 use config::ConfigFile;
@@ -19,13 +20,13 @@ pub struct RunCommand;
 impl Command for RunCommand {
     fn args(&self) -> Vec<Argument> {
         vec![
-            Argument::new_named("NODE_CONFIG_PATH", true, 
+            Argument::new_named("NODE_CONFIG_PATH", true,
             "Path to node configuration file.", "c", "node-config"),
-            Argument::new_named("LEVELDB_PATH", true, 
+            Argument::new_named("LEVELDB_PATH", true,
             "Use leveldb database with the given path.", "d", "leveldb"),
-            Argument::new_named("PUBLIC_API_ADDRESS", false, 
+            Argument::new_named("PUBLIC_API_ADDRESS", false,
             "Listen address for public api.", None, "public-api-address"),
-            Argument::new_named("PRIVATE_API_ADDRESS", false, 
+            Argument::new_named("PRIVATE_API_ADDRESS", false,
             "Listen address for private api.", None, "private-api-address"),
         ]
     }
@@ -51,7 +52,7 @@ pub struct KeyGeneratorCommand;
 impl Command for KeyGeneratorCommand {
     fn args(&self) -> Vec<Argument> {
         vec![
-            Argument::new_positional("KEYCHAIN", true, 
+            Argument::new_positional("KEYCHAIN", true,
             "Path to key config."),
         ]
     }
@@ -104,9 +105,9 @@ pub struct GenerateTemplateCommand;
 impl Command for GenerateTemplateCommand {
     fn args(&self) -> Vec<Argument> {
         vec![
-            Argument::new_positional("COUNT", true, 
+            Argument::new_positional("COUNT", true,
             "Validator total count."),
-            Argument::new_positional("TEMPLATE", true, 
+            Argument::new_positional("TEMPLATE", true,
             "Path to template config."),
         ]
     }
@@ -145,91 +146,84 @@ impl Command for GenerateTemplateCommand {
     }
 }
 
-/*
+
+
 /// `add-validator` - append validator to template.
 /// Automaticaly share keys from public key config.
 pub struct AddValidatorCommand;
-impl AddValidatorCommand {
-    pub fn new<'a>() -> App<'a, 'a> {
-        SubCommand::with_name("add-validator")
-            .about("Preinit configuration, add validator to config template.")
-            .arg(Arg::with_name("TEMPLATE")
-                     .help("Path to template")
-                     .required(true)
-                     .index(1))
-            .arg(Arg::with_name("PUBLIC_KEY")
-                     .help("Path to public key file.")
-                     .required(true)
-                     .index(2))
-            .arg(Arg::with_name("LISTEN_ADDR")
-                     .short("a")
-                     .long("listen-addr")
-                     .required(true)
-                     .takes_value(true))
 
+impl Command for AddValidatorCommand {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_positional("TEMPLATE", true,
+            "Path to template config."),
+            Argument::new_positional("PUBLIC_KEY", true,
+            "Path to public key file."),
+            Argument::new_named("LISTEN_ADDR", true,
+            "Path to public key file.", "a", "listen-addr"),
+        ]
     }
 
-    /// path to public_key file
-    pub fn public_key_file_path<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("PUBLIC_KEY").unwrap())
+    fn name(&self) -> CommandName {
+        "add-validator"
     }
 
-    /// path to template config
-    pub fn template_file_path<'a>(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("TEMPLATE").unwrap())
+    fn about(&self) -> &str {
+        "Preinit configuration, add validator to config template."
     }
 
-    // exonum listen addr
-    pub fn listen_addr(matches: &ArgMatches) -> String {
-        matches.value_of("LISTEN_ADDR").unwrap().to_string()
-    }
+    fn execute(&self, 
+               mut context: Context,
+               exts: &Fn(Context) -> Context) -> Feedback {
+        let template_path = context.get::<String>("TEMPLATE")
+                                   .expect("template not found");
+        let template_path = Path::new(&template_path);
+        let public_key_path = context.get::<String>("PUBLIC_KEY")
+                                   .expect("public_key path not found");
+        let public_key_path = Path::new(&public_key_path);
 
-    /// Add validator to template config.
-    pub fn execute_default(matches: &ArgMatches) {
-        Self::execute(matches, |_, _| Ok(()))
-    }
-
-    #[cfg_attr(feature="cargo-clippy", allow(map_entry))]
-    pub fn execute<F>(matches: &ArgMatches, on_add: F)
-        where F: FnOnce(&mut ValidatorIdent, &mut ConfigTemplate)
-                        -> Result<(), Box<Error>>,
-    {
-        let template_path = Self::template_file_path(matches);
-        let public_key_path = Self::public_key_file_path(matches);
-        let addr = Self::listen_addr(matches);
+        let addr = context.get::<String>("LISTEN_ADDR")
+                                   .unwrap_or_default();
         let mut addr_parts = addr.split(':');
 
-        let mut template: ConfigTemplate = ConfigFile::load(template_path).unwrap();
+        let template: ConfigTemplate = ConfigFile::load(template_path).unwrap();
         let public_key_config: PubKeyConfig = ConfigFile::load(public_key_path).unwrap();
         let addr = format!("{}:{}",
-                           addr_parts.next().expect("expected ip addr"),
+                           addr_parts.next().unwrap_or("0.0.0.0"),
                            addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, 
                                                     |s| s.parse().expect("could not parse port")))
                 .parse()
                 .unwrap();
-        if !template.validators.contains_key(&public_key_config.public_key) {
+        let template = if !template.validators.contains_key(&public_key_config.public_key) {
             if template.validators.len() >= template.count {
                 panic!("This template already full.");
             }
 
-            let mut ident = ValidatorIdent {
+            let ident = ValidatorIdent {
                 addr: addr,
                 variables: BTreeMap::default(),
                 keys: public_key_config.services_pub_keys,
             };
+            context.set("validator_ident", ident);
+            context.set("template", template);
 
-            on_add(&mut ident, &mut template)
-                  .expect("could not add validator, service return");
-
+            let new_context = exts(context);
+            let ident = new_context.get("validator_ident").expect("validator_ident not found after call exts");
+            let mut template:ConfigTemplate = new_context.get("template").expect("template not found after call exts");
+            
             template.validators.insert(public_key_config.public_key, ident);
+            template
         } else {
-            panic!("This node already in template");
-        }
+            panic!("This node already in template")
+        };
 
         ConfigFile::save(&template, template_path).unwrap();
+        Feedback::None
     }
 }
 
+
+/*
 pub struct InitCommand;
 
 impl InitCommand {

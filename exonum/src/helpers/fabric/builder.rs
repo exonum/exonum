@@ -9,7 +9,7 @@ use config::ConfigFile;
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::{Context, ServiceFactory};
-use super::details::{GenerateTestnetCommand, RunCommand,
+use super::details::{GenerateTestnetCommand, RunCommand, AddValidatorCommand, 
                      KeyGeneratorCommand, GenerateTemplateCommand};
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
@@ -25,6 +25,7 @@ impl NodeBuilder {
         NodeBuilder {
             commands: vec![CollectedCommand::new(Box::new(GenerateTestnetCommand)),
                            CollectedCommand::new(Box::new(RunCommand)),
+                           CollectedCommand::new(Box::new(AddValidatorCommand)),
                            CollectedCommand::new(Box::new(KeyGeneratorCommand)),
                            CollectedCommand::new(Box::new(GenerateTemplateCommand))
                            ],

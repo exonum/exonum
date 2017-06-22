@@ -117,8 +117,8 @@ impl<'a, 'b> RunCommand<'a, 'b>
 #[derive(Serialize, Deserialize)]
 pub struct ValidatorIdent {
     pub variables: BTreeMap<String, Value>,
-    keys: BTreeMap<String, Value>,
-    addr: SocketAddr,
+    pub keys: BTreeMap<String, Value>,
+    pub addr: SocketAddr,
 }
 
 impl ValidatorIdent {
