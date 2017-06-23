@@ -154,18 +154,21 @@ impl ConfigTemplate {
     }
 }
 
+pub type ServicesPubKey = BTreeMap<String, Value>;
+pub type ServicesSecKey = BTreeMap<String, Value>;
+
 // toml file could not save array without "field name"
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PubKeyConfig {
     pub public_key: PublicKey,
-    pub services_pub_keys: BTreeMap<String, Value>
+    pub services_pub_keys: ServicesPubKey
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KeyConfig {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub services_sec_keys: BTreeMap<String, Value>
+    pub services_sec_keys: ServicesSecKey
 }
 
 #[derive(Debug)]
@@ -432,6 +435,7 @@ impl InitCommand {
             secret_key: keychain.secret_key,
             genesis: genesis,
             api: Default::default(),
+            services_configs: Default::default(),
         };
         let value = on_init(config, &template, &keychain.services_sec_keys)
             .expect("Could not create config from template, services return error");

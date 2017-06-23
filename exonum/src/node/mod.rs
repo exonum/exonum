@@ -8,10 +8,12 @@
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
+use toml::Value;
 
 use std::io;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
+use std::collections::BTreeMap;
 use std::thread;
 use std::fmt;
 
@@ -172,6 +174,8 @@ pub struct NodeConfig {
     pub api: NodeApiConfig,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
+    /// Additional config, usable for services.
+    pub services_configs: BTreeMap<String, Value>,
 }
 
 /// Configuration for the `NodeHandler`.
