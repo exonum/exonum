@@ -17,7 +17,7 @@ use iron::prelude::*;
 use iron::Handler;
 use router::Router;
 
-// // // // // // // // // // DATA STRUCTURE // // // // // // // // // //
+// // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
 encoding_struct! {
     struct Wallet {
@@ -56,15 +56,6 @@ message! {
     }
 }
 
-impl TxCreateWallet {
-    pub fn execute(&self, mut schema: CurrencySchema) {
-        if let None = schema.wallet(self.pub_key()) {
-            let wallet = Wallet::new(self.pub_key(), self.name(), 0);
-            schema.wallets().put(self.pub_key(), wallet)
-        }
-    }
-}
-
 pub const TX_ISSUE_ID: u16 = 2;
 
 message! {
@@ -78,16 +69,6 @@ message! {
         field seed:        u64         [40 => 48]
     }
 }
-
-impl TxIssue {
-    pub fn execute(&self, mut schema: CurrencySchema) {
-        if let Some(mut wallet) = schema.wallet(self.pub_key()) {
-            wallet.increase(self.amount());
-            schema.wallets().put(self.pub_key(), wallet)
-        }
-    }
-}
-
 
 pub const TX_TRANSFER_ID: u16 = 3;
 
@@ -103,6 +84,27 @@ message! {
         field seed:        u64         [72 => 80]
     }
 }
+
+// // // // // // // // // // CONTRACTS // // // // // // // // // //
+
+impl TxCreateWallet {
+    pub fn execute(&self, mut schema: CurrencySchema) {
+        if let None = schema.wallet(self.pub_key()) {
+            let wallet = Wallet::new(self.pub_key(), self.name(), 0);
+            schema.wallets().put(self.pub_key(), wallet)
+        }
+    }
+}
+
+impl TxIssue {
+    pub fn execute(&self, mut schema: CurrencySchema) {
+        if let Some(mut wallet) = schema.wallet(self.pub_key()) {
+            wallet.increase(self.amount());
+            schema.wallets().put(self.pub_key(), wallet)
+        }
+    }
+}
+
 
 impl TxTransfer {
     pub fn execute(&self, mut schema: CurrencySchema) {
@@ -155,7 +157,7 @@ impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
     }
 }
 
-// // // // // // // // // // TRANSACTION // // // // // // // // // //
+// // // // // // // // // // BLOCKCHAIN TRANSACTION // // // // // // // // // //
 
 #[serde(untagged)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -211,7 +213,7 @@ impl Transaction for CurrencyTx {
     }
 }
 
-// // // // // // // // // // DATA SCHEMA // // // // // // // // // //
+// // // // // // // // // // STORAGE DATA LAYOUT // // // // // // // // // //
 
 pub struct CurrencySchema<'a> {
     view: &'a mut Fork,
@@ -227,7 +229,7 @@ impl<'a> CurrencySchema<'a> {
     }
 }
 
-// // // // // // // // // // SERVICE // // // // // // // // // //
+// // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 pub const SERVICE_ID: u16 = 1;
 
