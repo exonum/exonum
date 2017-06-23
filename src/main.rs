@@ -17,10 +17,9 @@ use iron::prelude::*;
 use iron::Handler;
 use router::Router;
 
-pub const SERVICE_ID: u16 = 128;
-pub const TX_WALLET_ID: u16 = 130;
-pub const TX_ISSUE_ID: u16 = 129;
-pub const TX_TRANSFER_ID: u16 = 128;
+pub const SERVICE_ID: u16 = 1;
+
+struct CurrencyService;
 
 encoding_struct! {
     struct Wallet {
@@ -33,19 +32,18 @@ encoding_struct! {
 }
 
 impl Wallet {
-    pub fn set_balance(&mut self, balance: u64) {
+    pub fn increase(&mut self, amount: u64) {
+        let balance = self.balance() + amount;
         Field::write(&balance, &mut self.raw, 40, 48);
     }
 
-    pub fn transfer_to(&mut self, other: &mut Wallet, amount: u64) {
-        if self.pub_key() != other.pub_key() && self.balance() >= amount {
-            let self_amount = self.balance() - amount;
-            let other_amount = other.balance() + amount;
-            self.set_balance(self_amount);
-            other.set_balance(other_amount);
-        }
+    pub fn decrease(&mut self, amount: u64) {
+        let balance = self.balance() - amount;
+        Field::write(&balance, &mut self.raw, 40, 48);
     }
 }
+
+pub const TX_WALLET_ID: u16 = 1;
 
 message! {
     struct TxCreateWallet {
@@ -71,10 +69,9 @@ impl TxCreateWallet {
 impl TxIssue {
     pub fn execute(&self, fork: &mut Fork) {
         let mut schema = CurrencySchema::new(fork);
-        if let Some(mut wallet) = schema.wallet(self.wallet()) {
-            let new_balance = wallet.balance() + self.amount();
-            wallet.set_balance(new_balance);
-            schema.wallets().put(self.wallet(), wallet)
+        if let Some(mut wallet) = schema.wallet(self.pub_key()) {
+            wallet.increase(self.amount());
+            schema.wallets().put(self.pub_key(), wallet)
         }
     }
 }
@@ -85,13 +82,20 @@ impl TxTransfer {
         let sender = schema.wallet(self.from());
         let receiver = schema.wallet(self.to());
         if let (Some(mut sender), Some(mut receiver)) = (sender, receiver) {
-            sender.transfer_to(&mut receiver, self.amount());
-            let mut wallets = schema.wallets();
-            wallets.put(self.from(), sender);
-            wallets.put(self.to(), receiver);
+            let amount = self.amount();
+            if sender.balance() >= amount {
+                sender.decrease(amount);
+                receiver.increase(amount);
+                println!("{:?} => {:?}", sender, receiver);
+                let mut wallets = schema.wallets();
+                wallets.put(self.from(), sender);
+                wallets.put(self.to(), receiver);
+            }
         }
     }
 }
+
+pub const TX_ISSUE_ID: u16 = 2;
 
 message! {
     struct TxIssue {
@@ -99,11 +103,13 @@ message! {
         const ID = TX_ISSUE_ID;
         const SIZE = 48;
 
-        field wallet:      &PublicKey  [00 => 32]
+        field pub_key:     &PublicKey  [00 => 32]
         field amount:      u64         [32 => 40]
         field seed:        u64         [40 => 48]
     }
 }
+
+pub const TX_TRANSFER_ID: u16 = 3;
 
 message! {
     struct TxTransfer {
@@ -184,7 +190,7 @@ impl Transaction for CurrencyTx {
                 self.verify_signature(msg.pub_key())
             },
             CurrencyTx::Issue(ref msg) => {
-                self.verify_signature(msg.wallet())
+                self.verify_signature(msg.pub_key())
             },
             CurrencyTx::Transfer(ref msg) => {
                 self.verify_signature(msg.from()) && (*msg.from() != *msg.to())
@@ -224,16 +230,6 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 
 }
 
-struct CurrencyService {
-
-}
-
-impl CurrencyService {
-    pub fn new() -> Self {
-        CurrencyService { }
-    }
-}
-
 impl Service for CurrencyService {
     fn service_name(&self) -> &'static str { "cryptocurrency" }
 
@@ -259,7 +255,7 @@ fn main() {
 
     let db = MemoryDB::new();
     let services: Vec<Box<Service>> = vec![
-        Box::new(CurrencyService::new()),
+        Box::new(CurrencyService),
     ];
     let blockchain = Blockchain::new(Box::new(db), services);
 
