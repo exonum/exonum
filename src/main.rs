@@ -17,9 +17,7 @@ use iron::prelude::*;
 use iron::Handler;
 use router::Router;
 
-pub const SERVICE_ID: u16 = 1;
-
-struct CurrencyService;
+// // // // // // // // // // DATA STRUCTURE // // // // // // // // // //
 
 encoding_struct! {
     struct Wallet {
@@ -43,6 +41,8 @@ impl Wallet {
     }
 }
 
+// // // // // // // // // // MESSAGES // // // // // // // // // //
+
 pub const TX_WALLET_ID: u16 = 1;
 
 message! {
@@ -65,12 +65,42 @@ impl TxCreateWallet {
     }
 }
 
+pub const TX_ISSUE_ID: u16 = 2;
+
+message! {
+    struct TxIssue {
+        const TYPE = SERVICE_ID;
+        const ID = TX_ISSUE_ID;
+        const SIZE = 48;
+
+        field pub_key:     &PublicKey  [00 => 32]
+        field amount:      u64         [32 => 40]
+        field seed:        u64         [40 => 48]
+    }
+}
+
 impl TxIssue {
     pub fn execute(&self, mut schema: CurrencySchema) {
         if let Some(mut wallet) = schema.wallet(self.pub_key()) {
             wallet.increase(self.amount());
             schema.wallets().put(self.pub_key(), wallet)
         }
+    }
+}
+
+
+pub const TX_TRANSFER_ID: u16 = 3;
+
+message! {
+    struct TxTransfer {
+        const TYPE = SERVICE_ID;
+        const ID = TX_TRANSFER_ID;
+        const SIZE = 80;
+
+        field from:        &PublicKey  [00 => 32]
+        field to:          &PublicKey  [32 => 64]
+        field amount:      u64         [64 => 72]
+        field seed:        u64         [72 => 80]
     }
 }
 
@@ -92,39 +122,7 @@ impl TxTransfer {
     }
 }
 
-pub const TX_ISSUE_ID: u16 = 2;
-
-message! {
-    struct TxIssue {
-        const TYPE = SERVICE_ID;
-        const ID = TX_ISSUE_ID;
-        const SIZE = 48;
-
-        field pub_key:     &PublicKey  [00 => 32]
-        field amount:      u64         [32 => 40]
-        field seed:        u64         [40 => 48]
-    }
-}
-
-pub const TX_TRANSFER_ID: u16 = 3;
-
-message! {
-    struct TxTransfer {
-        const TYPE = SERVICE_ID;
-        const ID = TX_TRANSFER_ID;
-        const SIZE = 80;
-
-        field from:        &PublicKey  [00 => 32]
-        field to:          &PublicKey  [32 => 64]
-        field amount:      u64         [64 => 72]
-        field seed:        u64         [72 => 80]
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-struct TransactionResult {
-    tx_hash: Hash,
-}
+// // // // // // // // // // REST API // // // // // // // // // //
 
 #[derive(Clone)]
 struct CryptocurrencyApi<T> {
@@ -133,6 +131,12 @@ struct CryptocurrencyApi<T> {
 
 impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
     fn wire(&self, router: &mut Router) {
+
+        #[derive(Serialize, Deserialize)]
+        struct TransactionResult {
+            tx_hash: Hash,
+        }
+
         let self_ = self.clone();
         let transaction = move |req: &mut Request| -> IronResult<Response> {
             match req.get::<bodyparser::Struct<CurrencyTx>>() {
@@ -150,6 +154,8 @@ impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
         router.post(&route_post, transaction, "transaction");
     }
 }
+
+// // // // // // // // // // TRANSACTION // // // // // // // // // //
 
 #[serde(untagged)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -205,6 +211,8 @@ impl Transaction for CurrencyTx {
     }
 }
 
+// // // // // // // // // // DATA SCHEMA // // // // // // // // // //
+
 pub struct CurrencySchema<'a> {
     view: &'a mut Fork,
 }
@@ -218,6 +226,12 @@ impl<'a> CurrencySchema<'a> {
         self.wallets().get(pub_key)
     }
 }
+
+// // // // // // // // // // SERVICE // // // // // // // // // //
+
+pub const SERVICE_ID: u16 = 1;
+
+struct CurrencyService;
 
 impl Service for CurrencyService {
     fn service_name(&self) -> &'static str { "cryptocurrency" }
@@ -237,6 +251,8 @@ impl Service for CurrencyService {
         Some(Box::new(router))
     }
 }
+
+// // // // // // // // // // ENTRY POINT // // // // // // // // // //
 
 fn main() {
     exonum::crypto::init();
