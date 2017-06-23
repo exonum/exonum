@@ -62,11 +62,10 @@ message! {
     struct TxIssue {
         const TYPE = SERVICE_ID;
         const ID = TX_ISSUE_ID;
-        const SIZE = 48;
+        const SIZE = 40;
 
         field pub_key:     &PublicKey  [00 => 32]
         field amount:      u64         [32 => 40]
-        field seed:        u64         [40 => 48]
     }
 }
 
@@ -76,12 +75,11 @@ message! {
     struct TxTransfer {
         const TYPE = SERVICE_ID;
         const ID = TX_TRANSFER_ID;
-        const SIZE = 80;
+        const SIZE = 72;
 
         field from:        &PublicKey  [00 => 32]
         field to:          &PublicKey  [32 => 64]
         field amount:      u64         [64 => 72]
-        field seed:        u64         [72 => 80]
     }
 }
 
