@@ -10,7 +10,7 @@ byteorder = "0.5.0"
 hex = "0.2.0"
 bit-vec = "0.4.0"
 vec_map = "0.6.0"
-sodiumoxide = "0.0.14"
+sodiumoxide = {version="0.0.14", path="../3rdparty/sodiumoxide"}
 rand = "0.3.0"
 leveldb = {version="0.9", path="../3rdparty/leveldb"}
 serde = "1.0.0"

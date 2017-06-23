@@ -1,0 +1,28 @@
+[package]
+authors = ["dnaq"]
+build = "build.rs"
+description = "FFI binding to libsodium"
+documentation = "https://dnaq.github.io/sodiumoxide"
+keywords = ["libsodium", "NaCl", "crypto"]
+license = "MIT OR Apache-2.0"
+links = "sodium"
+name = "libsodium-sys"
+repository = "https://github.com/dnaq/sodiumoxide.git"
+version = "0.0.14"
+
+[build-dependencies]
+pkg-config = "0.3"
+unwrap = "1.1.0"
+gcc = "0.3.50"
+flate2 = "0.2.19"
+libc = "0.2"
+tar = "0.4.13"
+zip = "0.2.3"
+
+[dependencies]
+libc = "0.2"
+unwrap = "1.1.0"
+
+[lib]
+name = "libsodium_sys"
+path = "lib.rs"

@@ -30,6 +30,8 @@ script:
 - cargo audit
 - cargo test --manifest-path exonum/Cargo.toml
 - cargo test --manifest-path sandbox/Cargo.toml
+- cargo test --manifest-path 3rdparty/leveldb/Cargo.toml
+- cargo test --manifest-path 3rdparty/sodiumoxide/Cargo.toml
 notifications:
   slack:
     rooms:
