@@ -85,8 +85,13 @@ message! {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
-impl TxCreateWallet {
-    pub fn execute(&self, mut schema: CurrencySchema) {
+impl Transaction for TxCreateWallet {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.pub_key())
+    }
+
+    fn execute(&self, view: &mut Fork) {
+        let schema = CurrencySchema { view };
         if let None = schema.wallet(self.pub_key()) {
             let wallet = Wallet::new(self.pub_key(), self.name(), 0);
             schema.wallets().put(self.pub_key(), wallet)
@@ -94,8 +99,13 @@ impl TxCreateWallet {
     }
 }
 
-impl TxIssue {
-    pub fn execute(&self, mut schema: CurrencySchema) {
+impl Transaction for TxIssue {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.pub_key())
+    }
+
+    fn execute(&self, view: &mut Fork) {
+        let schema = CurrencySchema { view };
         if let Some(mut wallet) = schema.wallet(self.pub_key()) {
             wallet.increase(self.amount());
             schema.wallets().put(self.pub_key(), wallet)
@@ -104,8 +114,13 @@ impl TxIssue {
 }
 
 
-impl TxTransfer {
-    pub fn execute(&self, mut schema: CurrencySchema) {
+impl Transaction for TxTransfer {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.from()) && (*self.from() != *self.to())
+    }
+
+    fn execute(&self, view: &mut Fork) {
+        let schema = CurrencySchema { view };
         let sender = schema.wallet(self.from());
         let receiver = schema.wallet(self.to());
         if let (Some(mut sender), Some(mut receiver)) = (sender, receiver) {
@@ -132,18 +147,37 @@ struct CryptocurrencyApi<T> {
 impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
     fn wire(&self, router: &mut Router) {
 
+        #[serde(untagged)]
+        #[derive(Clone, Serialize, Deserialize)]
+        enum TransactionRequest {
+            CreateWallet(TxCreateWallet),
+            Issue(TxIssue),
+            Transfer(TxTransfer),
+        }
+
+        impl Into<Box<Transaction>> for TransactionRequest {
+            fn into(self) -> Box<Transaction> {
+                match self {
+                    TransactionRequest::CreateWallet(trans) => Box::new(trans),
+                    TransactionRequest::Issue(trans) => Box::new(trans),
+                    TransactionRequest::Transfer(trans) => Box::new(trans),
+                }
+            }
+        }
+
         #[derive(Serialize, Deserialize)]
-        struct TransactionResult {
+        struct TransactionResponse {
             tx_hash: Hash,
         }
 
         let self_ = self.clone();
         let transaction = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<CurrencyTx>>() {
+            match req.get::<bodyparser::Struct<TransactionRequest>>() {
                 Ok(Some(transaction)) => {
+                    let transaction: Box<Transaction> = transaction.into();
                     let tx_hash = transaction.hash();
                     self_.channel.send(transaction).map_err(|e| ApiError::Events(e))?;
-                    let json = TransactionResult { tx_hash };
+                    let json = TransactionResponse { tx_hash };
                     self_.ok_response(&serde_json::to_value(&json).unwrap())
                 }
                 Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
@@ -157,6 +191,7 @@ impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
 
 // // // // // // // // // // BLOCKCHAIN TRANSACTION // // // // // // // // // //
 
+/*
 #[serde(untagged)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 enum CurrencyTx {
@@ -210,6 +245,7 @@ impl Transaction for CurrencyTx {
         }
     }
 }
+*/
 
 // // // // // // // // // // STORAGE DATA LAYOUT // // // // // // // // // //
 
@@ -239,7 +275,15 @@ impl Service for CurrencyService {
     fn service_id(&self) -> u16 { SERVICE_ID }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        CurrencyTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+        let trans: Box<Transaction> = match raw.message_type() {
+            TX_TRANSFER_ID => Box::new(TxTransfer::from_raw(raw)?),
+            TX_ISSUE_ID => Box::new(TxIssue::from_raw(raw)?),
+            TX_WALLET_ID => Box::new(TxCreateWallet::from_raw(raw)?),
+            _ => {
+                return Err(encoding::Error::IncorrectMessageType { message_type: raw.message_type() });
+            },
+        };
+        Ok(trans)
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
