@@ -57,8 +57,7 @@ message! {
 }
 
 impl TxCreateWallet {
-    pub fn execute(&self, fork: &mut Fork) {
-        let mut schema = CurrencySchema::new(fork);
+    pub fn execute(&self, mut schema: CurrencySchema) {
         if let None = schema.wallet(self.pub_key()) {
             let wallet = Wallet::new(self.pub_key(), self.name(), 0);
             schema.wallets().put(self.pub_key(), wallet)
@@ -67,8 +66,7 @@ impl TxCreateWallet {
 }
 
 impl TxIssue {
-    pub fn execute(&self, fork: &mut Fork) {
-        let mut schema = CurrencySchema::new(fork);
+    pub fn execute(&self, mut schema: CurrencySchema) {
         if let Some(mut wallet) = schema.wallet(self.pub_key()) {
             wallet.increase(self.amount());
             schema.wallets().put(self.pub_key(), wallet)
@@ -77,8 +75,7 @@ impl TxIssue {
 }
 
 impl TxTransfer {
-    pub fn execute(&self, fork: &mut Fork) {
-        let mut schema = CurrencySchema::new(fork);
+    pub fn execute(&self, mut schema: CurrencySchema) {
         let sender = schema.wallet(self.from());
         let receiver = schema.wallet(self.to());
         if let (Some(mut sender), Some(mut receiver)) = (sender, receiver) {
@@ -199,35 +196,27 @@ impl Transaction for CurrencyTx {
     }
 
     fn execute(&self, view: &mut Fork) {
+        let schema = CurrencySchema { view };
         match *self {
-            CurrencyTx::Transfer(ref msg) => msg.execute(view),
-            CurrencyTx::Issue(ref msg) => msg.execute(view),
-            CurrencyTx::CreateWallet(ref msg) => msg.execute(view),
+            CurrencyTx::Transfer(ref msg) => msg.execute(schema),
+            CurrencyTx::Issue(ref msg) => msg.execute(schema),
+            CurrencyTx::CreateWallet(ref msg) => msg.execute(schema),
         }
     }
 }
 
-pub struct CurrencySchema<T> {
-    view: T,
+pub struct CurrencySchema<'a> {
+    view: &'a mut Fork,
 }
 
-impl<T> CurrencySchema<T> {
-    pub fn new(view: T) -> Self {
-        CurrencySchema { view }
-    }
-}
-
-impl<'a> CurrencySchema<&'a mut Fork> {
-    /// Returns `MerklePatriciaTable` with wallets.
+impl<'a> CurrencySchema<'a> {
     pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
         MapIndex::new(vec![20], self.view)
     }
 
-    /// Returns wallet for the given public key.
     pub fn wallet(&mut self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets().get(pub_key)
     }
-
 }
 
 impl Service for CurrencyService {
