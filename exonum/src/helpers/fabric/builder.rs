@@ -31,27 +31,15 @@ impl NodeBuilder {
         }
     }
 
-    pub fn with_service<S: ServiceFactory>(mut self, service: S) -> NodeBuilder {
+    pub fn with_service<S: ServiceFactory>(mut self) -> NodeBuilder {
         //TODO: take endpoints, etc...
 
         for ref mut command in self.commands.iter_mut() {
             let name = command.name();
             command.extend(S::command(name))
         }
-        self.service_constructors.push(Self::make_constructor(service));
+        self.service_constructors.push(Box::new(S::make_service));
         self
-    }
-
-    fn make_constructor<S>(service: S) ->
-        Box<FnMut(&Context) -> Box<Service>>
-        where S: ServiceFactory
-    {
-        //TODO: wait for `FnBox` to be stable 
-        // https://github.com/rust-lang/rust/issues/28796
-        let mut service = Some(service);
-        Box::new(move |context| service.take()
-                                       .expect("Service constructor called twice.")
-                                       .make_service(context))
     }
 
     pub fn parse_cmd(self) -> Option<Node> {

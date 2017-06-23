@@ -1,3 +1,5 @@
+#![allow(missing_debug_implementations)]
+
 //! This module implement all core commands.
 use toml::Value;
 
@@ -18,10 +20,17 @@ use super::{Argument, Context, CommandName};
 
 const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 use helpers::clap::{ValidatorIdent, ConfigTemplate, KeyConfig, PubKeyConfig};
+// TODO:How to split `NodeConfig`, from services configs?
+// We should extend `NodeConfig` type to take services configs aswell.
 
 pub struct RunCommand;
 
 impl RunCommand {
+
+    pub fn name() -> CommandName {
+        "run"
+    }
+
     #[cfg(not(feature="memorydb"))]
     pub fn db_helper(ctx: &Context) -> Storage {
         use storage::{LevelDB, LevelDBOptions};
@@ -75,7 +84,7 @@ impl Command for RunCommand {
     }
 
     fn name(&self) -> CommandName {
-        "run"
+        Self::name()
     }
 
     fn about(&self) -> &str {
@@ -109,6 +118,12 @@ impl Command for RunCommand {
 
 pub struct KeyGeneratorCommand;
 
+impl KeyGeneratorCommand {
+    pub fn name() -> CommandName {
+        "keygen"
+    }
+}
+
 impl Command for KeyGeneratorCommand {
     fn args(&self) -> Vec<Argument> {
         vec![
@@ -118,7 +133,7 @@ impl Command for KeyGeneratorCommand {
     }
 
     fn name(&self) -> CommandName {
-        "keygen"
+        Self::name()
     }
 
     fn about(&self) -> &str {
@@ -161,6 +176,11 @@ impl Command for KeyGeneratorCommand {
 
 /// implements command for template generating
 pub struct GenerateTemplateCommand;
+impl GenerateTemplateCommand {
+    pub fn name() -> CommandName {
+        "generate-template"
+    }
+}
 
 impl Command for GenerateTemplateCommand {
     fn args(&self) -> Vec<Argument> {
@@ -173,7 +193,7 @@ impl Command for GenerateTemplateCommand {
     }
 
     fn name(&self) -> CommandName {
-        "generate-template"
+        Self::name()
     }
 
     fn about(&self) -> &str {
@@ -211,6 +231,11 @@ impl Command for GenerateTemplateCommand {
 /// `add-validator` - append validator to template.
 /// Automaticaly share keys from public key config.
 pub struct AddValidatorCommand;
+impl AddValidatorCommand {
+    pub fn name() -> CommandName {
+        "add-validator"
+    }
+}
 
 impl Command for AddValidatorCommand {
     fn args(&self) -> Vec<Argument> {
@@ -225,7 +250,7 @@ impl Command for AddValidatorCommand {
     }
 
     fn name(&self) -> CommandName {
-        "add-validator"
+        Self::name()
     }
 
     fn about(&self) -> &str {
@@ -283,6 +308,11 @@ impl Command for AddValidatorCommand {
 }
 
 pub struct InitCommand;
+impl InitCommand {
+    pub fn name() -> CommandName {
+        "init"
+    }
+}
 
 impl Command for InitCommand {
     fn args(&self) -> Vec<Argument> {
@@ -297,7 +327,7 @@ impl Command for InitCommand {
     }
 
     fn name(&self) -> CommandName {
-        "init"
+        Self::name()
     }
 
     fn about(&self) -> &str {
@@ -334,7 +364,9 @@ impl Command for InitCommand {
             .map(|(_, ident)| ident.addr)
             .collect();
         let config = {
-            let validator_ident = &template.validators[&keychain.public_key];
+            let validator_ident = &template.validators
+                                            .get(&keychain.public_key)
+                                            .expect("validator not found in template");
 
             NodeConfig {
                 listen_address: validator_ident.addr,
@@ -345,16 +377,17 @@ impl Command for InitCommand {
                 secret_key: keychain.secret_key,
                 genesis: genesis,
                 api: Default::default(),
+                services_configs: Default::default(),
             }
         };
 
-        context.set("config", config);
+        context.set("node_config", config);
         context.set("template", template);
         context.set("services_sec_keys", keychain.services_sec_keys);
 
         let new_context = exts(context);
 
-        let value: Value = new_context.get("value")
+        let value: Value = new_context.get("node_config")
             .expect("Could not create config from template, services return error");
         ConfigFile::save(&value, config_path)
                 .expect("Could not write config file.");
@@ -364,6 +397,11 @@ impl Command for InitCommand {
 }
 
 pub struct GenerateTestnetCommand;
+impl GenerateTestnetCommand {
+    pub fn name() -> CommandName {
+        "generate-testnet"
+    }
+}
 
 impl Command for GenerateTestnetCommand {
     fn args(&self) -> Vec<Argument> {
@@ -380,7 +418,7 @@ impl Command for GenerateTestnetCommand {
     }
 
     fn name(&self) -> CommandName {
-        "generate-testnet"
+        Self::name()
     }
 
     fn about(&self) -> &str {

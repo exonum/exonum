@@ -8,6 +8,9 @@ use std::collections::BTreeMap;
 use blockchain::Service;
 
 pub use self::builder::NodeBuilder;
+pub use self::details::{RunCommand, AddValidatorCommand,
+                    KeyGeneratorCommand, InitCommand,
+                    GenerateTestnetCommand, GenerateTemplateCommand };
 
 /// `Command` `name` type
 pub type CommandName = &'static str;
@@ -77,7 +80,7 @@ impl Argument {
 /// `Context` is a type, used to keep some values from `Command` into
 /// `CommandExtension` and vice verse.
 pub struct Context {
-    values: BTreeMap<&'static str, Value>
+    values: BTreeMap<String, Value>
 }
 
 impl Context {
@@ -87,7 +90,7 @@ impl Context {
         for arg in args {
             if let Some(value) = matches.value_of(&arg.name) {
                 println!("value with name {}, found {}", arg.name, value);
-                if context.values.insert(arg.name.clone(), value.to_string().into()).is_some() {
+                if context.values.insert(arg.name.to_owned(), value.to_string().into()).is_some() {
                     // TODO: replace by `unreachable!` 
                     // after making it unreachable ;)
                     panic!("Found args dupplicate, in args list.");
@@ -125,7 +128,7 @@ impl Context {
                          value: T) -> Option<Value> {
         let value: Value = Value::try_from(value)
                             .expect("could not convert value into toml");
-        self.values.insert(key, value)
+        self.values.insert(key.to_owned(), value)
     }
 
 }
@@ -145,7 +148,7 @@ pub trait ServiceFactory: 'static {
         None
     }
     /// create new service, from context, returned by `run` command.
-    fn make_service(self, run_context: &Context) -> Box<Service>;
+    fn make_service( run_context: &Context) -> Box<Service>;
 }
 
 mod builder;

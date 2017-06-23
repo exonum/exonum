@@ -62,13 +62,11 @@ impl CollectedCommand {
 
     pub fn execute(&self, context: Context) -> Feedback {
         self.command.execute(context, &|context| {
+            // TODO: check duplicates, in services context keys
             let mut new_context = context.clone();
             for ext in &self.exts {
-                let local_context = context.clone();
-                let out_context = ext.execute(local_context)
+                new_context = ext.execute(new_context)
                                      .expect("Could not execute extension.");
-                // TODO: check duplicates
-                new_context.values.extend(out_context.values.into_iter());
             };
             new_context
         })
