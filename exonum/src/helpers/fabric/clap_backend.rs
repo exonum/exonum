@@ -8,7 +8,7 @@ pub struct ClapBackend;
 impl ClapBackend {
 
     pub fn execute(commands: &[CollectedCommand]) -> Feedback {
-        let app = 
+        let app =
         clap::App::new("Exonum application based on fabric configuration.")
                 .version(env!("CARGO_PKG_VERSION"))
                 .author("Vladimir M. <vladimir.motylenko@xdev.re>")
@@ -57,7 +57,7 @@ impl ClapBackend {
                     };
                     clap_arg.help(&arg.help)
                             .required(arg.required)
-                    
+
                     }).collect();
 
         let mut subcommand = clap::SubCommand::with_name(command.name())

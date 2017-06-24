@@ -154,21 +154,21 @@ impl ConfigTemplate {
     }
 }
 
-pub type ServicesPubKey = BTreeMap<String, Value>;
-pub type ServicesSecKey = BTreeMap<String, Value>;
+pub type ServicesPubKeys = BTreeMap<String, Value>;
+pub type ServicesSecKeys = BTreeMap<String, Value>;
 
 // toml file could not save array without "field name"
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PubKeyConfig {
     pub public_key: PublicKey,
-    pub services_pub_keys: ServicesPubKey
+    pub services_pub_keys: ServicesPubKeys
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KeyConfig {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
-    pub services_sec_keys: ServicesSecKey
+    pub services_sec_keys: ServicesSecKeys
 }
 
 #[derive(Debug)]
@@ -197,7 +197,7 @@ impl KeyGeneratorCommand {
 
     /// Generates and writes key config to `keychain()` path.
     /// Append `services_sec_keys` to keychain.
-    /// Append `services_pub_keys` to public key config. 
+    /// Append `services_pub_keys` to public key config.
     /// `add-validator` command autmaticaly share public key config.
     pub fn execute<X, Y>(matches: &ArgMatches,
                     services_sec_keys: X,
@@ -332,7 +332,7 @@ impl AddValidatorCommand {
         let public_key_config: PubKeyConfig = ConfigFile::load(public_key_path).unwrap();
         let addr = format!("{}:{}",
                            addr_parts.next().expect("expected ip addr"),
-                           addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, 
+                           addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT,
                                                     |s| s.parse().expect("could not parse port")))
                 .parse()
                 .unwrap();
@@ -441,7 +441,7 @@ impl InitCommand {
             .expect("Could not create config from template, services return error");
         ConfigFile::save(&value, config_path)
                 .expect("Could not write config file.");
-        
+
     }
 }
 
