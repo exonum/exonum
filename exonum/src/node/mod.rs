@@ -350,7 +350,7 @@ impl<S> fmt::Debug for NodeHandler<S>
 }
 
 pub trait TransactionSend: Send + Sync {
-    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()>;
+    fn send(&self, tx: Box<Transaction>) -> EventsResult<()>;
 }
 
 impl<S> TxSender<S>
@@ -364,12 +364,11 @@ impl<S> TxSender<S>
 impl<S> TransactionSend for TxSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()> {
-        // TODO remove double data convertation
+    fn send(&self, tx: Box<Transaction>) -> EventsResult<()> {
         if !tx.verify() {
             return Err(EventsError::new("Unable to verify transaction"));
         }
-        let msg = ExternalMessage::Transaction(Box::new(tx));
+        let msg = ExternalMessage::Transaction(tx);
         self.inner.post_event(msg)
     }
 }
