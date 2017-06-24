@@ -6,7 +6,7 @@ use node::{Node, NodeConfig};
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::{Context, ServiceFactory};
-use super::details::{GenerateTestnetCommand, RunCommand, AddValidatorCommand, 
+use super::details::{GenerateTestnetCommand, RunCommand, AddValidatorCommand,
                      KeyGeneratorCommand, GenerateTemplateCommand, InitCommand};
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.

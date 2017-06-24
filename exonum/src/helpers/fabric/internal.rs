@@ -1,6 +1,7 @@
 use super::{Context, CommandName, Argument, CommandExtension};
 
 use std::fmt;
+use std::error::Error;
 
 //TODO: we could extend current feedback
 /// Used to take some additional information from executed command
@@ -8,13 +9,27 @@ pub enum Feedback {
     RunNode(Context),
     None,
 }
+#[derive(Clone, Debug, Copy)]
+pub struct NotFoundInMap;
+
+impl Error for NotFoundInMap {
+    fn description(&self) -> &str {
+        "Expected Some in getting context."
+    }
+}
+
+impl fmt::Display for NotFoundInMap {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
 
 /// `Command` trait useable to create subcommand for `NodeBuilder`
 pub trait Command {
     fn args(&self) -> Vec<Argument>;
     fn name(&self) -> CommandName ;
     fn about(&self) -> &str;
-    fn execute(&self, 
+    fn execute(&self,
                context: Context,
                extension: &Fn(Context) -> Context) -> Feedback;
 }

@@ -35,7 +35,7 @@ impl RunCommand {
     pub fn db_helper(ctx: &Context) -> Storage {
         use storage::{LevelDB, LevelDBOptions};
 
-        let path = ctx.get::<String>("LEVELDB_PATH")
+        let path = ctx.arg::<String>("LEVELDB_PATH")
                       .expect("LEVELDB_PATH not found.");
         let mut options = LevelDBOptions::new();
         options.create_if_missing = true;
@@ -48,24 +48,18 @@ impl RunCommand {
         MemoryDB::new()
     }
 
-    fn node_config(ctx: &Context) -> Value {
-        let path = ctx.get::<String>("NODE_CONFIG_PATH")
+    fn node_config(ctx: &Context) -> NodeConfig {
+        let path = ctx.arg::<String>("NODE_CONFIG_PATH")
                       .expect("NODE_CONFIG_PATH not found.");
-        ConfigFile::load(Path::new(&path)).unwrap()
+        ConfigFile::load(path).unwrap()
     }
 
     fn public_api_address(ctx: &Context) -> Option<SocketAddr> {
-        ctx.get::<String>("PUBLIC_API_ADDRESS").ok()
-            .map(|s|
-                s.parse()
-                 .expect("Public api address has incorrect format"))
+        ctx.arg("PUBLIC_API_ADDRESS").ok()
     }
 
     fn private_api_address(ctx: &Context) -> Option<SocketAddr> {
-        ctx.get::<String>("PRIVATE_API_ADDRESS").ok()
-            .map(|s|
-                s.parse()
-                 .expect("Public api address has incorrect format"))
+        ctx.arg("PRIVATE_API_ADDRESS").ok()
     }
 }
 
@@ -91,12 +85,13 @@ impl Command for RunCommand {
         "Run application"
     }
 
-    fn execute(&self, 
+    fn execute(&self,
                mut context: Context,
                exts: &Fn(Context) -> Context) -> Feedback {
         let config = Self::node_config(&context);
         let public_addr = Self::public_api_address(&context);
         let private_addr = Self::private_api_address(&context);
+
         context.set("node_config", config);
         let mut new_context = exts(context);
         let mut config: NodeConfig = new_context
@@ -140,23 +135,24 @@ impl Command for KeyGeneratorCommand {
         "Generate node secret and public keys."
     }
 
-    fn execute(&self, 
-               context: Context,
+    fn execute(&self,
+               mut context: Context,
                exts: &Fn(Context) -> Context) -> Feedback {
         let (pub_key, sec_key) = crypto::gen_keypair();
-        let keyconfig = context.get::<String>("KEYCHAIN")
+        let keyconfig = context.arg::<String>("KEYCHAIN")
                               .expect("expected keychain path");
-        let keyconfig = Path::new(&keyconfig);
 
-        let pub_key_path = keyconfig.with_extension("pub");
-
+        let pub_key_path = Path::new(&keyconfig).with_extension("pub");
+        context.set("validator_ident", BTreeMap::<String, Value>::default());
+        context.set("template", BTreeMap::<String, Value>::default());
         let new_context = exts(context);
         let services_pub_keys = new_context.get("services_pub_keys");
         let services_sec_keys = new_context.get("services_sec_keys");
 
         let pub_key_config: PubKeyConfig = PubKeyConfig {
             public_key: pub_key,
-            services_pub_keys: services_pub_keys.ok().unwrap_or_default(),
+            services_pub_keys: services_pub_keys
+                                .expect("service_pub_keys not found after exts call"),
         };
         // save pub_key seperately
         ConfigFile::save(&pub_key_config, &pub_key_path)
@@ -165,7 +161,8 @@ impl Command for KeyGeneratorCommand {
         let config = KeyConfig {
             public_key: pub_key,
             secret_key: sec_key,
-            services_sec_keys: services_sec_keys.ok().unwrap_or_default(),
+            services_sec_keys: services_sec_keys
+                                .expect("service_sec_keys not found after exts call"),
         };
 
         ConfigFile::save(&config, keyconfig)
@@ -200,19 +197,17 @@ impl Command for GenerateTemplateCommand {
         "Generate basic config template."
     }
 
-    fn execute(&self, 
-               context: Context,
+    fn execute(&self,
+               mut context: Context,
                exts: &Fn(Context) -> Context) -> Feedback {
-        let template_path = context.get::<String>("TEMPLATE")
+        let template_path = context.arg::<String>("TEMPLATE")
                                    .expect("template not found");
-        let template_path = Path::new(&template_path);
-        let count = context.get::<String>("COUNT")
-                                   .expect("template not found")
-                                   .parse()
+        let count = context.arg("COUNT")
                                    .expect("expected count to be int");
-
+                                   
+        context.set("VALUE", BTreeMap::<String, Value>::default());
         let new_context = exts(context);
-        let values = new_context.get("VALUES").unwrap_or_default();
+        let values = new_context.get("VALUE").unwrap_or_default();
 
         let template = ConfigTemplate {
             count: count,
@@ -257,29 +252,29 @@ impl Command for AddValidatorCommand {
         "Preinit configuration, add validator to config template."
     }
 
-    fn execute(&self, 
+    fn execute(&self,
                mut context: Context,
                exts: &Fn(Context) -> Context) -> Feedback {
-        let template_path = context.get::<String>("TEMPLATE")
+        let template_path = context.arg::<String>("TEMPLATE")
                                    .expect("template not found");
-        let template_path = Path::new(&template_path);
-        let public_key_path = context.get::<String>("PUBLIC_KEY")
+        let public_key_path = context.arg::<String>("PUBLIC_KEY")
                                    .expect("public_key path not found");
-        let public_key_path = Path::new(&public_key_path);
+        let addr = context.arg::<String>("LISTEN_ADDR").unwrap_or_default();
 
-        let addr = context.get::<String>("LISTEN_ADDR")
-                                   .unwrap_or_default();
         let mut addr_parts = addr.split(':');
-
-        let template: ConfigTemplate = ConfigFile::load(template_path).unwrap();
+        let template: ConfigTemplate = ConfigFile::load(&template_path).unwrap();
         let public_key_config: PubKeyConfig = ConfigFile::load(public_key_path).unwrap();
-        let addr = format!("{}:{}",
-                           addr_parts.next().unwrap_or("0.0.0.0"),
-                           addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, 
-                                                    |s| s.parse().expect("could not parse port")))
-                .parse()
-                .unwrap();
-        let template = if !template.validators.contains_key(&public_key_config.public_key) {
+
+        let addr_str = format!("{}:{}",
+                           addr_parts.next()
+                                     .unwrap_or("0.0.0.0"),
+                           addr_parts.next()
+                                     .map_or(DEFAULT_EXONUM_LISTEN_PORT,
+                                                |s| s.parse()
+                                                     .expect("could not parse port")));
+        let addr = addr_str.parse().unwrap();
+        let template =
+        if !template.validators.contains_key(&public_key_config.public_key) {
             if template.validators.len() >= template.count {
                 panic!("This template already full.");
             }
@@ -293,16 +288,18 @@ impl Command for AddValidatorCommand {
             context.set("template", template);
 
             let new_context = exts(context);
-            let ident = new_context.get("validator_ident").expect("validator_ident not found after call exts");
-            let mut template:ConfigTemplate = new_context.get("template").expect("template not found after call exts");
-            
+            let ident = new_context.get("validator_ident")
+                            .expect("validator_ident not found after call exts");
+            let mut template: ConfigTemplate = new_context.get("template")
+                            .expect("template not found after call exts");
+
             template.validators.insert(public_key_config.public_key, ident);
             template
         } else {
             panic!("This node already in template")
         };
 
-        ConfigFile::save(&template, template_path).unwrap();
+        ConfigFile::save(&template, &template_path).unwrap();
         Feedback::None
     }
 }
@@ -334,17 +331,17 @@ impl Command for InitCommand {
         "Toolchain to generate configuration."
     }
 
-    fn execute(&self, 
+    fn execute(&self,
                mut context: Context,
                exts: &Fn(Context) -> Context) -> Feedback {
-        let template_path = context.get::<String>("FULL_TEMPLATE")
+        let template_path = context.arg::<String>("FULL_TEMPLATE")
                                    .expect("template not found");
         let template_path = Path::new(&template_path);
-        let keychain_path = context.get::<String>("KEYCHAIN")
+        let keychain_path = context.arg::<String>("KEYCHAIN")
                                    .expect("keychain path not found");
         let keychain_path = Path::new(&keychain_path);
 
-        let config_path = context.get::<String>("CONFIG_PATH")
+        let config_path = context.arg::<String>("CONFIG_PATH")
                                    .expect("config path not found");
         let config_path = Path::new(&config_path);
 
@@ -391,7 +388,7 @@ impl Command for InitCommand {
             .expect("Could not create config from template, services return error");
         ConfigFile::save(&value, config_path)
                 .expect("Could not write config file.");
-        
+
         Feedback::None
     }
 }
@@ -425,21 +422,16 @@ impl Command for GenerateTestnetCommand {
         "Generates genesis configuration for testnet"
     }
 
-    fn execute(&self, 
+    fn execute(&self,
                context: Context,
                _: &Fn(Context) -> Context) -> Feedback {
 
-        let dir = context.get::<String>("OUTPUT_DIR").expect("output dir");
-        let count: u8 = context.get::<String>("COUNT")
-                                .expect("COUNT")
-                                .parse()
+        let dir = context.arg::<String>("OUTPUT_DIR").expect("output dir");
+        let count: u8 = context.arg("COUNT")
                                 .expect("count as int");
-        let start_port = context.get::<String>("START_PORT")
-                                .ok()
-                                .map_or(DEFAULT_EXONUM_LISTEN_PORT, 
-                                        |v| v.parse::<u16>()
-                                             .expect("COUNT as int"));
-        
+        let start_port = context.arg::<u16>("START_PORT")
+                                .unwrap_or(DEFAULT_EXONUM_LISTEN_PORT);
+
         let dir = Path::new(&dir);
         let dir = dir.join("validators");
         if !dir.exists() {

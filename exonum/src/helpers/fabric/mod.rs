@@ -2,10 +2,14 @@ use clap;
 use toml::Value;
 use serde::{Serialize, Deserialize};
 
+use std::str::FromStr;
 use std::error::Error;
 use std::collections::BTreeMap;
 
 use blockchain::Service;
+use self::internal::NotFoundInMap;
+
+
 
 pub use self::builder::NodeBuilder;
 pub use self::details::{RunCommand, AddValidatorCommand,
@@ -52,13 +56,13 @@ impl Argument {
     {
         Argument {
             argument: ArgumentType::Named (
-                NamedArgument { 
+                NamedArgument {
                     short_name: short_name.into(),
                     long_name
                 }
             ),
             name, help, required,
-            
+
         }
     }
 
@@ -70,7 +74,7 @@ impl Argument {
         Argument {
             argument: ArgumentType::Positional,
             name, help, required,
-            
+
         }
     }
 }
@@ -80,7 +84,8 @@ impl Argument {
 /// `Context` is a type, used to keep some values from `Command` into
 /// `CommandExtension` and vice verse.
 pub struct Context {
-    values: BTreeMap<String, Value>
+    args: BTreeMap<String, String>,
+    variables: BTreeMap<String, Value>,
 }
 
 impl Context {
@@ -89,46 +94,50 @@ impl Context {
         let mut context = Context::default();
         for arg in args {
             if let Some(value) = matches.value_of(&arg.name) {
-                println!("value with name {}, found {}", arg.name, value);
-                if context.values.insert(arg.name.to_owned(), value.to_string().into()).is_some() {
-                    // TODO: replace by `unreachable!` 
-                    // after making it unreachable ;)
+                if context.args.insert(arg.name.to_owned(), value.to_string()).is_some() {
+                    // TODO: replace by `unreachable!`
+                    // after moving this check into `CollectedCommand`
                     panic!("Found args dupplicate, in args list.");
                 }
             }
-            else {
-                if arg.required {
-                    panic!("Argument {} not found.", arg.name)
-                }
+            else if arg.required {
+                panic!("Argument {} not found.", arg.name)
             }
         }
         context
     }
 
-    /// Get value from context.
-    /// Warning: values from command line are parsed as string,
-    /// and can't be converted directly into int, because of `toml`
-    /// parsing specifics. Use `context.get<String>(key)?.parse()` instead.
-    pub fn get<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, Box<Error>> {
-        println!("Context iterator: {:?}, get:{}", self.values, key);
-        Ok(self.values.get(key)
-                   .map_or_else(
-                        | | Err(::serde::de::Error::custom("Expected Some in getting context.")),
-                        |v| v.clone()
-                            .try_into()
-                   )?)
-                   
-                   
+    /// Get cmd argument value
+    pub fn arg<T: FromStr>(&self, key: &str) -> Result<T, Box<Error>>
+        where <T as FromStr>::Err: Error + 'static
+    {
+        if let Some(v) = self.args.get(key) {
+            Ok(v.parse()?)
+        }
+        else{
+            Err(Box::new(NotFoundInMap))
+        }
     }
 
-    /// write some value into context, return pervios value
-    /// panic if value could not be serialized as `toml`
+    /// Get variable from context.
+    pub fn get<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, Box<Error>> {
+        if let Some(v) = self.variables.get(key) {
+            Ok(v.clone().try_into()?)
+        }
+        else {
+            Err(Box::new(NotFoundInMap))
+        }
+    }
+
+    /// Set variable in context, return pervios value
+    /// ## Panic:
+    /// if value could not be serialized as `toml`
     pub fn set<T: Serialize>(&mut self,
                          key: &'static str,
                          value: T) -> Option<Value> {
         let value: Value = Value::try_from(value)
                             .expect("could not convert value into toml");
-        self.values.insert(key.to_owned(), value)
+        self.variables.insert(key.to_owned(), value)
     }
 
 }
@@ -139,7 +148,7 @@ pub trait CommandExtension {
 }
 
 pub trait ServiceFactory: 'static {
-    //TODO: we could move 
+    //TODO: we could move
     // `service_name` and `service_id` from `Service` trait into this one
     //fn name() -> &'static str;
     /// return `CommandExtension` for specific `CommandName`
