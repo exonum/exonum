@@ -230,32 +230,32 @@ macro_rules! check_bounds {
      $field_name:ident : $field_type:ty [$field_from:expr => $field_to:expr],
      $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)+
      ) => {
-        debug_assert!($prev_to == $field_from);
-        debug_assert!($field_to - $field_from == <$field_type as Field>::field_size());
+        debug_assert_eq!($prev_to, $field_from);
+        debug_assert_eq!($field_to - $field_from, <$field_type as Field>::field_size());
         check_bounds!(@deep $size, $field_to, $($next_name : $next_type [$next_from => $next_to],)+);
     };
     (@deep $size:expr, $prev_to:expr,
      $last_name:ident : $last_type:ty [$last_from:expr => $last_to:expr],
      ) => {
-        debug_assert!($prev_to == $last_from);
-        debug_assert!($last_to == $size);
-        debug_assert!($last_to - $last_from == <$last_type as Field>::field_size());
+        debug_assert_eq!($prev_to, $last_from);
+        debug_assert_eq!($last_to, $size);
+        debug_assert_eq!($last_to - $last_from, <$last_type as Field>::field_size());
     };
     ($size:expr,
      $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
      ) => {{
         use $crate::encoding::Field;
-        debug_assert!($first_from == 0);
-        debug_assert!($first_to == $size);
-        debug_assert!($first_to - $first_from == <$first_type as Field>::field_size());
+        debug_assert_eq!($first_from, 0);
+        debug_assert_eq!($first_to, $size);
+        debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size());
     }};
     ($size:expr,
      $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
      $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)*
      ) => {{
         use $crate::encoding::Field;
-        debug_assert!($first_from == 0);
-        debug_assert!($first_to - $first_from == <$first_type as Field>::field_size());
+        debug_assert_eq!($first_from, 0);
+        debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size());
         check_bounds!(@deep $size, $first_to, $($next_name : $next_type [$next_from => $next_to],)*);
     }};
 }
