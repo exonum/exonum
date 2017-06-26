@@ -434,7 +434,7 @@ fn test_get_config_votes() {
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
 
-    let expected_body = ApiResponseVotesInfo::ProposeAbsent(None);
+    let expected_body: ApiResponseVotesInfo = None;
     let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);
     assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
@@ -446,6 +446,15 @@ fn test_get_config_votes() {
             .unwrap();
         api_sandbox.commit();
     }
+
+    let expected_body: ApiResponseVotesInfo = {
+        let n_validators = api_sandbox.sandbox.n_validators();
+        Some(vec![None; n_validators])
+    };
+    let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
+    let actual_body = response_body(resp_config_votes);
+    assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
+
     let votes = {
         let n_validators = api_sandbox.sandbox.n_validators();
         let excluded_validator = 2;
@@ -468,7 +477,7 @@ fn test_get_config_votes() {
         api_sandbox.commit();
         votes
     };
-    let expected_body = ApiResponseVotesInfo::Votes(votes);
+    let expected_body = Some(votes);
 
     let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);

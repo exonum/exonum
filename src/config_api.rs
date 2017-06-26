@@ -35,11 +35,7 @@ pub struct ApiResponseConfigInfo {
     pub propose: Option<StorageValueConfigProposeData>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub enum ApiResponseVotesInfo {
-    Votes(Vec<Option<TxConfigVote>>),
-    ProposeAbsent(Option<()>),
-}
+pub type ApiResponseVotesInfo = Option<Vec<Option<TxConfigVote>>>;
 
 #[derive(Serialize, Deserialize)]
 pub struct ApiResponseProposePost {
@@ -110,9 +106,10 @@ impl PublicConfigApi {
         let res = match configuration_schema
                   .propose_data_by_config_hash()
                   .get(cfg_hash)? {
-            None => ApiResponseVotesInfo::ProposeAbsent(None),
-            Some(_) => ApiResponseVotesInfo::Votes(configuration_schema.get_votes(cfg_hash)?),
+            None => None,
+            Some(_) => Some(configuration_schema.get_votes(cfg_hash)?),
         };
+
         Ok(res)
     }
 
