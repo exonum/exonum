@@ -310,20 +310,20 @@ fn main() {
 
     let (public_key, secret_key) = exonum::crypto::gen_keypair();
 
-    let peer = "0.0.0.0:2000".parse().unwrap();
-    let api = "0.0.0.0:8000".parse().unwrap();
+    let peer_address = "0.0.0.0:2000".parse().unwrap();
+    let api_address = "0.0.0.0:8000".parse().unwrap();
 
     let genesis = GenesisConfig::new(vec![public_key].into_iter());
 
     let api_cfg = NodeApiConfig {
         enable_blockchain_explorer: true,
-        public_api_address: Some(api),
+        public_api_address: Some(api_address),
         private_api_address: None,
     };
 
     let node_cfg = NodeConfig {
-        listen_address: peer,
-        peers: vec![peer],
+        listen_address: peer_address,
+        peers: vec![],
         public_key,
         secret_key,
         genesis,
