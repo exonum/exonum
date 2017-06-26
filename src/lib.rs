@@ -582,9 +582,7 @@ impl Service for ConfigurationService {
     /// Returns box ([ConfigTx](ConfigTx.t.html))
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
         match raw.message_type() {
-            CONFIG_PROPOSE_MESSAGE_ID => {
-                Ok(Box::new(TxConfigPropose::from_raw(raw)?))
-            }
+            CONFIG_PROPOSE_MESSAGE_ID => Ok(Box::new(TxConfigPropose::from_raw(raw)?)),
             CONFIG_VOTE_MESSAGE_ID => Ok(Box::new(TxConfigVote::from_raw(raw)?)),
             _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
         }
