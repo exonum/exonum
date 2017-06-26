@@ -14,11 +14,11 @@ iron-test = { git = "https://github.com/reem/iron-test" }
 cryptocurrency = {version="0.1.0", path="../cryptocurrency"}
 
 [dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/darkeld3r/exonum-core.git"
 version = "0.1.0"
-rev = "d17959deb4763539c23343665f94c1d469e1b4f2"
+rev = "fe9ef737d2be165b794870fe3bb977bae1b8ff6b"
 
 [dependencies.sandbox]
-git = "ssh://git@github.com/exonum/exonum-core.git"
+git = "ssh://git@github.com/darkeld3r/exonum-core.git"
 version = "0.1.0"
-rev = "d17959deb4763539c23343665f94c1d469e1b4f2"
+rev = "fe9ef737d2be165b794870fe3bb977bae1b8ff6b"
