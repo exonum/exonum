@@ -21,7 +21,7 @@
 //! - `previous_cfg_hash` - hash of previous configuration, which validators' set is allowed to cast
 //! votes for current config.
 //!
-//! See [StoredConfiguration](../exonum/blockchain/config/struct.StoredConfiguration.html)
+//! See [`StoredConfiguration`](../exonum/blockchain/config/struct.StoredConfiguration.html)
 //! in exonum.
 //!
 //! While using the service's transactions and/or api, it's important to understand, how [hash of a
@@ -129,13 +129,13 @@ use exonum::encoding::serialize::json::reexport as serde_json;
 pub mod config_api;
 
 type ProposeData = StorageValueConfigProposeData;
-/// Value of [service_id](struct.ConfigurationService.html#method.service_id) of
+/// Value of [`service_id`](struct.ConfigurationService.html#method.service_id) of
 /// `ConfigurationService`
 pub const CONFIG_SERVICE: u16 = 1;
-/// Value of [message_type](../exonum/messages/struct.MessageBuffer.html#method.message_type) of
+/// Value of [`message_type`](../exonum/messages/struct.MessageBuffer.html#method.message_type) of
 /// `TxConfigPropose`
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
-/// Value of [message_type](../exonum/messages/struct.MessageBuffer.html#method.message_type) of
+/// Value of [`message_type`](../exonum/messages/struct.MessageBuffer.html#method.message_type) of
 /// `TxConfigVote`
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
 
@@ -162,8 +162,8 @@ encoding_struct! {
 /// 1. `TxConfigPropose` in `tx_propose` field.
 ///
 /// 2. Reference to
-/// [votes_by_config_hash](struct.ConfigurationSchema.html#method.votes_by_config_hash) table. This
-///    reference is represented by 2 fields:
+///   [`votes_by_config_hash`](struct.ConfigurationSchema.html#method.votes_by_config_hash) table.
+///   This reference is represented by 2 fields:
 ///   - `votest_history_hash`
 ///   - `num_votes`
 ///
@@ -175,7 +175,7 @@ encoding_struct! {
 /// modified after a vote from validator is added.
 impl StorageValueConfigProposeData {
     /// Method to mutate `votes_history_hash` field containing root hash of
-    /// [votes_by_config_hash](struct.ConfigurationSchema.html#method.votes_by_config_hash)
+    /// [`votes_by_config_hash`](struct.ConfigurationSchema.html#method.votes_by_config_hash)
     /// after replacing [empty
     /// vote](struct.ZEROVOTE.html) with a real `TxConfigVote` cast by a validator.
     pub fn set_history_hash(&mut self, hash: &Hash) {
@@ -215,8 +215,8 @@ pub enum ConfigTx {
 
 /// Struct, implementing [Service](../exonum/blockchain/service/trait.Service.html) trait template.
 /// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
-/// [TxConfigPropose](struct.TxConfigPropose.html#method.execute) and
-/// [TxConfigVote](struct.TxConfigVote.html#method.execute).
+/// [`TxConfigPropose`](struct.TxConfigPropose.html#method.execute) and
+/// [`TxConfigVote`](struct.TxConfigVote.html#method.execute).
 #[derive(Default)]
 pub struct ConfigurationService {}
 
@@ -675,16 +675,16 @@ impl Service for ConfigurationService {
         let mut router = Router::new();
         let api = config_api::PublicConfigApi { blockchain: ctx.blockchain().clone() };
         api.wire(&mut router);
-        return Some(Box::new(router));
+        Some(Box::new(router))
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
         let api = config_api::PrivateConfigApi {
             channel: ctx.node_channel().clone(),
-            config: (ctx.public_key().clone(), ctx.secret_key().clone()),
+            config: (*ctx.public_key(), ctx.secret_key().clone()),
         };
         api.wire(&mut router);
-        return Some(Box::new(router));
+        Some(Box::new(router))
     }
 }
