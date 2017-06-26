@@ -76,8 +76,7 @@ format same as for `actual`
 1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7/votes> 
 
     ```javascript
-    {
-      "Votes": [
+    [
         {
           "body": {
             "cfg_hash": "d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7",
@@ -112,8 +111,7 @@ format same as for `actual`
           "service_id": 1,
           "signature": "ec041203eebd2b3aa2c5353e98142c94f8b8e40ba76de2595d26cab9ddafd301c26d697cbc5b5f355db5be42fbd2f7309c8f4f3eddd24303691ef07c3d4fab06"
         }
-      ]
-    }
+    ]
     ```
 
 1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/committed>
