@@ -101,9 +101,9 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.state.services_config().get(name).unwrap()
     }
 
-    pub fn add_transaction<T: Transaction>(&mut self, tx: T) {
+    pub fn add_transaction(&mut self, tx: Box<Transaction>) {
         assert!(tx.verify());
-        self.txs.push(Box::new(tx));
+        self.txs.push(tx);
     }
 
     pub fn transactions(self) -> Vec<Box<Transaction>> {
