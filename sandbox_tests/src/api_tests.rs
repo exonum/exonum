@@ -20,15 +20,15 @@ use exonum::node::TransactionSend;
 use exonum::crypto::Hash;
 use exonum::blockchain::{Service, Transaction};
 use exonum::events::Error as EventsError;
-use exonum::messages::{FromRaw, Message, RawMessage};
+use exonum::messages::{Message, RawMessage};
 use exonum::api::Api;
 use exonum::helpers::init_logger;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 
-use configuration_service::{StorageValueConfigProposeData, ConfigTx, TxConfigPropose,
-                            TxConfigVote, ConfigurationService, ZEROVOTE};
+use configuration_service::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote,
+                            ConfigurationService, ZEROVOTE};
 use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, ApiResponseConfigInfo,
                                         ApiResponseConfigHashInfo, ApiResponseVotesInfo,
                                         ApiResponseProposePost, ApiResponseVotePost};
@@ -91,7 +91,7 @@ struct TestTxSender {
 }
 
 impl TransactionSend for TestTxSender {
-    fn send<T: Transaction>(&self, tx: T) -> Result<(), EventsError> {
+    fn send(&self, tx: Box<Transaction>) -> Result<(), EventsError> {
         if !tx.verify() {
             return Err(EventsError::new("Unable to verify transaction"));
         }
@@ -142,7 +142,7 @@ impl ConfigurationApiSandbox {
         txs.iter()
             .inspect(|elem| {
                          trace!("Message hash: {:?}", Message::hash(*elem));
-                         trace!("{:?}", ConfigTx::from_raw((*elem).clone()));
+                         trace!("{:?}", (*elem).clone());
                      })
             .collect::<Vec<_>>();
         add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());

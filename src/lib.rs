@@ -114,13 +114,11 @@ extern crate lazy_static;
 use router::Router;
 use iron::Handler;
 
-use std::fmt;
-
 use exonum::api::Api;
 use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, Hash, HASH_SIZE};
-use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction};
+use exonum::messages::{Message, FromRaw, RawTransaction};
 use exonum::storage::{StorageValue, List, Map, View, MapTable, MerkleTable, MerklePatriciaTable,
                       Result as StorageResult};
 use exonum::encoding::{Field, Error as StreamStructError};
@@ -206,14 +204,6 @@ message! {
     }
 }
 
-/// Helper enum to aggregate `TxConfigPropose` and `TxConfigVote` within. This enum implements
-/// `Exonum` traits, necessary for messages and transactions: `Message`, `FromRaw`, `Transaction`
-#[derive(Clone, PartialEq)]
-pub enum ConfigTx {
-    ConfigPropose(TxConfigPropose),
-    ConfigVote(TxConfigVote),
-}
-
 /// Struct, implementing [Service](../exonum/blockchain/service/trait.Service.html) trait template.
 /// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
 /// [`TxConfigPropose`](struct.TxConfigPropose.html#method.execute) and
@@ -224,59 +214,6 @@ pub struct ConfigurationService {}
 /// `ConfigurationService` database schema: tables and logically atomic mutation methods.
 pub struct ConfigurationSchema<'a> {
     view: &'a View,
-}
-
-impl ConfigTx {
-    pub fn from(&self) -> &PublicKey {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.from(),
-            ConfigTx::ConfigVote(ref msg) => msg.from(),
-        }
-    }
-}
-
-impl fmt::Debug for ConfigTx {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
-            ConfigTx::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
-        }
-    }
-}
-
-impl FromRaw for ConfigTx {
-    fn from_raw(raw: RawMessage) -> Result<ConfigTx, StreamStructError> {
-        match raw.message_type() {
-            CONFIG_PROPOSE_MESSAGE_ID => {
-                Ok(ConfigTx::ConfigPropose(TxConfigPropose::from_raw(raw)?))
-            }
-            CONFIG_VOTE_MESSAGE_ID => Ok(ConfigTx::ConfigVote(TxConfigVote::from_raw(raw)?)),
-            _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
-        }
-    }
-}
-
-impl Message for ConfigTx {
-    fn raw(&self) -> &RawMessage {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.raw(),
-            ConfigTx::ConfigVote(ref msg) => msg.raw(),
-        }
-    }
-
-    fn verify_signature(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.verify_signature(public_key),
-            ConfigTx::ConfigVote(ref msg) => msg.verify_signature(public_key),
-        }
-    }
-
-    fn hash(&self) -> Hash {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => Message::hash(msg),
-            ConfigTx::ConfigVote(ref msg) => Message::hash(msg),
-        }
-    }
 }
 
 impl<'a> ConfigurationSchema<'a> {
@@ -464,8 +401,12 @@ impl<'a> ConfigurationSchema<'a> {
     }
 }
 
-impl TxConfigPropose {
-    pub fn execute(&self, view: &View) -> StorageResult<()> {
+impl Transaction for TxConfigPropose {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.from())
+    }
+
+    fn execute(&self, view: &View) -> StorageResult<()> {
         let blockchain_schema = Schema::new(view);
         let config_schema = ConfigurationSchema::new(view);
 
@@ -525,8 +466,12 @@ impl TxConfigPropose {
     }
 }
 
-impl TxConfigVote {
-    pub fn execute(&self, view: &View) -> StorageResult<()> {
+impl Transaction for TxConfigVote {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.from())
+    }
+
+    fn execute(&self, view: &View) -> StorageResult<()> {
         let blockchain_schema = Schema::new(view);
         let config_schema = ConfigurationSchema::new(view);
 
@@ -600,19 +545,6 @@ impl TxConfigVote {
     }
 }
 
-impl Transaction for ConfigTx {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
-    fn execute(&self, view: &View) -> StorageResult<()> {
-        match *self {
-            ConfigTx::ConfigPropose(ref tx) => tx.execute(view),
-            ConfigTx::ConfigVote(ref tx) => tx.execute(view),
-        }
-    }
-}
-
 impl ConfigurationService {
     pub fn new() -> ConfigurationService {
         ConfigurationService {}
@@ -649,7 +581,11 @@ impl Service for ConfigurationService {
 
     /// Returns box ([ConfigTx](ConfigTx.t.html))
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
-        ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+        match raw.message_type() {
+            CONFIG_PROPOSE_MESSAGE_ID => Ok(Box::new(TxConfigPropose::from_raw(raw)?)),
+            CONFIG_VOTE_MESSAGE_ID => Ok(Box::new(TxConfigVote::from_raw(raw)?)),
+            _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
+        }
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
