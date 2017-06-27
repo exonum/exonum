@@ -159,9 +159,9 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
 
     /// Adds transaction to the queue.
     /// After the services handle commit event these transactions will be broadcast by node.
-    pub fn add_transaction<T: Transaction>(&mut self, tx: T) {
+    pub fn add_transaction(&mut self, tx: Box<Transaction>) {
         assert!(tx.verify());
-        self.txs.push(Box::new(tx));
+        self.txs.push(tx);
     }
 
     #[doc(hidden)]
