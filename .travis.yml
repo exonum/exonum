@@ -50,7 +50,7 @@ after_success:
   tar xzf master.tar.gz && mkdir kcov-master/build && cd kcov-master/build &&
   cmake -DCMAKE_INSTALL_PREFIX:PATH=$LOCAL .. && make && make install && cd ../.. &&
   ls target/debug &&
-  RUSTFLAGS="-C link-dead-code" cargo test --no-run &&
+  RUSTFLAGS="-C link-dead-code" cargo test -p exonum --no-run &&
   for file in target/debug/*; do
     if [[ "${file: -2}" != ".d" ]]; then
       mkdir -p "target/cov/$(basename $file)";
