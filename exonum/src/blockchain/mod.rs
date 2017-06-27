@@ -1,5 +1,18 @@
 //! The module containing building blocks for creating blockchains powered by the 
-//! `Exonum` framework.
+//! Exonum framework.
+//! 
+//! Services are the main extension point for the Exonum framework. To create your own service on 
+//! top of Exonum blockchain you need to define following things:
+//!
+//! - Define your own information schema.
+//! - Create one or more types of messages using a macro `message!` and implement
+//! `Transaction` trait for them.
+//! - Create data structure that implements `Service` trait.
+//! - Optionally you can write api handlers.
+//!
+//! You may follow the [`minibank`][tutoral] tutorial to get experience of programming your services.
+//!
+//! [tutoral]: https://github.com/DenisKolodin/exonum-doc/blob/currency-tutorial/src/home/cryptocurrency/intro.md
 
 // TODO move to lib.rs
 #![deny(missing_docs)]
@@ -34,15 +47,17 @@ mod tests;
 
 pub mod config;
 
-/// A blockchain with a given services set and data storage.
+/// Exonum blockchain instance with the concrete services set and data storage. 
+/// Only blockchains with the identical set of services and genesis block can be combined 
+/// into the single network.
 pub struct Blockchain {
     db: Box<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
 }
 
 impl Blockchain {
-    /// Constructs a blockchain for given storage and list of services.
-    pub fn new(db: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
+    /// Constructs a blockchain for the given `storage` and list of `services`.
+    pub fn new(storage: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
             let id = service.service_id() as usize;
@@ -54,7 +69,7 @@ impl Blockchain {
         }
 
         Blockchain {
-            db: db,
+            db: storage,
             service_map: Arc::new(service_map),
         }
     }
@@ -64,13 +79,18 @@ impl Blockchain {
         self.db.snapshot()
     }
 
-    /// Creates snapshot of the current storage state that can be commited into storage
+    /// Creates snapshot of the current storage state that can be later committed into storage
     /// via `merge` method.
     pub fn fork(&self) -> Fork {
         self.db.fork()
     }
 
     /// Tries to create a `Transaction` object from the given raw message.
+    /// Raw message can be converted into `Transaction` object only 
+    /// if following conditions are met.
+    ///
+    /// - Blockchain has service with the `service_id` of given raw message.
+    /// - Service can deserialize given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
         let id = raw.service_id() as usize;
         self.service_map
@@ -79,12 +99,16 @@ impl Blockchain {
     }
 
     /// Commits changes from the patch to the blockchain storage. 
-    /// See [`Fork`](../storage/trait.Fork.html) for details.
+    /// See [`Fork`](../storage/struct.Fork.html) for details.
     pub fn merge(&mut self, patch: Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
 
     /// Returns the hash of latest committed block.
+    /// 
+    /// # Panics
+    ///
+    /// - If the genesis block did not commited.
     pub fn last_hash(&self) -> Hash {
         Schema::new(&self.snapshot())
                .block_hashes_by_height()
@@ -93,6 +117,10 @@ impl Blockchain {
     }
 
     /// Returns the latest committed block.
+    /// 
+    /// # Panics
+    ///
+    /// - If the genesis block did not commited.
     pub fn last_block(&self) -> Block {
         Schema::new(&self.snapshot()).last_block().unwrap()
     }
@@ -156,7 +184,7 @@ impl Blockchain {
     }
 
     /// Executes the given transactions from pool.
-    /// Then it collects the resulting changhes from the current storage state and returns them
+    /// Then it collects the resulting changes from the current storage state and returns them
     /// with the hash of resulting block.
     pub fn create_patch(&self,
                         proposer_id: u16,
@@ -264,7 +292,8 @@ impl Blockchain {
     }
 
     /// Commits to the storage block that proposes by node `State`. 
-    /// After that invokes `handle_commit` for each service and returns the list of transactions.
+    /// After that invokes `handle_commit` for each service in order of their identifiers
+    /// and returns the list of transactions which which were created by the `handle_commit` event.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I>(&mut self,
                          state: &mut State,

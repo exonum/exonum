@@ -8,7 +8,7 @@ use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, Pro
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
-/// Generates prefix that combines service identifier table identifier and given suffix.
+/// Generates prefix that combines service identifier, table identifier and given suffix.
 pub fn gen_prefix<K: StorageKey>(service_id: u16, ord: u8, suffix: &K) -> Vec<u8> {
     let pos = mem::size_of::<u16>();
     let mut res = vec![0; pos + 1 + suffix.size()];
