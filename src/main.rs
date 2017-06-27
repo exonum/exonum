@@ -41,7 +41,7 @@ impl Wallet {
     }
 }
 
-// // // // // // // // // // MESSAGES // // // // // // // // // //
+// // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 pub const TX_WALLET_ID: u16 = 1;
 
@@ -189,64 +189,6 @@ impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
         router.post(&route_post, transaction, "transaction");
     }
 }
-
-// // // // // // // // // // BLOCKCHAIN TRANSACTION // // // // // // // // // //
-
-/*
-#[serde(untagged)]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum CurrencyTx {
-    Transfer(TxTransfer),
-    Issue(TxIssue),
-    CreateWallet(TxCreateWallet),
-}
-
-impl Message for CurrencyTx {
-    fn raw(&self) -> &RawMessage {
-        match *self {
-            CurrencyTx::Transfer(ref msg) => msg.raw(),
-            CurrencyTx::Issue(ref msg) => msg.raw(),
-            CurrencyTx::CreateWallet(ref msg) => msg.raw(),
-        }
-    }
-}
-
-impl FromRaw for CurrencyTx {
-    fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error> {
-        match raw.message_type() {
-            TX_TRANSFER_ID => Ok(CurrencyTx::Transfer(TxTransfer::from_raw(raw)?)),
-            TX_ISSUE_ID => Ok(CurrencyTx::Issue(TxIssue::from_raw(raw)?)),
-            TX_WALLET_ID => Ok(CurrencyTx::CreateWallet(TxCreateWallet::from_raw(raw)?)),
-            _ => Err(encoding::Error::IncorrectMessageType { message_type: raw.message_type() }),
-        }
-    }
-}
-
-impl Transaction for CurrencyTx {
-    fn verify(&self) -> bool {
-        match *self {
-            CurrencyTx::CreateWallet(ref msg) => {
-                self.verify_signature(msg.pub_key())
-            },
-            CurrencyTx::Issue(ref msg) => {
-                self.verify_signature(msg.pub_key())
-            },
-            CurrencyTx::Transfer(ref msg) => {
-                self.verify_signature(msg.from()) && (*msg.from() != *msg.to())
-            },
-        }
-    }
-
-    fn execute(&self, view: &mut Fork) {
-        let schema = CurrencySchema { view };
-        match *self {
-            CurrencyTx::Transfer(ref msg) => msg.execute(schema),
-            CurrencyTx::Issue(ref msg) => msg.execute(schema),
-            CurrencyTx::CreateWallet(ref msg) => msg.execute(schema),
-        }
-    }
-}
-*/
 
 // // // // // // // // // // STORAGE DATA LAYOUT // // // // // // // // // //
 
