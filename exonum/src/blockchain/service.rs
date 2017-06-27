@@ -1,5 +1,5 @@
 //! # Introduction
-//! This module defines the `exonum` services interfaces. Like smart contracts in some other
+//! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 //!
 //! To create your own service you need to define following things:
@@ -15,7 +15,7 @@ use iron::Handler;
 use mount::Mount;
 
 use crypto::{Hash, PublicKey, SecretKey};
-use storage::{View, Error as StorageError};
+use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
@@ -30,16 +30,16 @@ pub trait Transaction: Message + 'static {
     /// *This method should not use external data, that is, it must be a pure function.*
     fn verify(&self) -> bool;
     /// Defines the rules for executing transactions, during which the state of
-    /// `View` can be changed.
-    fn execute(&self, view: &View) -> Result<(), StorageError>;
+    /// `fork` can be changed.
+    fn execute(&self, fork: &mut Fork);
     /// Returns transaction representation in `JSON`.
     fn info(&self) -> Value {
         Value::Null
     }
 }
 
-/// The main extension point for the `Exonum` framework. Like smart contracts in some other
-/// blockchain platforms, `Exonum` services encapsulate business logic of the blockchain application.
+/// The main extension point for the Exonum framework. Like smart contracts in some other
+/// blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
     /// Unique service identification for database schema and service messages.
@@ -56,8 +56,8 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, view: &View) -> Result<Vec<Hash>, StorageError> {
-        Ok(Vec::new())
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        Vec::new()
     }
 
     /// Tries to create `Transaction` object from the given raw message.
@@ -66,17 +66,15 @@ pub trait Service: Send + Sync + 'static {
     /// Handles genesis block creation event.
     /// By this method you can initialize information schema of service
     /// and generates initial service configuration.
-    fn handle_genesis_block(&self, view: &View) -> Result<Value, StorageError> {
-        Ok(Value::Null)
+    fn handle_genesis_block(&self, fork: &mut Fork) -> Value {
+        Value::Null
     }
 
     /// Handles commit event. This handler is invoked for each service after commit of the block.
     /// For example service can create some transaction if the specific condition occurred.
     ///
     /// *Try not to perform long operations here*.
-    fn handle_commit(&self, context: &mut ServiceContext) -> Result<(), StorageError> {
-        Ok(())
-    }
+    fn handle_commit(&self, context: &mut ServiceContext) { }
 
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
@@ -91,19 +89,19 @@ pub trait Service: Send + Sync + 'static {
 
 /// The current node state on which the blockchain is running, or in other words
 /// execution context.
-#[derive(Debug)]
 pub struct ServiceContext<'a, 'b> {
     state: &'a mut State,
-    view: &'b View,
+    snapshot: &'b Snapshot,
     txs: Vec<Box<Transaction>>,
 }
 
+
 impl<'a, 'b> ServiceContext<'a, 'b> {
     #[doc(hidden)]
-    pub fn new(state: &'a mut State, view: &'b View) -> ServiceContext<'a, 'b> {
+    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> ServiceContext<'a, 'b> {
         ServiceContext {
             state: state,
-            view: view,
+            snapshot: snapshot,
             txs: Vec::new(),
         }
     }
@@ -115,10 +113,8 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 
     /// Returns the current database snapshot.
-    /// You can write your changes to storage, but be very careful.
-    /// Use the write only for caching and never change tables that affect to `state_hash`!
-    pub fn view(&self) -> &View {
-        self.view
+    pub fn snapshot(&self) -> &'b Snapshot {
+        self.snapshot
     }
 
     /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
@@ -170,8 +166,13 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 }
 
+impl<'a, 'b> ::std::fmt::Debug for ServiceContext<'a, 'b> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "ServiceContext(state: {:?}, txs: {:?})", self.state, self.txs)
+    }
+}
+
 /// Provides the current node state to api handlers.
-#[derive(Debug)]
 pub struct ApiContext {
     blockchain: Blockchain,
     node_channel: TxSender<NodeChannel>,
@@ -179,6 +180,7 @@ pub struct ApiContext {
     secret_key: SecretKey,
 }
 
+/// Provides the current node state to api handlers.
 impl ApiContext {
     /// Constructs context for the given `Node`.
     pub fn new(node: &Node) -> ApiContext {
@@ -219,5 +221,11 @@ impl ApiContext {
     /// Returns `Mount` object that aggregates private api handlers.
     pub fn mount_private_api(&self) -> Mount {
         self.blockchain.mount_private_api(self)
+    }
+}
+
+impl ::std::fmt::Debug for ApiContext {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "ApiContext(blockchain: {:?}, public_key: {:?})", self.blockchain, self.public_key)
     }
 }

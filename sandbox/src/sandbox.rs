@@ -1,6 +1,6 @@
 use std::collections::{VecDeque, BinaryHeap, HashSet, HashMap};
 use std::iter::FromIterator;
-use std::cell::{RefCell, Ref};
+use std::cell::{RefCell, Ref, RefMut};
 use std::sync::{Arc, Mutex};
 use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 use std::ops::Drop;
@@ -11,7 +11,7 @@ use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, Externa
 use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service};
-use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
+use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
@@ -155,23 +155,23 @@ impl SandboxReactor {
         self.handler.state().is_validator()
     }
 
-    pub fn last_block(&self) -> Result<Block, StorageError> {
+    pub fn last_block(&self) -> Block {
         self.handler.blockchain.last_block()
     }
 
-    pub fn last_hash(&self) -> Result<Hash, StorageError> {
+    pub fn last_hash(&self) -> Hash {
         self.handler.blockchain.last_hash()
     }
 
-    pub fn actual_config(&self) -> Result<StoredConfiguration, StorageError> {
-        let view = self.handler.blockchain.view();
-        let schema = Schema::new(&view);
+    pub fn actual_config(&self) -> StoredConfiguration {
+        let snapshot = self.handler.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         schema.actual_configuration()
     }
 
-    pub fn following_config(&self) -> Result<Option<StoredConfiguration>, StorageError> {
-        let view = self.handler.blockchain.view();
-        let schema = Schema::new(&view);
+    pub fn following_config(&self) -> Option<StoredConfiguration> {
+        let snapshot = self.handler.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         schema.following_configuration()
     }
 
@@ -267,6 +267,11 @@ impl Sandbox {
 
     pub fn blockchain_ref(&self) -> Ref<Blockchain> {
         Ref::map(self.reactor.borrow(), |reactor| &reactor.handler.blockchain)
+    }
+
+    pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
+        RefMut::map(self.reactor.borrow_mut(),
+                    |reactor| &mut reactor.handler.blockchain)
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -387,25 +392,25 @@ impl Sandbox {
 
     pub fn last_block(&self) -> Block {
         let reactor = self.reactor.borrow();
-        reactor.last_block().unwrap()
+        reactor.last_block()
     }
 
     pub fn last_hash(&self) -> Hash {
         let reactor = self.reactor.borrow();
-        reactor.last_hash().unwrap()
+        reactor.last_hash()
     }
 
     pub fn last_state_hash(&self) -> Hash {
         let reactor = self.reactor.borrow();
-        *reactor.last_block().unwrap().state_hash()
+        *reactor.last_block().state_hash()
     }
 
     pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<RawMessage>
         where I: IntoIterator<Item = &'a RawMessage>
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
-        let view = self.reactor.borrow().handler.blockchain.view();
-        let schema = Schema::new(&view);
+        let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         let schema_transactions = schema.transactions();
         txs.into_iter()
             .filter(|elem| {
@@ -414,7 +419,7 @@ impl Sandbox {
                     return false;
                 }
                 unique_set.insert(hash_elem);
-                if schema_transactions.get(&hash_elem).unwrap().is_some() {
+                if schema_transactions.contains(&hash_elem) {
                     return false;
                 }
                 true
@@ -422,6 +427,7 @@ impl Sandbox {
             .cloned()
             .collect()
     }
+
     /// Extract state_hash from fake block
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
         where I: IntoIterator<Item = &'a RawTransaction>
@@ -439,44 +445,35 @@ impl Sandbox {
             (hashes, pool)
         };
 
-        let view = {
-            let db = blockchain.view();
-            let (_, patch) = blockchain
-                .create_patch(0, self.current_height(), &hashes, &tx_pool)
-                .unwrap();
-            db.merge(&patch);
-            db
+        let fork = {
+            let mut fork = blockchain.fork();
+            let (_, patch) = blockchain.create_patch(0, self.current_height(), &hashes, &tx_pool);
+            fork.merge(patch);
+            fork
         };
-        *Schema::new(&view)
-             .last_block()
-             .unwrap()
-             .unwrap()
-             .state_hash()
+        *Schema::new(&fork).last_block().unwrap().state_hash()
     }
 
-    pub fn get_proof_to_service_table(&self,
-                                      service_id: u16,
-                                      table_idx: usize)
-                                      -> Result<RootProofNode<Hash>, StorageError> {
-        let view = self.reactor.borrow().handler.blockchain.view();
-        let schema = Schema::new(&view);
+    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
+        let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
-    pub fn get_configs_root_hash(&self) -> Result<Hash, StorageError> {
-        let view = self.reactor.borrow().handler.blockchain.view();
-        let schema = Schema::new(&view);
+    pub fn get_configs_root_hash(&self) -> Hash {
+        let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         schema.configs().root_hash()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
         let reactor = self.reactor.borrow();
-        reactor.actual_config().unwrap()
+        reactor.actual_config()
     }
 
     pub fn following_cfg(&self) -> Option<StoredConfiguration> {
         let reactor = self.reactor.borrow();
-        reactor.following_config().unwrap()
+        reactor.following_config()
     }
 
     pub fn propose_timeout(&self) -> Milliseconds {
@@ -506,9 +503,9 @@ impl Sandbox {
         self.reactor.borrow().handler.state().round()
     }
 
-    pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, StorageError> {
-        let view = self.reactor.borrow().handler.blockchain.view();
-        let schema = Schema::new(&view);
+    pub fn block_and_precommits(&self, height: u64) -> Option<BlockProof> {
+        let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         schema.block_and_precommits(height)
     }
 
@@ -575,8 +572,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
                           gen_keypair_from_seed(&Seed::new([19; 32]))];
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
-    let db = MemoryDB::new();
-    let blockchain = Blockchain::new(db, services);
+    let db = Box::new(MemoryDB::new());
+    let mut blockchain = Blockchain::new(db, services);
 
     let consensus = ConsensusConfig {
         round_timeout: 1000,

@@ -13,7 +13,7 @@
 /// encoding_struct! {
 ///     struct SaveTwoInteger {
 ///         const SIZE = 16;
-///         
+///
 ///         field first: u64 [0 => 8]
 ///         field second: u64 [8 => 16]
 ///     }
@@ -26,7 +26,7 @@
 /// # }
 /// ```
 ///
-/// For additional reference about data layout see also 
+/// For additional reference about data layout see also
 /// *[ `encoding` documentation](./encoding/index.html).*
 ///
 /// `encoding_struct!` internaly use `ident_count!`, be sure to add this macro to namespace.
@@ -48,14 +48,14 @@ macro_rules! encoding_struct {
             raw: Vec<u8>
         }
 
-        // Reimplement `Field` for `encoding_struct!` 
+        // Reimplement `Field` for `encoding_struct!`
         // to write fields in place of another structure
         impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
                             from: $crate::encoding::Offset,
                             to: $crate::encoding::Offset) -> Self {
                 let vec: Vec<u8> = $crate::encoding::Field::read(buffer, from, to);
-                $crate::storage::StorageValue::deserialize(vec)
+                $crate::storage::StorageValue::from_bytes(::std::borrow::Cow::Owned(vec))
             }
 
             fn write(&self,
@@ -64,7 +64,7 @@ macro_rules! encoding_struct {
                             to: $crate::encoding::Offset) {
                 $crate::encoding::Field::write(&self.raw, buffer, from, to);
             }
-            
+
             #[allow(unused_variables)]
             fn check(buffer: &'a [u8],
                         from_st_val: $crate::encoding::CheckedOffset,
@@ -73,7 +73,7 @@ macro_rules! encoding_struct {
                 -> $crate::encoding::Result
             {
                 let latest_segment_origin = <&[u8] as $crate::encoding::Field>::check(buffer, from_st_val, to_st_val, latest_segment)?;
-                let vec: &[u8] = unsafe{ $crate::encoding::Field::read(buffer, 
+                let vec: &[u8] = unsafe{ $crate::encoding::Field::read(buffer,
                                                                         from_st_val.unchecked_offset(),
                                                                         to_st_val.unchecked_offset())};
                 let latest_segment = ($body as $crate::encoding::Offset).into();
@@ -100,13 +100,13 @@ macro_rules! encoding_struct {
         }
 
         impl $crate::storage::StorageValue for $name {
-            fn serialize(self) -> Vec<u8> {
+            fn into_bytes(self) -> Vec<u8> {
                 self.raw
             }
 
-            fn deserialize(v: Vec<u8>) -> Self {
+            fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
                 $name {
-                    raw: v
+                    raw: v.into_owned()
                 }
             }
 
@@ -120,9 +120,8 @@ macro_rules! encoding_struct {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             /// Create `$name`.
             pub fn new($($field_name: $field_type,)*) -> $name {
-                use $crate::encoding::{Field};
                 let mut buf = vec![0; $body];
-                $($field_name.write(&mut buf, $from, $to);)*
+                $($crate::encoding::Field::write(&$field_name, &mut buf, $from, $to);)*
                 $name { raw: buf }
             }
 
@@ -170,9 +169,9 @@ macro_rules! encoding_struct {
                 Ok(())
             }
 
-            fn serialize_field(&self) 
+            fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
-                            Box<::std::error::Error>>
+                          Box<::std::error::Error>>
             {
                 use $crate::encoding::serialize::json::reexport::Value;
                 let mut map = $crate::encoding::serialize::json::reexport::Map::new();

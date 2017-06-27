@@ -2,25 +2,17 @@ use byteorder::{ByteOrder, BigEndian};
 
 use std::mem;
 
-use crypto::Hash;
+use crypto::{Hash};
 use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
-use storage::{StorageValue, ListTable, MapTable, MerkleTable, MerklePatriciaTable, Error, Map,
-              List, RootProofNode, View};
+use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, MapProof};
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
-/// Generates prefix that combines service identifier,
-/// table identifier and given suffix.
-pub fn gen_prefix(service_id: u16, ord: u8, suf: Option<&[u8]>) -> Vec<u8> {
+/// Generates prefix that combines service identifier table identifier and given suffix.
+pub fn gen_prefix<K: StorageKey>(service_id: u16, ord: u8, suffix: &K) -> Vec<u8> {
     let pos = mem::size_of::<u16>();
-    let mut res;
-    if let Some(suffix) = suf {
-        let size = pos + 1 + suffix.len();
-        res = vec![0; size];
-        res[pos + 1..].copy_from_slice(suffix);
-    } else {
-        res = vec![0; pos + 1];
-    }
+    let mut res = vec![0; pos + 1 + suffix.size()];
+    suffix.write(&mut res[pos + 1..]);
     BigEndian::write_u16(&mut res[0..pos], service_id);
     res[pos] = ord;
     res
@@ -50,59 +42,61 @@ encoding_struct! (
 
 /// Information schema for `exonum-core`.
 #[derive(Debug)]
-pub struct Schema<'a> {
-    view: &'a View,
+pub struct Schema<T> {
+    view: T,
 }
 
-/// Data tables section.
-impl<'a> Schema<'a> {
+impl<T> Schema<T> where T: AsRef<Snapshot> {
+    /// Constructs information schema for the given `snapshot`.
+    pub fn new(snapshot: T) -> Schema<T> {
+        Schema { view: snapshot }
+    }
+
     /// Returns table that represents a map from transaction hash into raw transaction message.
-    pub fn transactions(&self) -> MapTable<View, Hash, RawMessage> {
-        MapTable::new(gen_prefix(CONSENSUS, 0, None), self.view)
+    pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
+        MapIndex::new(gen_prefix(CONSENSUS, 0, &()), &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
     /// transaction hash.
-    pub fn tx_location_by_tx_hash(&self) -> MapTable<View, Hash, TxLocation> {
-        MapTable::new(gen_prefix(CONSENSUS, 1, None), self.view)
+    pub fn tx_location_by_tx_hash(&self) -> MapIndex<&T, Hash, TxLocation> {
+        MapIndex::new(gen_prefix(CONSENSUS, 1, &()), &self.view)
     }
 
     /// Returns table that stores block object for every block height.
-    pub fn blocks(&self) -> MapTable<View, Hash, Block> {
-        MapTable::new(gen_prefix(CONSENSUS, 2, None), self.view)
+    pub fn blocks(&self) -> MapIndex<&T, Hash, Block> {
+        MapIndex::new(gen_prefix(CONSENSUS, 2, &()), &self.view)
     }
 
     /// Returns table that keeps block hash for the corresponding height.
-    pub fn block_hashes_by_height(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, Hash> {
-        ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 3, None), self.view))
+    pub fn block_hashes_by_height(&self) -> ListIndex<&T, Hash> {
+        ListIndex::new(gen_prefix(CONSENSUS, 3, &()), &self.view)
     }
 
     /// Returns table that keeps a list of transactions for the each block.
-    pub fn block_txs(&self, height: u64) -> MerkleTable<MapTable<View, [u8], Vec<u8>>, Hash> {
-        MerkleTable::new(MapTable::new(gen_prefix(CONSENSUS, 4, Some(&height.serialize())),
-                                       self.view))
+    pub fn block_txs(&self, height: u64) -> ProofListIndex<&T, Hash> {
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
-    pub fn precommits(&self, hash: &Hash) -> ListTable<MapTable<View, [u8], Vec<u8>>, Precommit> {
-        ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 5, Some(hash.as_ref())), self.view))
+    pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
+        ListIndex::new(gen_prefix(CONSENSUS, 5, hash), &self.view)
     }
 
     /// Returns table that represents a map from configuration hash into contents.
-    pub fn configs
-        (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, StoredConfiguration> {
+    pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
         // configs patricia merkletree <block height> json
-        MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 6, None), self.view))
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 6, &()), &self.view)
     }
 
     /// Returns auxiliary table that keeps hash references to configurations in order
     /// of increasing their `actual_from` height.
-    pub fn configs_actual_from(&self) -> ListTable<MapTable<View, [u8], Vec<u8>>, ConfigReference> {
-        ListTable::new(MapTable::new(gen_prefix(CONSENSUS, 7, None), self.view))
+    pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
+        // TODO: consider List index to reduce storage volume
+        ListIndex::new(gen_prefix(CONSENSUS, 7, &()), &self.view)
     }
 
-    /// Returns the accessory `MerklePatriciaTable` for calculating
+    /// Returns the accessory `ProofMapIndex` for calculating
     /// patches in the DBView layer.
     ///
     /// Table calculates "aggregation" of root hashes of individual
@@ -117,156 +111,114 @@ impl<'a> Schema<'a> {
     ///
     /// Core tables participate in resulting state_hash with `CORE_SERVICE`
     /// service_id. Their vector is returned by `core_state_hash` method.
-    pub fn state_hash_aggregator
-        (&self)
-         -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Hash> {
-        MerklePatriciaTable::new(MapTable::new(gen_prefix(CONSENSUS, 8, None), self.view))
-    }
-}
-
-/// Business logic section.
-impl<'a> Schema<'a> {
-    /// Constructs schema for the given storage `View`.
-    pub fn new(view: &'a View) -> Schema {
-        Schema { view: view }
+    pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &self.view)
     }
 
-    /// Returns block hash for the given height.
-    pub fn block_hash_by_height(&self, height: u64) -> Result<Option<Hash>, Error> {
+     /// Returns block hash for the given height.
+    pub fn block_hash_by_height(&self, height: u64) -> Option<Hash> {
         self.block_hashes_by_height().get(height)
     }
 
     /// Returns the block for the given height with the proof of its inclusion.
-    pub fn block_and_precommits(&self, height: u64) -> Result<Option<BlockProof>, Error> {
-        let block_hash = match self.block_hash_by_height(height)? {
-            None => return Ok(None),
+    pub fn block_and_precommits(&self, height: u64) -> Option<BlockProof> {
+        let block_hash = match self.block_hash_by_height(height) {
+            None => return None,
             Some(block_hash) => block_hash,
         };
-        let block = self.blocks().get(&block_hash)?.unwrap();
+        let block = self.blocks().get(&block_hash).unwrap();
         let precommits_table = self.precommits(&block_hash);
-        let precommits = precommits_table.values()?;
+        let precommits = precommits_table.iter().collect();
         let res = BlockProof {
             block: block,
             precommits: precommits,
         };
-        Ok(Some(res))
+        Some(res)
     }
 
     /// Returns latest committed block.
-    pub fn last_block(&self) -> Result<Option<Block>, Error> {
-        Ok(match self.block_hashes_by_height().last()? {
-               Some(hash) => Some(self.blocks().get(&hash)?.unwrap()),
-               None => None,
-           })
+    pub fn last_block(&self) -> Option<Block> {
+        match self.block_hashes_by_height().last() {
+           Some(hash) => Some(self.blocks().get(&hash).unwrap()),
+           None => None,
+        }
     }
-
+    
     /// Returns height of the latest committed block.
-    pub fn last_height(&self) -> Result<Option<u64>, Error> {
-        let block_opt = self.last_block()?;
-        Ok(block_opt.map(|block| block.height()))
+    pub fn last_height(&self) -> Option<u64> {
+        let block_opt = self.last_block();
+        block_opt.map(|block| block.height())
     }
 
     /// Returns the current height of the blockchain. Its value is equal to `last_height + 1`.
-    pub fn current_height(&self) -> Result<u64, Error> {
-        let last_height = self.last_height()?;
-        let res = match last_height {
+    pub fn current_height(&self) -> u64 {
+        let last_height = self.last_height();
+        match last_height {
             Some(last_height) => last_height + 1,
             None => 0,
-        };
-        Ok(res)
-    }
-
-    /// Adds a new configuration to the blockchain, which will become an actual at
-    /// the `actual_from` height in `config_data`.
-    pub fn commit_configuration(&self, config_data: StoredConfiguration) -> Result<(), Error> {
-        let actual_from = config_data.actual_from;
-        if let Some(last_cfg_reference) = self.configs_actual_from().last()? {
-            let last_actual_from = last_cfg_reference.actual_from();
-            if actual_from <= last_actual_from {
-                return Err(Error::new(format!("Attempting to commit configuration \
-                                               with actual_from {:?} less than \
-                                              the last committed actual_from {:?}",
-                                              actual_from,
-                                              last_actual_from)));
-            }
         }
-        let cfg_hash = config_data.hash();
-        self.configs().put(&cfg_hash, config_data.clone())?;
-
-        let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
-        self.configs_actual_from().append(cfg_ref)?;
-        info!("Scheduled the following configuration for acceptance: {:?}",
-              config_data);
-        // TODO: clear storages
-        Ok(())
     }
 
     /// Returns configuration for the latest height of blockchain.
-    pub fn actual_configuration(&self) -> Result<StoredConfiguration, Error> {
-        let current_height = self.current_height()?;
+    pub fn actual_configuration(&self) -> StoredConfiguration {
+        let current_height = self.current_height();
         let res = self.configuration_by_height(current_height);
         trace!("Retrieved actual_config: {:?}", res);
         res
     }
 
     /// Returns the nearest following configuration if it exists.
-    pub fn following_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
-        let current_height = self.current_height()?;
-        let idx = self.find_configurations_index_by_height(current_height)?;
-        let res = match self.configs_actual_from().get(idx + 1)? {
+    pub fn following_configuration(&self) -> Option<StoredConfiguration> {
+        let current_height = self.current_height();
+        let idx = self.find_configurations_index_by_height(current_height);
+        match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
-                let cfg =
-                    self.configuration_by_hash(cfg_hash)?
-                        .expect(&format!("Config with hash {:?} is absent in configs table",
-                                        cfg_hash));
+                let cfg = self.configuration_by_hash(cfg_hash)
+                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
                 Some(cfg)
             }
             None => None,
-        };
-        Ok(res)
+        }
     }
 
     /// Returns the previous configuration if it exists.
-    pub fn previous_configuration(&self) -> Result<Option<StoredConfiguration>, Error> {
-        let current_height = self.current_height()?;
-        let idx = self.find_configurations_index_by_height(current_height)?;
-        let res = if idx > 0 {
+    pub fn previous_configuration(&self) -> Option<StoredConfiguration> {
+        let current_height = self.current_height();
+        let idx = self.find_configurations_index_by_height(current_height);
+        if idx > 0 {
             let cfg_ref = self.configs_actual_from()
-                .get(idx - 1)?
+                .get(idx - 1)
                 .expect(&format!("Configuration at index {} not found", idx));
             let cfg_hash = cfg_ref.cfg_hash();
             let cfg =
-                self.configuration_by_hash(cfg_hash)?
+                self.configuration_by_hash(cfg_hash)
                     .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
             Some(cfg)
         } else {
             None
-        };
-        Ok(res)
+        }
     }
 
     /// Returns the configuration that is the actual for the given height.
-    pub fn configuration_by_height(&self, height: u64) -> Result<StoredConfiguration, Error> {
-        let idx = self.find_configurations_index_by_height(height)?;
+    pub fn configuration_by_height(&self, height: u64) -> StoredConfiguration {
+        let idx = self.find_configurations_index_by_height(height);
         let cfg_ref = self.configs_actual_from()
-            .get(idx)?
+            .get(idx)
             .expect(&format!("Configuration at index {} not found", idx));
         let cfg_hash = cfg_ref.cfg_hash();
-        let cfg =
-            self.configuration_by_hash(cfg_hash)?
-                .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
-        Ok(cfg)
+        self.configuration_by_hash(cfg_hash)
+                .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash))
     }
 
     /// Returns configuration for given configuration hash.
-    pub fn configuration_by_hash(&self, hash: &Hash) -> Result<Option<StoredConfiguration>, Error> {
+    pub fn configuration_by_hash(&self, hash: &Hash) -> Option<StoredConfiguration> {
         self.configs().get(hash)
     }
 
     /// Returns the `state_hash` table for core tables.
-    pub fn core_state_hash(&self) -> Result<Vec<Hash>, Error> {
-        Ok(vec![self.configs().root_hash()?])
+    pub fn core_state_hash(&self) -> Vec<Hash> {
+        vec![self.configs().root_hash()]
     }
 
     /// Constructs a proof of inclusion of root hash of a specific service
@@ -293,21 +245,114 @@ impl<'a> Schema<'a> {
     pub fn get_proof_to_service_table(&self,
                                       service_id: u16,
                                       table_idx: usize)
-                                      -> Result<RootProofNode<Hash>, Error> {
+                                      -> MapProof<Hash> {
         let key = Blockchain::service_table_unique_key(service_id, table_idx);
         let sum_table = self.state_hash_aggregator();
-        sum_table.construct_path_to_key(key)
+        sum_table.get_proof(&key)
     }
 
-    fn find_configurations_index_by_height(&self, height: u64) -> Result<u64, Error> {
-        let configs_actual_from = self.configs_actual_from();
-        let cfg_references = configs_actual_from.values()?;
+    fn find_configurations_index_by_height(&self, height: u64) -> u64 {
+        let actual_from = self.configs_actual_from();
+        for i in (0..actual_from.len()).rev() {
+            if actual_from.get(i).unwrap().actual_from() <= height {
+                return i as u64
+            }
+        }
+        panic!("Couldn't not find any config for height {}, \
+                that means that genesis block was created incorrectly.", height)
+    }
+}
 
-        let idx = cfg_references
-            .into_iter()
-            .rposition(|r| r.actual_from() <= height)
-            .expect(&format!("Couldn't not find any config for height {},\
-          that means that genesis block was created incorrectly.", height));
-        Ok(idx as u64)
+impl<'a> Schema<&'a mut Fork> {
+    /// Mutable reference to the [`transactions`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.transactions
+    pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
+        MapIndex::new(gen_prefix(CONSENSUS, 0, &()), &mut self.view)
+    }
+
+    /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.tx_location_by_tx_hash
+    pub fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
+        MapIndex::new(gen_prefix(CONSENSUS, 1, &()), &mut self.view)
+    }
+
+    /// Mutable reference to the [`blocks][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.blocks
+    pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
+        MapIndex::new(gen_prefix(CONSENSUS, 2, &()), &mut self.view)
+    }
+
+    /// Mutable reference to the [`block_hashes_by_height_mut`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.block_hashes_by_height_mut
+    pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
+        ListIndex::new(gen_prefix(CONSENSUS, 3, &()), &mut self.view)
+    }
+
+    /// Mutable reference to the [`block_hash_by_height`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.block_hash_by_height
+    pub fn block_hash_by_height_mut(&mut self, height: u64) -> Option<Hash> {
+        self.block_hashes_by_height().get(height)
+    }
+
+    /// Mutable reference to the [`block_txs`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.block_txs
+    pub fn block_txs_mut(&mut self, height: u64) -> ProofListIndex<&mut Fork, Hash> {
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), &mut self.view)
+    }
+
+    /// Mutable reference to the [`precommits`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.precommits
+    pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
+        ListIndex::new(gen_prefix(CONSENSUS, 5, hash), &mut self.view)
+    }
+
+    /// Mutable reference to the [`configs`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.configs
+    pub fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 6, &()), &mut self.view)
+    }
+
+    /// Mutable reference to the [`configs_actual_from`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.configs_actual_from
+    pub fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
+        ListIndex::new(gen_prefix(CONSENSUS, 7, &()), &mut self.view)
+    }
+
+    /// Mutable reference to the [`state_hash_aggregator`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.state_hash_aggregator
+    pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
+        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &mut self.view)
+    }
+
+    /// Adds a new configuration to the blockchain, which will become an actual at
+    /// the `actual_from` height in `config_data`.
+    pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
+        let actual_from = config_data.actual_from;
+        if let Some(last_cfg_reference) = self.configs_actual_from().last() {
+            let last_actual_from = last_cfg_reference.actual_from();
+            if actual_from <= last_actual_from {
+                panic!("Attempting to commit configuration \
+                                               with actual_from {:?} less than \
+                                              the last committed actual_from {:?}",
+                                              actual_from, last_actual_from);
+            }
+        }
+        let cfg_hash = config_data.hash();
+        self.configs_mut().put(&cfg_hash, config_data.clone());
+
+        let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
+        self.configs_actual_from_mut().push(cfg_ref);
+        info!("Scheduled the following configuration for acceptance: {:?}", config_data);
+        // TODO: clear storages
     }
 }

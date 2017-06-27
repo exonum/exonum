@@ -1,8 +1,8 @@
 use exonum::crypto::{PublicKey, Hash};
 use exonum::blockchain::{Service, Transaction, Schema};
 use exonum::messages::{RawTransaction, Message, FromRaw};
+use exonum::storage::{Snapshot, Fork};
 use exonum::encoding::Error as MessageError;
-use exonum::storage::{View, Error as StorageError};
 use exonum::blockchain::StoredConfiguration;
 
 pub const CONFIG_SERVICE: u16 = 1;
@@ -34,8 +34,8 @@ impl Transaction for TxConfig {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, view: &View) -> Result<(), StorageError> {
-        let schema = Schema::new(view);
+    fn execute(&self, fork: &mut Fork) {
+        let mut schema = Schema::new(fork);
         schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap())
     }
 }
@@ -49,8 +49,8 @@ impl Service for ConfigUpdateService {
         CONFIG_SERVICE
     }
 
-    fn state_hash(&self, _: &View) -> Result<Vec<Hash>, StorageError> {
-        Ok(vec![])
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        vec![]
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
