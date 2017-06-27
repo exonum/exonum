@@ -1,14 +1,5 @@
-//! # Introduction
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
-//!
-//! To create your own service you need to define following things:
-//!  - Define your own information schema.
-//!  - Create one or more types of messages using a macro `message!` and implement
-//!    `Transaction` trait for them.
-//!  - Create data structure that implements `Service` trait.
-//!  - Optionally you can write api handlers.
-//!
 
 use serde_json::Value;
 use iron::Handler;
@@ -22,24 +13,34 @@ use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain};
 
-/// A trait that describes transaction processing rules for the given message type.
+/// A trait that describes transaction processing rules (a group of sequential operations 
+/// with the Exonum storage) for the given `Message`.
 pub trait Transaction: Message + 'static {
-    /// Checks the internal correctness of the transaction.
-    /// That can be useful for signature verification.
+    /// Verifies the transaction, which includes the message signature verification and other 
+    /// specific internal constraints. verify is intended to check the internal consistency of
+    /// a transaction; it has no access to the blockchain state.
+    /// If a transaction fails verify, it is considered incorrect and cannot be included into 
+    /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
     fn verify(&self) -> bool;
-    /// Defines the rules for executing transactions, during which the state of
-    /// `fork` can be changed.
+    /// Takes the current blockchain state via `fork` and can modify it if certain conditions
+    /// are met.
+    ///
+    /// # Notes
+    ///
+    /// - When programming `execute`, you should perform state-related checks before any changes
+    /// to the state and return early if these checks fail.
+    /// - If the execute method of a transaction raises a `panic`, the changes made by the 
+    /// transactions are discarded, but the transaction itself is still considered committed.
     fn execute(&self, fork: &mut Fork);
-    /// Returns transaction representation in `JSON`.
+    /// Returns the useful information about the transaction in the JSON format.
     fn info(&self) -> Value {
         Value::Null
     }
 }
 
-/// The main extension point for the Exonum framework. Like smart contracts in some other
-/// blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
+/// A trait that describes a business-logic of the concrete service.
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
     /// Unique service identification for database schema and service messages.
