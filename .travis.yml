@@ -3,22 +3,27 @@ rust:
   - stable
 cache: cargo
 sudo: required
+group: deprecated-2017Q2
 dist: trusty
+
 env:
   global:
     - NIGHTLY_RUST=nightly-2017-05-10
     - CLIPPY_VERS=0.0.131
     - RUSTFMT_VERS=0.8.4
+
 before_install:
 - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+- cargo-audit -V || cargo install cargo-audit --force
 - rustup toolchain install $NIGHTLY_RUST
 - cargo +$NIGHTLY_RUST clippy -V | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --vers $CLIPPY_VERS --force
-- sudo add-apt-repository -y ppa:chris-lea/libsodium
+- sudo add-apt-repository -y ppa:elt/libsodium
 - sudo apt-get -qq update
 - cargo install --list
-- cargo-audit -V || cargo install cargo-audit --force
+
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+
 script:
 - cargo fmt -p sandbox -- --write-mode=diff
 - cd exonum
@@ -30,6 +35,32 @@ script:
 - cargo audit
 - cargo test --manifest-path exonum/Cargo.toml
 - cargo test --manifest-path sandbox/Cargo.toml
+
+addons:
+  apt:
+    packages:
+      - libcurl4-openssl-dev
+      - libelf-dev
+      - libdw-dev
+      - binutils-dev
+      - libiberty-dev
+
+after_success:
+  - '[ $TRAVIS_RUST_VERSION = stable ] &&
+    LOCAL="~/.local" && export PATH=$LOCAL/bin:$PATH &&
+    wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+    tar xzf master.tar.gz && mkdir kcov-master/build && cd kcov-master/build &&
+    cmake -DCMAKE_INSTALL_PREFIX:PATH=$LOCAL .. && make && make install && cd ../.. &&
+    ls target/debug &&
+    RUSTFLAGS="-C link-dead-code" cargo test -p exonum --no-run &&
+    for file in target/debug/exonum-*; do
+      if [[ "${file: -2}" != ".d" ]]; then
+        mkdir -p "target/cov/$(basename $file)";
+        kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file";
+      fi;
+    done &&
+    kcov --coveralls-id=$TRAVIS_JOB_ID --merge target/cov target/cov/*'
+
 notifications:
   slack:
     rooms:
