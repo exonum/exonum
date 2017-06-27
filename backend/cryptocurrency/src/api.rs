@@ -11,9 +11,9 @@ use std::fmt;
 
 use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
-use exonum::messages::BlockProof;
+use exonum::messages::{BlockProof, Message};
 use exonum::crypto::{HexValue, PublicKey, Hash};
-use exonum::storage::{StorageValue, List, Map, Proofnode, RootProofNode};
+use exonum::storage::{StorageValue, Proofnode, RootProofNode};
 use exonum::blockchain::{self, Blockchain};
 
 use super::tx_metarecord::TxMetaRecord;
@@ -57,10 +57,10 @@ impl<T> CryptocurrencyApi<T>
     fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
         let view = self.blockchain.view();
         let general_schema = blockchain::Schema::new(&view);
-        let currency_schema = CurrencySchema::new(&view);
+        let currency_schema = CurrencySchema::new(&mut view);
 
-        let max_height = general_schema.block_hashes_by_height().len()? - 1;
-        let block_proof = general_schema.block_and_precommits(max_height)?.unwrap();
+        let max_height = general_schema.block_hashes_by_height().len() - 1;
+        let block_proof = general_schema.block_and_precommits(max_height).unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
         let wallet_path: MPTProofTemplate<RootProofNode<Wallet>>;
@@ -68,7 +68,7 @@ impl<T> CryptocurrencyApi<T>
 
         let to_wallets_table: RootProofNode<Hash> =
             general_schema
-                .get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0)?;
+                .get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
 
         {
             let wallets_root_hash = currency_schema.wallets().root_hash()?; //debug code
@@ -85,17 +85,17 @@ impl<T> CryptocurrencyApi<T>
             value: to_specific_wallet,
         };
 
-        wallet_history = match currency_schema.wallet(pub_key)? {
+        wallet_history = match currency_schema.wallet(pub_key) {
             Some(wallet) => {
                 let history = currency_schema.wallet_history(pub_key);
-                let history_len = history.len()?;
+                let history_len = history.len();
                 debug_assert!(history_len >= 1);
                 debug_assert_eq!(history_len, wallet.history_len());
-                let tx_records: Vec<TxMetaRecord> = history.values()?;
+                let tx_records: Vec<TxMetaRecord> = history.into_iter().collect();
                 let transactions_table = general_schema.transactions();
                 let mut txs: Vec<CurrencyTx> = Vec::with_capacity(tx_records.len());
                 for record in tx_records {
-                    let raw_message = transactions_table.get(record.tx_hash())?.unwrap();
+                    let raw_message = transactions_table.get(record.tx_hash()).unwrap();
                     txs.push(CurrencyTx::from(raw_message));
                 }
                 let to_transaction_hashes: Proofnode<TxMetaRecord> =

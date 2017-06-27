@@ -27,8 +27,7 @@ use std::fmt;
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message};
 use exonum::crypto::{PublicKey, Hash, PUBLIC_KEY_LENGTH};
-use exonum::storage::{Map, Error, MerklePatriciaTable, MapTable, MerkleTable, List, View,
-                      Result as StorageResult};
+use exonum::storage::{self, Snapshot, Fork, ListIndex, MapIndex, ProofMapIndex};
 use exonum::blockchain::{Service, Transaction, ApiContext};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::encoding::Error as StreamStructError;
@@ -160,79 +159,88 @@ impl From<RawMessage> for CurrencyTx {
 }
 
 /// Database schema for the cryptocurrency.
-pub struct CurrencySchema<'a> {
-    view: &'a View,
+pub struct CurrencySchema<T> {
+    view: T,
 }
 
-impl<'a> fmt::Debug for CurrencySchema<'a> {
+impl<T> fmt::Debug for CurrencySchema<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "CurrencySchema {{}}")
     }
 }
 
-impl<'a> CurrencySchema<'a> {
+impl<T> CurrencySchema<T>
+    where T: AsRef<Snapshot>
+{
     /// Constructs schema from the database view.
-    pub fn new(view: &'a View) -> Self {
-        CurrencySchema { view: view }
+    pub fn new(view: T) -> Self {
+        CurrencySchema { view }
     }
 
     /// Returns `MerklePatriciaTable` with wallets.
-    pub fn wallets(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, PublicKey, Wallet> {
-        MerklePatriciaTable::new(MapTable::new(vec![20], self.view))
+    pub fn wallets_proof(&self) -> ProofMapIndex<&T, PublicKey, Wallet> {
+        ProofMapIndex::new(vec![20], &self.view)
+    }
+
+    /// Returns state hash.
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![self.wallets_proof().root_hash()]
+    }
+}
+
+impl<'a> CurrencySchema<&'a mut Fork> {
+    /// Returns `MerklePatriciaTable` with wallets.
+    pub fn wallets(&self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
+        MapIndex::new(vec![20], self.view)
     }
 
     /// Returns wallet for the given public key.
-    pub fn wallet(&self, pub_key: &PublicKey) -> StorageResult<Option<Wallet>> {
+    pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets().get(pub_key)
     }
 
     /// Returns history for the wallet by the given public key.
     pub fn wallet_history(&self,
                           public_key: &PublicKey)
-                          -> MerkleTable<MapTable<View, [u8], Vec<u8>>, TxMetaRecord> {
+                          -> ListIndex<&mut Fork, TxMetaRecord> {
         let mut prefix = vec![19; 1 + PUBLIC_KEY_LENGTH];
         prefix[1..].copy_from_slice(public_key.as_ref());
-        MerkleTable::new(MapTable::new(prefix, self.view))
-    }
-
-    /// Returns state hash.
-    pub fn state_hash(&self) -> StorageResult<Vec<Hash>> {
-        Ok(vec![self.wallets().root_hash()?])
+        MapIndex::new(prefix, self.view)
     }
 
     /// Adds transaction record to the walled by the given public key.
     fn append_history(&self,
                       mut wallet: Wallet,
                       key: &PublicKey,
-                      meta: TxMetaRecord)
-                      -> Result<(), Error> {
+                      meta: TxMetaRecord) {
         let history = self.wallet_history(key);
-        history.append(meta)?;
-        wallet.grow_length_set_history_hash(&history.root_hash()?);
+        history.push(meta);
+        wallet.grow_length_set_history_hash(&history.root_hash());
         self.wallets().put(key, wallet)
     }
 }
 
 impl TxTransfer {
     /// Executes transfer transaction.
-    pub fn execute(&self, schema: CurrencySchema, tx_hash: Hash) -> Result<(), Error> {
+    pub fn execute(&self, view: &mut Fork, tx_hash: Hash) {
+        let schema = CurrencySchema::new(view);
         let sender_pub_key = self.from();
         let receiver_pub_key = self.to();
 
-        let mut sender_wallet = match schema.wallet(sender_pub_key)? {
+        let mut sender_wallet = match schema.wallet(sender_pub_key) {
             Some(val) => val,
             None => {
-                return Ok(());
+                return;
             }
         };
 
-        let meta = match schema.wallet(receiver_pub_key)? {
+        let meta = match schema.wallet(receiver_pub_key) {
             Some(mut receiver) => {
                 let status = sender_wallet.transfer_to(&mut receiver, self.amount());
                 let meta = TxMetaRecord::new(&tx_hash, status);
                 if status {
                     let meta = meta.clone();
-                    schema.append_history(receiver, receiver_pub_key, meta)?;
+                    schema.append_history(receiver, receiver_pub_key, meta);
                 }
                 meta
             }
@@ -244,37 +252,38 @@ impl TxTransfer {
 
 impl TxIssue {
     /// Executes issue transaction.
-    pub fn execute(&self, schema: CurrencySchema, tx_hash: Hash) -> Result<(), Error> {
+    pub fn execute(&self, view: &mut Fork, tx_hash: Hash) {
+        let schema = CurrencySchema::new(view);
         let pub_key = self.wallet();
-        if let Some(mut wallet) = schema.wallet(pub_key)? {
+        if let Some(mut wallet) = schema.wallet(pub_key) {
             let new_balance = wallet.balance() + self.amount();
             wallet.set_balance(new_balance);
             let meta = TxMetaRecord::new(&tx_hash, true);
-            schema.append_history(wallet, pub_key, meta)?;
+            schema.append_history(wallet, pub_key, meta);
         }
-        Ok(())
     }
 }
 
 impl TxCreateWallet {
     /// Executes wallet creation transaction.
-    pub fn execute(&self, schema: CurrencySchema, tx_hash: Hash) -> Result<(), Error> {
-        let found_wallet = schema.wallet(self.pub_key())?;
+    pub fn execute(&self, view: &mut Fork, tx_hash: Hash) {
+        let schema = CurrencySchema::new(view);
+        let found_wallet = schema.wallet(self.pub_key());
         let execution_status = found_wallet.is_none();
 
         let meta = TxMetaRecord::new(&tx_hash, execution_status);
         let history = schema.wallet_history(self.pub_key());
-        history.append(meta)?;
+        history.push(meta);
 
         let wallet = if let Some(mut wallet) = found_wallet {
-            wallet.grow_length_set_history_hash(&history.root_hash()?);
+            wallet.grow_length_set_history_hash(&history.root_hash());
             wallet
         } else {
             Wallet::new(self.pub_key(),
                         self.name(),
                         0,
                         1, // history_len
-                        &history.root_hash()?)
+                        &history.root_hash())
         };
         schema.wallets().put(self.pub_key(), wallet)
     }
@@ -294,14 +303,12 @@ impl Transaction for CurrencyTx {
         res && res1
     }
 
-    fn execute(&self, view: &View) -> Result<(), Error> {
+    fn execute(&self, view: &mut Fork) {
         let tx_hash = Message::hash(self);
-        let schema = CurrencySchema::new(view);
-
         match *self {
-            CurrencyTx::Transfer(ref msg) => msg.execute(schema, tx_hash),
-            CurrencyTx::Issue(ref msg) => msg.execute(schema, tx_hash),
-            CurrencyTx::CreateWallet(ref msg) => msg.execute(schema, tx_hash),
+            CurrencyTx::Transfer(ref msg) => msg.execute(view, tx_hash),
+            CurrencyTx::Issue(ref msg) => msg.execute(view, tx_hash),
+            CurrencyTx::CreateWallet(ref msg) => msg.execute(view, tx_hash),
         }
     }
 }
@@ -326,7 +333,7 @@ impl Service for CurrencyService {
         CRYPTOCURRENCY_SERVICE_ID
     }
 
-    fn state_hash(&self, view: &View) -> StorageResult<Vec<Hash>> {
+    fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
         let schema = CurrencySchema::new(view);
         schema.state_hash()
     }
