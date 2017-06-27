@@ -37,7 +37,7 @@ impl<S> NodeHandler<S>
 
         let key = match self.state.public_key_of(msg.validator()) {
             Some(public_key) => {
-                if !msg.verify(public_key) {
+                if !msg.verify(&public_key) {
                     error!("Received consensus message with incorrect signature, msg={:?}", msg);
                     return;
                 }
