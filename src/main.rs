@@ -62,10 +62,11 @@ message! {
     struct TxIssue {
         const TYPE = SERVICE_ID;
         const ID = TX_ISSUE_ID;
-        const SIZE = 40;
+        const SIZE = 48;
 
         field pub_key:     &PublicKey  [00 => 32]
         field amount:      u64         [32 => 40]
+        field seed:        u64         [40 => 48]
     }
 }
 
