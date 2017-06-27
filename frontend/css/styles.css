@@ -32,7 +32,10 @@ body {
 .custom-table-header-column {
     border-bottom: 1px solid #ddd;
     font-weight: bold;
+    overflow: hidden;
     padding: 0 5px 5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .custom-table-column {

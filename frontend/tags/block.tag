@@ -32,18 +32,26 @@
                 </div>
                 <div class="row">
                     <div class="col-xs-6 custom-dd-column">
-                        <strong>Previous hash</strong>
+                        <strong>Tx count</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        <truncate class="truncate" val={ block.prev_hash }></truncate>
+                        { block.tx_count }
                     </div>
                 </div>
                 <div class="row">
                     <div class="col-xs-6 custom-dd-column">
-                        <strong>State hash</strong>
+                        <strong>Proposer ID</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        <truncate class="truncate" val={ block.state_hash }></truncate>
+                        { block.proposer_id }
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-6 custom-dd-column">
+                        <strong>Previous hash</strong>
+                    </div>
+                    <div class="col-xs-6 custom-dd-column">
+                        <truncate class="truncate" val={ block.prev_hash }></truncate>
                     </div>
                 </div>
                 <div class="row">
@@ -56,10 +64,10 @@
                 </div>
                 <div class="row">
                     <div class="col-xs-6 custom-dd-column">
-                        <strong>Propose round</strong>
+                        <strong>State hash</strong>
                     </div>
                     <div class="col-xs-6 custom-dd-column">
-                        { block.propose_round }
+                        <truncate class="truncate" val={ block.state_hash }></truncate>
                     </div>
                 </div>
             </div>
