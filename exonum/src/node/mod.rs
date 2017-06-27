@@ -90,6 +90,21 @@ impl Default for NodeApiConfig {
     }
 }
 
+/// Memory pool configuration parameters.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MemoryPoolConfig {
+    /// Maximum number of uncommited transactions.
+    pub unconfirmed_txs_limit: usize,
+}
+
+impl Default for MemoryPoolConfig {
+    fn default() -> MemoryPoolConfig {
+        MemoryPoolConfig {
+            unconfirmed_txs_limit: 20000,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
     pub genesis: GenesisConfig,
@@ -100,6 +115,7 @@ pub struct NodeConfig {
     pub secret_key: SecretKey,
     pub whitelist: Whitelist,
     pub api: NodeApiConfig,
+    pub mempool: MemoryPoolConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -108,6 +124,7 @@ pub struct Configuration {
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
     pub peer_discovery: Vec<SocketAddr>,
+    pub mempool: MemoryPoolConfig,
 }
 
 pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
@@ -149,6 +166,7 @@ impl<S> NodeHandler<S>
         let mut state = State::new(validator_id,
                                config.listener.public_key,
                                config.listener.secret_key,
+                               config.mempool,
                                whitelist,
                                stored,
                                connect,
@@ -395,6 +413,7 @@ impl Node {
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
             },
+            mempool: node_cfg.mempool,
             network: node_cfg.network,
             events: EventsConfiguration::default(),
             peer_discovery: node_cfg.peers,
