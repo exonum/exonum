@@ -14,7 +14,7 @@ use crypto::{hash, PublicKey, Hash};
 pub struct StoredConfiguration {
     /// Link to the previous configuration. 
     /// For configuration in genesis block `hash` is just an array of zeroes.
-    pub previous_cfg_hash: Hash, 
+    pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
     pub actual_from: u64,
     /// List of validator's public keys
@@ -66,12 +66,12 @@ impl StoredConfiguration {
 }
 
 impl StorageValue for StoredConfiguration {
-    fn serialize(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         self.try_serialize().unwrap()
     }
 
-    fn deserialize(v: Vec<u8>) -> Self {
-        StoredConfiguration::try_deserialize(&v).unwrap()
+    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
+        StoredConfiguration::try_deserialize(v.as_ref()).unwrap()
     }
 
     fn hash(&self) -> Hash {

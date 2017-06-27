@@ -7,7 +7,7 @@ use std::net::SocketAddr;
 
 use config::ConfigFile;
 use node::NodeConfig;
-use storage::Storage;
+use storage::Database;
 use helpers::generate_testnet_config;
 
 #[derive(Debug)]
@@ -148,18 +148,18 @@ impl<'a, 'b> RunCommand<'a, 'b>
     }
 
     #[cfg(not(feature="memorydb"))]
-    pub fn db(matches: &'a ArgMatches<'a>) -> Storage {
+    pub fn db(matches: &'a ArgMatches<'a>) -> Box<Database> {
         use storage::{LevelDB, LevelDBOptions};
 
         let path = Self::leveldb_path(matches).unwrap();
         let mut options = LevelDBOptions::new();
         options.create_if_missing = true;
-        LevelDB::new(path, options).unwrap()
+        Box::new(LevelDB::open(path, options).unwrap())
     }
 
     #[cfg(feature="memorydb")]
-    pub fn db(_: &'a ArgMatches<'a>) -> Storage {
+    pub fn db(_: &'a ArgMatches<'a>) -> Box<Database> {
         use storage::MemoryDB;
-        MemoryDB::new()
+        Box::new(MemoryDB::new())
     }
 }
