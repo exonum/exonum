@@ -116,7 +116,7 @@ impl<S> NodeHandler<S>
             .map(|tx_hash| schema.transactions().get(tx_hash).unwrap().unwrap())
             .collect::<Vec<_>>();
 
-        let block_msg = Block::new(&self.state.consensus_public_key(),
+        let block_msg = Block::new(self.state.consensus_public_key(),
                                    msg.from(),
                                    block,
                                    precommits,
