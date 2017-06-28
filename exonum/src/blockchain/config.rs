@@ -11,6 +11,7 @@ use crypto::{hash, PublicKey, Hash};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
+    #[doc(hidden)]
     pub consensus_key: PublicKey,
     /// Service key is used for services.
     pub service_key: PublicKey,
