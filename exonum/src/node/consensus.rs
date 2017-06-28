@@ -570,7 +570,7 @@ impl<S> NodeHandler<S>
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    RequestPropose::new(&self.state.consensus_public_key(),
+                    RequestPropose::new(self.state.consensus_public_key(),
                                         &peer,
                                         self.state.height(),
                                         propose_hash,
@@ -586,7 +586,7 @@ impl<S> NodeHandler<S>
                         .iter()
                         .cloned()
                         .collect();
-                    RequestTransactions::new(&self.state.consensus_public_key(),
+                    RequestTransactions::new(self.state.consensus_public_key(),
                                              &peer,
                                              &txs,
                                              self.state.consensus_secret_key())
@@ -594,7 +594,7 @@ impl<S> NodeHandler<S>
                         .clone()
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    RequestPrevotes::new(&self.state.consensus_public_key(),
+                    RequestPrevotes::new(self.state.consensus_public_key(),
                                          &peer,
                                          self.state.height(),
                                          round,
@@ -605,7 +605,7 @@ impl<S> NodeHandler<S>
                         .clone()
                 }
                 RequestData::Block(height) => {
-                    RequestBlock::new(&self.state.consensus_public_key(),
+                    RequestBlock::new(self.state.consensus_public_key(),
                                       &peer,
                                       height,
                                       self.state.consensus_secret_key())
