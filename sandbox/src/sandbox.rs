@@ -622,7 +622,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
                                                                      consensus_key: (x.0).0,
                                                                      service_key: (x.1).0,
                                                                  }
-                                                        }));
+                                                             }));
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
