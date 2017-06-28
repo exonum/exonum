@@ -8,7 +8,7 @@ use std::time::{SystemTime, Duration};
 use std::thread;
 use std::fmt;
 
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
              MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
@@ -350,7 +350,7 @@ impl<S> fmt::Debug for NodeHandler<S>
 }
 
 pub trait TransactionSend: Send + Sync {
-    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()>;
+    fn send(&self, tx: Box<Transaction>) -> EventsResult<()>;
 }
 
 impl<S> TxSender<S>
@@ -364,12 +364,11 @@ impl<S> TxSender<S>
 impl<S> TransactionSend for TxSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()> {
-        // TODO remove double data convertation
+    fn send(&self, tx: Box<Transaction>) -> EventsResult<()> {
         if !tx.verify() {
             return Err(EventsError::new("Unable to verify transaction"));
         }
-        let msg = ExternalMessage::Transaction(Box::new(tx));
+        let msg = ExternalMessage::Transaction(tx);
         self.inner.post_event(msg)
     }
 }
@@ -383,8 +382,11 @@ impl<T> fmt::Debug for TxSender<T>
 
 impl Node {
     /// Creates node for the given blockchain and node configuration
+
     pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
+        crypto::init();  
         blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
+
 
         let config = Configuration {
             listener: ListenerConfig {
