@@ -8,7 +8,7 @@ use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
-use blockchain::{ConsensusConfig, Blockchain};
+use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
@@ -80,12 +80,8 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.state.round()
     }
 
-    pub fn validators(&self) -> &[PublicKey] {
+    pub fn validators(&self) -> &[ValidatorKeys] {
         self.state.validators()
-    }
-
-    pub fn services(&self) -> &[PublicKey] {
-        self.state.services()
     }
 
     pub fn public_key(&self) -> &PublicKey {

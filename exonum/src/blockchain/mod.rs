@@ -15,7 +15,7 @@ use storage::{Patch, Database, Fork, Error, Map, List, Storage, View as StorageV
 pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
-pub use self::config::{StoredConfiguration, ConsensusConfig};
+pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, ServiceContext, ApiContext};
 
 mod block;
@@ -82,7 +82,6 @@ impl Blockchain {
             previous_cfg_hash: Hash::zero(),
             actual_from: 0,
             validator_keys: cfg.validator_keys,
-            service_keys: cfg.service_keys,
             consensus: cfg.consensus,
             services: BTreeMap::new(),
         };
