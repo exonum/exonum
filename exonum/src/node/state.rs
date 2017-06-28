@@ -9,7 +9,7 @@ use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, 
 use crypto::{PublicKey, SecretKey, Hash};
 use storage::Patch;
 use events::Milliseconds;
-use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
+use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction};
 use node::whitelist::Whitelist;
 
 // TODO: replace by in disk tx pool
@@ -369,12 +369,8 @@ impl State {
         &self.whitelist
     }
 
-    pub fn validators(&self) -> &[PublicKey] {
+    pub fn validators(&self) -> &[ValidatorKeys] {
         &self.config.validator_keys
-    }
-
-    pub fn services(&self) -> &[PublicKey] {
-        &self.config.service_keys
     }
 
     pub fn config(&self) -> &StoredConfiguration {
@@ -384,7 +380,7 @@ impl State {
     pub fn find_validator(&self, peer: PublicKey) -> Option<ValidatorId> {
         self.validators()
             .iter()
-            .position(|pk| pk == &peer)
+            .position(|pk| pk.consensus_key == peer)
             .map(|id| id as ValidatorId)
     }
 
@@ -400,9 +396,9 @@ impl State {
         trace!("Updating node config={:#?}", config);
         let validator_id = config.validator_keys
                             .iter()
-                            .position(|pk| pk == self.consensus_public_key())
+                            .position(|pk| pk.consensus_key == *self.consensus_public_key())
                             .map(|id| id as ValidatorId);
-        self.whitelist.set_validators(config.validator_keys.iter().cloned());
+        self.whitelist.set_validators(config.validator_keys.iter().map(|x| x.consensus_key));
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
         self.config = config;
@@ -425,7 +421,7 @@ impl State {
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
         if let Some(pubkey) = self.connections.remove(addr) {
             self.peers.remove(&pubkey);
-            return self.config.validator_keys.contains(&pubkey);
+            return self.config.validator_keys.iter().any(|x| x.consensus_key == pubkey);
         }
         false
     }
@@ -435,7 +431,7 @@ impl State {
     }
 
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
-        self.validators().get(id as usize).cloned()
+        self.validators().get(id as usize).map(|x| x.consensus_key)
     }
 
     pub fn consensus_public_key(&self) -> &PublicKey {

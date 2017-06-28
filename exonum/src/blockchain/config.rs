@@ -7,13 +7,21 @@ use storage::StorageValue;
 use events::Milliseconds;
 use crypto::{hash, PublicKey, Hash};
 
+/// Public keys of a validator.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ValidatorKeys {
+    /// Consensus key is used for messages related to the consensus algorithm.
+    pub consensus_key: PublicKey,
+    /// Service key is used for services.
+    pub service_key: PublicKey,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
     pub previous_cfg_hash: Hash, 
     pub actual_from: u64,
     /// List of validator's consensus and service public keys.
-    pub validator_keys: Vec<PublicKey>,
-    pub service_keys: Vec<PublicKey>,
+    pub validator_keys: Vec<ValidatorKeys>,
     pub consensus: ConsensusConfig,
     pub services: BTreeMap<String, serde_json::Value>,
 }
@@ -47,18 +55,13 @@ impl StoredConfiguration {
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
 
-        if config.validator_keys.len() != config.service_keys.len() {
-            return Err(
-                JsonError::custom("The amount of validator and service keys should be equal"));
-        }
-
         // Check that there are no duplicated keys.
         {
-            let keys: HashSet<_> = config
-                .validator_keys
-                .iter()
-                .chain(config.service_keys.iter())
-                .collect();
+            let mut keys = HashSet::with_capacity(config.validator_keys.len() * 2);
+            for k in config.validator_keys.iter() {
+                keys.insert(k.consensus_key);
+                keys.insert(k.service_key);
+            }
             if keys.len() != config.validator_keys.len() * 2 {
                 return Err(JsonError::custom("Duplicated validator keys are found"));
             }
@@ -105,32 +108,26 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "The amount of validator and service keys should be equal")]
-    fn stored_configuration_different_keys_amount() {
-        let mut configuration = create_test_configuration();
-        configuration.service_keys.push(PublicKey::zero());
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
     #[should_panic(expected = "Duplicated validator keys are found")]
     fn stored_configuration_duplicated_keys() {
         let mut configuration = create_test_configuration();
-        configuration.validator_keys.push(PublicKey::zero());
-        configuration.service_keys.push(PublicKey::zero());
+        configuration.validator_keys.push(ValidatorKeys {
+            consensus_key: PublicKey::zero(),
+            service_key: PublicKey::zero(),
+        });
         serialize_deserialize(&configuration);
     }
 
     fn create_test_configuration() -> StoredConfiguration {
-        let validator_keys = vec![gen_keypair_from_seed(&Seed::new([1; 32])).0,
-                                  gen_keypair_from_seed(&Seed::new([2; 32])).0];
-        let service_keys = vec![gen_keypair_from_seed(&Seed::new([3; 32])).0,
-                                gen_keypair_from_seed(&Seed::new([4; 32])).0];
+        let validator_keys = (1..4).map(|i| ValidatorKeys {
+                consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
+                service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
+            }).collect();
+
         StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: 42,
             validator_keys,
-            service_keys,
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
         }

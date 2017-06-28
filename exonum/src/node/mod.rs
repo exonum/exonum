@@ -61,12 +61,19 @@ pub struct NodeHandler<S>
     timeout_adjuster: Box<TimeoutAdjuster>
 }
 
+/// Service configuration.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ServiceConfig {
+    /// Service public key.
+    pub service_public_key: PublicKey,
+    /// Service secret key.
+    pub service_secret_key: SecretKey,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
     pub consensus_public_key: PublicKey,
     pub consensus_secret_key: SecretKey,
-    pub service_public_key: PublicKey,
-    pub service_secret_key: SecretKey,
     pub whitelist: Whitelist,
     pub address: SocketAddr,
 }
@@ -109,6 +116,8 @@ pub struct NodeConfig {
 #[derive(Debug, Clone)]
 pub struct Configuration {
     pub listener: ListenerConfig,
+    /// Service configuration.
+    pub service: ServiceConfig,
     pub events: EventsConfiguration,
     pub network: NetworkConfiguration,
     pub peer_discovery: Vec<SocketAddr>,
@@ -140,7 +149,7 @@ impl<S> NodeHandler<S>
         let validator_id = stored
             .validator_keys
             .iter()
-            .position(|pk| pk == &config.listener.consensus_public_key)
+            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| id as ValidatorId);
         info!("Validator={:#?}", validator_id);
         let connect = Connect::new(&config.listener.consensus_public_key,
@@ -149,12 +158,12 @@ impl<S> NodeHandler<S>
                                    &config.listener.consensus_secret_key);
 
         let mut whitelist = config.listener.whitelist;
-        whitelist.set_validators(stored.validator_keys.iter().cloned());
+        whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
         let mut state = State::new(validator_id,
                                config.listener.consensus_public_key,
                                config.listener.consensus_secret_key,
-                               config.listener.service_public_key,
-                               config.listener.service_secret_key,
+                               config.service.service_public_key,
+                               config.service.service_secret_key,
                                whitelist,
                                stored,
                                connect,
@@ -224,7 +233,7 @@ impl<S> NodeHandler<S>
 
     pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
         // TODO: check validator id
-        let public_key = self.state.validators()[id as usize];
+        let public_key = self.state.validators()[id as usize].consensus_key;
         self.send_to_peer(public_key, message);
     }
 
@@ -398,10 +407,12 @@ impl Node {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
                 consensus_secret_key: node_cfg.consensus_secret_key,
-                service_public_key: node_cfg.service_public_key,
-                service_secret_key: node_cfg.service_secret_key,
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
+            },
+            service: ServiceConfig {
+                service_public_key: node_cfg.service_public_key,
+                service_secret_key: node_cfg.service_secret_key,
             },
             network: node_cfg.network,
             events: EventsConfiguration::default(),

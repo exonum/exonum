@@ -7,10 +7,10 @@ use std::ops::Drop;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage,
-                   ListenerConfig};
+                   ListenerConfig, ServiceConfig};
 use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service};
+                         Schema, Transaction, Service, ValidatorKeys};
 use exonum::storage::{Map, MemoryDB, Error as StorageError, RootProofNode, Fork};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
@@ -265,11 +265,11 @@ impl Sandbox {
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
-        self.cfg().validator_keys.clone()
+        self.cfg().validator_keys.iter().map(|x| x.consensus_key).collect()
     }
 
     pub fn services(&self) -> Vec<PublicKey> {
-        self.cfg().service_keys.clone()
+        self.cfg().validator_keys.iter().map(|x| x.service_key).collect()
     }
 
     pub fn n_validators(&self) -> usize {
@@ -606,8 +606,10 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         txs_block_limit: 1000,
     };
     let genesis = GenesisConfig::new_with_consensus(consensus,
-                                                    validators.iter().map(|x| x.0),
-                                                    service_keys.iter().map(|x| x.0));
+        validators.iter().zip(service_keys.iter()).map(|x| ValidatorKeys {
+            consensus_key: (x.0).0,
+            service_key: (x.1).0,
+        }));
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
@@ -615,9 +617,11 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
             address: addresses[0],
             consensus_public_key: validators[0].0,
             consensus_secret_key: validators[0].1.clone(),
+            whitelist: Default::default(),
+        },
+        service: ServiceConfig {
             service_public_key: service_keys[0].0,
             service_secret_key: service_keys[0].1.clone(),
-            whitelist: Default::default(),
         },
         network: NetworkConfiguration::default(),
         events: EventsConfiguration::new(),

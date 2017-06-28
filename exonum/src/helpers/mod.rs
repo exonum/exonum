@@ -5,7 +5,7 @@ use colored::*;
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use blockchain::GenesisConfig;
+use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
 use crypto::gen_keypair;
 
@@ -25,7 +25,10 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
 pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair())).unzip();
-    let genesis = GenesisConfig::new(validators.iter().map(|x| x.0), services.iter().map(|x| x.0));
+    let genesis = GenesisConfig::new(validators.iter().zip(services.iter()).map(|x| ValidatorKeys {
+        consensus_key: (x.0).0,
+        service_key: (x.1).0,
+    }));
     let peers = (0..validators.len())
         .map(|x| {
                  format!("127.0.0.1:{}", start_port + x as u16)
