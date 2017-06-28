@@ -3,7 +3,6 @@ use profiler;
 use rocksdb::DB as _RocksDB;
 use rocksdb::DBRawIterator;
 use rocksdb::Snapshot as _Snapshot;
-// use rocksdb::WriteOptions;
 use rocksdb::Error as _Error;
 use rocksdb::WriteBatch;
 
