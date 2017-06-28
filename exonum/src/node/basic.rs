@@ -149,7 +149,7 @@ impl<S> NodeHandler<S>
                 .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
-            let msg = RequestPeers::new(self.state.consensus_public_key(),
+            let msg = RequestPeers::new(&self.state.consensus_public_key(),
                                         peer.pub_key(),
                                         self.state.consensus_secret_key());
             trace!("Request peers from peer with addr {:?}", peer.addr());
@@ -160,7 +160,7 @@ impl<S> NodeHandler<S>
 
     pub fn broadcast_status(&mut self) {
         let hash = self.blockchain.last_hash().unwrap();
-        let status = Status::new(self.state.consensus_public_key(),
+        let status = Status::new(&self.state.consensus_public_key(),
                                  self.state.height(),
                                  &hash,
                                  self.state.consensus_secret_key());

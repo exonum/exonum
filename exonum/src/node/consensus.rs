@@ -35,7 +35,7 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let key = match self.state.public_key_of(msg.validator()) {
+        let key = match self.state.consensus_public_key_of(msg.validator()) {
             Some(public_key) => {
                 if !msg.verify(&public_key) {
                     error!("Received consensus message with incorrect signature, msg={:?}", msg);
@@ -58,7 +58,7 @@ impl<S> NodeHandler<S>
     }
 
     pub fn handle_propose(&mut self, from: PublicKey, msg: Propose) {
-        debug_assert_eq!(Some(from), self.state.public_key_of(msg.validator()));
+        debug_assert_eq!(Some(from), self.state.consensus_public_key_of(msg.validator()));
 
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
@@ -231,7 +231,7 @@ impl<S> NodeHandler<S>
     pub fn handle_prevote(&mut self, from: PublicKey, msg: Prevote) {
         trace!("Handle prevote");
 
-        debug_assert_eq!(Some(from), self.state.public_key_of(msg.validator()));
+        debug_assert_eq!(Some(from), self.state.consensus_public_key_of(msg.validator()));
 
         // Add prevote
         let has_consensus = self.state.add_prevote(&msg);
@@ -274,7 +274,7 @@ impl<S> NodeHandler<S>
         let proposer = {
             let propose_state = self.state.propose(propose_hash).unwrap();
             if propose_state.has_unknown_txs() {
-                Some(self.state.public_key_of(propose_state.message().validator()).unwrap())
+                Some(self.state.consensus_public_key_of(propose_state.message().validator()).unwrap())
             } else {
                 None
             }
@@ -326,7 +326,7 @@ impl<S> NodeHandler<S>
     pub fn handle_precommit(&mut self, from: PublicKey, msg: Precommit) {
         trace!("Handle precommit");
 
-        debug_assert_eq!(Some(from), self.state.public_key_of(msg.validator()));
+        debug_assert_eq!(Some(from), self.state.consensus_public_key_of(msg.validator()));
 
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
@@ -570,7 +570,7 @@ impl<S> NodeHandler<S>
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    RequestPropose::new(self.state.consensus_public_key(),
+                    RequestPropose::new(&self.state.consensus_public_key(),
                                         &peer,
                                         self.state.height(),
                                         propose_hash,
@@ -586,7 +586,7 @@ impl<S> NodeHandler<S>
                         .iter()
                         .cloned()
                         .collect();
-                    RequestTransactions::new(self.state.consensus_public_key(),
+                    RequestTransactions::new(&self.state.consensus_public_key(),
                                              &peer,
                                              &txs,
                                              self.state.consensus_secret_key())
@@ -594,7 +594,7 @@ impl<S> NodeHandler<S>
                         .clone()
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    RequestPrevotes::new(self.state.consensus_public_key(),
+                    RequestPrevotes::new(&self.state.consensus_public_key(),
                                          &peer,
                                          self.state.height(),
                                          round,
@@ -605,7 +605,7 @@ impl<S> NodeHandler<S>
                         .clone()
                 }
                 RequestData::Block(height) => {
-                    RequestBlock::new(self.state.consensus_public_key(),
+                    RequestBlock::new(&self.state.consensus_public_key(),
                                       &peer,
                                       height,
                                       self.state.consensus_secret_key())
@@ -752,7 +752,7 @@ impl<S> NodeHandler<S>
                         precommit_round: Round,
                         precommit: &Precommit)
                         -> Result<(), String> {
-        if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
+        if let Some(pub_key) = self.state.consensus_public_key_of(precommit.validator()) {
             if !precommit.verify_signature(&pub_key) {
                 let e = format!("Received wrong signed precommit, precommit={:?}", precommit);
                 return Err(e);
