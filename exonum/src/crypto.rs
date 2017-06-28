@@ -4,6 +4,7 @@ use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          verify_detached, gen_keypair as gen_keypair_sodium,
                                          keypair_from_seed};
 use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
+use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 use hex::{ToHex, FromHex};
@@ -12,7 +13,7 @@ use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
 use std::fmt;
 
-pub use sodiumoxide::init;
+
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
                                              SIGNATUREBYTES as SIGNATURE_LENGTH,
@@ -46,6 +47,12 @@ pub fn verify(sig: &Signature, m: &[u8], pubkey: &PublicKey) -> bool {
 pub fn hash(m: &[u8]) -> Hash {
     let dig = hash_sodium(m);
     Hash(dig)
+}
+
+pub fn init() {
+    if !sodiumoxide::init() {
+        panic!("Cryptographic library hasn't initialized.");
+    }
 }
 
 macro_rules! implement_public_sodium_wrapper {
