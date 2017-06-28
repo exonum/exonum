@@ -265,11 +265,19 @@ impl Sandbox {
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
-        self.cfg().validator_keys.iter().map(|x| x.consensus_key).collect()
+        self.cfg()
+            .validator_keys
+            .iter()
+            .map(|x| x.consensus_key)
+            .collect()
     }
 
     pub fn services(&self) -> Vec<PublicKey> {
-        self.cfg().validator_keys.iter().map(|x| x.service_key).collect()
+        self.cfg()
+            .validator_keys
+            .iter()
+            .map(|x| x.service_key)
+            .collect()
     }
 
     pub fn n_validators(&self) -> usize {
@@ -606,10 +614,15 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         txs_block_limit: 1000,
     };
     let genesis = GenesisConfig::new_with_consensus(consensus,
-        validators.iter().zip(service_keys.iter()).map(|x| ValidatorKeys {
-            consensus_key: (x.0).0,
-            service_key: (x.1).0,
-        }));
+                                                    validators
+                                                        .iter()
+                                                        .zip(service_keys.iter())
+                                                        .map(|x| {
+                                                            ValidatorKeys {
+                                                                consensus_key: (x.0).0,
+                                                                service_key: (x.1).0,
+                                                            }
+                                                        }));
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
