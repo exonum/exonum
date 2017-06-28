@@ -26,7 +26,7 @@ mod tests {
     impl TxMetaRecordTestData {
         fn new(data: TxMetaRecord) -> TxMetaRecordTestData {
             let hash = data.hash();
-            let raw = StorageValue::serialize(data.clone());
+            let raw = StorageValue::into_bytes(data.clone());
             TxMetaRecordTestData {
                 json: data,
                 hash: hash,
