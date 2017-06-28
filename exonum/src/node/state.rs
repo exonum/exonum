@@ -434,7 +434,7 @@ impl State {
         &self.peers
     }
 
-    pub fn public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
         self.validators().get(id as usize).cloned()
     }
 
