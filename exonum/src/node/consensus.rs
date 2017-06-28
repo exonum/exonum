@@ -39,7 +39,7 @@ impl<S> NodeHandler<S>
         let key = match self.state.public_key_of(msg.validator()) {
             Some(public_key) => {
                 if !msg.verify(public_key) {
-                    error!("Received message with incorrect signature, msg={:?}", msg);
+                    error!("Received consensus message with incorrect signature, msg={:?}", msg);
                     return;
                 }
                 *public_key
@@ -125,6 +125,11 @@ impl<S> NodeHandler<S>
 
         if !self.state.whitelist().allow(msg.from()) {
             error!("Received request message from peer = {:?} which not in whitelist.", msg.from());
+            return;
+        }
+
+        if !msg.verify_signature(msg.from()) {
+            error!("Received block with incorrect signature, msg={:?}", msg);
             return;
         }
 
@@ -400,7 +405,7 @@ impl<S> NodeHandler<S>
 
         // Handle queued transactions from services
         for tx in new_txs {
-            assert!(tx.verify());
+            debug_assert!(tx.verify());
             self.handle_incoming_tx(tx);
         }
 
