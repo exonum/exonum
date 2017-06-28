@@ -1,0 +1,26 @@
+[package]
+name = "librocksdb-sys"
+version = "0.4.1"
+authors = ["Karl Hobley <karlhobley10@gmail.com>", "Arkadiy Paronyan <arkadiy@ethcore.io>"]
+license = "MIT/Apache-2.0/BSD-3-Clause"
+description = "Native bindings to librocksdb"
+readme = "README.md"
+repository = "https://github.com/spacejam/rust-rocksdb.git"
+keywords = [ "ffi", "rocksdb" ]
+
+build = "build.rs"
+links = "rocksdb"
+
+[features]
+default = [ "static" ]
+static = []
+
+[dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+const-cstr = "0.2"
+
+[build-dependencies]
+gcc = { version = "0.3", features = ["parallel"] }
+make-cmd = "0.1"

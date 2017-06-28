@@ -325,13 +325,12 @@ fn reconnect() {
     t1.join().unwrap();
 }
 
-#[cfg(feature = "long_benchmarks")]
-mod benches {
+#[cfg(all(test, feature = "long_benchmarks"))]
 
+mod tests {
     use std::thread;
     use std::net::SocketAddr;
-
-    use time::Duration;
+    use std::time::Duration;
 
     use ::events::{Network, NetworkConfiguration, Events, Reactor};
     use super::{gen_message, TestEvents, TestHandler};
@@ -368,7 +367,7 @@ mod benches {
             e1.0.bind().unwrap();
             e2.0.bind().unwrap();
 
-            let timeout = Duration::seconds(30);
+            let timeout = Duration::from_secs(30);
             let len = cfg.len;
             let times = cfg.times;
             let t1 = thread::spawn(move || {

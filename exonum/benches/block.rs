@@ -13,7 +13,7 @@ mod tests {
     use tempdir::TempDir;
 
     use exonum::storage::{ProofMapIndex, Database, Fork,
-                          LevelDB, LevelDBOptions, LevelDBCache, StorageValue, Patch};
+                          LevelDB, LevelDBOptions, LevelDBCache, RocksDB, RocksDBOptions, StorageValue, Patch};
 
     use std::collections::BTreeMap;
     use exonum::blockchain::{Blockchain, Transaction};
@@ -146,43 +146,69 @@ mod tests {
         });
     }
 
-    #[bench]
-    fn bench_execute_block_timestamping_leveldb(b: &mut Bencher) {
+    fn create_leveldb(tempdir: &TempDir, with_cache: bool) -> Box<Database> {
         let mut options = LevelDBOptions::new();
         options.create_if_missing = true;
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
+        if with_cache {
+            options.cache = Some(LevelDBCache::new(100_000_000));
+        }
+        let db = Box::new(LevelDB::open(tempdir.path(), options).unwrap());
+        db as Box<Database>
+    }
+
+    fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
+        let mut options = RocksDBOptions::default();
+        options.create_if_missing(true);
+        options.increase_parallelism(4);
+        options.set_allow_os_buffer(true);
+        options.set_disable_auto_compactions(true);
+        let db = Box::new(RocksDB::open(tempdir.path(), options).unwrap());
+        db as Box<Database>
+    }
+
+    // LevelDB
+
+    #[bench]
+    fn bench_execute_block_timestamping_leveldb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_leveldb(&tempdir, false);
         execute_timestamping(db, b)
     }
 
-
     #[bench]
     fn bench_execute_block_timestamping_leveldb_cache(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        options.cache = Some(LevelDBCache::new(100_000_000));
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_leveldb(&tempdir, true);
         execute_timestamping(db, b)
     }
 
     #[bench]
     fn bench_execute_block_cryptocurrency_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_leveldb(&tempdir, false);
         execute_cryptocurrency(db, b)
     }
 
-
     #[bench]
     fn bench_execute_block_cryptocurrency_leveldb_cache(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        options.cache = Some(LevelDBCache::new(100_000_000));
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_leveldb(&tempdir, true);
+        execute_cryptocurrency(db, b)
+    }
+
+    // RocksDB
+
+    #[bench]
+    fn bench_execute_block_timestamping_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        execute_timestamping(db, b)
+    }
+
+    #[bench]
+    fn bench_execute_block_cryptocurrency_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
         execute_cryptocurrency(db, b)
     }
 }

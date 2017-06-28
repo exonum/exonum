@@ -1,0 +1,26 @@
+[package]
+name = "rocksdb"
+description = "Rust wrapper for Facebook's RocksDB embeddable database"
+version = "0.6.1"
+authors = ["Tyler Neely <t@jujit.su>", "David Greenberg <dsg123456789@gmail.com>"]
+license = "Apache-2.0"
+keywords = ["database", "embedded", "LSM-tree", "persistence"]
+homepage = "https://github.com/spacejam/rust-rocksdb"
+exclude = [
+    ".gitignore",
+    ".travis.yml",
+    "deploy.sh",
+    "test/**/*",
+]
+
+[features]
+default = []
+valgrind = []
+
+[[test]]
+name = "test"
+path = "test/test.rs"
+
+[dependencies]
+libc = "0.2"
+librocksdb-sys = { path = "librocksdb-sys", version = "0.4.1" }

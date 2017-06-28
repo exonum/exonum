@@ -15,6 +15,7 @@ mod tests;
 mod key;
 mod node;
 mod proof;
+pub use self::key::KEY_SIZE;
 
 #[derive(Debug)]
 pub struct ProofMapIndex<T, K, V> {

@@ -1,0 +1,27 @@
+- title: Docs
+  href: /docs/
+  category: docs
+
+- title: GitHub
+  href: https://github.com/facebook/rocksdb/
+  category: github
+
+- title: API (C++)
+  href: https://github.com/facebook/rocksdb/tree/master/include/rocksdb
+  category: api
+
+- title: API (Java)
+  href: https://github.com/facebook/rocksdb/tree/master/java/src/main/java/org/rocksdb
+  category: api
+
+- title: Support
+  href: /support.html
+  category: support
+
+- title: Blog
+  href: /blog/
+  category: blog
+
+- title: Facebook
+  href: https://www.facebook.com/groups/rocksdb.dev/
+  category: facebook

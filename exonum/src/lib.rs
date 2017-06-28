@@ -18,6 +18,7 @@ extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
 extern crate leveldb;
+extern crate rocksdb;
 extern crate rand;
 extern crate serde;
 #[macro_use]
