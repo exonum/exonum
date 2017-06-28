@@ -94,13 +94,17 @@ impl Default for NodeApiConfig {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryPoolConfig {
     /// Maximum number of uncommited transactions.
-    pub unconfirmed_txs_limit: usize,
+    pub tx_pool_capacity: usize,
+    /// Sets the maximum number of messages that can be buffered on the event loop's 
+    /// notification channel before a send will fail.
+    pub events_pool_capacity: usize,
 }
 
 impl Default for MemoryPoolConfig {
     fn default() -> MemoryPoolConfig {
         MemoryPoolConfig {
-            unconfirmed_txs_limit: 20000,
+            tx_pool_capacity: 100000,
+            events_pool_capacity: 400000,
         }
     }
 }
@@ -166,7 +170,7 @@ impl<S> NodeHandler<S>
         let mut state = State::new(validator_id,
                                config.listener.public_key,
                                config.listener.secret_key,
-                               config.mempool,
+                               config.mempool.tx_pool_capacity,
                                whitelist,
                                stored,
                                connect,
@@ -406,6 +410,9 @@ impl Node {
             .create_genesis_block(node_cfg.genesis.clone())
             .unwrap();
 
+        let mut events_cfg = EventsConfiguration::default();
+        events_cfg.notify_capacity(node_cfg.mempool.events_pool_capacity);
+
         let config = Configuration {
             listener: ListenerConfig {
                 public_key: node_cfg.public_key,
@@ -415,7 +422,7 @@ impl Node {
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,
-            events: EventsConfiguration::default(),
+            events: events_cfg,
             peer_discovery: node_cfg.peers,
         };
         let network = Network::with_config(node_cfg.listen_address, config.network);
