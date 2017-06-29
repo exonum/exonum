@@ -59,7 +59,7 @@ impl StoredConfiguration {
         // Check that there are no duplicated keys.
         {
             let mut keys = HashSet::with_capacity(config.validator_keys.len() * 2);
-            for k in config.validator_keys.iter() {
+            for k in &config.validator_keys {
                 keys.insert(k.consensus_key);
                 keys.insert(k.service_key);
             }
