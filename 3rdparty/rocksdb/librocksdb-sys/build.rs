@@ -1,6 +1,8 @@
 extern crate gcc;
+extern crate pkg_config;
 
 use std::fs;
+use pkg_config::probe_library;
 
 fn link(name: &str, bundled: bool) {
     use std::env::var;
@@ -17,7 +19,10 @@ fn link(name: &str, bundled: bool) {
 
 fn fail_on_empty_directory(name: &str) {
     if fs::read_dir(name).unwrap().count() == 0 {
-        println!("The `{}` directory is empty, did you forget to pull the submodules?", name);
+        println!(
+            "The `{}` directory is empty, did you forget to pull the submodules?",
+            name
+        );
         println!("Try `git submodule update --init --recursive`");
         panic!();
     }
@@ -42,7 +47,8 @@ fn build_rocksdb() {
         .collect::<Vec<&'static str>>();
 
     // We have a pregenerated a version of build_version.cc in the local directory
-    lib_sources = lib_sources.iter()
+    lib_sources = lib_sources
+        .iter()
         .cloned()
         .filter(|file| *file != "util/build_version.cc")
         .collect::<Vec<&'static str>>();
@@ -70,18 +76,17 @@ fn build_rocksdb() {
         config.define("OS_WIN", Some("1"));
 
         // Remove POSIX-specific sources
-        lib_sources = lib_sources.iter()
+        lib_sources = lib_sources
+            .iter()
             .cloned()
-            .filter(|file| {
-                match *file {
-                    "port/port_posix.cc" |
-                    "util/env_posix.cc" |
-                    "util/io_posix.cc" |
-                    "db/db_impl_debug.cc" |
-                    "util/thread_status_util_debug.cc" |
-                    "util/xfunc.cc" => false,
-                    _ => true,
-                }
+            .filter(|file| match *file {
+                "port/port_posix.cc" |
+                "util/env_posix.cc" |
+                "util/io_posix.cc" |
+                "db/db_impl_debug.cc" |
+                "util/thread_status_util_debug.cc" |
+                "util/xfunc.cc" => false,
+                _ => true,
             })
             .collect::<Vec<&'static str>>();
 
@@ -130,9 +135,39 @@ fn build_snappy() {
     config.compile("libsnappy.a");
 }
 
+fn try_to_find_lib(library: &str) -> bool {
+    use std::env;
+
+    let lib_name = match library {
+        "librocksdb" => "ROCKSDB",
+        "libsnappy" => "SNAPPY",
+        _ => "UNKNOWN"
+    };
+
+    if let Ok(lib_dir) = env::var(format!("{}_LIB_DIR", lib_name).as_str()) {
+        println!("cargo:rustc-link-search=native={}", lib_dir);
+        let mode = match env::var_os(format!("{}_STATIC", lib_name).as_str()) {
+            Some(_) => "static",
+            None => "dylib",
+        };
+        println!("cargo:rustc-link-lib={0}={1}", mode, lib_name.to_lowercase());
+        return true;
+    }   
+
+    match probe_library("snappy") {
+        Ok(_) => true,
+        Err(_) => false,
+    }
+}
+
 fn main() {
-    fail_on_empty_directory("rocksdb");
-    fail_on_empty_directory("snappy");
-    build_rocksdb();
-    build_snappy();
+    if !try_to_find_lib("libsnappy") {
+        fail_on_empty_directory("snappy");
+        build_snappy();
+    }
+    
+    if !try_to_find_lib("librocksdb") {
+        fail_on_empty_directory("rocksdb");
+        build_rocksdb();
+    }
 }

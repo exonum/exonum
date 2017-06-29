@@ -76,6 +76,7 @@ impl<'a, 'b> BlockchainCommand<'a, 'b>
     }
 }
 
+
 fn main() {
     exonum::crypto::init();
     exonum::helpers::init_logger().unwrap();
