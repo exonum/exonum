@@ -6,6 +6,7 @@ use rand::{thread_rng, Rng};
 
 use crypto::{hash, Hash};
 use super::super::{Database, MemoryDB};
+use ::encoding::serialize::json::reexport::to_string;
 
 use super::{DBKey, ProofMapIndex};
 use super::proof::MapProof;
@@ -363,6 +364,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
 
 #[test]
 fn fuzz_insert_build_proofs() {
+    let _ = ::helpers::init_logger();
     let data = generate_fully_random_data_keys(100);
 
     let mut storage = MemoryDB::new().fork();
@@ -379,6 +381,8 @@ fn fuzz_insert_build_proofs() {
         let check_res = proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
         let proved_value: Option<&Vec<u8>> = check_res.unwrap();
         assert_eq!(proved_value.unwrap(), &item.1);
+        let json_repre = to_string(&proof_path_to_key).unwrap();
+        info!("{}", json_repre);
     }
 }
 
