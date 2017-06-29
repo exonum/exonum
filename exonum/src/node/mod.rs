@@ -116,6 +116,25 @@ impl Default for NodeApiConfig {
     }
 }
 
+/// Memory pool configuration parameters.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MemoryPoolConfig {
+    /// Maximum number of uncommited transactions.
+    pub tx_pool_capacity: usize,
+    /// Sets the maximum number of messages that can be buffered on the event loop's 
+    /// notification channel before a send will fail.
+    pub events_pool_capacity: usize,
+}
+
+impl Default for MemoryPoolConfig {
+    fn default() -> MemoryPoolConfig {
+        MemoryPoolConfig {
+            tx_pool_capacity: 100000,
+            events_pool_capacity: 400000,
+        }
+    }
+}
+
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
@@ -135,6 +154,7 @@ pub struct NodeConfig {
     pub whitelist: Whitelist,
     /// Api configuration.
     pub api: NodeApiConfig,
+    pub mempool: MemoryPoolConfig,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -148,6 +168,7 @@ pub struct Configuration {
     pub network: NetworkConfiguration,
     /// Known peer addresses.
     pub peer_discovery: Vec<SocketAddr>,
+    pub mempool: MemoryPoolConfig,
 }
 
 /// Channel for messages and timeouts.
@@ -192,6 +213,7 @@ impl<S> NodeHandler<S>
         let mut state = State::new(validator_id,
                                config.listener.public_key,
                                config.listener.secret_key,
+                               config.mempool.tx_pool_capacity,
                                whitelist,
                                stored,
                                connect,
@@ -456,6 +478,9 @@ impl Node {
             .create_genesis_block(node_cfg.genesis.clone())
             .unwrap();
 
+        let mut events_cfg = EventsConfiguration::default();
+        events_cfg.notify_capacity(node_cfg.mempool.events_pool_capacity);
+
         let config = Configuration {
             listener: ListenerConfig {
                 public_key: node_cfg.public_key,
@@ -463,8 +488,9 @@ impl Node {
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
             },
+            mempool: node_cfg.mempool,
             network: node_cfg.network,
-            events: EventsConfiguration::default(),
+            events: events_cfg,
             peer_discovery: node_cfg.peers,
         };
         let network = Network::with_config(node_cfg.listen_address, config.network);
