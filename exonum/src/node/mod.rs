@@ -154,6 +154,7 @@ pub struct NodeConfig {
     pub whitelist: Whitelist,
     /// Api configuration.
     pub api: NodeApiConfig,
+    /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
 }
 
@@ -168,6 +169,7 @@ pub struct Configuration {
     pub network: NetworkConfiguration,
     /// Known peer addresses.
     pub peer_discovery: Vec<SocketAddr>,
+    /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
 }
 
