@@ -48,6 +48,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 genesis: genesis.clone(),
                 whitelist: Default::default(),
                 api: Default::default(),
+                mempool: Default::default(),
             }
         })
         .collect::<Vec<_>>()
