@@ -400,6 +400,13 @@ fn test_request_block() {
 #[test]
 fn test_correct_encoding_struct() {
     encoding_struct! {
+        struct NoFields {
+            const SIZE = 0;
+        }
+    }
+    drop(NoFields::new());
+
+    encoding_struct! {
         struct OneField {
             const SIZE = 8;
 
