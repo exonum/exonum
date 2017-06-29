@@ -187,7 +187,7 @@ macro_rules! encoding_struct {
             }
         }
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &::serde_json::Value) -> Result<Self, Box<::std::error::Error>> {
+            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value) -> Result<Self, Box<::std::error::Error>> {
                 let to = $body as $crate::encoding::Offset;
                 let from = 0;
                 use $crate::encoding::serialize::json::ExonumJson;

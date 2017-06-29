@@ -3,6 +3,7 @@ rust:
   - stable
 cache: cargo
 sudo: required
+group: deprecated-2017Q2
 dist: trusty
 env:
   global:
@@ -13,9 +14,10 @@ before_install:
 - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
 - rustup toolchain install $NIGHTLY_RUST
 - cargo +$NIGHTLY_RUST clippy -V | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --vers $CLIPPY_VERS --force
-- sudo add-apt-repository -y ppa:chris-lea/libsodium
+- sudo add-apt-repository -y ppa:elt/libsodium
 - sudo apt-get -qq update
 - cargo install --list
+- cargo-audit -V || cargo install cargo-audit --force
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 script:
@@ -26,6 +28,7 @@ script:
 - cd sandbox
 - cargo +$NIGHTLY_RUST clippy -- -D warnings
 - cd ..
+- cargo audit
 - cargo test --manifest-path exonum/Cargo.toml
 - cargo test --manifest-path sandbox/Cargo.toml
 notifications:
