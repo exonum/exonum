@@ -251,7 +251,7 @@ macro_rules! check_bounds {
     }};
     ($size:expr,
      $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
-     $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)*
+     $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)+
      ) => {{
         use $crate::encoding::Field;
         debug_assert_eq!($first_from, 0);
