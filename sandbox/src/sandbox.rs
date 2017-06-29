@@ -639,6 +639,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         network: NetworkConfiguration::default(),
         events: EventsConfiguration::new(),
         peer_discovery: Vec::new(),
+        mempool: Default::default(),
     };
 
     // TODO use factory or other solution like set_handler or run
