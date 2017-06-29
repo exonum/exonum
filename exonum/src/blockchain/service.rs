@@ -8,8 +8,7 @@ use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
-use events::Milliseconds;
-use blockchain::{StoredConfiguration, ConsensusConfig, Blockchain};
+use blockchain::{ConsensusConfig, Blockchain};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
@@ -36,29 +35,29 @@ pub trait Service: Send + Sync + 'static {
         Ok(Value::Null)
     }
 
-    fn handle_commit(&self, context: &mut NodeState) -> Result<(), StorageError> {
+    fn handle_commit(&self, context: &mut ServiceContext) -> Result<(), StorageError> {
         Ok(())
     }
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
-    /// Returns api handler for maintainers. 
+    /// Returns api handler for maintainers.
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
 }
 
 #[derive(Debug)]
-pub struct NodeState<'a, 'b> {
+pub struct ServiceContext<'a, 'b> {
     state: &'a mut State,
     view: &'b View,
     txs: Vec<Box<Transaction>>,
 }
 
-impl<'a, 'b> NodeState<'a, 'b> {
-    pub fn new(state: &'a mut State, view: &'b View) -> NodeState<'a, 'b> {
-        NodeState {
+impl<'a, 'b> ServiceContext<'a, 'b> {
+    pub fn new(state: &'a mut State, view: &'b View) -> ServiceContext<'a, 'b> {
+        ServiceContext {
             state: state,
             view: view,
             txs: Vec::new(),
@@ -93,37 +92,18 @@ impl<'a, 'b> NodeState<'a, 'b> {
         self.state.secret_key()
     }
 
-    pub fn actual_config(&self) -> &StoredConfiguration {
-        self.state.config()
-    }
-
-    pub fn consensus_config(&self) -> &ConsensusConfig {
+    pub fn actual_consensus_config(&self) -> &ConsensusConfig {
         self.state.consensus_config()
     }
 
-    pub fn service_config(&self, service: &Service) -> &Value {
+    pub fn actual_service_config(&self, service: &Service) -> &Value {
         let name = service.service_name();
-        self.state
-            .services_config()
-            .get(name)
-            .unwrap()
+        self.state.services_config().get(name).unwrap()
     }
 
-    pub fn update_config(&mut self, new_config: StoredConfiguration) {
-        self.state.update_config(new_config)
-    }
-
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.state.propose_timeout()
-    }
-
-    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
-        self.state.set_propose_timeout(timeout)
-    }
-
-    pub fn add_transaction<T: Transaction>(&mut self, tx: T) {
+    pub fn add_transaction(&mut self, tx: Box<Transaction>) {
         assert!(tx.verify());
-        self.txs.push(Box::new(tx));
+        self.txs.push(tx);
     }
 
     pub fn transactions(self) -> Vec<Box<Transaction>> {
@@ -157,7 +137,7 @@ impl ApiContext {
     pub fn node_channel(&self) -> &TxSender<NodeChannel> {
         &self.node_channel
     }
-    
+
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
     }
