@@ -1,7 +1,7 @@
 /// `message!` implement structure that could be sent in exonum network.
 ///
 /// Each message is a piece of data that is signed by creators key.
-/// For now it's required to set service id as `const TYPE`, message id as `const ID`, and 
+/// For now it's required to set service id as `const TYPE`, message id as `const ID`, and
 /// message fixed part size as `const SIZE`.
 ///
 /// - service id should be unique inside whole exonum.
@@ -21,7 +21,7 @@
 ///         const TYPE = MY_NEW_MESSAGE_ID;
 ///         const ID   = MY_SERVICE_ID;
 ///         const SIZE = 16;
-///         
+///
 ///         field first: u64 [0 => 8]
 ///         field second: u64 [8 => 16]
 ///     }
@@ -40,7 +40,7 @@
 /// # }
 /// ```
 ///
-/// For additionall reference about data layout see also 
+/// For additionall reference about data layout see also
 /// *[ `encoding` documentation](./encoding/index.html).*
 ///
 /// `message!` internaly use `ident_count!`, be sure to add this macro to namespace.
@@ -71,7 +71,7 @@ macro_rules! message {
         }
 
         impl<'a> $crate::encoding::SegmentField<'a> for $name {
-            
+
             fn item_size() -> $crate::encoding::Offset {
                 1
             }
@@ -87,7 +87,7 @@ macro_rules! message {
             unsafe fn from_buffer(buffer: &'a [u8],
                                     from: $crate::encoding::Offset,
                                     count: $crate::encoding::Offset) -> Self {
-                let raw_message: $crate::messages::RawMessage = 
+                let raw_message: $crate::messages::RawMessage =
                                     $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from,
                                                                 count);
@@ -106,7 +106,7 @@ macro_rules! message {
                                                                 latest_segment)?;
                 // TODO: remove this allication,
                 // by allowing creating message from borrowed data
-                let raw_message: $crate::messages::RawMessage = 
+                let raw_message: $crate::messages::RawMessage =
                                     unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from.unchecked_offset(),
                                                                 count.unchecked_offset())};
@@ -173,7 +173,7 @@ macro_rules! message {
                 $(
                     let field_from: $crate::encoding::Offset = $from;
                     let field_to: $crate::encoding::Offset = $to;
-                    let latest_segment = raw_message.check::<$field_type>(field_from.into(), 
+                    let latest_segment = raw_message.check::<$field_type>(field_from.into(),
                                                     field_to.into(),
                                                     latest_segment)?;
                 )*
@@ -225,7 +225,7 @@ macro_rules! message {
             }
 
             #[allow(unused_mut)]
-            fn serialize_field(&self) 
+            fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
                             Box<::std::error::Error>>
             {
