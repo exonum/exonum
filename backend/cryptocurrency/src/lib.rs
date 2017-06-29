@@ -13,7 +13,7 @@ extern crate byteorder;
 extern crate log;
 #[cfg(test)]
 extern crate tempdir;
-#[macro_use(message, encoding_struct)]
+#[macro_use]
 extern crate exonum;
 extern crate params;
 extern crate router;

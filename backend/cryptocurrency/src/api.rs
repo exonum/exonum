@@ -119,7 +119,7 @@ impl<T> CryptocurrencyApi<T>
 
     fn transaction(&self, tx: CurrencyTx) -> Result<Hash, ApiError> {
         let tx_hash = tx.hash();
-        match self.channel.send(tx) {
+        match self.channel.send(Box::new(tx)) {
             Ok(_) => Ok(tx_hash),
             Err(e) => Err(ApiError::Events(e)),
         }
