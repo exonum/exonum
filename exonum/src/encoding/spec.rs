@@ -13,7 +13,7 @@
 /// encoding_struct! {
 ///     struct SaveTwoInteger {
 ///         const SIZE = 16;
-///         
+///
 ///         field first: u64 [0 => 8]
 ///         field second: u64 [8 => 16]
 ///     }
@@ -26,7 +26,7 @@
 /// # }
 /// ```
 ///
-/// For additional reference about data layout see also 
+/// For additional reference about data layout see also
 /// *[ `encoding` documentation](./encoding/index.html).*
 ///
 /// `encoding_struct!` internaly use `ident_count!`, be sure to add this macro to namespace.
@@ -48,7 +48,7 @@ macro_rules! encoding_struct {
             raw: Vec<u8>
         }
 
-        // Reimplement `Field` for `encoding_struct!` 
+        // Reimplement `Field` for `encoding_struct!`
         // to write fields in place of another structure
         impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
@@ -64,7 +64,7 @@ macro_rules! encoding_struct {
                             to: $crate::encoding::Offset) {
                 $crate::encoding::Field::write(&self.raw, buffer, from, to);
             }
-            
+
             #[allow(unused_variables)]
             fn check(buffer: &'a [u8],
                         from_st_val: $crate::encoding::CheckedOffset,
@@ -73,7 +73,7 @@ macro_rules! encoding_struct {
                 -> $crate::encoding::Result
             {
                 let latest_segment_origin = <&[u8] as $crate::encoding::Field>::check(buffer, from_st_val, to_st_val, latest_segment)?;
-                let vec: &[u8] = unsafe{ $crate::encoding::Field::read(buffer, 
+                let vec: &[u8] = unsafe{ $crate::encoding::Field::read(buffer,
                                                                         from_st_val.unchecked_offset(),
                                                                         to_st_val.unchecked_offset())};
                 let latest_segment: $crate::encoding::CheckedOffset =
@@ -173,7 +173,7 @@ macro_rules! encoding_struct {
             }
 
             #[allow(unused_mut)]
-            fn serialize_field(&self) 
+            fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
                             Box<::std::error::Error>>
             {
