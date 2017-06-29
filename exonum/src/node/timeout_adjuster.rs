@@ -28,19 +28,48 @@ use storage::View;
 ///     }
 /// }
 /// ```
-/// For more examples see `Constant` and `MovingAverage` implementations.
+/// For more examples see `Dynamic` and `MovingAverage` implementations.
 pub trait TimeoutAdjuster: Send {
     /// Called during node initialization and after accepting a new height.
     fn adjust_timeout(&mut self, state: &State, view: View) -> Milliseconds;
 }
 
-/// `Adjuster` implementation that returns value of `propose_timeout` field from `ConsensusConfig`.
-#[derive(Default, Debug)]
-pub struct Constant;
+/// `Adjuster` implementation that returns minimal or maximal timeout value depending on the
+/// threshold.
+///
+/// All parameters are configured through `ConsensusConfig`:
+/// - `min_propose_timeout` - minimal timeout value
+/// - `max_propose_timeout` - maximal timeout value
+/// - `txs_propose_timeout_threshold` - threshold
+#[derive(Debug, Default)]
+pub struct Dynamic {
+}
 
-impl TimeoutAdjuster for Constant {
+impl Dynamic {
+    /// Creates `Dynamic` timeout adjuster.
+    pub fn new() -> Self {
+        Dynamic::default()
+    }
+
+    fn adjust_timeout_impl(&mut self,
+                           current_load: usize,
+                           min_timeout: Milliseconds,
+                           max_timeout: Milliseconds,
+                           threshold: u32) -> Milliseconds {
+        if current_load > threshold as usize {
+            min_timeout
+        } else {
+            max_timeout
+        }
+    }
+}
+
+impl TimeoutAdjuster for Dynamic {
     fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
-        state.consensus_config().propose_timeout
+        self.adjust_timeout_impl(state.transactions().len(),
+                                 state.consensus_config().min_propose_timeout,
+                                 state.consensus_config().max_propose_timeout,
+                                 state.consensus_config().txs_propose_timeout_threshold)
     }
 }
 
@@ -101,6 +130,25 @@ mod tests {
 
     use super::*;
     use events::Milliseconds;
+
+    #[test]
+    fn dynamic_timeout_adjuster() {
+        static MIN_TIMEOUT: Milliseconds = 1;
+        static MAX_TIMEOUT: Milliseconds = 10;
+        static THRESHOLD: u32 = 2;
+
+        let test_data = [(0, MAX_TIMEOUT), (1, MAX_TIMEOUT), (2, MAX_TIMEOUT),
+                         (3, MIN_TIMEOUT), (10, MIN_TIMEOUT), (100, MIN_TIMEOUT)];
+
+        let mut adjuster = Dynamic::new();
+
+        for data in &test_data {
+            assert_eq!(data.1, adjuster.adjust_timeout_impl(data.0,
+                                                            MIN_TIMEOUT,
+                                                            MAX_TIMEOUT,
+                                                            THRESHOLD));
+        }
+    }
 
     #[test]
     fn moving_average_timeout_adjuster() {

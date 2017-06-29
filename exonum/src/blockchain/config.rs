@@ -20,7 +20,9 @@ pub struct ConsensusConfig {
     pub round_timeout: Milliseconds,
     pub status_timeout: Milliseconds,
     pub peers_timeout: Milliseconds,
-    pub propose_timeout: Milliseconds,
+    pub min_propose_timeout: Milliseconds,
+    pub max_propose_timeout: Milliseconds,
+    pub txs_propose_timeout_threshold: u32,
     pub txs_block_limit: u32,
 }
 
@@ -28,7 +30,9 @@ impl Default for ConsensusConfig {
     fn default() -> Self {
         ConsensusConfig {
             round_timeout: 3000,
-            propose_timeout: 500,
+            min_propose_timeout: 500,
+            max_propose_timeout: 2000,
+            txs_propose_timeout_threshold: 10,
             status_timeout: 5000,
             peers_timeout: 10000,
             txs_block_limit: 1000,
