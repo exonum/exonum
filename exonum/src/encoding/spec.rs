@@ -55,7 +55,7 @@ macro_rules! encoding_struct {
                             from: $crate::encoding::Offset,
                             to: $crate::encoding::Offset) -> Self {
                 let vec: Vec<u8> = $crate::encoding::Field::read(buffer, from, to);
-                $crate::storage::StorageValue::deserialize(vec)
+                $crate::storage::StorageValue::from_bytes(::std::borrow::Cow::Owned(vec))
             }
 
             fn write(&self,
@@ -101,13 +101,13 @@ macro_rules! encoding_struct {
         }
 
         impl $crate::storage::StorageValue for $name {
-            fn serialize(self) -> Vec<u8> {
+            fn into_bytes(self) -> Vec<u8> {
                 self.raw
             }
 
-            fn deserialize(v: Vec<u8>) -> Self {
+            fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
                 $name {
-                    raw: v
+                    raw: v.into_owned()
                 }
             }
 
@@ -122,10 +122,10 @@ macro_rules! encoding_struct {
             #[allow(unused_imports, unused_mut)]
             /// Create `$name`.
             pub fn new($($field_name: $field_type,)*) -> $name {
-                use $crate::encoding::Field;
+
                 check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut buf = vec![0; $body];
-                $($field_name.write(&mut buf, $from, $to);)*
+                $($crate::encoding::Field::write(&$field_name, &mut buf, $from, $to);)*
                 $name { raw: buf }
             }
 
@@ -172,10 +172,11 @@ macro_rules! encoding_struct {
                 Ok(())
             }
 
+
             #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
-                            Box<::std::error::Error>>
+                          Box<::std::error::Error>>
             {
                 use $crate::encoding::serialize::json::reexport::Value;
                 let mut map = $crate::encoding::serialize::json::reexport::Map::new();

@@ -199,6 +199,22 @@ macro_rules! message {
             })*
         }
 
+        impl $crate::storage::StorageValue for $name {
+            fn hash(&self) -> $crate::crypto::Hash {
+                $crate::messages::Message::hash(self)
+            }
+
+            fn into_bytes(self) -> Vec<u8> {
+                self.raw.as_ref().as_ref().to_vec()
+            }
+
+            fn from_bytes(value: ::std::borrow::Cow<[u8]>) -> Self {
+                $name {
+                    raw: ::std::sync::Arc::new($crate::messages::MessageBuffer::from_vec(value.into_owned()))
+                }
+            }
+        }
+
         impl ::std::fmt::Debug for $name {
             fn fmt(&self, fmt: &mut ::std::fmt::Formatter)
                 -> Result<(), ::std::fmt::Error> {
@@ -223,6 +239,7 @@ macro_rules! message {
                 buffer.write(from, to, structure);
                 Ok(())
             }
+
 
             #[allow(unused_mut)]
             fn serialize_field(&self)
