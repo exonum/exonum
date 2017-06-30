@@ -91,7 +91,7 @@ struct TestTxSender {
 }
 
 impl TransactionSend for TestTxSender {
-    fn send<T: Transaction>(&self, tx: T) -> Result<(), EventsError> {
+    fn send(&self, tx: Box<Transaction>) -> Result<(), EventsError> {
         if !tx.verify() {
             return Err(EventsError::new("Unable to verify transaction"));
         }
