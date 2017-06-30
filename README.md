@@ -9,7 +9,9 @@ To run this example you need:
 * Latest [Node.js](https://nodejs.org/en/) (version 6.9.1 or above)
 * Latest [Rust](https://www.rust-lang.org/en-US/) (version 1.18.0 or above)
 
-# Build & Run
+## Build & Run
+
+### Blockchain node
 
 To build and run a single node use:
 
@@ -23,6 +25,8 @@ cargo run
 ```
 
 Now the node is listening HTTP requests on `localhost:8000`.
+
+### Sample transactions
 
 To check transactions use [cc-examples](https://github.com/exonum/cc-examples/) repository:
 
