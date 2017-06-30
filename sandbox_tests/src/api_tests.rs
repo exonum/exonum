@@ -262,9 +262,7 @@ fn test_get_following_config() {
         (0..api_sandbox.sandbox.majority_count(n_validators))
             .inspect(|validator_id| {
                          api_sandbox
-                             .post_config_vote(*validator_id,
-                                               following_cfg.hash(),
-                                               validator_id)
+                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
                              .unwrap();
                      })
             .collect::<Vec<_>>();
@@ -375,9 +373,7 @@ fn test_get_config_by_hash3() {
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
             .inspect(|validator_id| if *validator_id != excluded_validator {
                          api_sandbox
-                             .post_config_vote(*validator_id,
-                                               following_cfg.hash(),
-                                               validator_id)
+                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
                              .unwrap();
                      })
             .map(|validator_id| if validator_id == excluded_validator {
@@ -461,9 +457,7 @@ fn test_get_config_votes() {
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
             .inspect(|validator_id| if *validator_id != excluded_validator {
                          api_sandbox
-                             .post_config_vote(*validator_id,
-                                               following_cfg.hash(),
-                                               validator_id)
+                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
                              .unwrap();
                      })
             .map(|validator_id| if validator_id == excluded_validator {

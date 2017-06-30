@@ -139,8 +139,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &full_node_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
         }
@@ -172,8 +172,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &validator_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &votes);
         }
@@ -212,7 +212,7 @@ mod tests {
                                                                      .clone()
                                                                      .into_bytes()
                                                                      .as_slice())
-                                                          .unwrap(),
+                                                      .unwrap(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
@@ -223,8 +223,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &added_keys_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
             sandbox.assert_state(3, 1);
@@ -251,8 +251,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &new_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
             sandbox.assert_state(6, 1);
@@ -299,8 +299,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &excluding_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
             sandbox.assert_state(3, 1);
@@ -478,8 +478,8 @@ mod tests {
                 expected_votes.push(TxConfigVote::new(&sandbox.p(validator),
                                                       &new_cfg.hash(),
                                                       sandbox.s(validator))
-                                            .raw()
-                                            .clone());
+                                        .raw()
+                                        .clone());
             }
             let unposted_vote = TxConfigVote::new(&sandbox.p(2), &new_cfg.hash(), sandbox.s(2));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
@@ -519,7 +519,7 @@ mod tests {
                                                                      .clone()
                                                                      .into_bytes()
                                                                      .as_slice())
-                                                          .unwrap(),
+                                                      .unwrap(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
@@ -532,8 +532,8 @@ mod tests {
                          TxConfigVote::new(&sandbox.p(validator),
                                            &following_config.hash(),
                                            sandbox.s(validator))
-                                 .raw()
-                                 .clone()
+                             .raw()
+                             .clone()
                      })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
@@ -605,7 +605,7 @@ mod tests {
                                                                            .clone()
                                                                            .into_bytes()
                                                                            .as_slice())
-                                                                .unwrap(),
+                                                            .unwrap(),
                                                         sandbox.s(1));
             let illegal_propose2 =
                 TxConfigPropose::new(&illegal_pub,
@@ -632,7 +632,7 @@ mod tests {
                                                                          .clone()
                                                                          .into_bytes()
                                                                          .as_slice())
-                                                              .unwrap(),
+                                                          .unwrap(),
                                                       sandbox.s(1));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
@@ -659,8 +659,8 @@ mod tests {
                          TxConfigVote::new(&sandbox.p(validator),
                                            &new_cfg.hash(),
                                            sandbox.s(validator))
-                                 .raw()
-                                 .clone()
+                             .raw()
+                             .clone()
                      })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
@@ -680,8 +680,8 @@ mod tests {
                          TxConfigVote::new(&sandbox.p(validator),
                                            &new_cfg_discarded_votes.hash(),
                                            sandbox.s(validator))
-                                 .raw()
-                                 .clone()
+                             .raw()
+                             .clone()
                      })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
@@ -713,10 +713,10 @@ mod tests {
                                                    str::from_utf8(cfg.clone()
                                                                       .into_bytes()
                                                                       .as_slice())
-                                                           .unwrap(),
+                                                       .unwrap(),
                                                    sandbox.s(1))
-                                      .raw()
-                                      .clone());
+                                  .raw()
+                                  .clone());
             }
 
             add_one_height_with_transactions(&sandbox, &sandbox_state, &proposes);
@@ -728,8 +728,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &new_cfg1.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
 
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
@@ -782,8 +782,8 @@ mod tests {
                 votes_for_new_cfg1.push(TxConfigVote::new(&sandbox.p(validator),
                                                           &new_cfg1.hash(),
                                                           sandbox.s(validator))
-                                                .raw()
-                                                .clone());
+                                            .raw()
+                                            .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes_for_new_cfg1);
             sandbox.assert_state(3, 1);
@@ -807,8 +807,8 @@ mod tests {
                 votes_for_new_cfg2.push(TxConfigVote::new(&sandbox.p(validator),
                                                           &new_cfg2.hash(),
                                                           sandbox.s(validator))
-                                                .raw()
-                                                .clone());
+                                            .raw()
+                                            .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes_for_new_cfg2);
             sandbox.assert_state(5, 1);

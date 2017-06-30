@@ -9,7 +9,7 @@ env:
   global:
     - NIGHTLY_RUST=nightly-2017-05-10
     - CLIPPY_VERS=0.0.131
-    - RUSTFMT_VERS=0.8.4
+    - RUSTFMT_VERS=0.8.6
 before_install:
 - rustfmt --version | grep $RUSTFMT_VERS || cargo install rustfmt --force --vers $RUSTFMT_VERS
 - rustup toolchain install $NIGHTLY_RUST

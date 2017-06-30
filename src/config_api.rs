@@ -274,10 +274,12 @@ impl Api for PublicConfigApi {
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => {
-                    Err(ApiError::IncorrectRequest("Required route \
+                    Err(ApiError::IncorrectRequest(
+                        "Required route \
                                            parameter of configuration \
                                            'hash' is missing"
-                                                           .into()))?
+                            .into(),
+                    ))?
                 }
             }
         };
@@ -292,10 +294,12 @@ impl Api for PublicConfigApi {
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => {
-                    Err(ApiError::IncorrectRequest("Required route \
+                    Err(ApiError::IncorrectRequest(
+                        "Required route \
                                            parameter of configuration \
                                            'hash' is missing"
-                                                           .into()))?
+                            .into(),
+                    ))?
                 }
             }
         };
@@ -357,10 +361,12 @@ impl<T> Api for PrivateConfigApi<T>
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => {
-                    Err(ApiError::IncorrectRequest("Required route \
+                    Err(ApiError::IncorrectRequest(
+                        "Required route \
                                            parameter of configuration \
                                            'hash' is missing"
-                                                           .into()))?
+                            .into(),
+                    ))?
                 }
             }
         };
