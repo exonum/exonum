@@ -114,13 +114,11 @@ extern crate lazy_static;
 use router::Router;
 use iron::Handler;
 
-use std::fmt;
-
 use exonum::api::Api;
 use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext, gen_prefix};
 use exonum::node::State;
 use exonum::crypto::{Signature, PublicKey, Hash};
-use exonum::messages::{RawMessage, Message, FromRaw, RawTransaction};
+use exonum::messages::{Message, FromRaw, RawTransaction};
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 use exonum::encoding::{Field, Error as StreamStructError};
 use exonum::encoding::serialize::json::reexport as serde_json;
@@ -205,14 +203,6 @@ message! {
     }
 }
 
-/// Helper enum to aggregate `TxConfigPropose` and `TxConfigVote` within. This enum implements
-/// `Exonum` traits, necessary for messages and transactions: `Message`, `FromRaw`, `Transaction`
-#[derive(Clone, PartialEq)]
-pub enum ConfigTx {
-    ConfigPropose(TxConfigPropose),
-    ConfigVote(TxConfigVote),
-}
-
 /// Struct, implementing [Service](../exonum/blockchain/service/trait.Service.html) trait template.
 /// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
 /// [`TxConfigPropose`](struct.TxConfigPropose.html#method.execute) and
@@ -225,58 +215,6 @@ pub struct ConfigurationSchema<T> {
     view: T,
 }
 
-impl ConfigTx {
-    pub fn from(&self) -> &PublicKey {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.from(),
-            ConfigTx::ConfigVote(ref msg) => msg.from(),
-        }
-    }
-}
-
-impl fmt::Debug for ConfigTx {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => write!(fmt, "{:?}", msg),
-            ConfigTx::ConfigVote(ref msg) => write!(fmt, "{:?}", msg),
-        }
-    }
-}
-
-impl FromRaw for ConfigTx {
-    fn from_raw(raw: RawMessage) -> Result<ConfigTx, StreamStructError> {
-        match raw.message_type() {
-            CONFIG_PROPOSE_MESSAGE_ID => {
-                Ok(ConfigTx::ConfigPropose(TxConfigPropose::from_raw(raw)?))
-            }
-            CONFIG_VOTE_MESSAGE_ID => Ok(ConfigTx::ConfigVote(TxConfigVote::from_raw(raw)?)),
-            _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
-        }
-    }
-}
-
-impl Message for ConfigTx {
-    fn raw(&self) -> &RawMessage {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.raw(),
-            ConfigTx::ConfigVote(ref msg) => msg.raw(),
-        }
-    }
-
-    fn verify_signature(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => msg.verify_signature(public_key),
-            ConfigTx::ConfigVote(ref msg) => msg.verify_signature(public_key),
-        }
-    }
-
-    fn hash(&self) -> Hash {
-        match *self {
-            ConfigTx::ConfigPropose(ref msg) => Message::hash(msg),
-            ConfigTx::ConfigVote(ref msg) => Message::hash(msg),
-        }
-    }
-}
 
 impl<T> ConfigurationSchema<T>
     where T: AsRef<Snapshot>
@@ -420,8 +358,8 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
             .configs()
             .get(&cfg.previous_cfg_hash)
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigPropose:{:?}",
-                            &cfg.previous_cfg_hash,
-                            serde_json::to_string(&tx_propose).unwrap()));
+                             &cfg.previous_cfg_hash,
+                             serde_json::to_string(&tx_propose).unwrap()));
 
         let propose_data_by_config_hash = {
             let mut votes_table = self.votes_by_config_hash_mut(cfg_hash);
@@ -449,7 +387,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         let mut propose_propose_data_by_config_hash = self.propose_data_by_config_hash()
             .get(cfg_hash)
             .expect(&format!("Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
-                            &tx_vote));
+                             &tx_vote));
 
         let tx_propose = propose_propose_data_by_config_hash.tx_propose();
         let prev_cfg_hash =
@@ -459,8 +397,8 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
             .configs()
             .get(&prev_cfg_hash)
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigVote:{:?}",
-                            prev_cfg_hash,
-                            &tx_vote));
+                             prev_cfg_hash,
+                             &tx_vote));
         let from: &PublicKey = tx_vote.from();
         let validator_id = prev_cfg
             .validators
@@ -488,8 +426,12 @@ impl<T> ConfigurationSchema<T> {
     }
 }
 
-impl TxConfigPropose {
-    pub fn execute(&self, fork: &mut Fork) {
+impl Transaction for TxConfigPropose {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.from())
+    }
+
+    fn execute(&self, fork: &mut Fork) {
         let following_config: Option<StoredConfiguration> = Schema::new(&fork)
             .following_configuration();
 
@@ -544,8 +486,12 @@ impl TxConfigPropose {
     }
 }
 
-impl TxConfigVote {
-    pub fn execute(&self, fork: &mut Fork) {
+impl Transaction for TxConfigVote {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.from())
+    }
+
+    fn execute(&self, fork: &mut Fork) {
         let propose_option = ConfigurationSchema::new(&fork).get_propose(self.cfg_hash());
         if propose_option.is_none() {
             error!("Discarding TxConfigVote:{:?} which references unknown config hash",
@@ -619,19 +565,6 @@ impl TxConfigVote {
     }
 }
 
-impl Transaction for ConfigTx {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.from())
-    }
-
-    fn execute(&self, view: &mut Fork) {
-        match *self {
-            ConfigTx::ConfigPropose(ref tx) => tx.execute(view),
-            ConfigTx::ConfigVote(ref tx) => tx.execute(view),
-        }
-    }
-}
-
 impl ConfigurationService {
     pub fn new() -> ConfigurationService {
         ConfigurationService {}
@@ -668,7 +601,11 @@ impl Service for ConfigurationService {
 
     /// Returns box ([ConfigTx](ConfigTx.t.html))
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
-        ConfigTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+        match raw.message_type() {
+            CONFIG_PROPOSE_MESSAGE_ID => Ok(Box::new(TxConfigPropose::from_raw(raw)?)),
+            CONFIG_VOTE_MESSAGE_ID => Ok(Box::new(TxConfigVote::from_raw(raw)?)),
+            _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
+        }
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {

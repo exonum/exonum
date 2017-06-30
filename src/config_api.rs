@@ -13,8 +13,7 @@ use exonum::storage::StorageValue;
 use exonum::node::{TxSender, NodeChannel, TransactionSend};
 use exonum::encoding::serialize::json::reexport as serde_json;
 
-use super::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigTx,
-            ConfigurationSchema};
+use super::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigurationSchema};
 
 pub type ConfigTxSender = TxSender<NodeChannel>;
 
@@ -232,7 +231,7 @@ impl<T> PrivateConfigApi<T>
                                                   &self.config.1);
         let tx_hash = config_propose.hash();
         let ch = self.channel.clone();
-        ch.send(Box::new(ConfigTx::ConfigPropose(config_propose)))?;
+        ch.send(Box::new(config_propose));
         let res = ApiResponseProposePost {
             tx_hash: tx_hash,
             cfg_hash: cfg_hash,
@@ -244,7 +243,7 @@ impl<T> PrivateConfigApi<T>
         let config_vote = TxConfigVote::new(&self.config.0, cfg_hash, &self.config.1);
         let tx_hash = config_vote.hash();
         let ch = self.channel.clone();
-        ch.send(Box::new(ConfigTx::ConfigVote(config_vote)))?;
+        ch.send(Box::new(config_vote));
         let res = ApiResponseVotePost { tx_hash: tx_hash };
         Ok(res)
     }
