@@ -2,12 +2,12 @@
   "block_info": {
     "block": {
       "height": "4",
-      "prev_hash": "2e933eba2887a1d9bb38c396577be23db58ea5f414761f6dda939d660b323140",
+      "prev_hash": "dd63374d9b8b325fcc62d91f1bafbfd407102c5c764e4d3722455d5464821d07",
       "proposer_id": 0,
       "schema_version": 0,
-      "state_hash": "da5ae8362137d3e4acae0917e30388959b6d2a91760d25bb5eca832b449550ce",
+      "state_hash": "19fb0c33b4a39f42ab1fb4dc5781bf436ffadf072f6684fcaf408032b9d90080",
       "tx_count": 1,
-      "tx_hash": "759de4b2df16488e1c13c20cb9a356487204abcedd97177f2fe773c187beb29e"
+      "tx_hash": "de134bb9ad5c643f2cc57f4fce5f97a93bb8aaabac5197b5f72136df88171299"
     },
     "precommits": [
       {
