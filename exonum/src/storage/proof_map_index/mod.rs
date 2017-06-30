@@ -115,16 +115,16 @@ impl<T, K, V> ProofMapIndex<T, K, V>
                             ProofNode::Branch(BranchProofNode::LeftBranch {
                                                   left_hash: Box::new(child_proof),
                                                   right_hash: neighbour_child_hash,
-                                                  left_key: l_s.suffix(c_pr_l),
-                                                  right_key: r_s.suffix(c_pr_l),
+                                                  left_key: l_s.suffix(searched_slice.from() + c_pr_l),
+                                                  right_key: r_s.suffix(searched_slice.from() + c_pr_l),
                                               })
                         }
                         ChildKind::Right => {
                             ProofNode::Branch(BranchProofNode::RightBranch {
                                                   left_hash: neighbour_child_hash,
                                                   right_hash: Box::new(child_proof),
-                                                  left_key: l_s.suffix(c_pr_l),
-                                                  right_key: r_s.suffix(c_pr_l),
+                                                  left_key: l_s.suffix(searched_slice.from() + c_pr_l),
+                                                  right_key: r_s.suffix(searched_slice.from() + c_pr_l),
                                               })
                         }
                     }
@@ -134,8 +134,8 @@ impl<T, K, V> ProofMapIndex<T, K, V>
                     ProofNode::Branch(BranchProofNode::BranchKeyNotFound {
                                           left_hash: l_h,
                                           right_hash: r_h,
-                                          left_key: l_s.suffix(c_pr_l),
-                                          right_key: r_s.suffix(c_pr_l),
+                                          left_key: l_s.suffix(searched_slice.from() + c_pr_l),
+                                          right_key: r_s.suffix(searched_slice.from() + c_pr_l),
                                       })
                     // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
                 }
