@@ -7,6 +7,7 @@ use rand::{thread_rng, Rng};
 use crypto::{hash, Hash};
 use super::super::{Database, MemoryDB};
 use ::encoding::serialize::json::reexport::to_string;
+use encoding::serialize::reexport::{Serialize, Serializer};
 
 use super::{DBKey, ProofMapIndex};
 use super::proof::MapProof;
@@ -339,6 +340,7 @@ fn build_proof_in_leaf_tree() {
 
 #[test]
 fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
+    let _ = ::helpers::init_logger();
     let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(100)
         .into_iter()
         .map(|el| {
@@ -357,6 +359,17 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
     let item = data[0];
     let proof_path_to_key = table.get_proof(&item.0);
     assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
+
+    let proof_info = ProofInfo {
+        root_hash: table_root_hash,
+        searched_key: &item.0,
+        proof: &proof_path_to_key,
+        key_found: true,
+    };
+
+    let json_repre = to_string(&proof_info).unwrap();
+    info!("{}", json_repre);
+
     let check_res = proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
     let proved_value: Option<&Hash> = check_res.unwrap();
     assert_eq!(proved_value.unwrap(), &item.1);
@@ -381,7 +394,15 @@ fn fuzz_insert_build_proofs() {
         let check_res = proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
         let proved_value: Option<&Vec<u8>> = check_res.unwrap();
         assert_eq!(proved_value.unwrap(), &item.1);
-        let json_repre = to_string(&proof_path_to_key).unwrap();
+
+        let proof_info = ProofInfo {
+            root_hash: table_root_hash,
+            searched_key: &item.0,
+            proof: &proof_path_to_key,
+            key_found: true,
+        };
+
+        let json_repre = to_string(&proof_info).unwrap();
         info!("{}", json_repre);
     }
 }
@@ -555,4 +576,28 @@ fn test_iter() {
     assert_eq!(map_index.values_from(&k2).collect::<Vec<u8>>(), vec![2, 3]);
     assert_eq!(map_index.values_from(&k4).collect::<Vec<u8>>(),
                Vec::<u8>::new());
+}
+
+fn bytes_to_hex<T: AsRef<[u8]> + ?Sized>(bytes: &T) -> String {
+    let strs: Vec<String> = bytes.as_ref()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect();
+    strs.join("")
+}
+
+fn serialize_str_u8<S, A>(data: &A, serializer:  S) -> Result<S::Ok, S::Error>
+    where S: Serializer,
+            A: AsRef<[u8]>
+{
+    serializer.serialize_str(&bytes_to_hex(data.as_ref()))
+}
+
+#[derive(Serialize)]
+struct ProofInfo<'a, A: AsRef<[u8]>, V: Serialize + 'a> {
+    root_hash: Hash,
+    #[serde(serialize_with = "serialize_str_u8")]
+    searched_key: A,
+    proof: &'a MapProof<V>,
+    key_found: bool,
 }
