@@ -7,7 +7,7 @@ extern crate bodyparser;
 extern crate iron;
 
 use exonum::blockchain::{Blockchain, Service, GenesisConfig, Transaction, ApiContext};
-use exonum::messages::{RawTransaction, RawMessage, FromRaw, Message};
+use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
 use exonum::crypto::{PublicKey, Hash};
@@ -92,7 +92,7 @@ impl Transaction for TxCreateWallet {
     }
 
     fn execute(&self, view: &mut Fork) {
-        let schema = CurrencySchema { view };
+        let mut schema = CurrencySchema { view };
         if let None = schema.wallet(self.pub_key()) {
             let wallet = Wallet::new(self.pub_key(), self.name(), 0);
             schema.wallets().put(self.pub_key(), wallet)
@@ -106,7 +106,7 @@ impl Transaction for TxIssue {
     }
 
     fn execute(&self, view: &mut Fork) {
-        let schema = CurrencySchema { view };
+        let mut schema = CurrencySchema { view };
         if let Some(mut wallet) = schema.wallet(self.pub_key()) {
             wallet.increase(self.amount());
             schema.wallets().put(self.pub_key(), wallet)
@@ -121,7 +121,7 @@ impl Transaction for TxTransfer {
     }
 
     fn execute(&self, view: &mut Fork) {
-        let schema = CurrencySchema { view };
+        let mut schema = CurrencySchema { view };
         let sender = schema.wallet(self.from());
         let receiver = schema.wallet(self.to());
         if let (Some(mut sender), Some(mut receiver)) = (sender, receiver) {
@@ -273,6 +273,7 @@ fn main() {
         network: Default::default(),
         whitelist: Default::default(),
         api: api_cfg,
+        mempool: Default::default(),
     };
 
     let mut node = Node::new(blockchain, node_cfg);
