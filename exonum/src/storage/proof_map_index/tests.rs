@@ -7,7 +7,7 @@ use rand::{thread_rng, Rng};
 use crypto::{hash, Hash};
 use super::super::{Database, MemoryDB};
 use ::encoding::serialize::json::reexport::to_string;
-use encoding::serialize::reexport::{Serialize, Serializer};
+use ::encoding::serialize::reexport::{Serialize, Serializer};
 
 use super::{DBKey, ProofMapIndex};
 use super::proof::MapProof;

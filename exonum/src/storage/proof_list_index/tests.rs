@@ -1,9 +1,10 @@
-use serde_json;
 use rand::{thread_rng, Rng};
 
 use crypto::{Hash, hash};
 use super::super::{Database, MemoryDB, StorageValue};
 use super::{ProofListIndex, ListProof, pair_hash};
+use ::encoding::serialize::json::reexport::{to_string, from_str};
+use ::encoding::serialize::reexport::{Serialize};
 
 use self::ListProof::*;
 
@@ -191,6 +192,7 @@ fn test_list_index_proof() {
 
 #[test]
 fn randomly_generate_proofs() {
+    let _ = ::helpers::init_logger();
     let mut fork = MemoryDB::new().fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     let num_vals = 100;
@@ -200,6 +202,7 @@ fn randomly_generate_proofs() {
         index.push(value.clone());
     }
     index.get(0);
+    let table_root_hash = index.root_hash();
 
     for _ in 0..50 {
         let start_range = rng.gen_range(0, num_vals);
@@ -207,7 +210,7 @@ fn randomly_generate_proofs() {
         let range_proof = index.get_range_proof(start_range, end_range);
         {
             let (inds, actual_vals): (Vec<_>, Vec<_>) = range_proof
-                .validate(index.root_hash(), index.len())
+                .validate(table_root_hash, index.len())
                 .unwrap()
                 .into_iter()
                 .unzip();
@@ -219,8 +222,17 @@ fn randomly_generate_proofs() {
             }
         }
 
-        let json_repr = serde_json::to_string(&range_proof).unwrap();
-        assert_eq!(range_proof, serde_json::from_str(&json_repr).unwrap());
+        let proof_info = ProofInfo {
+            root_hash: table_root_hash,
+            list_length: index.len(),
+            proof: &range_proof,
+            range_st: start_range,
+            range_end: end_range,
+        };
+
+        info!("{}", to_string(&proof_info).unwrap());
+        let json_repr = to_string(&range_proof).unwrap();
+        assert_eq!(range_proof, from_str(&json_repr).unwrap());
     }
 }
 
@@ -281,8 +293,8 @@ fn test_index_and_proof_roots() {
                        .unwrap()
                        .len(),
                    1);
-        let json_repre = serde_json::to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+        let json_repre = to_string(&range_proof).unwrap();
+        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
         let range_proof = index.get_range_proof(0, proof_ind + 1);
         assert_eq!(range_proof
@@ -290,8 +302,8 @@ fn test_index_and_proof_roots() {
                        .unwrap()
                        .len(),
                    (proof_ind + 1) as usize);
-        let json_repre = serde_json::to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+        let json_repre = to_string(&range_proof).unwrap();
+        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
         let range_proof = index.get_range_proof(0, 1);
         assert_eq!(range_proof
@@ -299,8 +311,8 @@ fn test_index_and_proof_roots() {
                        .unwrap()
                        .len(),
                    1);
-        let json_repre = serde_json::to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = serde_json::from_str(&json_repre).unwrap();
+        let json_repre = to_string(&range_proof).unwrap();
+        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
     }
 
@@ -449,4 +461,13 @@ fn test_same_root_hash() {
     i2.push(vec![1]);
 
     assert_eq!(i1.root_hash(), i2.root_hash());
+}
+
+#[derive(Serialize)]
+struct ProofInfo<'a, V: Serialize + 'a> {
+    root_hash: Hash,
+    list_length: u64,
+    proof: &'a ListProof<V>,
+    range_st: u64,
+    range_end: u64,
 }
