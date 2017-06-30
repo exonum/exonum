@@ -248,6 +248,7 @@ fn main() {
     exonum::crypto::init();
     exonum::helpers::init_logger().unwrap();
 
+    println!("Creating in-memory database...");
     let db = MemoryDB::new();
     let services: Vec<Box<Service>> = vec![
         Box::new(CurrencyService),
@@ -279,6 +280,9 @@ fn main() {
         mempool: Default::default(),
     };
 
+    println!("Starting a single node...");
     let mut node = Node::new(blockchain, node_cfg);
+
+    println!("Blockchain in ready for transactions!");
     node.run().unwrap();
 }
