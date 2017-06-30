@@ -1,4 +1,5 @@
 use std::collections::btree_map::{BTreeMap, Range};
+use std::collections::Bound::*;
 use std::cmp::Ordering::*;
 use std::iter::Peekable;
 
@@ -92,7 +93,6 @@ impl Snapshot for Fork {
     }
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
-        use std::collections::Bound::*;
         let range = (Included(from), Unbounded);
         Box::new(ForkIter {
                      snapshot: self.snapshot.iter(from),
@@ -149,6 +149,16 @@ impl Fork {
     }
 
     pub fn remove_by_prefix(&mut self, prefix: &[u8]) {
+        // Remove changes
+        let keys = self.changes
+                       .range::<[u8], _>((Included(prefix), Unbounded))
+                       .map(|(k, ..)| k.to_vec())
+                       .take_while(|k| k.starts_with(prefix))
+                       .collect::<Vec<_>>();
+        for k in keys {
+            self.changes.remove(&k);
+        }
+        // Remove from storage
         let mut iter = self.snapshot.iter(prefix);
         while let Some((k, ..)) = iter.next() {
             if !k.starts_with(prefix) {
@@ -181,7 +191,7 @@ impl AsRef<Snapshot> for Snapshot + 'static {
 
 impl AsRef<Snapshot> for Fork {
     fn as_ref(&self) -> &Snapshot {
-        &*self
+        self
     }
 }
 
@@ -275,8 +285,8 @@ impl<'a> Iterator<'a> for ForkIter<'a> {
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.step() {
-                Stored | Replaced => return self.snapshot.peek(),
-                Inserted => {
+                Stored => return self.snapshot.peek(),
+                Replaced | Inserted => {
                     return self.changes
                                .peek()
                                .map(|&(key, change)| {
