@@ -3,7 +3,7 @@ use iron::Handler;
 use mount::Mount;
 
 use crypto::{Hash, PublicKey, SecretKey};
-use storage::{View, Error as StorageError};
+use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
@@ -12,7 +12,7 @@ use blockchain::{ConsensusConfig, Blockchain};
 
 pub trait Transaction: Message + 'static {
     fn verify(&self) -> bool;
-    fn execute(&self, view: &View) -> Result<(), StorageError>;
+    fn execute(&self, view: &mut Fork);
     fn info(&self) -> Value {
         Value::Null
     }
@@ -25,19 +25,18 @@ pub trait Service: Send + Sync + 'static {
     /// Unique human readable service name.
     fn service_name(&self) -> &'static str;
 
-    fn state_hash(&self, _: &View) -> Result<Vec<Hash>, StorageError> {
-        Ok(Vec::new())
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        Vec::new()
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    fn handle_genesis_block(&self, view: &View) -> Result<Value, StorageError> {
-        Ok(Value::Null)
+    fn handle_genesis_block(&self, fork: &mut Fork) -> Value {
+        Value::Null
     }
 
-    fn handle_commit(&self, context: &mut ServiceContext) -> Result<(), StorageError> {
-        Ok(())
-    }
+    fn handle_commit(&self, context: &mut ServiceContext) { }
+
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
@@ -48,18 +47,17 @@ pub trait Service: Send + Sync + 'static {
     }
 }
 
-#[derive(Debug)]
 pub struct ServiceContext<'a, 'b> {
     state: &'a mut State,
-    view: &'b View,
+    snapshot: &'b Snapshot,
     txs: Vec<Box<Transaction>>,
 }
 
 impl<'a, 'b> ServiceContext<'a, 'b> {
-    pub fn new(state: &'a mut State, view: &'b View) -> ServiceContext<'a, 'b> {
+    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> ServiceContext<'a, 'b> {
         ServiceContext {
             state: state,
-            view: view,
+            snapshot: snapshot,
             txs: Vec::new(),
         }
     }
@@ -68,8 +66,8 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
         self.state.validator_state()
     }
 
-    pub fn view(&self) -> &View {
-        self.view
+    pub fn snapshot(&self) -> &'b Snapshot {
+        self.snapshot
     }
 
     pub fn height(&self) -> u64 {
@@ -108,6 +106,12 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
 
     pub fn transactions(self) -> Vec<Box<Transaction>> {
         self.txs
+    }
+}
+
+impl<'a, 'b> ::std::fmt::Debug for ServiceContext<'a, 'b> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "ServiceContext(state: {:?}, txs: {:?})", self.state, self.txs)
     }
 }
 
