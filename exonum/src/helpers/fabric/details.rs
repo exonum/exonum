@@ -143,8 +143,8 @@ impl Command for KeyGeneratorCommand {
                               .expect("expected keychain path");
 
         let pub_key_path = Path::new(&keyconfig).with_extension("pub");
-        context.set("validator_ident", BTreeMap::<String, Value>::default());
-        context.set("template", BTreeMap::<String, Value>::default());
+        context.set("services_pub_keys", BTreeMap::<String, Value>::default());
+        context.set("services_sec_keys", BTreeMap::<String, Value>::default());
         let new_context = exts(context);
         let services_pub_keys = new_context.get("services_pub_keys");
         let services_sec_keys = new_context.get("services_sec_keys");
