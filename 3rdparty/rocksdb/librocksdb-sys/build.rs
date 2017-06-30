@@ -1,8 +1,9 @@
 extern crate gcc;
 extern crate pkg_config;
 
-use std::fs;
 use pkg_config::probe_library;
+use std::process::Command;
+use std::fs::read_dir;
 
 fn link(name: &str, bundled: bool) {
     use std::env::var;
@@ -14,17 +15,6 @@ fn link(name: &str, bundled: bool) {
             let dir = var("CARGO_MANIFEST_DIR").unwrap();
             println!("cargo:rustc-link-search=native={}/{}", dir, target[0]);
         }
-    }
-}
-
-fn fail_on_empty_directory(name: &str) {
-    if fs::read_dir(name).unwrap().count() == 0 {
-        println!(
-            "The `{}` directory is empty, did you forget to pull the submodules?",
-            name
-        );
-        println!("Try `git submodule update --init --recursive`");
-        panic!();
     }
 }
 
@@ -82,10 +72,8 @@ fn build_rocksdb() {
             .filter(|file| match *file {
                 "port/port_posix.cc" |
                 "util/env_posix.cc" |
-                "util/io_posix.cc" |
-                "db/db_impl_debug.cc" |
-                "util/thread_status_util_debug.cc" |
-                "util/xfunc.cc" => false,
+                "util/io_posix.cc" | 
+                "utilities/lua/rocks_lua_compaction_filter.cc" => false,
                 _ => true,
             })
             .collect::<Vec<&'static str>>();
@@ -110,8 +98,6 @@ fn build_rocksdb() {
     }
 
     config.file("build_version.cc");
-
-    config.cpp(true);
     config.compile("librocksdb.a");
 }
 
@@ -131,7 +117,6 @@ fn build_snappy() {
     config.file("snappy/snappy.cc");
     config.file("snappy/snappy-sinksource.cc");
     config.file("snappy/snappy-c.cc");
-    config.cpp(true);
     config.compile("libsnappy.a");
 }
 
@@ -154,20 +139,68 @@ fn try_to_find_lib(library: &str) -> bool {
         return true;
     }   
 
-    match probe_library("snappy") {
-        Ok(_) => true,
-        Err(_) => false,
+    if probe_library(library).is_ok() {
+        true
+    } else {
+        false
     }
 }
 
+fn get_sources(git_path: &str, rev: &str) {
+    let mut command = Command::new("git");
+    let mut command_result = command
+                        .arg("clone")
+                        .arg(git_path)
+                        .output()
+                        .unwrap_or_else(|error| {
+                            panic!("Failed to run git command: {}", error);
+                        });
+    if !command_result.status.success() {   
+        panic!("{:?}\n{}\n{}\n", 
+            command, 
+            String::from_utf8_lossy(&command_result.stdout), 
+            String::from_utf8_lossy(&command_result.stderr)
+        );
+    }
+
+    command = Command::new("git");
+
+    if git_path.contains("snappy") {
+        command.current_dir("snappy");
+    } else {
+        command.current_dir("rocksdb");
+    }
+
+    command_result = command
+                        .arg("checkout")
+                        .arg(rev)
+                        .output()
+                        .unwrap_or_else(|error| {
+                            panic!("Failed to run git command: {}", err     or);
+                        });                              
+
+    if !command_result.status.success() {   
+        panic!("{:?}\n{}\n{}\n", 
+            command, 
+            String::from_utf8_lossy(&command_result.stdout), 
+            String::from_utf8_lossy(&command_result.stderr)
+        );
+    }   
+}
+
 fn main() {
+
     if !try_to_find_lib("libsnappy") {
-        fail_on_empty_directory("snappy");
+        if read_dir("snappy").is_err() {
+            get_sources("https://github.com/google/snappy.git", "513df5fb5a2d51146f409141f9eb8736935cc486");
+        }
         build_snappy();
     }
     
     if !try_to_find_lib("librocksdb") {
-        fail_on_empty_directory("rocksdb");
+        if read_dir("rocksdb").is_err() {
+            get_sources("https://github.com/facebook/rocksdb.git", "d310e0f33977d4e297bf25a98eef79d1a02513d7");
+        }
         build_rocksdb();
     }
 }

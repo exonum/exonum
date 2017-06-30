@@ -160,7 +160,7 @@ mod tests {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
         options.increase_parallelism(4);
-        options.set_allow_os_buffer(true);
+        // options.set_allow_os_buffer(true);
         options.set_disable_auto_compactions(true);
         let db = Box::new(RocksDB::open(tempdir.path(), options).unwrap());
         db as Box<Database>
