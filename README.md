@@ -41,7 +41,7 @@ cd cc-examples
 npm install
 
 # create 1st wallet
-node create-wallet.js
+node create-wallet-1.js
 
 # create 2nd wallet
 node create-wallet-2.js
