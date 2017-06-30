@@ -68,8 +68,7 @@ impl<T> CryptocurrencyApi<T>
         let wallet_history: Option<ListProofTemplate<CurrencyTx>>;
 
         let to_wallets_table: MapProof<Hash> =
-            general_schema
-                .get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
+            general_schema.get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
 
         {
             let wallets_root_hash = currency_schema.wallets_proof().root_hash(); //debug code

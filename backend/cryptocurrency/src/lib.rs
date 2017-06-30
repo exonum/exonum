@@ -215,10 +215,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
     }
 
     /// Adds transaction record to the walled by the given public key.
-    fn append_history(&mut self,
-                      mut wallet: Wallet,
-                      key: &PublicKey,
-                      meta: TxMetaRecord) {
+    fn append_history(&mut self, mut wallet: Wallet, key: &PublicKey, meta: TxMetaRecord) {
         {
             let mut history = self.wallet_history(key);
             history.push(meta);
