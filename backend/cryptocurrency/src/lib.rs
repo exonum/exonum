@@ -27,7 +27,7 @@ use std::fmt;
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message};
 use exonum::crypto::{PublicKey, Hash, PUBLIC_KEY_LENGTH};
-use exonum::storage::{Snapshot, Fork, MapIndex, ProofListIndex, ProofMapIndex};
+use exonum::storage::{Snapshot, Fork, ProofListIndex, ProofMapIndex};
 use exonum::blockchain::{Service, Transaction, ApiContext};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::encoding::Error as StreamStructError;
@@ -196,8 +196,8 @@ impl<T> CurrencySchema<T>
 
 impl<'a> CurrencySchema<&'a mut Fork> {
     /// Returns `MerklePatriciaTable` with wallets.
-    pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-        MapIndex::new(vec![20], self.view)
+    pub fn wallets(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, Wallet> {
+        ProofMapIndex::new(vec![20], self.view)
     }
 
     /// Returns wallet for the given public key.
