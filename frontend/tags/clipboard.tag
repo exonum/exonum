@@ -1,5 +1,5 @@
 <clipboard>
-    <button type="button" class="btn btn-xs btn-default" data-clipboard-text={ opts.val } onclick={ click }>
+    <button type="button" class="btn btn-xs btn-default" title="Click to clipboard" data-clipboard-text={ opts.val }>
         <i class="glyphicon glyphicon-copy"></i>
     </button>
 
@@ -12,10 +12,5 @@
                 self.notify('success', 'Copied to clipboard.');
             });
         });
-
-        click(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
     </script>
 </clipboard>

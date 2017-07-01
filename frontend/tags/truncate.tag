@@ -2,8 +2,8 @@
     <span class="monospace collapsed" if={ collapsed } onclick={ expand }>{ truncated }</span>
     <div class="monospace expanded" if={ !collapsed }>
         <div class="truncate-item" each={ line in lines }>{ line }</div>
-        <clipboard val={ opts.val }></clipboard>
     </div>
+    <clipboard val={ opts.val }></clipboard>
 
     <script>
         this.collapsed = true;
