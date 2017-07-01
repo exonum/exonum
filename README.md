@@ -121,3 +121,7 @@ npm start
 ```
 
 Application is served on [http://127.0.0.1:3000](http://127.0.0.1:3000). Port can be changred in the [frontend/app.js](frontend/app.js).
+
+### License
+
+Cryptocurrency demo is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
