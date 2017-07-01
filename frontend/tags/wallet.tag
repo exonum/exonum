@@ -25,8 +25,6 @@
 
             <div class="form-group">
                 <p class="text-center">Add more funds to your account:</p>
-                <!-- TODO revert later -->
-                <!--<a href="#user/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>-->
                 <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
             </div>
         </virtual>
@@ -50,13 +48,6 @@
                     <div class="col-xs-5 custom-table-column" if={ message_id === 129 }>
                         Add <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to your wallet
                     </div>
-                    <!-- TODO revert later -->
-                    <!--<div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.from === parent.publicKey }>
-                        Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
-                    </div>
-                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.to === parent.publicKey }>
-                        Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
-                    </div>-->
                     <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
                         Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
@@ -78,39 +69,21 @@
     </div>
 
     <script>
-        // TODO revert later
-//        var self = this;
-//        var user = self.auth.getUser();
-//
-//        this.publicKey = user.publicKey;
-//
-//        this.toggleLoading(true);
-//        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
-//            self.block = block;
-//            self.wallet = wallet;
-//            self.transactions = transactions;
-//            self.update();
-//            self.toggleLoading(false);
-//
-//            if (wallet.balance == 0) {
-//                self.notify('warning', 'You have not any money yet. Add some funds.');
-//            }
-//        });
-//
-//        transfer(e) {
-//            e.preventDefault();
-//            route('/user/transfer');
-//        }
-
         var self = this;
 
         this.toggleLoading(true);
-        this.service.getWallet(self.opts.publicKey, function(block, wallet, transactions) {
+        this.service.getWallet(self.opts.publicKey, function(error, block, wallet, transactions) {
+            self.toggleLoading(false);
+
+            if (error) {
+                self.notify('error', error.message);
+                return;
+            }
+
             self.block = block;
             self.wallet = wallet;
             self.transactions = transactions;
             self.update();
-            self.toggleLoading(false);
 
             if (wallet && wallet.balance === 0) {
                 self.notify('warning', 'You have not any money yet. Add some funds.');
@@ -129,8 +102,6 @@
 
         logout(e) {
             e.preventDefault();
-            // TODO revert later
-//            self.auth.logout();
             route('/dashboard');
         }
     </script>

@@ -83,7 +83,7 @@ All business logic is can be found in [cryptocurrency.js](frontend/js/cryptocurr
 
 Find detailed [step-by-step tutorial](http://exonum.com/doc/home/cryptocurrency/intro/) how to set up all this demo functionality from the very beginning.
 
-### Build
+### Install
 
 Install npm dependencies:
 

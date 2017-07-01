@@ -39,17 +39,20 @@
             e.preventDefault();
 
             self.toggleLoading(true);
-            self.service.login(self.login, self.password, function(publicKey, secretKey) {
+            self.service.login(self.login, self.password, function(error, publicKey, secretKey) {
+                self.toggleLoading(false);
+
+                if (error) {
+                    self.notify('error', error.message);
+                    return;
+                }
+
                 self.addUser({
                     publicKey: publicKey,
                     secretKey: secretKey
                 });
-                self.toggleLoading(false);
                 self.notify('success', 'Wallet has been created. Login and manage the wallet.');
                 route('/user/' + publicKey);
-            }, function() {
-                self.toggleLoading(false);
-                self.notify('error', 'Wrong password has been passed.');
             });
         }
     </script>

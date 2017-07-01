@@ -1,10 +1,5 @@
 <transfer>
     <div class="panel-heading">
-        <!-- TODO revert later -->
-        <!--<a class="btn btn-default pull-left page-nav" href="#user">
-            <i class="glyphicon glyphicon-arrow-left"></i>
-            <span class="hidden-xs">Back</span>
-        </a>-->
         <a class="btn btn-default pull-left page-nav" href="#user/{ opts.publicKey }">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
@@ -34,54 +29,21 @@
     </div>
 
     <script>
-        // TODO revert
-//        var self = this;
-//        var user = self.storage.getUser();
-//
-//        this.publicKey = user.publicKey;
-//
-//        this.toggleLoading(true);
-//        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
-//            self.block = block;
-//            self.wallet = wallet;
-//            self.update();
-//            self.toggleLoading(false);
-//        });
-//
-//        editReceiver(e) {
-//            this.receiver = e.target.value;
-//        }
-//
-//        editAmount(e) {
-//            if (e.target.value > 0 && e.target.value.toLowerCase().indexOf('e') === -1) {
-//                this.amount = e.target.value;
-//            } else {
-//                this.amount = 0;
-//            }
-//        }
-//
-//        submit(e) {
-//            e.preventDefault();
-//            var amount = self.amount.toString();
-//            var user = self.storage.getUser();
-//
-//            self.toggleLoading(true);
-//            self.service.transfer(amount, user.publicKey, self.receiver, user.secretKey, function() {
-//                self.toggleLoading(false);
-//                self.notify('success', 'Funds has been transferred.');
-//                route('/user');
-//            });
-//        }
-
         var self = this;
         var user = this.storage.getUser(this.opts.publicKey);
 
         this.toggleLoading(true);
-        this.service.getWallet(user.publicKey, function(block, wallet, transactions) {
+        this.service.getWallet(user.publicKey, function(error, block, wallet, transactions) {
+            self.toggleLoading(false);
+
+            if (error) {
+                self.notify('error', error.message);
+                return;
+            }
+
             self.block = block;
             self.wallet = wallet;
             self.update();
-            self.toggleLoading(false);
         });
 
         editReceiver(e) {
@@ -101,8 +63,14 @@
             var amount = self.amount.toString();
 
             self.toggleLoading(true);
-            self.service.transfer(amount, self.opts.publicKey, self.receiver, user.secretKey, function() {
+            self.service.transfer(amount, self.opts.publicKey, self.receiver, user.secretKey, function(error) {
                 self.toggleLoading(false);
+
+                if (error) {
+                    self.notify('error', error.message);
+                    return;
+                }
+
                 self.notify('success', 'Funds has been transferred.');
                 route('/user/' + self.opts.publicKey);
             });

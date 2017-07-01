@@ -4,34 +4,143 @@
 /**
  * Business logic
  */
-function CryptocurrencyService() {
-    var self = this;
 
-    this.getTransactionTypeParams = function(id) {
-        switch (id) {
-            case 128:
-                return Exonum.newMessage(this.TransferTransactionParams);
-            case 129:
-                return Exonum.newMessage(this.AddFundsTransactionParams);
-            case 130:
-                return Exonum.newMessage(this.CreateWalletTransactionParams);
+(function (window) {
+
+    var TX_TRANSFER_FUNDS_ID = 128;
+    var TX_ADD_FUNDS_ID = 129;
+    var TX_CREATE_WALLET_ID = 130;
+    var TransferTransaction = {
+        size: 80,
+        message_id: TX_TRANSFER_FUNDS_ID,
+        fields: {
+            from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
+            amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
+            seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
         }
     };
+    var AddFundsTransaction = {
+        size: 48,
+        message_id: TX_ADD_FUNDS_ID,
+        fields: {
+            wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
+            seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
+        }
+    };
+    var CreateWalletTransaction = {
+        size: 40,
+        message_id: TX_CREATE_WALLET_ID,
+        fields: {
+            pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            name: {type: Exonum.String, size: 8, from: 32, to: 40}
+        }
+    };
+    var Wallet = Exonum.newType({
+        size: 88,
+        fields: {
+            pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+            name: {type: Exonum.String, size: 8, from: 32, to: 40},
+            balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
+            history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
+            history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
+        }
+    });
+    var TableKey = Exonum.newType({
+        size: 4,
+        fields: {
+            service_id: {type: Exonum.Uint16, size: 2, from: 0, to: 2},
+            table_index: {type: Exonum.Uint16, size: 2, from: 2, to: 4}
+        }
+    });
+    var TransactionMetaData = Exonum.newType({
+        size: 33,
+        fields: {
+            tx_hash: {type: Exonum.Hash, size: 32, from: 0, to: 32},
+            execution_status: {type: Exonum.Bool, size: 1, from: 32, to: 33}
+        }
+    });
 
-    this.submitTransaction = function(typeParams, data, publicKey, secretKey, callback) {
+    function getData(url, callback) {
+        $.ajax({
+            method: 'GET',
+            url: url,
+            dataType: 'json',
+            success: function(response) {
+                if (typeof response === 'object') {
+                    callback(null, response);
+                } else {
+                    callback(new TypeError('Unknown format of server response'));
+                }
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                callback(errorThrown);
+            }
+        });
+    }
+
+    function createTransactionType(spec, configuration) {
+        var txConfiguration = {
+            network_id: configuration.network_id,
+            protocol_version: configuration.protocol_version,
+            service_id: configuration.service_id
+        };
+        return Exonum.newMessage(Object.assign({}, txConfiguration, spec));
+    }
+
+    function getTransaction(configuration, id) {
+        switch (id) {
+            // transfer funds
+            case TX_TRANSFER_FUNDS_ID:
+                return createTransactionType(TransferTransaction, configuration);
+            // add funds
+            case TX_ADD_FUNDS_ID:
+                return createTransactionType(AddFundsTransaction, configuration);
+            // create wallet
+            case TX_CREATE_WALLET_ID:
+                return createTransactionType(CreateWalletTransaction, configuration);
+            default:
+                throw new Error('Unknown transaction ID has been passed.');
+        }
+    }
+
+    function getPublicKeyOfTransaction(transaction, id) {
+        switch (id) {
+            case TX_TRANSFER_FUNDS_ID:
+                return transaction.from;
+            case TX_ADD_FUNDS_ID:
+                return transaction.wallet;
+            case TX_CREATE_WALLET_ID:
+                return transaction.pub_key;
+            default:
+                throw new Error('Unknown transaction ID has been passed.');
+        }
+    }
+
+    function submitTransaction(id, data, publicKey, secretKey, callback) {
         var self = this;
-        var type = Exonum.newMessage(typeParams);
+        var type = getTransaction(this.configuration, id);
 
         type.signature = type.sign(secretKey, data);
 
         var hash = type.hash(data);
 
         function loop() {
-            self.getWallet(publicKey, function(block, wallet, transactions) {
+            loadWallet.call(self, publicKey, function(error, block, wallet, transactions) {
+                if (error) {
+                    if (typeof callback === 'function') {
+                        callback(error);
+                    }
+                    return;
+                }
+
                 if (Array.isArray(transactions)) {
                     for (var i = 0; i < transactions.length; i++) {
                         if (transactions[i].hash === hash) {
-                            callback();
+                            if (typeof callback === 'function') {
+                                callback(null, block, wallet, transactions);
+                            }
                             return;
                         }
                     }
@@ -44,7 +153,7 @@ function CryptocurrencyService() {
         $.ajax({
             method: 'POST',
             url: 'api/services/cryptocurrency/v1/wallets/transaction',
-            contentType: 'application/json',
+            contentType: 'application/json; charset=utf-8',
             data: JSON.stringify({
                 body: data,
                 network_id: self.configuration.network_id,
@@ -53,62 +162,48 @@ function CryptocurrencyService() {
                 message_id: type.message_id,
                 signature: type.signature
             }),
-            success: function() {
-                loop();
+            success: function(response) {
+                if (typeof response === 'object') {
+                    loop();
+                } else {
+                    callback(new TypeError('Unknown format of server response'));
+                }
             },
-            error: function(jqXHR, textStatus) {
-                console.error(textStatus);
+            error: function(jqXHR, textStatus, errorThrown) {
+                callback(errorThrown);
             }
         });
-    };
+    }
 
-    this.validateWallet = function(publicKey, data) {
-        function getPublicKeyOfTransaction(id, transaction) {
-            switch (id) {
-                case 128:
-                    return transaction.from;
-                case 129:
-                    return transaction.wallet;
-                case 130:
-                    return transaction.pub_key;
-            }
+    function getPrecommitsMedianTime(precommits) {
+        var values = [];
+        for (var i = 0; i < precommits.length; i++) {
+            var time = precommits[i].body.time;
+            values.push(bigInt(time.secs).multiply(1000000000).plus(time.nanos));
         }
+        values.sort(function(a, b) {
+            return a.compare(b);
+        });
+        var half = Math.floor(values.length / 2);
 
-        function getBlocksMedianTime(precommits) {
-            var values = [];
-            for (var i = 0; i < precommits.length; i++) {
-                values.push(bigInt(precommits[i].body.time.secs).multiply(1000000000).plus(precommits[i].body.time.nanos));
-            }
-            values.sort(function(a, b) {
-                return a.minus(b).pow(0).toString();
-            });
-            var half = Math.floor(values.length / 2);
-
-            if (values.length % 2) {
-                return values[half].toString();
-            } else {
-                return values[half - 1].plus(values[half]).divide(2).toString();
-            }
+        if (values.length % 2) {
+            return values[half].toString();
+        } else {
+            return values[half - 1].plus(values[half]).divide(2).toString();
         }
+    }
 
-        // validate block
-        if (!Exonum.verifyBlock(data.block_info, self.configuration.validators, self.configuration.network_id)) {
+    function parseWalletProof(publicKey, data) {
+        if (!Exonum.verifyBlock(data.block_info, this.configuration.validators, this.configuration.network_id)) {
             return;
         }
 
         var block = data.block_info.block;
-        block.time = getBlocksMedianTime(data.block_info.precommits);
+        block.time = getPrecommitsMedianTime(data.block_info.precommits);
 
         // find root hash of table with wallets in the tree of all tables
-        var TableKey = Exonum.newType({
-            size: 4,
-            fields: {
-                service_id: {type: Exonum.Uint16, size: 2, from: 0, to: 2},
-                table_index: {type: Exonum.Uint16, size: 2, from: 2, to: 4}
-            }
-        });
         var tableKeyData = {
-            service_id: self.configuration.service_id,
+            service_id: this.configuration.service_id,
             table_index: 0
         };
         var tableKey = TableKey.hash(tableKeyData);
@@ -118,24 +213,24 @@ function CryptocurrencyService() {
         }
 
         // find wallet in the tree of all wallets
-        var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, this.Wallet);
+        var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
         if (wallet === null) {
             // wallet is not found
             return [data.block_info.block];
         }
 
-        // find hashes of all transactions
-        var TransactionHash = Exonum.newType({
-            size: 33,
-            fields: {
-                tx_hash: {type: Exonum.Hash, size: 32, from: 0, to: 32},
-                execution_status: {type: Exonum.Bool, size: 1, from: 32, to: 33}
-            }
-        });
-        var hashes = Exonum.merkleProof(wallet.history_hash, wallet.history_len, data.wallet_history.mt_proof, [0, wallet.history_len], TransactionHash);
+        // get transactions
+        var transactionsMetaData = Exonum.merkleProof(
+            wallet.history_hash,
+            wallet.history_len,
+            data.wallet_history.mt_proof,
+            [0, wallet.history_len],
+            TransactionMetaData
+        );
 
-        if (data.wallet_history.values.length !== hashes.length) {
-            console.error('Number of transaction hashes is not equal to transactions number.');
+        if (data.wallet_history.values.length !== transactionsMetaData.length) {
+            // number of transactions in wallet history is not equal
+            // to number of transactions in array with transactions meta data
             return;
         }
 
@@ -143,18 +238,18 @@ function CryptocurrencyService() {
         var transactions = [];
         for (var i = 0; i < data.wallet_history.values.length; i++) {
             var transaction = data.wallet_history.values[i];
-            var type = this.getTransactionTypeParams(transaction.message_id);
-            var publicKeyOfTransaction = getPublicKeyOfTransaction(transaction.message_id, transaction.body);
+            var type = getTransaction(this.configuration, transaction.message_id);
+            var publicKeyOfTransaction = getPublicKeyOfTransaction(transaction.body, transaction.message_id);
 
             type.signature = transaction.signature;
             transaction.hash = type.hash(transaction.body);
-            transaction.status = hashes[i].execution_status;
+            transaction.status = transactionsMetaData[i].execution_status;
 
-            if (transaction.hash !== hashes[i].tx_hash) {
-                console.error('Wrong transaction hash.');
+            if (transaction.hash !== transactionsMetaData[i].tx_hash) {
+                // wrong transaction hash
                 return;
             } else if (!type.verifySignature(transaction.signature, publicKeyOfTransaction, transaction.body)) {
-                console.error('Wrong transaction signature.');
+                // wrong transaction signature
                 return;
             }
 
@@ -162,190 +257,118 @@ function CryptocurrencyService() {
         }
 
         return [data.block_info.block, wallet, transactions];
-    };
-
-    $.ajax({
-        method: 'GET',
-        url: 'configuration',
-        success: function(response) {
-            self.configuration = response;
-
-            self.Wallet = Exonum.newType({
-                size: 88,
-                fields: {
-                    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                    // TODO revert later
-                    // login: {type: Exonum.String, size: 8, from: 32, to: 40},
-                    name: {type: Exonum.String, size: 8, from: 32, to: 40},
-                    balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
-                    history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
-                    history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
-                }
-            });
-
-            self.AddFundsTransactionParams = {
-                size: 48,
-                network_id: self.configuration.network_id,
-                protocol_version: self.configuration.protocol_version,
-                service_id: self.configuration.service_id,
-                message_id: 129,
-                fields: {
-                    wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                    amount: {type: Exonum.Int64, size: 8, from: 32, to: 40},
-                    seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-                }
-            };
-
-            self.CreateWalletTransactionParams = {
-                // TODO revert later
-                // size: 144,
-                size: 40,
-                network_id: self.configuration.network_id,
-                protocol_version: self.configuration.protocol_version,
-                service_id: self.configuration.service_id,
-                message_id: 130,
-                fields: {
-                    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                    name: {type: Exonum.String, size: 8, from: 32, to: 40}
-                    // TODO revert later
-                    // login: {type: Exonum.String, size: 8, from: 32, to: 40},
-                    // sec_key_enc: {type: Exonum.String, size: 80, from: 40, to: 120},
-                    // nonce: {type: Exonum.Nonce, size: 24, from: 120, to: 144}
-                }
-            };
-
-            self.TransferTransactionParams = {
-                size: 80,
-                network_id: self.configuration.network_id,
-                protocol_version: self.configuration.protocol_version,
-                service_id: self.configuration.service_id,
-                message_id: 128,
-                fields: {
-                    from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                    to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-                    amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
-                    seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-                }
-            };
-        },
-        error: function(jqXHR, textStatus) {
-            console.error(textStatus);
-        }
-    });
-}
-
-CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
-    var self = this;
-    $.ajax({
-        method: 'GET',
-        url: 'api/services/cryptocurrency/v1/wallets/info?pubkey=' + publicKey,
-        success: function(response) {
-            callback.apply(this, self.validateWallet(publicKey, response));
-        },
-        error: function(jqXHR, textStatus) {
-            console.error(textStatus);
-        }
-    });
-};
-
-CryptocurrencyService.prototype.addFunds = function(amount, publicKey, secretKey, callback) {
-    var seed = Exonum.randomUint64();
-    var data = {
-        wallet: publicKey,
-        amount: amount,
-        seed: seed
-    };
-
-    this.submitTransaction(this.AddFundsTransactionParams, data, publicKey, secretKey, callback);
-};
-
-// TODO revert later
-// CryptocurrencyService.prototype.createWallet = function(login, password, callback) {
-//     var pair = Exonum.keyPair();
-//     var nonce = Exonum.randomNonce();
-//     var secretKeyEncrypted = Exonum.encryptDigest(pair.secretKey, nonce, password);
-//     var data = {
-//         login: login,
-//         pub_key: pair.publicKey,
-//         sec_key_enc: secretKeyEncrypted,
-//         nonce: nonce
-//     };
-//
-//     this.submitTransaction(this.CreateWalletTransactionParams, data, pair.publicKey, pair.secretKey, callback);
-// };
-
-CryptocurrencyService.prototype.createWallet = function(publicKey, name, secretKey, callback) {
-    var data = {
-        pub_key: publicKey,
-        name: name
-    };
-
-    this.submitTransaction(this.CreateWalletTransactionParams, data, publicKey, secretKey, callback);
-};
-
-CryptocurrencyService.prototype.transfer = function(amount, from, to, secretKey, callback) {
-    var seed = Exonum.randomUint64();
-    var data = {
-        from: from,
-        to: to,
-        amount: amount,
-        seed: seed
-    };
-
-    this.submitTransaction(this.TransferTransactionParams, data, from, secretKey, callback);
-};
-
-CryptocurrencyService.prototype.getBlocks = function(height, callback) {
-    var suffix = '';
-    if (!isNaN(height)) {
-        suffix += '&latest=' + height;
     }
-    $.ajax({
-        method: 'GET',
-        url: 'api/explorer/v1/blocks?count=10' + suffix,
-        success: callback,
-        error: function(jqXHR, textStatus) {
-            console.error(textStatus);
-        }
-    });
-};
 
-CryptocurrencyService.prototype.getBlock = function(height, callback) {
-    $.ajax({
-        method: 'GET',
-        url: 'api/explorer/v1/blocks/' + height,
-        success: callback,
-        error: function(jqXHR, textStatus) {
-            console.error(textStatus);
-        }
-    });
-};
+    function loadWallet(publicKey, callback) {
+        var self = this;
+        var url = 'api/services/cryptocurrency/v1/wallets/info?pubkey=' + publicKey;
 
-CryptocurrencyService.prototype.getTransaction = function(hash, callback) {
-    $.ajax({
-        method: 'GET',
-        url: 'api/system/v1/transactions/' + hash,
-        success: callback,
-        error: function(jqXHR, textStatus) {
-            console.error(textStatus);
-        }
-    });
-};
-
-CryptocurrencyService.prototype.login = function(login, password, callback, error) {
-    $.ajax({
-        method: 'GET',
-        url: this.baseUrl + '/auth?login=' + login,
-        success: function(data) {
-            var secretKey = Exonum.decryptDigest(data.sec_key_enc, data.nonce, password);
-            if (secretKey !== false) {
-                callback(data.pub_key, secretKey);
-            } else {
-                error();
+        getData(url, function(error, response) {
+            if (error) {
+                callback(error);
+                return;
             }
-        },
-        error: function(jqXHR, textStatus) {
-            console.error(textStatus);
+
+            var wallet = parseWalletProof.call(self, publicKey, response);
+            callback.apply(undefined, [null].concat(wallet));
+        });
+    }
+
+    function CryptocurrencyService(configuration) {
+        this.configuration = configuration;
+    }
+
+    CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
+        loadWallet.call(this, publicKey, callback);
+    };
+
+    CryptocurrencyService.prototype.createWallet = function(publicKey, name, secretKey, callback) {
+        var data = {
+            pub_key: publicKey,
+            name: name
+        };
+
+        submitTransaction.call(this, TX_CREATE_WALLET_ID, data, publicKey, secretKey, callback);
+    };
+
+    CryptocurrencyService.prototype.addFunds = function(amount, publicKey, secretKey, callback) {
+        var seed = Exonum.randomUint64();
+        var data = {
+            wallet: publicKey,
+            amount: amount,
+            seed: seed
+        };
+
+        submitTransaction.call(this, TX_ADD_FUNDS_ID, data, publicKey, secretKey, callback);
+    };
+
+    CryptocurrencyService.prototype.transfer = function(amount, from, to, secretKey, callback) {
+        var seed = Exonum.randomUint64();
+        var data = {
+            from: from,
+            to: to,
+            amount: amount,
+            seed: seed
+        };
+
+        submitTransaction.call(this, TX_TRANSFER_FUNDS_ID, data, from, secretKey, callback);
+    };
+
+    CryptocurrencyService.prototype.getTransactionDescription = function(id) {
+        switch (id) {
+            case TX_TRANSFER_FUNDS_ID:
+                return 'Transfer';
+            case TX_ADD_FUNDS_ID:
+                return 'Add Funds';
+            case TX_CREATE_WALLET_ID:
+                return 'Create Wallet';
+            default:
+                return 'Unknown';
         }
-    });
-};
+    };
+
+    CryptocurrencyService.prototype.getBlocks = function(height, count, callback) {
+        var suffix = '';
+
+        if (!isNaN(height)) {
+            suffix += '&latest=' + height;
+        }
+
+        var url = 'api/explorer/v1/blocks?count=' + count + suffix;
+
+        getData(url, callback);
+    };
+
+    CryptocurrencyService.prototype.getBlock = function(height, callback) {
+        var url = 'api/explorer/v1/blocks/' + height;
+
+        getData(url, callback);
+    };
+
+    CryptocurrencyService.prototype.getTransaction = function(hash, callback) {
+        var url = 'api/system/v1/transactions/' + hash;
+
+        getData(url, callback);
+    };
+
+    CryptocurrencyService.prototype.login = function(login, password, callback) {
+        var url = this.baseUrl + '/auth?login=' + login;
+
+        getData(url, function(error, response) {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            var secretKey = Exonum.decryptDigest(response.sec_key_enc, response.nonce, password);
+            if (secretKey !== false) {
+                callback(null, response.pub_key, secretKey);
+            } else {
+                callback(new Error('Wrong login or password has been passed'));
+            }
+        });
+    };
+
+    window.CryptocurrencyService = CryptocurrencyService;
+
+})(window);

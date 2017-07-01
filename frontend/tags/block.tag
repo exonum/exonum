@@ -100,11 +100,17 @@
         var height = parseInt(this.opts.height);
 
         this.toggleLoading(true);
-        this.service.getBlock(height, function(response) {
+        this.service.getBlock(height, function(error, response) {
+            self.toggleLoading(false);
+
+            if (error) {
+                self.notify('error', error.message);
+                return;
+            }
+
             self.block = response.block;
             self.txs = response.txs;
             self.update();
-            self.toggleLoading(false);
         });
 
         rowClick(hash, e) {
