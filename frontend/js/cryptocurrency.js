@@ -1,3 +1,6 @@
+/* eslint-env jquery */
+/* global Exonum, bigInt */
+
 /**
  * Business logic
  */

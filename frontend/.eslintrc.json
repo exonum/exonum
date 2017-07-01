@@ -1,0 +1,11 @@
+{
+  "root": true,
+  "env": {
+    "browser": true
+  },
+  "extends": "eslint:recommended",
+  "rules": {
+    "quotes": ["error", "single"],
+    "indent": ["error", 4, {"SwitchCase": 1}]
+  }
+}
