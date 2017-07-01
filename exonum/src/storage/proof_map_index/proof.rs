@@ -14,7 +14,7 @@ impl Serialize for DBKey {
     {
         let mut repr = String::with_capacity(KEY_SIZE * 8);
         let bslice = self;
-        for ind in self.from()..self.to() {
+        for ind in 0..self.to() - self.from() {
             match bslice.get(ind) {
                 ChildKind::Left => {
                     repr.push('0');
