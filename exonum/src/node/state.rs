@@ -12,9 +12,6 @@ use events::Milliseconds;
 use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
 use node::whitelist::Whitelist;
 
-// TODO: replace by in disk tx pool
-const TX_POOL_LIMIT: usize = 20000;
-
 // TODO: move request timeouts into node configuration
 
 pub const REQUEST_PROPOSE_TIMEOUT: Milliseconds = 100;
@@ -38,6 +35,7 @@ pub struct State {
     secret_key: SecretKey,
     config: StoredConfiguration,
     whitelist: Whitelist,
+    tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -286,6 +284,7 @@ impl State {
     pub fn new(validator_id: Option<ValidatorId>,
                public_key: PublicKey,
                secret_key: SecretKey,
+               tx_pool_capacity: usize,
                whitelist: Whitelist,
                stored: StoredConfiguration,
                connect: Connect,
@@ -298,6 +297,7 @@ impl State {
             validator_state: validator_id.map(ValidatorState::new),
             public_key: public_key,
             secret_key: secret_key,
+            tx_pool_capacity: tx_pool_capacity,
             whitelist: whitelist,
             peers: HashMap::new(),
             connections: HashMap::new(),
@@ -562,7 +562,7 @@ impl State {
             }
         }
 
-        if self.transactions.len() >= TX_POOL_LIMIT {
+        if self.transactions.len() >= self.tx_pool_capacity {
             // but make warn about pool exceeded, even if we should add tx
             warn!("Too many transactions in pool, txs={}, high_priority={}",
                   self.transactions.len(),

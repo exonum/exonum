@@ -37,13 +37,13 @@ impl StorageValue for u8 {
     }
 
     fn hash(&self) -> Hash {
-        hash(vec![*self].as_slice())
+        hash(&[*self])
     }
 }
 
 impl StorageValue for u16 {
     fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; mem::size_of::<u16>()];
+        let mut v = vec![0; 2];
         LittleEndian::write_u16(&mut v, self);
         v
     }
@@ -53,7 +53,7 @@ impl StorageValue for u16 {
     }
 
     fn hash(&self) -> Hash {
-        let mut v = vec![0; mem::size_of::<u16>()];
+        let mut v = [0; 2];
         LittleEndian::write_u16(&mut v, *self);
         hash(&v)
     }
@@ -61,7 +61,7 @@ impl StorageValue for u16 {
 
 impl StorageValue for u32 {
     fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; mem::size_of::<u32>()];
+        let mut v = vec![0; 4];
         LittleEndian::write_u32(&mut v, self);
         v
     }
@@ -71,7 +71,7 @@ impl StorageValue for u32 {
     }
 
     fn hash(&self) -> Hash {
-        let mut v = vec![0; mem::size_of::<u32>()];
+        let mut v = [0; 4];
         LittleEndian::write_u32(&mut v, *self);
         hash(&v)
     }
@@ -89,7 +89,7 @@ impl StorageValue for u64 {
     }
 
     fn hash(&self) -> Hash {
-        let mut v = vec![0; mem::size_of::<u64>()];
+        let mut v = [0; 8];
         LittleEndian::write_u64(&mut v, *self);
         hash(&v)
     }
@@ -105,13 +105,13 @@ impl StorageValue for i8 {
     }
 
     fn hash(&self) -> Hash {
-        hash(vec![*self as u8].as_slice())
+        hash(&[*self as u8])
     }
 }
 
 impl StorageValue for i16 {
     fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; mem::size_of::<i16>()];
+        let mut v = vec![0; 2];
         LittleEndian::write_i16(&mut v, self);
         v
     }
@@ -121,7 +121,7 @@ impl StorageValue for i16 {
     }
 
     fn hash(&self) -> Hash {
-        let mut v = vec![0; mem::size_of::<i16>()];
+        let mut v = [0; 2];
         LittleEndian::write_i16(&mut v, *self);
         hash(&v)
     }
@@ -129,7 +129,7 @@ impl StorageValue for i16 {
 
 impl StorageValue for i32 {
     fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; mem::size_of::<i32>()];
+        let mut v = vec![0; 4];
         LittleEndian::write_i32(&mut v, self);
         v
     }
@@ -139,7 +139,7 @@ impl StorageValue for i32 {
     }
 
     fn hash(&self) -> Hash {
-        let mut v = vec![0; mem::size_of::<i32>()];
+        let mut v = [0; 4];
         LittleEndian::write_i32(&mut v, *self);
         hash(&v)
     }
@@ -147,7 +147,7 @@ impl StorageValue for i32 {
 
 impl StorageValue for i64 {
     fn into_bytes(self) -> Vec<u8> {
-        let mut v = vec![0; mem::size_of::<i64>()];
+        let mut v = vec![0; 8];
         LittleEndian::write_i64(&mut v, self);
         v
     }
@@ -157,7 +157,7 @@ impl StorageValue for i64 {
     }
 
     fn hash(&self) -> Hash {
-        let mut v = vec![0; mem::size_of::<i64>()];
+        let mut v = [0; 8];
         LittleEndian::write_i64(&mut v, *self);
         hash(&v)
     }
