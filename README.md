@@ -88,7 +88,7 @@ Find detailed [step-by-step tutorial](http://exonum.com/doc/home/cryptocurrency/
 
 Install npm dependencies:
 
-```
+```sh
 cd frontend
 npm install
 ```
@@ -100,7 +100,7 @@ Use [frontend/config-example.json](frontend/config-example.json) as template.
 
 Check url of backend endpoint and fill the list of validators.
 
-```
+```json
 {
   "endpoint": "http://127.0.0.1:8200",
   "network_id": 0,
@@ -108,7 +108,9 @@ Check url of backend endpoint and fill the list of validators.
   "service_id": 128,
   "validators": [
     "756f0bb877333e4059e785e38d72b716a2ae9981011563cf21e60ab16bec1fbc",
-    ...
+    "59e785e38d72b716a2ae9981011563cf21e60a7333e40b16bec1fbc756f0bb87",
+    "e99810115756f0bb877333e4059e785e38d72b716aab16bec1fbc2a63cf21e60",
+    "e4059e7fbc85e38d72b716a2756f0bb877333ae9981011563cf21e60ab16bec1"
   ]
 }
 ```
@@ -117,11 +119,31 @@ Check url of backend endpoint and fill the list of validators.
 
 To run the application:
 
-```
+```sh
 npm start
 ```
 
 Application is served on [http://127.0.0.1:8280](http://127.0.0.1:8280). Port can be changred in the [frontend/app.js](frontend/app.js).
+
+### Tests
+
+Before execute tests install `karma-cli` globally:
+
+```sh
+npm install -g karma-cli
+```
+
+Execute tests:
+
+```sh
+karma start
+```
+
+To lint code execute:
+
+```sh
+npm run lint
+```
 
 ### License
 
