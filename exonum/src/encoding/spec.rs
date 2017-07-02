@@ -76,7 +76,8 @@ macro_rules! encoding_struct {
                 let vec: &[u8] = unsafe{ $crate::encoding::Field::read(buffer,
                                                                         from_st_val.unchecked_offset(),
                                                                         to_st_val.unchecked_offset())};
-                let latest_segment = ($body as $crate::encoding::Offset).into();
+                let latest_segment: $crate::encoding::CheckedOffset =
+                    ($body as $crate::encoding::Offset).into();
                 $(
                 let latest_segment = <$field_type as $crate::encoding::Field>::check(&vec,
                                                                         $from.into(),
@@ -118,8 +119,11 @@ macro_rules! encoding_struct {
         // TODO extract some fields like hash and from_raw into trait
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            #[allow(unused_imports, unused_mut)]
             /// Create `$name`.
             pub fn new($($field_name: $field_type,)*) -> $name {
+
+                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut buf = vec![0; $body];
                 $($crate::encoding::Field::write(&$field_name, &mut buf, $from, $to);)*
                 $name { raw: buf }
@@ -149,6 +153,7 @@ macro_rules! encoding_struct {
         }
 
         impl $crate::encoding::serialize::json::ExonumJson for $name {
+            #[allow(unused_variables)]
             fn deserialize_field<B> (value: &$crate::encoding::serialize::json::reexport::Value,
                                         buffer: & mut B,
                                         from: $crate::encoding::Offset,
@@ -156,18 +161,19 @@ macro_rules! encoding_struct {
                 -> Result<(), Box<::std::error::Error>>
                 where B: $crate::encoding::serialize::WriteBufferWrapper
             {
-                use $crate::encoding::serialize::json::ExonumJson;
                 let obj = value.as_object().ok_or("Can't cast json as object.")?;
                 $(
                 let val = obj.get(stringify!($field_name)).ok_or("Can't get object from json.")?;
 
-                <$field_type as ExonumJson>::deserialize_field(val, buffer,
+                <$field_type as $crate::encoding::serialize::json::ExonumJson>::deserialize_field(val, buffer,
                                                                 from + $from, from + $to )?;
 
                 )*
                 Ok(())
             }
 
+
+            #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
                           Box<::std::error::Error>>
@@ -182,7 +188,7 @@ macro_rules! encoding_struct {
             }
         }
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &::serde_json::Value) -> Result<Self, Box<::std::error::Error>> {
+            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value) -> Result<Self, Box<::std::error::Error>> {
                 let to = $body as $crate::encoding::Offset;
                 let from = 0;
                 use $crate::encoding::serialize::json::ExonumJson;
@@ -219,4 +225,44 @@ macro_rules! encoding_struct {
             }
         }
     )
+}
+
+/// This macro checks bounds of fields for structs with custom layout.
+#[macro_export]
+macro_rules! check_bounds {
+    (@deep $size:expr, $prev_to:expr,
+     $field_name:ident : $field_type:ty [$field_from:expr => $field_to:expr],
+     $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)+
+     ) => {
+        debug_assert_eq!($prev_to, $field_from);
+        debug_assert_eq!($field_to - $field_from, <$field_type as Field>::field_size());
+        check_bounds!(@deep $size, $field_to, $($next_name : $next_type [$next_from => $next_to],)+);
+    };
+    (@deep $size:expr, $prev_to:expr,
+     $last_name:ident : $last_type:ty [$last_from:expr => $last_to:expr],
+     ) => {
+        debug_assert_eq!($prev_to, $last_from);
+        debug_assert_eq!($last_to, $size);
+        debug_assert_eq!($last_to - $last_from, <$last_type as Field>::field_size());
+    };
+    ($size:expr,
+     $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
+     ) => {{
+        use $crate::encoding::Field;
+        debug_assert_eq!($first_from, 0);
+        debug_assert_eq!($first_to, $size);
+        debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size());
+    }};
+    ($size:expr,
+     $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
+     $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)+
+     ) => {{
+        use $crate::encoding::Field;
+        debug_assert_eq!($first_from, 0);
+        debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size());
+        check_bounds!(@deep $size, $first_to, $($next_name : $next_type [$next_from => $next_to],)+);
+    }};
+    ($size:expr,) => {{
+        debug_assert_eq!($size, 0);
+    }};
 }

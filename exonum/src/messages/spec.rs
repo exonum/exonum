@@ -139,9 +139,11 @@ macro_rules! message {
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             /// Create messsage `$name` and sign it.
+            #[allow(unused_mut)]
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
+                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
                                                     $crate::messages::TEST_NETWORK_ID,
                                                     $extension, $id, $body);
@@ -151,9 +153,11 @@ macro_rules! message {
 
             /// Create message `$name` and append existing signature.
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            #[allow(dead_code, unused_mut)]
             pub fn new_with_signature($($field_name: $field_type,)*
                        signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
+                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
                                                     $crate::messages::TEST_NETWORK_ID,
                                                     $extension, $id, $body);
@@ -162,6 +166,7 @@ macro_rules! message {
 
             }
 
+            #[allow(unused_variables)]
             fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::encoding::Result {
                 let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
                                         as $crate::encoding::Offset).into();
@@ -176,11 +181,13 @@ macro_rules! message {
             }
 
             /// return `$name`s `message_id` useable for matching.
+            #[allow(dead_code)]
             pub fn message_id() -> u16 {
                 $id
             }
 
             /// return `$name`s `service_id` useable for matching.
+            #[allow(dead_code)]
             pub fn service_id() -> u16 {
                 $extension
             }
@@ -233,6 +240,8 @@ macro_rules! message {
                 Ok(())
             }
 
+
+            #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
                             Box<::std::error::Error>>
@@ -261,6 +270,7 @@ macro_rules! message {
         }
 
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
+            #[allow(unused_imports, unused_variables, unused_mut)]
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>>
             {
@@ -309,6 +319,7 @@ macro_rules! message {
 
         // TODO: Rewrite Deserialize and Serialize implementation
         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
+            #[allow(unused_mut)]
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::encoding::serialize::reexport::Deserializer<'de>
             {
@@ -333,5 +344,5 @@ macro_rules! message {
             }
         }
 
-    )
+    );
 }
