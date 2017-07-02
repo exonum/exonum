@@ -219,7 +219,7 @@ mod tests {
         let resp_absent_wallet = sandbox.request_wallet_info(&p_absent).unwrap();
         let actual_body = response_body(resp_absent_wallet);
         let expected_body = from_file("test_data/response_absent_wallet.json");
-        assert_eq!(actual_body, expected_body);
+        assert_eq!(actual_body, expected_body, "response_absent_wallet.json");
     }
 
     #[test]

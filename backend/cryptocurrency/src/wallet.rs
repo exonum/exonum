@@ -148,7 +148,7 @@ mod tests {
     impl WalletTestData {
         fn new(wallet: Wallet) -> WalletTestData {
             let wallet_hash = wallet.hash();
-            let raw = StorageValue::serialize(wallet.clone());
+            let raw = StorageValue::into_bytes(wallet.clone());
             WalletTestData {
                 wallet: wallet,
                 hash: wallet_hash,

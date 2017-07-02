@@ -11,9 +11,9 @@ use std::fmt;
 
 use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
-use exonum::messages::BlockProof;
+use exonum::messages::{BlockProof, Message};
 use exonum::crypto::{HexValue, PublicKey, Hash};
-use exonum::storage::{StorageValue, List, Map, Proofnode, RootProofNode};
+use exonum::storage::{MapProof, ListProof};
 use exonum::blockchain::{self, Blockchain};
 
 use super::tx_metarecord::TxMetaRecord;
@@ -22,15 +22,15 @@ use super::{CRYPTOCURRENCY_SERVICE_ID, CurrencySchema, CurrencyTx};
 
 /// TODO: Add documentation.
 #[derive(Debug, Serialize)]
-pub struct MPTProofTemplate<V: Serialize> {
-    mpt_proof: RootProofNode<Hash>,
+pub struct MapProofTemplate<V: Serialize> {
+    mpt_proof: MapProof<Hash>,
     value: V,
 }
 
 /// TODO: Add documentation.
 #[derive(Debug, Serialize)]
-pub struct MTProofTemplate<V: Serialize> {
-    mt_proof: Proofnode<TxMetaRecord>,
+pub struct ListProofTemplate<V: Serialize> {
+    mt_proof: ListProof<TxMetaRecord>,
     values: Vec<V>,
 }
 
@@ -38,8 +38,8 @@ pub struct MTProofTemplate<V: Serialize> {
 #[derive(Debug, Serialize)]
 pub struct WalletInfo {
     block_info: BlockProof,
-    wallet: MPTProofTemplate<RootProofNode<Wallet>>,
-    wallet_history: Option<MTProofTemplate<CurrencyTx>>,
+    wallet: MapProofTemplate<MapProof<Wallet>>,
+    wallet_history: Option<ListProofTemplate<CurrencyTx>>,
 }
 
 /// TODO: Add documentation.
@@ -55,52 +55,52 @@ impl<T> CryptocurrencyApi<T>
     where T: TransactionSend + Clone
 {
     fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
-        let view = self.blockchain.view();
+        let view = self.blockchain.snapshot();
         let general_schema = blockchain::Schema::new(&view);
-        let currency_schema = CurrencySchema::new(&view);
+        let mut view = self.blockchain.fork();
+        let mut currency_schema = CurrencySchema::new(&mut view);
 
-        let max_height = general_schema.block_hashes_by_height().len()? - 1;
-        let block_proof = general_schema.block_and_precommits(max_height)?.unwrap();
+        let max_height = general_schema.block_hashes_by_height().len() - 1;
+        let block_proof = general_schema.block_and_precommits(max_height).unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
-        let wallet_path: MPTProofTemplate<RootProofNode<Wallet>>;
-        let wallet_history: Option<MTProofTemplate<CurrencyTx>>;
+        let wallet_path: MapProofTemplate<MapProof<Wallet>>;
+        let wallet_history: Option<ListProofTemplate<CurrencyTx>>;
 
-        let to_wallets_table: RootProofNode<Hash> =
-            general_schema
-                .get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0)?;
+        let to_wallets_table: MapProof<Hash> =
+            general_schema.get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
 
         {
-            let wallets_root_hash = currency_schema.wallets().root_hash()?; //debug code
+            let wallets_root_hash = currency_schema.wallets_proof().root_hash(); //debug code
             let check_result = to_wallets_table.verify_root_proof_consistency(
-                Blockchain::service_table_unique_key(CRYPTOCURRENCY_SERVICE_ID, 0),
+                &Blockchain::service_table_unique_key(CRYPTOCURRENCY_SERVICE_ID, 0),
                 state_hash); //debug code
             debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());
         }
 
-        let to_specific_wallet: RootProofNode<Wallet> =
-            currency_schema.wallets().construct_path_to_key(pub_key)?;
-        wallet_path = MPTProofTemplate {
+        let to_specific_wallet: MapProof<Wallet> =
+            currency_schema.wallets_proof().get_proof(pub_key);
+        wallet_path = MapProofTemplate {
             mpt_proof: to_wallets_table,
             value: to_specific_wallet,
         };
 
-        wallet_history = match currency_schema.wallet(pub_key)? {
+        wallet_history = match currency_schema.wallet(pub_key) {
             Some(wallet) => {
                 let history = currency_schema.wallet_history(pub_key);
-                let history_len = history.len()?;
+                let history_len = history.len();
                 debug_assert!(history_len >= 1);
                 debug_assert_eq!(history_len, wallet.history_len());
-                let tx_records: Vec<TxMetaRecord> = history.values()?;
+                let tx_records: Vec<TxMetaRecord> = history.into_iter().collect();
                 let transactions_table = general_schema.transactions();
                 let mut txs: Vec<CurrencyTx> = Vec::with_capacity(tx_records.len());
                 for record in tx_records {
-                    let raw_message = transactions_table.get(record.tx_hash())?.unwrap();
+                    let raw_message = transactions_table.get(record.tx_hash()).unwrap();
                     txs.push(CurrencyTx::from(raw_message));
                 }
-                let to_transaction_hashes: Proofnode<TxMetaRecord> =
-                    history.construct_path_for_range(0, history_len)?;
-                let path_to_transactions = MTProofTemplate {
+                let to_transaction_hashes: ListProof<TxMetaRecord> =
+                    history.get_range_proof(0, history_len);
+                let path_to_transactions = ListProofTemplate {
                     mt_proof: to_transaction_hashes,
                     values: txs,
                 };
