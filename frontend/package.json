@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "app.js",
   "description": "Cryptocurrency solution on Exonum private blockchain",
-  "license": "",
+  "license": "Apache-2.0",
   "author": "BitFury Group Limited",
   "scripts": {
     "start": "node app.js"
