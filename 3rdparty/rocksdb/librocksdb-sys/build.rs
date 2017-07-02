@@ -29,6 +29,8 @@ fn build_rocksdb() {
     config.include("snappy/");
     config.include(".");
 
+    config.opt_level(3);
+
     config.define("NDEBUG", Some("1"));
     config.define("SNAPPY", Some("1"));
 
@@ -72,8 +74,7 @@ fn build_rocksdb() {
             .filter(|file| match *file {
                 "port/port_posix.cc" |
                 "util/env_posix.cc" |
-                "util/io_posix.cc" | 
-                "utilities/lua/rocks_lua_compaction_filter.cc" => false,
+                "util/io_posix.cc"  => false,
                 _ => true,
             })
             .collect::<Vec<&'static str>>();
@@ -98,6 +99,7 @@ fn build_rocksdb() {
     }
 
     config.file("build_version.cc");
+    config.cpp(true);
     config.compile("librocksdb.a");
 }
 
@@ -107,6 +109,7 @@ fn build_snappy() {
     config.include(".");
 
     config.define("NDEBUG", Some("1"));
+    config.opt_level(3);
 
     if cfg!(target_env = "msvc") {
         config.flag("-EHsc");
@@ -117,6 +120,8 @@ fn build_snappy() {
     config.file("snappy/snappy.cc");
     config.file("snappy/snappy-sinksource.cc");
     config.file("snappy/snappy-c.cc");
+
+    config.cpp(true);
     config.compile("libsnappy.a");
 }
 
@@ -139,7 +144,7 @@ fn try_to_find_lib(library: &str) -> bool {
         return true;
     }   
 
-    if probe_library(library).is_ok() {
+   if probe_library(library).is_ok() {
         true
     } else {
         false
@@ -176,7 +181,7 @@ fn get_sources(git_path: &str, rev: &str) {
                         .arg(rev)
                         .output()
                         .unwrap_or_else(|error| {
-                            panic!("Failed to run git command: {}", err     or);
+                            panic!("Failed to run git command: {}", error);
                         });                              
 
     if !command_result.status.success() {   
@@ -196,7 +201,7 @@ fn main() {
         }
         build_snappy();
     }
-    
+
     if !try_to_find_lib("librocksdb") {
         if read_dir("rocksdb").is_err() {
             get_sources("https://github.com/facebook/rocksdb.git", "d310e0f33977d4e297bf25a98eef79d1a02513d7");
