@@ -129,6 +129,7 @@ macro_rules! encoding_struct {
                 $name { raw: buf }
             }
 
+            /// Hashes the `$name` as a raw byte array and returns the resulting hash.
             pub fn hash(&self) -> $crate::crypto::Hash {
                 $crate::crypto::hash(self.raw.as_ref())
             }
