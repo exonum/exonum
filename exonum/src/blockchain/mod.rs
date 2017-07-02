@@ -1,3 +1,22 @@
+//! The module containing building blocks for creating blockchains powered by the 
+//! Exonum framework.
+//! 
+//! Services are the main extension point for the Exonum framework. To create your own service on 
+//! top of Exonum blockchain you need to define following things:
+//!
+//! - Define your own information schema.
+//! - Create one or more types of messages using a macro `message!` and implement
+//! `Transaction` trait for them.
+//! - Create data structure that implements `Service` trait.
+//! - Optionally you can write api handlers.
+//!
+//! You may follow the [`minibank`][tutoral] tutorial to get experience of programming your services.
+//!
+//! [tutoral]: https://github.com/DenisKolodin/exonum-doc/blob/currency-tutorial/src/home/cryptocurrency/intro.md
+
+// TODO move to lib.rs
+#![deny(missing_docs)]
+
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
@@ -28,13 +47,17 @@ mod tests;
 
 pub mod config;
 
+/// Exonum blockchain instance with the concrete services set and data storage. 
+/// Only blockchains with the identical set of services and genesis block can be combined 
+/// into the single network.
 pub struct Blockchain {
     db: Box<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
 }
 
 impl Blockchain {
-    pub fn new(db: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
+    /// Constructs a blockchain for the given `storage` and list of `services`.
+    pub fn new(storage: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
             let id = service.service_id() as usize;
@@ -46,19 +69,28 @@ impl Blockchain {
         }
 
         Blockchain {
-            db: db,
+            db: storage,
             service_map: Arc::new(service_map),
         }
     }
 
+    /// Creates a readonly snapshot of the current storage state.
     pub fn snapshot(&self) -> Box<Snapshot> {
         self.db.snapshot()
     }
 
+    /// Creates snapshot of the current storage state that can be later committed into storage
+    /// via `merge` method.
     pub fn fork(&self) -> Fork {
         self.db.fork()
     }
 
+    /// Tries to create a `Transaction` object from the given raw message.
+    /// Raw message can be converted into `Transaction` object only 
+    /// if following conditions are met.
+    ///
+    /// - Blockchain has service with the `service_id` of given raw message.
+    /// - Service can deserialize given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
         let id = raw.service_id() as usize;
         self.service_map
@@ -66,10 +98,17 @@ impl Blockchain {
             .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
+    /// Commits changes from the patch to the blockchain storage. 
+    /// See [`Fork`](../storage/struct.Fork.html) for details.
     pub fn merge(&mut self, patch: Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
 
+    /// Returns the hash of latest committed block.
+    /// 
+    /// # Panics
+    ///
+    /// - If the genesis block was not committed.
     pub fn last_hash(&self) -> Hash {
         Schema::new(&self.snapshot())
                .block_hashes_by_height()
@@ -77,10 +116,16 @@ impl Blockchain {
                .unwrap_or_else(Hash::default)
     }
 
+    /// Returns the latest committed block.
+    /// 
+    /// # Panics
+    ///
+    /// - If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
         Schema::new(&self.snapshot()).last_block().unwrap()
     }
 
+    /// Creates and commits the genesis block for the given genesis configuration.
     pub fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
@@ -118,6 +163,17 @@ impl Blockchain {
         Ok(())
     }
 
+    /// Helper function to map tuple (`u16`, `u16`) of service table coordinates
+    /// to 32 byte value for use as `MerklePatriciaTable` key (it currently
+    /// supports only fixed size keys). `hash` function is used to distribute
+    /// keys uniformly (compared to padding).
+    /// # Arguments
+    ///
+    /// * `service_id` - `service_id` as returned by instance of type of
+    /// `Service` trait
+    /// * `table_idx` - index of service table in `Vec`, returned by
+    /// `state_hash` method of instance of type of `Service` trait
+    // also, it was the first idea around, to use `hash`
     pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
         debug_assert!(table_idx <= u16::max_value() as usize);
         let size = mem::size_of::<u16>();
@@ -127,6 +183,9 @@ impl Blockchain {
         crypto::hash(&vec)
     }
 
+    /// Executes the given transactions from pool.
+    /// Then it collects the resulting changes from the current storage state and returns them
+    /// with the hash of resulting block.
     pub fn create_patch(&self,
                         proposer_id: u16,
                         height: u64,
@@ -232,6 +291,9 @@ impl Blockchain {
         (block_hash, fork.into_patch())
     }
 
+    /// Commits to the storage block that proposes by node `State`. 
+    /// After that invokes `handle_commit` for each service in order of their identifiers
+    /// and returns the list of transactions which which were created by the `handle_commit` event.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn commit<'a, I>(&mut self,
                          state: &mut State,
@@ -271,6 +333,7 @@ impl Blockchain {
         Ok(txs)
     }
 
+    /// Returns `Mount` object that aggregates public api handlers.
     pub fn mount_public_api(&self, context: &ApiContext) -> Mount {
         let mut mount = Mount::new();
         for service in self.service_map.values() {
@@ -281,6 +344,7 @@ impl Blockchain {
         mount
     }
 
+    /// Returns `Mount` object that aggregates private api handlers.
     pub fn mount_private_api(&self, context: &ApiContext) -> Mount {
         let mut mount = Mount::new();
         for service in self.service_map.values() {

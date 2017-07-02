@@ -404,9 +404,8 @@ impl<T> fmt::Debug for TxSender<T>
 
 impl Node {
     /// Creates node for the given blockchain and node configuration
-
     pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
-        crypto::init();  
+        crypto::init();
         blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
 
 
