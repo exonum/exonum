@@ -108,7 +108,7 @@ impl Blockchain {
     /// 
     /// # Panics
     ///
-    /// - If the genesis block did not commited.
+    /// - If the genesis block was not committed.
     pub fn last_hash(&self) -> Hash {
         Schema::new(&self.snapshot())
                .block_hashes_by_height()
@@ -120,7 +120,7 @@ impl Blockchain {
     /// 
     /// # Panics
     ///
-    /// - If the genesis block did not commited.
+    /// - If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
         Schema::new(&self.snapshot()).last_block().unwrap()
     }
