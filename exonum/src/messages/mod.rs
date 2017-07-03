@@ -15,6 +15,10 @@ mod spec;
 mod raw;
 mod protocol;
 
+
+#[cfg(test)]
+mod tests;
+
 pub type BitVec = bit_vec::BitVec;
 
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify)

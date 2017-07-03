@@ -19,7 +19,7 @@ impl<S> NodeHandler<S>
         //     if !raw.verify() {
         //         return;
         //     }
-        
+
         match Any::from_raw(raw) {
             Ok(Any::Connect(msg)) => self.handle_connect(msg),
             Ok(Any::Status(msg)) => self.handle_status(msg),
@@ -113,7 +113,7 @@ impl<S> NodeHandler<S>
                 error!("Received status message with incorrect signature, msg={:?}", msg);
                 return;
             }
-            
+
             // Check validator height info
             if msg.height() > self.state.node_height(peer) {
                 // Update validator height
@@ -171,7 +171,7 @@ impl<S> NodeHandler<S>
 
     /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
-        let hash = self.blockchain.last_hash().unwrap();
+        let hash = self.blockchain.last_hash();
         let status = Status::new(self.state.public_key(),
                                  self.state.height(),
                                  &hash,

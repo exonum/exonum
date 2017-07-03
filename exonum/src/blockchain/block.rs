@@ -3,18 +3,30 @@ use crypto::Hash;
 
 pub const BLOCK_SIZE: usize = 112;
 
+/// Current core information schema version.
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
 encoding_struct!(
+    /// Exonum block data structure. Block is essentially a list of transactions, which is
+    /// a result of the consensus algorithm (thus authenticated by the supermajority
+    /// of validators) and is applied atomically to the blockchain state.
     struct Block {
         const SIZE = BLOCK_SIZE;
 
+        /// Information schema version.
         field schema_version:         u16         [00 => 02]
+        /// Block proposer id.
         field proposer_id:            u16         [02 => 04]
+        /// Height of the committed block
         field height:                 u64         [04 => 12]
+        /// Number of transactions in block.
         field tx_count:               u32         [12 => 16]
+        /// Hash link to the previous block in blockchain.
         field prev_hash:              &Hash       [16 => 48]
+        /// Root hash of [merkle tree](struct.Schema.html#method.block_txs) of current block
+        /// transactions.
         field tx_hash:                &Hash       [48 => 80]
+        /// Hash of the current `exonum` state after applying transactions in the block.
         field state_hash:             &Hash       [80 => 112]
     }
 );
