@@ -135,33 +135,37 @@ impl PublicConfigApi {
         let configuration_schema = ConfigurationSchema::new(&snapshot);
         let proposes = {
             let index = configuration_schema.config_hash_by_ordinal();
-            let values = index.into_iter().collect::<Vec<Hash>>();
-            values
+            let proposes = index
+                .into_iter()
+                .map(|cfg_hash| {
+                    let propose_data = configuration_schema
+                        .propose_data_by_config_hash()
+                        .get(&cfg_hash)
+                        .expect(&format!("Not found propose for following cfg_hash: {:?}",
+                                         cfg_hash));
+
+                    (cfg_hash, propose_data)
+                })
+                .filter(|&(_, ref propose_data)| {
+                    let cfg = <StoredConfiguration as StorageValue>::from_bytes(propose_data
+                                                                                    .tx_propose()
+                                                                                    .cfg()
+                                                                                    .as_bytes()
+                                                                                    .into());
+                    PublicConfigApi::filter_cfg_predicate(&cfg,
+                                                          previous_cfg_hash_filter,
+                                                          actual_from_filter)
+                })
+                .map(|(cfg_hash, propose_data)| {
+                         ApiResponseProposeHashInfo {
+                             hash: cfg_hash,
+                             propose_data: propose_data,
+                         }
+                     })
+                .collect::<Vec<_>>();
+            proposes
         };
-        let mut res: Vec<_> = Vec::new();
-        for cfg_hash in proposes {
-            let propose_data =
-                configuration_schema
-                    .propose_data_by_config_hash()
-                    .get(&cfg_hash)
-                    .expect(&format!("Not found propose for following cfg_hash: {:?}", cfg_hash));
-            let cfg = <StoredConfiguration as StorageValue>::from_bytes(propose_data
-                                                                            .tx_propose()
-                                                                            .cfg()
-                                                                            .as_bytes()
-                                                                            .into());
-            if !PublicConfigApi::filter_cfg_predicate(&cfg,
-                                                      previous_cfg_hash_filter,
-                                                      actual_from_filter) {
-                continue;
-            }
-            let elem = ApiResponseProposeHashInfo {
-                hash: cfg_hash,
-                propose_data: propose_data,
-            };
-            res.push(elem);
-        }
-        Ok(res)
+        Ok(proposes)
     }
 
     fn get_all_committed(&self,
@@ -170,31 +174,35 @@ impl PublicConfigApi {
                          -> Result<Vec<ApiResponseConfigHashInfo>, ApiError> {
         let snapshot = self.blockchain.snapshot();
         let general_schema = Schema::new(&snapshot);
-        let references = {
+        let committed_configs = {
             let index = general_schema.configs_actual_from();
-            let values = index.into_iter().collect::<Vec<_>>();
+            let values = index
+                .into_iter()
+                .map(|reference| {
+
+                    let cfg_hash = reference.cfg_hash();
+                    let cfg = general_schema
+                        .configs()
+                        .get(cfg_hash)
+                        .expect(&format!("Config with hash {:?} is absent in configs table",
+                                         cfg_hash));
+                    (*cfg_hash, cfg)
+                })
+                .filter(|&(_, ref cfg)| {
+                            PublicConfigApi::filter_cfg_predicate(cfg,
+                                                                  previous_cfg_hash_filter,
+                                                                  actual_from_filter)
+                        })
+                .map(|(cfg_hash, cfg)| {
+                         ApiResponseConfigHashInfo {
+                             hash: cfg_hash,
+                             config: cfg,
+                         }
+                     })
+                .collect::<Vec<_>>();
             values
         };
-        let mut res: Vec<_> = Vec::new();
-        for reference in references {
-            let cfg_hash = reference.cfg_hash();
-            let cfg =
-                general_schema
-                    .configs()
-                    .get(cfg_hash)
-                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
-            if !PublicConfigApi::filter_cfg_predicate(&cfg,
-                                                      previous_cfg_hash_filter,
-                                                      actual_from_filter) {
-                continue;
-            }
-            let elem = ApiResponseConfigHashInfo {
-                hash: *cfg_hash,
-                config: cfg,
-            };
-            res.push(elem);
-        }
-        Ok(res)
+        Ok(committed_configs)
     }
 
     fn retrieve_params(map: &ParamsMap) -> Result<(Option<Hash>, Option<u64>), ApiError> {
@@ -231,7 +239,7 @@ impl<T> PrivateConfigApi<T>
                                                   &self.config.1);
         let tx_hash = config_propose.hash();
         let ch = self.channel.clone();
-        ch.send(Box::new(config_propose));
+        ch.send(Box::new(config_propose))?;
         let res = ApiResponseProposePost {
             tx_hash: tx_hash,
             cfg_hash: cfg_hash,
@@ -243,7 +251,7 @@ impl<T> PrivateConfigApi<T>
         let config_vote = TxConfigVote::new(&self.config.0, cfg_hash, &self.config.1);
         let tx_hash = config_vote.hash();
         let ch = self.channel.clone();
-        ch.send(Box::new(config_vote));
+        ch.send(Box::new(config_vote))?;
         let res = ApiResponseVotePost { tx_hash: tx_hash };
         Ok(res)
     }
