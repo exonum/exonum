@@ -136,9 +136,9 @@ fn try_to_find_lib(library: &str) -> bool {
 
     if let Ok(lib_dir) = env::var(format!("{}_LIB_DIR", lib_name).as_str()) {
         println!("cargo:rustc-link-search=native={}", lib_dir);
-        let mode = match env::var_os(format!("{}_STATIC", lib_name).as_str()) {
-            Some(_) => "static",
-            None => "dylib",
+        let mode = match env::var_os(format!("{}_DYNAMIC", lib_name).as_str()) {
+            Some(_) => "dylib",
+            None => "static",
         };
         println!("cargo:rustc-link-lib={0}={1}", mode, lib_name.to_lowercase());
         return true;
