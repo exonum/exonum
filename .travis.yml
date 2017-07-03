@@ -10,6 +10,7 @@ env:
     - NIGHTLY_RUST=nightly-2017-05-10
     - CLIPPY_VERS=0.0.131
     - RUSTFMT_VERS=0.8.4
+    - ROCKSDB_LIB_DIR=/usr/lib
 before_install:
 - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
 - rustup toolchain install $NIGHTLY_RUST

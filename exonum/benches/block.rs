@@ -160,6 +160,8 @@ mod tests {
         let mut block_options = RocksBlockOptions::default();
         block_options.set_block_size(4*1024);
         block_options.set_lru_cache(512*1024*1024);
+        block_options.set_bloom_filter(128, true);
+        block_options.set_cache_index_and_filter_blocks(true);
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
         options.increase_parallelism(4);
