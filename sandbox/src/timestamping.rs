@@ -3,7 +3,7 @@ use rand::{Rng, XorShiftRng, SeedableRng};
 use exonum::messages::{FromRaw, Message, RawTransaction};
 use exonum::encoding::Error as MessageError;
 use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
-use exonum::storage::{Error, View as StorageView};
+use exonum::storage::{Snapshot, Fork};
 use exonum::blockchain::{Service, Transaction};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
@@ -71,9 +71,7 @@ impl Transaction for TimestampTx {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, _: &StorageView) -> Result<(), Error> {
-        Ok(())
-    }
+    fn execute(&self, _: &mut Fork) {}
 }
 
 impl Service for TimestampingService {
@@ -85,8 +83,8 @@ impl Service for TimestampingService {
         TIMESTAMPING_SERVICE
     }
 
-    fn state_hash(&self, _: &StorageView) -> Result<Vec<Hash>, Error> {
-        Ok(vec![Hash::new([127; 32]), Hash::new([128; 32])])
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        vec![Hash::new([127; 32]), Hash::new([128; 32])]
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {

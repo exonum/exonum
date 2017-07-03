@@ -16,7 +16,6 @@ use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
 use exonum::blockchain::{Block, Blockchain, Schema};
 use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
                           REQUEST_TRANSACTIONS_TIMEOUT};
-use exonum::storage::Map;
 
 use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
@@ -125,36 +124,30 @@ fn test_query_state_hash() {
     //we do not change the state hash in between blocks for TimestampingService for now
     for _ in 0..2 {
         let state_hash = sandbox.last_state_hash();
-        let configs_rh = sandbox.get_configs_root_hash().unwrap();
+        let configs_rh = sandbox.get_configs_root_hash();
         let configs_key = Blockchain::service_table_unique_key(CONSENSUS, 0);
         let timestamp_t1_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 0);
         let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
 
-        let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0).unwrap();
+        let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0);
         assert_eq!(state_hash, proof_configs.compute_proof_root());
         assert_ne!(configs_rh, Hash::zero());
         let opt_configs_h = proof_configs
-            .verify_root_proof_consistency(configs_key, state_hash)
+            .verify_root_proof_consistency(&configs_key, state_hash)
             .unwrap();
         assert_eq!(configs_rh, *opt_configs_h.unwrap());
 
-        let proof_configs = sandbox
-            .get_proof_to_service_table(TIMESTAMPING_SERVICE, 0)
-            .unwrap();
+        let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
         assert_eq!(state_hash, proof_configs.compute_proof_root());
         let opt_configs_h = proof_configs
-            .verify_root_proof_consistency(timestamp_t1_key, state_hash)
-            .unwrap();
-        assert_eq!([127; 32], *opt_configs_h.unwrap().as_ref());
+            .verify_root_proof_consistency(&timestamp_t1_key, state_hash);
+        assert_eq!(&[127; 32], opt_configs_h.unwrap().unwrap().as_ref());
 
-        let proof_configs = sandbox
-            .get_proof_to_service_table(TIMESTAMPING_SERVICE, 1)
-            .unwrap();
+        let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
         assert_eq!(state_hash, proof_configs.compute_proof_root());
         let opt_configs_h = proof_configs
-            .verify_root_proof_consistency(timestamp_t2_key, state_hash)
-            .unwrap();
-        assert_eq!([128; 32], *opt_configs_h.unwrap().as_ref());
+            .verify_root_proof_consistency(&timestamp_t2_key, state_hash);
+        assert_eq!(&[128; 32], opt_configs_h.unwrap().unwrap().as_ref());
 
         add_one_height(&sandbox, &sandbox_state)
     }
@@ -172,7 +165,7 @@ fn test_retrieve_block_and_precommits() {
     }
     sandbox.assert_state(target_height, ROUND_ONE);
 
-    let bl_proof_option = sandbox.block_and_precommits(target_height - 1).unwrap();
+    let bl_proof_option = sandbox.block_and_precommits(target_height - 1);
     // use serde_json;
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
@@ -189,7 +182,7 @@ fn test_retrieve_block_and_precommits() {
                     .raw()
                     .verify_signature(&sandbox.p(precommit.validator() as usize)));
     }
-    let bl_proof_option = sandbox.block_and_precommits(target_height).unwrap();
+    let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
 }
 
@@ -220,11 +213,11 @@ fn test_store_txs_positions() {
     add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
     sandbox.assert_state(committed_height + 1, ROUND_ONE);
 
-    let view = sandbox.blockchain_ref().view();
-    let schema = Schema::new(&view);
+    let snapshot = sandbox.blockchain_ref().snapshot();
+    let schema = Schema::new(&snapshot);
     let locations = schema.tx_location_by_tx_hash();
     for (expected_idx, hash) in hashes.iter().enumerate() {
-        let location = locations.get(hash).unwrap().unwrap();
+        let location = locations.get(hash).unwrap();
         assert_eq!(expected_idx as u64, location.position_in_block());
         assert_eq!(committed_height, location.block_height());
     }
@@ -2399,7 +2392,7 @@ fn test_exclude_validator_from_consensus() {
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
-                      &consensus_cfg.clone().serialize(),
+                      &consensus_cfg.clone().into_bytes(),
                       consensus_cfg.actual_from,
                       sandbox.s(VALIDATOR_0 as usize))
     };
@@ -2428,7 +2421,7 @@ fn test_schema_config_changes() {
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         let tx = TxConfig::new(&sandbox.p(VALIDATOR_0 as usize),
-                               &consensus_cfg.clone().serialize(),
+                               &consensus_cfg.clone().into_bytes(),
                                consensus_cfg.actual_from,
                                sandbox.s(VALIDATOR_0 as usize));
         (tx, consensus_cfg)
@@ -2436,45 +2429,35 @@ fn test_schema_config_changes() {
     let prev_cfg = sandbox.cfg();
 
     // Check configuration from genesis block
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
-                   .actual_configuration()
-                   .unwrap(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
                prev_cfg);
     // Try to get configuration from non exists height
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
-                   .configuration_by_height(HEIGHT_FOUR)
-                   .unwrap(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())
+                   .configuration_by_height(HEIGHT_FOUR),
                prev_cfg);
     // Commit a new configuration
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
     // Check that following configuration is visible
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
-                   .following_configuration()
-                   .unwrap(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot()).following_configuration(),
                Some(following_cfg.clone()));
     // Make following configuration actual
     add_one_height(&sandbox, &sandbox_state);
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     // Check that following configuration becomes actual
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
-                   .actual_configuration()
-                   .unwrap(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
                following_cfg);
     // Check previous configuration
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())
                    .previous_configuration()
-                   .unwrap()
                    .unwrap(),
                prev_cfg);
 
     // Finally check configuration for some heights
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
-                   .configuration_by_height(HEIGHT_ZERO)
-                   .unwrap(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())
+                   .configuration_by_height(HEIGHT_ZERO),
                prev_cfg);
-    assert_eq!(Schema::new(&sandbox.blockchain_ref().view())
-                   .configuration_by_height(sandbox.current_height())
-                   .unwrap(),
+    assert_eq!(Schema::new(&sandbox.blockchain_ref().snapshot())
+                   .configuration_by_height(sandbox.current_height()),
                following_cfg);
 }
 

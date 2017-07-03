@@ -396,3 +396,88 @@ fn test_request_block() {
     assert_eq!(request.to(), &public_key);
     assert!(request.verify_signature(&public_key));
 }
+
+#[test]
+fn test_correct_encoding_struct() {
+    encoding_struct! {
+        struct NoFields {
+            const SIZE = 0;
+        }
+    }
+    drop(NoFields::new());
+
+    encoding_struct! {
+        struct OneField {
+            const SIZE = 8;
+
+            field one:   u64 [00 => 08]
+        }
+    }
+    drop(OneField::new(0));
+
+    encoding_struct! {
+        struct TwoFields {
+            const SIZE = 8;
+
+            field one:   u32 [00 => 04]
+            field two:   u32 [04 => 08]
+        }
+    }
+    drop(TwoFields::new(0, 0));
+
+    encoding_struct! {
+        struct ThreeFields {
+            const SIZE = 8;
+
+            field one:   u16 [00 => 02]
+            field two:   u16 [02 => 04]
+            field three: u32 [04 => 08]
+        }
+    }
+    drop(ThreeFields::new(0, 0, 0));
+}
+
+#[test]
+#[should_panic(expected = "(left: `2`, right: `3`)")]
+fn test_encoding_struct_with_hole() {
+    encoding_struct! {
+        struct MiddleHole {
+            const SIZE = 9;
+
+            field one:   u16 [00 => 02]
+            field two:   u16 [03 => 05] // start should be 2
+            field three: u32 [05 => 09]
+        }
+    }
+    drop(MiddleHole::new(0, 0, 0));
+}
+
+#[test]
+#[should_panic(expected = "(left: `2`, right: `1`)")]
+fn test_encoding_struct_with_overlay() {
+    encoding_struct! {
+        struct FieldOverlay {
+            const SIZE = 7;
+
+            field one:   u16 [00 => 02]
+            field two:   u16 [01 => 03] // start should be 2
+            field three: u32 [03 => 07]
+        }
+    }
+    drop(FieldOverlay::new(0, 0, 0));
+}
+
+#[test]
+#[should_panic(expected = "(left: `1`, right: `2`)")]
+fn test_encoding_struct_wrong_size() {
+    encoding_struct! {
+        struct WrongSize {
+            const SIZE = 7;
+
+            field one:   u16 [00 => 02]
+            field two:   u16 [02 => 03] // size should be 2
+            field three: u32 [03 => 07]
+        }
+    }
+    drop(WrongSize::new(0, 0, 0));
+}
