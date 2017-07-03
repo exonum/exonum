@@ -11,7 +11,7 @@ pub struct GenesisConfig {
 
 impl GenesisConfig {
     /// Creates a default configuration from the given list of public keys.
-    pub fn new<I: Iterator<Item = ValidatorKeys>>(validators: I) -> Self
+    pub fn new<I: Iterator<Item = ValidatorKeys>>(validators: I) -> Self {
         Self::new_with_consensus(ConsensusConfig::default(), validators)
     }
 
