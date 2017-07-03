@@ -592,14 +592,14 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 }
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
-    let validators = vec![gen_keypair_from_seed(&Seed::new([1; 32])),
-                          gen_keypair_from_seed(&Seed::new([2; 32])),
-                          gen_keypair_from_seed(&Seed::new([3; 32])),
-                          gen_keypair_from_seed(&Seed::new([4; 32]))];
-    let service_keys = vec![gen_keypair_from_seed(&Seed::new([11; 32])),
-                            gen_keypair_from_seed(&Seed::new([12; 32])),
-                            gen_keypair_from_seed(&Seed::new([13; 32])),
-                            gen_keypair_from_seed(&Seed::new([14; 32]))];
+    let validators = vec![gen_keypair_from_seed(&Seed::new([12; 32])),
+                          gen_keypair_from_seed(&Seed::new([13; 32])),
+                          gen_keypair_from_seed(&Seed::new([16; 32])),
+                          gen_keypair_from_seed(&Seed::new([19; 32]))];
+    let service_keys = vec![gen_keypair_from_seed(&Seed::new([20; 32])),
+                            gen_keypair_from_seed(&Seed::new([21; 32])),
+                            gen_keypair_from_seed(&Seed::new([22; 32])),
+                            gen_keypair_from_seed(&Seed::new([23; 32]))];
 
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
