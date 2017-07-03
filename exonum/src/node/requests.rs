@@ -1,7 +1,6 @@
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
                RequestBlock, Block};
 use blockchain::Schema;
-use storage::Map;
 use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
@@ -55,15 +54,15 @@ impl<S> NodeHandler<S>
 
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
         trace!("HANDLE TRANSACTIONS REQUEST!!!");
-        let view = self.blockchain.view();
-        let schema = Schema::new(&view);
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
             let tx = self.state
                 .transactions()
                 .get(hash)
                 .map(|tx| tx.raw())
                 .cloned()
-                .or_else(|| schema.transactions().get(hash).unwrap());
+                .or_else(|| schema.transactions().get(hash));
 
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), &tx);
@@ -98,29 +97,25 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let view = self.blockchain.view();
-        let schema = Schema::new(&view);
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
 
         let height = msg.height();
-        let block_hash = schema.block_hash_by_height(height).unwrap().unwrap();
+        let block_hash = schema.block_hash_by_height(height).unwrap();
 
-        let block = schema.blocks().get(&block_hash).unwrap().unwrap();
-        let precommits = schema.precommits(&block_hash)
-            .values()
-            .unwrap()
-            .to_vec();
-        let transactions = schema.block_txs(height)
-            .values()
-            .unwrap()
-            .iter()
-            .map(|tx_hash| schema.transactions().get(tx_hash).unwrap().unwrap())
-            .collect::<Vec<_>>();
+        let block = schema.blocks().get(&block_hash).unwrap();
+        let precommits = schema.precommits(&block_hash);
+        let transactions = schema.block_txs(height);
+
 
         let block_msg = Block::new(self.state.consensus_public_key(),
                                    msg.from(),
                                    block,
-                                   precommits,
-                                   transactions,
+                                   precommits.iter().collect(),
+                                   transactions
+                                        .iter()
+                                        .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
+                                        .collect(),
                                    self.state.consensus_secret_key());
         self.send_to_peer(*msg.from(), block_msg.raw());
     }

@@ -1,3 +1,5 @@
+//! Exonum global variables which stored in blockchain as utf8 encoded json.
+
 use serde::de::Error;
 use serde_json::{self, Error as JsonError};
 
@@ -17,22 +19,36 @@ pub struct ValidatorKeys {
     pub service_key: PublicKey,
 }
 
+/// Exonum blockchain global configuration.
+/// This configuration must be same for any exonum node in the certain network on given height.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
-    pub previous_cfg_hash: Hash, 
+    /// Link to the previous configuration. 
+    /// For configuration in genesis block `hash` is just an array of zeroes.
+    pub previous_cfg_hash: Hash,
+    /// The height, starting from which this configuration becomes actual.
     pub actual_from: u64,
     /// List of validator's consensus and service public keys.
     pub validator_keys: Vec<ValidatorKeys>,
+    /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
+    /// Services specific variables.
+    /// Keys are `service_name` from `Service` trait and values are the serialized json.
     pub services: BTreeMap<String, serde_json::Value>,
 }
 
+/// Consensus algorithm parameters.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
+    /// Interval between rounds.
     pub round_timeout: Milliseconds,
+    /// Period of sending a Status message.
     pub status_timeout: Milliseconds,
+    /// Peer exchange timeout.
     pub peers_timeout: Milliseconds,
+    /// Proposal timeout after committing a block.
     pub propose_timeout: Milliseconds,
+    /// Maximum number of transactions per block.
     pub txs_block_limit: u32,
 }
 
@@ -49,10 +65,12 @@ impl Default for ConsensusConfig {
 }
 
 impl StoredConfiguration {
+    /// Tries to serialize given configuration into the utf8 encoded json.
     pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
         serde_json::to_vec(&self)
     }
 
+    /// Tries to deserialize `StorageConfiguration` from the given utf8 encoded json.
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
 
@@ -73,12 +91,12 @@ impl StoredConfiguration {
 }
 
 impl StorageValue for StoredConfiguration {
-    fn serialize(self) -> Vec<u8> {
+    fn into_bytes(self) -> Vec<u8> {
         self.try_serialize().unwrap()
     }
 
-    fn deserialize(v: Vec<u8>) -> Self {
-        StoredConfiguration::try_deserialize(&v).unwrap()
+    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
+        StoredConfiguration::try_deserialize(v.as_ref()).unwrap()
     }
 
     fn hash(&self) -> Hash {
