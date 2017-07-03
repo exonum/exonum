@@ -223,7 +223,7 @@ impl<T> ConfigurationSchema<T>
         ConfigurationSchema { view: snapshot }
     }
 
-    /// Returns a table of all config proposes `TxConfigPropose`, which are stored
+    /// Returns a `ProofMapIndex` table of all config proposes `TxConfigPropose`, which are stored
     /// within
     /// `StorageValueConfigProposeData` along with votes' data.
     ///
@@ -248,6 +248,9 @@ impl<T> ConfigurationSchema<T>
         ProofMapIndex::new(prefix, &self.view)
     }
 
+    /// Returns a `ProofListIndex` table of hashes of proposed configurations in propose
+    /// commit order.
+    ///
     /// - Table **index** is propose_id - position of a proposed [hash of a configuration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) in the
     /// corresponding `TxConfigPropose` commit order.
@@ -259,7 +262,7 @@ impl<T> ConfigurationSchema<T>
         ProofListIndex::new(prefix, &self.view)
     }
 
-    /// Returns a table of votes of validators for config, referenced by the
+    /// Returns a `ProofListIndex` table of votes of validators for config, referenced by the
     /// queried
     /// `config_hash` - [hash of a configuration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash).
@@ -341,7 +344,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
     /// If an entry with the same [hash of a configuration]
     /// (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is present
     /// in `propose_data_by_config_hash`, as in config inside of `tx_propose`, nothing is done.
-    pub fn put_propose(&mut self, tx_propose: TxConfigPropose) {
+    pub fn put_propose(&mut self, tx_propose: TxConfigPropose) -> bool {
         let cfg =
             <StoredConfiguration as StorageValue>::from_bytes(tx_propose.cfg().as_bytes().into());
         let cfg_hash = &StorageValue::hash(&cfg);
@@ -351,7 +354,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
                     Previous TxConfigPropose:{}",
                    serde_json::to_string(&tx_propose).unwrap(),
                    serde_json::to_string(&old_tx_propose).unwrap());
-            return;
+            return false;
         }
 
         let prev_cfg = Schema::new(&self.view)
@@ -379,17 +382,18 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
             debug_assert!(propose_data_by_config_hash_table.get(cfg_hash).is_none());
             propose_data_by_config_hash_table.put(cfg_hash, propose_data_by_config_hash);
         }
-        self.config_hash_by_ordinal_mut().push(*cfg_hash)
+        self.config_hash_by_ordinal_mut().push(*cfg_hash);
+        true
     }
 
-    pub fn put_vote(&mut self, tx_vote: TxConfigVote) {
+    pub fn put_vote(&mut self, tx_vote: TxConfigVote) -> bool {
         let cfg_hash = tx_vote.cfg_hash();
-        let mut propose_propose_data_by_config_hash = self.propose_data_by_config_hash()
+        let mut propose_data_by_config_hash = self.propose_data_by_config_hash()
             .get(cfg_hash)
             .expect(&format!("Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
                              &tx_vote));
 
-        let tx_propose = propose_propose_data_by_config_hash.tx_propose();
+        let tx_propose = propose_data_by_config_hash.tx_propose();
         let prev_cfg_hash =
             <StoredConfiguration as StorageValue>::from_bytes(tx_propose.cfg().as_bytes().into())
                 .previous_cfg_hash;
@@ -399,6 +403,10 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
             .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigVote:{:?}",
                              prev_cfg_hash,
                              &tx_vote));
+        //expect above depends on restriction during propose execute()
+        //    let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
+        //    ...
+        //    if config_candidate_body.previous_cfg_hash != actual_config_hash {
         let from: &PublicKey = tx_vote.from();
         let validator_id = prev_cfg
             .validators
@@ -407,16 +415,28 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
             .expect(&format!("See !prev_cfg.validators.contains(self.from()) for \
                               TxConfigVote:{:?}",
                              &tx_vote));
-
+        //expect above depends on restrictions both during propose and vote execute()
+        //    if !actual_config.validators.contains(self.from()) {
+        //        error!("Discarding TxConfigVote:{:?} from unknown validator. ",
+        //               self);
+        //        return;
+        //    }
+        let res: bool;
         {
             let mut votes_for_cfg_table = self.votes_by_config_hash_mut(cfg_hash);
             if votes_for_cfg_table.get(validator_id as u64).unwrap() == ZEROVOTE.clone() {
                 votes_for_cfg_table.set(validator_id as u64, tx_vote.clone());
+                propose_data_by_config_hash.set_history_hash(&votes_for_cfg_table.root_hash());
+                res = true;
+            } else {
+                res = false;
             }
-            propose_propose_data_by_config_hash.set_history_hash(&votes_for_cfg_table.root_hash());
         }
-        self.propose_data_by_config_hash_mut()
-            .put(cfg_hash, propose_propose_data_by_config_hash)
+        if res {
+            self.propose_data_by_config_hash_mut()
+                .put(cfg_hash, propose_data_by_config_hash);
+        }
+        res
     }
 }
 
@@ -479,10 +499,12 @@ impl Transaction for TxConfigPropose {
             return;
         }
 
-        ConfigurationSchema::new(fork).put_propose(self.clone());
+        let result = ConfigurationSchema::new(fork).put_propose(self.clone());
 
-        trace!("Put TxConfigPropose:{} to config_proposes table",
-               serde_json::to_string(self).unwrap());
+        if result {
+            trace!("Put TxConfigPropose:{} to config_proposes table",
+                   serde_json::to_string(self).unwrap());
+        }
     }
 }
 
@@ -544,7 +566,11 @@ impl Transaction for TxConfigVote {
         }
 
         let mut configuration_schema = ConfigurationSchema::new(fork);
-        configuration_schema.put_vote(self.clone());
+        let result = configuration_schema.put_vote(self.clone());
+        if !result {
+            return;
+        }
+
         trace!("Put TxConfigVote:{:?} to corresponding cfg votes_by_config_hash table",
                self);
 
