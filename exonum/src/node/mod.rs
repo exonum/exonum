@@ -15,7 +15,7 @@ use std::time::{SystemTime, Duration};
 use std::thread;
 use std::fmt;
 
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
              MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
@@ -116,6 +116,25 @@ impl Default for NodeApiConfig {
     }
 }
 
+/// Memory pool configuration parameters.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MemoryPoolConfig {
+    /// Maximum number of uncommited transactions.
+    pub tx_pool_capacity: usize,
+    /// Sets the maximum number of messages that can be buffered on the event loop's 
+    /// notification channel before a send will fail.
+    pub events_pool_capacity: usize,
+}
+
+impl Default for MemoryPoolConfig {
+    fn default() -> MemoryPoolConfig {
+        MemoryPoolConfig {
+            tx_pool_capacity: 100000,
+            events_pool_capacity: 400000,
+        }
+    }
+}
+
 /// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
@@ -135,6 +154,8 @@ pub struct NodeConfig {
     pub whitelist: Whitelist,
     /// Api configuration.
     pub api: NodeApiConfig,
+    /// Memory pool configuration.
+    pub mempool: MemoryPoolConfig,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -148,6 +169,8 @@ pub struct Configuration {
     pub network: NetworkConfiguration,
     /// Known peer addresses.
     pub peer_discovery: Vec<SocketAddr>,
+    /// Memory pool configuration.
+    pub mempool: MemoryPoolConfig,
 }
 
 /// Channel for messages and timeouts.
@@ -167,13 +190,13 @@ impl<S> NodeHandler<S>
     pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
-            let block = blockchain.last_block().unwrap();
+            let block = blockchain.last_block();
             (block.hash(), block.height() + 1)
         };
 
-        let stored = Schema::new(&blockchain.view())
-            .actual_configuration()
-            .unwrap();
+        let snapshot = blockchain.snapshot();
+
+        let stored = Schema::new(&snapshot).actual_configuration();
         info!("Create node with config={:#?}", stored);
 
         let validator_id = stored
@@ -188,10 +211,11 @@ impl<S> NodeHandler<S>
                                    &config.listener.secret_key);
 
         let mut whitelist = config.listener.whitelist;
-        whitelist.set_validators(stored.validators.iter().cloned()); 
+        whitelist.set_validators(stored.validators.iter().cloned());
         let mut state = State::new(validator_id,
                                config.listener.public_key,
                                config.listener.secret_key,
+                               config.mempool.tx_pool_capacity,
                                whitelist,
                                stored,
                                connect,
@@ -200,7 +224,7 @@ impl<S> NodeHandler<S>
                                sender.get_time());
 
         let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
-        let timeout = timeout_adjuster.adjust_timeout(&state, blockchain.view());
+        let timeout = timeout_adjuster.adjust_timeout(&state, &*snapshot);
         state.set_propose_timeout(timeout);
 
         NodeHandler {
@@ -360,7 +384,7 @@ impl<S> NodeHandler<S>
 
     /// Returns hash of the last block.
     pub fn last_block_hash(&self) -> Hash {
-        self.blockchain.last_block().unwrap().hash()
+        self.blockchain.last_block().hash()
     }
 
     /// Returns start time of the requested round.
@@ -417,7 +441,7 @@ impl<S> fmt::Debug for NodeHandler<S>
 /// implementation.
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
-    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()>;
+    fn send(&self, tx: Box<Transaction>) -> EventsResult<()>;
 }
 
 impl<S> TxSender<S>
@@ -432,12 +456,11 @@ impl<S> TxSender<S>
 impl<S> TransactionSend for TxSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    fn send<T: Transaction>(&self, tx: T) -> EventsResult<()> {
-        // TODO remove double data convertation
+    fn send(&self, tx: Box<Transaction>) -> EventsResult<()> {
         if !tx.verify() {
             return Err(EventsError::new("Unable to verify transaction"));
         }
-        let msg = ExternalMessage::Transaction(Box::new(tx));
+        let msg = ExternalMessage::Transaction(tx);
         self.inner.post_event(msg)
     }
 }
@@ -451,10 +474,13 @@ impl<T> fmt::Debug for TxSender<T>
 
 impl Node {
     /// Creates node for the given blockchain and node configuration.
-    pub fn new(blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
-        blockchain
-            .create_genesis_block(node_cfg.genesis.clone())
-            .unwrap();
+    pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Self {
+        crypto::init();
+        blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
+
+
+        let mut events_cfg = EventsConfiguration::default();
+        events_cfg.notify_capacity(node_cfg.mempool.events_pool_capacity);
 
         let config = Configuration {
             listener: ListenerConfig {
@@ -463,8 +489,9 @@ impl Node {
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
             },
+            mempool: node_cfg.mempool,
             network: node_cfg.network,
-            events: EventsConfiguration::default(),
+            events: events_cfg,
             peer_discovery: node_cfg.peers,
         };
         let network = Network::with_config(node_cfg.listen_address, config.network);

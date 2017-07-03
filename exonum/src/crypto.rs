@@ -4,6 +4,7 @@ use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          verify_detached, gen_keypair as gen_keypair_sodium,
                                          keypair_from_seed};
 use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
+use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 use hex::{ToHex, FromHex};
@@ -12,9 +13,6 @@ use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
 use std::fmt;
 
-use storage::bytes_to_hex;
-
-pub use sodiumoxide::init;
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
                                              SIGNATUREBYTES as SIGNATURE_LENGTH,
@@ -50,10 +48,16 @@ pub fn hash(m: &[u8]) -> Hash {
     Hash(dig)
 }
 
+pub fn init() {
+    if !sodiumoxide::init() {
+        panic!("Cryptographic library hasn't initialized.");
+    }
+}
+
 macro_rules! implement_public_sodium_wrapper {
     ($name:ident, $name_from:ident, $size:expr) => (
     #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
-    pub struct $name($name_from); 
+    pub struct $name($name_from);
 
     impl $name {
         pub fn zero() -> Self {
@@ -78,11 +82,12 @@ macro_rules! implement_public_sodium_wrapper {
 
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let inner = &self.0; 
-            let slice = &inner.0; 
-            let hex_bytes = bytes_to_hex(&slice[0..BYTES_IN_DEBUG]); 
-            let type_str = stringify!($name); 
-            write!(f, "\"{}({}...)\"",type_str, hex_bytes)
+            write!(f, stringify!($name))?;
+            write!(f, "(")?;
+            for i in &self[0..BYTES_IN_DEBUG] {
+                write!(f, "{:X}", i)?
+            }
+            write!(f, ")")
         }
     }
     )
@@ -91,7 +96,7 @@ macro_rules! implement_public_sodium_wrapper {
 macro_rules! implement_private_sodium_wrapper {
     ($name:ident, $name_from:ident, $size:expr) => (
     #[derive(Clone, PartialEq, Eq)]
-    pub struct $name($name_from); 
+    pub struct $name($name_from);
 
     impl $name {
         pub fn zero() -> Self {
@@ -110,11 +115,12 @@ macro_rules! implement_private_sodium_wrapper {
     }
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let inner = &self.0; 
-            let slice = &inner.0; 
-            let hex_bytes = bytes_to_hex(&slice[0..BYTES_IN_DEBUG]); 
-            let type_str = stringify!($name); 
-            write!(f, "\"{}({}...)\"",type_str, hex_bytes)
+            write!(f, stringify!($name))?;
+            write!(f, "(")?;
+            for i in &self[0..BYTES_IN_DEBUG] {
+                write!(f, "{:X}", i)?
+            }
+            write!(f, "...)")
         }
     }
     )
@@ -132,7 +138,7 @@ macro_rules! implement_serde {
 ($name:ident) => (
     impl HexValue for $name {
         fn to_hex(&self) -> String {
-            let inner = &self.0; 
+            let inner = &self.0;
             inner.0.as_ref().to_hex()
         }
         fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {

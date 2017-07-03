@@ -140,14 +140,14 @@ message! {
     struct Precommit {
         const TYPE = CONSENSUS;
         const ID = PRECOMMIT_MESSAGE_ID;
-        const SIZE = 94;
+        const SIZE = 90;
 
         field validator:      u16         [00 => 02]
-        field height:         u64         [06 => 14]
-        field round:          u32         [14 => 18]
-        field propose_hash:   &Hash       [18 => 50]
-        field block_hash:     &Hash       [50 => 82]
-        field time:           SystemTime  [82 => 94]
+        field height:         u64         [02 => 10]
+        field round:          u32         [10 => 14]
+        field propose_hash:   &Hash       [14 => 46]
+        field block_hash:     &Hash       [46 => 78]
+        field time:           SystemTime  [78 => 90]
     }
 }
 

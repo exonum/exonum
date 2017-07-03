@@ -7,9 +7,10 @@ use std::collections::BTreeMap;
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
                        RequestPrevotes, BitVec};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
-use exonum::crypto::{Hash, HASH_SIZE, hash};
+use exonum::crypto::{Hash, HASH_SIZE};
 use exonum::events::Milliseconds;
 use exonum::node::ValidatorId;
+use exonum::storage::Database;
 
 use sandbox::Sandbox;
 use timestamping::{TimestampTx, TimestampingTxGenerator};
@@ -87,12 +88,7 @@ impl<'a> BlockBuilder<'a> {
     }
 
     pub fn with_tx_hash(mut self, individual_transaction_hash: &'a Hash) -> Self {
-        // root of merkle table, containing this single transaction
-        // exonum::storage::merkle_table
-        // see how hash(&self) changed in exonum::storage::fields::StorageValue for Hash,
-        // it's _hash(self.as_ref())_ as of now instead of _*self_ as it used to be
-        let merkle_root = hash(individual_transaction_hash.as_ref());
-        self.tx_hash = Some(merkle_root);
+        self.tx_hash = Some(*individual_transaction_hash);
         self.tx_count = Some(1);
         self
     }
@@ -226,12 +222,12 @@ pub fn empty_hash() -> Hash {
 
 pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
     // TODO use special function
-    use exonum::storage::{MemoryDB, List, MerkleTable};
+    use exonum::storage::{MemoryDB, ProofListIndex};
 
-    let db = MemoryDB::new();
-    let hashes: MerkleTable<MemoryDB, Hash> = MerkleTable::new(db);
-    hashes.extend(txs.iter().cloned()).unwrap();
-    hashes.root_hash().unwrap()
+    let mut fork = MemoryDB::new().fork();
+    let mut hashes = ProofListIndex::new(vec![], &mut fork);
+    hashes.extend(txs.iter().cloned());
+    hashes.root_hash()
 }
 
 pub fn add_round_with_transactions(sandbox: &TimestampingSandbox,

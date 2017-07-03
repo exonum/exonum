@@ -3,6 +3,7 @@ extern crate rand;
 use rand::Rng;
 
 use std::net::SocketAddr;
+use std::error::Error;
 
 use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
 use events::Channel;
@@ -18,7 +19,7 @@ impl<S> NodeHandler<S>
         //     if !raw.verify() {
         //         return;
         //     }
-        
+
         match Any::from_raw(raw) {
             Ok(Any::Connect(msg)) => self.handle_connect(msg),
             Ok(Any::Status(msg)) => self.handle_status(msg),
@@ -27,8 +28,7 @@ impl<S> NodeHandler<S>
             Ok(Any::Block(msg)) => self.handle_block(msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(msg),
             Err(err) => {
-                // TODO: Replace by `err.description()` after #103 is merged.
-                error!("Invalid message received: {:?}", err);
+                error!("Invalid message received: {:?}", err.description());
             }
         }
     }
@@ -59,12 +59,18 @@ impl<S> NodeHandler<S>
         }
 
         if !self.state.whitelist().allow(message.pub_key()) {
-            error!("Received connect message from peer = {:?} which not in whitelist.", message.pub_key());
+            error!("Received connect message from peer = {:?} which not in whitelist.",
+                message.pub_key());
             return;
         }
 
-        // Check if we have another connect message from peer with the given public_key
         let public_key = *message.pub_key();
+        if !message.verify_signature(&public_key) {
+            error!("Received connect-message with incorrect signature, msg={:?}", message);
+            return;
+        }
+
+        // Check if we have another connect message from peer with the given public_key.
         let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
@@ -103,11 +109,11 @@ impl<S> NodeHandler<S>
         if msg.height() > height {
             let peer = msg.from();
 
-            //verify message
             if !msg.verify_signature(peer) {
+                error!("Received status message with incorrect signature, msg={:?}", msg);
                 return;
             }
-            
+
             // Check validator height info
             if msg.height() > self.state.node_height(peer) {
                 // Update validator height
@@ -165,7 +171,7 @@ impl<S> NodeHandler<S>
 
     /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
-        let hash = self.blockchain.last_hash().unwrap();
+        let hash = self.blockchain.last_hash();
         let status = Status::new(self.state.public_key(),
                                  self.state.height(),
                                  &hash,

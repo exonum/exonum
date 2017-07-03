@@ -4,7 +4,7 @@ use crypto::{Hash, PublicKey, HexValue};
 use blockchain::{Schema, Transaction};
 use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
                RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
-use storage::{Map, Patch};
+use storage::Patch;
 use events::Channel;
 use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout};
 
@@ -39,7 +39,7 @@ impl<S> NodeHandler<S>
         let key = match self.state.public_key_of(msg.validator()) {
             Some(public_key) => {
                 if !msg.verify(public_key) {
-                    error!("Received message with incorrect signature, msg={:?}", msg);
+                    error!("Received consensus message with incorrect signature, msg={:?}", msg);
                     return;
                 }
                 *public_key
@@ -76,11 +76,11 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let view = self.blockchain.view();
-        // Check that transactions are not commited yet
+        let snapshot = self.blockchain.snapshot();
+        // Check that transactions are not committed yet
         for hash in msg.transactions() {
-            if Schema::new(&view).transactions().get(hash).unwrap().is_some() {
-                error!("Received propose with already commited transaction, msg={:?}",
+            if Schema::new(&snapshot).transactions().contains(hash) {
+                error!("Received propose with already committed transaction, msg={:?}",
                        msg);
                 return;
             }
@@ -128,6 +128,11 @@ impl<S> NodeHandler<S>
             return;
         }
 
+        if !msg.verify_signature(msg.from()) {
+            error!("Received block with incorrect signature, msg={:?}", msg);
+            return;
+        }
+
         trace!("Handle block");
 
         let block = msg.block();
@@ -152,14 +157,14 @@ impl<S> NodeHandler<S>
         }
 
         if self.state.block(&block_hash).is_none() {
-            let view = &self.blockchain.view();
-            let schema = Schema::new(view);
+            let snapshot = self.blockchain.snapshot();
+            let schema = Schema::new(&snapshot);
             // Verify transactions
             let mut tx_hashes = Vec::new();
             for raw in msg.transactions() {
                 if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                     let hash = tx.hash();
-                    if schema.transactions().get(&hash).unwrap().is_some() {
+                    if schema.transactions().contains(&hash) {
                         error!("Received block with already committed transaction, block={:?}",
                                msg);
                         return;
@@ -306,7 +311,7 @@ impl<S> NodeHandler<S>
             if self.state.is_validator() && !self.state.have_prevote(round) {
                     self.broadcast_prevote(round, &propose_hash);
             }
-            
+
             // Change lock
             if self.state.has_majority_prevotes(round, propose_hash) {
                 self.state.lock(round, propose_hash);
@@ -382,7 +387,7 @@ impl<S> NodeHandler<S>
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
 
-        info!("COMMIT ====== height={}, proposer={}, round={}, commited={}, pool={}, hash={}",
+        info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
               height,
               proposer,
               round.map(|x| x.to_string()).unwrap_or_else(|| "?".into()),
@@ -394,13 +399,13 @@ impl<S> NodeHandler<S>
         // TODO: reset status timeout.
         self.broadcast_status();
         self.add_status_timeout();
-           
-        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, self.blockchain.view());
+
+        let timeout = self.timeout_adjuster.adjust_timeout(&self.state, &*self.blockchain.snapshot());
         self.state.set_propose_timeout(timeout);
 
         // Handle queued transactions from services
         for tx in new_txs {
-            assert!(tx.verify());
+            debug_assert!(tx.verify());
             self.handle_incoming_tx(tx);
         }
 
@@ -417,7 +422,8 @@ impl<S> NodeHandler<S>
         }
     }
 
-    /// Handles transaction.
+    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
+    /// added to the transactions pool.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
         trace!("Handle transaction");
@@ -438,8 +444,8 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let view = self.blockchain.view();
-        if Schema::new(&view).transactions().get(&hash).unwrap().is_some() {
+        let snapshot = self.blockchain.snapshot();
+        if Schema::new(&snapshot).transactions().contains(&hash) {
             return;
         }
 
@@ -455,7 +461,8 @@ impl<S> NodeHandler<S>
         }
     }
 
-    /// Handles external transaction.
+    /// Handles external boxed transaction. Additionally transaction will be broadcast to the
+    /// Node's peers.
     pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
         trace!("Handle incoming transaction");
         let hash = msg.hash();
@@ -465,8 +472,8 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let view = self.blockchain.view();
-        if Schema::new(&view).transactions().get(&hash).unwrap().is_some() {
+        let snapshot = self.blockchain.snapshot();
+        if Schema::new(&snapshot).transactions().contains(&hash) {
             return;
         }
 
@@ -499,7 +506,7 @@ impl<S> NodeHandler<S>
 
         // Add timeout for this round
         self.add_round_timeout();
-        
+
         if !self.state.is_validator() {
             return;
         }
@@ -534,10 +541,7 @@ impl<S> NodeHandler<S>
         if self.state.locked_propose().is_some() {
             return;
         }
-        let validator_id = self.state.validator_state().as_ref().map(|validator_state| {
-            validator_state.id()
-        });
-        if let Some(validator_id) = validator_id { 
+        if let Some(validator_id) = self.state.validator_id() {
             if self.state.have_prevote(round) {
                 return;
             }
@@ -638,9 +642,7 @@ impl<S> NodeHandler<S>
                         height: Height,
                         tx_hashes: &[Hash])
                         -> (Hash, Patch) {
-        self.blockchain
-            .create_patch(proposer_id, height, tx_hashes, self.state.transactions())
-            .unwrap()
+        self.blockchain.create_patch(proposer_id, height, tx_hashes, self.state.transactions())
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
@@ -664,7 +666,8 @@ impl<S> NodeHandler<S>
         block_hash
     }
 
-    /// Returns `true` and request propose or transactions if needed, otherwise returns `false`.
+    /// Returns `true` if propose and all transactions are known, otherwise requests needed data
+    /// and returns `false`.
     pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, key: PublicKey) -> bool {
         let requested_data = match self.state.propose(propose_hash) {
             Some(state) => {
@@ -713,7 +716,7 @@ impl<S> NodeHandler<S>
 
     /// Broadcasts the `Prevote` message to all peers.
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
-        let validator_id = self.state.validator_state().as_ref().map(|s|s.id()).
+        let validator_id = self.state.validator_id().
             expect("called broadcast_prevote in Auditor node.");
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(validator_id,
@@ -730,8 +733,8 @@ impl<S> NodeHandler<S>
 
     /// Broadcasts the `Precommit` message to all peers.
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
-        let validator_id = self.state.validator_state().as_ref().map(|s|s.id()).
-            expect("called broadcast_prevote in Auditor node.");
+        let validator_id = self.state.validator_id().
+            expect("called broadcast_precommit in Auditor node.");
         let precommit = Precommit::new(validator_id,
                                         self.state.height(),
                                         round,
