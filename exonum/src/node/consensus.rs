@@ -75,10 +75,10 @@ impl<S> NodeHandler<S>
         }
 
         let snapshot = self.blockchain.snapshot();
-        // Check that transactions are not commited yet
+        // Check that transactions are not committed yet
         for hash in msg.transactions() {
             if Schema::new(&snapshot).transactions().contains(hash) {
-                error!("Received propose with already commited transaction, msg={:?}",
+                error!("Received propose with already committed transaction, msg={:?}",
                        msg);
                 return;
             }
@@ -376,7 +376,7 @@ impl<S> NodeHandler<S>
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
 
-        info!("COMMIT ====== height={}, proposer={}, round={}, commited={}, pool={}, hash={}",
+        info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
               height,
               proposer,
               round.map(|x| x.to_string()).unwrap_or_else(|| "?".into()),
