@@ -10,7 +10,7 @@ use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, Externa
                    ListenerConfig, ServiceConfig};
 use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service};
+                         Schema, Transaction, Service, ValidatorKeys};
 use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
