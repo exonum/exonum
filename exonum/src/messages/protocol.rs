@@ -219,7 +219,7 @@ message! {
 /// `Propose` is sent as the response.
 ///
 /// ### Generation
-/// A node can send `RequestPropose` during `Precommit` handling.
+/// A node can send `RequestPropose` during `Precommit` and `Prevote` handling.
     struct RequestPropose {
         const TYPE = CONSENSUS;
         const ID = REQUEST_PROPOSE_MESSAGE_ID;
