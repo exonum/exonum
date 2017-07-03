@@ -13,6 +13,7 @@ use std::fmt;
 use std::error;
 
 pub use rocksdb::Options as RocksDBOptions;
+pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
 
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
 

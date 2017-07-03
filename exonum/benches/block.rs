@@ -13,7 +13,7 @@ mod tests {
     use tempdir::TempDir;
 
     use exonum::storage::{ProofMapIndex, Database, Fork,
-                          LevelDB, LevelDBOptions, LevelDBCache, RocksDB, RocksDBOptions, StorageValue, Patch};
+                          LevelDB, LevelDBOptions, LevelDBCache, RocksDB, RocksDBOptions, RocksBlockOptions, StorageValue, Patch};
 
     use std::collections::BTreeMap;
     use exonum::blockchain::{Blockchain, Transaction};
@@ -157,11 +157,19 @@ mod tests {
     }
 
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
+        let mut block_options = RocksBlockOptions::default();
+        block_options.set_block_size(4*1024);
+        block_options.set_lru_cache(512*1024*1024);
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
         options.increase_parallelism(4);
+        options.set_max_write_buffer_number(16);
+        options.set_write_buffer_size(536870912);
+        options.set_max_open_files(-1);
+        options.set_block_based_table_factory(&block_options);
+        options.set_max_bytes_for_level_base(512 * 1024 * 1024);
         // options.set_allow_os_buffer(true);
-        options.set_disable_auto_compactions(true);
+        // options.set_disable_auto_compactions(true);
         let db = Box::new(RocksDB::open(tempdir.path(), options).unwrap());
         db as Box<Database>
     }

@@ -2,7 +2,6 @@ use tempdir::TempDir;
 
 use super::{Database, LevelDB, LevelDBOptions, RocksDB, RocksDBOptions, MemoryDB, Snapshot, Fork};
 
-
 fn leveldb_database() -> LevelDB {
     let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
