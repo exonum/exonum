@@ -342,14 +342,14 @@ impl<'a> Schema<&'a mut Fork> {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
                 // TODO: Replace logging with returning errors.
                 error!("Attempting to commit configuration with incorrect previous hash: {:?}, expected: {:?}",
-                    config_data.previous_cfg_hash, last_cfg.cfg_hash())));
+                    config_data.previous_cfg_hash, last_cfg.cfg_hash());
                 return;
             }
 
             if actual_from <= last_cfg.actual_from() {
                 error!("Attempting to commit configuration with actual_from {} less than the last committed \
                                               the last committed actual_from {}",
-                                              actual_from, last_cfg.actual_from())));
+                                              actual_from, last_cfg.actual_from());
                 return;
             }
         }
