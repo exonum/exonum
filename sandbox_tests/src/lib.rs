@@ -60,7 +60,7 @@ mod tests {
 
     use exonum::crypto::{Hash, Seed, SEED_LENGTH, HASH_SIZE, gen_keypair_from_seed, hash};
     use exonum::blockchain::config::StoredConfiguration;
-    use exonum::storage::{StorageValue, Error as StorageError};
+    use exonum::storage::StorageValue;
     use exonum::messages::{Message, FromRaw};
     use sandbox::timestamping::TimestampingService;
     use sandbox::sandbox::Sandbox;
@@ -82,19 +82,15 @@ mod tests {
         (sandbox, sandbox_state, initial_cfg)
     }
 
-    fn get_propose(sandbox: &Sandbox,
-                   config_hash: Hash)
-                   -> Result<Option<TxConfigPropose>, StorageError> {
-        let view = sandbox.blockchain_ref().view();
-        let schema = ConfigurationSchema::new(&view);
+    fn get_propose(sandbox: &Sandbox, config_hash: Hash) -> Option<TxConfigPropose> {
+        let snapshot = sandbox.blockchain_ref().snapshot();
+        let schema = ConfigurationSchema::new(&snapshot);
         schema.get_propose(&config_hash)
     }
 
-    fn get_votes_for_propose(sandbox: &Sandbox,
-                             config_hash: Hash)
-                             -> Result<Vec<Option<TxConfigVote>>, StorageError> {
-        let view = sandbox.blockchain_ref().view();
-        let schema = ConfigurationSchema::new(&view);
+    fn get_votes_for_propose(sandbox: &Sandbox, config_hash: Hash) -> Vec<Option<TxConfigVote>> {
+        let snapshot = sandbox.blockchain_ref().snapshot();
+        let schema = ConfigurationSchema::new(&snapshot);
         schema.get_votes(&config_hash)
     }
 
@@ -132,7 +128,7 @@ mod tests {
         {
             let propose_tx =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(full_node_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(full_node_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -143,8 +139,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &full_node_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
         }
@@ -163,7 +159,7 @@ mod tests {
         {
             let propose_tx =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(validator_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(validator_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions_from_other_validator(&sandbox,
@@ -176,8 +172,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &validator_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &votes);
         }
@@ -211,11 +207,13 @@ mod tests {
             services: services,
         };
         {
-            let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(added_keys_cfg.clone().serialize().as_slice())
-                                         .unwrap(),
-                                     sandbox.s(1));
+            let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+                                                  str::from_utf8(added_keys_cfg
+                                                                     .clone()
+                                                                     .into_bytes()
+                                                                     .as_slice())
+                                                      .unwrap(),
+                                                  sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
         }
@@ -225,8 +223,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &added_keys_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
             sandbox.assert_state(3, 1);
@@ -241,7 +239,7 @@ mod tests {
         {
             let propose_tx =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -253,8 +251,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &new_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
             sandbox.assert_state(6, 1);
@@ -289,7 +287,7 @@ mod tests {
         {
             let propose_tx =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(excluding_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(excluding_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -301,8 +299,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &excluding_cfg.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
             sandbox.assert_state(3, 1);
@@ -316,26 +314,25 @@ mod tests {
         let new_cfg = generate_config_with_message(initial_cfg.hash(), 4, "First cfg", &sandbox);
         let propose_tx =
             TxConfigPropose::new(&sandbox.p(1),
-                                 str::from_utf8(new_cfg.clone().serialize().as_slice()).unwrap(),
+                                 str::from_utf8(new_cfg.clone().into_bytes().as_slice()).unwrap(),
                                  sandbox.s(1));
         {
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
             assert_eq!(Some(propose_tx.clone()),
-                       get_propose(&sandbox, new_cfg.hash()).unwrap());
+                       get_propose(&sandbox, new_cfg.hash()));
         }
         {
             let duplicate_cfg_propose =
                 TxConfigPropose::new(&sandbox.p(0),
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(0));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[duplicate_cfg_propose.raw().clone()]);
             sandbox.assert_state(3, 1);
-            assert_eq!(Some(propose_tx),
-                       get_propose(&sandbox, new_cfg.hash()).unwrap());
+            assert_eq!(Some(propose_tx), get_propose(&sandbox, new_cfg.hash()));
         }
     }
 
@@ -349,7 +346,7 @@ mod tests {
         {
             let propose_tx =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
@@ -363,7 +360,7 @@ mod tests {
                                              &[legal_vote.raw().clone(),
                                                illegal_vote.raw().clone()]);
             sandbox.assert_state(3, 1);
-            let votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             assert!(votes.contains(&Some(legal_vote)));
             assert!(!votes.contains(&Some(illegal_vote)));
         }
@@ -385,12 +382,12 @@ mod tests {
         {
             let propose_tx =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(target_height + 1, 1);
-            assert_eq!(None, get_propose(&sandbox, new_cfg.hash()).unwrap());
+            assert_eq!(None, get_propose(&sandbox, new_cfg.hash()));
         }
     }
 
@@ -405,19 +402,18 @@ mod tests {
         {
             let propose_tx =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
-            assert_eq!(Some(propose_tx),
-                       get_propose(&sandbox, new_cfg.hash()).unwrap());
+            assert_eq!(Some(propose_tx), get_propose(&sandbox, new_cfg.hash()));
         }
         {
             let legal_vote = TxConfigVote::new(&sandbox.p(3), &new_cfg.hash(), sandbox.s(3));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[legal_vote.raw().clone()]);
             sandbox.assert_state(3, 1);
-            let votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             assert!(votes.contains(&Some(legal_vote)));
         }
         {
@@ -432,7 +428,7 @@ mod tests {
                                              &sandbox_state,
                                              &[illegal_vote.raw().clone()]);
             sandbox.assert_state(target_height + 1, 1);
-            let votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             assert!(!votes.contains(&Some(illegal_vote)));
         }
     }
@@ -447,8 +443,7 @@ mod tests {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1), new_cfg, sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
-            assert_eq!(None,
-                       get_propose(&sandbox, hash(new_cfg.as_bytes())).unwrap());
+            assert_eq!(None, get_propose(&sandbox, hash(new_cfg.as_bytes())));
         }
     }
 
@@ -470,13 +465,12 @@ mod tests {
         {
             let propose_tx =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(target_height + 2, 1);
-            assert_eq!(propose_tx,
-                       get_propose(&sandbox, new_cfg.hash()).unwrap().unwrap());
+            assert_eq!(propose_tx, get_propose(&sandbox, new_cfg.hash()).unwrap());
         }
         {
             let mut expected_votes = Vec::new();
@@ -484,13 +478,13 @@ mod tests {
                 expected_votes.push(TxConfigVote::new(&sandbox.p(validator),
                                                       &new_cfg.hash(),
                                                       sandbox.s(validator))
-                                            .raw()
-                                            .clone());
+                                        .raw()
+                                        .clone());
             }
             let unposted_vote = TxConfigVote::new(&sandbox.p(2), &new_cfg.hash(), sandbox.s(2));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
             sandbox.assert_state(target_height + 3, 1);
-            let actual_votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            let actual_votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             for raw_vote in expected_votes {
                 let exp_vote = TxConfigVote::from_raw(raw_vote).unwrap();
                 assert!(actual_votes.contains(&Some(exp_vote)));
@@ -503,7 +497,7 @@ mod tests {
             let vote3 = TxConfigVote::new(&sandbox.p(2), &new_cfg.hash(), sandbox.s(2));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[vote3.raw().clone()]);
             sandbox.assert_state(target_height + 4, 1);
-            let votes = get_votes_for_propose(&sandbox, new_cfg.hash()).unwrap();
+            let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             assert!(votes.contains(&Some(vote3)));
             assert_eq!(new_cfg, sandbox.cfg());
         }
@@ -523,14 +517,14 @@ mod tests {
             let propose_tx = TxConfigPropose::new(&sandbox.p(1),
                                                   str::from_utf8(following_config
                                                                      .clone()
-                                                                     .serialize()
+                                                                     .into_bytes()
                                                                      .as_slice())
-                                                          .unwrap(),
+                                                      .unwrap(),
                                                   sandbox.s(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
             assert_eq!(Some(propose_tx),
-                       get_propose(&sandbox, following_config.hash()).unwrap());
+                       get_propose(&sandbox, following_config.hash()));
         }
         {
             let votes = (0..3)
@@ -538,8 +532,8 @@ mod tests {
                          TxConfigVote::new(&sandbox.p(validator),
                                            &following_config.hash(),
                                            sandbox.s(validator))
-                                 .raw()
-                                 .clone()
+                             .raw()
+                             .clone()
                      })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
@@ -552,7 +546,7 @@ mod tests {
         {
             let propose_tx_new =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             add_one_height_with_transactions(&sandbox,
@@ -560,7 +554,7 @@ mod tests {
                                              &[propose_tx_new.raw().clone()]);
             sandbox.assert_state(4, 1);
 
-            assert_eq!(None, get_propose(&sandbox, new_cfg.hash()).unwrap());
+            assert_eq!(None, get_propose(&sandbox, new_cfg.hash()));
         }
         let vote_validator_0 =
             TxConfigVote::new(&sandbox.p(0), &following_config.hash(), sandbox.s(0));
@@ -572,7 +566,7 @@ mod tests {
                                              &[vote_validator_3.raw().clone()]);
             sandbox.assert_state(5, 1);
 
-            let votes = get_votes_for_propose(&sandbox, following_config.hash()).unwrap();
+            let votes = get_votes_for_propose(&sandbox, following_config.hash());
             assert!(votes.contains(&Some(vote_validator_0)));
             assert!(!votes.contains(&Some(vote_validator_3)));
             assert_eq!(initial_cfg, sandbox.cfg());
@@ -609,14 +603,14 @@ mod tests {
             let illegal_propose1 = TxConfigPropose::new(&sandbox.p(1),
                                                         str::from_utf8(new_cfg_bad_previous_cfg
                                                                            .clone()
-                                                                           .serialize()
+                                                                           .into_bytes()
                                                                            .as_slice())
-                                                                .unwrap(),
+                                                            .unwrap(),
                                                         sandbox.s(1));
             let illegal_propose2 =
                 TxConfigPropose::new(&illegal_pub,
                                      // not a member of actual config
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      &illegal_sec);
             add_one_height_with_transactions(&sandbox,
@@ -624,32 +618,30 @@ mod tests {
                                              &[illegal_propose1.raw().clone(),
                                                illegal_propose2.raw().clone()]);
             sandbox.assert_state(2, 1);
-            assert_eq!(None,
-                       get_propose(&sandbox, new_cfg_bad_previous_cfg.hash()).unwrap());
-            assert_eq!(None, get_propose(&sandbox, new_cfg.hash()).unwrap());
+            assert_eq!(None, get_propose(&sandbox, new_cfg_bad_previous_cfg.hash()));
+            assert_eq!(None, get_propose(&sandbox, new_cfg.hash()));
         }
         {
             let legal_propose1 =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
             let legal_propose2 = TxConfigPropose::new(&sandbox.p(1),
                                                       str::from_utf8(new_cfg_discarded_votes
                                                                          .clone()
-                                                                         .serialize()
+                                                                         .into_bytes()
                                                                          .as_slice())
-                                                              .unwrap(),
+                                                          .unwrap(),
                                                       sandbox.s(1));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[legal_propose1.raw().clone(),
                                                legal_propose2.raw().clone()]);
             sandbox.assert_state(3, 1);
-            assert_eq!(Some(legal_propose1),
-                       get_propose(&sandbox, new_cfg.hash()).unwrap());
+            assert_eq!(Some(legal_propose1), get_propose(&sandbox, new_cfg.hash()));
             assert_eq!(Some(legal_propose2),
-                       get_propose(&sandbox, new_cfg_discarded_votes.hash()).unwrap());
+                       get_propose(&sandbox, new_cfg_discarded_votes.hash()));
         }
         {
             let illegal_validator_vote =
@@ -658,7 +650,7 @@ mod tests {
                                              &sandbox_state,
                                              &[illegal_validator_vote.raw().clone()]);
             sandbox.assert_state(4, 1);
-            let votes = get_votes_for_propose(&sandbox, new_cfg_discarded_votes.hash()).unwrap();
+            let votes = get_votes_for_propose(&sandbox, new_cfg_discarded_votes.hash());
             assert!(!votes.contains(&Some(illegal_validator_vote)));
         }
         {
@@ -667,8 +659,8 @@ mod tests {
                          TxConfigVote::new(&sandbox.p(validator),
                                            &new_cfg.hash(),
                                            sandbox.s(validator))
-                                 .raw()
-                                 .clone()
+                             .raw()
+                             .clone()
                      })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
@@ -688,14 +680,13 @@ mod tests {
                          TxConfigVote::new(&sandbox.p(validator),
                                            &new_cfg_discarded_votes.hash(),
                                            sandbox.s(validator))
-                                 .raw()
-                                 .clone()
+                             .raw()
+                             .clone()
                      })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
             sandbox.assert_state(7, 1);
-            let actual_votes = get_votes_for_propose(&sandbox, new_cfg_discarded_votes.hash())
-                .unwrap();
+            let actual_votes = get_votes_for_propose(&sandbox, new_cfg_discarded_votes.hash());
             for raw_vote in expected_votes {
                 let exp_vote = TxConfigVote::from_raw(raw_vote).unwrap();
                 assert!(!actual_votes.contains(&Some(exp_vote)));
@@ -720,12 +711,12 @@ mod tests {
             for cfg in &[new_cfg1.clone(), new_cfg2.clone()] {
                 proposes.push(TxConfigPropose::new(&sandbox.p(1),
                                                    str::from_utf8(cfg.clone()
-                                                                      .serialize()
+                                                                      .into_bytes()
                                                                       .as_slice())
-                                                           .unwrap(),
+                                                       .unwrap(),
                                                    sandbox.s(1))
-                                      .raw()
-                                      .clone());
+                                  .raw()
+                                  .clone());
             }
 
             add_one_height_with_transactions(&sandbox, &sandbox_state, &proposes);
@@ -737,8 +728,8 @@ mod tests {
                 votes.push(TxConfigVote::new(&sandbox.p(validator),
                                              &new_cfg1.hash(),
                                              sandbox.s(validator))
-                                   .raw()
-                                   .clone());
+                               .raw()
+                               .clone());
             }
 
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
@@ -776,7 +767,7 @@ mod tests {
         {
             let propose_tx1 =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg1.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg1.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
 
@@ -791,8 +782,8 @@ mod tests {
                 votes_for_new_cfg1.push(TxConfigVote::new(&sandbox.p(validator),
                                                           &new_cfg1.hash(),
                                                           sandbox.s(validator))
-                                                .raw()
-                                                .clone());
+                                            .raw()
+                                            .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes_for_new_cfg1);
             sandbox.assert_state(3, 1);
@@ -801,7 +792,7 @@ mod tests {
         {
             let propose_tx2 =
                 TxConfigPropose::new(&sandbox.p(1),
-                                     str::from_utf8(new_cfg2.clone().serialize().as_slice())
+                                     str::from_utf8(new_cfg2.clone().into_bytes().as_slice())
                                          .unwrap(),
                                      sandbox.s(1));
 
@@ -816,8 +807,8 @@ mod tests {
                 votes_for_new_cfg2.push(TxConfigVote::new(&sandbox.p(validator),
                                                           &new_cfg2.hash(),
                                                           sandbox.s(validator))
-                                                .raw()
-                                                .clone());
+                                            .raw()
+                                            .clone());
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes_for_new_cfg2);
             sandbox.assert_state(5, 1);

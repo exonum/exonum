@@ -9,7 +9,7 @@ use std::num::ParseIntError;
 use exonum::api::{Api, ApiError};
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
-use exonum::storage::{Map, StorageValue};
+use exonum::storage::StorageValue;
 use exonum::node::{TxSender, NodeChannel, TransactionSend};
 use exonum::encoding::serialize::json::reexport as serde_json;
 
@@ -62,7 +62,7 @@ pub struct PublicConfigApi {
 impl PublicConfigApi {
     fn get_actual_config(&self) -> Result<ApiResponseConfigHashInfo, ApiError> {
 
-        let actual_cfg = Schema::new(&self.blockchain.view()).actual_configuration()?;
+        let actual_cfg = Schema::new(&self.blockchain.snapshot()).actual_configuration();
         let res = ApiResponseConfigHashInfo {
             hash: actual_cfg.hash(),
             config: actual_cfg,
@@ -72,8 +72,7 @@ impl PublicConfigApi {
 
     fn get_following_config(&self) -> Result<Option<ApiResponseConfigHashInfo>, ApiError> {
 
-        let following_cfg = Schema::new(&self.blockchain.view())
-            .following_configuration()?;
+        let following_cfg = Schema::new(&self.blockchain.snapshot()).following_configuration();
         let res = following_cfg.map(|cfg| {
                                         ApiResponseConfigHashInfo {
                                             hash: cfg.hash(),
@@ -84,14 +83,12 @@ impl PublicConfigApi {
     }
 
     fn get_config_by_hash(&self, hash: &Hash) -> Result<ApiResponseConfigInfo, ApiError> {
-        let view = self.blockchain.view();
-        let general_schema = Schema::new(&view);
-        let committed_config = general_schema.configs().get(hash)?;
+        let snapshot = self.blockchain.snapshot();
+        let general_schema = Schema::new(&snapshot);
+        let committed_config = general_schema.configs().get(hash);
 
-        let configuration_schema = ConfigurationSchema::new(&view);
-        let propose = configuration_schema
-            .propose_data_by_config_hash()
-            .get(hash)?;
+        let configuration_schema = ConfigurationSchema::new(&snapshot);
+        let propose = configuration_schema.propose_data_by_config_hash().get(hash);
         let res = ApiResponseConfigInfo {
             committed_config: committed_config,
             propose: propose,
@@ -101,13 +98,13 @@ impl PublicConfigApi {
 
 
     fn get_votes_for_propose(&self, cfg_hash: &Hash) -> Result<ApiResponseVotesInfo, ApiError> {
-        let view = self.blockchain.view();
-        let configuration_schema = ConfigurationSchema::new(&view);
+        let snapshot = self.blockchain.snapshot();
+        let configuration_schema = ConfigurationSchema::new(&snapshot);
         let res = match configuration_schema
                   .propose_data_by_config_hash()
-                  .get(cfg_hash)? {
+                  .get(cfg_hash) {
             None => None,
-            Some(_) => Some(configuration_schema.get_votes(cfg_hash)?),
+            Some(_) => Some(configuration_schema.get_votes(cfg_hash)),
         };
 
         Ok(res)
@@ -134,62 +131,78 @@ impl PublicConfigApi {
                         previous_cfg_hash_filter: Option<Hash>,
                         actual_from_filter: Option<u64>)
                         -> Result<Vec<ApiResponseProposeHashInfo>, ApiError> {
-        let view = self.blockchain.view();
-        let configuration_schema = ConfigurationSchema::new(&view);
-        let proposes: Vec<Hash> = configuration_schema.config_hash_by_ordinal().values()?;
-        let mut res: Vec<_> = Vec::new();
-        for cfg_hash in proposes {
-            let propose_data =
-                configuration_schema
-                    .propose_data_by_config_hash()
-                    .get(&cfg_hash)?
-                    .expect(&format!("Not found propose for following cfg_hash: {:?}", cfg_hash));
-            let cfg = <StoredConfiguration as StorageValue>::deserialize(propose_data
-                                                                             .tx_propose()
-                                                                             .cfg()
-                                                                             .as_bytes()
-                                                                             .to_vec());
-            if !PublicConfigApi::filter_cfg_predicate(&cfg,
-                                                      previous_cfg_hash_filter,
-                                                      actual_from_filter) {
-                continue;
-            }
-            let elem = ApiResponseProposeHashInfo {
-                hash: cfg_hash,
-                propose_data: propose_data,
-            };
-            res.push(elem);
-        }
-        Ok(res)
+        let snapshot = self.blockchain.snapshot();
+        let configuration_schema = ConfigurationSchema::new(&snapshot);
+        let proposes = {
+            let index = configuration_schema.config_hash_by_ordinal();
+            let proposes = index
+                .into_iter()
+                .map(|cfg_hash| {
+                    let propose_data = configuration_schema
+                        .propose_data_by_config_hash()
+                        .get(&cfg_hash)
+                        .expect(&format!("Not found propose for following cfg_hash: {:?}",
+                                         cfg_hash));
+
+                    (cfg_hash, propose_data)
+                })
+                .filter(|&(_, ref propose_data)| {
+                    let cfg = <StoredConfiguration as StorageValue>::from_bytes(propose_data
+                                                                                    .tx_propose()
+                                                                                    .cfg()
+                                                                                    .as_bytes()
+                                                                                    .into());
+                    PublicConfigApi::filter_cfg_predicate(&cfg,
+                                                          previous_cfg_hash_filter,
+                                                          actual_from_filter)
+                })
+                .map(|(cfg_hash, propose_data)| {
+                         ApiResponseProposeHashInfo {
+                             hash: cfg_hash,
+                             propose_data: propose_data,
+                         }
+                     })
+                .collect::<Vec<_>>();
+            proposes
+        };
+        Ok(proposes)
     }
 
     fn get_all_committed(&self,
                          previous_cfg_hash_filter: Option<Hash>,
                          actual_from_filter: Option<u64>)
                          -> Result<Vec<ApiResponseConfigHashInfo>, ApiError> {
-        let view = self.blockchain.view();
-        let general_schema = Schema::new(&view);
-        let references = general_schema.configs_actual_from().values()?;
-        let mut res: Vec<_> = Vec::new();
-        for reference in references {
-            let cfg_hash = reference.cfg_hash();
-            let cfg =
-                general_schema
-                    .configs()
-                    .get(cfg_hash)?
-                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
-            if !PublicConfigApi::filter_cfg_predicate(&cfg,
-                                                      previous_cfg_hash_filter,
-                                                      actual_from_filter) {
-                continue;
-            }
-            let elem = ApiResponseConfigHashInfo {
-                hash: *cfg_hash,
-                config: cfg,
-            };
-            res.push(elem);
-        }
-        Ok(res)
+        let snapshot = self.blockchain.snapshot();
+        let general_schema = Schema::new(&snapshot);
+        let committed_configs = {
+            let index = general_schema.configs_actual_from();
+            let values = index
+                .into_iter()
+                .map(|reference| {
+
+                    let cfg_hash = reference.cfg_hash();
+                    let cfg = general_schema
+                        .configs()
+                        .get(cfg_hash)
+                        .expect(&format!("Config with hash {:?} is absent in configs table",
+                                         cfg_hash));
+                    (*cfg_hash, cfg)
+                })
+                .filter(|&(_, ref cfg)| {
+                            PublicConfigApi::filter_cfg_predicate(cfg,
+                                                                  previous_cfg_hash_filter,
+                                                                  actual_from_filter)
+                        })
+                .map(|(cfg_hash, cfg)| {
+                         ApiResponseConfigHashInfo {
+                             hash: cfg_hash,
+                             config: cfg,
+                         }
+                     })
+                .collect::<Vec<_>>();
+            values
+        };
+        Ok(committed_configs)
     }
 
     fn retrieve_params(map: &ParamsMap) -> Result<(Option<Hash>, Option<u64>), ApiError> {
@@ -221,7 +234,7 @@ impl<T> PrivateConfigApi<T>
                           -> Result<ApiResponseProposePost, ApiError> {
         let cfg_hash = cfg.hash();
         let config_propose = TxConfigPropose::new(&self.config.0,
-                                                  str::from_utf8(cfg.serialize().as_slice())
+                                                  str::from_utf8(cfg.into_bytes().as_slice())
                                                       .unwrap(),
                                                   &self.config.1);
         let tx_hash = config_propose.hash();
@@ -269,10 +282,12 @@ impl Api for PublicConfigApi {
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => {
-                    Err(ApiError::IncorrectRequest("Required route \
+                    Err(ApiError::IncorrectRequest(
+                        "Required route \
                                            parameter of configuration \
                                            'hash' is missing"
-                                                           .into()))?
+                            .into(),
+                    ))?
                 }
             }
         };
@@ -287,10 +302,12 @@ impl Api for PublicConfigApi {
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => {
-                    Err(ApiError::IncorrectRequest("Required route \
+                    Err(ApiError::IncorrectRequest(
+                        "Required route \
                                            parameter of configuration \
                                            'hash' is missing"
-                                                           .into()))?
+                            .into(),
+                    ))?
                 }
             }
         };
@@ -352,10 +369,12 @@ impl<T> Api for PrivateConfigApi<T>
                     _self.ok_response(&serde_json::to_value(info).unwrap())
                 }
                 None => {
-                    Err(ApiError::IncorrectRequest("Required route \
+                    Err(ApiError::IncorrectRequest(
+                        "Required route \
                                            parameter of configuration \
                                            'hash' is missing"
-                                                           .into()))?
+                            .into(),
+                    ))?
                 }
             }
         };

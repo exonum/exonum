@@ -15,7 +15,7 @@ use std::fs::File;
 use std::io::Read;
 use std::str;
 
-use exonum::storage::{MemoryDB, MerkleTable, StorageValue, List};
+use exonum::storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 use exonum::node::TransactionSend;
 use exonum::crypto::Hash;
 use exonum::blockchain::{Service, Transaction};
@@ -262,9 +262,7 @@ fn test_get_following_config() {
         (0..api_sandbox.sandbox.majority_count(n_validators))
             .inspect(|validator_id| {
                          api_sandbox
-                             .post_config_vote(*validator_id,
-                                               following_cfg.hash(),
-                                               validator_id)
+                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
                              .unwrap();
                      })
             .collect::<Vec<_>>();
@@ -319,18 +317,18 @@ fn test_get_config_by_hash2() {
 
     let expected_body = {
         let expected_hash = {
-            let db = MemoryDB::new();
-            let hashes: MerkleTable<MemoryDB, TxConfigVote> = MerkleTable::new(db);
+            let mut fork = MemoryDB::new().fork();
+            let mut hashes = ProofListIndex::new(Vec::new(), &mut fork);
             for _ in 0..api_sandbox.sandbox.n_validators() {
-                hashes.append(ZEROVOTE.clone()).unwrap();
+                hashes.push(ZEROVOTE.clone());
             }
-            hashes.root_hash().unwrap()
+            hashes.root_hash()
         };
         let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
                                   api_sandbox.sandbox.s(proposer).clone());
         let expected_propose =
             TxConfigPropose::new(&pub_key,
-                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                 str::from_utf8(following_cfg.clone().into_bytes().as_slice())
                                      .unwrap(),
                                  &sec_key);
         let expected_voting_data =
@@ -375,9 +373,7 @@ fn test_get_config_by_hash3() {
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
             .inspect(|validator_id| if *validator_id != excluded_validator {
                          api_sandbox
-                             .post_config_vote(*validator_id,
-                                               following_cfg.hash(),
-                                               validator_id)
+                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
                              .unwrap();
                      })
             .map(|validator_id| if validator_id == excluded_validator {
@@ -393,16 +389,16 @@ fn test_get_config_by_hash3() {
     };
     let expected_body = {
         let expected_hash = {
-            let db = MemoryDB::new();
-            let hashes: MerkleTable<MemoryDB, TxConfigVote> = MerkleTable::new(db);
-            hashes.extend(votes).unwrap();
-            hashes.root_hash().unwrap()
+            let mut fork = MemoryDB::new().fork();
+            let mut hashes = ProofListIndex::new(Vec::new(), &mut fork);
+            hashes.extend(votes);
+            hashes.root_hash()
         };
         let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
                                   api_sandbox.sandbox.s(proposer).clone());
         let expected_propose =
             TxConfigPropose::new(&pub_key,
-                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                 str::from_utf8(following_cfg.clone().into_bytes().as_slice())
                                      .unwrap(),
                                  &sec_key);
         let expected_voting_data =
@@ -461,9 +457,7 @@ fn test_get_config_votes() {
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
             .inspect(|validator_id| if *validator_id != excluded_validator {
                          api_sandbox
-                             .post_config_vote(*validator_id,
-                                               following_cfg.hash(),
-                                               validator_id)
+                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
                              .unwrap();
                      })
             .map(|validator_id| if validator_id == excluded_validator {
@@ -501,7 +495,7 @@ fn test_post_propose_response() {
     let expected_body = {
         let propose_tx =
             TxConfigPropose::new(&pub_key,
-                                 str::from_utf8(following_cfg.clone().serialize().as_slice())
+                                 str::from_utf8(following_cfg.clone().into_bytes().as_slice())
                                      .unwrap(),
                                  &sec_key);
         ApiResponseProposePost {
