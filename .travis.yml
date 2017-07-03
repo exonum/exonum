@@ -21,7 +21,7 @@ before_install:
 - cargo install --list
 - cargo-audit -V || cargo install cargo-audit --force
 install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev librocksdb libssl-dev
+- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev librocksdb libsnappy-dev libssl-dev
 script:
 - cargo fmt -p sandbox -- --write-mode=diff
 - cd exonum
