@@ -438,7 +438,7 @@ fn test_correct_encoding_struct() {
 }
 
 #[test]
-#[should_panic(expected = "(left: `2`, right: `3`)")]
+#[should_panic(expected = "fields should be adjacent")]
 fn test_encoding_struct_with_hole() {
     encoding_struct! {
         struct MiddleHole {
@@ -453,7 +453,7 @@ fn test_encoding_struct_with_hole() {
 }
 
 #[test]
-#[should_panic(expected = "(left: `2`, right: `1`)")]
+#[should_panic(expected = "fields should be adjacent")]
 fn test_encoding_struct_with_overlay() {
     encoding_struct! {
         struct FieldOverlay {
@@ -468,7 +468,7 @@ fn test_encoding_struct_with_overlay() {
 }
 
 #[test]
-#[should_panic(expected = "(left: `1`, right: `2`)")]
+#[should_panic(expected = "wrong size of field")]
 fn test_encoding_struct_wrong_size() {
     encoding_struct! {
         struct WrongSize {
