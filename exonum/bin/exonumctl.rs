@@ -7,7 +7,7 @@ use clap::{App, SubCommand, Arg, ArgMatches};
 use std::marker::PhantomData;
 use std::path::Path;
 
-use exonum::storage::{LevelDB, LevelDBOptions, Map, MapTable};
+use exonum::storage::{LevelDB, LevelDBOptions, Map, MapIndex};
 use exonum::crypto::{HexValue, Hash};
 use exonum::helpers::clap::GenerateCommand;
 
@@ -49,7 +49,7 @@ impl<'a, 'b> BlockchainCommand<'a, 'b>
     pub fn db(matches: &'a ArgMatches<'a>) -> LevelDB {
         let path = Self::leveldb_path(matches);
         let options = LevelDBOptions::new();
-        LevelDB::new(path, options).unwrap()
+        LevelDB::open(path, options).unwrap()
     }
 
     pub fn action(matches: &'a ArgMatches<'a>) -> BlockchainAction {
@@ -68,7 +68,7 @@ impl<'a, 'b> BlockchainCommand<'a, 'b>
             BlockchainAction::FindTx(tx_hash) => {
                 let hash = Hash::from_hex(tx_hash).unwrap();
                 // TODO add constants to common used prefixes in blockchain
-                let txs = MapTable::new(vec![00], &storage);
+                let txs = MapIndex::new(vec![00], &storage);
                 let tx: Vec<u8> = txs.get(&hash).unwrap().unwrap();
                 println!("{}", tx.to_hex());
             }
