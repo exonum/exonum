@@ -378,6 +378,11 @@ impl State {
         &self.validator_state
     }
 
+    /// Returns validator id of the node if it is a validator. Returns `None` otherwise.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.validator_state.as_ref().map(|s| s.id())
+    }
+
     /// Updates the validator id. If there hasn't been `ValidatorState` for that id, then a new
     /// state will be created.
     pub fn renew_validator_id(&mut self, id: Option<ValidatorId>) {

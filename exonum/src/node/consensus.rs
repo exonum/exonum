@@ -422,7 +422,8 @@ impl<S> NodeHandler<S>
         }
     }
 
-    /// Handles transaction.
+    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
+    /// added to the transactions pool.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
         trace!("Handle transaction");
@@ -460,7 +461,8 @@ impl<S> NodeHandler<S>
         }
     }
 
-    /// Handles external transaction.
+    /// Handles external boxed transaction. Additionally transaction will be broadcast to the
+    /// Node's peers.
     pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
         trace!("Handle incoming transaction");
         let hash = msg.hash();
@@ -539,10 +541,7 @@ impl<S> NodeHandler<S>
         if self.state.locked_propose().is_some() {
             return;
         }
-        let validator_id = self.state.validator_state().as_ref().map(|validator_state| {
-            validator_state.id()
-        });
-        if let Some(validator_id) = validator_id {
+        if let Some(validator_id) = self.state.validator_id() {
             if self.state.have_prevote(round) {
                 return;
             }
@@ -667,7 +666,8 @@ impl<S> NodeHandler<S>
         block_hash
     }
 
-    /// Returns `true` and request propose or transactions if needed, otherwise returns `false`.
+    /// Returns `true` if propose and all transactions are known, otherwise requests needed data
+    /// and returns `false`.
     pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, key: PublicKey) -> bool {
         let requested_data = match self.state.propose(propose_hash) {
             Some(state) => {
@@ -716,7 +716,7 @@ impl<S> NodeHandler<S>
 
     /// Broadcasts the `Prevote` message to all peers.
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
-        let validator_id = self.state.validator_state().as_ref().map(|s|s.id()).
+        let validator_id = self.state.validator_id().
             expect("called broadcast_prevote in Auditor node.");
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(validator_id,
@@ -733,8 +733,8 @@ impl<S> NodeHandler<S>
 
     /// Broadcasts the `Precommit` message to all peers.
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
-        let validator_id = self.state.validator_state().as_ref().map(|s|s.id()).
-            expect("called broadcast_prevote in Auditor node.");
+        let validator_id = self.state.validator_id().
+            expect("called broadcast_precommit in Auditor node.");
         let precommit = Precommit::new(validator_id,
                                         self.state.height(),
                                         round,
