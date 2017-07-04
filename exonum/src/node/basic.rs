@@ -12,6 +12,7 @@ use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+    /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method
@@ -32,12 +33,15 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles the `Connected` event. Node's `Connect` message is sent as response.
     pub fn handle_connected(&mut self, addr: &SocketAddr) {
         info!("Connected to: {}", addr);
         let message = self.state.our_connect_message().clone();
         self.send_to_addr(addr, message.raw());
     }
 
+    /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
+    /// in the validators list.
     pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
         info!("Disconnected from: {}", addr);
         let need_reconnect = self.state.remove_peer_with_addr(addr);
@@ -46,6 +50,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles the `Connect` message and connects to a peer as result.
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO add spam protection
         let address = message.addr();
@@ -89,6 +94,8 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles the `Status` message. Node sends `RequestBlock` as response if height in the
+    /// message is higher than node's height.
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
         trace!("HANDLE STATUS: current height = {}, msg height = {}", height, msg.height());
@@ -118,6 +125,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles the `RequestPeers` message. Node sends `Connect` messages of other peers as result.
     pub fn handle_request_peers(&mut self, msg: RequestPeers) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!("HANDLE REQUEST PEERS: Sending {:?} peers to {:?}", peers, msg.from());
@@ -127,6 +135,8 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles `NodeTimeout::Status`, broadcasts the `Status` message if it isn't outdated as
+    /// result.
     pub fn handle_status_timeout(&mut self, height: Height) {
         if self.state.height() == height {
             self.broadcast_status();
@@ -134,6 +144,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles `NodeTimeout::PeerExchange`. Node sends the `RequestPeers` to a random peer.
     pub fn handle_peer_exchange_timeout(&mut self) {
         if !self.state.peers().is_empty() {
             let to = self.state.peers().len();
@@ -158,6 +169,7 @@ impl<S> NodeHandler<S>
         self.add_peer_exchange_timeout();
     }
 
+    /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
         let hash = self.blockchain.last_hash();
         let status = Status::new(self.state.consensus_public_key(),
