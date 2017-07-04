@@ -56,7 +56,7 @@ message! {
     }
 }
 
-pub const TX_TRANSFER_ID: u16 = 3;
+pub const TX_TRANSFER_ID: u16 = 2;
 
 message! {
     struct TxTransfer {
