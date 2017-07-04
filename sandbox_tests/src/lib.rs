@@ -42,10 +42,16 @@ fn generate_config_with_message(prev_cfg_hash: Hash,
     StoredConfiguration {
         previous_cfg_hash: prev_cfg_hash,
         actual_from: actual_from,
-        validator_keys: sandbox.validators()
+        validator_keys: sandbox
+            .validators()
             .iter()
             .zip(sandbox.services().iter())
-            .map(|(ck, sk)| ValidatorKeys { consensus_key: *ck, service_key: *sk })
+            .map(|(ck, sk)| {
+                     ValidatorKeys {
+                         consensus_key: *ck,
+                         service_key: *sk,
+                     }
+                 })
             .collect(),
         consensus: sandbox.cfg().consensus,
         services: services,
@@ -126,7 +132,12 @@ mod tests {
             validator_keys: validators[1..]
                 .iter()
                 .zip(service_keys[1..].iter())
-                .map(|(ck, sk)| ValidatorKeys { consensus_key: *ck, service_key: *sk })
+                .map(|(ck, sk)| {
+                         ValidatorKeys {
+                             consensus_key: *ck,
+                             service_key: *sk,
+                         }
+                     })
                 .collect(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
@@ -163,7 +174,12 @@ mod tests {
             validator_keys: validators[0..]
                 .iter()
                 .zip(service_keys[0..].iter())
-                .map(|(ck, sk)| ValidatorKeys { consensus_key: *ck, service_key: *sk })
+                .map(|(ck, sk)| {
+                         ValidatorKeys {
+                             consensus_key: *ck,
+                             service_key: *sk,
+                         }
+                     })
                 .collect(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
@@ -223,7 +239,12 @@ mod tests {
             validator_keys: validators
                 .iter()
                 .zip(service_keys.iter())
-                .map(|(ck, sk)| ValidatorKeys { consensus_key: *ck, service_key: *sk })
+                .map(|(ck, sk)| {
+                         ValidatorKeys {
+                             consensus_key: *ck,
+                             service_key: *sk,
+                         }
+                     })
                 .collect(),
             consensus: sandbox.cfg().consensus,
             services: services,
@@ -235,7 +256,7 @@ mod tests {
                                                                      .into_bytes()
                                                                      .as_slice())
                                                       .unwrap(),
-                                     sandbox.service_secret_key(1));
+                                                  sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
         }
@@ -309,10 +330,15 @@ mod tests {
         let excluding_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: actual_from,
-            validator_keys: new_public_keys.iter().map(|x| ValidatorKeys {
-                consensus_key: x.0,
-                service_key: x.1
-            }).collect(),
+            validator_keys: new_public_keys
+                .iter()
+                .map(|x| {
+                         ValidatorKeys {
+                             consensus_key: x.0,
+                             service_key: x.1
+                         }
+                     })
+                .collect(),
             consensus: sandbox.cfg().consensus,
             services: services,
         };

@@ -291,16 +291,14 @@ impl<T> ConfigurationSchema<T>
     }
 
     pub fn get_votes(&self, cfg_hash: &Hash) -> Vec<Option<TxConfigVote>> {
-        let votes_table = self.votes_by_config_hash(cfg_hash);
-        let votes_options = votes_table
+        self.votes_by_config_hash(cfg_hash)
             .into_iter()
             .map(|vote| if vote == ZEROVOTE.clone() {
                      None
                  } else {
                      Some(vote)
                  })
-            .collect::<Vec<_>>();
-        votes_options
+            .collect::<Vec<_>>()
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
@@ -466,7 +464,10 @@ impl Transaction for TxConfigPropose {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.validator_keys.iter().any(|k| k.service_key == *self.from()) {
+        if !actual_config
+                .validator_keys
+                .iter()
+                .any(|k| k.service_key == *self.from()) {
             error!("Discarding TxConfigPropose:{} from unknown validator. ",
                    serde_json::to_string(self).unwrap());
             return;
@@ -536,7 +537,10 @@ impl Transaction for TxConfigVote {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.validator_keys.iter().any(|k| k.service_key == *self.from()) {
+        if !actual_config
+                .validator_keys
+                .iter()
+                .any(|k| k.service_key == *self.from()) {
             error!("Discarding TxConfigVote:{:?} from unknown validator. ",
                    self);
             return;
