@@ -18,7 +18,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use exonum::crypto::Hash;
-use exonum::blockchain::config::StoredConfiguration;
+use exonum::blockchain::config::{StoredConfiguration, ValidatorKeys};
 use exonum::blockchain::Service;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use sandbox::sandbox::Sandbox;
@@ -42,8 +42,11 @@ fn generate_config_with_message(prev_cfg_hash: Hash,
     StoredConfiguration {
         previous_cfg_hash: prev_cfg_hash,
         actual_from: actual_from,
-        validator_keys: sandbox.validators(),
-        service_keys: sandbox.services(),
+        validator_keys: sandbox.validators()
+            .iter()
+            .zip(sandbox.services().iter())
+            .map(|(ck, sk)| ValidatorKeys { consensus_key: *ck, service_key: *sk })
+            .collect(),
         consensus: sandbox.cfg().consensus,
         services: services,
     }
@@ -60,7 +63,7 @@ mod tests {
     use std::str;
 
     use exonum::crypto::{Hash, Seed, SEED_LENGTH, HASH_SIZE, gen_keypair_from_seed, hash};
-    use exonum::blockchain::config::StoredConfiguration;
+    use exonum::blockchain::config::{StoredConfiguration, ValidatorKeys};
     use exonum::storage::StorageValue;
     use exonum::messages::{Message, FromRaw};
     use sandbox::timestamping::TimestampingService;
@@ -120,8 +123,11 @@ mod tests {
         let full_node_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: 4,
-            validator_keys: validators[1..].iter().cloned().collect(),
-            service_keys: service_keys[1..].iter().cloned().collect(),
+            validator_keys: validators[1..]
+                .iter()
+                .zip(service_keys[1..].iter())
+                .map(|(ck, sk)| ValidatorKeys { consensus_key: *ck, service_key: *sk })
+                .collect(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
         };
@@ -154,8 +160,11 @@ mod tests {
         let validator_cfg = StoredConfiguration {
             previous_cfg_hash: full_node_cfg.hash(),
             actual_from: 6,
-            validator_keys: validators[0..].iter().cloned().collect(),
-            service_keys: service_keys[0..].iter().cloned().collect(),
+            validator_keys: validators[0..]
+                .iter()
+                .zip(service_keys[0..].iter())
+                .map(|(ck, sk)| ValidatorKeys { consensus_key: *ck, service_key: *sk })
+                .collect(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
         };
@@ -211,8 +220,11 @@ mod tests {
         let added_keys_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: actual_from,
-            validator_keys: validators.clone(),
-            service_keys: service_keys.clone(),
+            validator_keys: validators
+                .iter()
+                .zip(service_keys.iter())
+                .map(|(ck, sk)| ValidatorKeys { consensus_key: *ck, service_key: *sk })
+                .collect(),
             consensus: sandbox.cfg().consensus,
             services: services,
         };
@@ -297,8 +309,10 @@ mod tests {
         let excluding_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: actual_from,
-            validator_keys: new_public_keys.iter().map(|x| x.0).collect(),
-            service_keys: new_public_keys.iter().map(|x| x.1).collect(),
+            validator_keys: new_public_keys.iter().map(|x| ValidatorKeys {
+                consensus_key: x.0,
+                service_key: x.1
+            }).collect(),
             consensus: sandbox.cfg().consensus,
             services: services,
         };

@@ -368,7 +368,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         let propose_data_by_config_hash = {
             let mut votes_table = self.votes_by_config_hash_mut(cfg_hash);
             debug_assert!(votes_table.is_empty());
-            let num_validators = prev_cfg.validators.len();
+            let num_validators = prev_cfg.validator_keys.len();
             for _ in 0..num_validators {
                 votes_table.push(ZEROVOTE.clone());
             }
@@ -410,9 +410,9 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         //    if config_candidate_body.previous_cfg_hash != actual_config_hash {
         let from: &PublicKey = tx_vote.from();
         let validator_id = prev_cfg
-            .service_keys
+            .validator_keys
             .iter()
-            .position(|pk| pk == from)
+            .position(|pk| pk.service_key == *from)
             .expect(&format!("See !prev_cfg.validators.contains(self.from()) for \
                               TxConfigVote:{:?}",
                              &tx_vote));
@@ -466,7 +466,7 @@ impl Transaction for TxConfigPropose {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.service_keys.contains(self.from()) {
+        if !actual_config.validator_keys.iter().any(|k| k.service_key == *self.from()) {
             error!("Discarding TxConfigPropose:{} from unknown validator. ",
                    serde_json::to_string(self).unwrap());
             return;
@@ -536,7 +536,7 @@ impl Transaction for TxConfigVote {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.service_keys.contains(self.from()) {
+        if !actual_config.validator_keys.iter().any(|k| k.service_key == *self.from()) {
             error!("Discarding TxConfigVote:{:?} from unknown validator. ",
                    self);
             return;
@@ -586,7 +586,7 @@ impl Transaction for TxConfigVote {
         }
 
         let fork = configuration_schema.into_snapshot();
-        if votes_count >= State::byzantine_majority_count(actual_config.validators.len()) {
+        if votes_count >= State::byzantine_majority_count(actual_config.validator_keys.len()) {
             Schema::new(fork).commit_configuration(parsed_config);
         }
     }
