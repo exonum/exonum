@@ -6,7 +6,7 @@ extern crate router;
 extern crate bodyparser;
 extern crate iron;
 
-use exonum::blockchain::{Blockchain, Service, GenesisConfig, Transaction, ApiContext};
+use exonum::blockchain::{self, Blockchain, Service, GenesisConfig, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
@@ -201,7 +201,8 @@ pub struct CurrencySchema<'a> {
 
 impl<'a> CurrencySchema<'a> {
     pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-        MapIndex::new(vec![20], self.view)
+        let prefix = blockchain::gen_prefix(SERVICE_ID, 0, &());
+        MapIndex::new(prefix, self.view)
     }
 
     pub fn wallet(&mut self, pub_key: &PublicKey) -> Option<Wallet> {
