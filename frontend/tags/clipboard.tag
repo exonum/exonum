@@ -1,5 +1,5 @@
 <clipboard>
-    <button type="button" class="btn btn-xs btn-default" title="Click to clipboard" data-clipboard-text={ opts.val }>
+    <button type="button" class="btn btn-xs btn-default" title="Copy to clipboard" data-clipboard-text={ opts.val }>
         <i class="glyphicon glyphicon-copy"></i>
     </button>
 
