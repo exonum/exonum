@@ -246,7 +246,6 @@ impl Service for CurrencyService {
 // // // // // // // // // // ENTRY POINT // // // // // // // // // //
 
 fn main() {
-    exonum::crypto::init();
     exonum::helpers::init_logger().unwrap();
 
     println!("Creating in-memory database...");
