@@ -1,3 +1,10 @@
+//! Exonum node that performs consensus algorithm.
+//!
+//! For details about consensus message handling see messages module documentation.
+
+// TODO: Move to the root `lib.rs` when all other things are documented.
+#![deny(missing_docs)]
+
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
@@ -29,20 +36,29 @@ mod whitelist;
 pub mod state; // TODO: temporary solution to get access to WAIT consts
 pub mod timeout_adjuster;
 
+/// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
+    /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
 }
 
+/// Node timeout types.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NodeTimeout {
+    /// Status timeout with the current height.
     Status(Height),
-    Round(u64, u32),
+    /// Round timeout.
+    Round(Height, Round),
+    /// `RequestData` timeout.
     Request(RequestData, Option<PublicKey>),
-    Propose(u64, u32),
+    /// Propose timeout.
+    Propose(Height, Round),
+    /// Exchange peers timeout.
     PeerExchange,
 }
 
+/// Transactions sender.
 #[derive(Clone)]
 pub struct TxSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
@@ -50,12 +66,17 @@ pub struct TxSender<S>
     inner: S,
 }
 
+/// Handler that that performs consensus algorithm.
 pub struct NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+    /// State of the `NodeHandler`.
     pub state: State,
+    /// Channel for messages and timeouts.
     pub channel: S,
+    /// Blockchain.
     pub blockchain: Blockchain,
+    /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
     timeout_adjuster: Box<TimeoutAdjuster>
@@ -70,15 +91,20 @@ pub struct ServiceConfig {
     pub service_secret_key: SecretKey,
 }
 
+/// Listener config.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
+    /// Public key.
     pub consensus_public_key: PublicKey,
+    /// Secret key.
     pub consensus_secret_key: SecretKey,
+    /// Whitelist.
     pub whitelist: Whitelist,
+    /// Socket address.
     pub address: SocketAddr,
 }
 
-/// An api configuration options
+/// An api configuration options.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeApiConfig {
     /// Enable api endpoints for the `blockchain_explorer` on public api address.
@@ -118,34 +144,54 @@ impl Default for MemoryPoolConfig {
     }
 }
 
+/// Configuration for the `Node`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeConfig {
+    /// Initial config that will be written in the first block.
     pub genesis: GenesisConfig,
+    /// Network address used by this node.
     pub listen_address: SocketAddr,
+    /// Network configuration.
     pub network: NetworkConfiguration,
+    /// Peer addresses.
     pub peers: Vec<SocketAddr>,
+    /// Consensus public key.
     pub consensus_public_key: PublicKey,
+    /// Consensus secret key.
     pub consensus_secret_key: SecretKey,
+    /// Service public key.
     pub service_public_key: PublicKey,
+    /// Service secret key.
     pub service_secret_key: SecretKey,
+    /// Node's whitelist.
     pub whitelist: Whitelist,
+    /// Api configuration.
     pub api: NodeApiConfig,
+    /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
 }
 
+/// Configuration for the `NodeHandler`.
 #[derive(Debug, Clone)]
 pub struct Configuration {
+    /// Current node socket address, public and secret keys.
     pub listener: ListenerConfig,
     /// Service configuration.
     pub service: ServiceConfig,
+    /// Events configuration.
     pub events: EventsConfiguration,
+    /// Network configuration.
     pub network: NetworkConfiguration,
+    /// Known peer addresses.
     pub peer_discovery: Vec<SocketAddr>,
+    /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
 }
 
+/// Channel for messages and timeouts.
 pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
 
+/// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
     reactor: Events<NodeHandler<NodeChannel>>,
@@ -155,6 +201,7 @@ pub struct Node {
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+    /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
@@ -206,34 +253,42 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Sets new timeout adjuster.
     pub fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
         self.timeout_adjuster = adjuster;
     }
 
+    /// Returns value of the `propose_timeout` field from the current `ConsensusConfig`.
     pub fn propose_timeout(&self) -> Milliseconds {
         self.state().consensus_config().propose_timeout
     }
 
+    /// Returns value of the `round_timeout` field from the current `ConsensusConfig`.
     pub fn round_timeout(&self) -> Milliseconds {
         self.state().consensus_config().round_timeout
     }
 
+    /// Returns value of the `status_timeout` field from the current `ConsensusConfig`.
     pub fn status_timeout(&self) -> Milliseconds {
         self.state().consensus_config().status_timeout
     }
 
+    /// Returns value of the `peers_timeout` field from the current `ConsensusConfig`.
     pub fn peers_timeout(&self) -> Milliseconds {
         self.state().consensus_config().peers_timeout
     }
 
+    /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
     pub fn txs_block_limit(&self) -> u32 {
         self.state().consensus_config().txs_block_limit
     }
 
+    /// Returns `State` of the node.
     pub fn state(&self) -> &State {
         &self.state
     }
 
+    /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
         info!("Start listening address={}", self.channel.address());
         for address in &self.peer_discovery.clone() {
@@ -253,12 +308,14 @@ impl<S> NodeHandler<S>
         self.add_peer_exchange_timeout();
     }
 
+    /// Sends the given message to a peer by its id.
     pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
         // TODO: check validator id
         let public_key = self.state.validators()[id as usize].consensus_key;
         self.send_to_peer(public_key, message);
     }
 
+    /// Sends the given message to a peer by its public key.
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
             trace!("Send to addr: {}", conn.addr());
@@ -268,11 +325,13 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         trace!("Send to addr: {}", address);
         self.channel.send_to(address, message.clone());
     }
 
+    /// Broadcasts given message to all peers.
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
@@ -281,10 +340,12 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         self.channel.connect(address);
     }
 
+    /// Adds request timeout if it isn't already requested.
     pub fn request(&mut self, data: RequestData, peer: PublicKey) {
         let is_new = self.state.request(data.clone(), peer);
         if is_new {
@@ -292,6 +353,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Adds `NodeTimeout::Round` timeout to the channel.
     pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round() + 1);
         trace!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
@@ -302,6 +364,7 @@ impl<S> NodeHandler<S>
         self.channel.add_timeout(timeout, time);
     }
 
+    /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
         let adjusted_propose_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
@@ -315,12 +378,14 @@ impl<S> NodeHandler<S>
         self.channel.add_timeout(timeout, time);
     }
 
+    /// Adds `NodeTimeout::Status` timeout to the channel.
     pub fn add_status_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
         self.channel
             .add_timeout(NodeTimeout::Status(self.state.height()), time);
     }
 
+    /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
@@ -328,15 +393,18 @@ impl<S> NodeHandler<S>
             .add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
+    /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
     pub fn add_peer_exchange_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::from_millis(self.peers_timeout());
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
+    /// Returns hash of the last block.
     pub fn last_block_hash(&self) -> Hash {
         self.blockchain.last_block().hash()
     }
 
+    /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
         let ms = (round - 1) as u64 * self.round_timeout();
         self.state.height_start_time() + Duration::from_millis(ms)
@@ -386,13 +454,17 @@ impl<S> fmt::Debug for NodeHandler<S>
     }
 }
 
+/// `TransactionSend` represents interface for sending transactions. For details see `TxSender`
+/// implementation.
 pub trait TransactionSend: Send + Sync {
+    /// Sends transaction. This can include transaction verification.
     fn send(&self, tx: Box<Transaction>) -> EventsResult<()>;
 }
 
 impl<S> TxSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+    /// Creates new `TxSender` with given channel.
     pub fn new(inner: S) -> TxSender<S> {
         TxSender { inner: inner }
     }
@@ -418,8 +490,8 @@ impl<T> fmt::Debug for TxSender<T>
 }
 
 impl Node {
-    /// Creates node for the given blockchain and node configuration
-    pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Node {
+    /// Creates node for the given blockchain and node configuration.
+    pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Self {
         crypto::init();
         blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
 
@@ -522,14 +594,17 @@ impl Node {
         Ok(())
     }
 
+    /// Returns `State`.
     pub fn state(&self) -> &State {
         self.reactor.handler().state()
     }
 
+    /// Returns `NodeHandler`.
     pub fn handler(&self) -> &NodeHandler<NodeChannel> {
         self.reactor.handler()
     }
 
+    /// Returns channel.
     pub fn channel(&self) -> TxSender<NodeChannel> {
         TxSender::new(self.reactor.handler().channel.clone())
     }

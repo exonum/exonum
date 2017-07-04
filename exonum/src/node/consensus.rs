@@ -12,6 +12,7 @@ use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeou
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+    /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
@@ -57,6 +58,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles the `Propose` message. For details see the message documentation.
     pub fn handle_propose(&mut self, from: PublicKey, msg: Propose) {
         debug_assert_eq!(Some(from), self.state.consensus_public_key_of(msg.validator()));
 
@@ -110,6 +112,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result
     pub fn handle_block(&mut self, msg: Block) {
         // Request are sended to us
@@ -193,6 +196,7 @@ impl<S> NodeHandler<S>
         self.request_next_block();
     }
 
+    /// Executes and commits block. This function is called when node has full propose information.
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
         if self.state.locked_round() == 0 {
@@ -228,6 +232,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles the `Prevote` message. For details see the message documentation.
     pub fn handle_prevote(&mut self, from: PublicKey, msg: Prevote) {
         trace!("Handle prevote");
 
@@ -251,6 +256,8 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Locks to the propose by calling `lock`. This function is called when node receives
+    /// +2/3 pre-votes.
     pub fn has_majority_prevotes(&mut self, prevote_round: Round, propose_hash: &Hash) {
         // Remove request info
         self.remove_request(RequestData::Prevotes(prevote_round, *propose_hash));
@@ -260,6 +267,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Executes and commits block. This function is called when the node has +2/3 pre-commits.
     pub fn has_majority_precommits(&mut self,
                                    round: Round,
                                    propose_hash: &Hash,
@@ -295,6 +303,7 @@ impl<S> NodeHandler<S>
         self.commit(our_block_hash, precommits.iter(), Some(round));
     }
 
+    /// Locks node to the specified round, so pre-votes for the lower round will be ignored.
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
         for round in prevote_round..self.state.round() + 1 {
@@ -323,6 +332,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles the `Precommit` message. For details see the message documentation.
     pub fn handle_precommit(&mut self, from: PublicKey, msg: Precommit) {
         trace!("Handle precommit");
 
@@ -350,6 +360,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Commits block, so new height is achieved.
     // FIXME: push precommits into storage
     pub fn commit<'a, I: Iterator<Item = &'a Precommit>>(&mut self,
                                                          block_hash: Hash,
@@ -411,6 +422,8 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
+    /// added to the transactions pool.
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
         trace!("Handle transaction");
@@ -448,6 +461,8 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles external boxed transaction. Additionally transaction will be broadcast to the
+    /// Node's peers.
     pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
         trace!("Handle incoming transaction");
         let hash = msg.hash();
@@ -474,6 +489,8 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
+    /// is locked to some round.
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
         // TODO debug asserts?
         if height != self.state.height() {
@@ -511,6 +528,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
         // TODO debug asserts?
         if height != self.state.height() {
@@ -523,10 +541,7 @@ impl<S> NodeHandler<S>
         if self.state.locked_propose().is_some() {
             return;
         }
-        let validator_id = self.state.validator_state().as_ref().map(|validator_state| {
-            validator_state.id()
-        });
-        if let Some(validator_id) = validator_id {
+        if let Some(validator_id) = self.state.validator_id() {
             if self.state.have_prevote(round) {
                 return;
             }
@@ -562,6 +577,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles request timeout by sending the corresponding request message to a peer.
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("!!!!!!!!!!!!!!!!!!! HANDLE REQUEST TIMEOUT");
         // FIXME: check height?
@@ -620,6 +636,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Creates block with given transaction and returns its hash and corresponding changes.
     pub fn create_block(&mut self,
                         proposer_id: u16,
                         height: Height,
@@ -628,6 +645,8 @@ impl<S> NodeHandler<S>
         self.blockchain.create_patch(proposer_id, height, tx_hashes, self.state.transactions())
     }
 
+    /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
+    /// block hash.
     // FIXME: remove this bull shit
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
@@ -647,6 +666,8 @@ impl<S> NodeHandler<S>
         block_hash
     }
 
+    /// Returns `true` if propose and all transactions are known, otherwise requests needed data
+    /// and returns `false`.
     pub fn request_propose_or_txs(&mut self, propose_hash: &Hash, key: PublicKey) -> bool {
         let requested_data = match self.state.propose(propose_hash) {
             Some(state) => {
@@ -671,6 +692,8 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Requests a block for the next height from all peers with a bigger height. Called when the
+    /// node tries to catch up with other nodes' height.
     pub fn request_next_block(&mut self) {
         // TODO randomize next peer
         let heights:Vec<_> = self.state.nodes_with_bigger_height().into_iter().cloned().collect();
@@ -685,13 +708,16 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Removes the specified request from the pending request list.
     pub fn remove_request(&mut self, data: RequestData) -> HashSet<PublicKey> {
         // TODO: clear timeout
         self.state.remove_request(&data)
     }
 
+    /// Broadcasts the `Prevote` message to all peers.
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
-        let validator_id = self.state.validator_state().as_ref().map(|s|s.id()).expect("called broadcast_prevote in Auditor node.");
+        let validator_id = self.state.validator_id().
+            expect("called broadcast_prevote in Auditor node.");
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(validator_id,
                                 self.state.height(),
@@ -705,8 +731,10 @@ impl<S> NodeHandler<S>
         has_majority_prevotes
     }
 
+    /// Broadcasts the `Precommit` message to all peers.
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
-        let validator_id = self.state.validator_state().as_ref().map(|s|s.id()).expect("called broadcast_prevote in Auditor node.");
+        let validator_id = self.state.validator_id().
+            expect("called broadcast_precommit in Auditor node.");
         let precommit = Precommit::new(validator_id,
                                         self.state.height(),
                                         round,
@@ -719,6 +747,7 @@ impl<S> NodeHandler<S>
         self.broadcast(precommit.raw());
     }
 
+    /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.
     fn verify_precommits(&self,
                          precommits: &[Precommit],
                          block_hash: &Hash,
@@ -744,6 +773,8 @@ impl<S> NodeHandler<S>
         Ok(())
     }
 
+    /// Verifies that `Precommit` contains correct block hash, height round and is signed by the
+    /// right validator.
     fn verify_precommit(&self,
                         block_hash: &Hash,
                         block_height: Height,

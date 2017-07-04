@@ -10,6 +10,7 @@ use super::{NodeHandler, ExternalMessage, NodeTimeout};
 impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+    /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
         if msg.to() != self.state.consensus_public_key() {
@@ -35,6 +36,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles `RequstPropose` message. For details see the message documentation.
     pub fn handle_request_propose(&mut self, msg: RequestPropose) {
         trace!("HANDLE PROPOSE REQUEST!!!");
         if msg.height() != self.state.height() {
@@ -52,6 +54,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles `RequestTransactions` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
         trace!("HANDLE TRANSACTIONS REQUEST!!!");
         let snapshot = self.blockchain.snapshot();
@@ -70,6 +73,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles `RequestPrevotes` message. For details see the message documentation.
     pub fn handle_request_prevotes(&mut self, msg: RequestPrevotes) {
         trace!("HANDLE PREVOTES REQUEST!!!");
         if msg.height() != self.state.height() {
@@ -89,6 +93,7 @@ impl<S> NodeHandler<S>
         }
     }
 
+    /// Handles `RequestBlock` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: RequestBlock) {
         trace!("Handle block request with height:{}, our height: {}",
                msg.height(),
