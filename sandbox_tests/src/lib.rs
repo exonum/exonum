@@ -335,7 +335,7 @@ mod tests {
                 .map(|x| {
                          ValidatorKeys {
                              consensus_key: x.0,
-                             service_key: x.1
+                             service_key: x.1,
                          }
                      })
                 .collect(),

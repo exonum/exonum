@@ -23,7 +23,7 @@ script:
 - cd sandbox_tests
 - cargo fmt -p sandbox_tests -- --write-mode=diff
 - cd ..
-- cargo +$NIGHTLY_RUST clippy -- -D warnings
+- cargo +$NIGHTLY_RUST clippy
 - cargo build --release 
 - RUST_LOG=off cargo test --manifest-path sandbox_tests/Cargo.toml 
 notifications:

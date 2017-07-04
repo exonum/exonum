@@ -134,7 +134,8 @@ impl PublicConfigApi {
         let snapshot = self.blockchain.snapshot();
         let configuration_schema = ConfigurationSchema::new(&snapshot);
         let proposes = {
-            configuration_schema.config_hash_by_ordinal()
+            let index = configuration_schema.config_hash_by_ordinal();
+            let proposes = index
                 .into_iter()
                 .map(|cfg_hash| {
                     let propose_data = configuration_schema
@@ -161,7 +162,8 @@ impl PublicConfigApi {
                              propose_data: propose_data,
                          }
                      })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>();
+            proposes
         };
         Ok(proposes)
     }
@@ -173,7 +175,8 @@ impl PublicConfigApi {
         let snapshot = self.blockchain.snapshot();
         let general_schema = Schema::new(&snapshot);
         let committed_configs = {
-            general_schema.configs_actual_from()
+            let index = general_schema.configs_actual_from();
+            let values = index
                 .into_iter()
                 .map(|reference| {
 
@@ -196,7 +199,8 @@ impl PublicConfigApi {
                              config: cfg,
                          }
                      })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>();
+            values
         };
         Ok(committed_configs)
     }
