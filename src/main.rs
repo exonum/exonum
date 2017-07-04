@@ -56,21 +56,7 @@ message! {
     }
 }
 
-pub const TX_ISSUE_ID: u16 = 2;
-
-message! {
-    struct TxIssue {
-        const TYPE = SERVICE_ID;
-        const ID = TX_ISSUE_ID;
-        const SIZE = 48;
-
-        field pub_key:     &PublicKey  [00 => 32]
-        field amount:      u64         [32 => 40]
-        field seed:        u64         [40 => 48]
-    }
-}
-
-pub const TX_TRANSFER_ID: u16 = 3;
+pub const TX_TRANSFER_ID: u16 = 2;
 
 message! {
     struct TxTransfer {
@@ -95,28 +81,12 @@ impl Transaction for TxCreateWallet {
     fn execute(&self, view: &mut Fork) {
         let mut schema = CurrencySchema { view };
         if let None = schema.wallet(self.pub_key()) {
-            let wallet = Wallet::new(self.pub_key(), self.name(), 0);
+            let wallet = Wallet::new(self.pub_key(), self.name(), 100);
             println!("Create the wallet: {:?}", wallet);
             schema.wallets().put(self.pub_key(), wallet)
         }
     }
 }
-
-impl Transaction for TxIssue {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
-    }
-
-    fn execute(&self, view: &mut Fork) {
-        let mut schema = CurrencySchema { view };
-        if let Some(mut wallet) = schema.wallet(self.pub_key()) {
-            wallet.increase(self.amount());
-            println!("Add funds to wallet: {:?}", wallet);
-            schema.wallets().put(self.pub_key(), wallet)
-        }
-    }
-}
-
 
 impl Transaction for TxTransfer {
     fn verify(&self) -> bool {
@@ -155,7 +125,6 @@ impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
         #[derive(Clone, Serialize, Deserialize)]
         enum TransactionRequest {
             CreateWallet(TxCreateWallet),
-            Issue(TxIssue),
             Transfer(TxTransfer),
         }
 
@@ -163,7 +132,6 @@ impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
             fn into(self) -> Box<Transaction> {
                 match self {
                     TransactionRequest::CreateWallet(trans) => Box::new(trans),
-                    TransactionRequest::Issue(trans) => Box::new(trans),
                     TransactionRequest::Transfer(trans) => Box::new(trans),
                 }
             }
@@ -224,7 +192,6 @@ impl Service for CurrencyService {
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
         let trans: Box<Transaction> = match raw.message_type() {
             TX_TRANSFER_ID => Box::new(TxTransfer::from_raw(raw)?),
-            TX_ISSUE_ID => Box::new(TxIssue::from_raw(raw)?),
             TX_WALLET_ID => Box::new(TxCreateWallet::from_raw(raw)?),
             _ => {
                 return Err(encoding::Error::IncorrectMessageType { message_type: raw.message_type() });

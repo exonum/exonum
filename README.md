@@ -40,14 +40,11 @@ cd cc-examples
 # get all dependencies
 npm install
 
-# create 1st wallet
+# create 1st wallet and add funds
 node create-wallet-1.js
 
-# create 2nd wallet
+# create 2nd wallet and add funds
 node create-wallet-2.js
-
-# add funds
-node add-funds.js
 
 # transfer funds from 1st to 2nd
 node transfer-funds.js
