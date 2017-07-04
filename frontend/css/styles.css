@@ -77,6 +77,11 @@ body {
     line-height: 1.5;
 }
 
+.input-group > .input-group-btn > .btn {
+    border-top-right-radius: 4px!important;
+    border-bottom-right-radius: 4px!important;
+}
+
 .monospace,
 .monospace.form-control {
     font-family: "Lucida Console", Monaco, Courier, monospace;
