@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "main": "app.js",
   "description": "Cryptocurrency solution on Exonum private blockchain",
-  "license": "",
+  "license": "Apache-2.0",
   "author": "BitFury Group Limited",
   "scripts": {
     "start": "node app.js"
   },
   "dependencies": {
-    "@exonum/exonum-client": "^0.1.0",
+    "@exonum/exonum-client": "^0.2.0",
     "big-integer": "^1.6.17",
     "body-parser": "^1.17.1",
     "bootstrap": "^3.3.7",
