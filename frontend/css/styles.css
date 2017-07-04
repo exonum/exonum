@@ -68,29 +68,21 @@ body {
     padding-top: 10px;
 }
 
-@media (min-width: 372px) {
-    .truncate .truncate-item {
-        display: inline;
-    }
-    .truncate .truncate-item:nth-child(2n):after {
-        display: block;
-        content: '';
-    }
+.input-group-xs > .form-control,
+.input-group-xs > .input-group-addon,
+.input-group-xs > .input-group-btn > .btn {
+    height: 22px;
+    padding: 1px 5px;
+    font-size: 12px;
+    line-height: 1.5;
 }
 
-.monospace {
+.monospace,
+.monospace.form-control {
     font-family: "Lucida Console", Monaco, Courier, monospace;
-    font-size: 0.875em;
+    font-size: 0.75em;
     letter-spacing: 0.025em;
     line-height: 1.15;
-}
-
-.expanded {
-    word-wrap: break-word;
-}
-
-.collapsed {
-    cursor: pointer;
 }
 
 .space-top {

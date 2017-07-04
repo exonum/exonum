@@ -1,28 +1,32 @@
 <truncate>
-    <span class="monospace collapsed" if={ collapsed } onclick={ expand }>{ truncated }</span>
-    <div class="monospace expanded" if={ !collapsed }>
-        <div class="truncate-item" each={ line in lines }>{ line }</div>
+    <div class="input-group input-group-xs" onclick={ click }>
+        <input type="text" class="form-control monospace" aria-label="Copy value to clipboard" value={ opts.val }>
+        <div class="input-group-btn">
+            <button type="button" class="btn btn-default" title="Copy to clipboard" data-toggle="tooltip" data-placement="bottom" data-clipboard-text={ opts.val }>
+                <i class="glyphicon glyphicon-copy"></i>
+            </button>
+        </div>
     </div>
-    <clipboard val={ opts.val }></clipboard>
 
     <script>
-        this.collapsed = true;
-        this.digits = this.opts.digits || 8;
-        this.truncated = this.opts.val.substring(0, this.digits) + '…';
-        this.lines = [];
+        var self = this;
 
-        for (var i = 0, len = opts.val.length; i < len; i += this.digits) {
-            this.lines.push(this.opts.val.substring(i, i + this.digits));
-        }
+        this.on('mount', function() {
+            var btn = this.root.getElementsByClassName('btn')[0];
+            var $btn = $(btn);
+            var $input = $(this.root.getElementsByClassName('form-control')[0]);
+            var clipboard = new Clipboard(btn);
 
-        expand(e) {
-            if (this.collapsed) {
-                e.preventDefault();
-                e.stopPropagation();
+            clipboard.on('success', function() {
+                self.notify('success', 'Copied to clipboard.');
+                $input.focus().select();
+            });
 
-                this.collapsed = false;
-                this.update();
-            }
+            $btn.tooltip();
+        });
+
+        click(e) {
+            e.stopPropagation();
         }
     </script>
 </truncate>
