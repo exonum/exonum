@@ -95,7 +95,7 @@ fn format_log_record(record: &LogRecord) -> String {
             LogLevel::Debug => "DEBUG".cyan(),
             LogLevel::Trace => "TRACE".white(),
         };
-        format!("[{} : {}] - [ {} ] - {} - {}",
+        format!("[{} : {:0>3}] - [ {} ] - {} - {}",
                 secs.bold(),
                 millis.bold(),
                 level,
@@ -109,7 +109,7 @@ fn format_log_record(record: &LogRecord) -> String {
             LogLevel::Debug => "DEBUG",
             LogLevel::Trace => "TRACE",
         };
-        format!("[{} : {}] - [ {} ] - {} - {}",
+        format!("[{} : {:0>3}] - [ {} ] - {} - {}",
                 secs,
                 millis,
                 level,
