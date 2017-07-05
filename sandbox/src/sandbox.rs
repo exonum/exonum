@@ -252,7 +252,7 @@ impl Sandbox {
     }
 
     pub fn service_public_key(&self, id: usize) -> PublicKey {
-        self.services()[id]
+        self.nodes_keys()[id].service_key
     }
 
     pub fn service_secret_key(&self, id: usize) -> &SecretKey {
@@ -272,12 +272,8 @@ impl Sandbox {
             .collect()
     }
 
-    pub fn services(&self) -> Vec<PublicKey> {
-        self.cfg()
-            .validator_keys
-            .iter()
-            .map(|x| x.service_key)
-            .collect()
+    pub fn nodes_keys(&self) -> Vec<ValidatorKeys> {
+        self.cfg().validator_keys
     }
 
     pub fn n_validators(&self) -> usize {
