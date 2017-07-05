@@ -290,9 +290,10 @@ impl<T> ConfigurationSchema<T>
             .map(|propose_data_by_config_hash| propose_data_by_config_hash.tx_propose())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn get_votes(&self, cfg_hash: &Hash) -> Vec<Option<TxConfigVote>> {
         let votes_table = self.votes_by_config_hash(cfg_hash);
-        let votes_options = votes_table
+        let votes = votes_table
             .into_iter()
             .map(|vote| if vote == ZEROVOTE.clone() {
                      None
@@ -300,7 +301,7 @@ impl<T> ConfigurationSchema<T>
                      Some(vote)
                  })
             .collect();
-        votes_options
+        votes
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {

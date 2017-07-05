@@ -199,12 +199,14 @@ mod tests {
         let mut nodes_keys = sandbox.nodes_keys();
         let old_len = nodes_keys.len();
         nodes_keys.extend(new_validator_keypairs
-            .iter()
-            .zip(new_service_keypairs.iter())
-            .map(|(ck, sk)| ValidatorKeys {
-                consensus_key: ck.0,
-                service_key: sk.0,
-            }));
+                              .iter()
+                              .zip(new_service_keypairs.iter())
+                              .map(|(ck, sk)| {
+                                       ValidatorKeys {
+                                           consensus_key: ck.0,
+                                           service_key: sk.0,
+                                       }
+                                   }));
         let new_len = nodes_keys.len();
 
         let actual_from = 3;
