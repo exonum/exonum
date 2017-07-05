@@ -11,7 +11,7 @@ use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, 
 use crypto::{PublicKey, SecretKey, Hash};
 use storage::Patch;
 use events::Milliseconds;
-use blockchain::{ConsensusConfig, StoredConfiguration, Transaction};
+use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction};
 use node::whitelist::Whitelist;
 
 // TODO: move request timeouts into node configuration
@@ -43,8 +43,11 @@ pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Connect,
 
-    public_key: PublicKey,
-    secret_key: SecretKey,
+    consensus_public_key: PublicKey,
+    consensus_secret_key: SecretKey,
+    service_public_key: PublicKey,
+    service_secret_key: SecretKey,
+
     config: StoredConfiguration,
     whitelist: Whitelist,
     tx_pool_capacity: usize,
@@ -239,7 +242,7 @@ impl RequestData {
 }
 
 impl RequestState {
-    fn new() -> RequestState {
+    fn new() -> Self {
         RequestState {
             retries: 0,
             known_nodes: HashSet::new(),
@@ -326,8 +329,10 @@ impl State {
     /// Creates state with the given parameters.
     #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
     pub fn new(validator_id: Option<ValidatorId>,
-               public_key: PublicKey,
-               secret_key: SecretKey,
+               consensus_public_key: PublicKey,
+               consensus_secret_key: SecretKey,
+               service_public_key: PublicKey,
+               service_secret_key: SecretKey,
                tx_pool_capacity: usize,
                whitelist: Whitelist,
                stored: StoredConfiguration,
@@ -338,8 +343,10 @@ impl State {
                -> Self {
         State {
             validator_state: validator_id.map(ValidatorState::new),
-            public_key,
-            secret_key,
+            consensus_public_key,
+            consensus_secret_key,
+            service_public_key,
+            service_secret_key,
             tx_pool_capacity: tx_pool_capacity,
             whitelist: whitelist,
             peers: HashMap::new(),
@@ -416,9 +423,9 @@ impl State {
         &self.whitelist
     }
 
-    /// Returns public keys of known validators.
-    pub fn validators(&self) -> &[PublicKey] {
-        &self.config.validators
+    /// Returns public (consensus and service) keys of known validators.
+    pub fn validators(&self) -> &[ValidatorKeys] {
+        &self.config.validator_keys
     }
 
     /// Returns `StoredConfiguration`.
@@ -427,10 +434,10 @@ impl State {
     }
 
     /// Returns validator id with a specified public key.
-    pub fn find_validator(&self, peer: &PublicKey) -> Option<ValidatorId> {
+    pub fn find_validator(&self, peer: PublicKey) -> Option<ValidatorId> {
         self.validators()
             .iter()
-            .position(|pk| pk == peer)
+            .position(|pk| pk.consensus_key == peer)
             .map(|id| id as ValidatorId)
     }
 
@@ -447,11 +454,11 @@ impl State {
     /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node.
     pub fn update_config(&mut self, config: StoredConfiguration) {
         trace!("Updating node config={:#?}", config);
-        let validator_id = config.validators
+        let validator_id = config.validator_keys
                             .iter()
-                            .position(|pk| pk == self.public_key())
+                            .position(|pk| pk.consensus_key == *self.consensus_public_key())
                             .map(|id| id as ValidatorId);
-        self.whitelist.set_validators(config.validators.iter().cloned());
+        self.whitelist.set_validators(config.validator_keys.iter().map(|x| x.consensus_key));
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
         self.config = config;
@@ -478,7 +485,7 @@ impl State {
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
         if let Some(pubkey) = self.connections.remove(addr) {
             self.peers.remove(&pubkey);
-            return self.config.validators.contains(&pubkey);
+            return self.config.validator_keys.iter().any(|x| x.consensus_key == pubkey);
         }
         false
     }
@@ -489,18 +496,28 @@ impl State {
     }
 
     /// Returns public key of a validator identified by id.
-    pub fn public_key_of(&self, id: ValidatorId) -> Option<&PublicKey> {
-        self.validators().get(id as usize)
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
+        self.validators().get(id as usize).map(|x| x.consensus_key)
     }
 
-    /// Returns the public key of the current node.
-    pub fn public_key(&self) -> &PublicKey {
-        &self.public_key
+    /// Returns the consensus public key of the current node.
+    pub fn consensus_public_key(&self) -> &PublicKey {
+        &self.consensus_public_key
     }
 
-    /// Returns the secret key of the current node.
-    pub fn secret_key(&self) -> &SecretKey {
-        &self.secret_key
+    /// Returns the consensus secret key of the current node.
+    pub fn consensus_secret_key(&self) -> &SecretKey {
+        &self.consensus_secret_key
+    }
+
+    /// Returns the service public key of the current node.
+    pub fn service_public_key(&self) -> &PublicKey {
+        &self.service_public_key
+    }
+
+    /// Returns the service secret key of the current node.
+    pub fn service_secret_key(&self) -> &SecretKey {
+        &self.service_secret_key
     }
 
     /// Returns the leader id for the specified round and current height.

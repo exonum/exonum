@@ -338,15 +338,20 @@ impl<'a> Schema<&'a mut Fork> {
     /// the `actual_from` height in `config_data`.
     pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
         let actual_from = config_data.actual_from;
-        if let Some(last_cfg_reference) = self.configs_actual_from().last() {
-            let last_actual_from = last_cfg_reference.actual_from();
-            if actual_from <= last_actual_from {
-                panic!("Attempting to commit configuration \
-                                               with actual_from {:?} less than \
-                                              the last committed actual_from {:?}",
-                                              actual_from, last_actual_from);
+        if let Some(last_cfg) = self.configs_actual_from().last() {
+            if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
+                // TODO: Replace panic with errors.
+                panic!("Attempting to commit configuration with incorrect previous hash: {:?}, expected: {:?}",
+                    config_data.previous_cfg_hash, last_cfg.cfg_hash());
+            }
+
+            if actual_from <= last_cfg.actual_from() {
+                panic!("Attempting to commit configuration with actual_from {} less than the last committed \
+                                              the last committed actual_from {}",
+                                              actual_from, last_cfg.actual_from());
             }
         }
+
         let cfg_hash = config_data.hash();
         self.configs_mut().put(&cfg_hash, config_data.clone());
 

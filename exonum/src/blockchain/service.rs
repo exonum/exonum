@@ -11,7 +11,7 @@ use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
-use blockchain::{ConsensusConfig, Blockchain};
+use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
 /// A trait that describes transaction processing rules (a group of sequential operations 
 /// with the Exonum storage) for the given `Message`.
@@ -129,18 +129,18 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 
     /// Returns the current list of validators.
-    pub fn validators(&self) -> &[PublicKey] {
+    pub fn validators(&self) -> &[ValidatorKeys] {
         self.state.validators()
     }
 
     /// Returns current node's public key.
     pub fn public_key(&self) -> &PublicKey {
-        self.state.public_key()
+        self.state.service_public_key()
     }
 
     /// Returns current node's secret key.
     pub fn secret_key(&self) -> &SecretKey {
-        self.state.secret_key()
+        self.state.service_secret_key()
     }
 
     /// Returns the actual blockchain global configuration.
@@ -189,8 +189,8 @@ impl ApiContext {
         ApiContext {
             blockchain: handler.blockchain.clone(),
             node_channel: node.channel(),
-            public_key: *node.state().public_key(),
-            secret_key: node.state().secret_key().clone(),
+            public_key: *node.state().service_public_key(),
+            secret_key: node.state().service_secret_key().clone(),
         }
     }
 
