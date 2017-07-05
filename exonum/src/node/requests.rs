@@ -13,7 +13,7 @@ impl<S> NodeHandler<S>
     /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub fn handle_request(&mut self, msg: RequestMessage) {
         // Request are sended to us
-        if msg.to() != self.state.public_key() {
+        if msg.to() != self.state.consensus_public_key() {
             return;
         }
 
@@ -113,7 +113,7 @@ impl<S> NodeHandler<S>
         let transactions = schema.block_txs(height);
 
 
-        let block_msg = Block::new(self.state.public_key(),
+        let block_msg = Block::new(self.state.consensus_public_key(),
                                    msg.from(),
                                    block,
                                    precommits.iter().collect(),
@@ -121,7 +121,7 @@ impl<S> NodeHandler<S>
                                         .iter()
                                         .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
                                         .collect(),
-                                   self.state.secret_key());
+                                   self.state.consensus_secret_key());
         self.send_to_peer(*msg.from(), block_msg.raw());
     }
 }

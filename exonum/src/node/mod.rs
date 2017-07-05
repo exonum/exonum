@@ -82,13 +82,22 @@ pub struct NodeHandler<S>
     timeout_adjuster: Box<TimeoutAdjuster>
 }
 
+/// Service configuration.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ServiceConfig {
+    /// Service public key.
+    pub service_public_key: PublicKey,
+    /// Service secret key.
+    pub service_secret_key: SecretKey,
+}
+
 /// Listener config.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ListenerConfig {
     /// Public key.
-    pub public_key: PublicKey,
+    pub consensus_public_key: PublicKey,
     /// Secret key.
-    pub secret_key: SecretKey,
+    pub consensus_secret_key: SecretKey,
     /// Whitelist.
     pub whitelist: Whitelist,
     /// Socket address.
@@ -146,10 +155,14 @@ pub struct NodeConfig {
     pub network: NetworkConfiguration,
     /// Peer addresses.
     pub peers: Vec<SocketAddr>,
-    /// Public key of the node.
-    pub public_key: PublicKey,
-    /// Secret key of the node.
-    pub secret_key: SecretKey,
+    /// Consensus public key.
+    pub consensus_public_key: PublicKey,
+    /// Consensus secret key.
+    pub consensus_secret_key: SecretKey,
+    /// Service public key.
+    pub service_public_key: PublicKey,
+    /// Service secret key.
+    pub service_secret_key: SecretKey,
     /// Node's whitelist.
     pub whitelist: Whitelist,
     /// Api configuration.
@@ -163,6 +176,8 @@ pub struct NodeConfig {
 pub struct Configuration {
     /// Current node socket address, public and secret keys.
     pub listener: ListenerConfig,
+    /// Service configuration.
+    pub service: ServiceConfig,
     /// Events configuration.
     pub events: EventsConfiguration,
     /// Network configuration.
@@ -200,21 +215,23 @@ impl<S> NodeHandler<S>
         info!("Create node with config={:#?}", stored);
 
         let validator_id = stored
-            .validators
+            .validator_keys
             .iter()
-            .position(|pk| pk == &config.listener.public_key)
+            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| id as ValidatorId);
         info!("Validator={:#?}", validator_id);
-        let connect = Connect::new(&config.listener.public_key,
+        let connect = Connect::new(&config.listener.consensus_public_key,
                                    sender.address(),
                                    sender.get_time(),
-                                   &config.listener.secret_key);
+                                   &config.listener.consensus_secret_key);
 
         let mut whitelist = config.listener.whitelist;
-        whitelist.set_validators(stored.validators.iter().cloned());
+        whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
         let mut state = State::new(validator_id,
-                               config.listener.public_key,
-                               config.listener.secret_key,
+                               config.listener.consensus_public_key,
+                               config.listener.consensus_secret_key,
+                               config.service.service_public_key,
+                               config.service.service_secret_key,
                                config.mempool.tx_pool_capacity,
                                whitelist,
                                stored,
@@ -294,7 +311,7 @@ impl<S> NodeHandler<S>
     /// Sends the given message to a peer by its id.
     pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
         // TODO: check validator id
-        let public_key = self.state.validators()[id as usize];
+        let public_key = self.state.validators()[id as usize].consensus_key;
         self.send_to_peer(public_key, message);
     }
 
@@ -484,10 +501,14 @@ impl Node {
 
         let config = Configuration {
             listener: ListenerConfig {
-                public_key: node_cfg.public_key,
-                secret_key: node_cfg.secret_key,
+                consensus_public_key: node_cfg.consensus_public_key,
+                consensus_secret_key: node_cfg.consensus_secret_key,
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
+            },
+            service: ServiceConfig {
+                service_public_key: node_cfg.service_public_key,
+                service_secret_key: node_cfg.service_secret_key,
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,

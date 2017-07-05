@@ -7,10 +7,10 @@ use std::ops::Drop;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage,
-                   ListenerConfig};
+                   ListenerConfig, ServiceConfig};
 use exonum::node::state::{Round, Height, TxPool};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service};
+                         Schema, Transaction, Service, ValidatorKeys};
 use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
@@ -185,11 +185,11 @@ impl SandboxReactor {
     }
 
     pub fn public_key(&self) -> &PublicKey {
-        self.handler.state().public_key()
+        self.handler.state().consensus_public_key()
     }
 
     pub fn secret_key(&self) -> &SecretKey {
-        self.handler.state().secret_key()
+        self.handler.state().consensus_secret_key()
     }
 }
 
@@ -197,6 +197,7 @@ pub struct Sandbox {
     inner: Arc<Mutex<SandboxInner>>,
     reactor: RefCell<SandboxReactor>,
     pub validators_map: HashMap<PublicKey, SecretKey>,
+    pub services_map: HashMap<PublicKey, SecretKey>,
     addresses: Vec<SocketAddr>,
 }
 
@@ -220,11 +221,13 @@ impl Sandbox {
 
     pub fn set_validators_map(&mut self,
                               new_addresses_len: u8,
-                              validators: Vec<(PublicKey, SecretKey)>) {
+                              validators: Vec<(PublicKey, SecretKey)>,
+                              services: Vec<(PublicKey, SecretKey)>) {
         self.addresses = (1..(new_addresses_len + 1) as u8)
             .map(gen_primitive_socket_addr)
             .collect::<Vec<_>>();
         self.validators_map.extend(validators);
+        self.services_map.extend(services);
     }
 
     fn check_unexpected_message(&self) {
@@ -248,13 +251,29 @@ impl Sandbox {
         &self.validators_map[&p]
     }
 
+    pub fn service_public_key(&self, id: usize) -> PublicKey {
+        self.nodes_keys()[id].service_key
+    }
+
+    pub fn service_secret_key(&self, id: usize) -> &SecretKey {
+        let public_key = self.service_public_key(id);
+        &self.services_map[&public_key]
+    }
+
     pub fn a(&self, id: usize) -> SocketAddr {
         self.addresses[id]
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {
-        let conf = self.cfg();
-        conf.validators.clone()
+        self.cfg()
+            .validator_keys
+            .iter()
+            .map(|x| x.consensus_key)
+            .collect()
+    }
+
+    pub fn nodes_keys(&self) -> Vec<ValidatorKeys> {
+        self.cfg().validator_keys
     }
 
     pub fn n_validators(&self) -> usize {
@@ -570,6 +589,11 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
                           gen_keypair_from_seed(&Seed::new([13; 32])),
                           gen_keypair_from_seed(&Seed::new([16; 32])),
                           gen_keypair_from_seed(&Seed::new([19; 32]))];
+    let service_keys = vec![gen_keypair_from_seed(&Seed::new([20; 32])),
+                            gen_keypair_from_seed(&Seed::new([21; 32])),
+                            gen_keypair_from_seed(&Seed::new([22; 32])),
+                            gen_keypair_from_seed(&Seed::new([23; 32]))];
+
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
     let db = Box::new(MemoryDB::new());
@@ -582,15 +606,28 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         propose_timeout: 200,
         txs_block_limit: 1000,
     };
-    let genesis = GenesisConfig::new_with_consensus(consensus, validators.iter().map(|x| x.0));
+    let genesis = GenesisConfig::new_with_consensus(consensus,
+                                                    validators
+                                                        .iter()
+                                                        .zip(service_keys.iter())
+                                                        .map(|x| {
+                                                                 ValidatorKeys {
+                                                                     consensus_key: (x.0).0,
+                                                                     service_key: (x.1).0,
+                                                                 }
+                                                             }));
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
         listener: ListenerConfig {
             address: addresses[0],
-            public_key: validators[0].0,
-            secret_key: validators[0].1.clone(),
+            consensus_public_key: validators[0].0,
+            consensus_secret_key: validators[0].1.clone(),
             whitelist: Default::default(),
+        },
+        service: ServiceConfig {
+            service_public_key: service_keys[0].0,
+            service_secret_key: service_keys[0].1.clone(),
         },
         network: NetworkConfiguration::default(),
         events: EventsConfiguration::new(),
@@ -615,13 +652,12 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         inner: inner.clone(),
         handler: node,
     };
-    let mut validators_map = HashMap::new();
-    validators_map.extend(validators.clone());
     reactor.handler.initialize();
     let sandbox = Sandbox {
         inner: inner.clone(),
         reactor: RefCell::new(reactor),
-        validators_map: validators_map,
+        validators_map: HashMap::from_iter(validators.clone()),
+        services_map: HashMap::from_iter(service_keys),
         addresses: addresses,
     };
 

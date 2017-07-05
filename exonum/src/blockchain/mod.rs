@@ -35,7 +35,7 @@ use storage::{Patch, Database, Snapshot, Fork, Error};
 pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
-pub use self::config::{StoredConfiguration, ConsensusConfig};
+pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig};
 pub use self::service::{Service, Transaction, ServiceContext, ApiContext};
 
 mod block;
@@ -130,7 +130,7 @@ impl Blockchain {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: 0,
-            validators: cfg.validators,
+            validator_keys: cfg.validator_keys,
             consensus: cfg.consensus,
             services: BTreeMap::new(),
         };

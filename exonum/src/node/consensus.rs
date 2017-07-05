@@ -36,13 +36,13 @@ impl<S> NodeHandler<S>
             return;
         }
 
-        let key = match self.state.public_key_of(msg.validator()) {
+        let key = match self.state.consensus_public_key_of(msg.validator()) {
             Some(public_key) => {
-                if !msg.verify(public_key) {
+                if !msg.verify(&public_key) {
                     error!("Received consensus message with incorrect signature, msg={:?}", msg);
                     return;
                 }
-                *public_key
+                public_key
             }
             None => {
                 error!("Received message from incorrect validator, msg={:?}", msg);
@@ -60,7 +60,7 @@ impl<S> NodeHandler<S>
 
     /// Handles the `Propose` message. For details see the message documentation.
     pub fn handle_propose(&mut self, from: PublicKey, msg: Propose) {
-        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
+        debug_assert_eq!(Some(from), self.state.consensus_public_key_of(msg.validator()));
 
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
@@ -116,7 +116,7 @@ impl<S> NodeHandler<S>
     // TODO write helper function which returns Result
     pub fn handle_block(&mut self, msg: Block) {
         // Request are sended to us
-        if msg.to() != self.state.public_key() {
+        if msg.to() != self.state.consensus_public_key() {
             error!("Received block that intended for another peer, to={}, from={}",
                    msg.to().to_hex(),
                    msg.from().to_hex());
@@ -236,7 +236,7 @@ impl<S> NodeHandler<S>
     pub fn handle_prevote(&mut self, from: PublicKey, msg: Prevote) {
         trace!("Handle prevote");
 
-        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
+        debug_assert_eq!(Some(from), self.state.consensus_public_key_of(msg.validator()));
 
         // Add prevote
         let has_consensus = self.state.add_prevote(&msg);
@@ -282,7 +282,7 @@ impl<S> NodeHandler<S>
         let proposer = {
             let propose_state = self.state.propose(propose_hash).unwrap();
             if propose_state.has_unknown_txs() {
-                Some(*self.state.public_key_of(propose_state.message().validator()).unwrap())
+                Some(self.state.consensus_public_key_of(propose_state.message().validator()).unwrap())
             } else {
                 None
             }
@@ -336,7 +336,7 @@ impl<S> NodeHandler<S>
     pub fn handle_precommit(&mut self, from: PublicKey, msg: Precommit) {
         trace!("Handle precommit");
 
-        debug_assert_eq!(Some(&from), self.state.public_key_of(msg.validator()));
+        debug_assert_eq!(Some(from), self.state.consensus_public_key_of(msg.validator()));
 
         // Add precommit
         let has_consensus = self.state.add_precommit(&msg);
@@ -562,7 +562,7 @@ impl<S> NodeHandler<S>
                                     round,
                                     self.state.last_hash(),
                                     &txs,
-                                    self.state.secret_key());
+                                    self.state.consensus_secret_key());
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
 
@@ -586,11 +586,11 @@ impl<S> NodeHandler<S>
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    RequestPropose::new(self.state.public_key(),
+                    RequestPropose::new(self.state.consensus_public_key(),
                                         &peer,
                                         self.state.height(),
                                         propose_hash,
-                                        self.state.secret_key())
+                                        self.state.consensus_secret_key())
                         .raw()
                         .clone()
                 }
@@ -602,29 +602,29 @@ impl<S> NodeHandler<S>
                         .iter()
                         .cloned()
                         .collect();
-                    RequestTransactions::new(self.state.public_key(),
+                    RequestTransactions::new(self.state.consensus_public_key(),
                                              &peer,
                                              &txs,
-                                             self.state.secret_key())
+                                             self.state.consensus_secret_key())
                         .raw()
                         .clone()
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    RequestPrevotes::new(self.state.public_key(),
+                    RequestPrevotes::new(self.state.consensus_public_key(),
                                          &peer,
                                          self.state.height(),
                                          round,
                                          propose_hash,
                                          self.state.known_prevotes(round, propose_hash),
-                                         self.state.secret_key())
+                                         self.state.consensus_secret_key())
                         .raw()
                         .clone()
                 }
                 RequestData::Block(height) => {
-                    RequestBlock::new(self.state.public_key(),
+                    RequestBlock::new(self.state.consensus_public_key(),
                                       &peer,
                                       height,
-                                      self.state.secret_key())
+                                      self.state.consensus_secret_key())
                         .raw()
                         .clone()
                 }
@@ -724,7 +724,7 @@ impl<S> NodeHandler<S>
                                 round,
                                 propose_hash,
                                 locked_round,
-                                self.state.secret_key());
+                                self.state.consensus_secret_key());
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
@@ -741,7 +741,7 @@ impl<S> NodeHandler<S>
                                         propose_hash,
                                         block_hash,
                                         self.channel.get_time(),
-                                        self.state.secret_key());
+                                        self.state.consensus_secret_key());
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
@@ -781,8 +781,8 @@ impl<S> NodeHandler<S>
                         precommit_round: Round,
                         precommit: &Precommit)
                         -> Result<(), String> {
-        if let Some(pub_key) = self.state.public_key_of(precommit.validator()) {
-            if !precommit.verify_signature(pub_key) {
+        if let Some(pub_key) = self.state.consensus_public_key_of(precommit.validator()) {
+            if !precommit.verify_signature(&pub_key) {
                 let e = format!("Received wrong signed precommit, precommit={:?}", precommit);
                 return Err(e);
             }
