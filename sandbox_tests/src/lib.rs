@@ -18,7 +18,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use exonum::crypto::Hash;
-use exonum::blockchain::config::{StoredConfiguration, ValidatorKeys};
+use exonum::blockchain::config::StoredConfiguration;
 use exonum::blockchain::Service;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use sandbox::sandbox::Sandbox;
@@ -42,17 +42,7 @@ fn generate_config_with_message(prev_cfg_hash: Hash,
     StoredConfiguration {
         previous_cfg_hash: prev_cfg_hash,
         actual_from: actual_from,
-        validator_keys: sandbox
-            .validators()
-            .iter()
-            .zip(sandbox.services().iter())
-            .map(|(ck, sk)| {
-                     ValidatorKeys {
-                         consensus_key: *ck,
-                         service_key: *sk,
-                     }
-                 })
-            .collect(),
+        validator_keys: sandbox.nodes_keys(),
         consensus: sandbox.cfg().consensus,
         services: services,
     }
@@ -117,8 +107,7 @@ mod tests {
 
         assert_eq!(sandbox.is_validator(), true);
 
-        let validators = sandbox.validators();
-        let service_keys = sandbox.services();
+        let nodes_keys = sandbox.nodes_keys();
 
         let mut services: BTreeMap<String, Value> = BTreeMap::new();
         let tmstmp_id = TimestampingService::new().service_id();
@@ -129,16 +118,7 @@ mod tests {
         let full_node_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: 4,
-            validator_keys: validators[1..]
-                .iter()
-                .zip(service_keys[1..].iter())
-                .map(|(ck, sk)| {
-                         ValidatorKeys {
-                             consensus_key: *ck,
-                             service_key: *sk,
-                         }
-                     })
-                .collect(),
+            validator_keys: nodes_keys[1..].to_vec(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
         };
@@ -171,16 +151,7 @@ mod tests {
         let validator_cfg = StoredConfiguration {
             previous_cfg_hash: full_node_cfg.hash(),
             actual_from: 6,
-            validator_keys: validators[0..]
-                .iter()
-                .zip(service_keys[0..].iter())
-                .map(|(ck, sk)| {
-                         ValidatorKeys {
-                             consensus_key: *ck,
-                             service_key: *sk,
-                         }
-                     })
-                .collect(),
+            validator_keys: nodes_keys[0..].to_vec(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
         };
@@ -224,28 +195,24 @@ mod tests {
         let new_service_keypairs: Vec<_> = (40..44)
             .map(|seed_num| gen_keypair_from_seed(&Seed::new([seed_num * 2; SEED_LENGTH])))
             .collect();
-        let mut validators = sandbox.validators();
-        let mut service_keys = sandbox.services();
-        let old_len = validators.len();
-        validators.extend(new_validator_keypairs.iter().map(|el| el.0));
-        service_keys.extend(new_service_keypairs.iter().map(|el| el.0));
-        let new_len = validators.len();
+
+        let mut nodes_keys = sandbox.nodes_keys();
+        let old_len = nodes_keys.len();
+        nodes_keys.extend(new_validator_keypairs
+            .iter()
+            .zip(new_service_keypairs.iter())
+            .map(|(ck, sk)| ValidatorKeys {
+                consensus_key: ck.0,
+                service_key: sk.0,
+            }));
+        let new_len = nodes_keys.len();
 
         let actual_from = 3;
         let services: BTreeMap<String, Value> = BTreeMap::new();
         let added_keys_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: actual_from,
-            validator_keys: validators
-                .iter()
-                .zip(service_keys.iter())
-                .map(|(ck, sk)| {
-                         ValidatorKeys {
-                             consensus_key: *ck,
-                             service_key: *sk,
-                         }
-                     })
-                .collect(),
+            validator_keys: nodes_keys,
             consensus: sandbox.cfg().consensus,
             services: services,
         };
