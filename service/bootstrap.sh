@@ -36,7 +36,7 @@ install() {
 
     echo "Generate new configuration for nodes..."
     ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/etc 6 -p 2000
-    validators=$(cat ${destdir}/etc/validators/0.toml | sed -n -e 's/consensus_key = //p')
+    validators=$(cat ${destdir}/etc/validators/0.toml | sed -n -e 's/consensus_key = //p' | sed -e 's/$/,/' | sed -e '1s/^/[/' | sed -e '$ s/,/]/g' | tr -d '\n')
     echo "Use validators: $validators"
     cat ${destdir}/frontend/config-example.json | sed -r "s/(\"validators\": )(\[\])/\1${validators}/" > ${destdir}/etc/frontend.json
 }
