@@ -43,12 +43,12 @@ impl Wallet {
 
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
-pub const TX_WALLET_ID: u16 = 1;
+pub const TX_CREATE_WALLET_ID: u16 = 1;
 
 message! {
     struct TxCreateWallet {
         const TYPE = SERVICE_ID;
-        const ID = TX_WALLET_ID;
+        const ID = TX_CREATE_WALLET_ID;
         const SIZE = 40;
 
         field pub_key:     &PublicKey  [00 => 32]
@@ -73,6 +73,8 @@ message! {
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
+const INIT_BALANCE: u64 = 100;
+
 impl Transaction for TxCreateWallet {
     fn verify(&self) -> bool {
         self.verify_signature(self.pub_key())
@@ -81,7 +83,7 @@ impl Transaction for TxCreateWallet {
     fn execute(&self, view: &mut Fork) {
         let mut schema = CurrencySchema { view };
         if let None = schema.wallet(self.pub_key()) {
-            let wallet = Wallet::new(self.pub_key(), self.name(), 100);
+            let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE);
             println!("Create the wallet: {:?}", wallet);
             schema.wallets().put(self.pub_key(), wallet)
         }
@@ -192,7 +194,7 @@ impl Service for CurrencyService {
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
         let trans: Box<Transaction> = match raw.message_type() {
             TX_TRANSFER_ID => Box::new(TxTransfer::from_raw(raw)?),
-            TX_WALLET_ID => Box::new(TxCreateWallet::from_raw(raw)?),
+            TX_CREATE_WALLET_ID => Box::new(TxCreateWallet::from_raw(raw)?),
             _ => {
                 return Err(encoding::Error::IncorrectMessageType { message_type: raw.message_type() });
             },
