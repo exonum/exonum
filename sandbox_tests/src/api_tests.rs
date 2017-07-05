@@ -123,7 +123,8 @@ impl ConfigurationApiSandbox {
     fn obtain_test_api(&self, validator_id: usize) -> Router {
         let channel = TestTxSender { transactions: self.transactions.clone() };
         let blockchain = self.sandbox.blockchain_ref().clone();
-        let keypair = (self.sandbox.p(validator_id), self.sandbox.s(validator_id).clone());
+        let keypair = (self.sandbox.service_public_key(validator_id),
+                       self.sandbox.service_secret_key(validator_id).clone());
         let pub_api = PublicConfigApi { blockchain: blockchain.clone() };
         let priv_api = PrivateConfigApi {
             channel: channel,
@@ -324,8 +325,8 @@ fn test_get_config_by_hash2() {
             }
             hashes.root_hash()
         };
-        let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
-                                  api_sandbox.sandbox.s(proposer).clone());
+        let (pub_key, sec_key) = (api_sandbox.sandbox.service_public_key(proposer),
+                                  api_sandbox.sandbox.service_secret_key(proposer).clone());
         let expected_propose =
             TxConfigPropose::new(&pub_key,
                                  str::from_utf8(following_cfg.clone().into_bytes().as_slice())
@@ -379,8 +380,9 @@ fn test_get_config_by_hash3() {
             .map(|validator_id| if validator_id == excluded_validator {
                      ZEROVOTE.clone()
                  } else {
-                     let (pub_key, sec_key) = (api_sandbox.sandbox.p(validator_id),
-                                               api_sandbox.sandbox.s(validator_id).clone());
+                     let (pub_key, sec_key) =
+                         (api_sandbox.sandbox.service_public_key(validator_id),
+                          api_sandbox.sandbox.service_secret_key(validator_id).clone());
                      TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key)
                  })
             .collect::<Vec<_>>();
@@ -394,8 +396,8 @@ fn test_get_config_by_hash3() {
             hashes.extend(votes);
             hashes.root_hash()
         };
-        let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
-                                  api_sandbox.sandbox.s(proposer).clone());
+        let (pub_key, sec_key) = (api_sandbox.sandbox.service_public_key(proposer),
+                                  api_sandbox.sandbox.service_secret_key(proposer).clone());
         let expected_propose =
             TxConfigPropose::new(&pub_key,
                                  str::from_utf8(following_cfg.clone().into_bytes().as_slice())
@@ -463,8 +465,9 @@ fn test_get_config_votes() {
             .map(|validator_id| if validator_id == excluded_validator {
                      None
                  } else {
-                     let (pub_key, sec_key) = (api_sandbox.sandbox.p(validator_id),
-                                               api_sandbox.sandbox.s(validator_id).clone());
+                     let (pub_key, sec_key) =
+                         (api_sandbox.sandbox.service_public_key(validator_id),
+                          api_sandbox.sandbox.service_secret_key(validator_id).clone());
                      Some(TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key))
                  })
             .collect::<Vec<_>>();
@@ -490,8 +493,8 @@ fn test_post_propose_response() {
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
     let proposer = 0;
-    let (pub_key, sec_key) = (api_sandbox.sandbox.p(proposer),
-                              api_sandbox.sandbox.s(proposer).clone());
+    let (pub_key, sec_key) = (api_sandbox.sandbox.service_public_key(proposer),
+                              api_sandbox.sandbox.service_secret_key(proposer).clone());
     let expected_body = {
         let propose_tx =
             TxConfigPropose::new(&pub_key,
@@ -522,7 +525,8 @@ fn test_post_vote_response() {
                                                      "config which is voted for",
                                                      &api_sandbox.sandbox);
     let voter = 0;
-    let (pub_key, sec_key) = (api_sandbox.sandbox.p(voter), api_sandbox.sandbox.s(voter).clone());
+    let (pub_key, sec_key) = (api_sandbox.sandbox.service_public_key(voter),
+                              api_sandbox.sandbox.service_secret_key(voter).clone());
     let expected_body = {
         let vote_tx = TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key);
         ApiResponseVotePost { tx_hash: Message::hash(&vote_tx) }

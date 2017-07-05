@@ -13,6 +13,7 @@
 //!
 //! - consensus algorithm parameters
 //! - list of validators' public keys - list of identities of consensus participants
+//! - list of services public keys
 //! - configuration of all services, plugged in for a specific blockchain instance.
 //!
 //! It also contains auxiliary fields:
@@ -289,17 +290,18 @@ impl<T> ConfigurationSchema<T>
             .map(|propose_data_by_config_hash| propose_data_by_config_hash.tx_propose())
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn get_votes(&self, cfg_hash: &Hash) -> Vec<Option<TxConfigVote>> {
         let votes_table = self.votes_by_config_hash(cfg_hash);
-        let votes_options = votes_table
+        let votes = votes_table
             .into_iter()
             .map(|vote| if vote == ZEROVOTE.clone() {
                      None
                  } else {
                      Some(vote)
                  })
-            .collect::<Vec<_>>();
-        votes_options
+            .collect();
+        votes
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
@@ -367,7 +369,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         let propose_data_by_config_hash = {
             let mut votes_table = self.votes_by_config_hash_mut(cfg_hash);
             debug_assert!(votes_table.is_empty());
-            let num_validators = prev_cfg.validators.len();
+            let num_validators = prev_cfg.validator_keys.len();
             for _ in 0..num_validators {
                 votes_table.push(ZEROVOTE.clone());
             }
@@ -409,9 +411,9 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         //    if config_candidate_body.previous_cfg_hash != actual_config_hash {
         let from: &PublicKey = tx_vote.from();
         let validator_id = prev_cfg
-            .validators
+            .validator_keys
             .iter()
-            .position(|pk| pk == from)
+            .position(|pk| pk.service_key == *from)
             .expect(&format!("See !prev_cfg.validators.contains(self.from()) for \
                               TxConfigVote:{:?}",
                              &tx_vote));
@@ -465,7 +467,10 @@ impl Transaction for TxConfigPropose {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.validators.contains(self.from()) {
+        if !actual_config
+               .validator_keys
+               .iter()
+               .any(|k| k.service_key == *self.from()) {
             error!("Discarding TxConfigPropose:{} from unknown validator. ",
                    serde_json::to_string(self).unwrap());
             return;
@@ -535,7 +540,10 @@ impl Transaction for TxConfigVote {
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config.validators.contains(self.from()) {
+        if !actual_config
+               .validator_keys
+               .iter()
+               .any(|k| k.service_key == *self.from()) {
             error!("Discarding TxConfigVote:{:?} from unknown validator. ",
                    self);
             return;
@@ -585,7 +593,7 @@ impl Transaction for TxConfigVote {
         }
 
         let fork = configuration_schema.into_snapshot();
-        if votes_count >= State::byzantine_majority_count(actual_config.validators.len()) {
+        if votes_count >= State::byzantine_majority_count(actual_config.validator_keys.len()) {
             Schema::new(fork).commit_configuration(parsed_config);
         }
     }

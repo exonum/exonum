@@ -42,7 +42,7 @@ fn generate_config_with_message(prev_cfg_hash: Hash,
     StoredConfiguration {
         previous_cfg_hash: prev_cfg_hash,
         actual_from: actual_from,
-        validators: sandbox.validators(),
+        validator_keys: sandbox.nodes_keys(),
         consensus: sandbox.cfg().consensus,
         services: services,
     }
@@ -59,7 +59,7 @@ mod tests {
     use std::str;
 
     use exonum::crypto::{Hash, Seed, SEED_LENGTH, HASH_SIZE, gen_keypair_from_seed, hash};
-    use exonum::blockchain::config::StoredConfiguration;
+    use exonum::blockchain::config::{StoredConfiguration, ValidatorKeys};
     use exonum::storage::StorageValue;
     use exonum::messages::{Message, FromRaw};
     use sandbox::timestamping::TimestampingService;
@@ -107,7 +107,7 @@ mod tests {
 
         assert_eq!(sandbox.is_validator(), true);
 
-        let validators = sandbox.validators();
+        let nodes_keys = sandbox.nodes_keys();
 
         let mut services: BTreeMap<String, Value> = BTreeMap::new();
         let tmstmp_id = TimestampingService::new().service_id();
@@ -118,7 +118,7 @@ mod tests {
         let full_node_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: 4,
-            validators: validators[1..].iter().cloned().collect(),
+            validator_keys: nodes_keys[1..].to_vec(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
         };
@@ -127,18 +127,18 @@ mod tests {
 
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(full_node_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
         }
         {
             let mut votes = Vec::new();
             for validator in 0..3 {
-                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                votes.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                              &full_node_cfg.hash(),
-                                             sandbox.s(validator))
+                                             sandbox.service_secret_key(validator))
                                .raw()
                                .clone());
             }
@@ -151,17 +151,17 @@ mod tests {
         let validator_cfg = StoredConfiguration {
             previous_cfg_hash: full_node_cfg.hash(),
             actual_from: 6,
-            validators: validators[0..].iter().cloned().collect(),
+            validator_keys: nodes_keys[0..].to_vec(),
             consensus: sandbox.cfg().consensus,
             services: services.clone(),
         };
 
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(validator_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions_from_other_validator(&sandbox,
                                                                   &sandbox_state,
                                                                   &[propose_tx.raw().clone()]);
@@ -169,9 +169,9 @@ mod tests {
         {
             let mut votes = Vec::new();
             for validator in 0..3 {
-                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                votes.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                              &validator_cfg.hash(),
-                                             sandbox.s(validator))
+                                             sandbox.service_secret_key(validator))
                                .raw()
                                .clone());
             }
@@ -189,40 +189,52 @@ mod tests {
         let start_time = sandbox.time();
         sandbox.assert_state(1, 1);
 
-        let new_keypairs = (40..44)
+        let new_validator_keypairs: Vec<_> = (40..44)
             .map(|seed_num| gen_keypair_from_seed(&Seed::new([seed_num; SEED_LENGTH])))
-            .collect::<Vec<_>>();
-        let mut validators = sandbox.validators();
-        let old_len = validators.len();
-        validators.extend(new_keypairs.iter().map(|el| el.0));
-        let new_len = validators.len();
+            .collect();
+        let new_service_keypairs: Vec<_> = (40..44)
+            .map(|seed_num| gen_keypair_from_seed(&Seed::new([seed_num * 2; SEED_LENGTH])))
+            .collect();
+
+        let mut nodes_keys = sandbox.nodes_keys();
+        let old_len = nodes_keys.len();
+        nodes_keys.extend(new_validator_keypairs
+                              .iter()
+                              .zip(new_service_keypairs.iter())
+                              .map(|(ck, sk)| {
+                                       ValidatorKeys {
+                                           consensus_key: ck.0,
+                                           service_key: sk.0,
+                                       }
+                                   }));
+        let new_len = nodes_keys.len();
 
         let actual_from = 3;
         let services: BTreeMap<String, Value> = BTreeMap::new();
         let added_keys_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: actual_from,
-            validators: validators.clone(),
+            validator_keys: nodes_keys,
             consensus: sandbox.cfg().consensus,
             services: services,
         };
         {
-            let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+            let propose_tx = TxConfigPropose::new(&sandbox.service_public_key(1),
                                                   str::from_utf8(added_keys_cfg
                                                                      .clone()
                                                                      .into_bytes()
                                                                      .as_slice())
                                                       .unwrap(),
-                                                  sandbox.s(1));
+                                                  sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
         }
         {
             let mut votes = Vec::new();
             for validator in 0..3 {
-                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                votes.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                              &added_keys_cfg.hash(),
-                                             sandbox.s(validator))
+                                             sandbox.service_secret_key(validator))
                                .raw()
                                .clone());
             }
@@ -230,7 +242,9 @@ mod tests {
             sandbox.assert_state(3, 1);
         }
         {
-            sandbox.set_validators_map(new_len as u8, new_keypairs);
+            let consensus_keys = new_validator_keypairs.iter().cloned().collect();
+            let service_keys = new_service_keypairs.iter().cloned().collect();
+            sandbox.set_validators_map(new_len as u8, consensus_keys, service_keys);
             sandbox.initialize(start_time, old_len, new_len);
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
             sandbox.assert_state(4, 1);
@@ -238,19 +252,19 @@ mod tests {
         let new_cfg = generate_config_with_message(added_keys_cfg.hash(), 8, "First cfg", &sandbox);
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(5, 1);
         }
         {
             let mut votes = Vec::new();
             for validator in 0..5 {
-                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                votes.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                              &new_cfg.hash(),
-                                             sandbox.s(validator))
+                                             sandbox.service_secret_key(validator))
                                .raw()
                                .clone());
             }
@@ -259,7 +273,9 @@ mod tests {
             assert_eq!(None, sandbox.following_cfg());
         }
         {
-            let last_vote = TxConfigVote::new(&sandbox.p(5), &new_cfg.hash(), sandbox.s(5));
+            let last_vote = TxConfigVote::new(&sandbox.service_public_key(5),
+                                              &new_cfg.hash(),
+                                              sandbox.service_secret_key(5));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[last_vote.raw().clone()]);
             sandbox.assert_state(7, 1);
             assert_eq!(Some(new_cfg), sandbox.following_cfg());
@@ -272,7 +288,10 @@ mod tests {
         sandbox.assert_state(1, 1);
 
         let new_public_keys = (40..44)
-            .map(|seed_num| gen_keypair_from_seed(&Seed::new([seed_num; SEED_LENGTH])).0)
+            .map(|seed| {
+                     (gen_keypair_from_seed(&Seed::new([seed; SEED_LENGTH])).0,
+                      gen_keypair_from_seed(&Seed::new([seed * 2; SEED_LENGTH])).0)
+                 })
             .collect::<Vec<_>>();
 
         let actual_from = 3;
@@ -280,25 +299,33 @@ mod tests {
         let excluding_cfg = StoredConfiguration {
             previous_cfg_hash: initial_cfg.hash(),
             actual_from: actual_from,
-            validators: new_public_keys,
+            validator_keys: new_public_keys
+                .iter()
+                .map(|x| {
+                         ValidatorKeys {
+                             consensus_key: x.0,
+                             service_key: x.1,
+                         }
+                     })
+                .collect(),
             consensus: sandbox.cfg().consensus,
             services: services,
         };
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(excluding_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
         }
         {
             let mut votes = Vec::new();
             for validator in 0..3 {
-                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                votes.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                              &excluding_cfg.hash(),
-                                             sandbox.s(validator))
+                                             sandbox.service_secret_key(validator))
                                .raw()
                                .clone());
             }
@@ -313,9 +340,9 @@ mod tests {
         sandbox.assert_state(1, 1);
         let new_cfg = generate_config_with_message(initial_cfg.hash(), 4, "First cfg", &sandbox);
         let propose_tx =
-            TxConfigPropose::new(&sandbox.p(1),
+            TxConfigPropose::new(&sandbox.service_public_key(1),
                                  str::from_utf8(new_cfg.clone().into_bytes().as_slice()).unwrap(),
-                                 sandbox.s(1));
+                                 sandbox.service_secret_key(1));
         {
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
@@ -324,10 +351,10 @@ mod tests {
         }
         {
             let duplicate_cfg_propose =
-                TxConfigPropose::new(&sandbox.p(0),
+                TxConfigPropose::new(&sandbox.service_public_key(0),
                                      str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(0));
+                                     sandbox.service_secret_key(0));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[duplicate_cfg_propose.raw().clone()]);
@@ -345,16 +372,20 @@ mod tests {
             generate_config_with_message(initial_cfg.hash(), 4, "Absent propose", &sandbox);
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
         }
         {
-            let legal_vote = TxConfigVote::new(&sandbox.p(3), &new_cfg.hash(), sandbox.s(3));
-            let illegal_vote = TxConfigVote::new(&sandbox.p(3), &absent_cfg.hash(), sandbox.s(3));
+            let legal_vote = TxConfigVote::new(&sandbox.service_public_key(3),
+                                               &new_cfg.hash(),
+                                               sandbox.service_secret_key(3));
+            let illegal_vote = TxConfigVote::new(&sandbox.service_public_key(3),
+                                                 &absent_cfg.hash(),
+                                                 sandbox.service_secret_key(3));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[legal_vote.raw().clone(),
@@ -381,10 +412,10 @@ mod tests {
             generate_config_with_message(initial_cfg.hash(), target_height, "First cfg", &sandbox);
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(target_height + 1, 1);
             assert_eq!(None, get_propose(&sandbox, new_cfg.hash()));
@@ -401,16 +432,18 @@ mod tests {
             generate_config_with_message(initial_cfg.hash(), target_height, "First cfg", &sandbox);
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
             assert_eq!(Some(propose_tx), get_propose(&sandbox, new_cfg.hash()));
         }
         {
-            let legal_vote = TxConfigVote::new(&sandbox.p(3), &new_cfg.hash(), sandbox.s(3));
+            let legal_vote = TxConfigVote::new(&sandbox.service_public_key(3),
+                                               &new_cfg.hash(),
+                                               sandbox.service_secret_key(3));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[legal_vote.raw().clone()]);
             sandbox.assert_state(3, 1);
             let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
@@ -423,7 +456,9 @@ mod tests {
             sandbox.assert_state(target_height, 1);
         }
         {
-            let illegal_vote = TxConfigVote::new(&sandbox.p(0), &new_cfg.hash(), sandbox.s(0));
+            let illegal_vote = TxConfigVote::new(&sandbox.service_public_key(0),
+                                                 &new_cfg.hash(),
+                                                 sandbox.service_secret_key(0));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[illegal_vote.raw().clone()]);
@@ -440,7 +475,9 @@ mod tests {
         let cfg_bytes = [70; 74];
         let new_cfg = str::from_utf8(&cfg_bytes).unwrap(); // invalid json bytes
         {
-            let propose_tx = TxConfigPropose::new(&sandbox.p(1), new_cfg, sandbox.s(1));
+            let propose_tx = TxConfigPropose::new(&sandbox.service_public_key(1),
+                                                  new_cfg,
+                                                  sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
             assert_eq!(None, get_propose(&sandbox, hash(new_cfg.as_bytes())));
@@ -464,10 +501,10 @@ mod tests {
                                                    &sandbox);
         {
             let propose_tx =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(target_height + 2, 1);
             assert_eq!(propose_tx, get_propose(&sandbox, new_cfg.hash()).unwrap());
@@ -475,13 +512,15 @@ mod tests {
         {
             let mut expected_votes = Vec::new();
             for validator in 0..2 {
-                expected_votes.push(TxConfigVote::new(&sandbox.p(validator),
+                expected_votes.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                                       &new_cfg.hash(),
-                                                      sandbox.s(validator))
+                                                      sandbox.service_secret_key(validator))
                                         .raw()
                                         .clone());
             }
-            let unposted_vote = TxConfigVote::new(&sandbox.p(2), &new_cfg.hash(), sandbox.s(2));
+            let unposted_vote = TxConfigVote::new(&sandbox.service_public_key(2),
+                                                  &new_cfg.hash(),
+                                                  sandbox.service_secret_key(2));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
             sandbox.assert_state(target_height + 3, 1);
             let actual_votes = get_votes_for_propose(&sandbox, new_cfg.hash());
@@ -494,7 +533,9 @@ mod tests {
             assert_eq!(None, sandbox.following_cfg());
         }
         {
-            let vote3 = TxConfigVote::new(&sandbox.p(2), &new_cfg.hash(), sandbox.s(2));
+            let vote3 = TxConfigVote::new(&sandbox.service_public_key(2),
+                                          &new_cfg.hash(),
+                                          sandbox.service_secret_key(2));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[vote3.raw().clone()]);
             sandbox.assert_state(target_height + 4, 1);
             let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
@@ -514,13 +555,13 @@ mod tests {
                                                             &sandbox);
 
         {
-            let propose_tx = TxConfigPropose::new(&sandbox.p(1),
+            let propose_tx = TxConfigPropose::new(&sandbox.service_public_key(1),
                                                   str::from_utf8(following_config
                                                                      .clone()
                                                                      .into_bytes()
                                                                      .as_slice())
                                                       .unwrap(),
-                                                  sandbox.s(1));
+                                                  sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
             sandbox.assert_state(2, 1);
             assert_eq!(Some(propose_tx),
@@ -529,9 +570,9 @@ mod tests {
         {
             let votes = (0..3)
                 .map(|validator| {
-                         TxConfigVote::new(&sandbox.p(validator),
+                         TxConfigVote::new(&sandbox.service_public_key(validator),
                                            &following_config.hash(),
-                                           sandbox.s(validator))
+                                           sandbox.service_secret_key(validator))
                              .raw()
                              .clone()
                      })
@@ -545,10 +586,10 @@ mod tests {
 
         {
             let propose_tx_new =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[propose_tx_new.raw().clone()]);
@@ -556,10 +597,12 @@ mod tests {
 
             assert_eq!(None, get_propose(&sandbox, new_cfg.hash()));
         }
-        let vote_validator_0 =
-            TxConfigVote::new(&sandbox.p(0), &following_config.hash(), sandbox.s(0));
-        let vote_validator_3 =
-            TxConfigVote::new(&sandbox.p(3), &following_config.hash(), sandbox.s(3));
+        let vote_validator_0 = TxConfigVote::new(&sandbox.service_public_key(0),
+                                                 &following_config.hash(),
+                                                 sandbox.service_secret_key(0));
+        let vote_validator_3 = TxConfigVote::new(&sandbox.service_public_key(3),
+                                                 &following_config.hash(),
+                                                 sandbox.service_secret_key(3));
         {
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
@@ -600,13 +643,13 @@ mod tests {
         let (illegal_pub, illegal_sec) = gen_keypair_from_seed(&Seed::new([66; 32]));
 
         {
-            let illegal_propose1 = TxConfigPropose::new(&sandbox.p(1),
+            let illegal_propose1 = TxConfigPropose::new(&sandbox.service_public_key(1),
                                                         str::from_utf8(new_cfg_bad_previous_cfg
                                                                            .clone()
                                                                            .into_bytes()
                                                                            .as_slice())
                                                             .unwrap(),
-                                                        sandbox.s(1));
+                                                        sandbox.service_secret_key(1));
             let illegal_propose2 =
                 TxConfigPropose::new(&illegal_pub,
                                      // not a member of actual config
@@ -623,17 +666,17 @@ mod tests {
         }
         {
             let legal_propose1 =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
-            let legal_propose2 = TxConfigPropose::new(&sandbox.p(1),
+                                     sandbox.service_secret_key(1));
+            let legal_propose2 = TxConfigPropose::new(&sandbox.service_public_key(1),
                                                       str::from_utf8(new_cfg_discarded_votes
                                                                          .clone()
                                                                          .into_bytes()
                                                                          .as_slice())
                                                           .unwrap(),
-                                                      sandbox.s(1));
+                                                      sandbox.service_secret_key(1));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[legal_propose1.raw().clone(),
@@ -656,9 +699,9 @@ mod tests {
         {
             let votes = (0..3)
                 .map(|validator| {
-                         TxConfigVote::new(&sandbox.p(validator),
+                         TxConfigVote::new(&sandbox.service_public_key(validator),
                                            &new_cfg.hash(),
-                                           sandbox.s(validator))
+                                           sandbox.service_secret_key(validator))
                              .raw()
                              .clone()
                      })
@@ -677,9 +720,9 @@ mod tests {
         {
             let expected_votes = (0..3)
                 .map(|validator| {
-                         TxConfigVote::new(&sandbox.p(validator),
+                         TxConfigVote::new(&sandbox.service_public_key(validator),
                                            &new_cfg_discarded_votes.hash(),
-                                           sandbox.s(validator))
+                                           sandbox.service_secret_key(validator))
                              .raw()
                              .clone()
                      })
@@ -709,12 +752,12 @@ mod tests {
         {
             let mut proposes = Vec::new();
             for cfg in &[new_cfg1.clone(), new_cfg2.clone()] {
-                proposes.push(TxConfigPropose::new(&sandbox.p(1),
+                proposes.push(TxConfigPropose::new(&sandbox.service_public_key(1),
                                                    str::from_utf8(cfg.clone()
                                                                       .into_bytes()
                                                                       .as_slice())
                                                        .unwrap(),
-                                                   sandbox.s(1))
+                                                   sandbox.service_secret_key(1))
                                   .raw()
                                   .clone());
             }
@@ -725,9 +768,9 @@ mod tests {
         {
             let mut votes = Vec::new();
             for validator in 0..2 {
-                votes.push(TxConfigVote::new(&sandbox.p(validator),
+                votes.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                              &new_cfg1.hash(),
-                                             sandbox.s(validator))
+                                             sandbox.service_secret_key(validator))
                                .raw()
                                .clone());
             }
@@ -737,7 +780,9 @@ mod tests {
             assert_eq!(initial_cfg, sandbox.cfg());
         }
         {
-            let prop2_validator2 = TxConfigVote::new(&sandbox.p(2), &new_cfg2.hash(), sandbox.s(2));
+            let prop2_validator2 = TxConfigVote::new(&sandbox.service_public_key(2),
+                                                     &new_cfg2.hash(),
+                                                     sandbox.service_secret_key(2));
 
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
@@ -746,7 +791,9 @@ mod tests {
             assert_eq!(initial_cfg, sandbox.cfg());
         }
         {
-            let prop1_validator2 = TxConfigVote::new(&sandbox.p(2), &new_cfg1.hash(), sandbox.s(2));
+            let prop1_validator2 = TxConfigVote::new(&sandbox.service_public_key(2),
+                                                     &new_cfg1.hash(),
+                                                     sandbox.service_secret_key(2));
 
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
@@ -766,10 +813,10 @@ mod tests {
 
         {
             let propose_tx1 =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg1.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
 
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
@@ -779,9 +826,9 @@ mod tests {
         {
             let mut votes_for_new_cfg1 = Vec::new();
             for validator in 0..3 {
-                votes_for_new_cfg1.push(TxConfigVote::new(&sandbox.p(validator),
+                votes_for_new_cfg1.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                                           &new_cfg1.hash(),
-                                                          sandbox.s(validator))
+                                                          sandbox.service_secret_key(validator))
                                             .raw()
                                             .clone());
             }
@@ -791,10 +838,10 @@ mod tests {
         }
         {
             let propose_tx2 =
-                TxConfigPropose::new(&sandbox.p(1),
+                TxConfigPropose::new(&sandbox.service_public_key(1),
                                      str::from_utf8(new_cfg2.clone().into_bytes().as_slice())
                                          .unwrap(),
-                                     sandbox.s(1));
+                                     sandbox.service_secret_key(1));
 
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
@@ -804,9 +851,9 @@ mod tests {
         {
             let mut votes_for_new_cfg2 = Vec::new();
             for validator in 0..3 {
-                votes_for_new_cfg2.push(TxConfigVote::new(&sandbox.p(validator),
+                votes_for_new_cfg2.push(TxConfigVote::new(&sandbox.service_public_key(validator),
                                                           &new_cfg2.hash(),
-                                                          sandbox.s(validator))
+                                                          sandbox.service_secret_key(validator))
                                             .raw()
                                             .clone());
             }
@@ -815,7 +862,9 @@ mod tests {
             assert_eq!(new_cfg2, sandbox.cfg());
         }
         {
-            let prop1_validator3 = TxConfigVote::new(&sandbox.p(3), &new_cfg1.hash(), sandbox.s(3));
+            let prop1_validator3 = TxConfigVote::new(&sandbox.service_public_key(3),
+                                                     &new_cfg1.hash(),
+                                                     sandbox.service_secret_key(3));
             add_one_height_with_transactions(&sandbox,
                                              &sandbox_state,
                                              &[prop1_validator3.raw().clone()]);
