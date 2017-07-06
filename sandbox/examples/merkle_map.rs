@@ -7,7 +7,7 @@ use rand::{SeedableRng, XorShiftRng, Rng};
 
 use std::path::Path;
 
-use exonum::storage::{LevelDB, LevelDBOptions};
+use exonum::storage::{RocksDB, RocksDBOptions};
 use exonum::storage::{Database, ProofMapIndex};
 
 /// usage
@@ -52,9 +52,9 @@ fn main() {
         (k, v)
     };
 
-    let mut options = LevelDBOptions::new();
-    options.create_if_missing = true;
-    let mut db = LevelDB::open(Path::new(&path), options).unwrap();
+    let mut options = RocksDBOptions::default();
+    options.create_if_missing(true);
+    let mut db = RocksDB::open(Path::new(&path), options).unwrap();
 
     let patch;
     {

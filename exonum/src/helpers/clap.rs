@@ -93,15 +93,10 @@ impl<'a, 'b> RunCommand<'a, 'b>
                      .help("Path to node configuration file")
                      .required(true)
                      .takes_value(true))
-            .arg(Arg::with_name("LEVELDB_PATH")
+            .arg(Arg::with_name("DB_PATH")
                      .short("d")
-                     .long("leveldb-path")
-                     .help("Use leveldb database with the given path")
-                     .required(false)
-                     .takes_value(true))
-            .arg(Arg::with_name("ROCKSDB_PATH")
-                     .long("rocksdb-path")
-                     .help("Use rocksdb database with the given path")
+                     .long("db-path")
+                     .help("Use database with the given path")
                      .required(false)
                      .takes_value(true))
             .arg(Arg::with_name("PUBLIC_API_ADDRESS")
@@ -148,29 +143,17 @@ impl<'a, 'b> RunCommand<'a, 'b>
             .map(|s| s.parse().expect("Private api address has incorrect format"))
     }
 
-    pub fn leveldb_path(matches: &'a ArgMatches<'a>) -> Option<&'a Path> {
-        matches.value_of("LEVELDB_PATH").map(Path::new)
-    }
-
-    pub fn rocksdb_path(matches: &'a ArgMatches<'a>) -> Option<&'a Path> {
-        matches.value_of("ROCKSDB_PATH").map(Path::new)
+    pub fn db_path(matches: &'a ArgMatches<'a>) -> Option<&'a Path> {
+        matches.value_of("DB_PATH").map(Path::new)
     }
 
     #[cfg(not(feature="memorydb"))]
     pub fn db(matches: &'a ArgMatches<'a>) -> Box<Database> {
-        if matches.value_of("ROCKSDB_PATH").is_some() {
-            use storage::{RocksDB, RocksDBOptions};
-            let path = Self::rocksdb_path(matches).unwrap();
-            let mut options = RocksDBOptions::default();
-            options.create_if_missing(true);
-            Box::new(RocksDB::open(path, options).unwrap())
-        } else {
-            use storage::{LevelDB, LevelDBOptions};
-            let path = Self::leveldb_path(matches).unwrap();
-            let mut options = LevelDBOptions::new();
-            options.create_if_missing = true;
-            Box::new(LevelDB::open(path, options).unwrap())
-        }
+        use storage::{RocksDB, RocksDBOptions};
+        let path = Self::db_path(matches).unwrap();
+        let mut options = RocksDBOptions::default();
+        options.create_if_missing(true);
+        Box::new(RocksDB::open(path, options).unwrap())
     }
 
     #[cfg(feature="memorydb")]

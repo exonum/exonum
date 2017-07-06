@@ -7,7 +7,7 @@ use clap::{App, SubCommand, Arg, ArgMatches};
 use std::marker::PhantomData;
 use std::path::Path;
 
-use exonum::storage::{LevelDB, LevelDBOptions, Map, MapIndex};
+use exonum::storage::{RocksDB, RocksDBOptions, Map, MapIndex};
 use exonum::crypto::{HexValue, Hash};
 use exonum::helpers::clap::GenerateCommand;
 
@@ -27,11 +27,11 @@ impl<'a, 'b> BlockchainCommand<'a, 'b>
     pub fn new() -> App<'a, 'b> {
         SubCommand::with_name("blockchain")
             .about("Blockchain explorer")
-            .arg(Arg::with_name("LEVELDB_PATH")
+            .arg(Arg::with_name("DB_PATH")
                      .short("d")
-                     .long("leveldb-path")
-                     .value_name("LEVELDB_PATH")
-                     .help("Use leveldb database with the given path")
+                     .long("db-path")
+                     .value_name("DB_PATH")
+                     .help("Use database with the given path")
                      .required(true)
                      .takes_value(true))
             .subcommand(SubCommand::with_name("find_tx")
@@ -42,14 +42,15 @@ impl<'a, 'b> BlockchainCommand<'a, 'b>
                                      .index(1)))
     }
 
-    pub fn leveldb_path(matches: &'a ArgMatches<'a>) -> &'a Path {
-        Path::new(matches.value_of("LEVELDB_PATH").unwrap())
+    pub fn db_path(matches: &'a ArgMatches<'a>) -> &'a Path {
+        Path::new(matches.value_of("DB_PATH").unwrap())
     }
 
-    pub fn db(matches: &'a ArgMatches<'a>) -> LevelDB {
-        let path = Self::leveldb_path(matches);
-        let options = LevelDBOptions::new();
-        LevelDB::open(path, options).unwrap()
+    pub fn db(matches: &'a ArgMatches<'a>) -> RocksDB {
+        let path = Self::db_path(matches);
+        let mut options = RocksDBOptions::default();
+        options.create_if_missing(true);
+        RocksDB::open(path, options).unwrap()
     }
 
     pub fn action(matches: &'a ArgMatches<'a>) -> BlockchainAction {

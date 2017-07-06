@@ -1,12 +1,6 @@
 use tempdir::TempDir;
 
-use super::{Database, LevelDB, LevelDBOptions, RocksDB, RocksDBOptions, MemoryDB, Snapshot, Fork};
-
-fn leveldb_database() -> LevelDB {
-    let mut options = LevelDBOptions::new();
-    options.create_if_missing = true;
-    LevelDB::open(TempDir::new("exonum_leveldb").unwrap().path(), options).unwrap()
-}
+use super::{Database, RocksDB, RocksDBOptions, MemoryDB, Snapshot, Fork};
 
 fn rocksdb_database() -> RocksDB {
     let mut options = RocksDBOptions::default();
@@ -160,11 +154,6 @@ fn changelog<T: Database>(db: T) {
 }
 
 #[test]
-fn test_leveldb_fork_iter() {
-    fork_iter(leveldb_database())
-}
-
-#[test]
 fn test_memory_fork_iter() {
     fork_iter(memorydb_database())
 }
@@ -172,11 +161,6 @@ fn test_memory_fork_iter() {
 #[test]
 fn test_rocksdb_fork_iter() {
     fork_iter(rocksdb_database())
-}
-
-#[test]
-fn test_leveldb_changelog() {
-    changelog(leveldb_database())
 }
 
 #[test]

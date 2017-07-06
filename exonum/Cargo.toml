@@ -12,7 +12,6 @@ bit-vec = "0.4.0"
 vec_map = "0.6.0"
 sodiumoxide = "0.0.14"
 rand = "0.3.0"
-leveldb = {version="0.9", path="../3rdparty/leveldb"}
 rocksdb = {version="0.6.1", path="../3rdparty/rocksdb"}
 serde = "1.0.0"
 serde_derive = "1.0.0"

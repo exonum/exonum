@@ -1,10 +1,9 @@
 [workspace]
 
 members = [
-    "3rdparty/leveldb-sys",
-    "3rdparty/leveldb",
     "exonum",
     "sandbox",
     "3rdparty/flamer",
+    "3rdparty/rocksdb",
     "3rdparty/profiler",
 ]

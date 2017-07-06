@@ -10,7 +10,7 @@ mod tests {
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
     use tempdir::TempDir;
-    use exonum::storage::{Database, MemoryDB, LevelDB, LevelDBOptions, RocksDB, RocksDBOptions};
+    use exonum::storage::{Database, MemoryDB, RocksDB, RocksDBOptions};
     use exonum::storage::{ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::KEY_SIZE;
 
@@ -101,13 +101,6 @@ mod tests {
                });
     }
 
-    fn create_leveldb(tempdir: &TempDir) -> LevelDB {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let db = LevelDB::open(tempdir.path(), options).unwrap();
-        db
-    }
-
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
@@ -118,13 +111,6 @@ mod tests {
     #[bench]
     fn bench_merkle_table_append_memorydb(b: &mut Bencher) {
         let db = MemoryDB::new();
-        merkle_table_insertion(b, &db);
-    }
-
-    #[bench]
-    fn bench_merkle_table_append_leveldb(b: &mut Bencher) {
-        let tempdir = TempDir::new("exonum").unwrap();
-        let db = create_leveldb(&tempdir);
         merkle_table_insertion(b, &db);
     }
 
@@ -142,24 +128,10 @@ mod tests {
     }
 
     #[bench]
-    fn bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
-        let tempdir = TempDir::new("exonum").unwrap();
-        let db = create_leveldb(&tempdir);
-        merkle_patricia_table_insertion(b, &db);
-    }
-
-    #[bench]
     fn bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
         let db = create_rocksdb(&tempdir);
         merkle_patricia_table_insertion(b, &db);
-    }
-
-    #[bench]
-    fn bench_merkle_patricia_table_insertion_fork_leveldb(b: &mut Bencher) {
-        let tempdir = TempDir::new("exonum").unwrap();
-        let db = create_leveldb(&tempdir);
-        merkle_patricia_table_insertion_fork(b, &db);
     }
 
     #[bench]
@@ -174,14 +146,7 @@ mod tests {
         let db = MemoryDB::new();
         merkle_patricia_table_insertion_large_map(b, &db);
     }
-
-    #[bench]
-    fn long_bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
-        let tempdir = TempDir::new("exonum").unwrap();
-        let db = create_leveldb(&tempdir);
-        merkle_patricia_table_insertion_large_map(b, &db);
-    }
-
+    
     #[bench]
     fn long_bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();

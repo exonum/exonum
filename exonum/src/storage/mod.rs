@@ -1,7 +1,6 @@
 pub use self::error::Error;
 pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
 
-pub use self::leveldb::{LevelDB, LevelDBOptions, LevelDBCache};
 pub use self::rocksdb::{RocksDB, RocksDBOptions, RocksBlockOptions};
 pub use self::memorydb::MemoryDB;
 
@@ -23,7 +22,6 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 mod error;
 
 mod db;
-mod leveldb;
 mod memorydb;
 mod rocksdb;
 
