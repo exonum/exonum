@@ -646,7 +646,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
                                     }));
 
     let channel = SandboxChannel { inner: inner.clone() };
-    let node = NodeHandler::new(blockchain.clone(), channel, config.clone());
+    let node = NodeHandler::new(blockchain.clone(), addresses[0], channel, config.clone());
 
     let mut reactor = SandboxReactor {
         inner: inner.clone(),
