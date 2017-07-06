@@ -9,7 +9,7 @@ use self::NextIterValue::*;
 
 
 pub type Patch = BTreeMap<Vec<u8>, Change>;
-pub type Iter<'a> = Box<Iterator<'a> + 'a>;
+pub type Iter<'a> = Box<Iterator + 'a>;
 
 #[derive(Debug, Clone)]
 pub enum Change {
@@ -62,7 +62,7 @@ pub trait Snapshot: 'static {
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
 }
 
-pub trait Iterator<'a> {
+pub trait Iterator {
     fn next(&mut self) -> Option<(&[u8], &[u8])>;
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
@@ -242,7 +242,7 @@ impl<'a> ForkIter<'a> {
     }
 }
 
-impl<'a> Iterator<'a> for ForkIter<'a> {
+impl<'a> Iterator for ForkIter<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         loop {
             match self.step() {

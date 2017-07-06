@@ -111,7 +111,7 @@ impl Snapshot for LevelDBSnapshot {
     }
 }
 
-impl<'a> Iterator<'a> for LevelDBIterator<'a> {
+impl<'a> Iterator for LevelDBIterator<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         let _p = profiler::ProfilerSpan::new("LevelDBIterator::next");
         self.iter.next()
