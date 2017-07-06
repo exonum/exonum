@@ -59,7 +59,7 @@ impl Snapshot for MemoryDB {
     }
 }
 
-impl<'a> Iterator<'a> for MemoryDBIter<'a> {
+impl<'a> Iterator for MemoryDBIter<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         self.iter
             .next()
