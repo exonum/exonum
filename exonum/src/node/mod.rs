@@ -494,7 +494,7 @@ impl Node {
     /// Creates node for the given blockchain and node configuration.
     pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Self {
         crypto::init();
-        
+
         if cfg!(feature="flame_profile") {
             ::profiler::init_handler(
                 ::std::env::var(PROFILE_ENV_VARIABLE_NAME)
