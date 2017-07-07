@@ -1,7 +1,9 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
 extern crate thread_id;
-
+extern crate ctrlc;
+#[macro_use]
+extern crate lazy_static;
 
 mod html;
 
@@ -9,18 +11,25 @@ use std::cell::{RefCell};
 use std::rc::Rc;
 use std::time::{Instant};
 use std::collections::BTreeMap;
+use std::fs::File;
 use std::marker::PhantomData;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, Arc};
 
 pub type SpanPtr = RefCell<Span>;
 thread_local!(static THREAD_FRAME: RefCell<ThreadFrame> = RefCell::new(ThreadFrame::new()));
 
+lazy_static!{
+    static ref SETTED_NAME: Mutex<Option<String>> = Mutex::new(None);
+    static ref INTERRUPTED_TICKS: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
 
+} 
 
-
-struct ThreadFrame {
+pub struct ThreadFrame {
     epoch: Instant,
     root: Rc<SpanPtr>,
     events: Vec<Event>,
+    dumped_time: usize,
 }
 
 struct Event {
@@ -55,7 +64,12 @@ impl ThreadFrame {
             epoch: epoch,
             root: root.clone(),
             events: vec![Event::new("Self", ns_since_epoch(epoch), root)],
+            dumped_time: 0,
         }
+    }
+
+    fn root(&self) -> &SpanPtr {
+        &self.root
     }
 
     fn start_span(&mut self, name: &'static str) {
@@ -65,6 +79,16 @@ impl ThreadFrame {
     }
     
     fn end_span(&mut self) {
+        let new_time = INTERRUPTED_TICKS.load(Ordering::SeqCst);
+        if self.dumped_time < new_time {
+            let name: String = SETTED_NAME.lock().unwrap().clone()
+                                .expect("Profiler: received interrupt without setted name.");
+            File::create(&name)
+                    .and_then(|ref mut  file| dump_html(file, &self) )
+                    .expect("could not write profiler data");
+            self.dumped_time = new_time;
+        };
+
         let timestamp = ns_since_epoch(self.epoch);
         let event = self.events.pop().expect("ThreadFrame::end_span() called events.pop() without a currently running span!");
         let current = event.span;
@@ -104,24 +128,24 @@ impl Span {
 }
 
 #[cfg(not(feature="nomock"))]
-fn start(name: &'static str) {
+pub fn start(name: &'static str) {
     
 }
 
 #[cfg(not(feature="nomock"))]
-fn end() {
+pub fn end() {
     
 }
 
 
 #[cfg(feature="nomock")]
-fn start(name: &'static str) {
+pub fn start(name: &'static str) {
     THREAD_FRAME.with(|thread| thread.borrow_mut().start_span(name));
 }
 
 
 #[cfg(feature="nomock")]
-fn end() {
+pub fn end() {
     THREAD_FRAME.with(|thread| thread.borrow_mut().end_span());
 }
 
@@ -189,5 +213,22 @@ impl<'scope> ProfilerSpan<'scope> {
     }
 }
 
+#[cfg(not(feature="nomock"))]
+pub fn init_handler(file: String) {
+}
+
+#[cfg(feature="nomock")]
+pub fn init_handler(file: String) {
+
+    *SETTED_NAME.lock().unwrap() = Some(file);
+
+    let r = INTERRUPTED_TICKS.clone();
+    ctrlc::set_handler(move || {
+        let secs = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap().as_secs() as usize;
+        r.store(secs, Ordering::SeqCst);
+    }).expect("Error setting Ctrl-C handler");
+}
 
 pub use html::dump_html;

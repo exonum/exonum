@@ -114,6 +114,7 @@ impl<S> NodeHandler<S>
 
     /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result
+    #[cfg_attr(feature="flame_profile", flame)]
     pub fn handle_block(&mut self, msg: Block) {
         // Request are sended to us
         if msg.to() != self.state.consensus_public_key() {
@@ -169,10 +170,12 @@ impl<S> NodeHandler<S>
                                msg);
                         return;
                     }
-                    if !tx.verify() {
-                        error!("Incorrect transaction in block detected, block={:?}", msg);
-                        return;
-                    }
+                    profiler_span!("tx.verify()", {
+                        if !tx.verify() {
+                            error!("Incorrect transaction in block detected, block={:?}", msg);
+                            return;
+                        }
+                    });
                     self.state.add_transaction(hash, tx);
                     tx_hashes.push(hash);
                 } else {
@@ -439,19 +442,22 @@ impl<S> NodeHandler<S>
             }
         };
 
-        // Make sure that it is new transaction
-        if self.state.transactions().contains_key(&hash) {
-            return;
-        }
+        profiler_span!("Make sure that it is new transaction", {
+            if self.state.transactions().contains_key(&hash) {
+                return;
+            }
 
-        let snapshot = self.blockchain.snapshot();
-        if Schema::new(&snapshot).transactions().contains(&hash) {
-            return;
-        }
+            let snapshot = self.blockchain.snapshot();
+            if Schema::new(&snapshot).transactions().contains(&hash) {
+                return;
+            }
+        });
 
-        if !tx.verify() {
-            return;
-        }
+        profiler_span!("tx.verify()", {
+            if !tx.verify() {
+                return;
+            }
+        });
 
         let full_proposes = self.state.add_transaction(hash, tx);
         // Go to has full propose if we get last transaction

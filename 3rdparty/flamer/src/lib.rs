@@ -5,7 +5,7 @@ extern crate syntax;
 
 use rustc_plugin::registry::Registry;
 use syntax::ast::{Attribute, Block, Expr, ExprKind, Ident, Item, ItemKind, Mac,
-                  MetaItem, MetaItemKind};
+                  MetaItem};
 use syntax::fold::{self, Folder};
 use syntax::ptr::P;
 use syntax::codemap::{DUMMY_SP, Span};
@@ -46,13 +46,8 @@ impl<'a, 'cx> Folder for Flamer<'a, 'cx> {
 
     fn fold_item_simple(&mut self, i: Item) -> Item {
         fn is_flame_annotation(attr: &Attribute) -> bool {
-            match attr.value.node {
-                MetaItemKind::Word => {
-                    let name = &*attr.value.name.as_str();
-                    name == "flame" || name == "noflame"
-                },
-                _ => false
-            }
+            attr.name().map_or(false, |name|
+                    name == "flame" || name == "noflame")
         }
         // don't double-flame nested annotations
         if i.attrs.iter().any(is_flame_annotation) { return i; }
@@ -73,6 +68,7 @@ impl<'a, 'cx> Folder for Flamer<'a, 'cx> {
                 drop(g);
                 r
             }).unwrap()
+
         })
     }
 
