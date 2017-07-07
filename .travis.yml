@@ -10,6 +10,7 @@ env:
     - NIGHTLY_RUST=nightly-2017-05-10
     - CLIPPY_VERS=0.0.131
     - RUSTFMT_VERS=0.8.4
+    - ROCKSDB_LIB_DIR=/usr/lib
 before_install:
 - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
 - rustup toolchain install $NIGHTLY_RUST
@@ -20,7 +21,7 @@ before_install:
 - cargo install --list
 - cargo-audit -V || cargo install cargo-audit --force
 install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libssl-dev
+- sudo apt-get -qq --yes install gcc g++ make libsodium-dev librocksdb libssl-dev
 script:
 - cargo fmt -p sandbox -- --write-mode=diff
 - cd exonum

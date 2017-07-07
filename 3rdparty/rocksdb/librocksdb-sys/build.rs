@@ -115,6 +115,7 @@ fn build_snappy() {
         config.flag("-EHsc");
     } else {
         config.flag("-std=c++11");
+        config.flag("-fPIC");
     }
 
     config.file("snappy/snappy.cc");
