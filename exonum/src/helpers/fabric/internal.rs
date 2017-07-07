@@ -3,10 +3,11 @@ use super::{Context, CommandName, Argument, CommandExtension};
 use std::fmt;
 use std::error::Error;
 
-//TODO: we could extend current feedback
 /// Used to take some additional information from executed command
 pub enum Feedback {
+    /// Run node with current context.
     RunNode(Context),
+    /// Do nothing
     None,
 }
 #[derive(Clone, Debug, Copy)]

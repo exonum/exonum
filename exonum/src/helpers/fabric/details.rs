@@ -12,34 +12,35 @@ use blockchain::GenesisConfig;
 use helpers::generate_testnet_config;
 use config::ConfigFile;
 use node::NodeConfig;
-use storage::Storage;
+use storage::Database;
 use crypto;
+
+use blockchain::config::ValidatorKeys;
 
 use super::internal::{Command, Feedback};
 use super::{Argument, Context, CommandName};
 
-const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
-use helpers::clap::{ValidatorIdent, ConfigTemplate, KeyConfig, PubKeyConfig};
-// TODO:How to split `NodeConfig`, from services configs?
-// We should extend `NodeConfig` type to take services configs aswell.
+use super::shared::{AbstractConfig, NodePublicConfig, SharedConfig,
+                     NodePrivateConfig, CommonConfigTemplate};
+use super::DEFAULT_EXONUM_LISTEN_PORT;
 
-pub struct RunCommand;
+pub struct Run;
 
-impl RunCommand {
+impl Run {
 
     pub fn name() -> CommandName {
         "run"
     }
 
     #[cfg(not(feature="memorydb"))]
-    pub fn db_helper(ctx: &Context) -> Storage {
+    pub fn db_helper(ctx: &Context) -> Box<Database> {
         use storage::{LevelDB, LevelDBOptions};
 
         let path = ctx.arg::<String>("LEVELDB_PATH")
                       .expect("LEVELDB_PATH not found.");
         let mut options = LevelDBOptions::new();
         options.create_if_missing = true;
-        LevelDB::new(Path::new(&path), options).unwrap()
+        Box::new(LevelDB::open(Path::new(&path), options).unwrap())
     }
 
     #[cfg(feature="memorydb")]
@@ -63,17 +64,17 @@ impl RunCommand {
     }
 }
 
-impl Command for RunCommand {
+impl Command for Run {
     fn args(&self) -> Vec<Argument> {
         vec![
             Argument::new_named("NODE_CONFIG_PATH", true,
-            "Path to node configuration file.", "c", "node-config"),
+            "Path to node configuration file.", "c", "node-config", false),
             Argument::new_named("LEVELDB_PATH", true,
-            "Use leveldb database with the given path.", "d", "leveldb"),
+            "Use leveldb database with the given path.", "d", "leveldb", false),
             Argument::new_named("PUBLIC_API_ADDRESS", false,
-            "Listen address for public api.", None, "public-api-address"),
+            "Listen address for public api.", None, "public-api-address", false),
             Argument::new_named("PRIVATE_API_ADDRESS", false,
-            "Listen address for private api.", None, "private-api-address"),
+            "Listen address for private api.", None, "private-api-address", false),
         ]
     }
 
@@ -111,81 +112,19 @@ impl Command for RunCommand {
 }
 
 
-pub struct KeyGeneratorCommand;
-
-impl KeyGeneratorCommand {
-    pub fn name() -> CommandName {
-        "keygen"
-    }
-}
-
-impl Command for KeyGeneratorCommand {
-    fn args(&self) -> Vec<Argument> {
-        vec![
-            Argument::new_positional("KEYCHAIN", true,
-            "Path to key config."),
-        ]
-    }
-
-    fn name(&self) -> CommandName {
-        Self::name()
-    }
-
-    fn about(&self) -> &str {
-        "Generate node secret and public keys."
-    }
-
-    fn execute(&self,
-               mut context: Context,
-               exts: &Fn(Context) -> Context) -> Feedback {
-        let (pub_key, sec_key) = crypto::gen_keypair();
-        let keyconfig = context.arg::<String>("KEYCHAIN")
-                              .expect("expected keychain path");
-
-        let pub_key_path = Path::new(&keyconfig).with_extension("pub");
-        context.set("services_pub_keys", BTreeMap::<String, Value>::default());
-        context.set("services_sec_keys", BTreeMap::<String, Value>::default());
-        let new_context = exts(context);
-        let services_pub_keys = new_context.get("services_pub_keys");
-        let services_sec_keys = new_context.get("services_sec_keys");
-
-        let pub_key_config: PubKeyConfig = PubKeyConfig {
-            public_key: pub_key,
-            services_pub_keys: services_pub_keys
-                                .expect("service_pub_keys not found after exts call"),
-        };
-        // save pub_key seperately
-        ConfigFile::save(&pub_key_config, &pub_key_path)
-                    .expect("Could not write public key file.");
-
-        let config = KeyConfig {
-            public_key: pub_key,
-            secret_key: sec_key,
-            services_sec_keys: services_sec_keys
-                                .expect("service_sec_keys not found after exts call"),
-        };
-
-        ConfigFile::save(&config, keyconfig)
-                    .expect("Could not write keychain file.");
-        Feedback::None
-    }
-}
-
 /// implements command for template generating
-pub struct GenerateTemplateCommand;
-impl GenerateTemplateCommand {
+pub struct GenerateCommonConfig;
+impl GenerateCommonConfig {
     pub fn name() -> CommandName {
-        "generate-template"
+        "generate-common"
     }
 }
 
-impl Command for GenerateTemplateCommand {
+impl Command for GenerateCommonConfig {
     fn args(&self) -> Vec<Argument> {
         vec![
-            Argument::new_positional("COUNT", true,
-            "Validator total count."),
-            Argument::new_positional("TEMPLATE", true,
-            "Path to template config."),
+            Argument::new_positional("COMMON_CONFIG", true,
+            "Path to common config."),
         ]
     }
 
@@ -200,19 +139,16 @@ impl Command for GenerateTemplateCommand {
     fn execute(&self,
                mut context: Context,
                exts: &Fn(Context) -> Context) -> Feedback {
-        let template_path = context.arg::<String>("TEMPLATE")
-                                   .expect("template not found");
-        let count = context.arg("COUNT")
-                                   .expect("expected count to be int");
+        let template_path = context.arg::<String>("COMMON_CONFIG")
+                                   .expect("COMMON_CONFIG not found");
                                    
-        context.set("VALUE", BTreeMap::<String, Value>::default());
+        context.set("services_config", AbstractConfig::default());
         let new_context = exts(context);
-        let values = new_context.get("VALUE").unwrap_or_default();
+        let services_config = new_context.get("services_config").unwrap_or_default();
 
-        let template = ConfigTemplate {
-            count: count,
-            services: values,
-            ..ConfigTemplate::default()
+        let template = CommonConfigTemplate {
+            services_config,
+            ..CommonConfigTemplate::default()
         };
 
         ConfigFile::save(&template, template_path)
@@ -221,26 +157,42 @@ impl Command for GenerateTemplateCommand {
     }
 }
 
+pub struct GenerateNodeConfig;
 
-
-/// `add-validator` - append validator to template.
-/// Automaticaly share keys from public key config.
-pub struct AddValidatorCommand;
-impl AddValidatorCommand {
+impl GenerateNodeConfig {
     pub fn name() -> CommandName {
-        "add-validator"
+        "generate-config"
+    }
+
+    fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
+        let addr = context.arg::<String>("PEER_ADDR").unwrap_or_default();
+
+        let mut addr_parts = addr.split(':');
+        let ip = addr_parts.next().expect("Expected ip address");
+        if ip.len() < 8 {
+            panic!("Expected ip address in PEER_ADDR.")
+        }
+        let port = addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT,
+                                                |s| s.parse()
+                                                     .expect("could not parse port"));
+        let external_addr = format!("{}:{}", ip, port);
+        let listen_addr = format!("0.0.0.0:{}", port);
+        (external_addr.parse().unwrap(),
+            listen_addr.parse().unwrap())
     }
 }
 
-impl Command for AddValidatorCommand {
+impl Command for GenerateNodeConfig {
     fn args(&self) -> Vec<Argument> {
         vec![
-            Argument::new_positional("TEMPLATE", true,
-            "Path to template config."),
-            Argument::new_positional("PUBLIC_KEY", true,
-            "Path to public key file."),
-            Argument::new_named("LISTEN_ADDR", true,
-            "Path to public key file.", "a", "listen-addr"),
+            Argument::new_positional("COMMON_CONFIG", true,
+            "Path to common config."),
+            Argument::new_positional("PUB_CONFIG", true,
+            "Path where save public config."),
+            Argument::new_positional("SEC_CONFIG", true,
+            "Path where save private config."),
+            Argument::new_named("PEER_ADDR", true,
+            "Remote peer address", "a", "peer-addr", false),
         ]
     }
 
@@ -249,76 +201,123 @@ impl Command for AddValidatorCommand {
     }
 
     fn about(&self) -> &str {
-        "Preinit configuration, add validator to config template."
+        "Generate node secret and public configs."
     }
 
     fn execute(&self,
                mut context: Context,
                exts: &Fn(Context) -> Context) -> Feedback {
-        let template_path = context.arg::<String>("TEMPLATE")
-                                   .expect("template not found");
-        let public_key_path = context.arg::<String>("PUBLIC_KEY")
-                                   .expect("public_key path not found");
-        let addr = context.arg::<String>("LISTEN_ADDR").unwrap_or_default();
+        let common_config_path = context.arg::<String>("COMMON_CONFIG")
+                              .expect("expected common config path");
+        let pub_config_path = context.arg::<String>("PUB_CONFIG")
+                              .expect("expected public config path");
+        let priv_config_path = context.arg::<String>("SEC_CONFIG")
+                              .expect("expected secret config path");
 
-        let mut addr_parts = addr.split(':');
-        let template: ConfigTemplate = ConfigFile::load(&template_path).unwrap();
-        let public_key_config: PubKeyConfig = ConfigFile::load(public_key_path).unwrap();
+        
+        let addr = Self::addr(&context);
+        let common: CommonConfigTemplate = ConfigFile::load(&common_config_path)
+                                .expect("Could not load common config");
+        context.set("common_config", common.clone());
+        context.set("services_public_configs", BTreeMap::<String, Value>::default());
+        context.set("services_secret_configs", BTreeMap::<String, Value>::default());
+        let new_context = exts(context);
+        let services_public_configs = new_context.get("services_public_configs")
+                                                 .unwrap();
+        let services_secret_configs = new_context.get("services_secret_configs");
 
-        let addr_str = format!("{}:{}",
-                           addr_parts.next()
-                                     .unwrap_or("0.0.0.0"),
-                           addr_parts.next()
-                                     .map_or(DEFAULT_EXONUM_LISTEN_PORT,
-                                                |s| s.parse()
-                                                     .expect("could not parse port")));
-        let addr = addr_str.parse().unwrap();
-        let template =
-        if !template.validators.contains_key(&public_key_config.public_key) {
-            if template.validators.len() >= template.count {
-                panic!("This template already full.");
-            }
+        let (consensus_public_key,
+                consensus_secret_key) = crypto::gen_keypair();
+        let (service_public_key,
+                service_secret_key) = crypto::gen_keypair();
 
-            let ident = ValidatorIdent {
-                addr: addr,
-                variables: BTreeMap::default(),
-                keys: public_key_config.services_pub_keys,
-            };
-            context.set("validator_ident", ident);
-            context.set("template", template);
+        let validator_keys = ValidatorKeys {
+            consensus_key: consensus_public_key,
+            service_key: service_public_key,
+        };
+        let node_pub_config =  NodePublicConfig {
+            addr: addr.0,
+            validator_keys,
+            services_public_configs,
+        };
+        let shared_config = SharedConfig {
+            node: node_pub_config,
+            common: common
+        };
+        // save public config seperately
+        ConfigFile::save(&shared_config, &pub_config_path)
+                    .expect("Could not write public config file.");
 
-            let new_context = exts(context);
-            let ident = new_context.get("validator_ident")
-                            .expect("validator_ident not found after call exts");
-            let mut template: ConfigTemplate = new_context.get("template")
-                            .expect("template not found after call exts");
-
-            template.validators.insert(public_key_config.public_key, ident);
-            template
-        } else {
-            panic!("This node already in template")
+        let priv_config = NodePrivateConfig {
+            listen_addr: addr.1, 
+            consensus_public_key,
+            consensus_secret_key,
+            service_public_key,
+            service_secret_key,
+            services_secret_configs: services_secret_configs
+                                .expect("services_secret_configs not found after exts call"),
         };
 
-        ConfigFile::save(&template, &template_path).unwrap();
+        ConfigFile::save(&priv_config, priv_config_path)
+                    .expect("Could not write secret config file.");
         Feedback::None
     }
 }
 
-pub struct InitCommand;
-impl InitCommand {
+pub struct Finalize;
+impl Finalize {
     pub fn name() -> CommandName {
-        "init"
+        "finalize"
+    }
+
+    pub fn genesis_from_template(template: CommonConfigTemplate,
+                            configs: Vec<NodePublicConfig>) -> GenesisConfig {
+        GenesisConfig::new_with_consensus(template.consensus_config,
+                                        configs
+                                            .iter()
+                                            .map(|c| c.validator_keys))
+    }
+
+    pub fn reduce_configs(public_configs: Vec<SharedConfig>,
+                            our_config: &NodePrivateConfig) 
+    -> (CommonConfigTemplate, Vec<NodePublicConfig>, NodePublicConfig)
+    {
+        let mut map =  BTreeMap::new();
+        let mut config_iter = public_configs.into_iter();
+        let first = config_iter
+                        .next()
+                        .expect("Expected at least one config in PUBLIC_CONFIGS");
+        let common = first.common;
+        map.insert(first.node
+                        .validator_keys
+                        .consensus_key, first.node);
+
+        for config in config_iter {
+            if common != config.common {
+                panic!("Found config with different common part.");
+            };
+            if map.insert(config.node
+                        .validator_keys
+                        .consensus_key, config.node).is_some() {
+                panic!("Found duplicate consenus keys in PUBLIC_CONFIGS");
+            }
+            
+        }
+        (common, 
+            map.iter().map(|(_, &ref c)|c.clone()).collect(),
+            map.get(&our_config.consensus_public_key).unwrap().clone())
     }
 }
 
-impl Command for InitCommand {
+impl Command for Finalize {
     fn args(&self) -> Vec<Argument> {
         vec![
-            Argument::new_positional("FULL_TEMPLATE", true,
-            "Path to full template."),
-            Argument::new_positional("KEYCHAIN", true,
-            "Path to keychain config."),
-            Argument::new_positional("CONFIG_PATH", true,
+            Argument::new_named("PUBLIC_CONFIGS", true,
+            "Path to validators public configs",
+            "p", "public-configs", true),
+            Argument::new_positional("SECRET_CONFIG", true,
+            "Path to our secret config."),
+            Argument::new_positional("OUTPUT_CONFIG_PATH", true,
             "Path to output node config."),
         ]
     }
@@ -328,65 +327,63 @@ impl Command for InitCommand {
     }
 
     fn about(&self) -> &str {
-        "Toolchain to generate configuration."
+        "Collect public and secret configs into node config."
     }
 
     fn execute(&self,
                mut context: Context,
                exts: &Fn(Context) -> Context) -> Feedback {
-        let template_path = context.arg::<String>("FULL_TEMPLATE")
-                                   .expect("template not found");
-        let template_path = Path::new(&template_path);
-        let keychain_path = context.arg::<String>("KEYCHAIN")
+        let public_configs_path = context.arg_multiple::<String>("PUBLIC_CONFIGS")
                                    .expect("keychain path not found");
-        let keychain_path = Path::new(&keychain_path);
-
-        let config_path = context.arg::<String>("CONFIG_PATH")
+        let secret_config_path = context.arg::<String>("SECRET_CONFIG")
                                    .expect("config path not found");
-        let config_path = Path::new(&config_path);
+        let output_config_path = context.arg::<String>("OUTPUT_CONFIG_PATH")
+                                   .expect("config path not found");
 
-        let template: ConfigTemplate = ConfigFile::load(template_path)
-                                                .expect("Failed to load config template.");
-        let keychain: KeyConfig = ConfigFile::load(keychain_path)
+        let secret_config: NodePrivateConfig = ConfigFile::load(secret_config_path)
                                                 .expect("Failed to load key config.");
-
-        if template.validators.len() != template.count {
-            panic!("Template should be full.");
-        }
-
-        let genesis = GenesisConfig::new(template.validators.iter().map(|(k, _)| *k));
-        let peers = template
-            .validators
+        let public_configs: Vec<SharedConfig> = 
+                public_configs_path.into_iter()
+                                .map(|path| 
+                                    ConfigFile::load(path)
+                                    .expect("Failed to load validator public config.")
+                                ).collect();
+        let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
+        let peers = list
             .iter()
-            .map(|(_, ident)| ident.addr)
+            .map(|c| c.addr)
             .collect();
-        let config = {
-            let validator_ident = &template.validators
-                                            .get(&keychain.public_key)
-                                            .expect("validator not found in template");
 
+        let genesis = Self::genesis_from_template(common.clone(), list.clone());
+
+        let config = {
             NodeConfig {
-                listen_address: validator_ident.addr,
+                listen_address: secret_config.listen_addr,
+                external_address: Some(our.addr),
                 network: Default::default(),
                 whitelist: Default::default(),
                 peers: peers,
-                public_key: keychain.public_key,
-                secret_key: keychain.secret_key,
+                consensus_public_key: secret_config.consensus_public_key,
+                consensus_secret_key: secret_config.consensus_secret_key,
+                service_public_key: secret_config.service_public_key,
+                service_secret_key: secret_config.service_secret_key,
                 genesis: genesis,
                 api: Default::default(),
+                mempool: Default::default(),
                 services_configs: Default::default(),
             }
         };
 
+        context.set("public_config_list", list);
         context.set("node_config", config);
-        context.set("template", template);
-        context.set("services_sec_keys", keychain.services_sec_keys);
+        context.set("common_config", common);
+        context.set("services_secret_configs", secret_config.services_secret_configs);
 
         let new_context = exts(context);
 
-        let value: Value = new_context.get("node_config")
+        let config: NodeConfig = new_context.get("node_config")
             .expect("Could not create config from template, services return error");
-        ConfigFile::save(&value, config_path)
+        ConfigFile::save(&config, output_config_path)
                 .expect("Could not write config file.");
 
         Feedback::None
@@ -405,10 +402,10 @@ impl Command for GenerateTestnetCommand {
         vec![
             Argument::new_named("OUTPUT_DIR", true,
                 "Path to directory where save configs.",
-                "o", "output_dir"),
+                "o", "output_dir", false),
             Argument::new_named("START_PORT", false,
                 "Port number started from which should validators listen.",
-                "p", "start"),
+                "p", "start", false),
             Argument::new_positional("COUNT", true,
                 "Count of validators in testnet."),
         ]
@@ -423,8 +420,8 @@ impl Command for GenerateTestnetCommand {
     }
 
     fn execute(&self,
-               context: Context,
-               _: &Fn(Context) -> Context) -> Feedback {
+               mut context: Context,
+               exts: &Fn(Context) -> Context) -> Feedback {
 
         let dir = context.arg::<String>("OUTPUT_DIR").expect("output dir");
         let count: u8 = context.arg("COUNT")
@@ -439,6 +436,11 @@ impl Command for GenerateTestnetCommand {
         }
 
         let configs = generate_testnet_config(count, start_port);
+        context.set("configs", configs);
+        let new_context = exts(context);
+        let configs: Vec<NodeConfig> = new_context.get("configs")
+                      .expect("Couldn't read testnet configs after exts call.");
+
         for (idx, cfg) in configs.into_iter().enumerate() {
             let file_name = format!("{}.toml", idx);
             ConfigFile::save(&cfg, &dir.join(file_name)).unwrap();
