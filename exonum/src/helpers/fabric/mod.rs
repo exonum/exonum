@@ -9,14 +9,15 @@ use std::collections::BTreeMap;
 use blockchain::Service;
 use self::internal::NotFoundInMap;
 
-
-
 pub use self::builder::NodeBuilder;
-pub use self::details::{RunCommand, AddValidatorCommand,
-                    KeyGeneratorCommand, InitCommand,
-                    GenerateTestnetCommand, GenerateTemplateCommand };
+pub use self::details::{Run, Finalize,
+                    GenerateNodeConfig, GenerateCommonConfig,
+                    GenerateTestnetCommand };
+pub use self::shared::{AbstractConfig, NodePublicConfig, CommonConfigTemplate, NodePrivateConfig};
 
-/// `Command` `name` type
+pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
+
+/// `Command` name type
 pub type CommandName = &'static str;
 
 #[derive(Clone, Copy, Debug)]
@@ -24,6 +25,7 @@ pub type CommandName = &'static str;
 pub struct NamedArgument {
     pub short_name: Option<&'static str>,
     pub long_name: &'static str,
+    pub multiple: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -35,12 +37,18 @@ pub enum ArgumentType {
     Named(NamedArgument)
 }
 
+
 #[derive(Clone, Copy, Debug)]
 /// Abstraction to represent arguments in command line
 pub struct Argument {
+    /// Name of the current argument.
+    /// This name is used in `context.arg(name)`.
     pub name: &'static str,
-    pub argument: ArgumentType,
+    /// Explains how this argument is represented.
+    pub argument_type: ArgumentType,
+    /// Explains does it argument required or not.
     pub required: bool,
+    /// Help string, that should be printed if user missed.
     pub help: &'static str,
 }
 
@@ -51,14 +59,16 @@ impl Argument {
                     required: bool,
                     help: &'static str,
                     short_name: T,
-                    long_name: &'static str) -> Argument
+                    long_name: &'static str,
+                    multiple: bool) -> Argument
     where T: Into<Option<&'static str>>
     {
         Argument {
-            argument: ArgumentType::Named (
+            argument_type: ArgumentType::Named (
                 NamedArgument {
                     short_name: short_name.into(),
-                    long_name
+                    long_name,
+                    multiple,
                 }
             ),
             name, help, required,
@@ -72,7 +82,7 @@ impl Argument {
                     help: &'static str) -> Argument
     {
         Argument {
-            argument: ArgumentType::Positional,
+            argument_type: ArgumentType::Positional,
             name, help, required,
 
         }
@@ -85,6 +95,7 @@ impl Argument {
 /// `CommandExtension` and vice verse.
 pub struct Context {
     args: BTreeMap<String, String>,
+    multiple_args: BTreeMap<String, Vec<String>>,
     variables: BTreeMap<String, Value>,
 }
 
@@ -93,12 +104,26 @@ impl Context {
     fn new_from_args(args: &Vec<Argument>, matches: &clap::ArgMatches) -> Context {
         let mut context = Context::default();
         for arg in args {
+            // processing multiple value arguments make code ugly =(
+            match arg.argument_type {
+                ArgumentType::Named(detail) if detail.multiple => {
+                    if let Some(values) = matches.values_of(&arg.name) {
+                        let values: Vec<String> = values.map(|e| e.to_owned()).collect();
+                        if context.multiple_args.insert(arg.name.to_owned(), values).is_some() {
+                            panic!("Found args dupplicate, in args list. {}", arg.name);
+                        }
+                        continue;
+                        }
+                    }
+                _ => ()
+            };
+
             if let Some(value) = matches.value_of(&arg.name) {
                 if context.args.insert(arg.name.to_owned(), value.to_string()).is_some() {
-                    // TODO: replace by `unreachable!`
-                    // after moving this check into `CollectedCommand`
-                    panic!("Found args dupplicate, in args list.");
+                    panic!("Found args dupplicate, in args list. {}", arg.name);
                 }
+                            
+                
             }
             else if arg.required {
                 panic!("Argument {} not found.", arg.name)
@@ -113,6 +138,18 @@ impl Context {
     {
         if let Some(v) = self.args.get(key) {
             Ok(v.parse()?)
+        }
+        else{
+            Err(Box::new(NotFoundInMap))
+        }
+    }
+
+    /// Get cmd argument mutliple values
+    pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, Box<Error>>
+        where <T as FromStr>::Err: Error + 'static
+    {
+        if let Some(ref values) = self.multiple_args.get(key) {
+            values.iter().map(|v| Ok(v.parse()?)).collect()
         }
         else{
             Err(Box::new(NotFoundInMap))
@@ -160,6 +197,7 @@ pub trait ServiceFactory: 'static {
     fn make_service( run_context: &Context) -> Box<Service>;
 }
 
+mod shared;
 mod builder;
 mod details;
 mod internal;

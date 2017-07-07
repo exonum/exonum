@@ -6,8 +6,9 @@ use node::{Node, NodeConfig};
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::{Context, ServiceFactory};
-use super::details::{GenerateTestnetCommand, RunCommand, AddValidatorCommand,
-                     KeyGeneratorCommand, GenerateTemplateCommand, InitCommand};
+use super::details::{Run, Finalize,
+                    GenerateNodeConfig, GenerateCommonConfig,
+                    GenerateTestnetCommand };
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
 
@@ -21,11 +22,10 @@ impl NodeBuilder {
     pub fn new() -> NodeBuilder {
         NodeBuilder {
             commands: vec![CollectedCommand::new(Box::new(GenerateTestnetCommand)),
-                           CollectedCommand::new(Box::new(RunCommand)),
-                           CollectedCommand::new(Box::new(AddValidatorCommand)),
-                           CollectedCommand::new(Box::new(KeyGeneratorCommand)),
-                           CollectedCommand::new(Box::new(GenerateTemplateCommand)),
-                           CollectedCommand::new(Box::new(InitCommand))
+                           CollectedCommand::new(Box::new(Run)),
+                           CollectedCommand::new(Box::new(GenerateNodeConfig)),
+                           CollectedCommand::new(Box::new(GenerateCommonConfig)),
+                           CollectedCommand::new(Box::new(Finalize))
                            ],
             service_constructors: Vec::new()
         }
@@ -45,7 +45,7 @@ impl NodeBuilder {
     pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(self.commands.as_slice()) {
             Feedback::RunNode(ref ctx) => {
-                let db = RunCommand::db_helper(ctx);
+                let db = Run::db_helper(ctx);
                 let config: NodeConfig = ctx.get("node_config")
                                             .expect("could not find node_config");
                 let services: Vec<Box<Service>> = self.service_constructors

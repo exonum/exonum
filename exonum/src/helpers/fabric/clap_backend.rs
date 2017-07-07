@@ -10,7 +10,7 @@ impl ClapBackend {
     pub fn execute(commands: &[CollectedCommand]) -> Feedback {
         let app =
         clap::App::new("Exonum application based on fabric configuration.")
-                .version(env!("CARGO_PKG_VERSION"))
+                .version(crate_version!())
                 .author("Vladimir M. <vladimir.motylenko@xdev.re>")
                 .about("Exonum application based on fabric configuration.");
 
@@ -41,7 +41,7 @@ impl ClapBackend {
                 .iter()
                 .map(|arg|{
                     let clap_arg = clap::Arg::with_name(&arg.name);
-                    let clap_arg = match arg.argument.clone() {
+                    let clap_arg = match arg.argument_type.clone() {
                         ArgumentType::Positional => {
                             let arg = clap_arg.index(index);
                             index += 1;
@@ -52,7 +52,8 @@ impl ClapBackend {
                             if let Some(short) = detail.short_name {
                                 clap_arg = clap_arg.short(&short);
                             }
-                            clap_arg.takes_value(true)
+                            clap_arg.multiple(detail.multiple)
+                                    .takes_value(true)
                         }
                     };
                     clap_arg.help(&arg.help)
