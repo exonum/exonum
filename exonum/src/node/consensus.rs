@@ -656,12 +656,16 @@ impl<S> NodeHandler<S>
     // FIXME: remove this bull shit
     #[cfg_attr(feature="flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
-        let propose = self.state
-            .propose(propose_hash)
-            .unwrap()
-            .message()
-            .clone();
-
+        // if we already execute this block, return hash
+        if let Some(hash) = self.state
+                                .mut_propose(propose_hash)
+                                .unwrap()
+                                .block_hash()
+        {
+            return hash;
+        }
+        let propose = self.state.propose(propose_hash).unwrap().message().clone();
+        
         let tx_hashes = propose.transactions().to_vec();
 
         let (block_hash, patch) = self.create_block(propose.validator(),
@@ -669,6 +673,9 @@ impl<S> NodeHandler<S>
                                                     tx_hashes.as_slice());
         // Save patch
         self.state.add_block(block_hash, patch, tx_hashes, propose.validator());
+        self.state.mut_propose(propose_hash)
+                  .unwrap()
+                  .set_block_hash(block_hash);
         block_hash
     }
 
