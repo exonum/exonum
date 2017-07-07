@@ -118,6 +118,7 @@ use iron::Handler;
 use exonum::api::Api;
 use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext, gen_prefix};
 use exonum::node::State;
+use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::crypto::{Signature, PublicKey, Hash};
 use exonum::messages::{Message, FromRaw, RawTransaction};
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
@@ -657,5 +658,11 @@ impl Service for ConfigurationService {
         };
         api.wire(&mut router);
         Some(Box::new(router))
+    }
+}
+
+impl ServiceFactory for ConfigurationService {
+    fn make_service(_: &Context) -> Box<Service> {
+        Box::new(ConfigurationService::new())
     }
 }
