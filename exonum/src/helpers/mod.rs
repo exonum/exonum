@@ -44,6 +44,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         .map(|(idx, (validator, service))| {
             NodeConfig {
                 listen_address: peers[idx],
+                external_address: Some(peers[idx]),
                 network: Default::default(),
                 peers: peers.clone(),
                 consensus_public_key: validator.0,

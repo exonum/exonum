@@ -149,8 +149,10 @@ impl Default for MemoryPoolConfig {
 pub struct NodeConfig {
     /// Initial config that will be written in the first block.
     pub genesis: GenesisConfig,
-    /// Network address used by this node.
+    /// Network listening address.
     pub listen_address: SocketAddr,
+    /// Remote Network address used by this node.
+    pub external_address: Option<SocketAddr>,
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Peer addresses.
@@ -202,7 +204,7 @@ impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     /// Creates `NodeHandler` using specified `Configuration`.
-    pub fn new(blockchain: Blockchain, sender: S, config: Configuration) -> Self {
+    pub fn new(blockchain: Blockchain, external_address: SocketAddr, sender: S, config: Configuration) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -221,7 +223,7 @@ impl<S> NodeHandler<S>
             .map(|id| id as ValidatorId);
         info!("Validator={:#?}", validator_id);
         let connect = Connect::new(&config.listener.consensus_public_key,
-                                   sender.address(),
+                                   external_address,
                                    sender.get_time(),
                                    &config.listener.consensus_secret_key);
 
@@ -498,7 +500,6 @@ impl Node {
 
         let mut events_cfg = EventsConfiguration::default();
         events_cfg.notify_capacity(node_cfg.mempool.events_pool_capacity);
-
         let config = Configuration {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
@@ -515,10 +516,20 @@ impl Node {
             events: events_cfg,
             peer_discovery: node_cfg.peers,
         };
+
+        let external_address = 
+        if let Some(v) = node_cfg.external_address
+        {
+            v
+        } else {
+            warn!("Could not find external_address, in config, using listen_address");
+            node_cfg.listen_address
+        };
+
         let network = Network::with_config(node_cfg.listen_address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
-        let worker = NodeHandler::new(blockchain, channel, config);
+        let worker = NodeHandler::new(blockchain, external_address, channel, config);
         Node {
             reactor: Events::with_event_loop(network, worker, event_loop),
             api_options: node_cfg.api,
