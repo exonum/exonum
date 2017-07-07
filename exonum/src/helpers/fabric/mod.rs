@@ -90,7 +90,7 @@ impl Argument {
 }
 
 
-#[derive(Debug, Clone, Default)]
+#[derive(PartialEq, Debug, Clone, Default)]
 /// `Context` is a type, used to keep some values from `Command` into
 /// `CommandExtension` and vice verse.
 pub struct Context {
@@ -101,7 +101,7 @@ pub struct Context {
 
 impl Context {
 
-    fn new_from_args(args: &Vec<Argument>, matches: &clap::ArgMatches) -> Context {
+    fn new_from_args(args: &[Argument], matches: &clap::ArgMatches) -> Context {
         let mut context = Context::default();
         for arg in args {
             // processing multiple value arguments make code ugly =(
@@ -148,7 +148,7 @@ impl Context {
     pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, Box<Error>>
         where <T as FromStr>::Err: Error + 'static
     {
-        if let Some(ref values) = self.multiple_args.get(key) {
+        if let Some(values) = self.multiple_args.get(key) {
             values.iter().map(|v| Ok(v.parse()?)).collect()
         }
         else{

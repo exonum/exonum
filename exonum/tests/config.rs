@@ -2,38 +2,27 @@
 #[macro_use] extern crate pretty_assertions;
 extern crate toml;
 extern crate exonum;
-extern crate clap;
 extern crate lazy_static;
 
 use std::ffi::OsString;
 use std::fs::File;
 use std::fs;
+use std::panic;
 use std::io::Read;
-use std::path::Path;
-use clap::{App, Result};
 
-use exonum::helpers::clap::{Value, GenerateTemplateCommand, GenerateTestnetCommand,
-                                AddValidatorCommand, InitCommand };
+use exonum::helpers::fabric::NodeBuilder;
 
 const CONFIG_TMP_FOLDER: &'static str = "/tmp/";
 const CONFIG_TESTDATA_FOLDER: &'static str = 
                     concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");
 
-const GENERATED_TEMPLATES: [&'static str; 5] = ["template.toml", "template1.toml", 
-                                                "template2.toml", "template3.toml",
-                                                "template_full.toml", ];
+const GENERATED_TEMPLATE :&'static str= "template.toml";
 
-const KEYCHAINS: [&'static str; 4] = ["keychain1.toml","keychain2.toml",
-                                        "keychain3.toml","keychain4.toml"];
+const SEC_CONFIG: [&'static str; 4] = ["config0_sec.toml","config1_sec.toml",
+                                        "config2_sec.toml","config3_sec.toml"];
 
-const OUT_CONFIGS : [&'static str; 4] = ["config1.toml","config2.toml",
-                                        "config3.toml","config4.toml"];
-
-const PUB_KEYS: [&'static str; 4] = ["keychain1.pub","keychain2.pub",
-                                        "keychain3.pub","keychain4.pub"];
-
-const START_TEMPLATE: &'static str = GENERATED_TEMPLATES[0];
-const FULL_TEMPLATE: &'static str = GENERATED_TEMPLATES[4];
+const PUB_CONFIG: [&'static str; 4] = ["config0_pub.toml","config1_pub.toml",
+                                    "config2_pub.toml","config3_pub.toml"];
 
 fn full_tmp_folder(folder: &str) -> String {
     format!("{}exonum-test-{}/", CONFIG_TMP_FOLDER, folder)
@@ -66,91 +55,119 @@ fn compare_files(filename: &str, folder: &str) {
     assert_eq!(source_toml, destination_toml);
 }
 
-fn default_run_with_matches<I, T>(iter: I) -> Result<()>
+fn default_run_with_matches<I, T>(iter: I) -> bool
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone, 
 {
-    let app = App::new("Test template generate")
-                    .subcommand(GenerateTemplateCommand::new())
-                    .subcommand(GenerateTestnetCommand::new())
-                    .subcommand(AddValidatorCommand::new())
-                    .subcommand(InitCommand::new());
-
-    let matches = app.get_matches_from_safe(iter)?;
-
-    match matches.subcommand() {
-        ("generate-template", Some(matches)) => GenerateTemplateCommand::execute(matches, None),
-        ("add-validator", Some(matches)) => AddValidatorCommand::execute(matches, |_, _| Ok(())),
-        ("generate", Some(matches)) => GenerateTestnetCommand::execute(matches),
-        ("init", Some(matches)) => InitCommand::execute(matches, |config, _, _ | Ok(Value::try_from(config).unwrap())),
-        _ => panic!("Wrong subcommand"),
-    };
-    Ok(())
+    let builder = NodeBuilder::new();
+    builder.parse_cmd_string(iter)
 }
 
 fn generate_template(folder: &str) {
-    default_run_with_matches(vec!["exonum-config-test", "generate-template", "4",
-                                    &full_tmp_name(START_TEMPLATE, folder)]).unwrap();
+    assert!(!default_run_with_matches(vec!["exonum-config-test", "generate-template",
+                                    &full_tmp_name(GENERATED_TEMPLATE, folder)]));
     
 }
 
-fn add_validator(folder: &str, i: usize) {
-    default_run_with_matches(vec!["exonum-config-test", "add-validator", 
-                                    &full_tmp_name(GENERATED_TEMPLATES[i + 1], folder),
-                                    &full_testdata_name(PUB_KEYS[i]),
+fn generate_config(folder: &str, i: usize) {
+    assert!(!default_run_with_matches(vec!["exonum-config-test", "generate-config", 
+                                    &full_testdata_name(GENERATED_TEMPLATE),
+                                    &full_tmp_name(PUB_CONFIG[i], folder),
+                                    &full_tmp_name(SEC_CONFIG[i], folder),
                                     "-a",
                                     "127.0.0.1"]
-                                    ).unwrap();
+                                    ));
 }
 
-fn init_validator(config: &str, folder: &str, i: usize) {
-    default_run_with_matches(vec!["exonum-config-test", "init", 
-                                    &full_testdata_name(config),
-                                    &full_testdata_name(KEYCHAINS[i]),
-                                    &full_tmp_name(OUT_CONFIGS[i], folder)]
-                                    ).unwrap();  
-}
+#[cfg_attr(feature="cargo-clippy", allow(needless_range_loop))]
+fn finalize_config(folder: &str, config: &str, i:usize, count: usize) {
 
-fn deploy_file(file:&str, folder:&str) {
-    let dest = full_tmp_name(file, folder);
-    let path: &Path = dest.as_ref();
-    if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).unwrap();
+    let mut variables = vec!["exonum-config-test".to_owned(), "finalize".to_owned(), 
+                                    full_testdata_name(SEC_CONFIG[i]),
+                                    full_tmp_name(config, folder),
+                                    "-p".to_owned()];
+    for n in 0..count {
+        variables.push(full_testdata_name(PUB_CONFIG[n]));
     }
-    fs::copy(&full_testdata_name(file), 
-                path).unwrap();
+    println!("{:?}", variables);
+    assert!(!default_run_with_matches(variables));  
 }
+
+fn run_node(config: &str, folder:&str) {
+    assert!(default_run_with_matches(vec!["exonum-config-test", "run", "-c",
+                                    &full_testdata_name(config),
+                                    "-d", &full_tmp_folder(folder)]));  
+}
+
 
 #[test]
 fn test_generate_template() {
     let command = "generate-template";
-    generate_template(command);
-    compare_files(START_TEMPLATE, command);
+
+    let result = panic::catch_unwind(|| {
+        generate_template(command);
+        compare_files(GENERATED_TEMPLATE, command);
+    });
+
     fs::remove_dir_all(full_tmp_folder(command)).unwrap();
+
+    if let Err(err) = result {
+        panic::resume_unwind(err);
+    }
 }
 
 #[test]
 #[cfg_attr(feature="cargo-clippy", allow(needless_range_loop))]
-fn test_add_validators_full_template() {
-    let command = "add-validator";
-    deploy_file(START_TEMPLATE, command);
-    for i in 0..KEYCHAINS.len() {
-        fs::rename(&full_tmp_name(GENERATED_TEMPLATES[i], command),
-                         &full_tmp_name(GENERATED_TEMPLATES[i + 1], command)).unwrap();
-        add_validator(command, i);
-        compare_files(GENERATED_TEMPLATES[i + 1], command);
-    }
+fn test_generate_config() {
+    let command = "generate-config";
+
+    let result = panic::catch_unwind(|| {
+        for i in 0..PUB_CONFIG.len() {
+            generate_config(command, i);
+        }
+    });
+
     fs::remove_dir_all(full_tmp_folder(command)).unwrap();
+
+    if let Err(err) = result {
+        panic::resume_unwind(err);
+    }
 }
+
 
 #[test]
 #[cfg_attr(feature="cargo-clippy", allow(needless_range_loop))]
-fn test_generate_full_config() {
-    let command = "init";
-    for i in 0..KEYCHAINS.len() {
-        init_validator(FULL_TEMPLATE, command, i);
-        compare_files(OUT_CONFIGS[i], command);
-    }
+fn test_generate_full_config_run() {
+    let command = "finalize";
+    let result = panic::catch_unwind(|| {
+        for i in 0..PUB_CONFIG.len() {
+            for n in 0..PUB_CONFIG.len()+1 {
+                println!("{} {}", i, n);
+                let config = format!("config{}{}.toml", i, n);
+                let result = panic::catch_unwind(|| {
+                    finalize_config(command, &config, i, n);
+                    compare_files(&config, command);
+                    run_node(&config, command);
+                });
+
+                // if we trying to create config,
+                // without our config, this is a problem
+                if n <= i || n == 0 {
+                    assert!(result.is_err());
+                }
+                else {
+                    assert!(result.is_ok());
+                }
+            }
+            
+        }
+    });
+
     fs::remove_dir_all(full_tmp_folder(command)).unwrap();
+
+    if let Err(err) = result {
+        panic::resume_unwind(err);
+    }
 }
+
