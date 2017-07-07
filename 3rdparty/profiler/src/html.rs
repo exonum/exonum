@@ -1,11 +1,11 @@
 use std::io::Write;
 use std::io::Result as IoResult;
-use super::{SpanPtr, Span};
+use super::{SpanPtr, Span, ThreadFrame};
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
 
-pub fn dump_html<W: Write>(out: &mut W) -> IoResult<()> {
+pub fn dump_html<W: Write>(out: &mut W, frame: &ThreadFrame) -> IoResult<()> {
     fn dump_span<W: Write>(out: &mut W, name:&'static str, span: &Span) -> IoResult<()>{
             try!(writeln!(out, "{{"));
             try!(writeln!(out, r#"name: "{}","#, name));
@@ -69,7 +69,7 @@ pub fn dump_html<W: Write>(out: &mut W) -> IoResult<()> {
                   }});
             d3.select("body").datum({{ children: [
 "#, include_str!("../resources/flameGraph.css"), include_str!("../resources/d3.js"), include_str!("../resources/d3-tip.js"), include_str!("../resources/flameGraph.js")));
-    let spans = ::spans();
+    let spans = frame.root();
     let root = spans.borrow();
     try!(dump_span(out, "Self", &root));
 
