@@ -44,9 +44,9 @@ impl Run {
     }
 
     #[cfg(feature="memorydb")]
-    pub fn db_helper(_: &Context) -> Storage {
+    pub fn db_helper(_: &Context) -> Box<Database> {
         use storage::MemoryDB;
-        MemoryDB::new()
+        Box::new(MemoryDB::new())
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
