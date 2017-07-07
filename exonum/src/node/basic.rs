@@ -55,6 +55,7 @@ impl<S> NodeHandler<S>
         // TODO add spam protection
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
+            trace!("Received Connect with same addr as our external_address.");
             return;
         }
 
