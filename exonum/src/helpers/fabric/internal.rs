@@ -4,6 +4,7 @@ use std::fmt;
 use std::error::Error;
 
 /// Used to take some additional information from executed command
+#[derive(Debug, PartialEq, Clone)]
 pub enum Feedback {
     /// Run node with current context.
     RunNode(Context),

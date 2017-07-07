@@ -116,7 +116,7 @@ impl Command for Run {
 pub struct GenerateCommonConfig;
 impl GenerateCommonConfig {
     pub fn name() -> CommandName {
-        "generate-common"
+        "generate-template"
     }
 }
 
@@ -305,7 +305,8 @@ impl Finalize {
         }
         (common, 
             map.iter().map(|(_, &ref c)|c.clone()).collect(),
-            map.get(&our_config.consensus_public_key).unwrap().clone())
+            map.get(&our_config.consensus_public_key)
+               .expect("our key not found in config").clone())
     }
 }
 
