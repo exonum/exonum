@@ -1,7 +1,7 @@
 [package]
 name = "minibank"
 version = "0.1.0"
-authors = ["Denis Kolodin <deniskolodin@gmail.com>"]
+authors = ["Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
 iron = "0.5.1"
