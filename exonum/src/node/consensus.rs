@@ -658,7 +658,7 @@ impl<S> NodeHandler<S>
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         // if we already execute this block, return hash
         if let Some(hash) = self.state
-                                .mut_propose(propose_hash)
+                                .propose_mut(propose_hash)
                                 .unwrap()
                                 .block_hash()
         {
@@ -673,7 +673,7 @@ impl<S> NodeHandler<S>
                                                     tx_hashes.as_slice());
         // Save patch
         self.state.add_block(block_hash, patch, tx_hashes, propose.validator());
-        self.state.mut_propose(propose_hash)
+        self.state.propose_mut(propose_hash)
                   .unwrap()
                   .set_block_hash(block_hash);
         block_hash
