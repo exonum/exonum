@@ -391,14 +391,14 @@ impl Command for Finalize {
     }
 }
 
-pub struct GenerateTestnetCommand;
-impl GenerateTestnetCommand {
+pub struct GenerateTestnet;
+impl GenerateTestnet {
     pub fn name() -> CommandName {
         "generate-testnet"
     }
 }
 
-impl Command for GenerateTestnetCommand {
+impl Command for GenerateTestnet {
     fn args(&self) -> Vec<Argument> {
         vec![
             Argument::new_named("OUTPUT_DIR", true,

@@ -9,7 +9,7 @@ use super::clap_backend::ClapBackend;
 use super::{Context, ServiceFactory};
 use super::details::{Run, Finalize,
                     GenerateNodeConfig, GenerateCommonConfig,
-                    GenerateTestnetCommand };
+                    GenerateTestnet };
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
 #[derive(Default)]
@@ -23,7 +23,7 @@ impl NodeBuilder {
     /// creates new empty `NodeBuilder`
     pub fn new() -> NodeBuilder {
         NodeBuilder {
-            commands: vec![CollectedCommand::new(Box::new(GenerateTestnetCommand)),
+            commands: vec![CollectedCommand::new(Box::new(GenerateTestnet)),
                            CollectedCommand::new(Box::new(Run)),
                            CollectedCommand::new(Box::new(GenerateNodeConfig)),
                            CollectedCommand::new(Box::new(GenerateCommonConfig)),

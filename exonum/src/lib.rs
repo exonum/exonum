@@ -35,7 +35,7 @@ extern crate test;
 extern crate env_logger;
 extern crate colored;
 extern crate term;
-#[macro_use(crate_version)]
+#[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate hyper;
 extern crate iron;
