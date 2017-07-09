@@ -119,6 +119,7 @@ struct RequestState {
 pub struct ProposeState {
     propose: Propose,
     unknown_txs: HashSet<Hash>,
+    block_hash: Option<Hash>,
 }
 
 /// State of a block.
@@ -271,6 +272,16 @@ impl ProposeState {
     /// Returns hash of the propose.
     pub fn hash(&self) -> Hash {
         self.propose.hash()
+    }
+
+    /// Returns block hash propose was executed.
+    pub fn block_hash(&self) -> Option<Hash> {
+        self.block_hash
+    }
+
+    /// Set block hash on propose execute.
+    pub fn set_block_hash(&mut self, block_hash: Hash) {
+        self.block_hash = Some(block_hash)
     }
 
     /// Returns propose-message.
@@ -597,6 +608,10 @@ impl State {
         self.locked_propose
     }
 
+    /// Returns muttable propose state identified by hash.
+    pub fn propose_mut(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
+        self.proposes.get_mut(hash)
+    }
     /// Returns propose state identified by hash.
     pub fn propose(&self, hash: &Hash) -> Option<&ProposeState> {
         self.proposes.get(hash)
@@ -732,6 +747,7 @@ impl State {
                              ProposeState {
                                  propose: msg,
                                  unknown_txs: HashSet::new(),
+                                 block_hash: None,
                              });
 
         propose_hash
@@ -758,6 +774,7 @@ impl State {
                 Some(e.insert(ProposeState {
                     propose: msg.clone(),
                     unknown_txs: unknown_txs,
+                    block_hash: None,
                 }))
             }
         }

@@ -9,12 +9,13 @@ mod html;
 
 use std::cell::{RefCell};
 use std::rc::Rc;
-use std::time::{Instant};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, Arc};
+
 
 pub type SpanPtr = RefCell<Span>;
 thread_local!(static THREAD_FRAME: RefCell<ThreadFrame> = RefCell::new(ThreadFrame::new()));
@@ -38,6 +39,7 @@ struct Event {
     span: Rc<SpanPtr>,
 }
 
+#[derive(Clone)]
 pub struct Span {
     value: u64,
     count: u64,
@@ -70,6 +72,10 @@ impl ThreadFrame {
 
     fn root(&self) -> &SpanPtr {
         &self.root
+    }
+
+    fn time_since_start(&self) -> u64 {
+        ns_since_epoch(self.epoch)
     }
 
     fn start_span(&mut self, name: &'static str) {

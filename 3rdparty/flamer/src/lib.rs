@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 #![feature(plugin_registrar, quote, rustc_private, custom_attribute)]
 
 extern crate rustc_plugin;
