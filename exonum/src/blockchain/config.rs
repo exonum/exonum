@@ -10,7 +10,7 @@ use events::Milliseconds;
 use crypto::{hash, PublicKey, Hash};
 
 /// Public keys of a validator.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     #[doc(hidden)]

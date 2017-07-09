@@ -9,7 +9,7 @@ use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
 use crypto::gen_keypair;
 
-pub mod clap;
+pub mod fabric;
 
 pub fn init_logger() -> Result<(), SetLoggerError> {
     let mut builder = LogBuilder::new();
@@ -55,6 +55,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 whitelist: Default::default(),
                 api: Default::default(),
                 mempool: Default::default(),
+                services_configs: Default::default(),
             }
         })
         .collect::<Vec<_>>()
