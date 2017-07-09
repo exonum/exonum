@@ -609,7 +609,7 @@ impl State {
     }
 
     /// Returns muttable propose state identified by hash.
-    pub fn mut_propose(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
+    pub fn propose_mut(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
         self.proposes.get_mut(hash)
     }
     /// Returns propose state identified by hash.
