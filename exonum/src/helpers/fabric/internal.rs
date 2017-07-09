@@ -29,11 +29,9 @@ impl fmt::Display for NotFoundInMap {
 /// `Command` trait useable to create subcommand for `NodeBuilder`
 pub trait Command {
     fn args(&self) -> Vec<Argument>;
-    fn name(&self) -> CommandName ;
+    fn name(&self) -> CommandName;
     fn about(&self) -> &str;
-    fn execute(&self,
-               context: Context,
-               extension: &Fn(Context) -> Context) -> Feedback;
+    fn execute(&self, context: Context, extension: &Fn(Context) -> Context) -> Feedback;
 }
 
 /// We keep command internal state into `CollectedCommand`
@@ -45,7 +43,7 @@ pub trait Command {
 pub struct CollectedCommand {
     command: Box<Command>,
     args: Vec<Argument>,
-    exts: Vec<Box<CommandExtension>>
+    exts: Vec<Box<CommandExtension>>,
 }
 
 impl CollectedCommand {
@@ -53,7 +51,7 @@ impl CollectedCommand {
         CollectedCommand {
             args: command.args(),
             command: command,
-            exts: Vec::new()
+            exts: Vec::new(),
         }
     }
 
@@ -82,9 +80,10 @@ impl CollectedCommand {
             // TODO: check duplicates, in services context keys
             let mut new_context = context.clone();
             for ext in &self.exts {
-                new_context = ext.execute(new_context)
-                                     .expect("Could not execute extension.");
-            };
+                new_context = ext.execute(new_context).expect(
+                    "Could not execute extension.",
+                );
+            }
             new_context
         })
     }
@@ -93,7 +92,9 @@ impl CollectedCommand {
 
 impl fmt::Debug for CollectedCommand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CollectedCommand {{ args: {:?}, ext_count: {} }}",
+        write!(
+            f,
+            "CollectedCommand {{ args: {:?}, ext_count: {} }}",
             self.args,
             self.exts.len()
         )

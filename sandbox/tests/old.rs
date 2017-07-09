@@ -125,7 +125,7 @@ fn test_commit() {
 }
 
 #[test]
-#[should_panic(expected = "Expected to broadcast the message Consensus(Prevote" ])]
+#[should_panic(expected = "Expected to broadcast the message Consensus(Prevote")]
 fn received_unexpected_propose() {
     let sandbox = timestamping_sandbox();
 

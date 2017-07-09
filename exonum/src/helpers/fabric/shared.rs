@@ -1,4 +1,4 @@
-//! This module is used, to collect structures, 
+//! This module is used, to collect structures,
 //! that is shared into `CommandExtension` from `Command`.
 //!
 use toml::Value;
@@ -16,7 +16,7 @@ pub type AbstractConfig = BTreeMap<String, Value>;
 pub struct NodePublicConfig {
     pub addr: SocketAddr,
     pub validator_keys: ValidatorKeys,
-    pub services_public_configs: AbstractConfig
+    pub services_public_configs: AbstractConfig,
 }
 
 /// `SharedConfig` contain all public information
@@ -58,5 +58,5 @@ pub struct NodePrivateConfig {
     /// Service secret key.
     pub service_secret_key: SecretKey,
     /// Additional service secret config.
-    pub services_secret_configs: AbstractConfig
+    pub services_secret_configs: AbstractConfig,
 }

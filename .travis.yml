@@ -7,7 +7,7 @@ group: deprecated-2017Q2
 dist: trusty
 env:
   global:
-    - NIGHTLY_RUST=nightly-2017-07-02
+    - NIGHTLY_RUST=nightly-2017-07-05
     - CLIPPY_VERS=0.0.142
     - RUSTFMT_VERS=0.9.0
 before_install:

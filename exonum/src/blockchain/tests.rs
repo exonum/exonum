@@ -43,10 +43,36 @@ encoding_struct! {
 
 #[test]
 fn test_correct_encoding_struct() {
-    let dat: Vec<u8> = vec![8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0,
-                            0, 0, 1, 2];
+    let dat: Vec<u8> = vec![
+        8u8,
+        0,
+        0,
+        0,
+        18,
+        0,
+        0,
+        0,
+        16,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        17,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        1,
+        2,
+    ];
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
-    let mut buffer = vec![0;8];
+    let mut buffer = vec![0; 8];
     test.write(&mut buffer, 0, 8);
     assert_eq!(buffer, dat);
     <StructWithTwoSegments as Field>::check(&dat, 0.into(), 8.into(), 8.into()).unwrap();
@@ -56,24 +82,40 @@ fn test_correct_encoding_struct() {
 }
 
 #[test]
-#[should_panic(expected ="OverlappingSegment")]
+#[should_panic(expected = "OverlappingSegment")]
 fn test_overlap_segments() {
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 1, 2];
-    let mut buffer = vec![0;8];
+    let mut buffer = vec![0; 8];
     test.write(&mut buffer, 0, 8);
     <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }
 
 
 #[test]
-#[should_panic(expected ="SpaceBetweenSegments")]
+#[should_panic(expected = "SpaceBetweenSegments")]
 fn test_segments_has_spaces_between() {
-    let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0,
-        18, 0, 0, 0, 1, 0, 0, 0, // <-- link after space
+    let test = vec![
+        16u8,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0,
+        18,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0, // <-- link after space
         1,
         0, // <-- this is space one
-        2];
-    let mut buffer = vec![0;8];
+        2,
+    ];
+    let mut buffer = vec![0; 8];
     test.write(&mut buffer, 0, 8);
     <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }
@@ -121,14 +163,25 @@ fn test_handling_tx_panic() {
     let tx_failed = Tx::new(0, &sec_key);
     let tx_storage_error = Tx::new(42, &sec_key);
 
-    let mut pool : BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
+    let mut pool: BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
 
     pool.insert(tx_ok1.hash(), Box::new(tx_ok1.clone()) as Box<Transaction>);
     pool.insert(tx_ok2.hash(), Box::new(tx_ok2.clone()) as Box<Transaction>);
-    pool.insert(tx_failed.hash(), Box::new(tx_failed.clone()) as Box<Transaction>);
-    pool.insert(tx_storage_error.hash(), Box::new(tx_storage_error.clone()) as Box<Transaction>);
+    pool.insert(
+        tx_failed.hash(),
+        Box::new(tx_failed.clone()) as Box<Transaction>,
+    );
+    pool.insert(
+        tx_storage_error.hash(),
+        Box::new(tx_storage_error.clone()) as Box<Transaction>,
+    );
 
-    let (_, patch) = blockchain.create_patch(0, 0, &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()], &pool);
+    let (_, patch) = blockchain.create_patch(
+        0,
+        0,
+        &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
+        &pool,
+    );
 
     let mut db = MemoryDB::new();
     db.merge(patch).unwrap();
@@ -136,9 +189,18 @@ fn test_handling_tx_panic() {
 
     let schema = Schema::new(&snapshot);
 
-    assert_eq!(schema.transactions().get(&tx_ok1.hash()), Some(tx_ok1.raw().clone()));
-    assert_eq!(schema.transactions().get(&tx_ok2.hash()), Some(tx_ok2.raw().clone()));
-    assert_eq!(schema.transactions().get(&tx_failed.hash()), Some(tx_failed.raw().clone()));
+    assert_eq!(
+        schema.transactions().get(&tx_ok1.hash()),
+        Some(tx_ok1.raw().clone())
+    );
+    assert_eq!(
+        schema.transactions().get(&tx_ok2.hash()),
+        Some(tx_ok2.raw().clone())
+    );
+    assert_eq!(
+        schema.transactions().get(&tx_failed.hash()),
+        Some(tx_failed.raw().clone())
+    );
 
     let index = ListIndex::new(vec![01], &snapshot);
 
@@ -193,12 +255,23 @@ fn test_handling_tx_panic_storage_error() {
     let tx_failed = Tx::new(0, &sec_key);
     let tx_storage_error = Tx::new(42, &sec_key);
 
-    let mut pool : BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
+    let mut pool: BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
 
     pool.insert(tx_ok1.hash(), Box::new(tx_ok1.clone()) as Box<Transaction>);
     pool.insert(tx_ok2.hash(), Box::new(tx_ok2.clone()) as Box<Transaction>);
-    pool.insert(tx_failed.hash(), Box::new(tx_failed.clone()) as Box<Transaction>);
-    pool.insert(tx_storage_error.hash(), Box::new(tx_storage_error.clone()) as Box<Transaction>);
+    pool.insert(
+        tx_failed.hash(),
+        Box::new(tx_failed.clone()) as Box<Transaction>,
+    );
+    pool.insert(
+        tx_storage_error.hash(),
+        Box::new(tx_storage_error.clone()) as Box<Transaction>,
+    );
 
-    blockchain.create_patch(0, 0, &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()], &pool);
+    blockchain.create_patch(
+        0,
+        0,
+        &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
+        &pool,
+    );
 }

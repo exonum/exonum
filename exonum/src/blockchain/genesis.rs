@@ -17,7 +17,8 @@ impl GenesisConfig {
 
     /// Creates a configuration from the given consensus configuration and list of public keys.
     pub fn new_with_consensus<I>(consensus: ConsensusConfig, validator_keys: I) -> Self
-        where I: Iterator<Item = ValidatorKeys>
+    where
+        I: Iterator<Item = ValidatorKeys>,
     {
         GenesisConfig {
             consensus: consensus,

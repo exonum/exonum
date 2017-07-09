@@ -46,8 +46,8 @@
 //!
 //! | Position | Stored data  | Hexadecimal form | Comment |
 //! |:--------|:------:|:---------------------|:--------------------------------------------------|
-//! `0  => 4`  | 16    | `10 00 00 00`            | Little endian stored segment pointer, reffer to position in data where real string is located |
-//! `4  => 8`  | 6     | `06 00 00 00`            | Little endian stored segment size |
+//! `0  => 4`  | 16    | `10 00 00 00`            | LE stored segment pointer to the data |
+//! `4  => 8`  | 6     | `06 00 00 00`            | LE stored segment size |
 //! `8  => 16` | 23    | `17 00 00 00 00 00 00 00`| number in little endian |
 //! `16 => 24` | Andrew| `41 6e 64 72 65 77`	    | Real text bytes|
 //!

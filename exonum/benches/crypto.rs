@@ -25,9 +25,7 @@ mod tests {
     #[bench]
     fn bench_sign_1024(b: &mut Bencher) {
         let (_, secret_key) = gen_keypair();
-        let data = (0..1024)
-            .map(|x| (x % 255) as u8)
-            .collect::<Vec<_>>();
+        let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
         b.iter(|| sign(&data, &secret_key))
     }
 
@@ -35,9 +33,7 @@ mod tests {
     fn bench_sign_1024_inited_sodium(b: &mut Bencher) {
         ::exonum::crypto::init();
         let (_, secret_key) = gen_keypair();
-        let data = (0..1024)
-            .map(|x| (x % 255) as u8)
-            .collect::<Vec<_>>();
+        let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
         b.iter(|| sign(&data, &secret_key))
     }
 
@@ -60,9 +56,7 @@ mod tests {
     #[bench]
     fn bench_verify_1024(b: &mut Bencher) {
         let (public_key, secret_key) = gen_keypair();
-        let data = (0..1024)
-            .map(|x| (x % 255) as u8)
-            .collect::<Vec<_>>();
+        let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
         let signature = sign(&data, &secret_key);
         b.iter(|| verify(&signature, &data, &public_key))
     }
@@ -71,9 +65,7 @@ mod tests {
     fn bench_verify_1024_inited_sodium(b: &mut Bencher) {
         ::exonum::crypto::init();
         let (public_key, secret_key) = gen_keypair();
-        let data = (0..1024)
-            .map(|x| (x % 255) as u8)
-            .collect::<Vec<_>>();
+        let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
         let signature = sign(&data, &secret_key);
         b.iter(|| verify(&signature, &data, &public_key))
     }
@@ -92,18 +84,14 @@ mod tests {
 
     #[bench]
     fn bench_hash_1024(b: &mut Bencher) {
-        let data = (0..1024)
-            .map(|x| (x % 255) as u8)
-            .collect::<Vec<_>>();
+        let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
         b.iter(|| hash(&data))
     }
 
     #[bench]
     fn bench_hash_1024_inited_sodium(b: &mut Bencher) {
         ::exonum::crypto::init();
-        let data = (0..1024)
-            .map(|x| (x % 255) as u8)
-            .collect::<Vec<_>>();
+        let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
         b.iter(|| hash(&data))
     }
 }

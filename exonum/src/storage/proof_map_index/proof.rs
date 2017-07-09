@@ -10,7 +10,8 @@ use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
 
 impl Serialize for DBKey {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         let mut repr = String::with_capacity(KEY_SIZE * 8);
         let bslice = self;
@@ -103,11 +104,12 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                let full_slice = &[left_hash.as_ref(),
-                                   right_hash.as_ref(),
-                                   &left_key.to_vec(),
-                                   &right_key.to_vec()]
-                                          .concat();
+                let full_slice = &[
+                    left_hash.as_ref(),
+                    right_hash.as_ref(),
+                    &left_key.to_vec(),
+                    &right_key.to_vec(),
+                ].concat();
                 hash(full_slice)
             }
             LeftBranch {
@@ -116,11 +118,12 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                let full_slice = &[left_hash.compute_proof_root().as_ref(),
-                                   right_hash.as_ref(),
-                                   &left_key.to_vec(),
-                                   &right_key.to_vec()]
-                                          .concat();
+                let full_slice = &[
+                    left_hash.compute_proof_root().as_ref(),
+                    right_hash.as_ref(),
+                    &left_key.to_vec(),
+                    &right_key.to_vec(),
+                ].concat();
                 hash(full_slice)
             }
             RightBranch {
@@ -129,11 +132,12 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                let full_slice = &[left_hash.as_ref(),
-                                   right_hash.compute_proof_root().as_ref(),
-                                   &left_key.to_vec(),
-                                   &right_key.to_vec()]
-                                          .concat();
+                let full_slice = &[
+                    left_hash.as_ref(),
+                    right_hash.compute_proof_root().as_ref(),
+                    &left_key.to_vec(),
+                    &right_key.to_vec(),
+                ].concat();
                 hash(full_slice)
             }
         }
@@ -143,7 +147,8 @@ impl<V: StorageValue> BranchProofNode<V> {
 
 impl<V: Serialize> Serialize for MapProof<V> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         use self::MapProof::*;
 
@@ -173,7 +178,8 @@ impl<V: Serialize> Serialize for MapProof<V> {
 }
 impl<V: Serialize> Serialize for BranchProofNode<V> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         use self::BranchProofNode::*;
         let mut state = serializer.serialize_map(Some(2))?;
@@ -211,7 +217,8 @@ impl<V: Serialize> Serialize for BranchProofNode<V> {
 }
 impl<V: Serialize> Serialize for ProofNode<V> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         use self::ProofNode::*;
         match *self {
@@ -230,10 +237,11 @@ impl<V: Serialize> Serialize for ProofNode<V> {
 }
 
 impl<V: fmt::Debug + StorageValue> MapProof<V> {
-    pub fn verify_root_proof_consistency<K: ProofMapKey>(&self,
-                                                         searched_key: &K,
-                                                         root_hash: Hash)
-                                                         -> Result<Option<&V>, Error> {
+    pub fn verify_root_proof_consistency<K: ProofMapKey>(
+        &self,
+        searched_key: &K,
+        root_hash: Hash,
+    ) -> Result<Option<&V>, Error> {
         let searched_slice = DBKey::leaf(searched_key);
         use self::MapProof::*;
 
@@ -243,20 +251,24 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
             LeafRootInclusive(ref root_db_key, ref val) => {
                 let root_slice = root_db_key;
                 if root_slice != &searched_slice {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}. ",
-                                                  searched_slice,
-                                                  self)));
+                        searched_slice,
+                        self
+                    )));
                 }
                 Some(val)
             }
             LeafRootExclusive(ref root_db_key, _) => {
                 let root_slice = root_db_key;
                 if root_slice == &searched_slice {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?} ",
-                                                  searched_slice,
-                                                  self)));
+                        searched_slice,
+                        self
+                    )));
                 }
                 None
             }
@@ -264,10 +276,12 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
         };
         let proof_hash = self.compute_proof_root();
         if proof_hash != root_hash {
-            return Err(Error::new(format!("The proof doesn't match the expected hash! \
+            return Err(Error::new(format!(
+                "The proof doesn't match the expected hash! \
                                            Expected: {:?} , from proof: {:?}",
-                                          root_hash,
-                                          proof_hash)));
+                root_hash,
+                proof_hash
+            )));
         }
         Ok(res)
     }
@@ -286,13 +300,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
             } => {
                 let left_slice = left_slice_key;
                 if !searched_slice.starts_with(left_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
-                                                  searched_slice,
-                                                  self)));
+                        searched_slice,
+                        self
+                    )));
                 }
-                proof
-                    .verify_proof_consistency(left_slice, searched_slice)?
+                proof.verify_proof_consistency(left_slice, searched_slice)?
             }
             RightBranch {
                 right_hash: ref proof,
@@ -301,13 +316,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
             } => {
                 let right_slice = right_slice_key;
                 if !searched_slice.starts_with(right_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
-                                                  searched_slice,
-                                                  self)));
+                        searched_slice,
+                        self
+                    )));
                 }
-                proof
-                    .verify_proof_consistency(right_slice, searched_slice)?
+                proof.verify_proof_consistency(right_slice, searched_slice)?
             }
             BranchKeyNotFound {
                 left_key: ref left_slice_key,
@@ -317,11 +333,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 let left_slice = left_slice_key;
                 let right_slice = right_slice_key;
                 if searched_slice.starts_with(left_slice) ||
-                   searched_slice.starts_with(right_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    searched_slice.starts_with(right_slice)
+                {
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
-                                                  searched_slice,
-                                                  self)));
+                        searched_slice,
+                        self
+                    )));
                 }
                 None
             }
@@ -329,10 +348,11 @@ impl<V: fmt::Debug> BranchProofNode<V> {
         Ok(res)
     }
 
-    fn verify_proof_consistency<'a>(&'a self,
-                                    parent_slice: &DBKey,
-                                    searched_slice: &DBKey)
-                                    -> Result<Option<&'a V>, Error> {
+    fn verify_proof_consistency<'a>(
+        &'a self,
+        parent_slice: &DBKey,
+        searched_slice: &DBKey,
+    ) -> Result<Option<&'a V>, Error> {
         use self::BranchProofNode::*;
 
         // if we inspect sub-proofs of a proof
@@ -347,21 +367,23 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 left_slice.set_from(0);
                 let mut right_slice = right_slice_key.clone();
                 right_slice.set_from(0);
-                if !left_slice.starts_with(parent_slice) ||
-                   !right_slice.starts_with(parent_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
+                if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with itself: Proof: \
                                                    {:?} . Parent slice: {:?}",
-                                                  self,
-                                                  parent_slice)));
+                        self,
+                        parent_slice
+                    )));
                 }
                 if !searched_slice.starts_with(&left_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
-                                                  searched_slice,
-                                                  self)));
+                        searched_slice,
+                        self
+                    )));
                 }
-                proof
-                    .verify_proof_consistency(&left_slice, searched_slice)?
+                proof.verify_proof_consistency(&left_slice, searched_slice)?
             }
             RightBranch {
                 right_hash: ref proof,
@@ -373,21 +395,23 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 left_slice.set_from(0);
                 let mut right_slice = right_slice_key.clone();
                 right_slice.set_from(0);
-                if !left_slice.starts_with(parent_slice) ||
-                   !right_slice.starts_with(parent_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
+                if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with itself: Proof: \
                                                    {:?} . Parent slice: {:?}",
-                                                  self,
-                                                  parent_slice)));
+                        self,
+                        parent_slice
+                    )));
                 }
                 if !searched_slice.starts_with(&right_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
-                                                  searched_slice,
-                                                  self)));
+                        searched_slice,
+                        self
+                    )));
                 }
-                proof
-                    .verify_proof_consistency(&right_slice, searched_slice)?
+                proof.verify_proof_consistency(&right_slice, searched_slice)?
             }
             BranchKeyNotFound {
                 left_key: ref left_slice_key,
@@ -398,19 +422,23 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 left_slice.set_from(0);
                 let mut right_slice = right_slice_key.clone();
                 right_slice.set_from(0);
-                if !left_slice.starts_with(parent_slice) ||
-                   !right_slice.starts_with(parent_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with itself: Proof: \
+                if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with itself: Proof: \
                                                    {:?} . Parent slice: {:?}",
-                                                  self,
-                                                  parent_slice)));
+                        self,
+                        parent_slice
+                    )));
                 }
                 if searched_slice.starts_with(&left_slice) ||
-                   searched_slice.starts_with(&right_slice) {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    searched_slice.starts_with(&right_slice)
+                {
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Proof: {:?}",
-                                                  searched_slice,
-                                                  self)));
+                        searched_slice,
+                        self
+                    )));
                 }
                 None
             }
@@ -419,26 +447,31 @@ impl<V: fmt::Debug> BranchProofNode<V> {
     }
 }
 impl<V: fmt::Debug> ProofNode<V> {
-    fn verify_proof_consistency<'a>(&'a self,
-                                    parent_slice: &DBKey,
-                                    searched_slice: &DBKey)
-                                    -> Result<Option<&'a V>, Error> {
+    fn verify_proof_consistency<'a>(
+        &'a self,
+        parent_slice: &DBKey,
+        searched_slice: &DBKey,
+    ) -> Result<Option<&'a V>, Error> {
         use self::ProofNode::*;
 
         // if we inspect sub-proofs of a proof
         let res: Option<&V> = match *self {
             Leaf(ref val) => {
                 if searched_slice != parent_slice {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!(
+                        "Proof is inconsistent with searched_key: \
                                                    {:?}. Parent slice: {:?} ",
-                                                  searched_slice,
-                                                  parent_slice)));
+                        searched_slice,
+                        parent_slice
+                    )));
                 }
                 Some(val)
             }
             Branch(ref branch) => {
-                branch
-                    .verify_proof_consistency(parent_slice, searched_slice)?
+                branch.verify_proof_consistency(
+                    parent_slice,
+                    searched_slice,
+                )?
             }
         };
         Ok(res)
@@ -480,12 +513,14 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                write!(f,
-                       "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
-                       left_hash,
-                       right_hash,
-                       left_key,
-                       right_key)
+                write!(
+                    f,
+                    "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
+                    left_hash,
+                    right_hash,
+                    left_key,
+                    right_key
+                )
             }
             RightBranch {
                 ref left_hash,
@@ -493,12 +528,14 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                write!(f,
-                       "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
-                       left_hash,
-                       right_hash,
-                       left_key,
-                       right_key)
+                write!(
+                    f,
+                    "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
+                    left_hash,
+                    right_hash,
+                    left_key,
+                    right_key
+                )
             }
             BranchKeyNotFound {
                 ref left_hash,
@@ -506,12 +543,14 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                write!(f,
-                       "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
-                       left_hash,
-                       right_hash,
-                       left_key,
-                       right_key)
+                write!(
+                    f,
+                    "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
+                    left_hash,
+                    right_hash,
+                    left_key,
+                    right_key
+                )
             }
         }
     }

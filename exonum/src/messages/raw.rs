@@ -57,15 +57,26 @@ impl MessageBuffer {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
-    pub fn check<'a, F: Field<'a>>(&'a self,
-                                    from: CheckedOffset,
-                                    to: CheckedOffset,
-                                    latest_segment: CheckedOffset) -> StreamStructResult {
-        F::check(self.body(), (from + HEADER_LENGTH as u32)?, (to + HEADER_LENGTH as u32)?, latest_segment)
+    pub fn check<'a, F: Field<'a>>(
+        &'a self,
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> StreamStructResult {
+        F::check(
+            self.body(),
+            (from + HEADER_LENGTH as u32)?,
+            (to + HEADER_LENGTH as u32)?,
+            latest_segment,
+        )
     }
 
     pub unsafe fn read<'a, F: Field<'a>>(&'a self, from: Offset, to: Offset) -> F {
-        F::read(self.body(), from + HEADER_LENGTH as u32, to + HEADER_LENGTH as u32)
+        F::read(
+            self.body(),
+            from + HEADER_LENGTH as u32,
+            to + HEADER_LENGTH as u32,
+        )
     }
 
     pub fn signature(&self) -> &Signature {
@@ -86,7 +97,13 @@ pub struct MessageWriter {
 }
 
 impl MessageWriter {
-    pub fn new(protocol_version: u8, network_id: u8, service_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
+    pub fn new(
+        protocol_version: u8,
+        network_id: u8,
+        service_id: u16,
+        message_type: u16,
+        payload_length: usize,
+    ) -> MessageWriter {
         let mut raw = MessageWriter { raw: vec![0; HEADER_LENGTH + payload_length] };
         raw.set_network_id(network_id);
         raw.set_version(protocol_version);
@@ -116,7 +133,11 @@ impl MessageWriter {
     }
 
     pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
-        field.write(&mut self.raw, from + HEADER_LENGTH as Offset, to + HEADER_LENGTH as Offset);
+        field.write(
+            &mut self.raw,
+            from + HEADER_LENGTH as Offset,
+            to + HEADER_LENGTH as Offset,
+        );
     }
 
     pub fn sign(mut self, secret_key: &SecretKey) -> MessageBuffer {
@@ -128,11 +149,11 @@ impl MessageWriter {
     }
 
     pub fn append_signature(mut self, signature: &Signature) -> MessageBuffer {
-        let payload_length = self.raw.len() + SIGNATURE_LENGTH; 
-        self.set_payload_length(payload_length); 
-        self.raw.extend_from_slice(signature.as_ref()); 
-        debug_assert_eq!(self.raw.len(), payload_length); 
-        MessageBuffer {raw: self.raw}
+        let payload_length = self.raw.len() + SIGNATURE_LENGTH;
+        self.set_payload_length(payload_length);
+        self.raw.extend_from_slice(signature.as_ref());
+        debug_assert_eq!(self.raw.len(), payload_length);
+        MessageBuffer { raw: self.raw }
     }
 }
 

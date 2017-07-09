@@ -12,8 +12,8 @@ mod tests {
 
     use tempdir::TempDir;
 
-    use exonum::storage::{ProofMapIndex, Database, Fork,
-                          LevelDB, LevelDBOptions, LevelDBCache, StorageValue, Patch};
+    use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
+                          StorageValue, Patch};
 
     use std::collections::BTreeMap;
     use exonum::blockchain::{Blockchain, Transaction};
@@ -56,10 +56,12 @@ mod tests {
             (txs, pool)
         }
 
-        fn execute_block(blockchain: &Blockchain,
-                         height: u64,
-                         txs: &[Hash],
-                         pool: &BTreeMap<Hash, Box<Transaction>>) -> Patch {
+        fn execute_block(
+            blockchain: &Blockchain,
+            height: u64,
+            txs: &[Hash],
+            pool: &BTreeMap<Hash, Box<Transaction>>,
+        ) -> Patch {
             blockchain.create_patch(0, height, txs, pool).1
         }
 
@@ -71,9 +73,7 @@ mod tests {
 
         let (txs, pool) = prepare_txs(100, 1000);
 
-        b.iter(|| {
-           execute_block(&blockchain, 100, &txs, &pool)
-        });
+        b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
 
     fn execute_cryptocurrency(db: Box<Database>, b: &mut Bencher) {
@@ -110,15 +110,19 @@ mod tests {
             keys.push(gen_keypair());
         }
 
-        fn prepare_txs(height: u64, count: u64, keys: &[(PublicKey, SecretKey)])
-            -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>)
-        {
+        fn prepare_txs(
+            height: u64,
+            count: u64,
+            keys: &[(PublicKey, SecretKey)],
+        ) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
             let mut txs = Vec::new();
             let mut pool = BTreeMap::new();
             for i in (height * count)..((height + 1) * count) {
-                let tx = Tx::new(&keys[i as usize % 10_000].0,
-                                 &keys[(i as usize + 3_456) % 10_000].0,
-                                 &keys[i as usize % 10_000].1);
+                let tx = Tx::new(
+                    &keys[i as usize % 10_000].0,
+                    &keys[(i as usize + 3_456) % 10_000].0,
+                    &keys[i as usize % 10_000].1,
+                );
                 let tx_hash = Transaction::hash(&tx);
                 txs.push(tx_hash);
                 pool.insert(tx_hash, Box::new(tx) as Box<Transaction>);
@@ -126,10 +130,12 @@ mod tests {
             (txs, pool)
         }
 
-        fn execute_block(blockchain: &Blockchain,
-                         height: u64,
-                         txs: &[Hash],
-                         pool: &BTreeMap<Hash, Box<Transaction>>) -> Patch {
+        fn execute_block(
+            blockchain: &Blockchain,
+            height: u64,
+            txs: &[Hash],
+            pool: &BTreeMap<Hash, Box<Transaction>>,
+        ) -> Patch {
             blockchain.create_patch(0, height, txs, pool).1
         }
 
@@ -141,9 +147,7 @@ mod tests {
 
         let (txs, pool) = prepare_txs(100, 1000, &keys);
 
-        b.iter(|| {
-           execute_block(&blockchain, 100, &txs, &pool)
-        });
+        b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
 
     #[bench]

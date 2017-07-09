@@ -33,7 +33,7 @@ macro_rules! implement_exonum_serializer {
                                                         buffer: &mut B,
                                                         from: $crate::encoding::Offset,
                                                         to: $crate::encoding::Offset)
-                                                        -> Result<(), Box<::std::error::Error>> 
+                                                        -> Result<(), Box<::std::error::Error>>
             where B: $crate::encoding::serialize::WriteBufferWrapper
             {
                 use $crate::encoding::serialize::json::reexport::from_value;
@@ -42,7 +42,7 @@ macro_rules! implement_exonum_serializer {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> 
+            fn serialize_field(&self) ->
                 Result<$crate::encoding::serialize::json::reexport::Value,
                         Box<::std::error::Error>>
             {

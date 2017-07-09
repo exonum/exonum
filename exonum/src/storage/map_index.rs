@@ -35,9 +35,10 @@ impl<T, K, V> MapIndex<T, K, V> {
 }
 
 impl<T, K, V> MapIndex<T, K, V>
-    where T: AsRef<Snapshot>,
-          K: StorageKey,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
+    V: StorageValue,
 {
     pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(key)
@@ -73,8 +74,9 @@ impl<T, K, V> MapIndex<T, K, V>
 }
 
 impl<'a, K, V> MapIndex<&'a mut Fork, K, V>
-    where K: StorageKey,
-          V: StorageValue
+where
+    K: StorageKey,
+    V: StorageValue,
 {
     pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value)
@@ -90,9 +92,10 @@ impl<'a, K, V> MapIndex<&'a mut Fork, K, V>
 }
 
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
-    where T: AsRef<Snapshot>,
-          K: StorageKey,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
+    V: StorageValue,
 {
     type Item = (K, V);
     type IntoIter = MapIndexIter<'a, K, V>;
@@ -103,8 +106,9 @@ impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
 }
 
 impl<'a, K, V> Iterator for MapIndexIter<'a, K, V>
-    where K: StorageKey,
-          V: StorageValue
+where
+    K: StorageKey,
+    V: StorageValue,
 {
     type Item = (K, V);
 
@@ -114,7 +118,8 @@ impl<'a, K, V> Iterator for MapIndexIter<'a, K, V>
 }
 
 impl<'a, K> Iterator for MapIndexKeys<'a, K>
-    where K: StorageKey
+where
+    K: StorageKey,
 {
     type Item = K;
 
@@ -124,7 +129,8 @@ impl<'a, K> Iterator for MapIndexKeys<'a, K>
 }
 
 impl<'a, V> Iterator for MapIndexValues<'a, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     type Item = V;
 
@@ -148,34 +154,52 @@ mod test {
         map_index.put(&2u8, 2u8);
         map_index.put(&3u8, 3u8);
 
-        assert_eq!(map_index.iter().collect::<Vec<(u8, u8)>>(),
-                   vec![(1, 1), (2, 2), (3, 3)]);
+        assert_eq!(
+            map_index.iter().collect::<Vec<(u8, u8)>>(),
+            vec![(1, 1), (2, 2), (3, 3)]
+        );
 
-        assert_eq!(map_index.iter_from(&0).collect::<Vec<(u8, u8)>>(),
-                   vec![(1, 1), (2, 2), (3, 3)]);
-        assert_eq!(map_index.iter_from(&1).collect::<Vec<(u8, u8)>>(),
-                   vec![(1, 1), (2, 2), (3, 3)]);
-        assert_eq!(map_index.iter_from(&2).collect::<Vec<(u8, u8)>>(),
-                   vec![(2, 2), (3, 3)]);
-        assert_eq!(map_index.iter_from(&4).collect::<Vec<(u8, u8)>>(),
-                   Vec::<(u8, u8)>::new());
+        assert_eq!(
+            map_index.iter_from(&0).collect::<Vec<(u8, u8)>>(),
+            vec![(1, 1), (2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&1).collect::<Vec<(u8, u8)>>(),
+            vec![(1, 1), (2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&2).collect::<Vec<(u8, u8)>>(),
+            vec![(2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&4).collect::<Vec<(u8, u8)>>(),
+            Vec::<(u8, u8)>::new()
+        );
 
         assert_eq!(map_index.keys().collect::<Vec<u8>>(), vec![1, 2, 3]);
 
         assert_eq!(map_index.keys_from(&0).collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(map_index.keys_from(&1).collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(map_index.keys_from(&2).collect::<Vec<u8>>(), vec![2, 3]);
-        assert_eq!(map_index.keys_from(&4).collect::<Vec<u8>>(),
-                   Vec::<u8>::new());
+        assert_eq!(
+            map_index.keys_from(&4).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
 
         assert_eq!(map_index.values().collect::<Vec<u8>>(), vec![1, 2, 3]);
 
-        assert_eq!(map_index.values_from(&0).collect::<Vec<u8>>(),
-                   vec![1, 2, 3]);
-        assert_eq!(map_index.values_from(&1).collect::<Vec<u8>>(),
-                   vec![1, 2, 3]);
+        assert_eq!(
+            map_index.values_from(&0).collect::<Vec<u8>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(
+            map_index.values_from(&1).collect::<Vec<u8>>(),
+            vec![1, 2, 3]
+        );
         assert_eq!(map_index.values_from(&2).collect::<Vec<u8>>(), vec![2, 3]);
-        assert_eq!(map_index.values_from(&4).collect::<Vec<u8>>(),
-                   Vec::<u8>::new());
+        assert_eq!(
+            map_index.values_from(&4).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
     }
 }
