@@ -70,7 +70,8 @@ pub fn dump_html<W: Write>(out: &mut W, frame: &ThreadFrame) -> IoResult<()> {
             d3.select("body").datum({{ children: [
 "#, include_str!("../resources/flameGraph.css"), include_str!("../resources/d3.js"), include_str!("../resources/d3-tip.js"), include_str!("../resources/flameGraph.js")));
     let spans = frame.root();
-    let root = spans.borrow();
+    let mut root = spans.borrow().clone();
+    root.value = frame.time_since_start();
     try!(dump_span(out, "Self", &root));
 
     try!(write!(out, r#"]}}).call(flamegraph);
