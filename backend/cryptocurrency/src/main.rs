@@ -18,7 +18,7 @@ fn main() {
 
     let app = App::new("Simple cryptocurrency demo program")
         .version(env!("CARGO_PKG_VERSION"))
-        .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+        .author("Exonum Team <exonum@bitfury.com>")
         .about("Demo cryptocurrency validator node")
         .subcommand(GenerateCommand::new())
         .subcommand(RunCommand::new());
