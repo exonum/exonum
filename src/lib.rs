@@ -72,7 +72,7 @@
 //!
 //!     let app = App::new("Simple configuration api demo program")
 //!         .version(env!("CARGO_PKG_VERSION"))
-//!         .author("Aleksey S. <aleksei.sidorov@xdev.re>")
+//!         .author("Exonum Team <exonum@bitfury.com>")
 //!         .about("Demo validator node")
 //!         .subcommand(GenerateCommand::new())
 //!         .subcommand(RunCommand::new());

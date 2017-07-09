@@ -1,9 +1,7 @@
 [package]
 name = "sandbox_tests"
 version = "0.1.0"
-authors = ["Ivan Ivashchenko <ivan.ivashchenko@xdev.re",
-           "Aleksey Sidorov <aleksei.sidorov@xdev.re>",
-           "Oleg Kuzmin <oleg.kuzmin@xdev.re>"]
+authors = ["Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
 iron = "0.5.1"
