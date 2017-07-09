@@ -47,26 +47,30 @@ fn test_get_lock_and_send_precommit() {
 
     let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
 
-    let block = Block::new(SCHEMA_MAJOR_VERSION,
-                           2,
-                           1,
-                           0,
-                           &sandbox.last_hash(),
-                           &Hash::zero(),
-                           &sandbox.last_state_hash());
+    let block = Block::new(
+        SCHEMA_MAJOR_VERSION,
+        2,
+        1,
+        0,
+        &sandbox.last_hash(),
+        &Hash::zero(),
+        &sandbox.last_state_hash(),
+    );
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
     sandbox.recv(Prevote::new(1, 1, 1, &propose.hash(), 0, sandbox.s(1)));
     sandbox.assert_lock(0, None);
     sandbox.recv(Prevote::new(2, 1, 1, &propose.hash(), 0, sandbox.s(2)));
-    sandbox.broadcast(Precommit::new(0,
-                                     1,
-                                     1,
-                                     &propose.hash(),
-                                     &block.hash(),
-                                     sandbox.time(),
-                                     sandbox.s(0)));
+    sandbox.broadcast(Precommit::new(
+        0,
+        1,
+        1,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time(),
+        sandbox.s(0),
+    ));
     sandbox.assert_lock(1, Some(propose.hash()));
 }
 
@@ -76,44 +80,52 @@ fn test_commit() {
 
     let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
 
-    let block = Block::new(SCHEMA_MAJOR_VERSION,
-                           2,
-                           1,
-                           0,
-                           &sandbox.last_hash(),
-                           &Hash::zero(),
-                           &sandbox.last_state_hash());
+    let block = Block::new(
+        SCHEMA_MAJOR_VERSION,
+        2,
+        1,
+        0,
+        &sandbox.last_hash(),
+        &Hash::zero(),
+        &sandbox.last_state_hash(),
+    );
 
     sandbox.recv(propose.clone());
     sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
     sandbox.recv(Prevote::new(1, 1, 1, &propose.hash(), 0, sandbox.s(1)));
     sandbox.recv(Prevote::new(2, 1, 1, &propose.hash(), 0, sandbox.s(2)));
-    sandbox.broadcast(Precommit::new(0,
-                                     1,
-                                     1,
-                                     &propose.hash(),
-                                     &block.hash(),
-                                     sandbox.time(),
-                                     sandbox.s(0)));
-    sandbox.recv(Precommit::new(2,
-                                1,
-                                1,
-                                &propose.hash(),
-                                &propose.hash(),
-                                sandbox.time(),
-                                sandbox.s(2)));
-    sandbox.recv(Precommit::new(3,
-                                1,
-                                1,
-                                &propose.hash(),
-                                &propose.hash(),
-                                sandbox.time(),
-                                sandbox.s(3)));
+    sandbox.broadcast(Precommit::new(
+        0,
+        1,
+        1,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time(),
+        sandbox.s(0),
+    ));
+    sandbox.recv(Precommit::new(
+        2,
+        1,
+        1,
+        &propose.hash(),
+        &propose.hash(),
+        sandbox.time(),
+        sandbox.s(2),
+    ));
+    sandbox.recv(Precommit::new(
+        3,
+        1,
+        1,
+        &propose.hash(),
+        &propose.hash(),
+        sandbox.time(),
+        sandbox.s(3),
+    ));
     sandbox.assert_state(1, 1);
 }
 
 #[test]
-#[should_panic(expected = "Expected to broadcast the message Consensus(Prevote")]
+#[should_panic(expected = "Expected to broadcast the message Consensus(Prevote" ])]
 fn received_unexpected_propose() {
     let sandbox = timestamping_sandbox();
 

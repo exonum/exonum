@@ -27,8 +27,7 @@ fn main() {
         (@arg count: -c --count +takes_value "Total amount of data items to write")
         (@arg data_len: -l --len +takes_value "Length of data chunk")
         (@arg seed: -s --seed +takes_value "Seed for rng")
-    )
-            .get_matches();
+    ).get_matches();
 
     let path = matches.value_of("DIR").unwrap();
     let count: usize = matches.value_of("count").unwrap_or("100").parse().unwrap();
