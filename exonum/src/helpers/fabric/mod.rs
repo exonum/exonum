@@ -12,7 +12,7 @@ use self::internal::NotFoundInMap;
 pub use self::builder::NodeBuilder;
 pub use self::details::{Run, Finalize,
                     GenerateNodeConfig, GenerateCommonConfig,
-                    GenerateTestnetCommand };
+                    GenerateTestnet };
 pub use self::shared::{AbstractConfig, NodePublicConfig, CommonConfigTemplate, NodePrivateConfig};
 
 pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
@@ -46,9 +46,9 @@ pub struct Argument {
     pub name: &'static str,
     /// Explains how this argument is represented.
     pub argument_type: ArgumentType,
-    /// Explains does it argument required or not.
+    /// Explains if the argument required or not.
     pub required: bool,
-    /// Help string, that should be printed if user missed.
+    /// Help string.
     pub help: &'static str,
 }
 

@@ -43,7 +43,7 @@ impl ClapBackend {
         let app =
         clap::App::new("Exonum application based on fabric configuration.")
                 .version(crate_version!())
-                .author("Vladimir M. <vladimir.motylenko@xdev.re>")
+                .author(crate_authors!("\n"))
                 .about("Exonum application based on fabric configuration.");
 
         let subcommands: Vec<_> = commands.iter().map(|command|
