@@ -1,3 +1,4 @@
+//! An implementation a Merklized version of a map (Merkle Patricia tree).
 use std::marker::PhantomData;
 
 use crypto::{hash, Hash};
@@ -16,6 +17,18 @@ mod key;
 mod node;
 mod proof;
 
+/// A Merkalized verison of a map that allows proofs of existence or non-existence for the map keys.
+///
+/// `ProofMapIndex` implements a Merkle Patricia tree, storing the values as leaves.
+/// `ProofMapIndex` requires that the keys implement [`ProofMapKey`] and values implement the
+/// [`StorageValue`] trait.
+///
+/// **The size of the proof map keys must be exactly 32 bytes and the keys must have a uniform
+/// distribution.** Usually [`Hash`] and [`PublicKey`] are used as types of proof map keys.
+/// [`ProofMapKey`]: trait.ProofMapKey.html
+/// [`StorageValue`]: ../trait.StorageValue.html
+/// [`Hash`]: ../../crypto/struct.Hash.html
+/// [`PublicKey`]: ../../crypto/struct.PublicKey.html
 #[derive(Debug)]
 pub struct ProofMapIndex<T, K, V> {
     base: BaseIndex<T>,
@@ -23,18 +36,42 @@ pub struct ProofMapIndex<T, K, V> {
     _v: PhantomData<V>,
 }
 
+/// An iterator over the entries of a `ProofMapIndex`.
+///
+/// This struct is created by the [`iter`] or
+/// [`iter_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+///
+/// [`iter`]: struct.ProofMapIndex.html#method.iter
+/// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexIter<'a, K, V> {
     base_iter: BaseIndexIter<'a, DBKey, V>,
     _k: PhantomData<K>,
 }
 
+/// An iterator over the keys of a `ProofMapIndex`.
+///
+/// This struct is created by the [`keys`] or
+/// [`keys_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+///
+/// [`keys`]: struct.ProofMapIndex.html#method.keys
+/// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
+/// [`ProofMapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, DBKey, ()>,
     _k: PhantomData<K>,
 }
 
+/// An iterator over the values of a `ProofMapIndex`.
+///
+/// This struct is created by the [`values`] or
+/// [`values_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+///
+/// [`values`]: struct.ProofMapIndex.html#method.values
+/// [`values_from`]: struct.ProofMapIndex.html#method.values_from
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, DBKey, V>,
@@ -48,9 +85,16 @@ enum RemoveResult {
 }
 
 impl<T, K, V> ProofMapIndex<T, K, V> {
-    pub fn new(prefix: Vec<u8>, base: T) -> Self {
+    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ProofMapIndex {
-            base: BaseIndex::new(prefix, base),
+            base: BaseIndex::new(prefix, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -144,6 +188,7 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         Some(res)
     }
 
+    /// Returns the root hash of the proof map or default hash value if it is empty.
     pub fn root_hash(&self) -> Hash {
         match self.get_root_node() {
             Some((k, Node::Leaf(v))) => hash(&[&k.to_vec(), v.hash().as_ref()].concat()),
@@ -152,14 +197,17 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         }
     }
 
+    /// Returns a value corresponding to the key.
     pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(&DBKey::leaf(key))
     }
 
+    /// Returns `true` if the map contains a value for the specified key.
     pub fn contains(&self, key: &K) -> bool {
         self.base.contains(&DBKey::leaf(key))
     }
 
+    /// Returns the proof of existence or non-existance for the specified key.
     pub fn get_proof(&self, key: &K) -> MapProof<V> {
         let searched_slice = DBKey::leaf(key);
 
@@ -231,6 +279,8 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         }
     }
 
+    /// Returns an iterator over the entries of the map in ascending order. The iterator element
+    /// type is (K, V).
     pub fn iter(&self) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
             base_iter: self.base.iter(&LEAF_KEY_PREFIX),
@@ -238,6 +288,8 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         }
     }
 
+    /// Returns an iterator over the keys of the map in ascending order. The iterator element
+    /// type is K.
     pub fn keys(&self) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
             base_iter: self.base.iter(&LEAF_KEY_PREFIX),
@@ -245,10 +297,14 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         }
     }
 
+    /// Returns an iterator over the values of the map in ascending order of keys. The iterator
+    /// element type is V.
     pub fn values(&self) -> ProofMapIndexValues<V> {
         ProofMapIndexValues { base_iter: self.base.iter(&LEAF_KEY_PREFIX) }
     }
 
+    /// Returns an iterator over the entries of the map in ascending order starting from the
+    /// specified key. The iterator element type is (K, V).
     pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
             base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
@@ -256,6 +312,8 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         }
     }
 
+    /// Returns an iterator over the keys of the map in ascending order starting from the
+    /// specified key. The iterator element type is K.
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
             base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
@@ -263,6 +321,8 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         }
     }
 
+    /// Returns an iterator over the values of the map in ascending order of keys starting from the
+    /// specified key. The iterator element type is V.
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
         ProofMapIndexValues { base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)) }
     }
@@ -336,6 +396,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
         }
     }
 
+    /// Inserts the key-value pair into the proof map.
     pub fn put(&mut self, key: &K, value: V) {
         let key_slice = DBKey::leaf(key);
         match self.get_root_node() {
@@ -434,6 +495,7 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
         RemoveResult::KeyNotFound
     }
 
+    /// Removes the key from the proof map.
     pub fn remove(&mut self, key: &K) {
         let key_slice = DBKey::leaf(key);
         match self.get_root_node() {
@@ -469,6 +531,12 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
         }
     }
 
+    /// Clears the proof map, removing all entries.
+    ///
+    /// # Notes
+    /// Currently this method is not optimized to delete large set of data. During the execution of
+    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// in the index.
     pub fn clear(&mut self) {
         self.base.clear()
     }
