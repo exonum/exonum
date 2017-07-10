@@ -35,7 +35,7 @@ impl NodeBuilder {
     pub fn with_service<S: ServiceFactory>(mut self) -> NodeBuilder {
         //TODO: take endpoints, etc...
 
-        for ref mut command in &mut self.commands {
+        for command in &mut self.commands {
             let name = command.name();
             command.extend(S::command(name))
         }
