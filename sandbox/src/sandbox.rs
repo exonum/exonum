@@ -453,7 +453,7 @@ impl Sandbox {
     {
         let blockchain = &self.reactor.borrow().handler.blockchain;
         let (hashes, tx_pool) = {
-            let mut pool = TxPool::new();
+            let mut pool = HashMap::new();
             let mut hashes = Vec::new();
             for raw in txs {
                 let tx = blockchain.tx_from_raw(raw.clone()).unwrap();

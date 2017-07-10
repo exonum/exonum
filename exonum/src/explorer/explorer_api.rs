@@ -5,22 +5,39 @@ use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
-use blockchain::{Blockchain, Block};
+use node::state::TxPool;
+use blockchain::{Blockchain, Block, SharedNodeState};
 use crypto::{Hash, HexValue};
 use explorer::{TxInfo, BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
+#[derive(Serialize)]
+enum MemPoolResult {
+    Unknown,
+    MemPool(::serde_json::Value),
+    Commited(TxInfo)
+}
+
+#[derive(Serialize)]
+struct MemPoolInfo {
+    size: usize,
+}
+
 #[derive(Clone, Debug)]
 pub struct ExplorerApi {
+    pool: TxPool,
+    shared_api_state: SharedNodeState,
     blockchain: Blockchain,
 }
 
 impl ExplorerApi {
-    pub fn new(blockchain: Blockchain) -> ExplorerApi {
+    pub fn new(blockchain: Blockchain,
+               pool: TxPool,
+               shared_api_state: SharedNodeState) -> ExplorerApi {
         ExplorerApi {
-            blockchain: blockchain
+            blockchain, pool, shared_api_state
         }
     }
 
@@ -42,6 +59,27 @@ impl ExplorerApi {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         let hash = Hash::from_hex(hash_str)?;
         explorer.tx_info(&hash)
+    }
+
+    fn get_mempool_info(&self) -> MemPoolInfo {
+        MemPoolInfo {
+            size: self.pool.read().expect("Expected read lock").len()
+        }
+    }
+
+    fn get_mempool_tx(&self, hash_str: &str) -> Result<MemPoolResult, ApiError> {
+        let hash = Hash::from_hex(hash_str)?;
+        
+        self.pool.read().expect("Expected read lock")
+                        .get(&hash)
+                        .map_or_else(
+                            ||{
+                                let explorer = BlockchainExplorer::new(&self.blockchain);
+                                Ok(explorer.tx_info(&hash)?.map_or(MemPoolResult::Unknown, |i| MemPoolResult::Commited(i)))
+                            },
+                            |o| Ok(MemPoolResult::MemPool(o.info())))
+                        
+
     }
 }
 
@@ -101,8 +139,28 @@ impl Api for ExplorerApi {
             }
         };
 
+        let _self = self.clone();
+        let mempool = move |req: &mut Request| -> IronResult<Response> {
+            let params = req.extensions.get::<Router>().unwrap();
+            match params.find("hash") {
+                Some(hash_str) => {
+                    let info = _self.get_mempool_tx(hash_str)?;
+                    _self.ok_response(&::serde_json::to_value(info).unwrap())
+                }
+                None => Err(ApiError::IncorrectRequest("Required parameter of transaction 'hash' is missing".into()))?,
+            }
+        };
+
+        let _self = self.clone();
+        let mempool_info = move |_: &mut Request| -> IronResult<Response> {
+            let info = _self.get_mempool_info();
+            _self.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
         router.get("/v1/blocks", blocks, "blocks");
         router.get("/v1/blocks/:height", block, "height");
+        router.get("/v1/mempool", mempool_info, "mempool");
+        router.get("/v1/mempool/:hash", mempool, "mempool_tx");
         router.get("/v1/transactions/:hash", transaction, "hash");
     }
 }

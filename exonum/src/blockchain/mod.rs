@@ -22,21 +22,22 @@ use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 
 use std::sync::Arc;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::mem;
 use std::fmt;
 use std::panic;
 
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
-use node::{State, TxPool};
+use node::State;
 use storage::{Patch, Database, Snapshot, Fork, Error};
 
 pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction, ServiceContext, ApiContext};
+pub use self::service::{Service, Transaction, ServiceContext,
+                        ApiContext, SharedNodeState};
 
 mod block;
 mod schema;
@@ -157,7 +158,7 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(0, 0, &[], &BTreeMap::new()).1
+            self.create_patch(0, 0, &[], &HashMap::new()).1
         };
         self.merge(patch)?;
         Ok(())
@@ -190,7 +191,7 @@ impl Blockchain {
                         proposer_id: u16,
                         height: u64,
                         tx_hashes: &[Hash],
-                        pool: &TxPool)
+                        pool: &HashMap<Hash, Box<Transaction>>)
                         -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();

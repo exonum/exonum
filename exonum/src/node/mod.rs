@@ -21,7 +21,8 @@ use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
              MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
-use blockchain::{Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
+use blockchain::{SharedNodeState, Blockchain, Schema,
+                    GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
 use explorer::ExplorerApi;
 use api::Api;
@@ -59,6 +60,8 @@ pub enum NodeTimeout {
     Request(RequestData, Option<PublicKey>),
     /// Propose timeout.
     Propose(Height, Round),
+    /// Update api shared state.
+    UpdateApiState,
     /// Exchange peers timeout.
     PeerExchange,
 }
@@ -75,8 +78,12 @@ pub struct ApiSender<S>
 pub struct NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+    /// Timeout to update api state.
+    pub state_update_timeout: usize,
     /// State of the `NodeHandler`.
     pub state: State,
+    /// Shared api state
+    pub api_state: SharedNodeState,
     /// Channel for messages and timeouts.
     pub channel: S,
     /// Blockchain.
@@ -112,6 +119,8 @@ pub struct ListenerConfig {
 /// An api configuration options.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeApiConfig {
+    /// Timeout to update api state.
+    pub state_update_timeout: usize,
     /// Enable api endpoints for the `blockchain_explorer` on public api address.
     pub enable_blockchain_explorer: bool,
     /// Listen address for public api endpoints.
@@ -123,6 +132,7 @@ pub struct NodeApiConfig {
 impl Default for NodeApiConfig {
     fn default() -> NodeApiConfig {
         NodeApiConfig {
+            state_update_timeout: 10000,
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
@@ -216,7 +226,9 @@ impl<S> NodeHandler<S>
         external_address: SocketAddr,
         sender: S,
         config: Configuration,
-    ) -> Self {
+        state_update_timeout: usize,
+        ) -> Self
+    {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -262,9 +274,20 @@ impl<S> NodeHandler<S>
             state: state,
             channel: sender,
             blockchain: blockchain,
-            peer_discovery: config.peer_discovery,
             timeout_adjuster: timeout_adjuster,
+            peer_discovery: config.peer_discovery,
+            state_update_timeout: state_update_timeout,
+            api_state: SharedNodeState::new(),
         }
+    }
+
+    /// Return internal `SharedNodeState`
+    pub fn api_state(&self) -> &SharedNodeState {
+        &self.api_state
+    } 
+    /// Returns value of the `state_update_timeout`.
+    pub fn state_update_timeout(&self) -> Milliseconds {
+        self.state_update_timeout as u64
     }
 
     /// Sets new timeout adjuster.
@@ -320,6 +343,7 @@ impl<S> NodeHandler<S>
         self.add_round_timeout();
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
+        self.add_update_api_state_timeout();
     }
 
     /// Sends the given message to a peer by its id.
@@ -414,6 +438,12 @@ impl<S> NodeHandler<S>
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
+    /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
+    pub fn add_update_api_state_timeout(&mut self) {
+        let time = self.channel.get_time() + Duration::from_millis(self.state_update_timeout());
+        self.channel.add_timeout(NodeTimeout::UpdateApiState, time);
+    }
+
     /// Returns hash of the last block.
     pub fn last_block_hash(&self) -> Hash {
         self.blockchain.last_block().hash()
@@ -446,6 +476,10 @@ impl<S> EventHandler for NodeHandler<S>
             ExternalMessage::Transaction(tx) => {
                 self.handle_incoming_tx(tx);
             }
+            ExternalMessage::PeerAdd(address) => {
+                info!("Send Connect message to {}", address);
+                self.connect(&address);
+            }
         }
     }
 
@@ -455,6 +489,7 @@ impl<S> EventHandler for NodeHandler<S>
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
             NodeTimeout::Status(height) => self.handle_status_timeout(height),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
+            NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
             NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
         }
     }
@@ -547,12 +582,15 @@ impl Node {
             warn!("Could not find 'external_address' in the config, using 'listen_address'");
             node_cfg.listen_address
         };
-        let tx_pool = Arc::new(CHashMap::new());
 
         let network = Network::with_config(node_cfg.listen_address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
-        let worker = NodeHandler::new(blockchain, external_address, channel, config);
+        let worker = NodeHandler::new(blockchain,
+                                        external_address,
+                                        channel,
+                                        config,
+                                        node_cfg.api.state_update_timeout);
         Node {
             reactor: Events::with_event_loop(network, worker, event_loop),
             api_options: node_cfg.api,
@@ -598,8 +636,11 @@ impl Node {
                 mount.mount("api/services", api_context.mount_public_api());
 
                 if self.api_options.enable_blockchain_explorer {
+
+                    let pool = self.state().transactions().clone();
+                    let shared_api_state = self.handler().api_state().clone();
                     let mut router = Router::new();
-                    let explorer_api = ExplorerApi::new(blockchain);
+                    let explorer_api = ExplorerApi::new(blockchain, pool, shared_api_state);
                     explorer_api.wire(&mut router);
                     mount.mount("api/explorer", router);
                 }

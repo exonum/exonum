@@ -5,13 +5,18 @@ use serde_json::Value;
 use iron::Handler;
 use mount::Mount;
 
+<<<<<<< HEAD
 use std::fmt;
+=======
+use std::sync::{Arc, RwLock};
+use std::net::SocketAddr;
+>>>>>>> add shared context and make txpool concurrent
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{Node, State, NodeChannel, ApiSender};
+use node::{Node, State, NodeChannel, ApiSender };
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
@@ -175,32 +180,42 @@ impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
     }
 }
 
-struct ApiState {
+#[derive(Debug)]
+struct ApiNodeState {
     in_connections: Vec<SocketAddr>,
     out_connections: Vec<SocketAddr>,
 }
-
-#[derive(Clone, Debug)]
-pub struct SharedApiState {
-    state: Arc<RwLock<ApiState>>,
+impl ApiNodeState {
+    fn new() -> ApiNodeState {
+        ApiNodeState {
+            in_connections: Vec::new(),
+            out_connections: Vec::new(),
+        }
+    }
 }
 
-impl SharedApiState {
-    fn new( ) -> SharedApiState {
-        SharedApiState {
-            state: Arc::new(RwLock::new(ApiState::new())),
+/// Shared part of context, used to take some values from the `Node` `State`
+#[derive(Clone, Debug)]
+pub struct SharedNodeState {
+    state: Arc<RwLock<ApiNodeState>>,
+}
+
+impl SharedNodeState {
+    /// create new `SharedNodeState`
+    pub fn new( ) -> SharedNodeState {
+        SharedNodeState {
+            state: Arc::new(RwLock::new(ApiNodeState::new())),
         }
     }
 
-    fn update(&self, state: &State) {
-        ///TODO: implement updating
+    /// Update internal state, from `Node` State`
+    pub fn update(&self, state: &State) {
+        //FIXME: Before merge implement update code
     }
 }
 
 /// Provides the current node state to api handlers.
 pub struct ApiContext {
-    pool: TxPool,
-    shared_api_state: SharedApiContext,
     blockchain: Blockchain,
     node_channel: ApiSender<NodeChannel>,
     public_key: PublicKey,
@@ -213,7 +228,6 @@ impl ApiContext {
     pub fn new(node: &Node) -> ApiContext {
         let handler = node.handler();
         ApiContext {
-            pool: node.state().transactions().clone(),
             blockchain: handler.blockchain.clone(),
             node_channel: node.channel(),
             public_key: *node.state().service_public_key(),
