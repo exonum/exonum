@@ -43,6 +43,7 @@ pub enum ChildKind {
     Right,
 }
 
+/// A struct that represents a bit slices of the proof map keys.
 #[derive(Clone)]
 pub struct DBKey {
     data: [u8; KEY_SIZE],

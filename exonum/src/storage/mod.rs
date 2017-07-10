@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 pub use self::error::Error;
 pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
 
