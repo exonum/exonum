@@ -63,9 +63,9 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new(prefix: Vec<u8>, base: T) -> Self {
+    pub fn new(prefix: Vec<u8>, view: T) -> Self {
         MapIndex {
-            base: BaseIndex::new(prefix, base),
+            base: BaseIndex::new(prefix, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -138,7 +138,7 @@ impl<'a, K, V> MapIndex<&'a mut Fork, K, V>
         self.base.remove(key)
     }
 
-    /// Clears the list, removing all values.
+    /// Clears the map, removing all entries.
     ///
     /// # Notes
     /// Currently this method is not optimized to delete large set of data. During the execution of

@@ -1,14 +1,30 @@
+//! Implementation of base index with most common features.
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 
+/// Basic struct for all indices that implements common features.
+///
+/// `BaseIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
+/// [`StorageValue`] trait. However, this structure is not bound to specific types and allows the
+/// use of *any* types as keys or values.
+/// [`StorageKey`]: ../trait.StorageKey.html
+/// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct BaseIndex<T> {
     prefix: Vec<u8>,
     view: T,
 }
 
+/// An iterator over an entries of a `BaseIndex`.
+///
+/// This struct is created by the [`iter`] or
+/// [`iter_from`] methods on [`BaseIndex`]. See its documentation for more.
+///
+/// [`iter`]: struct.BaseIndex.html#method.iter
+/// [`iter_from`]: struct.BaseIndex.html#method.iter_from
+/// [`BaseIndex`]: struct.BaseIndex.html
 pub struct BaseIndexIter<'a, K, V> {
     base_iter: Iter<'a>,
     base_prefix_len: usize,
@@ -19,6 +35,13 @@ pub struct BaseIndexIter<'a, K, V> {
 }
 
 impl<T> BaseIndex<T> {
+    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         BaseIndex {
             prefix: prefix,
@@ -37,6 +60,7 @@ impl<T> BaseIndex<T> {
 impl<T> BaseIndex<T>
     where T: AsRef<Snapshot>
 {
+    /// Returns a value of *any* corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
         where K: StorageKey,
               V: StorageValue
@@ -47,12 +71,16 @@ impl<T> BaseIndex<T>
             .map(|v| StorageValue::from_bytes(Cow::Owned(v)))
     }
 
+    /// Returns `true` if the index contains a value for the specified key of *any* type.
     pub fn contains<K>(&self, key: &K) -> bool
         where K: StorageKey
     {
         self.view.as_ref().contains(&self.prefixed_key(key))
     }
 
+    /// Returns an iterator over the entries of the index in ascending order. The iterator element
+    /// type is any key-value pair. An argument `subprefix` allows to specify a subset of
+    /// iteration.
     pub fn iter<P, K, V>(&self, subprefix: &P) -> BaseIndexIter<K, V>
         where P: StorageKey,
               K: StorageKey,
@@ -69,6 +97,9 @@ impl<T> BaseIndex<T>
         }
     }
 
+    /// Returns an iterator over the entries of the index in ascending order starting from the
+    /// specified key. The iterator element type is any key-value pair. An argument `subprefix`
+    /// allows to specify a subset of iteration.
     pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> BaseIndexIter<K, V>
         where P: StorageKey,
               F: StorageKey,
@@ -89,6 +120,7 @@ impl<T> BaseIndex<T>
 }
 
 impl<'a> BaseIndex<&'a mut Fork> {
+    /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
     pub fn put<K, V>(&mut self, key: &K, value: V)
         where K: StorageKey,
               V: StorageValue
@@ -97,6 +129,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
         self.view.put(key, value.into_bytes());
     }
 
+    /// Removes the key of *any* type from the index.
     pub fn remove<K>(&mut self, key: &K)
         where K: StorageKey
     {
@@ -104,6 +137,12 @@ impl<'a> BaseIndex<&'a mut Fork> {
         self.view.remove(key);
     }
 
+    /// Clears the index, removing all entries.
+    ///
+    /// # Notes
+    /// Currently this method is not optimized to delete large set of data. During the execution of
+    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// in the index.
     pub fn clear(&mut self) {
         self.view.remove_by_prefix(&self.prefix)
     }
