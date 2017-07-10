@@ -16,7 +16,7 @@ impl ClapBackend {
         let app =
         clap::App::new("Exonum application based on fabric configuration.")
                 .version(crate_version!())
-                .author("Vladimir M. <vladimir.motylenko@xdev.re>")
+                .author("Exonum Team <exonum@bitfury.com>")
                 .about("It contain basic set of command, to deploy network on exonum.");
 
         let subcommands: Vec<_> = commands.iter().map(|command|
