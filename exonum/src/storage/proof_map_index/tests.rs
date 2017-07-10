@@ -289,7 +289,7 @@ fn build_proof_in_empty_tree() {
         _ => assert!(false),
     }
     {
-        let check_res = search_res.verify_root_proof_consistency(&[244u8; 32], table.root_hash());
+        let check_res = search_res.validate(&[244u8; 32], table.root_hash());
         assert!(check_res.unwrap().is_none());
     }
 }
@@ -308,7 +308,7 @@ fn build_proof_in_leaf_tree() {
 
     {
         let check_res = proof_path
-            .verify_root_proof_consistency(&searched_key, table_root)
+            .validate(&searched_key, table_root)
             .unwrap();
         assert!(check_res.is_none());
     }
@@ -322,10 +322,10 @@ fn build_proof_in_leaf_tree() {
     }
 
     let proof_path = table.get_proof(&root_key);
-    assert_eq!(table_root, proof_path.compute_proof_root());
+    assert_eq!(table_root, proof_path.root_hash());
     {
         let check_res = proof_path
-            .verify_root_proof_consistency(&root_key, table_root)
+            .validate(&root_key, table_root)
             .unwrap();
         assert_eq!(check_res.unwrap(), &root_val);
     }
@@ -358,7 +358,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
     let table_root_hash = table.root_hash();
     let item = data[0];
     let proof_path_to_key = table.get_proof(&item.0);
-    assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
+    assert_eq!(proof_path_to_key.root_hash(), table_root_hash);
 
     let proof_info = ProofInfo {
         root_hash: table_root_hash,
@@ -370,7 +370,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
     let json_repre = to_string(&proof_info).unwrap();
     info!("{}", json_repre);
 
-    let check_res = proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
+    let check_res = proof_path_to_key.validate(&item.0, table_root_hash);
     let proved_value: Option<&Hash> = check_res.unwrap();
     assert_eq!(proved_value.unwrap(), &item.1);
 }
@@ -390,8 +390,8 @@ fn fuzz_insert_build_proofs() {
 
     for item in &data {
         let proof_path_to_key = table.get_proof(&item.0);
-        assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
-        let check_res = proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
+        assert_eq!(proof_path_to_key.root_hash(), table_root_hash);
+        let check_res = proof_path_to_key.validate(&item.0, table_root_hash);
         let proved_value: Option<&Vec<u8>> = check_res.unwrap();
         assert_eq!(proved_value.unwrap(), &item.1);
 
@@ -430,8 +430,8 @@ fn fuzz_delete_build_proofs() {
     let table_root_hash = index1.root_hash();
     for key in &keys_to_remove {
         let proof_path_to_key = index1.get_proof(key);
-        assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
-        let check_res = proof_path_to_key.verify_root_proof_consistency(key, table_root_hash);
+        assert_eq!(proof_path_to_key.root_hash(), table_root_hash);
+        let check_res = proof_path_to_key.validate(key, table_root_hash);
         assert!(check_res.is_ok());
         let proved_value: Option<&Vec<u8>> = check_res.unwrap();
         assert!(proved_value.is_none());
