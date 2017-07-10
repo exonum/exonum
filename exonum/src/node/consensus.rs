@@ -397,7 +397,11 @@ impl<S> NodeHandler<S>
               proposer,
               round.map(|x| x.to_string()).unwrap_or_else(|| "?".into()),
               commited_txs,
-              self.state.transactions().len(),
+              self.state
+                  .transactions()
+                  .read()
+                  .expect("Expected read lock")
+                  .len(),
               block_hash.to_hex(),
               );
 
@@ -445,7 +449,10 @@ impl<S> NodeHandler<S>
         };
 
         profiler_span!("Make sure that it is new transaction", {
-            if self.state.transactions().contains_key(&hash) {
+            if self.state.transactions()
+                  .read()
+                  .expect("Expected read lock")
+                  .contains_key(&hash) {
                 return;
             }
 
@@ -476,7 +483,10 @@ impl<S> NodeHandler<S>
         let hash = msg.hash();
 
         // Make sure that it is new transaction
-        if self.state.transactions().contains_key(&hash) {
+        if self.state.transactions()
+                        .read()
+                        .expect("Expected read lock")
+                        .contains_key(&hash) {
             return;
         }
 
@@ -553,14 +563,19 @@ impl<S> NodeHandler<S>
             if self.state.have_prevote(round) {
                 return;
             }
+            let pool_len = self.state.transactions()
+                  .read()
+                  .expect("Expected read lock").len();
 
-            info!("LEADER: pool = {}", self.state.transactions().len());
+            info!("LEADER: pool = {}", pool_len);
 
             let round = self.state.round();
             let max_count = ::std::cmp::min(self.txs_block_limit() as usize,
-                                            self.state.transactions().len());
+                                            pool_len);
             let txs: Vec<Hash> = self.state
                 .transactions()
+                .read()
+                .expect("Expected read lock")
                 .keys()
                 .take(max_count)
                 .cloned()
@@ -650,7 +665,10 @@ impl<S> NodeHandler<S>
                         height: Height,
                         tx_hashes: &[Hash])
                         -> (Hash, Patch) {
-        self.blockchain.create_patch(proposer_id, height, tx_hashes, self.state.transactions())
+        self.blockchain.create_patch(proposer_id, height, tx_hashes, &self.state
+                                                                         .transactions()
+                                                                         .read()
+                                                                         .expect("Expected read lock"))
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the

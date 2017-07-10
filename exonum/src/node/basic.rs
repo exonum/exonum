@@ -144,7 +144,6 @@ impl<S> NodeHandler<S>
             self.add_status_timeout();
         }
     }
-
     /// Handles `NodeTimeout::PeerExchange`. Node sends the `RequestPeers` to a random peer.
     pub fn handle_peer_exchange_timeout(&mut self) {
         if !self.state.peers().is_empty() {
@@ -168,6 +167,12 @@ impl<S> NodeHandler<S>
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
         self.add_peer_exchange_timeout();
+    }
+    /// Handles `NodeTimeout::UpdateApiState`.
+    /// Node update internal `ApiState`.
+    pub fn handle_update_api_state_timeout(&mut self) {
+        self.api_state.update(&self.state);
+        self.add_update_api_state_timeout();
     }
 
     /// Broadcasts the `Status` message to all peers.

@@ -93,7 +93,8 @@ impl MovingAverage {
 impl TimeoutAdjuster for MovingAverage {
     fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
         self.adjust_timeout_impl(state.config().consensus.txs_block_limit as f64,
-                                 state.transactions().len() as f64)
+                                 state.transactions().read()
+                                      .expect("Expected read lock").len() as f64)
     }
 }
 

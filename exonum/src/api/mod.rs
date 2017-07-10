@@ -20,7 +20,6 @@ use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
 use encoding::serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
 
-
 #[derive(Debug)]
 pub enum ApiError {
     Service(Box<::std::error::Error + Send + Sync>),
