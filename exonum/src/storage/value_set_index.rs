@@ -7,7 +7,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 /// A set of items that implemets `StorageValue` trait.
 ///
-/// `ValueSetIndex` implements a hashmap, storing the element using its hash as a key.
+/// `ValueSetIndex` implements a set, storing the element as values using its hash as a key.
 /// `ValueSetIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
@@ -50,7 +50,6 @@ impl<T, V> ValueSetIndex<T, V> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ValueSetIndex {
             base: BaseIndex::new(prefix, view),
@@ -78,7 +77,7 @@ impl<T, V> ValueSetIndex<T, V>
         ValueSetIndexIter { base_iter: self.base.iter(&()) }
     }
 
-    /// An iterator visiting all elements in arbitrary order  starting from the specified hash of
+    /// An iterator visiting all elements in arbitrary order starting from the specified hash of
     /// a value. The iterator element type is T.
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
         ValueSetIndexIter { base_iter: self.base.iter_from(&(), from) }
