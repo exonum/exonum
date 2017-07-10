@@ -234,8 +234,9 @@ fn test_store_txs_positions() {
 /// - reach that first height
 /// - handle queued Prevote
 /// - and observe `RequestPropose` for queued `Prevote`
+#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
-#[should_panic(expected = "Send unexpected message Request(RequestPropose" ])]
+#[should_panic(expected = "Send unexpected message Request(RequestPropose")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -263,8 +264,9 @@ fn test_queue_prevote_message_from_next_height() {
 /// - and observe Prevote for queued Propose
 /// check line from `NodeHandler.handle_consensus()`
 /// case `msg.height() == self.state.height() + 1`
+#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
-#[should_panic(expected = "Send unexpected message Consensus(Prevote" ])]
+#[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
     let _ = env_logger::init();
 
@@ -765,8 +767,9 @@ fn not_request_txs_when_get_tx_and_propose() {
 /// HANDLE TX
 /// - verify signature
 /// - should panic because tx has wrong signature and is not considered
+#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
-#[should_panic(expected = "Send unexpected message Request(RequestTransactions" ])]
+#[should_panic(expected = "Send unexpected message Request(RequestTransactions")]
 fn handle_tx_verify_signature() {
     let sandbox = timestamping_sandbox();
 
@@ -2667,8 +2670,9 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - lock to propose
 ///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
+#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
-#[should_panic(expected = "Send unexpected message Request(RequestPropose" ])]
+#[should_panic(expected = "Send unexpected message Request(RequestPropose")]
 fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 

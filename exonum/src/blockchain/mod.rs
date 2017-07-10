@@ -12,7 +12,7 @@
 //!
 //! You may follow the [`minibank`][1] tutorial to get experience of programming your services.
 //!
-//! [1]:
+//! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
 
 // TODO move to lib.rs
 #![deny(missing_docs)]
