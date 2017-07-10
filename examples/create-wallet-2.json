@@ -1,0 +1,12 @@
+{
+    "body": {
+        "pub_key": "d1e877472a4585d515b13f52ae7bfded1ccea511816d7772cb17e1ab20830819",
+        "name": "Janie Roe"
+    },
+    "network_id": 0,
+    "protocol_version": 0,
+    "service_id": 1,
+    "message_id": 1,
+    "signature": "05f51eb13cfaaebc97b27e340048f35f40c7bb6e3ae4c47728dee9908a10636add57700dfce1bcd686dc36fae4fa930d1318fb76a0d5c410b998be1949382209"
+}
+
