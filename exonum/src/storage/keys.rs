@@ -1,10 +1,22 @@
+//! A definition of `StorageKey` trait and implementations for common types.
 use byteorder::{ByteOrder, BigEndian};
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
 
+/// A trait that define serialization of corresponding types as storage keys.
+///
+/// Since internally the keys are sorted in a serialized form, the big-endian encoding is used.
 pub trait StorageKey {
+    /// Returns the size of serialized key in bytes.
     fn size(&self) -> usize;
+
+    /// Serialize a key into the specified buffer of bytes.
+    ///
+    /// The size of the buffer is guaranteed equally to the precalculated size
+    /// of the serialized key.
     fn write(&self, buffer: &mut [u8]);
+
+    /// Deserialize a key from the specified buffer of bytes.
     fn read(buffer: &[u8]) -> Self;
 }
 

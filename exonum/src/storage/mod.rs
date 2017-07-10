@@ -17,6 +17,7 @@ pub use self::value_set_index::ValueSetIndex;
 pub use self::proof_list_index::{ProofListIndex, ListProof};
 pub use self::proof_map_index::{ProofMapIndex, MapProof};
 
+/// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 mod error;

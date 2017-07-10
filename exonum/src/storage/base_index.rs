@@ -1,4 +1,4 @@
-//! Implementation of base index with most common features.
+//! An implementation of base index with most common features.
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -60,7 +60,7 @@ impl<T> BaseIndex<T> {
 impl<T> BaseIndex<T>
     where T: AsRef<Snapshot>
 {
-    /// Returns a value of *any* corresponding to the key of *any* type.
+    /// Returns a value of *any* type corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
         where K: StorageKey,
               V: StorageValue
@@ -71,7 +71,8 @@ impl<T> BaseIndex<T>
             .map(|v| StorageValue::from_bytes(Cow::Owned(v)))
     }
 
-    /// Returns `true` if the index contains a value for the specified key of *any* type.
+    /// Returns `true` if the index contains a value of *any* type for the specified key of
+    /// *any* type.
     pub fn contains<K>(&self, key: &K) -> bool
         where K: StorageKey
     {
@@ -79,7 +80,7 @@ impl<T> BaseIndex<T>
     }
 
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
-    /// type is any key-value pair. An argument `subprefix` allows to specify a subset of
+    /// type is *any* key-value pair. An argument `subprefix` allows to specify a subset of
     /// iteration.
     pub fn iter<P, K, V>(&self, subprefix: &P) -> BaseIndexIter<K, V>
         where P: StorageKey,
@@ -98,7 +99,7 @@ impl<T> BaseIndex<T>
     }
 
     /// Returns an iterator over the entries of the index in ascending order starting from the
-    /// specified key. The iterator element type is any key-value pair. An argument `subprefix`
+    /// specified key. The iterator element type is *any* key-value pair. An argument `subprefix`
     /// allows to specify a subset of iteration.
     pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> BaseIndexIter<K, V>
         where P: StorageKey,
