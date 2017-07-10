@@ -42,6 +42,8 @@ const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
+    /// Add new connection
+    PeerAdd(SocketAddr),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
 }
@@ -63,7 +65,7 @@ pub enum NodeTimeout {
 
 /// Transactions sender.
 #[derive(Clone)]
-pub struct TxSender<S>
+pub struct ApiSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     inner: S,
@@ -209,7 +211,12 @@ impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     /// Creates `NodeHandler` using specified `Configuration`.
-    pub fn new(blockchain: Blockchain, external_address: SocketAddr, sender: S, config: Configuration) -> Self {
+    pub fn new(
+        blockchain: Blockchain,
+        external_address: SocketAddr,
+        sender: S,
+        config: Configuration,
+    ) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -462,23 +469,23 @@ impl<S> fmt::Debug for NodeHandler<S>
     }
 }
 
-/// `TransactionSend` represents interface for sending transactions. For details see `TxSender`
+/// `TransactionSend` represents interface for sending transactions. For details see `ApiSender`
 /// implementation.
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
     fn send(&self, tx: Box<Transaction>) -> EventsResult<()>;
 }
 
-impl<S> TxSender<S>
+impl<S> ApiSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    /// Creates new `TxSender` with given channel.
-    pub fn new(inner: S) -> TxSender<S> {
-        TxSender { inner: inner }
+    /// Creates new `ApiSender` with given channel.
+    pub fn new(inner: S) -> ApiSender<S> {
+        ApiSender { inner: inner }
     }
 }
 
-impl<S> TransactionSend for TxSender<S>
+impl<S> TransactionSend for ApiSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     fn send(&self, tx: Box<Transaction>) -> EventsResult<()> {
@@ -490,10 +497,10 @@ impl<S> TransactionSend for TxSender<S>
     }
 }
 
-impl<T> fmt::Debug for TxSender<T>
+impl<T> fmt::Debug for ApiSender<T>
     where T: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("TxSender { .. }")
+        f.pad("ApiSender { .. }")
     }
 }
 
@@ -540,6 +547,7 @@ impl Node {
             warn!("Could not find 'external_address' in the config, using 'listen_address'");
             node_cfg.listen_address
         };
+        let tx_pool = Arc::new(CHashMap::new());
 
         let network = Network::with_config(node_cfg.listen_address, config.network);
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
@@ -631,7 +639,7 @@ impl Node {
     }
 
     /// Returns channel.
-    pub fn channel(&self) -> TxSender<NodeChannel> {
-        TxSender::new(self.reactor.handler().channel.clone())
+    pub fn channel(&self) -> ApiSender<NodeChannel> {
+        ApiSender::new(self.reactor.handler().channel.clone())
     }
 }

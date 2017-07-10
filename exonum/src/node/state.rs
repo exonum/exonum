@@ -14,6 +14,8 @@ use events::Milliseconds;
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction};
 use node::whitelist::Whitelist;
 
+use ::chashmap::CHashMap;
+
 // TODO: move request timeouts into node configuration
 
 /// Timeout value for the `RequestPropose` message.
@@ -34,7 +36,7 @@ pub type ValidatorId = u16;
 
 /// Transactions pool.
 // TODO replace by persistent TxPool
-pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
+pub type TxPool = Arc<CHashMap<Hash, Box<Transaction>>>;
 // TODO: reduce copying of Hash
 
 /// State of the `NodeHandler`.
@@ -350,7 +352,8 @@ impl State {
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
-               height_start_time: SystemTime)
+               height_start_time: SystemTime,
+               )
                -> Self {
         State {
             validator_state: validator_id.map(ValidatorState::new),
@@ -374,7 +377,7 @@ impl State {
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
-            transactions: TxPool::new(),
+            transactions: Arc::new(CHashMap::new()),
 
             queued: Vec::new(),
 

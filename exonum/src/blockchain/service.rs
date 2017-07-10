@@ -11,7 +11,7 @@ use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{Node, State, NodeChannel, TxSender};
+use node::{Node, State, NodeChannel, ApiSender};
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
@@ -175,10 +175,34 @@ impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
     }
 }
 
+struct ApiState {
+    in_connections: Vec<SocketAddr>,
+    out_connections: Vec<SocketAddr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SharedApiState {
+    state: Arc<RwLock<ApiState>>,
+}
+
+impl SharedApiState {
+    fn new( ) -> SharedApiState {
+        SharedApiState {
+            state: Arc::new(RwLock::new(ApiState::new())),
+        }
+    }
+
+    fn update(&self, state: &State) {
+        ///TODO: implement updating
+    }
+}
+
 /// Provides the current node state to api handlers.
 pub struct ApiContext {
+    pool: TxPool,
+    shared_api_state: SharedApiContext,
     blockchain: Blockchain,
-    node_channel: TxSender<NodeChannel>,
+    node_channel: ApiSender<NodeChannel>,
     public_key: PublicKey,
     secret_key: SecretKey,
 }
@@ -189,6 +213,7 @@ impl ApiContext {
     pub fn new(node: &Node) -> ApiContext {
         let handler = node.handler();
         ApiContext {
+            pool: node.state().transactions().clone(),
             blockchain: handler.blockchain.clone(),
             node_channel: node.channel(),
             public_key: *node.state().service_public_key(),
@@ -202,7 +227,7 @@ impl ApiContext {
     }
 
     /// Returns reference to the transaction sender.
-    pub fn node_channel(&self) -> &TxSender<NodeChannel> {
+    pub fn node_channel(&self) -> &ApiSender<NodeChannel> {
         &self.node_channel
     }
 
