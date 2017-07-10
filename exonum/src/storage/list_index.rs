@@ -78,13 +78,13 @@ impl<T, V> ListIndex<T, V>
         len
     }
 
-    /// Returns an iterator over the list. The iterator element type is T.
+    /// Returns an iterator over the list. The iterator element type is V.
     pub fn iter(&self) -> ListIndexIter<V> {
         ListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
-    /// element type is T.
+    /// element type is V.
     pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
         ListIndexIter { base_iter: self.base.iter_from(&(), &from) }
     }

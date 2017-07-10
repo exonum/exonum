@@ -1,7 +1,14 @@
+//! An implementation of key-value map.
 use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
 
+/// A map of keys and values.
+///
+/// `MapIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
+/// [`StorageValue`] trait.
+/// [`StorageKey`]: ../trait.StorageKey.html
+/// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct MapIndex<T, K, V> {
     base: BaseIndex<T>,
@@ -9,22 +16,53 @@ pub struct MapIndex<T, K, V> {
     _v: PhantomData<V>,
 }
 
+/// An iterator over an entries of a `MapIndex`.
+///
+/// This struct is created by the [`iter`] or
+/// [`iter_from`] methods on [`MapIndex`]. See its documentation for more.
+///
+/// [`iter`]: struct.MapIndex.html#method.iter
+/// [`iter_from`]: struct.MapIndex.html#method.iter_from
+/// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
 pub struct MapIndexIter<'a, K, V> {
     base_iter: BaseIndexIter<'a, K, V>,
 }
 
+/// An iterator over a keys of a `MapIndex`.
+///
+/// This struct is created by the [`keys`] or
+/// [`keys_from`] methods on [`MapIndex`]. See its documentation for more.
+///
+/// [`keys`]: struct.MapIndex.html#method.keys
+/// [`keys_from`]: struct.MapIndex.html#method.keys_from
+/// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
 pub struct MapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, K, ()>,
 }
 
+/// An iterator over a values of a `MapIndex`.
+///
+/// This struct is created by the [`values`] or
+/// [`values_from`] methods on [`MapIndex`]. See its documentation for more.
+///
+/// [`values`]: struct.MapIndex.html#method.values
+/// [`values_from`]: struct.MapIndex.html#method.values_from
+/// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
 pub struct MapIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
 impl<T, K, V> MapIndex<T, K, V> {
+    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
     pub fn new(prefix: Vec<u8>, base: T) -> Self {
         MapIndex {
             base: BaseIndex::new(prefix, base),
@@ -39,34 +77,48 @@ impl<T, K, V> MapIndex<T, K, V>
           K: StorageKey,
           V: StorageValue
 {
+    /// Returns a value corresponding to the key.
     pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(key)
     }
 
+    /// Returns `true` if the map contains a value for the specified key.
     pub fn contains(&self, key: &K) -> bool {
         self.base.contains(key)
     }
 
+    /// Returns an iterator over the entries of the map in ascending order. The iterator element
+    /// type is (K, V).
     pub fn iter(&self) -> MapIndexIter<K, V> {
         MapIndexIter { base_iter: self.base.iter(&()) }
     }
 
+    /// Returns an iterator over the keys of the map in ascending order. The iterator element
+    /// type is K.
     pub fn keys(&self) -> MapIndexKeys<K> {
         MapIndexKeys { base_iter: self.base.iter(&()) }
     }
 
+    /// Returns an iterator over the values of the map in ascending order of keys. The iterator
+    /// element type is V.
     pub fn values(&self) -> MapIndexValues<V> {
         MapIndexValues { base_iter: self.base.iter(&()) }
     }
 
+    /// Returns an iterator over the entries of the map in ascending order starting from the
+    /// specified key. The iterator element type is (K, V).
     pub fn iter_from(&self, from: &K) -> MapIndexIter<K, V> {
         MapIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
 
+    /// Returns an iterator over the keys of the map in ascending order starting from the
+    /// specified key. The iterator element type is K.
     pub fn keys_from(&self, from: &K) -> MapIndexKeys<K> {
         MapIndexKeys { base_iter: self.base.iter_from(&(), from) }
     }
 
+    /// Returns an iterator over the values of the map in ascending order of keys starting from the
+    /// specified key. The iterator element type is V.
     pub fn values_from(&self, from: &K) -> MapIndexValues<V> {
         MapIndexValues { base_iter: self.base.iter_from(&(), from) }
     }
@@ -76,14 +128,22 @@ impl<'a, K, V> MapIndex<&'a mut Fork, K, V>
     where K: StorageKey,
           V: StorageValue
 {
+    /// Inserts the key-value pair into the map.
     pub fn put(&mut self, key: &K, value: V) {
         self.base.put(key, value)
     }
 
+    /// Removes the key from the map.
     pub fn remove(&mut self, key: &K) {
         self.base.remove(key)
     }
 
+    /// Clears the list, removing all values.
+    ///
+    /// # Notes
+    /// Currently this method is not optimized to delete large set of data. During the execution of
+    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// in the index.
     pub fn clear(&mut self) {
         self.base.clear()
     }
