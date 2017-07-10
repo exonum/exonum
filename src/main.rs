@@ -17,6 +17,16 @@ use iron::prelude::*;
 use iron::Handler;
 use router::Router;
 
+// // // // // // // // // // CONSTANTS // // // // // // // // // //
+
+const SERVICE_ID: u16 = 1;
+
+const TX_CREATE_WALLET_ID: u16 = 1;
+
+const TX_TRANSFER_ID: u16 = 2;
+
+const INIT_BALANCE: u64 = 100;
+
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
 encoding_struct! {
@@ -43,8 +53,6 @@ impl Wallet {
 
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
-pub const TX_CREATE_WALLET_ID: u16 = 1;
-
 message! {
     struct TxCreateWallet {
         const TYPE = SERVICE_ID;
@@ -55,8 +63,6 @@ message! {
         field name:        &str        [32 => 40]
     }
 }
-
-pub const TX_TRANSFER_ID: u16 = 2;
 
 message! {
     struct TxTransfer {
@@ -72,8 +78,6 @@ message! {
 }
 
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
-
-const INIT_BALANCE: u64 = 100;
 
 impl Transaction for TxCreateWallet {
     fn verify(&self) -> bool {
@@ -181,8 +185,6 @@ impl<'a> CurrencySchema<'a> {
 }
 
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
-
-pub const SERVICE_ID: u16 = 1;
 
 struct CurrencyService;
 
