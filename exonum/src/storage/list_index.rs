@@ -37,9 +37,9 @@ impl<T, V> ListIndex<T, V> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new(prefix: Vec<u8>, base: T) -> Self {
+    pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ListIndex {
-            base: BaseIndex::new(prefix, base),
+            base: BaseIndex::new(prefix, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
