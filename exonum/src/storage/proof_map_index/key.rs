@@ -10,6 +10,10 @@ pub const LEAF_KEY_PREFIX: u8 = 01;
 pub const KEY_SIZE: usize = HASH_SIZE;
 pub const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 
+/// A trait that defines a subset of storage key types which are suitable for use with
+/// `ProofMapIndex`.
+///
+/// The size of the keys must be exactly 32 bytes and the keys must have a uniform distribution.
 pub trait ProofMapKey: StorageKey {}
 
 impl ProofMapKey for Hash {}

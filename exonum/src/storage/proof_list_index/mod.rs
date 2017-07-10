@@ -19,7 +19,7 @@ mod proof;
 
 /// A Merkalized verison of an array list that allows proofs of existence for the list items.
 ///
-/// `ProofListIndex` implements a Merkle tree, storing the element as leafs and using `u64` as
+/// `ProofListIndex` implements a Merkle tree, storing the element as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
