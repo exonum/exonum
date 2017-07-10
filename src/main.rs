@@ -6,9 +6,11 @@ extern crate router;
 extern crate bodyparser;
 extern crate iron;
 
-use exonum::blockchain::{self, Blockchain, Service, GenesisConfig, ValidatorKeys, Transaction, ApiContext};
+use exonum::blockchain::{self, Blockchain, Service, GenesisConfig,
+                         ValidatorKeys, Transaction, ApiContext};
+use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend,
+                   TxSender, NodeChannel};
 use exonum::messages::{RawTransaction, FromRaw, Message};
-use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend, TxSender, NodeChannel};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
 use exonum::crypto::{PublicKey, Hash};
 use exonum::encoding::{self, Field};
