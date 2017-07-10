@@ -64,8 +64,12 @@ pub trait Snapshot: 'static {
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
 }
 
+/// A trait that define streaming iterator over storage view entries.
 pub trait Iterator {
+    /// Advances the iterator and returns the next key and value.
     fn next(&mut self) -> Option<(&[u8], &[u8])>;
+
+    /// Returns references to the current key and value of the iterator.
     fn peek(&mut self) -> Option<(&[u8], &[u8])>;
 }
 

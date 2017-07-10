@@ -6,7 +6,7 @@ use crypto::Hash;
 use super::{BaseIndex, Snapshot, Fork, StorageValue};
 
 /// An index that may only contain one element.
-
+///
 /// A value should implement [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
