@@ -14,7 +14,7 @@ use messages::{RawMessage, MessageBuffer, Message};
 pub trait StorageValue: Sized {
     /// Returns a hash of the value.
     ///
-    /// This method is actively used to build indexes, so the hashing strategy must satisfy
+    /// This method is actively used to build indices, so the hashing strategy must satisfy
     /// the basic requirements of cryptographic hashing: equal values must have the same hash and
     /// not equal values must have different hashes.
     fn hash(&self) -> Hash;
