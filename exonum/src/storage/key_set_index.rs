@@ -52,13 +52,13 @@ impl<T, K> KeySetIndex<T, K>
         self.base.contains(item)
     }
 
-    /// An iterator visiting all elements in ascending order. The iterator element type is T.
+    /// An iterator visiting all elements in ascending order. The iterator element type is K.
     pub fn iter(&self) -> KeySetIndexIter<K> {
         KeySetIndexIter { base_iter: self.base.iter(&()) }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified value.
-    /// The iterator element type is T.
+    /// The iterator element type is K.
     pub fn iter_from(&self, from: &K) -> KeySetIndexIter<K> {
         KeySetIndexIter { base_iter: self.base.iter_from(&(), from) }
     }

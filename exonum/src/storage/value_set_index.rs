@@ -72,13 +72,13 @@ impl<T, V> ValueSetIndex<T, V>
         self.base.contains(hash)
     }
 
-    /// An iterator visiting all elements in arbitrary order. The iterator element type is T.
+    /// An iterator visiting all elements in arbitrary order. The iterator element type is V.
     pub fn iter(&self) -> ValueSetIndexIter<V> {
         ValueSetIndexIter { base_iter: self.base.iter(&()) }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified hash of
-    /// a value. The iterator element type is T.
+    /// a value. The iterator element type is V.
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
         ValueSetIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
