@@ -45,7 +45,7 @@ struct LevelDBSnapshot {
     snapshot: _Snapshot<'static>,
 }
 
-/// An iterator over an entries of a `LevelDB`.
+/// An iterator over the entries of a `LevelDB`.
 struct LevelDBIterator<'a> {
     iter: _Iterator<'a>,
 }

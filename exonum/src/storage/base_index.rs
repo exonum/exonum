@@ -20,7 +20,7 @@ pub struct BaseIndex<T> {
     view: T,
 }
 
-/// An iterator over an entries of a `BaseIndex`.
+/// An iterator over the entries of a `BaseIndex`.
 ///
 /// This struct is created by the [`iter`] or
 /// [`iter_from`] methods on [`BaseIndex`]. See its documentation for more.

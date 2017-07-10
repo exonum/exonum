@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
 
-/// A set of items that implemets `StorageKey` trait.
+/// A set of items that implements `StorageKey` trait.
 ///
 /// `KeySetIndex` implements a set, storing the element as keys with empty values.
 /// `KeySetIndex` requires that the elements implement the [`StorageKey`] trait.
