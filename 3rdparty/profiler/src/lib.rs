@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(unused_imports)]
 #![allow(unused_variables)]
 extern crate thread_id;
 extern crate ctrlc;
