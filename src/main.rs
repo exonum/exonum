@@ -6,7 +6,7 @@ extern crate router;
 extern crate bodyparser;
 extern crate iron;
 
-use exonum::blockchain::{self, Blockchain, Service, GenesisConfig, Transaction, ApiContext};
+use exonum::blockchain::{self, Blockchain, Service, GenesisConfig, ValidatorKeys, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend, TxSender, NodeChannel};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
@@ -224,12 +224,17 @@ fn main() {
     ];
     let blockchain = Blockchain::new(Box::new(db), services);
 
-    let (public_key, secret_key) = exonum::crypto::gen_keypair();
+    let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
+    let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
 
     let peer_address = "0.0.0.0:2000".parse().unwrap();
     let api_address = "0.0.0.0:8000".parse().unwrap();
 
-    let genesis = GenesisConfig::new(vec![public_key].into_iter());
+    let validator_keys = ValidatorKeys {
+        consensus_key: consensus_public_key,
+        service_key: service_public_key,
+    };
+    let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
 
     let api_cfg = NodeApiConfig {
         enable_blockchain_explorer: true,
@@ -240,13 +245,17 @@ fn main() {
     let node_cfg = NodeConfig {
         listen_address: peer_address,
         peers: vec![],
-        public_key,
-        secret_key,
+        service_public_key,
+        service_secret_key,
+        consensus_public_key,
+        consensus_secret_key,
         genesis,
+        external_address: None,
         network: Default::default(),
         whitelist: Default::default(),
         api: api_cfg,
         mempool: Default::default(),
+        services_configs: Default::default(),
     };
 
     println!("Starting a single node...");
