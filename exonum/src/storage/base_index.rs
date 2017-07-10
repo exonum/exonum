@@ -6,6 +6,9 @@ use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 
 /// Basic struct for all indices that implements common features.
 ///
+/// This structure is not intended for direct use, rather it is the basis for building other types
+/// of indexes.
+///
 /// `BaseIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
 /// [`StorageValue`] trait. However, this structure is not bound to specific types and allows the
 /// use of *any* types as keys or values.

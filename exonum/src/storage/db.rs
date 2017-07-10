@@ -13,9 +13,12 @@ pub type Patch = BTreeMap<Vec<u8>, Change>;
 /// A generalized iterator over a storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
 
+/// An enum that represents a kind of change of some key in storage.
 #[derive(Debug, Clone)]
 pub enum Change {
+    /// Put the specified value into storage for a corresponding key.
     Put(Vec<u8>),
+    /// Delete a value from storage for a corresponding key.
     Delete,
 }
 
@@ -27,7 +30,7 @@ pub struct Fork {
     logged: bool,
 }
 
-pub struct ForkIter<'a> {
+struct ForkIter<'a> {
     snapshot: Iter<'a>,
     changes: Peekable<Range<'a, Vec<u8>, Change>>,
 }
@@ -42,9 +45,44 @@ enum NextIterValue {
     Finished,
 }
 
+/// A trait that define a low-level storage backend.
+///
+/// The trait `Database` requires to implement traits `Send` and `Sync` and should not be borrowed
+/// data, so you can use method [`clone`] to get the references to the database for concurrent
+/// usage.
+///
+/// There is no way to directly interact with data in the database.
+///
+/// If you only need to read the data, you can create a [`Snapshot`] using method [`snapshot`].
+/// Snapshots provide a read isolation, so you are guaranteed to work with consistent values even
+/// if the data in the database changes between reads.
+///
+/// If you need to make any changes to the data, you need to create a [`Fork`] using method
+/// [`fork`]. As well as `Snapshot`, `Fork` provides a read isolation and also allows you to create
+/// a sequence of changes to the database that are specified as [`Patch`]. Later you can atomically
+/// merge a patch into the database using method [`merge`].
+///
+/// [`clone`]: #tymethod.fork
+/// [`Snapshot`]: trait.Snapshot.html
+/// [`snapshot`]: #tymethod.snapshot
+/// [`Fork`]: struct.Fork.html
+/// [`fork`]: #method.fork
+/// [`Patch`]: type.Patch.html
+/// [`merge`]: #tymethod.merge
 pub trait Database: Send + Sync + 'static {
+    /// Creates a new reference to the database as `Box<Database>`.
     fn clone(&self) -> Box<Database>;
+
+    /// Creates a new snapshot of the database from its current state.
+    ///
+    /// See [`Snapshot`] documentation for more.
+    /// [`Snapshot`]: trait.Snapshot.html
     fn snapshot(&self) -> Box<Snapshot>;
+
+    /// Creates a new fork of the database from its current state.
+    ///
+    /// See [`Fork`] documentation for more.
+    /// [`Fork`]: struct.Fork.html
     fn fork(&self) -> Fork {
         Fork {
             snapshot: self.snapshot(),
@@ -53,14 +91,40 @@ pub trait Database: Send + Sync + 'static {
             logged: false,
         }
     }
+
+    /// Atomically applies a sequence of patch changes to the database.
+    ///
+    /// # Errors
+    /// If this method encounters any form of I/O or other error during merging, an error variant
+    /// will be returned. If an error is returned then it must be guaranteed that no changes were
+    /// applied.
     fn merge(&mut self, patch: Patch) -> Result<()>;
 }
 
+/// A trait that define a snapshot of storage backend.
+///
+/// `Snapshot` instance is immutable representation of storage state. It provides a read isolation,
+/// so using snapshot you are guaranteed to work with consistent values even if the data in
+/// the database changes between reads.
+///
+/// `Snapshot` provides all the necessary methods for reading data from the database, so `&Storage`
+/// is used as a storage view for creating read-only indexes representation.
+// TODO: should Snapshot be Send or Sync?
 pub trait Snapshot: 'static {
+    /// Returns a value as raw vector of bytes corresponding to the specified key
+    /// or `None` if not exists.
     fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
+
+    /// Returns `true` if the snapshot contains a value for the specified key.
+    ///
+    /// Default implementation tries to read the value using method [`get`].
+    /// [`get`]: #tymethod.get
     fn contains(&self, key: &[u8]) -> bool {
         self.get(key).is_some()
     }
+
+    /// Returns an iterator over the entries of the snapshot in ascending order starting from
+    /// the specified key. The iterator element type is `(&[u8], &[u8])`.
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
 }
 
