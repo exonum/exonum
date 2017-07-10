@@ -8,7 +8,7 @@ extern crate iron;
 
 use exonum::blockchain::{self, Blockchain, Service, GenesisConfig, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, FromRaw, Message};
-use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend};
+use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend, TxSender, NodeChannel};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
 use exonum::crypto::{PublicKey, Hash};
 use exonum::encoding::{self, Field};
@@ -116,11 +116,11 @@ impl Transaction for TxTransfer {
 // // // // // // // // // // REST API // // // // // // // // // //
 
 #[derive(Clone)]
-struct CryptocurrencyApi<T> {
-    channel: T,
+struct CryptocurrencyApi {
+    channel: TxSender<NodeChannel>,
 }
 
-impl<T: TransactionSend + Clone + 'static> Api for CryptocurrencyApi<T> {
+impl Api for CryptocurrencyApi {
     fn wire(&self, router: &mut Router) {
 
         #[serde(untagged)]
