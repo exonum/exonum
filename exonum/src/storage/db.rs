@@ -7,8 +7,10 @@ use super::Result;
 
 use self::NextIterValue::*;
 
-
+/// A set of serial changes that should be applied to a storage atomically.
 pub type Patch = BTreeMap<Vec<u8>, Change>;
+
+/// A generalized iterator over a storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
 
 #[derive(Debug, Clone)]
