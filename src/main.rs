@@ -53,6 +53,23 @@ impl Wallet {
     }
 }
 
+// // // // // // // // // // STORAGE DATA LAYOUT // // // // // // // // // //
+
+pub struct CurrencySchema<'a> {
+    view: &'a mut Fork,
+}
+
+impl<'a> CurrencySchema<'a> {
+    pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
+        let prefix = blockchain::gen_prefix(SERVICE_ID, 0, &());
+        MapIndex::new(prefix, self.view)
+    }
+
+    pub fn wallet(&mut self, pub_key: &PublicKey) -> Option<Wallet> {
+        self.wallets().get(pub_key)
+    }
+}
+
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 message! {
@@ -166,23 +183,6 @@ impl Api for CryptocurrencyApi {
         };
         let route_post = "/v1/wallets/transaction";
         router.post(&route_post, transaction, "transaction");
-    }
-}
-
-// // // // // // // // // // STORAGE DATA LAYOUT // // // // // // // // // //
-
-pub struct CurrencySchema<'a> {
-    view: &'a mut Fork,
-}
-
-impl<'a> CurrencySchema<'a> {
-    pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-        let prefix = blockchain::gen_prefix(SERVICE_ID, 0, &());
-        MapIndex::new(prefix, self.view)
-    }
-
-    pub fn wallet(&mut self, pub_key: &PublicKey) -> Option<Wallet> {
-        self.wallets().get(pub_key)
     }
 }
 
