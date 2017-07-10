@@ -1,3 +1,4 @@
+//! An implementation of `MemoryDB` database.
 use profiler;
 
 use leveldb::database::Database as _LevelDB;
@@ -16,7 +17,10 @@ use std::path::Path;
 use std::error;
 use std::sync::Arc;
 
+/// Options to consider when opening a new or pre-existing LevelDB database.
 pub use leveldb::options::Options as LevelDBOptions;
+
+/// Represents a LevelDB cache.
 pub use leveldb::database::cache::Cache as LevelDBCache;
 
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
@@ -29,16 +33,19 @@ const LEVELDB_READ_OPTIONS: ReadOptions<'static> = ReadOptions {
 
 const LEVELDB_WRITE_OPTIONS: WriteOptions = WriteOptions { sync: false };
 
+/// Database implementation on the top of LevelDB backend.
 #[derive(Clone)]
 pub struct LevelDB {
     db: Arc<_LevelDB>,
 }
 
+/// A snapshot of a `LevelDB`.
 struct LevelDBSnapshot {
     _db: Arc<_LevelDB>,
     snapshot: _Snapshot<'static>,
 }
 
+/// An iterator over an entries of a `LevelDB`.
 struct LevelDBIterator<'a> {
     iter: _Iterator<'a>,
 }
@@ -56,8 +63,9 @@ impl From<io::Error> for Error {
 }
 
 impl LevelDB {
-    // TODO: configurate LRU cache
+    /// Open a database stored in the specified path with the specified options.
     pub fn open<P: AsRef<Path>>(path: P, options: LevelDBOptions) -> Result<LevelDB> {
+        // TODO: configurate LRU cache
         if options.create_if_missing {
             fs::create_dir_all(path.as_ref())?;
         }

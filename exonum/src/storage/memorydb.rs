@@ -1,19 +1,25 @@
+//! An implementation of `MemoryDB` database.
 use std::clone::Clone;
 use std::collections::btree_map::{BTreeMap, Range};
 use std::iter::Peekable;
 
 use super::{Database, Snapshot, Patch, Change, Iterator, Iter, Result};
 
+/// Database implementation that stores all the data in memory.
+///
+/// It's mainly used for testing and not designed to be efficient.
 #[derive(Default, Clone, Debug)]
 pub struct MemoryDB {
     map: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
-pub struct MemoryDBIter<'a> {
+/// An iterator over an entries of a `MemoryDB`.
+struct MemoryDBIter<'a> {
     iter: Peekable<Range<'a, Vec<u8>, Vec<u8>>>,
 }
 
 impl MemoryDB {
+    /// Creates a new, empty database.
     pub fn new() -> MemoryDB {
         MemoryDB { map: BTreeMap::new() }
     }
