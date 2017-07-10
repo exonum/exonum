@@ -5,7 +5,7 @@ use crypto::Hash;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
-/// A set of items that implemets `StorageValue` trait.
+/// A set of items that implements `StorageValue` trait.
 ///
 /// `ValueSetIndex` implements a set, storing the element as values using its hash as a key.
 /// `ValueSetIndex` requires that the elements implement the [`StorageValue`] trait.

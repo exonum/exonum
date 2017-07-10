@@ -13,7 +13,7 @@ pub struct MemoryDB {
     map: BTreeMap<Vec<u8>, Vec<u8>>,
 }
 
-/// An iterator over an entries of a `MemoryDB`.
+/// An iterator over the entries of a `MemoryDB`.
 struct MemoryDBIter<'a> {
     iter: Peekable<Range<'a, Vec<u8>, Vec<u8>>>,
 }

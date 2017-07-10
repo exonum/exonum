@@ -10,7 +10,7 @@ use self::NextIterValue::*;
 /// A set of serial changes that should be applied to a storage atomically.
 pub type Patch = BTreeMap<Vec<u8>, Change>;
 
-/// A generalized iterator over a storage views.
+/// A generalized iterator over the storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
 
 /// An enum that represents a kind of change of some key in storage.
@@ -40,7 +40,7 @@ pub enum Change {
 /// that allows you to rollback some of the latest changes if for some reason you can not provide
 /// a consistent state after the changes due to a runtime error.
 ///
-/// `Fork` implement [`Snapshot`] trait and provides all the necessary methods for both reading and
+/// `Fork` implements [`Snapshot`] trait and provides all the necessary methods for both reading and
 /// writing data from the database, so `&mut Fork` is used as a storage view for creating
 /// read-write indices representation.
 ///
@@ -77,7 +77,7 @@ enum NextIterValue {
     Finished,
 }
 
-/// A trait that define a low-level storage backend.
+/// A trait that defines a low-level storage backend.
 ///
 /// The trait `Database` requires to implement traits `Send` and `Sync` and should not be borrowed
 /// data, so you can use method [`clone`] to get the references to the database for concurrent
@@ -133,7 +133,7 @@ pub trait Database: Send + Sync + 'static {
     fn merge(&mut self, patch: Patch) -> Result<()>;
 }
 
-/// A trait that define a snapshot of storage backend.
+/// A trait that defines a snapshot of storage backend.
 ///
 /// `Snapshot` instance is immutable representation of storage state. It provides a read isolation,
 /// so using snapshot you are guaranteed to work with consistent values even if the data in
@@ -160,7 +160,7 @@ pub trait Snapshot: 'static {
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
 }
 
-/// A trait that define streaming iterator over storage view entries.
+/// A trait that defines streaming iterator over storage view entries.
 pub trait Iterator {
     /// Advances the iterator and returns the next key and value.
     fn next(&mut self) -> Option<(&[u8], &[u8])>;

@@ -3,7 +3,7 @@ use byteorder::{ByteOrder, BigEndian};
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
 
-/// A trait that define serialization of corresponding types as storage keys.
+/// A trait that defines serialization of corresponding types as storage keys.
 ///
 /// Since internally the keys are sorted in a serialized form, the big-endian encoding is used.
 pub trait StorageKey {

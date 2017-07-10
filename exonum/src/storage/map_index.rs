@@ -16,7 +16,7 @@ pub struct MapIndex<T, K, V> {
     _v: PhantomData<V>,
 }
 
-/// An iterator over an entries of a `MapIndex`.
+/// An iterator over the entries of a `MapIndex`.
 ///
 /// This struct is created by the [`iter`] or
 /// [`iter_from`] methods on [`MapIndex`]. See its documentation for more.
@@ -29,7 +29,7 @@ pub struct MapIndexIter<'a, K, V> {
     base_iter: BaseIndexIter<'a, K, V>,
 }
 
-/// An iterator over a keys of a `MapIndex`.
+/// An iterator over the keys of a `MapIndex`.
 ///
 /// This struct is created by the [`keys`] or
 /// [`keys_from`] methods on [`MapIndex`]. See its documentation for more.
@@ -42,7 +42,7 @@ pub struct MapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, K, ()>,
 }
 
-/// An iterator over a values of a `MapIndex`.
+/// An iterator over the values of a `MapIndex`.
 ///
 /// This struct is created by the [`values`] or
 /// [`values_from`] methods on [`MapIndex`]. See its documentation for more.

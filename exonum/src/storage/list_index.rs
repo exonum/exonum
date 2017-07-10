@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
-/// A list of items that implemets `StorageValue` trait.
+/// A list of items that implements `StorageValue` trait.
 ///
 /// `ListIndex` implements an array list, storing the element as values and using `u64` as an index.
 /// `ListIndex` requires that the elements implement the [`StorageValue`] trait.
