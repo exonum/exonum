@@ -8,7 +8,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 use self::key::ProofListKey;
 
-pub use self::proof::ListProof;
+pub use self::proof::{ListProof, ListProofError};
 
 #[cfg(test)]
 mod tests;

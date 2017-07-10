@@ -24,10 +24,14 @@ pub enum ListProof<V> {
     Leaf(V),
 }
 
+/// An error that returned when the list proof is invalid.
 #[derive(Debug)]
 pub enum ListProofError {
+    /// The proof is too short and does not correspond to the height of the tree.
     UnexpectedLeaf,
+    /// The proof is too long and does not correspond to the height of the tree.
     UnexpectedBranch,
+    /// The hash of the proof is not equal to the trusted root hash.
     UnmatchedRootHash,
 }
 

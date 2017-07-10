@@ -52,23 +52,35 @@ pub enum ProofNode<V> {
 pub enum BranchProofNode<V> {
     /// A branch of proof in which both children do not contain the requested key.
     BranchKeyNotFound {
+        /// A hash of the left child.
         left_hash: Hash,
+        /// A hash of the right child.
         right_hash: Hash,
+        /// A key of the left child.
         left_key: DBKey,
+        /// A key of the right child.
         right_key: DBKey,
     },
     /// A branch of proof in which left child may contains requested key.
     LeftBranch {
+        /// A left child node.
         left_hash: Box<ProofNode<V>>,
+        /// A hash of the right child.
         right_hash: Hash,
+        /// A key of the left child.
         left_key: DBKey,
+        /// A key of the right child.
         right_key: DBKey,
     },
     /// A branch of proof in which right child may contains requested key.
     RightBranch {
+        /// A hash of the left child.
         left_hash: Hash,
+        /// A right child node.
         right_hash: Box<ProofNode<V>>,
+        /// A key of the left child.
         left_key: DBKey,
+        /// A key of the right child.
         right_key: DBKey,
     },
 }
