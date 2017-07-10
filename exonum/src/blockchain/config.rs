@@ -23,7 +23,7 @@ pub struct ValidatorKeys {
 /// This configuration must be same for any exonum node in the certain network on given height.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
-    /// Link to the previous configuration. 
+    /// Link to the previous configuration.
     /// For configuration in genesis block `hash` is just an array of zeroes.
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
@@ -138,10 +138,14 @@ mod tests {
     }
 
     fn create_test_configuration() -> StoredConfiguration {
-        let validator_keys = (1..4).map(|i| ValidatorKeys {
-                consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
-                service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
-            }).collect();
+        let validator_keys = (1..4)
+            .map(|i| {
+                ValidatorKeys {
+                    consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
+                    service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
+                }
+            })
+            .collect();
 
         StoredConfiguration {
             previous_cfg_hash: Hash::zero(),

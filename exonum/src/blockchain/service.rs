@@ -13,13 +13,13 @@ use node::{Node, State, NodeChannel, TxSender};
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
-/// A trait that describes transaction processing rules (a group of sequential operations 
+/// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
 pub trait Transaction: Message + 'static {
-    /// Verifies the transaction, which includes the message signature verification and other 
+    /// Verifies the transaction, which includes the message signature verification and other
     /// specific internal constraints. verify is intended to check the internal consistency of
     /// a transaction; it has no access to the blockchain state.
-    /// If a transaction fails verify, it is considered incorrect and cannot be included into 
+    /// If a transaction fails verify, it is considered incorrect and cannot be included into
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
@@ -31,7 +31,7 @@ pub trait Transaction: Message + 'static {
     ///
     /// - When programming `execute`, you should perform state-related checks before any changes
     /// to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a `panic`, the changes made by the 
+    /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
     fn execute(&self, fork: &mut Fork);
     /// Returns the useful information about the transaction in the JSON format.
@@ -75,7 +75,7 @@ pub trait Service: Send + Sync + 'static {
     /// For example service can create some transaction if the specific condition occurred.
     ///
     /// *Try not to perform long operations here*.
-    fn handle_commit(&self, context: &mut ServiceContext) { }
+    fn handle_commit(&self, context: &mut ServiceContext) {}
 
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
@@ -169,7 +169,12 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
 
 impl<'a, 'b> ::std::fmt::Debug for ServiceContext<'a, 'b> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "ServiceContext(state: {:?}, txs: {:?})", self.state, self.txs)
+        write!(
+            f,
+            "ServiceContext(state: {:?}, txs: {:?})",
+            self.state,
+            self.txs
+        )
     }
 }
 
@@ -227,6 +232,11 @@ impl ApiContext {
 
 impl ::std::fmt::Debug for ApiContext {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "ApiContext(blockchain: {:?}, public_key: {:?})", self.blockchain, self.public_key)
+        write!(
+            f,
+            "ApiContext(blockchain: {:?}, public_key: {:?})",
+            self.blockchain,
+            self.public_key
+        )
     }
 }

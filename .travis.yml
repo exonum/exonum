@@ -7,9 +7,9 @@ group: deprecated-2017Q2
 dist: trusty
 env:
   global:
-    - NIGHTLY_RUST=nightly-2017-05-10
-    - CLIPPY_VERS=0.0.131
-    - RUSTFMT_VERS=0.8.4
+    - NIGHTLY_RUST=nightly-2017-07-05
+    - CLIPPY_VERS=0.0.142
+    - RUSTFMT_VERS=0.9.0
 before_install:
 - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
 - rustup toolchain install $NIGHTLY_RUST
@@ -21,6 +21,7 @@ before_install:
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 script:
+- cargo fmt -p exonum -- --write-mode=diff
 - cargo fmt -p sandbox -- --write-mode=diff
 - cd exonum
 - cargo +$NIGHTLY_RUST clippy -- -D warnings

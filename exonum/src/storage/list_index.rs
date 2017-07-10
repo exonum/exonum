@@ -26,8 +26,9 @@ impl<T, V> ListIndex<T, V> {
 }
 
 impl<T, V> ListIndex<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     pub fn get(&self, index: u64) -> Option<V> {
         self.base.get(&index)
@@ -63,7 +64,8 @@ impl<T, V> ListIndex<T, V>
 }
 
 impl<'a, V> ListIndex<&'a mut Fork, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
@@ -90,7 +92,8 @@ impl<'a, V> ListIndex<&'a mut Fork, V>
     }
 
     pub fn extend<I>(&mut self, iter: I)
-        where I: IntoIterator<Item = V>
+    where
+        I: IntoIterator<Item = V>,
     {
         let mut len = self.len();
         for value in iter {
@@ -110,10 +113,12 @@ impl<'a, V> ListIndex<&'a mut Fork, V>
 
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
-            panic!("index out of bounds: \
+            panic!(
+                "index out of bounds: \
                     the len is {} but the index is {}",
-                   self.len(),
-                   index);
+                self.len(),
+                index
+            );
         }
         self.base.put(&index, value)
     }
@@ -125,8 +130,9 @@ impl<'a, V> ListIndex<&'a mut Fork, V>
 }
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     type Item = V;
     type IntoIter = ListIndexIter<'a, V>;
@@ -137,7 +143,8 @@ impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
 }
 
 impl<'a, V> Iterator for ListIndexIter<'a, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     type Item = V;
 
@@ -205,7 +212,9 @@ mod tests {
 
         assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
-        assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(),
-                   Vec::<u8>::new());
+        assert_eq!(
+            list_index.iter_from(3).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
     }
 }

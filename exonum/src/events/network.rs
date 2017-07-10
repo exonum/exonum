@@ -78,8 +78,10 @@ impl Network {
             listener: None,
 
             incoming: Slab::new_starting_at(Token(2), config.max_incoming_connections),
-            outgoing: Slab::new_starting_at(Token(2 + config.max_incoming_connections),
-                                            config.max_outgoing_connections),
+            outgoing: Slab::new_starting_at(
+                Token(2 + config.max_incoming_connections),
+                config.max_outgoing_connections,
+            ),
             addresses: HashMap::new(),
 
             reconnects: HashMap::new(),
@@ -96,19 +98,25 @@ impl Network {
             return Err(make_io_error("Already binded"));
         }
         let listener = TcpListener::bind(&self.listen_address)?;
-        event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge())?;
+        event_loop.register(
+            &listener,
+            SERVER_ID,
+            EventSet::readable(),
+            PollOpt::edge(),
+        )?;
         self.listener = Some(listener);
         Ok(())
     }
 
     // TODO: Use ticks for fast reregistering sockets
     // TODO: Implement Connections collection with (re)registering
-    pub fn io<H: EventHandler>(&mut self,
-                               event_loop: &mut EventLoop<H>,
-                               handler: &mut H,
-                               id: PeerId,
-                               set: EventSet)
-                               -> io::Result<()> {
+    pub fn io<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        handler: &mut H,
+        id: PeerId,
+        set: EventSet,
+    ) -> io::Result<()> {
 
         match self.peer_kind(id) {
             PeerKind::Server => {
@@ -123,10 +131,12 @@ impl Network {
                     let peer = IncomingConnection::new(stream, address);
                     self.add_incoming_connection(event_loop, peer)?;
 
-                    trace!("{}: Accepted incoming connection from {} id: {}",
-                           self.address(),
-                           address,
-                           id.0);
+                    trace!(
+                        "{}: Accepted incoming connection from {} id: {}",
+                        self.address(),
+                        address,
+                        id.0
+                    );
                 }
                 return Ok(());
             }
@@ -136,9 +146,11 @@ impl Network {
                 }
 
                 if set.is_hup() | set.is_error() {
-                    trace!("{}: incoming connection with addr {} closed",
-                           self.address(),
-                           self.incoming[id].address());
+                    trace!(
+                        "{}: incoming connection with addr {} closed",
+                        self.address(),
+                        self.incoming[id].address()
+                    );
 
                     self.remove_incoming_connection(event_loop, id);
                     return Ok(());
@@ -168,9 +180,11 @@ impl Network {
                 if set.is_hup() | set.is_error() {
                     let address = *self.outgoing[id].address();
 
-                    trace!("{}: outgoing connection with addr {} closed",
-                           self.address(),
-                           self.outgoing[id].address());
+                    trace!(
+                        "{}: outgoing connection with addr {} closed",
+                        self.address(),
+                        self.outgoing[id].address()
+                    );
 
                     self.remove_outgoing_connection(event_loop, id);
                     if !self.reconnects.contains_key(&address) {
@@ -184,10 +198,12 @@ impl Network {
                     let r = {
                         // Write data into socket
                         self.outgoing[id].try_write()?;
-                        event_loop.reregister(self.outgoing[id].socket(),
-                                        id,
-                                        self.outgoing[id].interest(),
-                                        PollOpt::edge())?;
+                        event_loop.reregister(
+                            self.outgoing[id].socket(),
+                            id,
+                            self.outgoing[id].interest(),
+                            PollOpt::edge(),
+                        )?;
                         Ok(())
                     };
                     if let Err(e) = r {
@@ -208,20 +224,23 @@ impl Network {
 
     pub fn tick<H: EventHandler>(&mut self, _: &mut EventLoop<H>) {}
 
-    pub fn send_to<H: EventHandler>(&mut self,
-                                    event_loop: &mut EventLoop<H>,
-                                    address: &SocketAddr,
-                                    message: RawMessage)
-                                    -> io::Result<()> {
+    pub fn send_to<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        address: &SocketAddr,
+        message: RawMessage,
+    ) -> io::Result<()> {
         match self.get_outgoing_peer(address) {
             Ok(id) => {
                 self.outgoing[id]
                     .send(message)
                     .and_then(|_| {
-                        event_loop.reregister(self.outgoing[id].socket(),
-                                        id,
-                                        self.outgoing[id].interest(),
-                                        PollOpt::edge())?;
+                        event_loop.reregister(
+                            self.outgoing[id].socket(),
+                            id,
+                            self.outgoing[id].interest(),
+                            PollOpt::edge(),
+                        )?;
                         self.mark_connected(event_loop, id);
                         Ok(())
                     })
@@ -234,10 +253,11 @@ impl Network {
         }
     }
 
-    pub fn connect<H: EventHandler>(&mut self,
-                                    event_loop: &mut EventLoop<H>,
-                                    address: &SocketAddr)
-                                    -> io::Result<()> {
+    pub fn connect<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        address: &SocketAddr,
+    ) -> io::Result<()> {
         if !self.is_connected(address) {
             self.add_reconnect_request(event_loop, *address)?;
 
@@ -246,10 +266,12 @@ impl Network {
             let peer = OutgoingConnection::new(stream, *address);
             let id = self.add_outgoing_connection(event_loop, peer)?;
 
-            trace!("{}: Establish connection with {}, id: {}",
-                   self.address(),
-                   address,
-                   id.0);
+            trace!(
+                "{}: Establish connection with {}, id: {}",
+                self.address(),
+                address,
+                id.0
+            );
         }
         Ok(())
     }
@@ -258,23 +280,29 @@ impl Network {
         self.addresses.contains_key(address)
     }
 
-    pub fn handle_timeout<H: EventHandler>(&mut self,
-                                           event_loop: &mut EventLoop<H>,
-                                           timeout: InternalTimeout) {
+    pub fn handle_timeout<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        timeout: InternalTimeout,
+    ) {
         match timeout {
             InternalTimeout::Reconnect(addr, delay) => {
                 if self.reconnects.contains_key(&addr) {
                     trace!("Try to reconnect with delay {}", delay);
 
                     if let Err(e) = self.connect(event_loop, &addr) {
-                        error!("{}: Unable to create connection to addr {}, error: {:?}",
-                               self.address(),
-                               addr,
-                               e);
+                        error!(
+                            "{}: Unable to create connection to addr {}, error: {:?}",
+                            self.address(),
+                            addr,
+                            e
+                        );
                     }
 
-                    let delay = min((delay as f32 * RECONNECT_GROW_FACTOR) as u64,
-                                    self.config.tcp_reconnect_timeout_max);
+                    let delay = min(
+                        (delay as f32 * RECONNECT_GROW_FACTOR) as u64,
+                        self.config.tcp_reconnect_timeout_max,
+                    );
 
                     if let Err(e) = self.add_reconnect_timeout(event_loop, addr, delay) {
                         error!("{}: Unable to add timeout, error: {:?}", self.address(), e);
@@ -298,23 +326,30 @@ impl Network {
         if let Some(id) = self.addresses.get(addr) {
             return Ok(*id);
         };
-        Err(make_io_error(format!("{}: Outgoing peer not found {}", self.address(), addr)))
+        Err(make_io_error(format!(
+            "{}: Outgoing peer not found {}",
+            self.address(),
+            addr
+        )))
     }
 
-    fn add_incoming_connection<H: EventHandler>(&mut self,
-                                                event_loop: &mut EventLoop<H>,
-                                                connection: IncomingConnection)
-                                                -> io::Result<PeerId> {
+    fn add_incoming_connection<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        connection: IncomingConnection,
+    ) -> io::Result<PeerId> {
         let address = *connection.address();
-        let id = self.incoming
-            .insert(connection)
-            .map_err(|_| make_io_error("Maximum incoming onnections"))?;
+        let id = self.incoming.insert(connection).map_err(|_| {
+            make_io_error("Maximum incoming onnections")
+        })?;
         self.addresses.insert(address, id);
 
-        let r = event_loop.register(self.incoming[id].socket(),
-                                    id,
-                                    self.incoming[id].interest(),
-                                    PollOpt::edge());
+        let r = event_loop.register(
+            self.incoming[id].socket(),
+            id,
+            self.incoming[id].interest(),
+            PollOpt::edge(),
+        );
 
         if let Err(e) = r {
             self.remove_incoming_connection(event_loop, id);
@@ -323,20 +358,23 @@ impl Network {
         Ok(id)
     }
 
-    fn add_outgoing_connection<H: EventHandler>(&mut self,
-                                                event_loop: &mut EventLoop<H>,
-                                                connection: OutgoingConnection)
-                                                -> io::Result<PeerId> {
+    fn add_outgoing_connection<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        connection: OutgoingConnection,
+    ) -> io::Result<PeerId> {
         let address = *connection.address();
-        let id = self.outgoing
-            .insert(connection)
-            .map_err(|_| make_io_error("Maximum outgoing onnections"))?;
+        let id = self.outgoing.insert(connection).map_err(|_| {
+            make_io_error("Maximum outgoing onnections")
+        })?;
         self.addresses.insert(address, id);
 
-        let r = event_loop.register(self.outgoing[id].socket(),
-                                    id,
-                                    self.outgoing[id].interest() | EventSet::writable(),
-                                    PollOpt::edge());
+        let r = event_loop.register(
+            self.outgoing[id].socket(),
+            id,
+            self.outgoing[id].interest() | EventSet::writable(),
+            PollOpt::edge(),
+        );
 
         if let Err(e) = r {
             self.remove_outgoing_connection(event_loop, id);
@@ -345,32 +383,40 @@ impl Network {
         Ok(id)
     }
 
-    fn remove_incoming_connection<H: EventHandler>(&mut self,
-                                                   event_loop: &mut EventLoop<H>,
-                                                   id: PeerId) {
+    fn remove_incoming_connection<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        id: PeerId,
+    ) {
         let addr = *self.incoming[id].address();
         self.addresses.remove(&addr);
         if let Some(connection) = self.incoming.remove(id) {
             if let Err(e) = event_loop.deregister(connection.socket()) {
-                error!("{}: Unable to deregister incoming connection, id: {}, error: {:?}",
-                       self.address(),
-                       id.0,
-                       e);
+                error!(
+                    "{}: Unable to deregister incoming connection, id: {}, error: {:?}",
+                    self.address(),
+                    id.0,
+                    e
+                );
             }
         }
     }
 
-    fn remove_outgoing_connection<H: EventHandler>(&mut self,
-                                                   event_loop: &mut EventLoop<H>,
-                                                   id: PeerId) {
+    fn remove_outgoing_connection<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        id: PeerId,
+    ) {
         let addr = *self.outgoing[id].address();
         self.addresses.remove(&addr);
         if let Some(connection) = self.outgoing.remove(id) {
             if let Err(e) = event_loop.deregister(connection.socket()) {
-                error!("{}: Unable to deregister outgoing connection, id: {}, error: {:?}",
-                       self.address(),
-                       id.0,
-                       e);
+                error!(
+                    "{}: Unable to deregister outgoing connection, id: {}, error: {:?}",
+                    self.address(),
+                    id.0,
+                    e
+                );
             }
         }
     }
@@ -382,10 +428,11 @@ impl Network {
         stream.take_socket_error()
     }
 
-    fn add_reconnect_request<H: EventHandler>(&mut self,
-                                              event_loop: &mut EventLoop<H>,
-                                              address: SocketAddr)
-                                              -> io::Result<()> {
+    fn add_reconnect_request<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        address: SocketAddr,
+    ) -> io::Result<()> {
         if !self.reconnects.contains_key(&address) {
             let delay = self.config.tcp_reconnect_timeout;
             return self.add_reconnect_timeout(event_loop, address, delay);
@@ -393,34 +440,40 @@ impl Network {
         Ok(())
     }
 
-    fn add_reconnect_timeout<H: EventHandler>(&mut self,
-                                              event_loop: &mut EventLoop<H>,
-                                              address: SocketAddr,
-                                              delay: u64)
-                                              -> io::Result<()> {
-        trace!("{}: Add reconnect timeout to={}, delay={}",
-               self.address(),
-               address,
-               delay);
+    fn add_reconnect_timeout<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        address: SocketAddr,
+        delay: u64,
+    ) -> io::Result<()> {
+        trace!(
+            "{}: Add reconnect timeout to={}, delay={}",
+            self.address(),
+            address,
+            delay
+        );
         let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
-        let timeout = event_loop.timeout_ms(reconnect, delay)
-            .map_err(|e| make_io_error(format!("A mio error occured {:?}", e)))?;
+        let timeout = event_loop.timeout_ms(reconnect, delay).map_err(|e| {
+            make_io_error(format!("A mio error occured {:?}", e))
+        })?;
         self.reconnects.insert(address, timeout);
         Ok(())
     }
 
-    fn mark_connected<H: EventHandler>(&mut self,
-                                       event_loop: &mut EventLoop<H>,
-                                       id: Token)
-                                       -> bool {
+    fn mark_connected<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        id: Token,
+    ) -> bool {
         let address = *self.outgoing[id].address();
         self.clear_reconnect_request(event_loop, &address)
     }
 
-    fn clear_reconnect_request<H: EventHandler>(&mut self,
-                                                event_loop: &mut EventLoop<H>,
-                                                addr: &SocketAddr)
-                                                -> bool {
+    fn clear_reconnect_request<H: EventHandler>(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        addr: &SocketAddr,
+    ) -> bool {
         if let Some(timeout) = self.reconnects.remove(addr) {
             trace!("{}: Clear reconnect timeout to={}", self.address(), addr);
             event_loop.clear_timeout(timeout);
@@ -432,8 +485,15 @@ impl Network {
 
 impl fmt::Debug for Network {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Network {{ listen_address: {:?}, listener: {:?}, incoming: {:?}, \
+        write!(
+            f,
+            "Network {{ listen_address: {:?}, listener: {:?}, incoming: {:?}, \
         outgoing: {:?}, addresses: {:?}, reconnects: {{ .. }} }}",
-               self.listen_address, self.listener, self.incoming, self.outgoing, self.addresses)
+            self.listen_address,
+            self.listener,
+            self.incoming,
+            self.outgoing,
+            self.addresses
+        )
     }
 }

@@ -64,14 +64,16 @@ pub enum NodeTimeout {
 /// Transactions sender.
 #[derive(Clone)]
 pub struct TxSender<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     inner: S,
 }
 
 /// Handler that that performs consensus algorithm.
 pub struct NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// State of the `NodeHandler`.
     pub state: State,
@@ -82,7 +84,7 @@ pub struct NodeHandler<S>
     /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    timeout_adjuster: Box<TimeoutAdjuster>
+    timeout_adjuster: Box<TimeoutAdjuster>,
 }
 
 /// Service configuration.
@@ -133,7 +135,7 @@ impl Default for NodeApiConfig {
 pub struct MemoryPoolConfig {
     /// Maximum number of uncommited transactions.
     pub tx_pool_capacity: usize,
-    /// Sets the maximum number of messages that can be buffered on the event loop's 
+    /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
     pub events_pool_capacity: usize,
 }
@@ -206,10 +208,16 @@ pub struct Node {
 }
 
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// Creates `NodeHandler` using specified `Configuration`.
-    pub fn new(blockchain: Blockchain, external_address: SocketAddr, sender: S, config: Configuration) -> Self {
+    pub fn new(
+        blockchain: Blockchain,
+        external_address: SocketAddr,
+        sender: S,
+        config: Configuration,
+    ) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -224,28 +232,34 @@ impl<S> NodeHandler<S>
         let validator_id = stored
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
+            .position(|pk| {
+                pk.consensus_key == config.listener.consensus_public_key
+            })
             .map(|id| id as ValidatorId);
         info!("Validator={:#?}", validator_id);
-        let connect = Connect::new(&config.listener.consensus_public_key,
-                                   external_address,
-                                   sender.get_time(),
-                                   &config.listener.consensus_secret_key);
+        let connect = Connect::new(
+            &config.listener.consensus_public_key,
+            external_address,
+            sender.get_time(),
+            &config.listener.consensus_secret_key,
+        );
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
-        let mut state = State::new(validator_id,
-                               config.listener.consensus_public_key,
-                               config.listener.consensus_secret_key,
-                               config.service.service_public_key,
-                               config.service.service_secret_key,
-                               config.mempool.tx_pool_capacity,
-                               whitelist,
-                               stored,
-                               connect,
-                               last_hash,
-                               last_height,
-                               sender.get_time());
+        let mut state = State::new(
+            validator_id,
+            config.listener.consensus_public_key,
+            config.listener.consensus_secret_key,
+            config.service.service_public_key,
+            config.service.service_secret_key,
+            config.mempool.tx_pool_capacity,
+            whitelist,
+            stored,
+            connect,
+            last_hash,
+            last_height,
+            sender.get_time(),
+        );
 
         let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
         let timeout = timeout_adjuster.adjust_timeout(&state, &*snapshot);
@@ -363,10 +377,12 @@ impl<S> NodeHandler<S>
     /// Adds `NodeTimeout::Round` timeout to the channel.
     pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round() + 1);
-        trace!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
-               time,
-               self.state.height(),
-               self.state.round());
+        trace!(
+            "ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
+            time,
+            self.state.height(),
+            self.state.round()
+        );
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
@@ -375,12 +391,14 @@ impl<S> NodeHandler<S>
     pub fn add_propose_timeout(&mut self) {
         let adjusted_propose_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
-                   Duration::from_millis(adjusted_propose_timeout);
+            Duration::from_millis(adjusted_propose_timeout);
 
-        trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}",
-               time,
-               self.state.height(),
-               self.state.round());
+        trace!(
+            "ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}",
+            time,
+            self.state.height(),
+            self.state.round()
+        );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
@@ -388,16 +406,20 @@ impl<S> NodeHandler<S>
     /// Adds `NodeTimeout::Status` timeout to the channel.
     pub fn add_status_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
-        self.channel
-            .add_timeout(NodeTimeout::Status(self.state.height()), time);
+        self.channel.add_timeout(
+            NodeTimeout::Status(self.state.height()),
+            time,
+        );
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
-        self.channel
-            .add_timeout(NodeTimeout::Request(data, peer), time);
+        self.channel.add_timeout(
+            NodeTimeout::Request(data, peer),
+            time,
+        );
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
@@ -419,7 +441,11 @@ impl<S> NodeHandler<S>
 }
 
 impl<S> EventHandler for NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<
+        ApplicationEvent = ExternalMessage,
+        Timeout = NodeTimeout,
+    >,
 {
     type Timeout = NodeTimeout;
     type ApplicationEvent = ExternalMessage;
@@ -453,11 +479,20 @@ impl<S> EventHandler for NodeHandler<S>
 }
 
 impl<S> fmt::Debug for NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> {
+where
+    S: Channel<
+        ApplicationEvent = ExternalMessage,
+        Timeout = NodeTimeout,
+    >,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, \
+        write!(
+            f,
+            "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, \
             peer_discovery: {:?}, timeout_adjuster: Box<TimeoutAdjuster> }}",
-               self.blockchain, self.peer_discovery)
+            self.blockchain,
+            self.peer_discovery
+        )
     }
 }
 
@@ -469,7 +504,8 @@ pub trait TransactionSend: Send + Sync {
 }
 
 impl<S> TxSender<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// Creates new `TxSender` with given channel.
     pub fn new(inner: S) -> TxSender<S> {
@@ -478,7 +514,11 @@ impl<S> TxSender<S>
 }
 
 impl<S> TransactionSend for TxSender<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<
+        ApplicationEvent = ExternalMessage,
+        Timeout = NodeTimeout,
+    >,
 {
     fn send(&self, tx: Box<Transaction>) -> EventsResult<()> {
         if !tx.verify() {
@@ -501,15 +541,16 @@ impl Node {
     pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Self {
         crypto::init();
 
-        if cfg!(feature="flame_profile") {
-            ::profiler::init_handler(
-                ::std::env::var(PROFILE_ENV_VARIABLE_NAME)
-                .expect(
-                    &format!("You compile exonum with profiling support, but {}",
-                     PROFILE_ENV_VARIABLE_NAME)))
+        if cfg!(feature = "flame_profile") {
+            ::profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(&format!(
+                "You compile exonum with profiling support, but {}",
+                PROFILE_ENV_VARIABLE_NAME
+            )))
         };
 
-        blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
+        blockchain
+            .create_genesis_block(node_cfg.genesis.clone())
+            .unwrap();
 
 
         let mut events_cfg = EventsConfiguration::default();
@@ -531,9 +572,7 @@ impl Node {
             peer_discovery: node_cfg.peers,
         };
 
-        let external_address = 
-        if let Some(v) = node_cfg.external_address
-        {
+        let external_address = if let Some(v) = node_cfg.external_address {
             v
         } else {
             warn!("Could not find external_address, in config, using listen_address");
@@ -573,11 +612,10 @@ impl Node {
                 mount.mount("api/services", api_context.mount_private_api());
 
                 let thread = thread::spawn(move || {
-                                               info!("Private exonum api started on {}",
-                                                     listen_address);
-                                               let chain = Chain::new(mount);
-                                               Iron::new(chain).http(listen_address).unwrap();
-                                           });
+                    info!("Private exonum api started on {}", listen_address);
+                    let chain = Chain::new(mount);
+                    Iron::new(chain).http(listen_address).unwrap();
+                });
                 Some(thread)
             }
             None => None,
@@ -596,12 +634,11 @@ impl Node {
                 }
 
                 let thread = thread::spawn(move || {
-                                               info!("Public exonum api started on {}",
-                                                     listen_address);
+                    info!("Public exonum api started on {}", listen_address);
 
-                                               let chain = Chain::new(mount);
-                                               Iron::new(chain).http(listen_address).unwrap();
-                                           });
+                    let chain = Chain::new(mount);
+                    Iron::new(chain).http(listen_address).unwrap();
+                });
                 Some(thread)
             }
             None => None,

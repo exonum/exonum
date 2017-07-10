@@ -20,8 +20,9 @@ impl<T, V> Entry<T, V> {
 }
 
 impl<T, V> Entry<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     pub fn get(&self) -> Option<V> {
         self.base.get(&())
@@ -40,7 +41,8 @@ impl<T, V> Entry<T, V>
 }
 
 impl<'a, V> Entry<&'a mut Fork, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     pub fn set(&mut self, value: V) {
         self.base.put(&(), value)

@@ -95,9 +95,9 @@ impl Snapshot for Fork {
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         let range = (Included(from), Unbounded);
         Box::new(ForkIter {
-                     snapshot: self.snapshot.iter(from),
-                     changes: self.changes.range::<[u8], _>(range).peekable(),
-                 })
+            snapshot: self.snapshot.iter(from),
+            changes: self.changes.range::<[u8], _>(range).peekable(),
+        })
     }
 }
 
@@ -132,8 +132,10 @@ impl Fork {
 
     pub fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
         if self.logged {
-            self.changelog
-                .push((key.clone(), self.changes.insert(key, Change::Put(value))));
+            self.changelog.push((
+                key.clone(),
+                self.changes.insert(key, Change::Put(value)),
+            ));
         } else {
             self.changes.insert(key, Change::Put(value));
         }
@@ -141,8 +143,10 @@ impl Fork {
 
     pub fn remove(&mut self, key: Vec<u8>) {
         if self.logged {
-            self.changelog
-                .push((key.clone(), self.changes.insert(key, Change::Delete)));
+            self.changelog.push((
+                key.clone(),
+                self.changes.insert(key, Change::Delete),
+            ));
         } else {
             self.changes.insert(key, Change::Delete);
         }
@@ -151,10 +155,10 @@ impl Fork {
     pub fn remove_by_prefix(&mut self, prefix: &[u8]) {
         // Remove changes
         let keys = self.changes
-                       .range::<[u8], _>((Included(prefix), Unbounded))
-                       .map(|(k, ..)| k.to_vec())
-                       .take_while(|k| k.starts_with(prefix))
-                       .collect::<Vec<_>>();
+            .range::<[u8], _>((Included(prefix), Unbounded))
+            .map(|(k, ..)| k.to_vec())
+            .take_while(|k| k.starts_with(prefix))
+            .collect::<Vec<_>>();
         for k in keys {
             self.changes.remove(&k);
         }
@@ -249,26 +253,26 @@ impl<'a> Iterator for ForkIter<'a> {
                 Stored => return self.snapshot.next(),
                 Replaced => {
                     self.snapshot.next();
-                    return self.changes
-                               .next()
-                               .map(|(key, change)| {
-                                        (key.as_slice(),
-                                         match *change {
-                                             Change::Put(ref value) => value.as_slice(),
-                                             Change::Delete => unreachable!(),
-                                         })
-                                    });
+                    return self.changes.next().map(|(key, change)| {
+                        (
+                            key.as_slice(),
+                            match *change {
+                                Change::Put(ref value) => value.as_slice(),
+                                Change::Delete => unreachable!(),
+                            },
+                        )
+                    });
                 }
                 Inserted => {
-                    return self.changes
-                               .next()
-                               .map(|(key, change)| {
-                                        (key.as_slice(),
-                                         match *change {
-                                             Change::Put(ref value) => value.as_slice(),
-                                             Change::Delete => unreachable!(),
-                                         })
-                                    })
+                    return self.changes.next().map(|(key, change)| {
+                        (
+                            key.as_slice(),
+                            match *change {
+                                Change::Put(ref value) => value.as_slice(),
+                                Change::Delete => unreachable!(),
+                            },
+                        )
+                    })
                 }
                 Deleted => {
                     self.changes.next();
@@ -287,15 +291,15 @@ impl<'a> Iterator for ForkIter<'a> {
             match self.step() {
                 Stored => return self.snapshot.peek(),
                 Replaced | Inserted => {
-                    return self.changes
-                               .peek()
-                               .map(|&(key, change)| {
-                                        (key.as_slice(),
-                                         match *change {
-                                             Change::Put(ref value) => value.as_slice(),
-                                             Change::Delete => unreachable!(),
-                                         })
-                                    })
+                    return self.changes.peek().map(|&(key, change)| {
+                        (
+                            key.as_slice(),
+                            match *change {
+                                Change::Put(ref value) => value.as_slice(),
+                                Change::Delete => unreachable!(),
+                            },
+                        )
+                    })
                 }
                 Deleted => {
                     self.changes.next();
