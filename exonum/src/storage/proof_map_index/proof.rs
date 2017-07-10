@@ -86,7 +86,8 @@ pub enum BranchProofNode<V> {
 }
 
 impl<V: StorageValue> MapProof<V> {
-    fn root_hash(&self) -> Hash {
+    /// Returns root hash of the map proof.
+    pub fn root_hash(&self) -> Hash {
         use self::MapProof::*;
         match *self {
             Empty => Hash::zero(),
