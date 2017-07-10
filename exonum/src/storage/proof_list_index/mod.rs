@@ -1,3 +1,4 @@
+//! An implementation a Merklized version of an array list (Merkle tree).
 use std::cell::Cell;
 use std::marker::PhantomData;
 
@@ -16,16 +17,11 @@ mod proof;
 
 // TODO: implement pop and truncate methods for Merkle tree
 
-/// Merkle tree over list. Data in table is stored in rows.
-/// Height is determined by amount of values: `H = log2(values_length) + 1`
+/// A Merkalized verison of an array list that allows proofs of existence for the list items.
 ///
-/// | Height | Stored data                                                                  |
-/// |-------:|------------------------------------------------------------------------------|
-/// |0 | Values, stored in the structure by index. A datum is stored at `(0, index)`        |
-/// |1 | Hash of value datum, stored at level 0. `(1, index) = Hash((0, index))`            |
-/// |>1| Merkle tree node, where at position `(h, i) = Hash((h - 1, 2i) + (h - 1, 2i + 1))` |
-///
-/// `+` operation is concatenation of byte arrays.
+/// `ProofListIndex` implements a Merkle tree, storing the element as leafs and using `u64` as
+/// an index. `ProofListIndex` requires that the elements implement the [`StorageValue`] trait.
+/// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct ProofListIndex<T, V> {
     base: BaseIndex<T>,
@@ -33,22 +29,37 @@ pub struct ProofListIndex<T, V> {
     _v: PhantomData<V>,
 }
 
+/// An iterator over the items of a `ProofListIndex`.
+///
+/// This struct is created by the [`iter`] or
+/// [`iter_from`] methods on [`ProofListIndex`]. See its documentation for more.
+///
+/// [`iter`]: struct.ProofListIndex.html#method.iter
+/// [`iter_from`]: struct.ProofListIndex.html#method.iter_from
+/// [`ProofListIndex`]: struct.ProofListIndex.html
 #[derive(Debug)]
 pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
 impl<T, V> ProofListIndex<T, V> {
-    pub fn new(prefix: Vec<u8>, base: T) -> Self {
+    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ProofListIndex {
-            base: BaseIndex::new(prefix, base),
+            base: BaseIndex::new(prefix, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
 }
 
-pub fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
+fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
     let mut v = [0; HASH_SIZE * 2];
     v[..HASH_SIZE].copy_from_slice(h1.as_ref());
     v[HASH_SIZE..].copy_from_slice(h2.as_ref());
@@ -100,10 +111,12 @@ impl<T, V> ProofListIndex<T, V>
         }
     }
 
+    /// Returns an element at that position or `None` if out of bounds.
     pub fn get(&self, index: u64) -> Option<V> {
         self.base.get(&ProofListKey::leaf(index))
     }
 
+    /// Returns the last element of the proof list, or `None` if it is empty.
     pub fn last(&self) -> Option<V> {
         match self.len() {
             0 => None,
@@ -111,10 +124,12 @@ impl<T, V> ProofListIndex<T, V>
         }
     }
 
+    /// Returns `true` if the proof list contains no elements.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the number of elements in the proof list.
     pub fn len(&self) -> u64 {
         if let Some(len) = self.length.get() {
             return len;
@@ -124,18 +139,34 @@ impl<T, V> ProofListIndex<T, V>
         len
     }
 
+    /// Returns the height of the proof list.
     pub fn height(&self) -> u8 {
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
+    /// Returns the root hash of the proof list or default hash value if it is empty.
     pub fn root_hash(&self) -> Hash {
         self.get_branch(self.root_key()).unwrap_or_default()
     }
 
+    /// Returns the proof of existence for the list element at specified position.
+    ///
+    /// # Panics
+    /// Panics if `index` is out of bounds.
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
-        self.get_range_proof(index, index + 1)
+        if index >= self.len() {
+            panic!("index out of bounds: \
+                    the len is {} but the index is {}",
+                   self.len(),
+                   index);
+        }
+        self.construct_proof(self.root_key(), index, index + 1)
     }
 
+    /// Returns the proof of existence for the list elements at specified range.
+    ///
+    /// # Panics
+    /// Panics if the range is out of bounds.
     pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
         if to > self.len() {
             panic!("illegal range boundaries: \
@@ -153,10 +184,13 @@ impl<T, V> ProofListIndex<T, V>
         self.construct_proof(self.root_key(), from, to)
     }
 
+    /// Returns an iterator over the list. The iterator element type is V.
     pub fn iter(&self) -> ProofListIndexIter<V> {
         ProofListIndexIter { base_iter: self.base.iter(&0u8) }
     }
 
+    /// Returns an iterator over the list starting from the specified position. The iterator
+    /// element type is V.
     pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
         ProofListIndexIter { base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)) }
     }
@@ -176,6 +210,7 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
         self.base.put(&key, hash)
     }
 
+    /// Appends an element to the back of the proof list.
     pub fn push(&mut self, value: V) {
         let len = self.len();
         self.set_len(len + 1);
@@ -194,6 +229,7 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
         }
     }
 
+    /// Extends the proof list with the contents of an iterator.
     pub fn extend<I>(&mut self, iter: I)
         where I: IntoIterator<Item = V>
     {
@@ -202,6 +238,10 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
         }
     }
 
+    /// Changes a value at specified position.
+    ///
+    /// # Panics
+    /// Panics if `index` is equal or greater than the proof list's current length.
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
             panic!("index out of bounds: \
@@ -225,6 +265,12 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
         }
     }
 
+    /// Clears the proof list, removing all values.
+    ///
+    /// # Notes
+    /// Currently this method is not optimized to delete large set of data. During the execution of
+    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// in the index.
     pub fn clear(&mut self) {
         self.length.set(Some(0));
         self.base.clear()

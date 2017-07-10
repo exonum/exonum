@@ -11,11 +11,16 @@ use super::key::ProofListKey;
 
 use self::ListProof::*;
 
+/// An enum that represents a proof of existence for a proof list elements.
 #[derive(Debug, PartialEq, Eq)]
 pub enum ListProof<V> {
+    /// A branch of proof in which both children contain requested elements.
     Full(Box<ListProof<V>>, Box<ListProof<V>>),
+    /// A branch of proof in which only left child contains requested elements.
     Left(Box<ListProof<V>>, Option<Hash>),
+    /// A branch of proof in which only right child contains requested elements.
     Right(Hash, Box<ListProof<V>>),
+    /// A leaf of proof with requested element.
     Leaf(V),
 }
 
@@ -53,6 +58,11 @@ impl<V: StorageValue> ListProof<V> {
         Ok(hash)
     }
 
+    /// Verifies the correctness of the proof by the trusted root hash and the number of elements
+    /// in the tree.
+    ///
+    /// If the proof is valid, a vector with indicies and references to elements is returned.
+    /// Otherwise, `Err` is returned.
     pub fn validate(&self,
                      root_hash: Hash,
                      len: u64)
