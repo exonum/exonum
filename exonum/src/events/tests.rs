@@ -196,10 +196,8 @@ pub fn gen_message(id: u16, len: usize) -> RawMessage {
 #[test]
 fn big_message() {
     let _ = env_logger::init();
-    let addrs: [SocketAddr; 2] = [
-        "127.0.0.1:7200".parse().unwrap(),
-        "127.0.0.1:7201".parse().unwrap(),
-    ];
+    let addrs: [SocketAddr; 2] =
+        ["127.0.0.1:7200".parse().unwrap(), "127.0.0.1:7201".parse().unwrap()];
 
     let m1 = gen_message(15, 100000);
     let m2 = gen_message(16, 400);
@@ -256,10 +254,8 @@ fn big_message() {
 #[test]
 fn reconnect() {
     let _ = env_logger::init();
-    let addrs: [SocketAddr; 2] = [
-        "127.0.0.1:9100".parse().unwrap(),
-        "127.0.0.1:9101".parse().unwrap(),
-    ];
+    let addrs: [SocketAddr; 2] =
+        ["127.0.0.1:9100".parse().unwrap(), "127.0.0.1:9101".parse().unwrap()];
 
     let m1 = gen_message(15, 250);
     let m2 = gen_message(16, 400);
@@ -422,10 +418,7 @@ mod benches {
             len: 100,
             times: 100,
         };
-        let addrs = [
-            "127.0.0.1:6990".parse().unwrap(),
-            "127.0.0.1:6991".parse().unwrap(),
-        ];
+        let addrs = ["127.0.0.1:6990".parse().unwrap(), "127.0.0.1:6991".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -436,10 +429,7 @@ mod benches {
             len: 100,
             times: 1000,
         };
-        let addrs = [
-            "127.0.0.1:9792".parse().unwrap(),
-            "127.0.0.1:9793".parse().unwrap(),
-        ];
+        let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -450,10 +440,7 @@ mod benches {
             len: 100,
             times: 10000,
         };
-        let addrs = [
-            "127.0.0.1:9982".parse().unwrap(),
-            "127.0.0.1:9983".parse().unwrap(),
-        ];
+        let addrs = ["127.0.0.1:9982".parse().unwrap(), "127.0.0.1:9983".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -464,10 +451,7 @@ mod benches {
             len: 100,
             times: 100,
         };
-        let addrs = [
-            "127.0.0.1:4990".parse().unwrap(),
-            "127.0.0.1:4991".parse().unwrap(),
-        ];
+        let addrs = ["127.0.0.1:4990".parse().unwrap(), "127.0.0.1:4991".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -478,10 +462,7 @@ mod benches {
             len: 100,
             times: 10000,
         };
-        let addrs = [
-            "127.0.0.1:5990".parse().unwrap(),
-            "127.0.0.1:5991".parse().unwrap(),
-        ];
+        let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -492,10 +473,7 @@ mod benches {
             len: 100000,
             times: 10,
         };
-        let addrs = [
-            "127.0.0.1:9984".parse().unwrap(),
-            "127.0.0.1:9985".parse().unwrap(),
-        ];
+        let addrs = ["127.0.0.1:9984".parse().unwrap(), "127.0.0.1:9985".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -506,10 +484,7 @@ mod benches {
             len: 100000,
             times: 100,
         };
-        let addrs = [
-            "127.0.0.1:9946".parse().unwrap(),
-            "127.0.0.1:9947".parse().unwrap(),
-        ];
+        let addrs = ["127.0.0.1:9946".parse().unwrap(), "127.0.0.1:9947".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 
@@ -520,10 +495,7 @@ mod benches {
             len: 100000,
             times: 100,
         };
-        let addrs = [
-            "127.0.0.1:9198".parse().unwrap(),
-            "127.0.0.1:9199".parse().unwrap(),
-        ];
+        let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
         bench_network(b, addrs, cfg);
     }
 }

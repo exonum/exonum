@@ -145,9 +145,7 @@ impl GenerateCommonConfig {
 
 impl Command for GenerateCommonConfig {
     fn args(&self) -> Vec<Argument> {
-        vec![
-            Argument::new_positional("COMMON_CONFIG", true, "Path to common config."),
-        ]
+        vec![Argument::new_positional("COMMON_CONFIG", true, "Path to common config.")]
     }
 
     fn name(&self) -> CommandName {

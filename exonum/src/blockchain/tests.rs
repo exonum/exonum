@@ -43,34 +43,8 @@ encoding_struct! {
 
 #[test]
 fn test_correct_encoding_struct() {
-    let dat: Vec<u8> = vec![
-        8u8,
-        0,
-        0,
-        0,
-        18,
-        0,
-        0,
-        0,
-        16,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        17,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1,
-        2,
-    ];
+    let dat: Vec<u8> =
+        vec![8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
     let mut buffer = vec![0; 8];
     test.write(&mut buffer, 0, 8);
