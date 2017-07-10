@@ -17,10 +17,10 @@ use std::path::Path;
 use std::error;
 use std::sync::Arc;
 
-/// Options to consider when opening a new or pre-existing LevelDB database.
+/// Options to consider when opening a new or pre-existing `LevelDB` database.
 pub use leveldb::options::Options as LevelDBOptions;
 
-/// Represents a LevelDB cache.
+/// Represents a `LevelDB` cache.
 pub use leveldb::database::cache::Cache as LevelDBCache;
 
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
@@ -33,7 +33,7 @@ const LEVELDB_READ_OPTIONS: ReadOptions<'static> = ReadOptions {
 
 const LEVELDB_WRITE_OPTIONS: WriteOptions = WriteOptions { sync: false };
 
-/// Database implementation on the top of LevelDB backend.
+/// Database implementation on the top of `LevelDB` backend.
 #[derive(Clone)]
 pub struct LevelDB {
     db: Arc<_LevelDB>,
