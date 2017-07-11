@@ -36,8 +36,8 @@ pub enum ApiError {
     Unauthorized,
 }
 
-impl ::std::fmt::Display for ApiError {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
@@ -51,10 +51,10 @@ impl ::std::error::Error for ApiError {
             ApiError::Events(ref error) => error.description(),
             ApiError::FromHex(ref error) => error.description(),
             ApiError::Io(ref error) => error.description(),
-            ApiError::FileNotFound(_) => "FileNotFound",
-            ApiError::NotFound => "NotFound",
-            ApiError::FileTooBig => "FileToBig",
-            ApiError::FileExists(_) => "FileExists",
+            ApiError::FileNotFound(_) => "File not found",
+            ApiError::NotFound => "Not found",
+            ApiError::FileTooBig => "File too big",
+            ApiError::FileExists(_) => "File exists",
             ApiError::Unauthorized => "Unauthorized",
         }
     }

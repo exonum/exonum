@@ -82,7 +82,8 @@ impl StoredConfiguration {
                 keys.insert(k.service_key);
             }
             if keys.len() != config.validator_keys.len() * 2 {
-                return Err(JsonError::custom("Duplicated validator keys are found"));
+                return Err(JsonError::custom(
+                    "Duplicated keys are found: each consensus and service key must be unique"));
             }
         }
 

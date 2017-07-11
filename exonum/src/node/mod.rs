@@ -219,14 +219,14 @@ impl<S> NodeHandler<S>
         let snapshot = blockchain.snapshot();
 
         let stored = Schema::new(&snapshot).actual_configuration();
-        info!("Create node with config={:#?}", stored);
+        info!("Creating a node with config: {:#?}", stored);
 
         let validator_id = stored
             .validator_keys
             .iter()
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| id as ValidatorId);
-        info!("Validator={:#?}", validator_id);
+        info!("Validator id = '{}'", validator_id);
         let connect = Connect::new(&config.listener.consensus_public_key,
                                    external_address,
                                    sender.get_time(),
@@ -303,7 +303,7 @@ impl<S> NodeHandler<S>
                 continue;
             }
             self.connect(address);
-            info!("Try to connect with peer {}", address);
+            info!("Trying to connect with peer {}", address);
         }
 
         let round = 1;
@@ -325,7 +325,7 @@ impl<S> NodeHandler<S>
     /// Sends the given message to a peer by its public key.
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
-            trace!("Send to addr: {}", conn.addr());
+            trace!("Send to address: {}", conn.addr());
             self.channel.send_to(&conn.addr(), message.clone());
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
@@ -334,7 +334,7 @@ impl<S> NodeHandler<S>
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
-        trace!("Send to addr: {}", address);
+        trace!("Send to address: {}", address);
         self.channel.send_to(address, message.clone());
     }
 
@@ -342,7 +342,7 @@ impl<S> NodeHandler<S>
     // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
-            trace!("Send to addr: {}", conn.addr());
+            trace!("Send to address: {}", conn.addr());
             self.channel.send_to(&conn.addr(), message.clone());
         }
     }
@@ -363,7 +363,7 @@ impl<S> NodeHandler<S>
     /// Adds `NodeTimeout::Round` timeout to the channel.
     pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round() + 1);
-        trace!("ADD ROUND TIMEOUT, time={:?}, height={}, round={}",
+        trace!("ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
                time,
                self.state.height(),
                self.state.round());
@@ -377,7 +377,7 @@ impl<S> NodeHandler<S>
         let time = self.round_start_time(self.state.round()) +
                    Duration::from_millis(adjusted_propose_timeout);
 
-        trace!("ADD PROPOSE TIMEOUT, time={:?}, height={}, round={}",
+        trace!("ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
                time,
                self.state.height(),
                self.state.round());
@@ -402,6 +402,7 @@ impl<S> NodeHandler<S>
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
     pub fn add_peer_exchange_timeout(&mut self) {
+        trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.channel.get_time() + Duration::from_millis(self.peers_timeout());
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
@@ -505,7 +506,7 @@ impl Node {
             ::profiler::init_handler(
                 ::std::env::var(PROFILE_ENV_VARIABLE_NAME)
                 .expect(
-                    &format!("You compile exonum with profiling support, but {}",
+                    &format!("You compiled exonum with profiling support, but {}",
                      PROFILE_ENV_VARIABLE_NAME)))
         };
 
@@ -536,7 +537,7 @@ impl Node {
         {
             v
         } else {
-            warn!("Could not find external_address, in config, using listen_address");
+            warn!("Could not find 'external_address' in the config, using 'listen_address'");
             node_cfg.listen_address
         };
 

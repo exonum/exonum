@@ -55,12 +55,12 @@ impl<S> NodeHandler<S>
         // TODO add spam protection
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
-            trace!("Received Connect with same addr as our external_address.");
+            trace!("Received Connect with same address as our external_address.");
             return;
         }
 
         if !self.state.whitelist().allow(message.pub_key()) {
-            error!("Received connect message from peer = {:?} which not in whitelist.",
+            error!("Received connect message from {:?} peer which not in whitelist.",
                 message.pub_key());
             return;
         }
