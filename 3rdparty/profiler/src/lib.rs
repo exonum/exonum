@@ -7,9 +7,9 @@ extern crate lazy_static;
 
 mod html;
 
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::Instant;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::marker::PhantomData;
@@ -24,7 +24,7 @@ lazy_static!{
     static ref SETTED_NAME: Mutex<Option<String>> = Mutex::new(None);
     static ref INTERRUPTED_TICKS: Arc<AtomicUsize> = Arc::new(AtomicUsize::new(0));
 
-} 
+}
 
 pub struct ThreadFrame {
     epoch: Instant,
@@ -83,7 +83,7 @@ impl ThreadFrame {
         let span = Span::sub_span(&self.events[self.events.len()-1].span, name);
         self.events.push(Event::new(name, timestamp, span));
     }
-    
+
     fn end_span(&mut self) {
         let new_time = INTERRUPTED_TICKS.load(Ordering::SeqCst);
         if self.dumped_time < new_time {
@@ -135,12 +135,12 @@ impl Span {
 
 #[cfg(not(feature="nomock"))]
 pub fn start(name: &'static str) {
-    
+
 }
 
 #[cfg(not(feature="nomock"))]
 pub fn end() {
-    
+
 }
 
 
@@ -213,7 +213,7 @@ impl<'scope> ProfilerSpan<'scope> {
         start(self.name);
     }
 
-    pub fn sub_span<'smaller>(&'smaller mut self, name: &'static str) -> ProfilerSpan<'smaller> 
+    pub fn sub_span<'smaller>(&'smaller mut self, name: &'static str) -> ProfilerSpan<'smaller>
     where 'scope: 'smaller {
         ProfilerSpan::new(name)
     }
@@ -225,6 +225,7 @@ pub fn init_handler(file: String) {
 
 #[cfg(feature="nomock")]
 pub fn init_handler(file: String) {
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     *SETTED_NAME.lock().unwrap() = Some(file);
 
