@@ -34,10 +34,6 @@ pub trait Transaction: Message + 'static {
     /// - If the execute method of a transaction raises a `panic`, the changes made by the 
     /// transactions are discarded, but the transaction itself is still considered committed.
     fn execute(&self, fork: &mut Fork);
-    /// Returns the useful information about the transaction in the JSON format.
-    fn info(&self) -> Value {
-        Value::Null
-    }
 }
 
 /// A trait that describes a business-logic of the concrete service.
