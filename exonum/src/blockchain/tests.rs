@@ -153,7 +153,7 @@ fn test_handling_tx_panic() {
 #[test]
 #[should_panic]
 fn test_handling_tx_panic_storage_error() {
-    use std::collections::BTreeMap;
+    use std::collections::HashMap;
     use super::{Blockchain, Transaction};
     use crypto::{gen_keypair, Hash};
     use storage::{MemoryDB, Fork, Error, ListIndex};
@@ -193,7 +193,7 @@ fn test_handling_tx_panic_storage_error() {
     let tx_failed = Tx::new(0, &sec_key);
     let tx_storage_error = Tx::new(42, &sec_key);
 
-    let mut pool : BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
+    let mut pool : HashMap<Hash, Box<Transaction>> = HashMap::new();
 
     pool.insert(tx_ok1.hash(), Box::new(tx_ok1.clone()) as Box<Transaction>);
     pool.insert(tx_ok2.hash(), Box::new(tx_ok2.clone()) as Box<Transaction>);

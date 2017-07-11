@@ -9,9 +9,11 @@ use mount::Mount;
 use std::fmt;
 =======
 use std::sync::{Arc, RwLock};
+use std::collections::HashSet;
 use std::net::SocketAddr;
 >>>>>>> add shared context and make txpool concurrent
 
+use events::Milliseconds;
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
@@ -180,38 +182,82 @@ impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct ApiNodeState {
-    in_connections: Vec<SocketAddr>,
-    out_connections: Vec<SocketAddr>,
+    in_connections: HashSet<SocketAddr>,
+    out_connections: HashSet<SocketAddr>,
 }
 impl ApiNodeState {
     fn new() -> ApiNodeState {
-        ApiNodeState {
-            in_connections: Vec::new(),
-            out_connections: Vec::new(),
-        }
+        Self::default()
     }
+
+    
 }
 
 /// Shared part of context, used to take some values from the `Node` `State`
+/// should be used to take some metrics.
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     state: Arc<RwLock<ApiNodeState>>,
+    /// Timeout to update api state.
+    pub state_update_timeout: Milliseconds,
 }
 
 impl SharedNodeState {
     /// create new `SharedNodeState`
-    pub fn new( ) -> SharedNodeState {
+    pub fn new(state_update_timeout: Milliseconds ) -> SharedNodeState {
         SharedNodeState {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
+            state_update_timeout,
         }
     }
 
     /// Update internal state, from `Node` State`
-    pub fn update(&self, state: &State) {
+    pub fn update_node_state(&self, _state: &State) {
         //FIXME: Before merge implement update code
     }
+    
+    /// Returns value of the `state_update_timeout`.
+    pub fn state_update_timeout(&self) -> Milliseconds {
+        self.state_update_timeout
+    }
+
+    /// add incomming connection into state
+    pub fn add_incoming_connection(&self, addr: SocketAddr) {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .in_connections
+            .insert(addr);
+    }
+    /// add outgoing connection into state
+    pub fn add_outgoing_connection(&self, addr: SocketAddr) {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .out_connections
+            .insert(addr);
+    }
+
+    /// remove incomming connection from state
+    pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .in_connections
+            .remove(addr)
+    }
+
+    /// remove outgoing connection from state
+    pub fn remove_outgoing_connection(&self, addr: &SocketAddr) -> bool {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .out_connections
+            .remove(addr)
+    }
+
 }
 
 /// Provides the current node state to api handlers.

@@ -171,7 +171,7 @@ impl<S> NodeHandler<S>
     /// Handles `NodeTimeout::UpdateApiState`.
     /// Node update internal `ApiState`.
     pub fn handle_update_api_state_timeout(&mut self) {
-        self.api_state.update(&self.state);
+        self.api_state.update_node_state(&self.state);
         self.add_update_api_state_timeout();
     }
 

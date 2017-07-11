@@ -8,9 +8,9 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage,
                    ListenerConfig, ServiceConfig};
-use exonum::node::state::{Round, Height, TxPool};
+use exonum::node::state::{Round, Height};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service, ValidatorKeys};
+                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState};
 use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
@@ -508,12 +508,14 @@ impl Sandbox {
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        self.reactor
-            .borrow()
-            .handler
+        let b = self.reactor
+            .borrow();
+        let rlock = b.handler
             .state()
             .transactions()
-            .keys()
+            .read()
+            .expect("Expected read lock");
+            rlock.keys()
             .cloned()
             .collect()
     }
@@ -646,7 +648,11 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
                                     }));
 
     let channel = SandboxChannel { inner: inner.clone() };
-    let node = NodeHandler::new(blockchain.clone(), addresses[0], channel, config.clone());
+    let node = NodeHandler::new(blockchain.clone(),
+                                addresses[0],
+                                channel,
+                                config.clone(),
+                                SharedNodeState::new(5000));
 
     let mut reactor = SandboxReactor {
         inner: inner.clone(),

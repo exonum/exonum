@@ -78,8 +78,7 @@ pub struct ApiSender<S>
 pub struct NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    /// Timeout to update api state.
-    pub state_update_timeout: usize,
+
     /// State of the `NodeHandler`.
     pub state: State,
     /// Shared api state
@@ -226,7 +225,7 @@ impl<S> NodeHandler<S>
         external_address: SocketAddr,
         sender: S,
         config: Configuration,
-        state_update_timeout: usize,
+        api_state: SharedNodeState,
         ) -> Self
     {
         // FIXME: remove unwraps here, use FATAL log level instead
@@ -271,13 +270,12 @@ impl<S> NodeHandler<S>
         state.set_propose_timeout(timeout);
 
         NodeHandler {
-            state: state,
+            blockchain,
+            timeout_adjuster,
+            api_state,
+            state,
             channel: sender,
-            blockchain: blockchain,
-            timeout_adjuster: timeout_adjuster,
             peer_discovery: config.peer_discovery,
-            state_update_timeout: state_update_timeout,
-            api_state: SharedNodeState::new(),
         }
     }
 
@@ -285,10 +283,7 @@ impl<S> NodeHandler<S>
     pub fn api_state(&self) -> &SharedNodeState {
         &self.api_state
     } 
-    /// Returns value of the `state_update_timeout`.
-    pub fn state_update_timeout(&self) -> Milliseconds {
-        self.state_update_timeout as u64
-    }
+
 
     /// Sets new timeout adjuster.
     pub fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
@@ -440,7 +435,8 @@ impl<S> NodeHandler<S>
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
     pub fn add_update_api_state_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::from_millis(self.state_update_timeout());
+        let time = self.channel.get_time() + 
+                Duration::from_millis(self.api_state().state_update_timeout());
         self.channel.add_timeout(NodeTimeout::UpdateApiState, time);
     }
 
@@ -582,15 +578,19 @@ impl Node {
             warn!("Could not find 'external_address' in the config, using 'listen_address'");
             node_cfg.listen_address
         };
-
-        let network = Network::with_config(node_cfg.listen_address, config.network);
+        let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
+        let network = Network::with_config(
+                        node_cfg.listen_address,
+                        config.network,
+                        api_state.clone()
+                    );
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
         let worker = NodeHandler::new(blockchain,
                                         external_address,
                                         channel,
                                         config,
-                                        node_cfg.api.state_update_timeout);
+                                        api_state);
         Node {
             reactor: Events::with_event_loop(network, worker, event_loop),
             api_options: node_cfg.api,
