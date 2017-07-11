@@ -64,10 +64,10 @@ pub trait Service: Send + Sync + 'static {
     /// Tries to create `Transaction` object from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    /// Handles genesis block creation event.
     /// By this method you can initialize information schema of service
     /// and generates initial service configuration.
-    fn handle_genesis_block(&self, fork: &mut Fork) -> Value {
+    /// This method is called on genesis block creation event.
+    fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
 
