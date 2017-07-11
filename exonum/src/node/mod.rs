@@ -226,7 +226,7 @@ impl<S> NodeHandler<S>
             .iter()
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| id as ValidatorId);
-        info!("Validator id = '{}'", validator_id);
+        info!("Validator id = '{:?}'", validator_id);
         let connect = Connect::new(&config.listener.consensus_public_key,
                                    external_address,
                                    sender.get_time(),
