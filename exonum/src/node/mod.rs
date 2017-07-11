@@ -514,6 +514,12 @@ impl<S> ApiSender<S>
     pub fn new(inner: S) -> ApiSender<S> {
         ApiSender { inner: inner }
     }
+
+    /// Addr peer to peer list
+    pub fn peer_add(&self, addr: SocketAddr) -> EventsResult<()> {
+        let msg = ExternalMessage::PeerAdd(addr);
+        self.inner.post_event(msg)
+    }
 }
 
 impl<S> TransactionSend for ApiSender<S>
@@ -612,6 +618,7 @@ impl Node {
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(&mut self) -> io::Result<()> {
         let blockchain = self.handler().blockchain.clone();
+        let channel = self.channel();
 
         let private_config_api_thread = match self.api_options.private_api_address {
             Some(listen_address) => {
@@ -640,7 +647,7 @@ impl Node {
                     let pool = self.state().transactions().clone();
                     let shared_api_state = self.handler().api_state().clone();
                     let mut router = Router::new();
-                    let explorer_api = ExplorerApi::new(blockchain, pool, shared_api_state);
+                    let explorer_api = ExplorerApi::new(blockchain, pool, shared_api_state, channel);
                     explorer_api.wire(&mut router);
                     mount.mount("api/explorer", router);
                 }

@@ -22,7 +22,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 
 use std::sync::Arc;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::mem;
 use std::fmt;
 use std::panic;
@@ -158,7 +158,7 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(0, 0, &[], &HashMap::new()).1
+            self.create_patch(0, 0, &[], &BTreeMap::new()).1
         };
         self.merge(patch)?;
         Ok(())
@@ -191,7 +191,7 @@ impl Blockchain {
                         proposer_id: u16,
                         height: u64,
                         tx_hashes: &[Hash],
-                        pool: &HashMap<Hash, Box<Transaction>>)
+                        pool: &BTreeMap<Hash, Box<Transaction>>)
                         -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();

@@ -35,7 +35,7 @@ pub type ValidatorId = u16;
 
 /// Transactions pool.
 // TODO replace by persistent TxPool
-pub type TxPool = Arc<RwLock<HashMap<Hash, Box<Transaction>>>>;
+pub type TxPool = Arc<RwLock<BTreeMap<Hash, Box<Transaction>>>>;
 // TODO: reduce copying of Hash
 
 /// State of the `NodeHandler`.
@@ -375,7 +375,7 @@ impl State {
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
-            transactions: Arc::new(RwLock::new(HashMap::new())),
+            transactions: Arc::new(RwLock::new(BTreeMap::new())),
 
             queued: Vec::new(),
 
