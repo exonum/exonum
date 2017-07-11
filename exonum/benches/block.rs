@@ -59,7 +59,7 @@ mod tests {
         fn execute_block(blockchain: &Blockchain,
                          height: u64,
                          txs: &[Hash],
-                         pool: &HashMap<Hash, Box<Transaction>>) -> Patch {
+                         pool: &BTreeMap<Hash, Box<Transaction>>) -> Patch {
             blockchain.create_patch(0, height, txs, pool).1
         }
 

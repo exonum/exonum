@@ -9,7 +9,7 @@ use mount::Mount;
 use std::fmt;
 =======
 use std::sync::{Arc, RwLock};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::net::SocketAddr;
 >>>>>>> add shared context and make txpool concurrent
 
@@ -183,16 +183,15 @@ impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
 }
 
 #[derive(Debug, Default)]
-struct ApiNodeState {
+pub struct ApiNodeState {
     in_connections: HashSet<SocketAddr>,
     out_connections: HashSet<SocketAddr>,
+    reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
 }
 impl ApiNodeState {
     fn new() -> ApiNodeState {
         Self::default()
     }
-
-    
 }
 
 /// Shared part of context, used to take some values from the `Node` `State`
@@ -212,7 +211,36 @@ impl SharedNodeState {
             state_update_timeout,
         }
     }
-
+    /// Return list of connected sockets
+    pub fn in_connections(&self) -> Vec<SocketAddr> {
+        self.state
+             .read()
+             .expect("Expected read lock.")
+             .in_connections
+             .iter()
+             .cloned()
+             .collect()
+    }
+    /// Return list of our connection sockets
+    pub fn out_connections(&self) -> Vec<SocketAddr> {
+        self.state
+             .read()
+             .expect("Expected read lock.")
+             .out_connections
+             .iter()
+             .cloned()
+             .collect()
+    }
+    /// return reconnects list
+    pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
+        self.state
+             .read()
+             .expect("Expected read lock.")
+             .reconnects_timeout
+             .iter()
+             .map(|(c,e)| (c.clone(), e.clone()))
+             .collect()
+    }
     /// Update internal state, from `Node` State`
     pub fn update_node_state(&self, _state: &State) {
         //FIXME: Before merge implement update code
@@ -256,6 +284,31 @@ impl SharedNodeState {
             .expect("Expected write lock")
             .out_connections
             .remove(addr)
+    }
+
+    /// Add reconect timeout
+    pub fn add_reconnect_timeout(
+        &self,
+        addr: SocketAddr,
+        timeout: Milliseconds
+    ) -> Option<Milliseconds>
+    {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .reconnects_timeout.insert(addr, timeout)
+    }
+
+    /// Remove reconect timeout
+    pub fn remove_reconnect_timeout(
+        &self,
+        addr: &SocketAddr
+    ) -> Option<Milliseconds>
+    {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .reconnects_timeout.remove(addr)
     }
 
 }

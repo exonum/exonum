@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, BinaryHeap, HashSet, HashMap};
+use std::collections::{VecDeque, BinaryHeap, HashSet, BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::cell::{RefCell, Ref, RefMut};
 use std::sync::{Arc, Mutex};
@@ -453,7 +453,7 @@ impl Sandbox {
     {
         let blockchain = &self.reactor.borrow().handler.blockchain;
         let (hashes, tx_pool) = {
-            let mut pool = HashMap::new();
+            let mut pool = BTreeMap::new();
             let mut hashes = Vec::new();
             for raw in txs {
                 let tx = blockchain.tx_from_raw(raw.clone()).unwrap();

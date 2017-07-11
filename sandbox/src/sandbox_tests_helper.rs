@@ -282,7 +282,7 @@ pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxStat
 
 pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                                sandbox_state: &SandboxState,
-                                               txs: I)
+                                               txs: I) -> Vec<Hash>
     where I: IntoIterator<Item = &'a RawTransaction>
 {
     // sort transaction in order accordingly their hashes
@@ -379,7 +379,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
             }
             sandbox.check_broadcast_status(new_height, &block.hash());
 
-            return;
+            return hashes;
         }
     }
 
@@ -388,7 +388,7 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
 
 pub fn add_one_height_with_transactions_from_other_validator(sandbox: &TimestampingSandbox,
                                                              sandbox_state: &SandboxState,
-                                                             txs: &[RawTransaction]) {
+                                                             txs: &[RawTransaction]) -> Vec<Hash> {
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
@@ -466,7 +466,7 @@ pub fn add_one_height_with_transactions_from_other_validator(sandbox: &Timestamp
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
             }
-            return;
+            return hashes;
         }
     }
 

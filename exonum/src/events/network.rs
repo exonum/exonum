@@ -415,6 +415,8 @@ impl Network {
         let timeout = event_loop.timeout_ms(reconnect, delay)
             .map_err(|e| make_io_error(format!("A mio error occurred {:?}", e)))?;
         self.reconnects.insert(address, timeout);
+        self.api_state.add_reconnect_timeout(address, delay);
+
         Ok(())
     }
 
@@ -431,6 +433,7 @@ impl Network {
                                                 addr: &SocketAddr)
                                                 -> bool {
         if let Some(timeout) = self.reconnects.remove(addr) {
+            self.api_state.remove_reconnect_timeout(addr);
             trace!("{}: Clear reconnect timeout to={}", self.address(), addr);
             event_loop.clear_timeout(timeout);
             return true;

@@ -33,6 +33,7 @@ pub enum ApiError {
     FileExists(Hash),
     IncorrectRequest(Box<::std::error::Error + Send + Sync>),
     Unauthorized,
+    AddressParseError(::std::net::AddrParseError),
 }
 
 impl fmt::Display for ApiError {
@@ -55,7 +56,14 @@ impl ::std::error::Error for ApiError {
             ApiError::FileTooBig => "File too big",
             ApiError::FileExists(_) => "File exists",
             ApiError::Unauthorized => "Unauthorized",
+            ApiError::AddressParseError(_) => "AddressParseError",
         }
+    }
+}
+
+impl From<::std::net::AddrParseError> for ApiError {
+    fn from(e: ::std::net::AddrParseError) -> ApiError {
+        ApiError::AddressParseError(e)
     }
 }
 
