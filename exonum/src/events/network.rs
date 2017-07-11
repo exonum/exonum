@@ -11,6 +11,7 @@ use std::cmp;
 use std::default::Default;
 
 use messages::RawMessage;
+use blockchain::SharedNodeState;
 use super::connection::{Connection, IncomingConnection, OutgoingConnection};
 use super::{Timeout, InternalTimeout, EventLoop, EventHandler, Event};
 
@@ -48,6 +49,7 @@ impl Default for NetworkConfiguration {
 // TODO Implement generic ConnectionPool struct to avoid copy paste.
 // Write proper code to configure outgoing streams
 pub struct Network {
+    api_state: SharedNodeState,
     config: NetworkConfiguration,
     listen_address: SocketAddr,
     listener: Option<TcpListener>,
@@ -71,8 +73,9 @@ fn make_io_error<T: Borrow<str>>(s: T) -> io::Error {
 }
 
 impl Network {
-    pub fn with_config(address: SocketAddr, config: NetworkConfiguration) -> Network {
+    pub fn with_config(address: SocketAddr, config: NetworkConfiguration, api_state: SharedNodeState ) -> Network {
         Network {
+            api_state,
             config: config,
             listen_address: address,
             listener: None,
@@ -310,6 +313,7 @@ impl Network {
             .insert(connection)
             .map_err(|_| make_io_error("Maximum incoming connections"))?;
         self.addresses.insert(address, id);
+        self.api_state.add_incoming_connection(address);
 
         let r = event_loop.register(self.incoming[id].socket(),
                                     id,
@@ -332,6 +336,7 @@ impl Network {
             .insert(connection)
             .map_err(|_| make_io_error("Maximum outgoing connections"))?;
         self.addresses.insert(address, id);
+        self.api_state.add_outgoing_connection(address);
 
         let r = event_loop.register(self.outgoing[id].socket(),
                                     id,
@@ -350,6 +355,8 @@ impl Network {
                                                    id: PeerId) {
         let addr = *self.incoming[id].address();
         self.addresses.remove(&addr);
+        self.api_state.remove_incoming_connection(&addr);
+        
         if let Some(connection) = self.incoming.remove(id) {
             if let Err(e) = event_loop.deregister(connection.socket()) {
                 error!("{}: Unable to deregister incoming connection, id: {}, error: {:?}",
@@ -365,6 +372,8 @@ impl Network {
                                                    id: PeerId) {
         let addr = *self.outgoing[id].address();
         self.addresses.remove(&addr);
+        self.api_state.remove_outgoing_connection(&addr);
+
         if let Some(connection) = self.outgoing.remove(id) {
             if let Err(e) = event_loop.deregister(connection.socket()) {
                 error!("{}: Unable to deregister outgoing connection, id: {}, error: {:?}",
