@@ -1,3 +1,5 @@
+//! This module wraps `sodiumoxide` types and methods.
+
 use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
                                          Signature as SignatureSodium, sign_detached,
@@ -21,33 +23,43 @@ pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 
 pub use encoding::serialize::{FromHexError, HexValue};
 
-
+/// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
+/// Signs a message `m` using the signer's secret key `secret_key`.
+/// Returns the resulting signature.
 pub fn sign(m: &[u8], secret_key: &SecretKey) -> Signature {
     let sodium_signature = sign_detached(m, &secret_key.0);
     Signature(sodium_signature)
 }
 
+/// Computes a secret key and a corresponding public key from a `Seed`.
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (sod_pub_key, sod_secr_key) = keypair_from_seed(&seed.0);
     (PublicKey(sod_pub_key), SecretKey(sod_secr_key))
 }
 
+/// Randomly generates a secret key and a corresponding public key.
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
     let (pubkey, secrkey) = gen_keypair_sodium();
     (PublicKey(pubkey), SecretKey(secrkey))
 }
 
+/// Verifies the signature in `sig` against the message `m`
+/// and the signer's public key `pk`.
 pub fn verify(sig: &Signature, m: &[u8], pubkey: &PublicKey) -> bool {
     verify_detached(&sig.0, m, &pubkey.0)
 }
 
+/// Calculates `SHA256` hash of bytes slice.
 pub fn hash(m: &[u8]) -> Hash {
     let dig = hash_sodium(m);
     Hash(dig)
 }
 
+/// Initializes the sodium library and chooses faster versions
+/// of the primitives if possible.
+/// This method is called automatically when a node instance initialized.
 pub fn init() {
     if !sodiumoxide::init() {
         panic!("Cryptographic library hasn't initialized.");
