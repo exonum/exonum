@@ -38,7 +38,7 @@ impl<S> NodeHandler<S>
 
     /// Handles `RequstPropose` message. For details see the message documentation.
     pub fn handle_request_propose(&mut self, msg: RequestPropose) {
-        trace!("HANDLE PROPOSE REQUEST!!!");
+        trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
             return;
         }
@@ -56,7 +56,7 @@ impl<S> NodeHandler<S>
 
     /// Handles `RequestTransactions` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
-        trace!("HANDLE TRANSACTIONS REQUEST!!!");
+        trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
@@ -75,7 +75,7 @@ impl<S> NodeHandler<S>
 
     /// Handles `RequestPrevotes` message. For details see the message documentation.
     pub fn handle_request_prevotes(&mut self, msg: RequestPrevotes) {
-        trace!("HANDLE PREVOTES REQUEST!!!");
+        trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
         }

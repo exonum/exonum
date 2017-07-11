@@ -15,6 +15,12 @@ pub use self::details::{Run, Finalize,
                     GenerateTestnet };
 pub use self::shared::{AbstractConfig, NodePublicConfig, CommonConfigTemplate, NodePrivateConfig};
 
+mod shared;
+mod builder;
+mod details;
+mod internal;
+mod clap_backend;
+
 pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 
 /// `Command` name type
@@ -36,7 +42,6 @@ pub enum ArgumentType {
     /// argument with `long` and optionally `short` name
     Named(NamedArgument)
 }
-
 
 #[derive(Clone, Copy, Debug)]
 /// Abstraction to represent arguments in command line
@@ -89,7 +94,6 @@ impl Argument {
     }
 }
 
-
 #[derive(PartialEq, Debug, Clone, Default)]
 /// `Context` is a type, used to keep some values from `Command` into
 /// `CommandExtension` and vice verse.
@@ -110,7 +114,7 @@ impl Context {
                     if let Some(values) = matches.values_of(&arg.name) {
                         let values: Vec<String> = values.map(|e| e.to_owned()).collect();
                         if context.multiple_args.insert(arg.name.to_owned(), values).is_some() {
-                            panic!("Found args dupplicate, in args list. {}", arg.name);
+                            panic!("Duplicated argument: {}", arg.name);
                         }
                         continue;
                         }
@@ -120,13 +124,13 @@ impl Context {
 
             if let Some(value) = matches.value_of(&arg.name) {
                 if context.args.insert(arg.name.to_owned(), value.to_string()).is_some() {
-                    panic!("Found args dupplicate, in args list. {}", arg.name);
+                    panic!("Duplicated argument: {}", arg.name);
                 }
                             
                 
             }
             else if arg.required {
-                panic!("Argument {} not found.", arg.name)
+                panic!("Required argument is not found: {}", arg.name)
             }
         }
         context
@@ -144,7 +148,7 @@ impl Context {
         }
     }
 
-    /// Get cmd argument mutliple values
+    /// Get cmd argument multiple values
     pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, Box<Error>>
         where <T as FromStr>::Err: Error + 'static
     {
@@ -166,7 +170,7 @@ impl Context {
         }
     }
 
-    /// Set variable in context, return pervios value
+    /// Sets the variable in the context and returns the previous value.
     /// ## Panic:
     /// if value could not be serialized as `toml`
     pub fn set<T: Serialize>(&mut self,
@@ -196,9 +200,3 @@ pub trait ServiceFactory: 'static {
     /// create new service, from context, returned by `run` command.
     fn make_service( run_context: &Context) -> Box<Service>;
 }
-
-mod shared;
-mod builder;
-mod details;
-mod internal;
-mod clap_backend;

@@ -4,7 +4,6 @@ use std::borrow::Cow;
 
 use super::Offset;
 
-
 #[derive( Debug)]
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
@@ -98,18 +97,18 @@ impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
             Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
-            Error::IncorrectBoolean { .. } => "Incorrect bool.",
-            Error::IncorrectSegmentReference { .. } => "Incorrect segment reference.",
-            Error::IncorrectSegmentSize { .. } => "Incorrect segment size.",
-            Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage.",
-            Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage.",
-            Error::IncorrectMessageType { .. } => "Incorrect message type.",
-            Error::OverlappingSegment { .. } => "Overlapping segment.",
-            Error::SpaceBetweenSegments { .. } => "Space between segments.",
-            Error::Utf8 { .. } => "Utf8 error in parsing string.",
-            Error::OffsetOverflow => "Overflow in offset pointers.",
+            Error::IncorrectBoolean { .. } => "Incorrect boolean value",
+            Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
+            Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
+            Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage",
+            Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage",
+            Error::IncorrectMessageType { .. } => "Incorrect message type",
+            Error::OverlappingSegment { .. } => "Overlapping segments",
+            Error::SpaceBetweenSegments { .. } => "Space between segments",
+            Error::Utf8 { .. } => "Utf8 error in parsing string",
+            Error::OffsetOverflow => "Offset pointers overflow",
             Error::Basic(ref x) => x.as_ref(),
-            Error::Other(_) => "Other error.",
+            Error::Other(_) => "Other error",
         }
     }
 

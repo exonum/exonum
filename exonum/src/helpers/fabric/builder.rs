@@ -10,6 +10,7 @@ use super::{Context, ServiceFactory};
 use super::details::{Run, Finalize,
                     GenerateNodeConfig, GenerateCommonConfig,
                     GenerateTestnet };
+
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
 #[derive(Default)]
@@ -80,7 +81,6 @@ impl NodeBuilder {
         }
     }
 }
-
 
 impl fmt::Debug for NodeBuilder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

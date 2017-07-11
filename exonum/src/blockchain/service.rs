@@ -5,6 +5,8 @@ use serde_json::Value;
 use iron::Handler;
 use mount::Mount;
 
+use std::fmt;
+
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
@@ -167,8 +169,8 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ::std::fmt::Debug for ServiceContext<'a, 'b> {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ServiceContext(state: {:?}, txs: {:?})", self.state, self.txs)
     }
 }
@@ -226,7 +228,7 @@ impl ApiContext {
 }
 
 impl ::std::fmt::Debug for ApiContext {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "ApiContext(blockchain: {:?}, public_key: {:?})", self.blockchain, self.public_key)
     }
 }

@@ -101,7 +101,7 @@ impl<S> NodeHandler<S>
         let known_nodes = self.remove_request(RequestData::Propose(hash));
 
         if has_unknown_txs {
-            trace!("REQUEST TRANSACTIONS!!!");
+            trace!("REQUEST TRANSACTIONS");
             self.request(RequestData::Transactions(hash), from);
 
             for node in known_nodes {
@@ -189,7 +189,8 @@ impl<S> NodeHandler<S>
                                                         tx_hashes.as_slice());
             // Verify block_hash
             if block_hash != block.hash() {
-                panic!("Block_hash incorrect in received block={:?}", msg);
+                panic!("Block_hash incorrect in the received block={:?}. Either a node's \
+                implementation is incorrect or validators majority works incorrectly", msg);
             }
 
             // Commit block
@@ -225,7 +226,8 @@ impl<S> NodeHandler<S>
             let our_block_hash = self.execute(&hash);
 
             if our_block_hash != block_hash {
-                panic!("Full propose: wrong state hash");
+                panic!("Full propose: wrong state hash. Either a node's implementation is \
+                incorrect or validators majority works incorrectly");
             }
 
             let precommits = self.state
@@ -552,7 +554,7 @@ impl<S> NodeHandler<S>
                 return;
             }
 
-            info!("I AM LEADER!!! pool = {}", self.state.transactions().len());
+            info!("LEADER: pool = {}", self.state.transactions().len());
 
             let round = self.state.round();
             let max_count = ::std::cmp::min(self.txs_block_limit() as usize,
@@ -585,7 +587,7 @@ impl<S> NodeHandler<S>
 
     /// Handles request timeout by sending the corresponding request message to a peer.
     pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
-        trace!("!!!!!!!!!!!!!!!!!!! HANDLE REQUEST TIMEOUT");
+        trace!("HANDLE REQUEST TIMEOUT");
         // FIXME: check height?
         if let Some(peer) = self.state.retry(&data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
@@ -635,7 +637,7 @@ impl<S> NodeHandler<S>
                         .clone()
                 }
             };
-            trace!("!!!!!!!!!!!!!!!!!!! Send request {:?} to peer {:?}",
+            trace!("Send request {:?} to peer {:?}",
                    data,
                    peer);
             self.send_to_peer(peer, &message);

@@ -26,7 +26,7 @@ impl fmt::Display for NotFoundInMap {
     }
 }
 
-/// `Command` trait useable to create subcommand for `NodeBuilder`
+/// `Command` trait is used to create sub-command for `NodeBuilder`.
 pub trait Command {
     fn args(&self) -> Vec<Argument>;
     fn name(&self) -> CommandName ;
@@ -89,7 +89,6 @@ impl CollectedCommand {
         })
     }
 }
-
 
 impl fmt::Debug for CollectedCommand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
