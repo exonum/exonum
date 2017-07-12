@@ -142,7 +142,7 @@ impl Blockchain {
                 let cfg = service.initialize(&mut fork);
                 let name = service.service_name();
                 if config_propose.services.contains_key(name) {
-                    panic!("Services have already contain service with name={}, please change it.",
+                    panic!("Services already contain service with '{}' name, please change it",
                            name);
                 }
                 config_propose.services.insert(name.into(), cfg);
@@ -216,7 +216,7 @@ impl Blockchain {
                             panic::resume_unwind(err);
                         }
                         fork.rollback();
-                        error!("Transaction execution failed: {:?}, reason: {:?}", tx, err);
+                        error!("{:?} transaction execution failed: {:?}", tx, err);
                     }
                 }
 
