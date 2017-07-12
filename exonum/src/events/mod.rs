@@ -1,7 +1,9 @@
 use mio;
 
 use std::io;
-use std::fmt::{self, Display};
+use std::fmt;
+use std::error;
+use std::result;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
@@ -216,7 +218,7 @@ impl<H: EventHandler> MioAdapter<H> {
                       message: RawMessage) {
         if self.network.is_connected(address) {
             if let Err(e) = self.network.send_to(event_loop, address, message) {
-                error!("{}: An error during send_to occured {:?}",
+                error!("{}: An error during send_to occurred {:?}",
                        self.network.address(),
                        e);
                 self.handler.handle_event(Event::Disconnected(*address));
@@ -243,7 +245,7 @@ impl<H: EventHandler> MioAdapter<H> {
                 event_loop.timeout_ms(Timeout::Node(timeout), num_milliseconds(&duration))
                     .map(|_| ())
                     .map_err(|x| format!("{:?}", x))
-                    .log_error("Unable to add timeout to event loop"),
+                    .log_error("Unable to add timeout to the event loop"),
             Err(_) => self.handler.handle_timeout(timeout),
         }
     }
@@ -315,12 +317,12 @@ trait LogError {
     fn log_error<S: AsRef<str>>(self, msg: S);
 }
 
-impl<E> LogError for ::std::result::Result<(), E>
-    where E: Display
+impl<E> LogError for result::Result<(), E>
+    where E: fmt::Display
 {
     fn log_error<S: AsRef<str>>(self, msg: S) {
         if let Err(error) = self {
-            error!("{}, an error occured: {}", msg.as_ref(), error);
+            error!("{}, an error occurred: {}", msg.as_ref(), error);
         }
     }
 }
@@ -330,7 +332,7 @@ pub struct Error {
     message: String,
 }
 
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = result::Result<T, Error>;
 
 impl Error {
     pub fn new<T: Into<String>>(message: T) -> Error {
@@ -338,13 +340,13 @@ impl Error {
     }
 }
 
-impl ::std::fmt::Display for Error {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Events error: {}", self.message)
     }
 }
 
-impl ::std::error::Error for Error {
+impl error::Error for Error {
     fn description(&self) -> &str {
         &self.message
     }

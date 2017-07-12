@@ -7,7 +7,7 @@ use std::io;
 use std::fmt;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::cmp::min;
+use std::cmp;
 use std::default::Default;
 
 use messages::RawMessage;
@@ -93,7 +93,7 @@ impl Network {
     // TODO use error trait
     pub fn bind<H: EventHandler>(&mut self, event_loop: &mut EventLoop<H>) -> io::Result<()> {
         if self.listener.is_some() {
-            return Err(make_io_error("Already binded"));
+            return Err(make_io_error("Already bind"));
         }
         let listener = TcpListener::bind(&self.listen_address)?;
         event_loop.register(&listener, SERVER_ID, EventSet::readable(), PollOpt::edge())?;
@@ -136,7 +136,7 @@ impl Network {
                 }
 
                 if set.is_hup() | set.is_error() {
-                    trace!("{}: incoming connection with addr {} closed",
+                    trace!("{}: incoming connection with {} address is closed",
                            self.address(),
                            self.incoming[id].address());
 
@@ -168,7 +168,7 @@ impl Network {
                 if set.is_hup() | set.is_error() {
                     let address = *self.outgoing[id].address();
 
-                    trace!("{}: outgoing connection with addr {} closed",
+                    trace!("{}: outgoing connection with address {} is closed",
                            self.address(),
                            self.outgoing[id].address());
 
@@ -197,7 +197,7 @@ impl Network {
                     }
 
                     if self.mark_connected(event_loop, id) {
-                        trace!("{}: Handle connected with={}", self.address(), address);
+                        trace!("{}: Handle connected with {}", self.address(), address);
                         handler.handle_event(Event::Connected(address));
                     }
                 }
@@ -264,16 +264,16 @@ impl Network {
         match timeout {
             InternalTimeout::Reconnect(addr, delay) => {
                 if self.reconnects.contains_key(&addr) {
-                    trace!("Try to reconnect with delay {}", delay);
+                    trace!("Try to reconnect with '{}' delay", delay);
 
                     if let Err(e) = self.connect(event_loop, &addr) {
-                        error!("{}: Unable to create connection to addr {}, error: {:?}",
+                        error!("{}: Unable to create connection to address '{}', error: {:?}",
                                self.address(),
                                addr,
                                e);
                     }
 
-                    let delay = min((delay as f32 * RECONNECT_GROW_FACTOR) as u64,
+                    let delay = cmp::min((delay as f32 * RECONNECT_GROW_FACTOR) as u64,
                                     self.config.tcp_reconnect_timeout_max);
 
                     if let Err(e) = self.add_reconnect_timeout(event_loop, addr, delay) {
@@ -308,7 +308,7 @@ impl Network {
         let address = *connection.address();
         let id = self.incoming
             .insert(connection)
-            .map_err(|_| make_io_error("Maximum incoming onnections"))?;
+            .map_err(|_| make_io_error("Maximum incoming connections"))?;
         self.addresses.insert(address, id);
 
         let r = event_loop.register(self.incoming[id].socket(),
@@ -330,7 +330,7 @@ impl Network {
         let address = *connection.address();
         let id = self.outgoing
             .insert(connection)
-            .map_err(|_| make_io_error("Maximum outgoing onnections"))?;
+            .map_err(|_| make_io_error("Maximum outgoing connections"))?;
         self.addresses.insert(address, id);
 
         let r = event_loop.register(self.outgoing[id].socket(),
@@ -398,13 +398,13 @@ impl Network {
                                               address: SocketAddr,
                                               delay: u64)
                                               -> io::Result<()> {
-        trace!("{}: Add reconnect timeout to={}, delay={}",
+        trace!("{}: Add reconnect timeout to {}, delay = {}",
                self.address(),
                address,
                delay);
         let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
         let timeout = event_loop.timeout_ms(reconnect, delay)
-            .map_err(|e| make_io_error(format!("A mio error occured {:?}", e)))?;
+            .map_err(|e| make_io_error(format!("A mio error occurred {:?}", e)))?;
         self.reconnects.insert(address, timeout);
         Ok(())
     }
