@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 
 use blockchain::GenesisConfig;
 use helpers::generate_testnet_config;
-use config::ConfigFile;
+use helpers::config::ConfigFile;
 use node::NodeConfig;
 use storage::Database;
 use crypto;
