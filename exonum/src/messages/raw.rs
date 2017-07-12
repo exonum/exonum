@@ -136,7 +136,7 @@ impl MessageWriter {
     }
 }
 
-pub trait Message: Debug + Send {
+pub trait Message: Debug + Send + Sync {
     fn raw(&self) -> &RawMessage;
 
     fn hash(&self) -> Hash {

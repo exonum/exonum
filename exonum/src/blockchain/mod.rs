@@ -29,14 +29,15 @@ use std::panic;
 
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
-use node::{State, TxPool};
+use node::State;
 use storage::{Patch, Database, Snapshot, Fork, Error};
 
 pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction, ServiceContext, ApiContext};
+pub use self::service::{Service, Transaction, ServiceContext,
+                        ApiContext, SharedNodeState};
 
 mod block;
 mod schema;
@@ -72,6 +73,11 @@ impl Blockchain {
             db: storage,
             service_map: Arc::new(service_map),
         }
+    }
+
+    /// Returnts service `VecMap` for all our services.
+    pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
+        &self.service_map
     }
 
     /// Creates a readonly snapshot of the current storage state.
@@ -190,7 +196,7 @@ impl Blockchain {
                         proposer_id: u16,
                         height: u64,
                         tx_hashes: &[Hash],
-                        pool: &TxPool)
+                        pool: &BTreeMap<Hash, Box<Transaction>>)
                         -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();

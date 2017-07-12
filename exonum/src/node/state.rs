@@ -4,6 +4,7 @@ use serde_json::Value;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
+use std::sync::{Arc, RwLock};
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
@@ -34,7 +35,7 @@ pub type ValidatorId = u16;
 
 /// Transactions pool.
 // TODO replace by persistent TxPool
-pub type TxPool = BTreeMap<Hash, Box<Transaction>>;
+pub type TxPool = Arc<RwLock<BTreeMap<Hash, Box<Transaction>>>>;
 // TODO: reduce copying of Hash
 
 /// State of the `NodeHandler`.
@@ -68,7 +69,6 @@ pub struct State {
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
-    // TODO: add hashmap of transactions we wait for
     transactions: TxPool,
 
     queued: Vec<ConsensusMessage>,
@@ -350,7 +350,8 @@ impl State {
                connect: Connect,
                last_hash: Hash,
                last_height: u64,
-               height_start_time: SystemTime)
+               height_start_time: SystemTime,
+               )
                -> Self {
         State {
             validator_state: validator_id.map(ValidatorState::new),
@@ -374,7 +375,7 @@ impl State {
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
-            transactions: TxPool::new(),
+            transactions: Arc::new(RwLock::new(BTreeMap::new())),
 
             queued: Vec::new(),
 
@@ -645,7 +646,9 @@ impl State {
             // Commit transactions if needed
             let txs = self.block(block_hash).unwrap().txs.clone();
             for hash in txs {
-                self.transactions.remove(&hash);
+                self.transactions.write()
+                  .expect("Expected write lock")
+                  .remove(&hash);
             }
         }
         // TODO: destruct/construct structure HeightState instead of call clear
@@ -692,18 +695,22 @@ impl State {
                 full_proposes.push((*propose_hash, propose_state.message().round()));
             }
         }
-
-        if self.transactions.len() >= self.tx_pool_capacity {
+        let tx_pool_len = self.transactions.read()
+                  .expect("Expected read lock").len();
+        if tx_pool_len >= self.tx_pool_capacity {
             // but make warn about pool exceeded, even if we should add tx
             warn!("Too many transactions in pool, txs={}, high_priority={}",
-                  self.transactions.len(),
+                  tx_pool_len,
                   high_priority_tx);
             if !high_priority_tx {
                 return full_proposes;
             }
         }
 
-        self.transactions.insert(tx_hash, msg);
+        self.transactions
+            .write()
+            .expect("Expected read lock")
+            .insert(tx_hash, msg);
 
         full_proposes
     }
@@ -756,7 +763,8 @@ impl State {
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
     pub fn add_propose(&mut self, msg: Propose) -> Option<&ProposeState> {
         let propose_hash = msg.hash();
-        let txs = &self.transactions;
+        let txs = &self.transactions.read()
+                  .expect("Expected read lock");
         match self.proposes.entry(propose_hash) {
             Entry::Occupied(..) => None,
             Entry::Vacant(e) => {

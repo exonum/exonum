@@ -208,9 +208,9 @@ fn test_store_txs_positions() {
         .take(num_txs)
         .map(|tx| (tx.hash(), tx.raw().clone()))
         .collect::<BTreeMap<Hash, RawMessage>>();
-    let hashes = committed_block1.keys().collect::<Vec<_>>();
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
+    let hashes =
+        add_one_height_with_transactions(&sandbox, &sandbox_state, committed_block1.values());
     sandbox.assert_state(committed_height + 1, ROUND_ONE);
 
     let snapshot = sandbox.blockchain_ref().snapshot();

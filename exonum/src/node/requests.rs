@@ -62,6 +62,8 @@ impl<S> NodeHandler<S>
         for hash in msg.txs() {
             let tx = self.state
                 .transactions()
+                .read()
+                .expect("Expected read lock")
                 .get(hash)
                 .map(|tx| tx.raw())
                 .cloned()

@@ -18,9 +18,11 @@ pub struct ExplorerApi {
 }
 
 impl ExplorerApi {
-    pub fn new(blockchain: Blockchain) -> ExplorerApi {
+    pub fn new(
+        blockchain: Blockchain
+    ) -> ExplorerApi {
         ExplorerApi {
-            blockchain: blockchain
+            blockchain,
         }
     }
 
@@ -105,4 +107,5 @@ impl Api for ExplorerApi {
         router.get("/v1/blocks/:height", block, "height");
         router.get("/v1/transactions/:hash", transaction, "hash");
     }
+    
 }

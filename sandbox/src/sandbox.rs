@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, BinaryHeap, HashSet, HashMap};
+use std::collections::{VecDeque, BinaryHeap, HashSet, BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::cell::{RefCell, Ref, RefMut};
 use std::sync::{Arc, Mutex};
@@ -8,9 +8,9 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage,
                    ListenerConfig, ServiceConfig};
-use exonum::node::state::{Round, Height, TxPool};
+use exonum::node::state::{Round, Height};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service, ValidatorKeys};
+                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState};
 use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
@@ -289,8 +289,9 @@ impl Sandbox {
     }
 
     pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
-        RefMut::map(self.reactor.borrow_mut(),
-                    |reactor| &mut reactor.handler.blockchain)
+        RefMut::map(self.reactor.borrow_mut(), |reactor| {
+            &mut reactor.handler.blockchain
+        })
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -453,7 +454,7 @@ impl Sandbox {
     {
         let blockchain = &self.reactor.borrow().handler.blockchain;
         let (hashes, tx_pool) = {
-            let mut pool = TxPool::new();
+            let mut pool = BTreeMap::new();
             let mut hashes = Vec::new();
             for raw in txs {
                 let tx = blockchain.tx_from_raw(raw.clone()).unwrap();
@@ -508,14 +509,13 @@ impl Sandbox {
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        self.reactor
-            .borrow()
-            .handler
+        let b = self.reactor.borrow();
+        let rlock = b.handler
             .state()
             .transactions()
-            .keys()
-            .cloned()
-            .collect()
+            .read()
+            .expect("Expected read lock");
+        rlock.keys().cloned().collect()
     }
 
     pub fn current_round(&self) -> Round {
@@ -646,7 +646,11 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
                                     }));
 
     let channel = SandboxChannel { inner: inner.clone() };
-    let node = NodeHandler::new(blockchain.clone(), addresses[0], channel, config.clone());
+    let node = NodeHandler::new(blockchain.clone(),
+                                addresses[0],
+                                channel,
+                                config.clone(),
+                                SharedNodeState::new(5000));
 
     let mut reactor = SandboxReactor {
         inner: inner.clone(),
