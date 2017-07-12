@@ -1,4 +1,4 @@
-# minibank
+# Cryptocurrency (demo)
 
 Minimal blockchain example.
 
@@ -17,8 +17,8 @@ To build and run a single node use:
 
 ```sh
 # clone the repository with blockchain node
-git clone git@github.com:exonum/minibank.git
-cd minibank
+git clone git@github.com:exonum/cryptocurrency.git
+cd cryptocurrency
 
 # build and run
 cargo run
