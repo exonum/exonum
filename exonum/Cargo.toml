@@ -1,7 +1,17 @@
 [package]
 name = "exonum"
 version = "0.1.0"
-authors = ["Exonum Team <exonum@bitfury.com>"]
+authors = ["The Exonum Team <exonum@bitfury.com>"]
+homepage = "https://exonum.com/"
+repository = "https://github.com/exonum/exonum"
+documentation = "https://docs.rs/exonum"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["database", "distributed", "crypto", "blockchain", "framework", "exonum"]
+categories = ["cryptography", "database-implementations"]
+description = """
+An extensible framework for blockchain software projects.
+"""
 
 [dependencies]
 log = "0.3.0"
