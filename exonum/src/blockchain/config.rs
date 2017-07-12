@@ -128,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Duplicated validator keys are found")]
+    #[should_panic(expected = "Duplicated keys are found")]
     fn stored_configuration_duplicated_keys() {
         let mut configuration = create_test_configuration();
         configuration.validator_keys.push(ValidatorKeys {
