@@ -1,5 +1,3 @@
-use serde_json::Value;
-
 use std::cmp;
 
 use storage::ListProof;
@@ -23,7 +21,6 @@ pub struct BlockInfo {
 
 #[derive(Debug, Serialize)]
 pub struct TxInfo {
-    content: Value,
     location: TxLocation,
     proof_to_block_merkle_root: ListProof<Hash>,
 }
@@ -38,35 +35,23 @@ impl<'a> BlockchainExplorer<'a> {
         let snapshot = b.snapshot();
         let schema = Schema::new(&snapshot);
         let tx = schema.transactions().get(tx_hash);
-        let res = match tx {
-            None => None,
-            Some(raw_tx) => {
-                let box_transaction = self.blockchain
-                    .tx_from_raw(raw_tx.clone())
-                    .ok_or_else(|| {
-                                    ApiError::Service(format!("Service not found for tx: {:?}",
-                                                              raw_tx)
-                                                              .into())
-                                })?;
-                let content = box_transaction.info();
+        if tx.is_some() {
+            let location = schema
+                .tx_location_by_tx_hash()
+                .get(tx_hash)
+                .expect(&format!("Not found tx_hash location: {:?}", tx_hash));
 
-                let location = schema
-                    .tx_location_by_tx_hash()
-                    .get(tx_hash)
-                    .expect(&format!("Not found tx_hash location: {:?}", tx_hash));
-
-                let block_height = location.block_height();
-                let tx_index = location.position_in_block();
-                let proof = schema.block_txs(block_height).get_proof(tx_index);
-                let tx_info = TxInfo {
-                    content: content,
-                    location: location,
-                    proof_to_block_merkle_root: proof,
-                };
-                Some(tx_info)
-            }
-        };
-        Ok(res)
+            let block_height = location.block_height();
+            let tx_index = location.position_in_block();
+            let proof = schema.block_txs(block_height).get_proof(tx_index);
+            let tx_info = TxInfo {
+                location: location,
+                proof_to_block_merkle_root: proof,
+            };
+            Ok(Some(tx_info))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn block_info(&self, height: u64) -> Option<BlockInfo> {
