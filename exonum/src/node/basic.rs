@@ -10,7 +10,8 @@ use events::Channel;
 use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
 
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, raw: RawMessage) {
@@ -60,14 +61,19 @@ impl<S> NodeHandler<S>
         }
 
         if !self.state.whitelist().allow(message.pub_key()) {
-            error!("Received connect message from {:?} peer which not in whitelist.",
-                message.pub_key());
+            error!(
+                "Received connect message from {:?} peer which not in whitelist.",
+                message.pub_key()
+            );
             return;
         }
 
         let public_key = *message.pub_key();
         if !message.verify_signature(&public_key) {
-            error!("Received connect-message with incorrect signature, msg={:?}", message);
+            error!(
+                "Received connect-message with incorrect signature, msg={:?}",
+                message
+            );
             return;
         }
 
@@ -84,9 +90,11 @@ impl<S> NodeHandler<S>
                 return;
             }
         }
-        info!("Received Connect message from {}, {}",
-              address,
-              need_connect);
+        info!(
+            "Received Connect message from {}, {}",
+            address,
+            need_connect
+        );
         self.state.add_peer(public_key, message);
         if need_connect {
             // TODO: reduce double sending of connect message
@@ -99,10 +107,17 @@ impl<S> NodeHandler<S>
     /// message is higher than node's height.
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
-        trace!("HANDLE STATUS: current height = {}, msg height = {}", height, msg.height());
+        trace!(
+            "HANDLE STATUS: current height = {}, msg height = {}",
+            height,
+            msg.height()
+        );
 
         if !self.state.whitelist().allow(msg.from()) {
-            error!("Received status message from peer = {:?} which not in whitelist.", msg.from());
+            error!(
+                "Received status message from peer = {:?} which not in whitelist.",
+                msg.from()
+            );
             return;
         }
 
@@ -111,7 +126,10 @@ impl<S> NodeHandler<S>
             let peer = msg.from();
 
             if !msg.verify_signature(peer) {
-                error!("Received status message with incorrect signature, msg={:?}", msg);
+                error!(
+                    "Received status message with incorrect signature, msg={:?}",
+                    msg
+                );
                 return;
             }
 
@@ -129,7 +147,11 @@ impl<S> NodeHandler<S>
     /// Handles the `RequestPeers` message. Node sends `Connect` messages of other peers as result.
     pub fn handle_request_peers(&mut self, msg: RequestPeers) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
-        trace!("HANDLE REQUEST PEERS: Sending {:?} peers to {:?}", peers, msg.from());
+        trace!(
+            "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
+            peers,
+            msg.from()
+        );
 
         for peer in peers {
             self.send_to_peer(*msg.from(), peer.raw());
@@ -160,9 +182,11 @@ impl<S> NodeHandler<S>
                 .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
-            let msg = RequestPeers::new(self.state.consensus_public_key(),
-                                        peer.pub_key(),
-                                        self.state.consensus_secret_key());
+            let msg = RequestPeers::new(
+                self.state.consensus_public_key(),
+                peer.pub_key(),
+                self.state.consensus_secret_key(),
+            );
             trace!("Request peers from peer with addr {:?}", peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
@@ -178,10 +202,12 @@ impl<S> NodeHandler<S>
     /// Broadcasts the `Status` message to all peers.
     pub fn broadcast_status(&mut self) {
         let hash = self.blockchain.last_hash();
-        let status = Status::new(self.state.consensus_public_key(),
-                                 self.state.height(),
-                                 &hash,
-                                 self.state.consensus_secret_key());
+        let status = Status::new(
+            self.state.consensus_public_key(),
+            self.state.height(),
+            &hash,
+            self.state.consensus_secret_key(),
+        );
         trace!("Broadcast status: {:?}", status);
         self.broadcast(status.raw());
     }

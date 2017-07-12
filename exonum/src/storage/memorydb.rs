@@ -61,20 +61,18 @@ impl Snapshot for MemoryDB {
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         use std::collections::Bound::*;
         let range = (Included(from), Unbounded);
-        Box::new(MemoryDBIter { iter: self.map.range::<[u8], _>(range).peekable() })
+        Box::new(MemoryDBIter {
+            iter: self.map.range::<[u8], _>(range).peekable(),
+        })
     }
 }
 
 impl<'a> Iterator for MemoryDBIter<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter
-            .next()
-            .map(|(k, v)| (k.as_slice(), v.as_slice()))
+        self.iter.next().map(|(k, v)| (k.as_slice(), v.as_slice()))
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter
-            .peek()
-            .map(|&(k, v)| (k.as_slice(), v.as_slice()))
+        self.iter.peek().map(|&(k, v)| (k.as_slice(), v.as_slice()))
     }
 }

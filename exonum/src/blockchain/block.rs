@@ -47,13 +47,15 @@ mod tests {
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
-        let block = Block::new(SCHEMA_MAJOR_VERSION,
-                               proposer_id,
-                               height,
-                               tx_count,
-                               &prev_hash,
-                               &tx_hash,
-                               &state_hash);
+        let block = Block::new(
+            SCHEMA_MAJOR_VERSION,
+            proposer_id,
+            height,
+            tx_count,
+            &prev_hash,
+            &tx_hash,
+            &state_hash,
+        );
 
         assert_eq!(block.schema_version(), SCHEMA_MAJOR_VERSION);
         assert_eq!(block.proposer_id(), proposer_id);

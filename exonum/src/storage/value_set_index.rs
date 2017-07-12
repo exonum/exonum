@@ -59,8 +59,9 @@ impl<T, V> ValueSetIndex<T, V> {
 }
 
 impl<T, V> ValueSetIndex<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     /// Returns `true` if the set contains a value.
     pub fn contains(&self, item: &V) -> bool {
@@ -97,7 +98,8 @@ impl<T, V> ValueSetIndex<T, V>
 }
 
 impl<'a, V> ValueSetIndex<&'a mut Fork, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     /// Adds a value to the set.
     pub fn insert(&mut self, item: V) {
@@ -126,8 +128,9 @@ impl<'a, V> ValueSetIndex<&'a mut Fork, V>
 }
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     type Item = (Hash, V);
     type IntoIter = ValueSetIndexIter<'a, V>;
@@ -139,7 +142,8 @@ impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
 
 
 impl<'a, V> Iterator for ValueSetIndexIter<'a, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     type Item = (Hash, V);
 

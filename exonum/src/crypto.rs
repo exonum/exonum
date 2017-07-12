@@ -465,7 +465,9 @@ mod tests {
     fn test_range_sodium() {
         let h = hash(&[]);
         let sub_range = &h[10..20];
-        assert_eq!(&[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228],
-                   sub_range);
+        assert_eq!(
+            &[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228],
+            sub_range
+        );
     }
 }

@@ -19,7 +19,7 @@ impl Whitelist {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn allow(&self, peer: &PublicKey) -> bool {
         !self.whitelist_enabled || self.validators_list.contains(peer) ||
-        self.whitelisted_peers.contains(peer)
+            self.whitelisted_peers.contains(peer)
     }
 
     /// Adds peer to the whitelist.
@@ -37,7 +37,8 @@ impl Whitelist {
 
     /// Resets list of validators with the given public keys.
     pub fn set_validators<I>(&mut self, list: I)
-        where I: IntoIterator<Item = PublicKey>
+    where
+        I: IntoIterator<Item = PublicKey>,
     {
         self.validators_list = list.into_iter().collect();
     }
@@ -62,14 +63,18 @@ mod test {
         let mut rng = XorShiftRng::from_seed(source);
         (0..count)
             .into_iter()
-            .map(|_| PublicKey::from_slice(&<[u8;32] as Rand>::rand(&mut rng)).unwrap())
+            .map(|_| {
+                PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap()
+            })
             .collect()
     }
 
-    fn check_in_whitelist(whitelist: &Whitelist,
-                          keys: &[PublicKey],
-                          in_whitelist: &[usize],
-                          not_in_whitelist: &[usize]) {
+    fn check_in_whitelist(
+        whitelist: &Whitelist,
+        keys: &[PublicKey],
+        in_whitelist: &[usize],
+        not_in_whitelist: &[usize],
+    ) {
         for i in in_whitelist {
             assert_eq!(whitelist.allow(&keys[*i]), true);
         }

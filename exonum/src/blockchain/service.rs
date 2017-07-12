@@ -15,17 +15,17 @@ use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{Node, State, NodeChannel, ApiSender };
+use node::{Node, State, NodeChannel, ApiSender};
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
-/// A trait that describes transaction processing rules (a group of sequential operations 
+/// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
 pub trait Transaction: Message + 'static {
-    /// Verifies the transaction, which includes the message signature verification and other 
+    /// Verifies the transaction, which includes the message signature verification and other
     /// specific internal constraints. verify is intended to check the internal consistency of
     /// a transaction; it has no access to the blockchain state.
-    /// If a transaction fails verify, it is considered incorrect and cannot be included into 
+    /// If a transaction fails verify, it is considered incorrect and cannot be included into
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
@@ -37,7 +37,7 @@ pub trait Transaction: Message + 'static {
     ///
     /// - When programming `execute`, you should perform state-related checks before any changes
     /// to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a `panic`, the changes made by the 
+    /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
     fn execute(&self, fork: &mut Fork);
     /// Returns the useful information about the transaction in the JSON format.
@@ -81,7 +81,7 @@ pub trait Service: Send + Sync + 'static {
     /// For example service can create some transaction if the specific condition occurred.
     ///
     /// *Try not to perform long operations here*.
-    fn handle_commit(&self, context: &mut ServiceContext) { }
+    fn handle_commit(&self, context: &mut ServiceContext) {}
 
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
@@ -175,7 +175,12 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
 
 impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ServiceContext(state: {:?}, txs: {:?})", self.state, self.txs)
+        write!(
+            f,
+            "ServiceContext(state: {:?}, txs: {:?})",
+            self.state,
+            self.txs
+        )
     }
 }
 
@@ -202,7 +207,7 @@ pub struct SharedNodeState {
 
 impl SharedNodeState {
     /// Creates new `SharedNodeState`
-    pub fn new(state_update_timeout: Milliseconds ) -> SharedNodeState {
+    pub fn new(state_update_timeout: Milliseconds) -> SharedNodeState {
         SharedNodeState {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
             state_update_timeout,
@@ -211,38 +216,38 @@ impl SharedNodeState {
     /// Return list of connected sockets
     pub fn incoming_connections(&self) -> Vec<SocketAddr> {
         self.state
-             .read()
-             .expect("Expected read lock.")
-             .incoming_connections
-             .iter()
-             .cloned()
-             .collect()
+            .read()
+            .expect("Expected read lock.")
+            .incoming_connections
+            .iter()
+            .cloned()
+            .collect()
     }
     /// Return list of our connection sockets
     pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
         self.state
-             .read()
-             .expect("Expected read lock.")
-             .outgoing_connections
-             .iter()
-             .cloned()
-             .collect()
+            .read()
+            .expect("Expected read lock.")
+            .outgoing_connections
+            .iter()
+            .cloned()
+            .collect()
     }
     /// Return reconnects list
     pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
         self.state
-             .read()
-             .expect("Expected read lock.")
-             .reconnects_timeout
-             .iter()
-             .map(|(c,e)| (*c, *e))
-             .collect()
+            .read()
+            .expect("Expected read lock.")
+            .reconnects_timeout
+            .iter()
+            .map(|(c, e)| (*c, *e))
+            .collect()
     }
     /// Update internal state, from `Node` State`
     pub fn update_node_state(&self, _state: &State) {
         //FIXME: Before merge implement update code
     }
-    
+
     /// Returns value of the `state_update_timeout`.
     pub fn state_update_timeout(&self) -> Milliseconds {
         self.state_update_timeout
@@ -287,27 +292,23 @@ impl SharedNodeState {
     pub fn add_reconnect_timeout(
         &self,
         addr: SocketAddr,
-        timeout: Milliseconds
-    ) -> Option<Milliseconds>
-    {
+        timeout: Milliseconds,
+    ) -> Option<Milliseconds> {
         self.state
             .write()
             .expect("Expected write lock")
-            .reconnects_timeout.insert(addr, timeout)
+            .reconnects_timeout
+            .insert(addr, timeout)
     }
 
     /// Removes reconect timeout and returns the previous value.
-    pub fn remove_reconnect_timeout(
-        &self,
-        addr: &SocketAddr
-    ) -> Option<Milliseconds>
-    {
+    pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
         self.state
             .write()
             .expect("Expected write lock")
-            .reconnects_timeout.remove(addr)
+            .reconnects_timeout
+            .remove(addr)
     }
-
 }
 
 /// Provides the current node state to api handlers.
@@ -364,6 +365,11 @@ impl ApiContext {
 
 impl ::std::fmt::Debug for ApiContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ApiContext(blockchain: {:?}, public_key: {:?})", self.blockchain, self.public_key)
+        write!(
+            f,
+            "ApiContext(blockchain: {:?}, public_key: {:?})",
+            self.blockchain,
+            self.public_key
+        )
     }
 }
