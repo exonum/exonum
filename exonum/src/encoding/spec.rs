@@ -121,7 +121,7 @@ macro_rules! encoding_struct {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(unused_imports, unused_mut)]
 
-            /// Default constructor.
+            /// Creates a new instance with given parameters.
             pub fn new($($field_name: $field_type,)*) -> $name {
 
                 check_bounds!($body, $($field_name : $field_type [$from => $to],)*);

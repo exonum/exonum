@@ -138,7 +138,7 @@ macro_rules! message {
         }
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
-            /// Create messsage and sign it.
+            /// Creates messsage and sign it.
             #[allow(unused_mut)]
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
@@ -151,7 +151,7 @@ macro_rules! message {
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
 
-            /// Create message and append existing signature.
+            /// Creates message and appends existing signature.
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(dead_code, unused_mut)]
             pub fn new_with_signature($($field_name: $field_type,)*
@@ -180,13 +180,13 @@ macro_rules! message {
                 Ok(latest_segment)
             }
 
-            /// return message `message_id` useable for matching.
+            /// Returns `message_id` useable for matching.
             #[allow(dead_code)]
             pub fn message_id() -> u16 {
                 $id
             }
 
-            /// return message `service_id` useable for matching.
+            /// Returns `service_id` useable for matching.
             #[allow(dead_code)]
             pub fn service_id() -> u16 {
                 $extension
