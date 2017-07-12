@@ -82,7 +82,7 @@ fn main() {
 
     let app = App::new("Blockchain control utility")
         .version(env!("CARGO_PKG_VERSION"))
-        .author("Exonum Team <exonum@bitfury.com>")
+        .author("The Exonum Team <exonum@bitfury.com>")
         .about("Blockchain control utility")
         .subcommand(GenerateCommand::new())
         .subcommand(BlockchainCommand::new());

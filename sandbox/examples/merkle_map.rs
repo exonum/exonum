@@ -21,7 +21,7 @@ fn main() {
 
     let matches = clap_app!(merkle_map =>
         (version: "0.1")
-        (author: "Exonum Team <exonum@bitfury.com>")
+        (author: "The Exonum Team <exonum@bitfury.com>")
         (about: "Merkle map benchmarking tool")
         (@arg DIR: +required "Sets the input directory to use")
         (@arg count: -c --count +takes_value "Total amount of data items to write")
