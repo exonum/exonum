@@ -9,9 +9,10 @@ readme = "README.md"
 license = "Apache-2.0"
 keywords = ["database", "distributed", "crypto", "blockchain", "framework", "exonum"]
 categories = ["cryptography", "database-implementations"]
-description = """
-An extensible framework for blockchain software projects.
-"""
+description = "An extensible framework for blockchain software projects."
+
+[badges]
+travis-ci = { repository = "https://github.com/exonum/exonum" }
 
 [dependencies]
 log = "0.3.0"
