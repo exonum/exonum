@@ -1,2 +1,2 @@
-pub use self::system::SystemApi;
+pub use self::system::{SystemApi, NodeInfo};
 mod system;

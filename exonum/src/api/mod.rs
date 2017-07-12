@@ -20,7 +20,7 @@ use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
 use encoding::serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
 pub use self::explorer_api::ExplorerApi;
-pub use self::private::SystemApi;
+pub use self::private::{SystemApi, NodeInfo};
 
 #[derive(Debug)]
 pub enum ApiError {
