@@ -120,7 +120,8 @@ macro_rules! encoding_struct {
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(unused_imports, unused_mut)]
-            /// Create `$name`.
+
+            /// Creates a new instance with given parameters.
             pub fn new($($field_name: $field_type,)*) -> $name {
 
                 check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
@@ -129,7 +130,7 @@ macro_rules! encoding_struct {
                 $name { raw: buf }
             }
 
-            /// Hashes the `$name` as a raw byte array and returns the resulting hash.
+            /// Hashes data as a raw byte array and returns the resulting hash.
             pub fn hash(&self) -> $crate::crypto::Hash {
                 $crate::crypto::hash(self.raw.as_ref())
             }
