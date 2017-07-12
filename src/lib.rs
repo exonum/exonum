@@ -61,8 +61,6 @@
 //!     NodeBuilder::new()
 //!         .with_service::<ConfigurationService>()
 //!         .run();
-//!     exonum::crypto::init();
-//!     exonum::helpers::init_logger().unwrap();
 //! }
 //! ```
 
