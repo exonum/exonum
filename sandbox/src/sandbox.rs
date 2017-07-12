@@ -289,8 +289,9 @@ impl Sandbox {
     }
 
     pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
-        RefMut::map(self.reactor.borrow_mut(),
-                    |reactor| &mut reactor.handler.blockchain)
+        RefMut::map(self.reactor.borrow_mut(), |reactor| {
+            &mut reactor.handler.blockchain
+        })
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -508,16 +509,13 @@ impl Sandbox {
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        let b = self.reactor
-            .borrow();
+        let b = self.reactor.borrow();
         let rlock = b.handler
             .state()
             .transactions()
             .read()
             .expect("Expected read lock");
-            rlock.keys()
-            .cloned()
-            .collect()
+        rlock.keys().cloned().collect()
     }
 
     pub fn current_round(&self) -> Round {

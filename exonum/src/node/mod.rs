@@ -24,8 +24,7 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
 use blockchain::{SharedNodeState, Blockchain, Schema,
                     GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
-use explorer::ExplorerApi;
-use api::Api;
+use api::{Api, ExplorerApi, SystemApi};
 
 use self::timeout_adjuster::TimeoutAdjuster;
 
@@ -625,6 +624,13 @@ impl Node {
                 let api_context = ApiContext::new(self);
                 let mut mount = Mount::new();
                 mount.mount("api/services", api_context.mount_private_api());
+                
+                let pool = self.state().transactions().clone();
+                let shared_api_state = self.handler().api_state().clone();
+                let mut router = Router::new();
+                let system_api = SystemApi::new(blockchain.clone(), pool, shared_api_state, channel);
+                system_api.wire(&mut router);
+                mount.mount("api/system", router);
 
                 let thread = thread::spawn(move || {
                                                info!("Private exonum api started on {}",
@@ -643,11 +649,8 @@ impl Node {
                 mount.mount("api/services", api_context.mount_public_api());
 
                 if self.api_options.enable_blockchain_explorer {
-
-                    let pool = self.state().transactions().clone();
-                    let shared_api_state = self.handler().api_state().clone();
                     let mut router = Router::new();
-                    let explorer_api = ExplorerApi::new(blockchain, pool, shared_api_state, channel);
+                    let explorer_api = ExplorerApi::new(blockchain);
                     explorer_api.wire(&mut router);
                     mount.mount("api/explorer", router);
                 }

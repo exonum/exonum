@@ -115,7 +115,7 @@ impl<'a> BlockBuilder<'a> {
                    &self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
                    &self.tx_hash.unwrap_or_else(Hash::zero),
                    &self.state_hash
-                        .unwrap_or_else(|| self.sandbox.last_state_hash()))
+                       .unwrap_or_else(|| self.sandbox.last_state_hash()))
     }
 }
 
@@ -184,10 +184,9 @@ impl<'a> ProposeBuilder<'a> {
                      self.round.unwrap_or_else(|| self.sandbox.current_round()),
                      self.prev_hash.unwrap_or(&self.sandbox.last_hash()),
                      self.tx_hashes.unwrap_or(&[]),
-                     self.sandbox
-                         .s(self.validator_id
-                                .unwrap_or_else(|| self.sandbox.current_leader()) as
-                            usize))
+                     self.sandbox.s(self.validator_id
+                                        .unwrap_or_else(|| self.sandbox.current_leader()) as
+                                    usize))
     }
 }
 
@@ -282,7 +281,8 @@ pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxStat
 
 pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
                                                sandbox_state: &SandboxState,
-                                               txs: I) -> Vec<Hash>
+                                               txs: I)
+                                               -> Vec<Hash>
     where I: IntoIterator<Item = &'a RawTransaction>
 {
     // sort transaction in order accordingly their hashes
@@ -388,7 +388,8 @@ pub fn add_one_height_with_transactions<'a, I>(sandbox: &TimestampingSandbox,
 
 pub fn add_one_height_with_transactions_from_other_validator(sandbox: &TimestampingSandbox,
                                                              sandbox_state: &SandboxState,
-                                                             txs: &[RawTransaction]) -> Vec<Hash> {
+                                                             txs: &[RawTransaction])
+                                                             -> Vec<Hash> {
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
