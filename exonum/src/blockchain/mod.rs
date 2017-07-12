@@ -139,7 +139,7 @@ impl Blockchain {
             let mut fork = self.fork();
             // Update service tables
             for (_, service) in self.service_map.iter() {
-                let cfg = service.handle_genesis_block(&mut fork);
+                let cfg = service.initialize(&mut fork);
                 let name = service.service_name();
                 if config_propose.services.contains_key(name) {
                     panic!("Services have already contain service with name={}, please change it.",
