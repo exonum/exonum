@@ -32,8 +32,9 @@ impl<T, V> Entry<T, V> {
 }
 
 impl<T, V> Entry<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     /// Returns a value of the entry or `None` if does not exist.
     pub fn get(&self) -> Option<V> {
@@ -55,7 +56,8 @@ impl<T, V> Entry<T, V>
 }
 
 impl<'a, V> Entry<&'a mut Fork, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     /// Changes a value of the entry.
     pub fn set(&mut self, value: V) {

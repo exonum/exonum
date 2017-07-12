@@ -240,12 +240,14 @@ impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "DBKey(")?;
         for i in 0..self.len() {
-            write!(f,
-                   "{}",
-                   match self.get(i) {
-                       ChildKind::Left => '0',
-                       ChildKind::Right => '1',
-                   })?;
+            write!(
+                f,
+                "{}",
+                match self.get(i) {
+                    ChildKind::Left => '0',
+                    ChildKind::Right => '1',
+                }
+            )?;
         }
         write!(f, ")")
     }

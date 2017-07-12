@@ -36,9 +36,10 @@ impl TimestampingTxGenerator {
         TimestampingTxGenerator::with_keypair(data_size, keypair)
     }
 
-    pub fn with_keypair(data_size: usize,
-                        keypair: (PublicKey, SecretKey))
-                        -> TimestampingTxGenerator {
+    pub fn with_keypair(
+        data_size: usize,
+        keypair: (PublicKey, SecretKey),
+    ) -> TimestampingTxGenerator {
         let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
 
         TimestampingTxGenerator {
@@ -89,7 +90,9 @@ impl Service for TimestampingService {
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         if raw.message_type() != TIMESTAMPING_TRANSACTION_MESSAGE_ID {
-            return Err(MessageError::IncorrectMessageType { message_type: raw.message_type() });
+            return Err(MessageError::IncorrectMessageType {
+                message_type: raw.message_type(),
+            });
         }
 
         TimestampTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
