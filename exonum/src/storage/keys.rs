@@ -7,12 +7,12 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 ///
 /// Since internally the keys are sorted in a serialized form, the big-endian encoding is used.
 pub trait StorageKey {
-    /// Returns the size of serialized key in bytes.
+    /// Returns the size of the serialized key in bytes.
     fn size(&self) -> usize;
 
     /// Serialize a key into the specified buffer of bytes.
     ///
-    /// The size of the buffer is guaranteed equally to the precalculated size
+    /// The caller must guarantee that the size of the buffer is equally to the precalculated size
     /// of the serialized key.
     // TODO: should be unsafe?
     fn write(&self, buffer: &mut [u8]);

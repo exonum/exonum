@@ -5,7 +5,7 @@
 //! A [`Database`] is the underlying type for working with stored data. Internally `Database` is
 //! a key-value storage with reading isolation and atomic writing. This is an embedded database,
 //! which means that only the Exonum process can access it. You can interact with a `Database` from
-//! different threads by cloning it's instance.
+//! different threads by cloning its instance.
 //!
 //! Exonum provides two types of database: [`LevelDB`] and [`MemoryDB`]. However, you can make your
 //! own implementations of [`Database`] trait. See its documentation for more.
@@ -21,7 +21,7 @@
 //! is used as a storage view for creating read-only [indices] representation.
 //!
 //! If you need to make any changes to the data, you need to create a [`Fork`] using method
-//! [`fork`][2] of the `Database` instance. As well as `Snapshot`, `Fork` provides a read isolation
+//! [`fork`][2] of the `Database` instance. As well as `Snapshot`, `Fork` provides read isolation
 //! and also allows you to create a sequence of changes to the database that are specified
 //! as [`Patch`]. Later you can atomically merge a patch into the database using method [`merge`].
 //!

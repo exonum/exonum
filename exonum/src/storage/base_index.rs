@@ -83,8 +83,8 @@ impl<T> BaseIndex<T>
     }
 
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
-    /// type is *any* key-value pair. An argument `subprefix` allows to specify a subset of
-    /// iteration.
+    /// type is *any* key-value pair. An argument `subprefix` allows to specify a subset of keys
+    /// for iteration.
     pub fn iter<P, K, V>(&self, subprefix: &P) -> BaseIndexIter<K, V>
         where P: StorageKey,
               K: StorageKey,

@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
-/// A list of items that implements `StorageValue` trait.
+/// A list of items that implement `StorageValue` trait.
 ///
 /// `ListIndex` implements an array list, storing the element as values and using `u64` as an index.
 /// `ListIndex` requires that the elements implement the [`StorageValue`] trait.
@@ -142,7 +142,7 @@ impl<'a, V> ListIndex<&'a mut Fork, V>
         }
     }
 
-    /// Changes a value at specified position.
+    /// Changes a value at the specified position.
     ///
     /// # Panics
     /// Panics if `index` is equal or greater than the list's current length.

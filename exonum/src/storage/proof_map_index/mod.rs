@@ -1,4 +1,4 @@
-//! An implementation a Merklized version of a map (Merkle Patricia tree).
+//! An implementation of a Merklized version of a map (Merkle Patricia tree).
 use std::marker::PhantomData;
 
 use crypto::{hash, Hash};
@@ -17,7 +17,7 @@ mod key;
 mod node;
 mod proof;
 
-/// A Merkalized verison of a map that allows proofs of existence or non-existence for the map keys.
+/// A Merkalized version of a map that provides proofs of existence or non-existence for the map keys.
 ///
 /// `ProofMapIndex` implements a Merkle Patricia tree, storing the values as leaves.
 /// `ProofMapIndex` requires that the keys implement [`ProofMapKey`] and values implement the
@@ -207,7 +207,7 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         self.base.contains(&DBKey::leaf(key))
     }
 
-    /// Returns the proof of existence or non-existance for the specified key.
+    /// Returns the proof of existence or non-existence for the specified key.
     pub fn get_proof(&self, key: &K) -> MapProof<V> {
         let searched_slice = DBKey::leaf(key);
 

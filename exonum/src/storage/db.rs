@@ -13,7 +13,7 @@ pub type Patch = BTreeMap<Vec<u8>, Change>;
 /// A generalized iterator over the storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
 
-/// An enum that represents a kind of change of some key in storage.
+/// An enum that represents a kind of change to some key in storage.
 #[derive(Debug, Clone)]
 pub enum Change {
     /// Put the specified value into storage for a corresponding key.
@@ -25,7 +25,7 @@ pub enum Change {
 /// A combination of a database snapshot and a sequence of changes on top of it.
 ///
 /// A `Fork` provides both immutable and mutable operations over database. As well as [`Snapshot`],
-/// it provides a read isolation. When mutable operations ([`put`], [`remove`] and
+/// it provides read isolation. When mutable operations ([`put`], [`remove`] and
 /// [`remove_by_prefix`] methods) are performed for fork, the data is presented as if these changes
 /// are applied to the database. However, instead of applying changes directly to the database,
 /// fork only accumulates these changes in memory.
@@ -90,8 +90,8 @@ enum NextIterValue {
 /// if the data in the database changes between reads.
 ///
 /// If you need to make any changes to the data, you need to create a [`Fork`] using method
-/// [`fork`][2]. As well as `Snapshot`, `Fork` provides a read isolation and also allows you to create
-/// a sequence of changes to the database that are specified as [`Patch`]. Later you can atomically
+/// [`fork`][2]. As well as `Snapshot`, `Fork` provides read isolation and also allows you to create
+/// a sequence of changes to the database that are specified as a [`Patch`]. Later you can atomically
 /// merge a patch into the database using method [`merge`].
 ///
 /// [`clone`]: #tymethod.fork
@@ -128,14 +128,14 @@ pub trait Database: Send + Sync + 'static {
     ///
     /// # Errors
     /// If this method encounters any form of I/O or other error during merging, an error variant
-    /// will be returned. If an error is returned then it must be guaranteed that no changes were
-    /// applied.
+    /// will be returned. In case of an error the method guarantees no changes were applied to
+    /// the database.
     fn merge(&mut self, patch: Patch) -> Result<()>;
 }
 
 /// A trait that defines a snapshot of storage backend.
 ///
-/// `Snapshot` instance is immutable representation of storage state. It provides a read isolation,
+/// `Snapshot` instance is immutable representation of storage state. It provides read isolation,
 /// so using snapshot you are guaranteed to work with consistent values even if the data in
 /// the database changes between reads.
 ///
@@ -144,7 +144,7 @@ pub trait Database: Send + Sync + 'static {
 // TODO: should Snapshot be Send or Sync?
 pub trait Snapshot: 'static {
     /// Returns a value as raw vector of bytes corresponding to the specified key
-    /// or `None` if not exists.
+    /// or `None` if does not exist.
     fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
 
     /// Returns `true` if the snapshot contains a value for the specified key.
@@ -266,7 +266,7 @@ impl Fork {
         }
     }
 
-    /// Removes all keys started with specified prefix from the fork.
+    /// Removes all keys starting with the specified prefix from the fork.
     pub fn remove_by_prefix(&mut self, prefix: &[u8]) {
         // Remove changes
         let keys = self.changes

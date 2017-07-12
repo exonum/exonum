@@ -61,7 +61,7 @@ pub enum BranchProofNode<V> {
         /// A key of the right child.
         right_key: DBKey,
     },
-    /// A branch of proof in which left child may contains requested key.
+    /// A branch of proof in which left child may contains the requested key.
     LeftBranch {
         /// A left child node.
         left_hash: Box<ProofNode<V>>,
@@ -72,7 +72,7 @@ pub enum BranchProofNode<V> {
         /// A key of the right child.
         right_key: DBKey,
     },
-    /// A branch of proof in which right child may contains requested key.
+    /// A branch of proof in which right child may contains the requested key.
     RightBranch {
         /// A hash of the left child.
         left_hash: Hash,
@@ -251,7 +251,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
     /// Verifies the correctness of the proof by the trusted root hash and the requested key.
     ///
     /// If the proof is valid and the requested key exists, `Ok(Some(&V))` is returned.
-    /// If the proof is valid and the requested key not exists, `Ok(None)` is returned.
+    /// If the proof is valid and the requested key does not exists, `Ok(None)` is returned.
     /// If the proof is invalid, `Err` is returned.
     pub fn validate<K: ProofMapKey>(&self,
                                     key: &K,

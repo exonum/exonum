@@ -1,4 +1,4 @@
-//! An implementation of `MemoryDB` database.
+//! An implementation of `LevelDB` database.
 use profiler;
 
 use leveldb::database::Database as _LevelDB;
@@ -65,7 +65,7 @@ impl From<io::Error> for Error {
 impl LevelDB {
     /// Open a database stored in the specified path with the specified options.
     pub fn open<P: AsRef<Path>>(path: P, options: LevelDBOptions) -> Result<LevelDB> {
-        // TODO: configurate LRU cache
+        // TODO: configure LRU cache
         if options.create_if_missing {
             fs::create_dir_all(path.as_ref())?;
         }
