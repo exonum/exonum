@@ -59,10 +59,15 @@ struct PeersInfo {
 }
 
 #[derive(Serialize)]
+struct MemPoolTxInfo{
+    content: Value
+}
+
+#[derive(Serialize)]
 #[serde(tag = "type")]
 enum MemPoolResult {
     Unknown,
-    MemPool(Value),
+    MemPool(MemPoolTxInfo),
     Commited(TxInfo)
 }
 
@@ -137,7 +142,7 @@ impl SystemApi {
                                 .map_or(MemPoolResult::Unknown,
                                         MemPoolResult::Commited))
                 },
-                |o| Ok(MemPoolResult::MemPool(o.info())))
+                |o| Ok(MemPoolResult::MemPool(MemPoolTxInfo{content:o.info()})))
                         
     }
 
