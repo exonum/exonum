@@ -12,7 +12,7 @@ pub trait StorageKey {
 
     /// Serialize a key into the specified buffer of bytes.
     ///
-    /// The caller must guarantee that the size of the buffer is equally to the precalculated size
+    /// The caller must guarantee that the size of the buffer is equal to the precalculated size
     /// of the serialized key.
     // TODO: should be unsafe?
     fn write(&self, buffer: &mut [u8]);
