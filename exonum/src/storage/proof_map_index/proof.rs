@@ -28,48 +28,66 @@ impl Serialize for DBKey {
     }
 }
 
+/// An enum that represents a proof of existence or non-existence for a proof map key.
 pub enum MapProof<V> {
-    /// to match a leaf root with found key; (root_db_key= searched_db_key, value)
+    /// A boundary case with a single element tree and a matching key.
     LeafRootInclusive(DBKey, V),
-    /// to prove exclusion for a leaf root when root_db_key != searched db_key
+    /// A boundary case with a single element tree and a non-matching key
     LeafRootExclusive(DBKey, Hash),
+    /// A boundary case with empty tree.
     Empty,
+    /// A root branch of the tree.
     Branch(BranchProofNode<V>),
 }
 
+/// An enum that represents a node of the map proof.
 pub enum ProofNode<V> {
+    /// A branch of map proof.
     Branch(BranchProofNode<V>),
-    /// to prove inclusion of a value under searched_key below root level
+    /// A leaf of map proof with the value of the requested key.
     Leaf(V),
 }
 
+/// An enum that represents a branch node of the map proof.
 pub enum BranchProofNode<V> {
-    /// format: (left_hash, right_hash, left_slice_db_key, right_slice_db_key)
-    /// to prove exclusion for a branch with both child_key(s) != prefix(searched_key)
+    /// A branch of proof in which both children do not contain the requested key.
     BranchKeyNotFound {
+        /// A hash of the left child.
         left_hash: Hash,
+        /// A hash of the right child.
         right_hash: Hash,
+        /// A key of the left child.
         left_key: DBKey,
+        /// A key of the right child.
         right_key: DBKey,
     },
-    /// format: (proof, right_slice_hash, left_slice_db_key, right_slice_db_key)
+    /// A branch of proof in which left child may contains the requested key.
     LeftBranch {
+        /// A left child node.
         left_hash: Box<ProofNode<V>>,
+        /// A hash of the right child.
         right_hash: Hash,
+        /// A key of the left child.
         left_key: DBKey,
+        /// A key of the right child.
         right_key: DBKey,
     },
-    /// format: (left_slice_hash, proof, left_slice_db_key, right_slice_db_key)
+    /// A branch of proof in which right child may contains the requested key.
     RightBranch {
+        /// A hash of the left child.
         left_hash: Hash,
+        /// A right child node.
         right_hash: Box<ProofNode<V>>,
+        /// A key of the left child.
         left_key: DBKey,
+        /// A key of the right child.
         right_key: DBKey,
     },
 }
 
 impl<V: StorageValue> MapProof<V> {
-    pub fn compute_proof_root(&self) -> Hash {
+    /// Returns root hash of the map proof.
+    pub fn root_hash(&self) -> Hash {
         use self::MapProof::*;
         match *self {
             Empty => Hash::zero(),
@@ -79,22 +97,22 @@ impl<V: StorageValue> MapProof<V> {
             LeafRootExclusive(ref root_key, ref root_val_hash) => {
                 hash(&[&root_key.to_vec(), root_val_hash.as_ref()].concat())
             }
-            Branch(ref branch) => branch.compute_proof_root(),
+            Branch(ref branch) => branch.root_hash(),
         }
     }
 }
 impl<V: StorageValue> ProofNode<V> {
-    pub fn compute_proof_root(&self) -> Hash {
+    fn root_hash(&self) -> Hash {
         use self::ProofNode::*;
         match *self {
             Leaf(ref val) => val.hash(),
-            Branch(ref branch) => branch.compute_proof_root(),
+            Branch(ref branch) => branch.root_hash(),
         }
     }
 }
 
 impl<V: StorageValue> BranchProofNode<V> {
-    pub fn compute_proof_root(&self) -> Hash {
+    fn root_hash(&self) -> Hash {
         use self::BranchProofNode::*;
         match *self {
             BranchKeyNotFound {
@@ -116,7 +134,7 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                let full_slice = &[left_hash.compute_proof_root().as_ref(),
+                let full_slice = &[left_hash.root_hash().as_ref(),
                                    right_hash.as_ref(),
                                    &left_key.to_vec(),
                                    &right_key.to_vec()]
@@ -130,7 +148,7 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref right_key,
             } => {
                 let full_slice = &[left_hash.as_ref(),
-                                   right_hash.compute_proof_root().as_ref(),
+                                   right_hash.root_hash().as_ref(),
                                    &left_key.to_vec(),
                                    &right_key.to_vec()]
                                           .concat();
@@ -230,11 +248,16 @@ impl<V: Serialize> Serialize for ProofNode<V> {
 }
 
 impl<V: fmt::Debug + StorageValue> MapProof<V> {
-    pub fn verify_root_proof_consistency<K: ProofMapKey>(&self,
-                                                         searched_key: &K,
-                                                         root_hash: Hash)
-                                                         -> Result<Option<&V>, Error> {
-        let searched_slice = DBKey::leaf(searched_key);
+    /// Verifies the correctness of the proof by the trusted root hash and the requested key.
+    ///
+    /// If the proof is valid and the requested key exists, `Ok(Some(&V))` is returned.
+    /// If the proof is valid and the requested key does not exists, `Ok(None)` is returned.
+    /// If the proof is invalid, `Err` is returned.
+    pub fn validate<K: ProofMapKey>(&self,
+                                    key: &K,
+                                    root_hash: Hash)
+                                    -> Result<Option<&V>, Error> {
+        let searched_slice = DBKey::leaf(key);
         use self::MapProof::*;
 
         // if we inspect the topmost level of a proof
@@ -243,7 +266,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
             LeafRootInclusive(ref root_db_key, ref val) => {
                 let root_slice = root_db_key;
                 if root_slice != &searched_slice {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!("Proof is inconsistent with searched key: \
                                                    {:?}. Proof: {:?}. ",
                                                   searched_slice,
                                                   self)));
@@ -253,16 +276,16 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
             LeafRootExclusive(ref root_db_key, _) => {
                 let root_slice = root_db_key;
                 if root_slice == &searched_slice {
-                    return Err(Error::new(format!("Proof is inconsistent with searched_key: \
+                    return Err(Error::new(format!("Proof is inconsistent with searched key: \
                                                    {:?}. Proof: {:?} ",
                                                   searched_slice,
                                                   self)));
                 }
                 None
             }
-            Branch(ref branch) => branch.verify_root_proof_consistency(&searched_slice)?,
+            Branch(ref branch) => branch.validate(&searched_slice)?,
         };
-        let proof_hash = self.compute_proof_root();
+        let proof_hash = self.root_hash();
         if proof_hash != root_hash {
             return Err(Error::new(format!("The proof doesn't match the expected hash! \
                                            Expected: {:?} , from proof: {:?}",
@@ -274,7 +297,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
 }
 
 impl<V: fmt::Debug> BranchProofNode<V> {
-    fn verify_root_proof_consistency(&self, searched_slice: &DBKey) -> Result<Option<&V>, Error> {
+    fn validate(&self, searched_slice: &DBKey) -> Result<Option<&V>, Error> {
         use self::BranchProofNode::*;
 
         // if we inspect the topmost level of a proof
@@ -292,7 +315,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   self)));
                 }
                 proof
-                    .verify_proof_consistency(left_slice, searched_slice)?
+                    .validate_consistency(left_slice, searched_slice)?
             }
             RightBranch {
                 right_hash: ref proof,
@@ -307,7 +330,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   self)));
                 }
                 proof
-                    .verify_proof_consistency(right_slice, searched_slice)?
+                    .validate_consistency(right_slice, searched_slice)?
             }
             BranchKeyNotFound {
                 left_key: ref left_slice_key,
@@ -329,7 +352,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
         Ok(res)
     }
 
-    fn verify_proof_consistency<'a>(&'a self,
+    fn validate_consistency<'a>(&'a self,
                                     parent_slice: &DBKey,
                                     searched_slice: &DBKey)
                                     -> Result<Option<&'a V>, Error> {
@@ -361,7 +384,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   self)));
                 }
                 proof
-                    .verify_proof_consistency(&left_slice, searched_slice)?
+                    .validate_consistency(&left_slice, searched_slice)?
             }
             RightBranch {
                 right_hash: ref proof,
@@ -387,7 +410,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                                                   self)));
                 }
                 proof
-                    .verify_proof_consistency(&right_slice, searched_slice)?
+                    .validate_consistency(&right_slice, searched_slice)?
             }
             BranchKeyNotFound {
                 left_key: ref left_slice_key,
@@ -419,10 +442,10 @@ impl<V: fmt::Debug> BranchProofNode<V> {
     }
 }
 impl<V: fmt::Debug> ProofNode<V> {
-    fn verify_proof_consistency<'a>(&'a self,
-                                    parent_slice: &DBKey,
-                                    searched_slice: &DBKey)
-                                    -> Result<Option<&'a V>, Error> {
+    fn validate_consistency<'a>(&'a self,
+                                parent_slice: &DBKey,
+                                searched_slice: &DBKey)
+                                -> Result<Option<&'a V>, Error> {
         use self::ProofNode::*;
 
         // if we inspect sub-proofs of a proof
@@ -438,7 +461,7 @@ impl<V: fmt::Debug> ProofNode<V> {
             }
             Branch(ref branch) => {
                 branch
-                    .verify_proof_consistency(parent_slice, searched_slice)?
+                    .validate_consistency(parent_slice, searched_slice)?
             }
         };
         Ok(res)
