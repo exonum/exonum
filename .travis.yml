@@ -24,7 +24,7 @@ script:
 - cargo fmt -p sandbox_tests -- --write-mode=diff
 - cd ..
 - cargo +$NIGHTLY_RUST clippy
-- cargo build --release 
+- cargo test
 - RUST_LOG=off cargo test --manifest-path sandbox_tests/Cargo.toml 
 notifications:
   slack:
