@@ -28,9 +28,9 @@
 /// }
 ///
 /// # fn main() {
-///     let (p, creators_key) = ::exonum::crypto::gen_keypair();
-/// #    let stucture = create_message(&creators_key);
-/// #    println!("Debug structure = {:?}", stucture);
+///     let (_, creators_key) = ::exonum::crypto::gen_keypair();
+/// #    let structure = create_message(&creators_key);
+/// #    println!("Debug structure = {:?}", structure);
 /// # }
 ///
 /// # fn create_message(creators_key: &::exonum::crypto::SecretKey) -> SendTwoInteger {
