@@ -6,11 +6,8 @@ use storage::ListProof;
 use crypto::Hash;
 use blockchain::{Schema, Blockchain, Block, TxLocation};
 use messages::Precommit;
+// TODO: if explorer is usable anywhere else, remove `ApiError` dependencies.
 use api::ApiError;
-
-pub use self::explorer_api::ExplorerApi;
-
-mod explorer_api;
 
 #[derive(Debug)]
 pub struct BlockchainExplorer<'a> {

@@ -21,10 +21,10 @@ use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
              MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
-use blockchain::{Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
+use blockchain::{SharedNodeState, Blockchain, Schema,
+                    GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
-use explorer::ExplorerApi;
-use api::Api;
+use api::{Api, ExplorerApi, SystemApi, NodeInfo};
 
 use self::timeout_adjuster::TimeoutAdjuster;
 
@@ -42,6 +42,8 @@ const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
+    /// Add new connection
+    PeerAdd(SocketAddr),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
 }
@@ -57,13 +59,15 @@ pub enum NodeTimeout {
     Request(RequestData, Option<PublicKey>),
     /// Propose timeout.
     Propose(Height, Round),
+    /// Update api shared state.
+    UpdateApiState,
     /// Exchange peers timeout.
     PeerExchange,
 }
 
 /// Transactions sender.
 #[derive(Clone)]
-pub struct TxSender<S>
+pub struct ApiSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     inner: S,
@@ -73,8 +77,11 @@ pub struct TxSender<S>
 pub struct NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
+
     /// State of the `NodeHandler`.
     pub state: State,
+    /// Shared api state
+    pub api_state: SharedNodeState,
     /// Channel for messages and timeouts.
     pub channel: S,
     /// Blockchain.
@@ -110,6 +117,8 @@ pub struct ListenerConfig {
 /// An api configuration options.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NodeApiConfig {
+    /// Timeout to update api state.
+    pub state_update_timeout: usize,
     /// Enable api endpoints for the `blockchain_explorer` on public api address.
     pub enable_blockchain_explorer: bool,
     /// Listen address for public api endpoints.
@@ -121,6 +130,7 @@ pub struct NodeApiConfig {
 impl Default for NodeApiConfig {
     fn default() -> NodeApiConfig {
         NodeApiConfig {
+            state_update_timeout: 10000,
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
@@ -209,7 +219,14 @@ impl<S> NodeHandler<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     /// Creates `NodeHandler` using specified `Configuration`.
-    pub fn new(blockchain: Blockchain, external_address: SocketAddr, sender: S, config: Configuration) -> Self {
+    pub fn new(
+        blockchain: Blockchain,
+        external_address: SocketAddr,
+        sender: S,
+        config: Configuration,
+        api_state: SharedNodeState,
+        ) -> Self
+    {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -252,13 +269,20 @@ impl<S> NodeHandler<S>
         state.set_propose_timeout(timeout);
 
         NodeHandler {
-            state: state,
+            blockchain,
+            timeout_adjuster,
+            api_state,
+            state,
             channel: sender,
-            blockchain: blockchain,
             peer_discovery: config.peer_discovery,
-            timeout_adjuster: timeout_adjuster,
         }
     }
+
+    /// Return internal `SharedNodeState`
+    pub fn api_state(&self) -> &SharedNodeState {
+        &self.api_state
+    } 
+
 
     /// Sets new timeout adjuster.
     pub fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
@@ -313,6 +337,7 @@ impl<S> NodeHandler<S>
         self.add_round_timeout();
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
+        self.add_update_api_state_timeout();
     }
 
     /// Sends the given message to a peer by its id.
@@ -407,6 +432,13 @@ impl<S> NodeHandler<S>
         self.channel.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
+    /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
+    pub fn add_update_api_state_timeout(&mut self) {
+        let time = self.channel.get_time() + 
+                Duration::from_millis(self.api_state().state_update_timeout());
+        self.channel.add_timeout(NodeTimeout::UpdateApiState, time);
+    }
+
     /// Returns hash of the last block.
     pub fn last_block_hash(&self) -> Hash {
         self.blockchain.last_block().hash()
@@ -439,6 +471,10 @@ impl<S> EventHandler for NodeHandler<S>
             ExternalMessage::Transaction(tx) => {
                 self.handle_incoming_tx(tx);
             }
+            ExternalMessage::PeerAdd(address) => {
+                info!("Send Connect message to {}", address);
+                self.connect(&address);
+            }
         }
     }
 
@@ -448,6 +484,7 @@ impl<S> EventHandler for NodeHandler<S>
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
             NodeTimeout::Status(height) => self.handle_status_timeout(height),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
+            NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
             NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
         }
     }
@@ -462,23 +499,29 @@ impl<S> fmt::Debug for NodeHandler<S>
     }
 }
 
-/// `TransactionSend` represents interface for sending transactions. For details see `TxSender`
+/// `TransactionSend` represents interface for sending transactions. For details see `ApiSender`
 /// implementation.
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
     fn send(&self, tx: Box<Transaction>) -> EventsResult<()>;
 }
 
-impl<S> TxSender<S>
+impl<S> ApiSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
-    /// Creates new `TxSender` with given channel.
-    pub fn new(inner: S) -> TxSender<S> {
-        TxSender { inner: inner }
+    /// Creates new `ApiSender` with given channel.
+    pub fn new(inner: S) -> ApiSender<S> {
+        ApiSender { inner: inner }
+    }
+
+    /// Addr peer to peer list
+    pub fn peer_add(&self, addr: SocketAddr) -> EventsResult<()> {
+        let msg = ExternalMessage::PeerAdd(addr);
+        self.inner.post_event(msg)
     }
 }
 
-impl<S> TransactionSend for TxSender<S>
+impl<S> TransactionSend for ApiSender<S>
     where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
 {
     fn send(&self, tx: Box<Transaction>) -> EventsResult<()> {
@@ -490,10 +533,10 @@ impl<S> TransactionSend for TxSender<S>
     }
 }
 
-impl<T> fmt::Debug for TxSender<T>
+impl<T> fmt::Debug for ApiSender<T>
     where T: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("TxSender { .. }")
+        f.pad("ApiSender { .. }")
     }
 }
 
@@ -540,11 +583,19 @@ impl Node {
             warn!("Could not find 'external_address' in the config, using 'listen_address'");
             node_cfg.listen_address
         };
-
-        let network = Network::with_config(node_cfg.listen_address, config.network);
+        let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
+        let network = Network::with_config(
+                        node_cfg.listen_address,
+                        config.network,
+                        api_state.clone()
+                    );
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
-        let worker = NodeHandler::new(blockchain, external_address, channel, config);
+        let worker = NodeHandler::new(blockchain,
+                                        external_address,
+                                        channel,
+                                        config,
+                                        api_state);
         Node {
             reactor: Events::with_event_loop(network, worker, event_loop),
             api_options: node_cfg.api,
@@ -566,12 +617,21 @@ impl Node {
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(&mut self) -> io::Result<()> {
         let blockchain = self.handler().blockchain.clone();
+        let channel = self.channel();
 
         let private_config_api_thread = match self.api_options.private_api_address {
             Some(listen_address) => {
                 let api_context = ApiContext::new(self);
                 let mut mount = Mount::new();
                 mount.mount("api/services", api_context.mount_private_api());
+                
+                let pool = self.state().transactions().clone();
+                let shared_api_state = self.handler().api_state().clone();
+                let mut router = Router::new();
+                let node_info = NodeInfo::new(blockchain.service_map().iter().map(|(_,s)|s));
+                let system_api = SystemApi::new(node_info, blockchain.clone(), pool, shared_api_state, channel);
+                system_api.wire(&mut router);
+                mount.mount("api/system", router);
 
                 let thread = thread::spawn(move || {
                                                info!("Private exonum api started on {}",
@@ -631,7 +691,7 @@ impl Node {
     }
 
     /// Returns channel.
-    pub fn channel(&self) -> TxSender<NodeChannel> {
-        TxSender::new(self.reactor.handler().channel.clone())
+    pub fn channel(&self) -> ApiSender<NodeChannel> {
+        ApiSender::new(self.reactor.handler().channel.clone())
     }
 }

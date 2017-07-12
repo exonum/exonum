@@ -6,12 +6,16 @@ use iron::Handler;
 use mount::Mount;
 
 use std::fmt;
+use std::sync::{Arc, RwLock};
+use std::collections::{HashSet, HashMap};
+use std::net::SocketAddr;
 
+use events::Milliseconds;
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{Node, State, NodeChannel, TxSender};
+use node::{Node, State, NodeChannel, ApiSender };
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
@@ -175,10 +179,141 @@ impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct ApiNodeState {
+    incoming_connections: HashSet<SocketAddr>,
+    outgoing_connections: HashSet<SocketAddr>,
+    reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
+}
+impl ApiNodeState {
+    fn new() -> ApiNodeState {
+        Self::default()
+    }
+}
+
+/// Shared part of the context, used to take some values from the `Node`s `State`
+/// should be used to take some metrics.
+#[derive(Clone, Debug)]
+pub struct SharedNodeState {
+    state: Arc<RwLock<ApiNodeState>>,
+    /// Timeout to update api state.
+    pub state_update_timeout: Milliseconds,
+}
+
+impl SharedNodeState {
+    /// Creates new `SharedNodeState`
+    pub fn new(state_update_timeout: Milliseconds ) -> SharedNodeState {
+        SharedNodeState {
+            state: Arc::new(RwLock::new(ApiNodeState::new())),
+            state_update_timeout,
+        }
+    }
+    /// Return list of connected sockets
+    pub fn incoming_connections(&self) -> Vec<SocketAddr> {
+        self.state
+             .read()
+             .expect("Expected read lock.")
+             .incoming_connections
+             .iter()
+             .cloned()
+             .collect()
+    }
+    /// Return list of our connection sockets
+    pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
+        self.state
+             .read()
+             .expect("Expected read lock.")
+             .outgoing_connections
+             .iter()
+             .cloned()
+             .collect()
+    }
+    /// Return reconnects list
+    pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
+        self.state
+             .read()
+             .expect("Expected read lock.")
+             .reconnects_timeout
+             .iter()
+             .map(|(c,e)| (*c, *e))
+             .collect()
+    }
+    /// Update internal state, from `Node` State`
+    pub fn update_node_state(&self, _state: &State) {
+        //FIXME: Before merge implement update code
+    }
+    
+    /// Returns value of the `state_update_timeout`.
+    pub fn state_update_timeout(&self) -> Milliseconds {
+        self.state_update_timeout
+    }
+
+    /// add incomming connection into state
+    pub fn add_incoming_connection(&self, addr: SocketAddr) {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .incoming_connections
+            .insert(addr);
+    }
+    /// add outgoing connection into state
+    pub fn add_outgoing_connection(&self, addr: SocketAddr) {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .outgoing_connections
+            .insert(addr);
+    }
+
+    /// remove incomming connection from state
+    pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .incoming_connections
+            .remove(addr)
+    }
+
+    /// remove outgoing connection from state
+    pub fn remove_outgoing_connection(&self, addr: &SocketAddr) -> bool {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .outgoing_connections
+            .remove(addr)
+    }
+
+    /// Add reconect timeout
+    pub fn add_reconnect_timeout(
+        &self,
+        addr: SocketAddr,
+        timeout: Milliseconds
+    ) -> Option<Milliseconds>
+    {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .reconnects_timeout.insert(addr, timeout)
+    }
+
+    /// Removes reconect timeout and returns the previous value.
+    pub fn remove_reconnect_timeout(
+        &self,
+        addr: &SocketAddr
+    ) -> Option<Milliseconds>
+    {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .reconnects_timeout.remove(addr)
+    }
+
+}
+
 /// Provides the current node state to api handlers.
 pub struct ApiContext {
     blockchain: Blockchain,
-    node_channel: TxSender<NodeChannel>,
+    node_channel: ApiSender<NodeChannel>,
     public_key: PublicKey,
     secret_key: SecretKey,
 }
@@ -202,7 +337,7 @@ impl ApiContext {
     }
 
     /// Returns reference to the transaction sender.
-    pub fn node_channel(&self) -> &TxSender<NodeChannel> {
+    pub fn node_channel(&self) -> &ApiSender<NodeChannel> {
         &self.node_channel
     }
 

@@ -7,6 +7,7 @@ use std::collections::VecDeque;
 use std::time::{SystemTime, Duration};
 
 use messages::{MessageWriter, RawMessage};
+use blockchain::SharedNodeState;
 use crypto::gen_keypair;
 use super::{Events, Reactor, Event, InternalEvent, Channel, Network, NetworkConfiguration,
             EventHandler};
@@ -72,7 +73,7 @@ impl TestEvents {
                                                tcp_keep_alive: Some(1),
                                                tcp_reconnect_timeout: 1000,
                                                tcp_reconnect_timeout_max: 600000,
-                                           });
+                                           }, SharedNodeState::new(0));
         let handler = TestHandler::new();
 
         TestEvents(Events::new(network, handler).unwrap())
