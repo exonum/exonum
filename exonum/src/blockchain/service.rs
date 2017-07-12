@@ -238,7 +238,7 @@ impl SharedNodeState {
              .expect("Expected read lock.")
              .reconnects_timeout
              .iter()
-             .map(|(c,e)| (c.clone(), e.clone()))
+             .map(|(c,e)| (*c, *e))
              .collect()
     }
     /// Update internal state, from `Node` State`

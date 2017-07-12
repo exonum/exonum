@@ -19,6 +19,8 @@ use events::Error as EventsError;
 use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
 use encoding::serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
+pub use self::explorer_api::ExplorerApi;
+pub use self::private::SystemApi;
 
 #[derive(Debug)]
 pub enum ApiError {
@@ -34,6 +36,7 @@ pub enum ApiError {
     IncorrectRequest(Box<::std::error::Error + Send + Sync>),
     Unauthorized,
     AddressParseError(::std::net::AddrParseError),
+    
 }
 
 impl fmt::Display for ApiError {
@@ -223,39 +226,8 @@ pub trait Api {
     fn wire<'b>(&self, router: &'b mut Router);
 }
 
+mod explorer_api;
+mod private;
+
 #[cfg(test)]
-mod tests {
-    use router::Router;
-    use serde_json;
-
-    use blockchain::{Block, SCHEMA_MAJOR_VERSION};
-    use crypto::Hash;
-
-    use super::*;
-
-    #[test]
-    fn test_json_response_for_complex_val() {
-        let str_val = "sghdkgskgskldghshgsd";
-        let txs = [34, 32];
-        let tx_count = txs.len() as u32;
-        let complex_val = Block::new(SCHEMA_MAJOR_VERSION,
-                                     0,
-                                     24,
-                                     tx_count,
-                                     &Hash::new([24; 32]),
-                                     &Hash::new([34; 32]),
-                                     &Hash::new([38; 32]));
-        struct SampleAPI;
-        impl Api for SampleAPI {
-            fn wire<'b>(&self, _: &'b mut Router) {
-                return;
-            }
-        }
-        let stub = SampleAPI;
-        let result = stub.ok_response(&serde_json::to_value(str_val).unwrap());
-        assert!(result.is_ok());
-        let result = stub.ok_response(&serde_json::to_value(&complex_val).unwrap());
-        assert!(result.is_ok());
-        print!("{:?}", result);
-    }
-}
+mod tests;
