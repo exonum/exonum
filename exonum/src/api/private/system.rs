@@ -20,7 +20,7 @@ struct ServiceInfo {
     id: u16,
 }
 
-/// `DTO` used to transfer information about node
+/// `DTO` is used to transfer information about node.
 #[derive(Serialize, Clone, Debug)]
 pub struct NodeInfo {
     network_id: u8,
@@ -29,7 +29,7 @@ pub struct NodeInfo {
 }
 
 impl NodeInfo {
-    /// Create new `NodeInfo`, from services list.
+    /// Creates new `NodeInfo`, from services list.
     pub fn new<'a, I>(services: I) -> NodeInfo 
     where I: IntoIterator<Item = &'a Box<Service>>,
     {
@@ -86,7 +86,7 @@ pub struct SystemApi {
 }
 
 impl SystemApi {
-    /// Create new `SystemApi`, from `ApiContext`
+    /// Creates new `SystemApi`, from `ApiContext`
     pub fn new(
         info: NodeInfo,
         blockchain: Blockchain,
@@ -110,9 +110,9 @@ impl SystemApi {
     fn get_peers_info(&self) -> PeersInfo {
         PeersInfo{
             incoming_connections: self.shared_api_state
-                                      .in_connections(),
+                                      .incoming_connections(),
             outgoing_connections: self.shared_api_state
-                                      .out_connections(),
+                                      .outgoing_connections(),
             reconnects: self.shared_api_state
                             .reconnects_timeout()
                             .into_iter()

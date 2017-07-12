@@ -8,6 +8,7 @@ service_secret_key = "422acb782a4430c7dd982f73b88c29f03440248a010119410c7f522871
 
 [api]
 enable_blockchain_explorer = true
+state_update_timeout = 10000
 [[genesis.validator_keys]]
 consensus_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
 service_key = "523ead8ea8457de570e165a512dd5d1b6688cb5757c3d744e03d1173f3e3e237"
