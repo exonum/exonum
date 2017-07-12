@@ -22,7 +22,8 @@ use storage::Snapshot;
 /// impl TimeoutAdjuster for CustomAdjuster {
 ///     fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
 ///         // Simply increase propose time after empty blocks.
-///         if state.transactions().is_empty() {
+///         if state.transactions()
+///                 .read().expect("Expected read lock").is_empty() {
 ///             1000
 ///         } else {
 ///             200

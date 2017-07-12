@@ -5,13 +5,10 @@ use serde_json::Value;
 use iron::Handler;
 use mount::Mount;
 
-<<<<<<< HEAD
 use std::fmt;
-=======
 use std::sync::{Arc, RwLock};
 use std::collections::{HashSet, HashMap};
 use std::net::SocketAddr;
->>>>>>> add shared context and make txpool concurrent
 
 use events::Milliseconds;
 use crypto::{Hash, PublicKey, SecretKey};
@@ -184,8 +181,8 @@ impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
 
 #[derive(Debug, Default)]
 pub struct ApiNodeState {
-    in_connections: HashSet<SocketAddr>,
-    out_connections: HashSet<SocketAddr>,
+    incoming_connections: HashSet<SocketAddr>,
+    outgoing_connections: HashSet<SocketAddr>,
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
 }
 impl ApiNodeState {
@@ -194,7 +191,7 @@ impl ApiNodeState {
     }
 }
 
-/// Shared part of context, used to take some values from the `Node` `State`
+/// Shared part of the context, used to take some values from the `Node`s `State`
 /// should be used to take some metrics.
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
@@ -204,7 +201,7 @@ pub struct SharedNodeState {
 }
 
 impl SharedNodeState {
-    /// create new `SharedNodeState`
+    /// Creates new `SharedNodeState`
     pub fn new(state_update_timeout: Milliseconds ) -> SharedNodeState {
         SharedNodeState {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
@@ -212,26 +209,26 @@ impl SharedNodeState {
         }
     }
     /// Return list of connected sockets
-    pub fn in_connections(&self) -> Vec<SocketAddr> {
+    pub fn incoming_connections(&self) -> Vec<SocketAddr> {
         self.state
              .read()
              .expect("Expected read lock.")
-             .in_connections
+             .incoming_connections
              .iter()
              .cloned()
              .collect()
     }
     /// Return list of our connection sockets
-    pub fn out_connections(&self) -> Vec<SocketAddr> {
+    pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
         self.state
              .read()
              .expect("Expected read lock.")
-             .out_connections
+             .outgoing_connections
              .iter()
              .cloned()
              .collect()
     }
-    /// return reconnects list
+    /// Return reconnects list
     pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
         self.state
              .read()
@@ -256,7 +253,7 @@ impl SharedNodeState {
         self.state
             .write()
             .expect("Expected write lock")
-            .in_connections
+            .incoming_connections
             .insert(addr);
     }
     /// add outgoing connection into state
@@ -264,7 +261,7 @@ impl SharedNodeState {
         self.state
             .write()
             .expect("Expected write lock")
-            .out_connections
+            .outgoing_connections
             .insert(addr);
     }
 
@@ -273,7 +270,7 @@ impl SharedNodeState {
         self.state
             .write()
             .expect("Expected write lock")
-            .in_connections
+            .incoming_connections
             .remove(addr)
     }
 
@@ -282,7 +279,7 @@ impl SharedNodeState {
         self.state
             .write()
             .expect("Expected write lock")
-            .out_connections
+            .outgoing_connections
             .remove(addr)
     }
 
@@ -299,7 +296,7 @@ impl SharedNodeState {
             .reconnects_timeout.insert(addr, timeout)
     }
 
-    /// Remove reconect timeout
+    /// Removes reconect timeout and returns the previous value.
     pub fn remove_reconnect_timeout(
         &self,
         addr: &SocketAddr
