@@ -35,7 +35,7 @@ impl<T, V> Entry<T, V>
     where T: AsRef<Snapshot>,
           V: StorageValue
 {
-    /// Returns a value of the entry or `None` if not exists.
+    /// Returns a value of the entry or `None` if does not exist.
     pub fn get(&self) -> Option<V> {
         self.base.get(&())
     }
@@ -45,7 +45,7 @@ impl<T, V> Entry<T, V>
         self.base.contains(&())
     }
 
-    /// Returns hash of the entry or default hash value if not exists.
+    /// Returns hash of the entry or default hash value if does not exist.
     pub fn hash(&self) -> Hash {
         self.base
             .get::<(), V>(&())

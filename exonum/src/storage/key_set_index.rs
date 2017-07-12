@@ -1,11 +1,11 @@
-//! An implementation of set for items that implements `StorageKey` trait.
+//! An implementation of set for items that implement `StorageKey` trait.
 use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
 
-/// A set of items that implements `StorageKey` trait.
+/// A set of items that implement `StorageKey` trait.
 ///
-/// `KeySetIndex` implements a set, storing the element as keys with empty values.
+/// `KeySetIndex` implements a set, storing the elements as keys with empty values.
 /// `KeySetIndex` requires that the elements implement the [`StorageKey`] trait.
 /// [`StorageKey`]: ../trait.StorageKey.html
 #[derive(Debug)]

@@ -1,11 +1,11 @@
-//! An implementation of set for items that implements `StorageValue` trait.
+//! An implementation of set for items that implement `StorageValue` trait.
 use std::marker::PhantomData;
 
 use crypto::Hash;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
-/// A set of items that implements `StorageValue` trait.
+/// A set of items that implement `StorageValue` trait.
 ///
 /// `ValueSetIndex` implements a set, storing the element as values using its hash as a key.
 /// `ValueSetIndex` requires that the elements implement the [`StorageValue`] trait.

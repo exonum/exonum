@@ -1,4 +1,4 @@
-//! An implementation a Merklized version of an array list (Merkle tree).
+//! An implementation of a Merklized version of an array list (Merkle tree).
 use std::cell::Cell;
 use std::marker::PhantomData;
 
@@ -17,9 +17,9 @@ mod proof;
 
 // TODO: implement pop and truncate methods for Merkle tree
 
-/// A Merkalized verison of an array list that allows proofs of existence for the list items.
+/// A Merkalized version of an array list that provides proofs of existence for the list items.
 ///
-/// `ProofListIndex` implements a Merkle tree, storing the element as leaves and using `u64` as
+/// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
@@ -149,7 +149,7 @@ impl<T, V> ProofListIndex<T, V>
         self.get_branch(self.root_key()).unwrap_or_default()
     }
 
-    /// Returns the proof of existence for the list element at specified position.
+    /// Returns the proof of existence for the list element at the specified position.
     ///
     /// # Panics
     /// Panics if `index` is out of bounds.
@@ -163,7 +163,7 @@ impl<T, V> ProofListIndex<T, V>
         self.construct_proof(self.root_key(), index, index + 1)
     }
 
-    /// Returns the proof of existence for the list elements at specified range.
+    /// Returns the proof of existence for the list elements in the specified range.
     ///
     /// # Panics
     /// Panics if the range is out of bounds.
@@ -238,7 +238,7 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
         }
     }
 
-    /// Changes a value at specified position.
+    /// Changes a value at the specified position.
     ///
     /// # Panics
     /// Panics if `index` is equal or greater than the proof list's current length.
