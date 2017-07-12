@@ -11,8 +11,8 @@ mod tests {
     use test::Bencher;
     use rand::{SeedableRng, XorShiftRng, Rng};
     use tempdir::TempDir;
-    use exonum::storage::{ProofListIndex, ProofMapIndex, Database, MapIndex, Fork,
-                          MemoryDB, LevelDB, LevelDBOptions};
+    use exonum::storage::{ProofListIndex, ProofMapIndex, Database, MapIndex, Fork, MemoryDB,
+                          LevelDB, LevelDBOptions};
 
     fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
         let kv_generator = |_| {
@@ -51,8 +51,8 @@ mod tests {
         let map = MapIndex::new(vec![234], db);
         let table = ProofMapIndex::new(map);
         b.iter(|| for item in &data {
-                   table.put(&item.0, item.1.clone()).unwrap();
-               });
+            table.put(&item.0, item.1.clone()).unwrap();
+        });
     }
 
     fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: &T) {
@@ -95,8 +95,8 @@ mod tests {
         }
 
         b.iter(|| for item in &data {
-                   table.put(&item.0, item.1.clone()).unwrap();
-               });
+            table.put(&item.0, item.1.clone()).unwrap();
+        });
     }
 
     #[bench]

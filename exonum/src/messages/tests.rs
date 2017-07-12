@@ -11,4 +11,3 @@ fn test_message_without_fields() {
     }
     drop(NoFields::new(&SecretKey::new([1; 64])));
 }
-

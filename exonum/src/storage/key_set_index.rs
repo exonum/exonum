@@ -44,8 +44,9 @@ impl<T, K> KeySetIndex<T, K> {
 }
 
 impl<T, K> KeySetIndex<T, K>
-    where T: AsRef<Snapshot>,
-          K: StorageKey
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
 {
     /// Returns `true` if the set contains a value.
     pub fn contains(&self, item: &K) -> bool {
@@ -65,7 +66,8 @@ impl<T, K> KeySetIndex<T, K>
 }
 
 impl<'a, K> KeySetIndex<&'a mut Fork, K>
-    where K: StorageKey
+where
+    K: StorageKey,
 {
     /// Adds a value to the set.
     pub fn insert(&mut self, item: K) {
@@ -89,8 +91,9 @@ impl<'a, K> KeySetIndex<&'a mut Fork, K>
 }
 
 impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
-    where T: AsRef<Snapshot>,
-          K: StorageKey
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
 {
     type Item = K;
     type IntoIter = KeySetIndexIter<'a, K>;
@@ -101,7 +104,8 @@ impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
 }
 
 impl<'a, K> Iterator for KeySetIndexIter<'a, K>
-    where K: StorageKey
+where
+    K: StorageKey,
 {
     type Item = K;
 

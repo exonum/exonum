@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use super::Offset;
 
-#[derive( Debug)]
+#[derive(Debug)]
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
@@ -128,15 +128,13 @@ impl From<Box<StdError>> for Error {
     }
 }
 
-impl From<Cow<'static, str>> for Error
-{
+impl From<Cow<'static, str>> for Error {
     fn from(t: Cow<'static, str>) -> Error {
         Error::Basic(t)
     }
 }
 
-impl From<&'static str> for Error
-{
+impl From<&'static str> for Error {
     fn from(t: &'static str) -> Error {
         Error::Basic(t.into())
     }
