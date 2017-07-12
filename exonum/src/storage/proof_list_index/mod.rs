@@ -67,8 +67,9 @@ fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
 }
 
 impl<T, V> ProofListIndex<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     fn has_branch(&self, key: ProofListKey) -> bool {
         debug_assert!(key.height() > 0);
@@ -100,14 +101,20 @@ impl<T, V> ProofListIndex<T, V>
         }
         let middle = key.first_right_leaf_index();
         if to <= middle {
-            ListProof::Left(Box::new(self.construct_proof(key.left(), from, to)),
-                            self.get_branch(key.right()))
+            ListProof::Left(
+                Box::new(self.construct_proof(key.left(), from, to)),
+                self.get_branch(key.right()),
+            )
         } else if middle <= from {
-            ListProof::Right(self.get_branch_unchecked(key.left()),
-                             Box::new(self.construct_proof(key.right(), from, to)))
+            ListProof::Right(
+                self.get_branch_unchecked(key.left()),
+                Box::new(self.construct_proof(key.right(), from, to)),
+            )
         } else {
-            ListProof::Full(Box::new(self.construct_proof(key.left(), from, middle)),
-                            Box::new(self.construct_proof(key.right(), middle, to)))
+            ListProof::Full(
+                Box::new(self.construct_proof(key.left(), from, middle)),
+                Box::new(self.construct_proof(key.right(), middle, to)),
+            )
         }
     }
 
@@ -155,10 +162,12 @@ impl<T, V> ProofListIndex<T, V>
     /// Panics if `index` is out of bounds.
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
         if index >= self.len() {
-            panic!("index out of bounds: \
+            panic!(
+                "index out of bounds: \
                     the len is {} but the index is {}",
-                   self.len(),
-                   index);
+                self.len(),
+                index
+            );
         }
         self.construct_proof(self.root_key(), index, index + 1)
     }
@@ -169,16 +178,20 @@ impl<T, V> ProofListIndex<T, V>
     /// Panics if the range is out of bounds.
     pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
         if to > self.len() {
-            panic!("illegal range boundaries: \
+            panic!(
+                "illegal range boundaries: \
                     the len is {:?}, but the range end is {:?}",
-                   self.len(),
-                   to)
+                self.len(),
+                to
+            )
         }
         if to <= from {
-            panic!("illegal range boundaries: \
+            panic!(
+                "illegal range boundaries: \
                     the range start is {:?}, but the range end is {:?}",
-                   from,
-                   to)
+                from,
+                to
+            )
         }
 
         self.construct_proof(self.root_key(), from, to)
@@ -197,7 +210,8 @@ impl<T, V> ProofListIndex<T, V>
 }
 
 impl<'a, V> ProofListIndex<&'a mut Fork, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
@@ -221,8 +235,10 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
             let hash = if key.is_left() {
                 hash(self.get_branch_unchecked(key).as_ref())
             } else {
-                pair_hash(&self.get_branch_unchecked(key.as_left()),
-                          &self.get_branch_unchecked(key))
+                pair_hash(
+                    &self.get_branch_unchecked(key.as_left()),
+                    &self.get_branch_unchecked(key),
+                )
             };
             key = key.parent();
             self.set_branch(key, hash);
@@ -231,7 +247,8 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
 
     /// Extends the proof list with the contents of an iterator.
     pub fn extend<I>(&mut self, iter: I)
-        where I: IntoIterator<Item = V>
+    where
+        I: IntoIterator<Item = V>,
     {
         for value in iter {
             self.push(value)
@@ -244,10 +261,12 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
     /// Panics if `index` is equal or greater than the proof list's current length.
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
-            panic!("index out of bounds: \
+            panic!(
+                "index out of bounds: \
                     the len is {} but the index is {}",
-                   self.len(),
-                   index);
+                self.len(),
+                index
+            );
         }
         let mut key = ProofListKey::new(1, index);
         self.base.put(&key, value.hash());
@@ -255,8 +274,10 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
         while key.height() < self.height() {
             let (left, right) = (key.as_left(), key.as_right());
             let hash = if self.has_branch(right) {
-                pair_hash(&self.get_branch_unchecked(left),
-                          &self.get_branch_unchecked(right))
+                pair_hash(
+                    &self.get_branch_unchecked(left),
+                    &self.get_branch_unchecked(right),
+                )
             } else {
                 hash(self.get_branch_unchecked(left).as_ref())
             };
@@ -278,8 +299,9 @@ impl<'a, V> ProofListIndex<&'a mut Fork, V>
 }
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     type Item = V;
     type IntoIter = ProofListIndexIter<'a, V>;
@@ -290,7 +312,8 @@ impl<'a, T, V> ::std::iter::IntoIterator for &'a ProofListIndex<T, V>
 }
 
 impl<'a, V> Iterator for ProofListIndexIter<'a, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     type Item = V;
 

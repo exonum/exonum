@@ -26,11 +26,12 @@ pub trait Field<'a> {
     /// Checks if data in the buffer could be deserialized.
     /// Returns an index of latest data seen.
     #[allow(unused_variables)]
-    fn check(buffer: &'a [u8],
-             from: CheckedOffset,
-             to: CheckedOffset,
-             latest_segment: CheckedOffset)
-             -> ::std::result::Result<CheckedOffset, Error>;
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> ::std::result::Result<CheckedOffset, Error>;
 }
 
 /// implement field for all types that has writer and reader functions
@@ -131,19 +132,20 @@ impl<'a> Field<'a> for bool {
         buffer[from as usize] = if *self { 1 } else { 0 }
     }
 
-    fn check(buffer: &'a [u8],
-             from: CheckedOffset,
-             to: CheckedOffset,
-             latest_segment: CheckedOffset)
-             -> Result {
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
 
         let from: Offset = from.unchecked_offset();
         if buffer[from as usize] != 0 && buffer[from as usize] != 1 {
             Err(Error::IncorrectBoolean {
-                    position: from,
-                    value: buffer[from as usize],
-                })
+                position: from,
+                value: buffer[from as usize],
+            })
         } else {
             Ok(latest_segment)
         }
@@ -163,20 +165,19 @@ impl<'a> Field<'a> for u8 {
         buffer[from as usize] = *self;
     }
 
-    fn check(_: &'a [u8],
-             from: CheckedOffset,
-             to: CheckedOffset,
-             latest_segment: CheckedOffset)
-             -> Result {
+    fn check(
+        _: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         Ok(latest_segment)
     }
-
 }
 
 // TODO expect some codding of signed ints?
 impl<'a> Field<'a> for i8 {
-
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
     }
@@ -189,11 +190,12 @@ impl<'a> Field<'a> for i8 {
         buffer[from as usize] = *self as u8;
     }
 
-    fn check(_: &'a [u8],
-             from: CheckedOffset,
-             to: CheckedOffset,
-             latest_segment: CheckedOffset)
-             -> Result {
+    fn check(
+        _: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         Ok(latest_segment)
     }
@@ -217,9 +219,8 @@ impl<'a> Field<'a> for SystemTime {
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> SystemTime {
-        let secs = LittleEndian::read_u64(&buffer[from as usize .. from as usize + 8]);
-        let nanos = LittleEndian::read_u32(&buffer[from as usize + 8..
-                                            to as usize]);
+        let secs = LittleEndian::read_u64(&buffer[from as usize..from as usize + 8]);
+        let nanos = LittleEndian::read_u32(&buffer[from as usize + 8..to as usize]);
         UNIX_EPOCH + Duration::new(secs, nanos)
     }
 
@@ -227,23 +228,28 @@ impl<'a> Field<'a> for SystemTime {
         let duration = self.duration_since(UNIX_EPOCH).unwrap();
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
-        LittleEndian::write_u64(&mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
-                                secs);
-        LittleEndian::write_u32(&mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
-                                nanos);
+        LittleEndian::write_u64(
+            &mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
+            secs,
+        );
+        LittleEndian::write_u32(
+            &mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
+            nanos,
+        );
     }
 
-    fn check(_: &'a [u8],
-             from: CheckedOffset,
-             to: CheckedOffset,
-             latest_segment: CheckedOffset)
-             -> Result {
+    fn check(
+        _: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         Ok(latest_segment)
     }
 }
 
-// TODO add socketaddr check, for now with only ipv4 
+// TODO add socketaddr check, for now with only ipv4
 // all possible (>6 bytes long) sequences is a valid addr.
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
@@ -272,11 +278,12 @@ impl<'a> Field<'a> for SocketAddr {
         LittleEndian::write_u16(&mut buffer[to as usize - 2..to as usize], self.port());
     }
 
-    fn check(_: &'a [u8],
-             from: CheckedOffset,
-             to: CheckedOffset,
-             latest_segment: CheckedOffset)
-             -> Result {
+    fn check(
+        _: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         Ok(latest_segment)
     }

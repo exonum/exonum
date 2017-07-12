@@ -6,7 +6,7 @@ use router::Router;
 use iron::prelude::*;
 
 use params::{Params, Value as ParamsValue};
-use node::{NodeChannel, ApiSender };
+use node::{NodeChannel, ApiSender};
 use node::state::TxPool;
 use blockchain::{Service, Blockchain, SharedNodeState};
 use crypto::{Hash, HexValue};
@@ -25,21 +25,27 @@ struct ServiceInfo {
 pub struct NodeInfo {
     network_id: u8,
     protocol_version: u8,
-    services: Vec<ServiceInfo>
+    services: Vec<ServiceInfo>,
 }
 
 impl NodeInfo {
     /// Creates new `NodeInfo`, from services list.
-    pub fn new<'a, I>(services: I) -> NodeInfo 
-    where I: IntoIterator<Item = &'a Box<Service>>,
+    pub fn new<'a, I>(services: I) -> NodeInfo
+    where
+        I: IntoIterator<Item = &'a Box<Service>>,
     {
         NodeInfo {
             network_id: TEST_NETWORK_ID,
             protocol_version: PROTOCOL_MAJOR_VERSION,
-            services: services.into_iter().map(|s| ServiceInfo{
-                name: s.service_name().to_owned(),
-                id: s.service_id()
-            }).collect()
+            services: services
+                .into_iter()
+                .map(|s| {
+                    ServiceInfo {
+                        name: s.service_name().to_owned(),
+                        id: s.service_id(),
+                    }
+                })
+                .collect(),
         }
     }
 }
@@ -55,12 +61,12 @@ struct PeerInfo {
 struct PeersInfo {
     incoming_connections: Vec<SocketAddr>,
     outgoing_connections: Vec<SocketAddr>,
-    reconnects: Vec<PeerInfo>
+    reconnects: Vec<PeerInfo>,
 }
 
 #[derive(Serialize)]
-struct MemPoolTxInfo{
-    content: Value
+struct MemPoolTxInfo {
+    content: Value,
 }
 
 #[derive(Serialize)]
@@ -68,7 +74,7 @@ struct MemPoolTxInfo{
 enum MemPoolResult {
     Unknown,
     MemPool(MemPoolTxInfo),
-    Commited(TxInfo)
+    Commited(TxInfo),
 }
 
 #[derive(Serialize)]
@@ -82,7 +88,7 @@ pub struct SystemApi {
     pool: TxPool,
     info: NodeInfo,
     shared_api_state: SharedNodeState,
-    node_channel: ApiSender<NodeChannel>
+    node_channel: ApiSender<NodeChannel>,
 }
 
 impl SystemApi {
@@ -92,36 +98,30 @@ impl SystemApi {
         blockchain: Blockchain,
         pool: TxPool,
         shared_api_state: SharedNodeState,
-        node_channel: ApiSender<NodeChannel>
+        node_channel: ApiSender<NodeChannel>,
     ) -> SystemApi {
         SystemApi {
             info,
-            blockchain, node_channel,
-            pool, shared_api_state,
+            blockchain,
+            node_channel,
+            pool,
+            shared_api_state,
         }
     }
 
     fn get_mempool_info(&self) -> MemPoolInfo {
-        MemPoolInfo {
-            size: self.pool.read().expect("Expected read lock").len()
-        }
+        MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() }
     }
 
     fn get_peers_info(&self) -> PeersInfo {
-        PeersInfo{
-            incoming_connections: self.shared_api_state
-                                      .incoming_connections(),
-            outgoing_connections: self.shared_api_state
-                                      .outgoing_connections(),
+        PeersInfo {
+            incoming_connections: self.shared_api_state.incoming_connections(),
+            outgoing_connections: self.shared_api_state.outgoing_connections(),
             reconnects: self.shared_api_state
-                            .reconnects_timeout()
-                            .into_iter()
-                            .map(|(s,d)|
-                                PeerInfo {
-                                    addr: s,
-                                    delay: d,
-                                })
-                            .collect(),
+                .reconnects_timeout()
+                .into_iter()
+                .map(|(s, d)| PeerInfo { addr: s, delay: d })
+                .collect(),
         }
     }
 
@@ -136,14 +136,16 @@ impl SystemApi {
             .expect("Expected read lock")
             .get(&hash)
             .map_or_else(
-                ||{
+                || {
                     let explorer = BlockchainExplorer::new(&self.blockchain);
-                    Ok(explorer.tx_info(&hash)?
-                                .map_or(MemPoolResult::Unknown,
-                                        MemPoolResult::Commited))
+                    Ok(explorer.tx_info(&hash)?.map_or(
+                        MemPoolResult::Unknown,
+                        MemPoolResult::Commited,
+                    ))
                 },
-                |o| Ok(MemPoolResult::MemPool(MemPoolTxInfo{content:o.info()})))
-                        
+                |o| Ok(MemPoolResult::MemPool(MemPoolTxInfo { content: o.info() })),
+            )
+
     }
 
     fn peer_add(&self, ip_str: &str) -> Result<(), ApiError> {
@@ -151,7 +153,6 @@ impl SystemApi {
         self.node_channel.peer_add(addr)?;
         Ok(())
     }
-
 }
 
 impl Api for SystemApi {
@@ -164,7 +165,11 @@ impl Api for SystemApi {
                     let info = _self.get_mempool_tx(hash_str)?;
                     _self.ok_response(&::serde_json::to_value(info).unwrap())
                 }
-                None => Err(ApiError::IncorrectRequest("Required parameter of transaction 'hash' is missing".into()))?,
+                None => {
+                    Err(ApiError::IncorrectRequest(
+                        "Required parameter of transaction 'hash' is missing".into(),
+                    ))?
+                }
             }
         };
 
@@ -182,7 +187,11 @@ impl Api for SystemApi {
                     _self.peer_add(ip_str)?;
                     _self.ok_response(&::serde_json::to_value("Ok").unwrap())
                 }
-                _ => Err(ApiError::IncorrectRequest("Required parameter of peer 'ip' is missing".into()))?,
+                _ => {
+                    Err(ApiError::IncorrectRequest(
+                        "Required parameter of peer 'ip' is missing".into(),
+                    ))?
+                }
             }
         };
 

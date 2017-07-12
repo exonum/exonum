@@ -167,7 +167,8 @@ macro_rules! message {
             }
 
             #[allow(unused_variables)]
-            fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::encoding::Result {
+            fn check_fields(raw_message: &$crate::messages::RawMessage)
+            -> $crate::encoding::Result {
                 let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
                                         as $crate::encoding::Offset).into();
                 $(
@@ -210,7 +211,8 @@ macro_rules! message {
 
             fn from_bytes(value: ::std::borrow::Cow<[u8]>) -> Self {
                 $name {
-                    raw: ::std::sync::Arc::new($crate::messages::MessageBuffer::from_vec(value.into_owned()))
+                    raw: ::std::sync::Arc::new($crate::messages::MessageBuffer::from_vec(
+                        value.into_owned()))
                 }
             }
         }
@@ -326,8 +328,8 @@ macro_rules! message {
                 use $crate::encoding::serialize::json::reexport::Value;
                 use $crate::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
-                .map_err(|_| D::Error::custom("Can not deserialize value."))
+                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
+                    &value).map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 

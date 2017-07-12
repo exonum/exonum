@@ -40,10 +40,14 @@ impl MessageReader {
     pub fn allocate(&mut self) -> io::Result<()> {
         let size = self.total_len();
         if size > MAX_MESSAGE_LEN {
-            Err(io::Error::new(io::ErrorKind::Other,
-                format!("Received message is too long: {}, maximum allowed length is {}",
-                        size,
-                        MAX_MESSAGE_LEN)))
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!(
+                    "Received message is too long: {}, maximum allowed length is {}",
+                    size,
+                    MAX_MESSAGE_LEN
+                ),
+            ))
         } else {
             self.raw.resize(size, 0);
             Ok(())
@@ -87,8 +91,11 @@ impl MessageWriter {
         while let Some(message) = self.queue.front().cloned() {
             let buf = message.as_ref().as_ref();
             if buf.len() > MAX_MESSAGE_LEN {
-                error!("Attempted to send too long ({}) message, maximum allowed length is {}",
-                    buf.len(), MAX_MESSAGE_LEN);
+                error!(
+                    "Attempted to send too long ({}) message, maximum allowed length is {}",
+                    buf.len(),
+                    MAX_MESSAGE_LEN
+                );
             }
             match socket.try_write(&buf[self.position..])? {
                 None | Some(0) => {
@@ -168,17 +175,19 @@ impl OutgoingConnection {
 
     pub fn try_write(&mut self) -> io::Result<()> {
         // TODO: reregister
-        self.writer.write(&mut self.socket).or_else(|e| {
-            match e.kind() {
+        self.writer.write(&mut self.socket).or_else(
+            |e| match e.kind() {
                 io::ErrorKind::WouldBlock |
                 io::ErrorKind::WriteZero => {
-                    warn!("Unable to write to socket {}, socket is blocked",
-                          self.address);
+                    warn!(
+                        "Unable to write to socket {}, socket is blocked",
+                        self.address
+                    );
                     Ok(())
                 }
                 _ => Err(e),
-            }
-        })
+            },
+        )
     }
 
     pub fn send(&mut self, message: RawMessage) -> io::Result<()> {

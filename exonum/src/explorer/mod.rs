@@ -41,19 +41,17 @@ impl<'a> BlockchainExplorer<'a> {
         let res = match tx {
             None => None,
             Some(raw_tx) => {
-                let box_transaction = self.blockchain
-                    .tx_from_raw(raw_tx.clone())
-                    .ok_or_else(|| {
-                                    ApiError::Service(format!("Service not found for tx: {:?}",
-                                                              raw_tx)
-                                                              .into())
-                                })?;
+                let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
+                    ApiError::Service(format!("Service not found for tx: {:?}", raw_tx).into())
+                })?;
                 let content = box_transaction.info();
 
-                let location = schema
-                    .tx_location_by_tx_hash()
-                    .get(tx_hash)
-                    .expect(&format!("Not found tx_hash location: {:?}", tx_hash));
+                let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
+                    &format!(
+                        "Not found tx_hash location: {:?}",
+                        tx_hash
+                    ),
+                );
 
                 let block_height = location.block_height();
                 let tx_index = location.position_in_block();
@@ -88,11 +86,12 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
-    pub fn blocks_range(&self,
-                        count: u64,
-                        upper: Option<u64>,
-                        skip_empty_blocks: bool)
-                        -> Vec<Block> {
+    pub fn blocks_range(
+        &self,
+        count: u64,
+        upper: Option<u64>,
+        skip_empty_blocks: bool,
+    ) -> Vec<Block> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
         let schema = Schema::new(&snapshot);
@@ -109,12 +108,14 @@ impl<'a> BlockchainExplorer<'a> {
             if skip_empty_blocks && block_txs.is_empty() {
                 continue;
             }
-            let block_hash = hashes
-                .get(height)
-                .expect(&format!("Block not found, height:{:?}", height));
-            let block = blocks
-                .get(&block_hash)
-                .expect(&format!("Block not found, hash:{:?}", block_hash));
+            let block_hash = hashes.get(height).expect(&format!(
+                "Block not found, height:{:?}",
+                height
+            ));
+            let block = blocks.get(&block_hash).expect(&format!(
+                "Block not found, hash:{:?}",
+                block_hash
+            ));
             v.push(block)
         }
         v

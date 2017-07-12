@@ -82,9 +82,9 @@ impl Database for LevelDB {
     fn snapshot(&self) -> Box<Snapshot> {
         let _p = profiler::ProfilerSpan::new("LevelDB::snapshot");
         Box::new(LevelDBSnapshot {
-                     _db: self.db.clone(),
-                     snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-                 })
+            _db: self.db.clone(),
+            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+        })
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
@@ -96,9 +96,9 @@ impl Database for LevelDB {
                 Change::Delete => batch.delete(key),
             }
         }
-        self.db
-            .write(LEVELDB_WRITE_OPTIONS, &batch)
-            .map_err(Into::into)
+        self.db.write(LEVELDB_WRITE_OPTIONS, &batch).map_err(
+            Into::into,
+        )
     }
 }
 

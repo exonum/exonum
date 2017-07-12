@@ -25,7 +25,7 @@
 //! and also allows you to create a sequence of changes to the database that are specified
 //! as [`Patch`]. Later you can atomically merge a patch into the database using method [`merge`].
 //!
-//! # StorageKey and StorageValue traits
+//! # `StorageKey` and `StorageValue` traits
 //!
 //! If you need to use your own data types as keys or values in storage, you need to implement
 //! the [`StorageKey`] or [`StorageValue`] traits respectively. These traits are already

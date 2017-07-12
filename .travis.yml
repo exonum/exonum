@@ -10,9 +10,9 @@ dist: trusty
 
 env:
   global:
-    - NIGHTLY_RUST=nightly-2017-05-10
-    - CLIPPY_VERS=0.0.131
-    - RUSTFMT_VERS=0.8.4
+    - NIGHTLY_RUST=nightly-2017-07-05
+    - CLIPPY_VERS=0.0.142
+    - RUSTFMT_VERS=0.9.0
     - RUSTFLAGS="-C link-dead-code"
     - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
 
@@ -29,6 +29,7 @@ install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 
 script:
+- cargo fmt -p exonum -- --write-mode=diff
 - cargo fmt -p sandbox -- --write-mode=diff
 - cd exonum
 - cargo +$NIGHTLY_RUST clippy -- -D warnings

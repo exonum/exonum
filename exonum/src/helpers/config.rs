@@ -13,8 +13,9 @@ pub struct ConfigFile {}
 
 impl ConfigFile {
     pub fn load<P, T>(path: P) -> Result<T, Box<Error>>
-        where T: for<'r> Deserialize<'r>,
-              P: AsRef<Path>
+    where
+        T: for<'r> Deserialize<'r>,
+        P: AsRef<Path>,
     {
         let mut file = File::open(path.as_ref())?;
         let mut toml = String::new();
@@ -26,8 +27,9 @@ impl ConfigFile {
     }
 
     pub fn save<P, T>(value: &T, path: P) -> Result<(), Box<Error>>
-        where T: Serialize,
-              P: AsRef<Path>
+    where
+        T: Serialize,
+        P: AsRef<Path>,
     {
         if let Some(dir) = path.as_ref().parent() {
             fs::create_dir_all(dir)?;
