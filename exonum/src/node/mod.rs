@@ -24,7 +24,7 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
 use blockchain::{SharedNodeState, Blockchain, Schema,
                     GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
-use api::{Api, ExplorerApi, SystemApi};
+use api::{Api, ExplorerApi, SystemApi, NodeInfo};
 
 use self::timeout_adjuster::TimeoutAdjuster;
 
@@ -628,7 +628,8 @@ impl Node {
                 let pool = self.state().transactions().clone();
                 let shared_api_state = self.handler().api_state().clone();
                 let mut router = Router::new();
-                let system_api = SystemApi::new(blockchain.clone(), pool, shared_api_state, channel);
+                let node_info = NodeInfo::new(blockchain.service_map().iter().map(|(_,s)|s));
+                let system_api = SystemApi::new(node_info, blockchain.clone(), pool, shared_api_state, channel);
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
 

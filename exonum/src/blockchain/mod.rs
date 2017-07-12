@@ -75,6 +75,11 @@ impl Blockchain {
         }
     }
 
+    /// Returnts service `VecMap` for all our services.
+    pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
+        &self.service_map
+    }
+
     /// Creates a readonly snapshot of the current storage state.
     pub fn snapshot(&self) -> Box<Snapshot> {
         self.db.snapshot()

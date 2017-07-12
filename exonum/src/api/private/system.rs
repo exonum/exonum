@@ -8,12 +8,44 @@ use iron::prelude::*;
 use params::{Params, Value as ParamsValue};
 use node::{NodeChannel, ApiSender };
 use node::state::TxPool;
-use blockchain::{Blockchain, SharedNodeState};
+use blockchain::{Service, Blockchain, SharedNodeState};
 use crypto::{Hash, HexValue};
 use explorer::{TxInfo, BlockchainExplorer};
 use api::{Api, ApiError};
+use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Debug)]
+struct ServiceInfo {
+    name: String,
+    id: u16,
+}
+
+/// `DTO` used to transfer information about node
+#[derive(Serialize, Clone, Debug)]
+pub struct NodeInfo {
+    network_id: u8,
+    protocol_version: u8,
+    services: Vec<ServiceInfo>
+}
+
+impl NodeInfo {
+    /// Create new `NodeInfo`, from services list.
+    pub fn new<'a, I>(services: I) -> NodeInfo 
+    where I: IntoIterator<Item = &'a Box<Service>>,
+    {
+        NodeInfo {
+            network_id: TEST_NETWORK_ID,
+            protocol_version: PROTOCOL_MAJOR_VERSION,
+            services: services.into_iter().map(|s| ServiceInfo{
+                name: s.service_name().to_owned(),
+                id: s.service_id()
+            }).collect()
+        }
+    }
+}
+
+
+#[derive(Serialize, Debug)]
 struct PeerInfo {
     addr: SocketAddr,
     delay: u64,
@@ -43,6 +75,7 @@ struct MemPoolInfo {
 pub struct SystemApi {
     blockchain: Blockchain,
     pool: TxPool,
+    info: NodeInfo,
     shared_api_state: SharedNodeState,
     node_channel: ApiSender<NodeChannel>
 }
@@ -50,12 +83,14 @@ pub struct SystemApi {
 impl SystemApi {
     /// Create new `SystemApi`, from `ApiContext`
     pub fn new(
+        info: NodeInfo,
         blockchain: Blockchain,
         pool: TxPool,
         shared_api_state: SharedNodeState,
         node_channel: ApiSender<NodeChannel>
     ) -> SystemApi {
         SystemApi {
+            info,
             blockchain, node_channel,
             pool, shared_api_state,
         }
@@ -83,6 +118,10 @@ impl SystemApi {
                                 })
                             .collect(),
         }
+    }
+
+    fn get_network_info(&self) -> NodeInfo {
+        self.info.clone()
     }
 
     fn get_mempool_tx(&self, hash_str: &str) -> Result<MemPoolResult, ApiError> {
@@ -148,9 +187,16 @@ impl Api for SystemApi {
             _self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
+        let _self = self.clone();
+        let network = move |_: &mut Request| -> IronResult<Response> {
+            let info = _self.get_network_info();
+            _self.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
         router.get("/v1/mempool", mempool_info, "mempool");
         router.get("/v1/mempool/:hash", mempool, "mempool_tx");
         router.get("/v1/peers", peers_info, "peers_info");
         router.post("/v1/peeradd", peer_add, "peer_add");
+        router.get("/v1/network", network, "network_info");
     }
 }
