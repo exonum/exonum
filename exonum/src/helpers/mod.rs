@@ -10,6 +10,7 @@ use node::NodeConfig;
 use crypto::gen_keypair;
 
 pub mod fabric;
+pub mod config;
 
 pub fn init_logger() -> Result<(), SetLoggerError> {
     let mut builder = LogBuilder::new();
