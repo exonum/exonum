@@ -1,3 +1,11 @@
+//! Cryptography related types and functions.
+//!
+//! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
+//! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
+
+// TODO: Move to the root `lib.rs` when all other things are documented.
+#![deny(missing_docs)]
+
 use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
                                          Signature as SignatureSodium, sign_detached,
@@ -21,33 +29,108 @@ pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 
 pub use encoding::serialize::{FromHexError, HexValue};
 
-
+/// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
-pub fn sign(m: &[u8], secret_key: &SecretKey) -> Signature {
-    let sodium_signature = sign_detached(m, &secret_key.0);
+/// Signs slice of bytes using the signer's secret key. Returns the resulting `Signature`.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto;
+///
+/// # crypto::init();
+/// let (public_key, secret_key) = crypto::gen_keypair();
+/// let data = [1, 2, 3];
+/// let signature = crypto::sign(&data, &secret_key);
+/// assert!(crypto::verify(&signature, &data, &public_key));
+/// ```
+pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
+    let sodium_signature = sign_detached(data, &secret_key.0);
     Signature(sodium_signature)
 }
 
+/// Computes a secret key and a corresponding public key from a `Seed`.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto::{self, Seed};
+///
+/// # crypto::init();
+/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
+/// # drop(public_key);
+/// # drop(secret_key);
+/// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (sod_pub_key, sod_secr_key) = keypair_from_seed(&seed.0);
     (PublicKey(sod_pub_key), SecretKey(sod_secr_key))
 }
 
+/// Randomly generates a secret key and a corresponding public key.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto;
+///
+/// # crypto::init();
+/// let (public_key, secret_key) = crypto::gen_keypair();
+/// # drop(public_key);
+/// # drop(secret_key);
+/// ```
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
     let (pubkey, secrkey) = gen_keypair_sodium();
     (PublicKey(pubkey), SecretKey(secrkey))
 }
 
-pub fn verify(sig: &Signature, m: &[u8], pubkey: &PublicKey) -> bool {
-    verify_detached(&sig.0, m, &pubkey.0)
+/// Verifies that `data` is signed with a secret key corresponding to the given public key.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto;
+///
+/// # crypto::init();
+/// let (public_key, secret_key) = crypto::gen_keypair();
+/// let data = [1, 2, 3];
+/// let signature = crypto::sign(&data, &secret_key);
+/// assert!(crypto::verify(&signature, &data, &public_key));
+/// ```
+pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
+    verify_detached(&sig.0, data, &pubkey.0)
 }
 
-pub fn hash(m: &[u8]) -> Hash {
-    let dig = hash_sodium(m);
+/// Calculates `SHA256` hash of bytes slice.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto;
+///
+/// # crypto::init();
+/// let data = [1, 2, 3];
+/// let hash = crypto::hash(&data);
+/// # drop(hash);
+/// ```
+pub fn hash(data: &[u8]) -> Hash {
+    let dig = hash_sodium(data);
     Hash(dig)
 }
 
+/// Initializes the sodium library and chooses faster versions of the primitives if possible.
+///
+/// # Panics
+///
+/// Panics if sodium initialization is failed.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto;
+///
+/// crypto::init();
+/// ```
 pub fn init() {
     if !sodiumoxide::init() {
         panic!("Cryptographic library hasn't initialized.");
@@ -55,25 +138,30 @@ pub fn init() {
 }
 
 macro_rules! implement_public_sodium_wrapper {
-    ($name:ident, $name_from:ident, $size:expr) => (
+    ($(#[$attr:meta])* struct $name:ident, $name_from:ident, $size:expr) => (
     #[derive(PartialEq, Eq, Clone, Copy, PartialOrd, Ord, Hash)]
+    $(#[$attr])*
     pub struct $name($name_from);
 
     impl $name {
+        /// Creates a new instance filled with zeros.
         pub fn zero() -> Self {
             $name::new([0; $size])
         }
     }
 
     impl $name {
-        pub fn new(ba: [u8; $size]) -> $name {
+        /// Creates a new instance from bytes array.
+        pub fn new(ba: [u8; $size]) -> Self {
             $name($name_from(ba))
         }
 
-        pub fn from_slice(bs: &[u8]) -> Option<$name> {
+        /// Creates a new instance from bytes slice.
+        pub fn from_slice(bs: &[u8]) -> Option<Self> {
             $name_from::from_slice(bs).map($name)
         }
     }
+
     impl AsRef<[u8]> for $name {
         fn as_ref(&self) -> &[u8] {
             self.0.as_ref()
@@ -94,25 +182,30 @@ macro_rules! implement_public_sodium_wrapper {
 }
 
 macro_rules! implement_private_sodium_wrapper {
-    ($name:ident, $name_from:ident, $size:expr) => (
+    ($(#[$attr:meta])* struct $name:ident, $name_from:ident, $size:expr) => (
     #[derive(Clone, PartialEq, Eq)]
+    $(#[$attr])*
     pub struct $name($name_from);
 
     impl $name {
+        /// Creates a new instance filled with zeros.
         pub fn zero() -> Self {
             $name::new([0; $size])
         }
     }
 
     impl $name {
-        pub fn new(ba: [u8; $size]) -> $name {
+        /// Creates a new instance from bytes array.
+        pub fn new(ba: [u8; $size]) -> Self {
             $name($name_from(ba))
         }
 
-        pub fn from_slice(bs: &[u8]) -> Option<$name> {
+        /// Creates a new instance from bytes slice.
+        pub fn from_slice(bs: &[u8]) -> Option<Self> {
             $name_from::from_slice(bs).map($name)
         }
     }
+
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
@@ -126,13 +219,86 @@ macro_rules! implement_private_sodium_wrapper {
     )
 }
 
-implement_public_sodium_wrapper! {PublicKey, PublicKeySodium, PUBLIC_KEY_LENGTH}
-implement_public_sodium_wrapper! {Hash, Digest, HASH_SIZE}
-implement_public_sodium_wrapper! {Signature, SignatureSodium, SIGNATURE_LENGTH}
-implement_private_sodium_wrapper! {SecretKey, SecretKeySodium, SECRET_KEY_LENGTH}
-implement_private_sodium_wrapper! {Seed, SeedSodium, SEED_LENGTH}
+implement_public_sodium_wrapper! {
+/// Public key used for verifying signatures.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto;
+///
+/// # crypto::init();
+/// let (public_key, _) = crypto::gen_keypair();
+/// # drop(public_key);
+/// ```
+    struct PublicKey, PublicKeySodium, PUBLIC_KEY_LENGTH
+}
 
+implement_private_sodium_wrapper! {
+/// Secret key used for signing.
+////// # Example
+///
+/// ```
+/// use exonum::crypto;
+///
+/// # crypto::init();
+/// let (_, secret_key) = crypto::gen_keypair();
+/// # drop(secret_key);
+/// ```
+    struct SecretKey, SecretKeySodium, SECRET_KEY_LENGTH
+}
 
+implement_public_sodium_wrapper! {
+/// SHA256 hash.
+///
+/// `Default` implementation for the `Hash` returns hash consisting of zeros.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto::{self, Hash};
+///
+/// let data = [1, 2, 3];
+/// let hash_from_data = crypto::hash(&data);
+/// let default_hash = Hash::default();
+/// # drop(hash_from_data);
+/// # drop(default_hash);
+/// ```
+    struct Hash, Digest, HASH_SIZE
+}
+
+implement_public_sodium_wrapper! {
+/// Signature.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto;
+///
+/// # crypto::init();
+/// let (public_key, secret_key) = crypto::gen_keypair();
+/// let data = [1, 2, 3];
+/// let signature = crypto::sign(&data, &secret_key);
+/// assert!(crypto::verify(&signature, &data, &public_key));
+/// ```
+    struct Signature, SignatureSodium, SIGNATURE_LENGTH
+}
+
+implement_private_sodium_wrapper! {
+/// Seed that can be used for keypair generation.
+///
+/// # Example
+///
+/// ```
+/// use exonum::crypto::{self, Seed};
+///
+/// # crypto::init();
+/// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
+/// # drop(public_key);
+/// # drop(secret_key);
+/// ```
+    struct Seed, SeedSodium, SEED_LENGTH
+}
 
 macro_rules! implement_serde {
 ($name:ident) => (
@@ -141,6 +307,7 @@ macro_rules! implement_serde {
             let inner = &self.0;
             inner.0.as_ref().to_hex()
         }
+
         fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
             let bytes: Vec<u8> = FromHex::from_hex(v.as_ref())?;
             if let Some(self_value) = Self::from_slice(bytes.as_ref()) {
@@ -247,6 +414,7 @@ mod tests {
     use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature};
     use super::HexValue;
     use serde_json;
+
     #[test]
     fn test_hash() {
         let h = hash(&[]);
