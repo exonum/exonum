@@ -34,7 +34,7 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
              Error as EventsError};
 use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
-use api::{Api, ExplorerApi, SystemApi, NodeInfo};
+use api::{Api, public, private};
 
 use self::timeout_adjuster::TimeoutAdjuster;
 
@@ -664,15 +664,12 @@ impl Node {
                 let api_context = ApiContext::new(self);
                 let mut mount = Mount::new();
                 mount.mount("api/services", api_context.mount_private_api());
-
-                let pool = self.state().transactions().clone();
                 let shared_api_state = self.handler().api_state().clone();
                 let mut router = Router::new();
-                let node_info = NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-                let system_api = SystemApi::new(
+                let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
+                let system_api = private::SystemApi::new(
                     node_info,
                     blockchain.clone(),
-                    pool,
                     shared_api_state,
                     channel,
                 );
@@ -693,10 +690,15 @@ impl Node {
                 let api_context = ApiContext::new(self);
                 let mut mount = Mount::new();
                 mount.mount("api/services", api_context.mount_public_api());
-
+            
+                let mut router = Router::new();
+                let pool = self.state().transactions().clone();
+                let system_api = public::SystemApi::new(pool, blockchain.clone());
+                system_api.wire(&mut router);
+                mount.mount("api/system", router);
                 if self.api_options.enable_blockchain_explorer {
                     let mut router = Router::new();
-                    let explorer_api = ExplorerApi::new(blockchain);
+                    let explorer_api = public::ExplorerApi::new(blockchain);
                     explorer_api.wire(&mut router);
                     mount.mount("api/explorer", router);
                 }

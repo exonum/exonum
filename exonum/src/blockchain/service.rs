@@ -203,6 +203,8 @@ pub struct ApiNodeState {
     incoming_connections: HashSet<SocketAddr>,
     outgoing_connections: HashSet<SocketAddr>,
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
+    //TODO: update on event?
+    peers_info: HashMap<SocketAddr, PublicKey>
 }
 impl ApiNodeState {
     fn new() -> ApiNodeState {
@@ -257,9 +259,24 @@ impl SharedNodeState {
             .map(|(c, e)| (*c, *e))
             .collect()
     }
+    /// Return peers info list
+    pub fn peers_info(&self) -> Vec<(SocketAddr, PublicKey)> {
+        self.state
+            .read()
+            .expect("Expected read lock.")
+            .peers_info
+            .iter()
+            .map(|(c, e)| (*c, *e))
+            .collect()
+    }
     /// Update internal state, from `Node` State`
-    pub fn update_node_state(&self, _state: &State) {
-        //FIXME: Before merge implement update code
+    pub fn update_node_state(&self, state: &State) {
+        for (p,c) in state.peers().iter() {
+            self.state
+                .write()
+                .expect("Expected write lock.")
+                .peers_info.insert(c.addr(), *p);
+        }
     }
 
     /// Returns value of the `state_update_timeout`.

@@ -12,19 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_json::Value;
-
 use std::net::SocketAddr;
+use std::collections::HashMap;
 
+use crypto::PublicKey;
 use router::Router;
 use iron::prelude::*;
 
 use params::{Params, Value as ParamsValue};
 use node::{NodeChannel, ApiSender};
-use node::state::TxPool;
 use blockchain::{Service, Blockchain, SharedNodeState};
-use crypto::{Hash, HexValue};
-use explorer::{TxInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
 
@@ -64,54 +61,50 @@ impl NodeInfo {
     }
 }
 
+#[derive(Serialize, Default)]
+struct ReconnectInfo {
+    delay: u64
+}
 
-#[derive(Serialize, Debug)]
-struct PeerInfo {
-    addr: SocketAddr,
-    delay: u64,
+
+#[derive(Serialize)]
+enum IncommingConnectionState {
+    Active,
+    Reconnect(ReconnectInfo),
+}
+
+impl Default for IncommingConnectionState {
+    fn default() -> IncommingConnectionState {
+        IncommingConnectionState::Active
+    }
+}
+
+#[derive(Serialize, Default)]
+struct IncommingConnection {
+    public_key: Option<PublicKey>,
+    state: IncommingConnectionState
 }
 
 #[derive(Serialize)]
 struct PeersInfo {
-    incoming_connections: Vec<SocketAddr>,
+    incoming_connections: HashMap<SocketAddr, IncommingConnection>,
     outgoing_connections: Vec<SocketAddr>,
-    reconnects: Vec<PeerInfo>,
-}
-
-#[derive(Serialize)]
-struct MemPoolTxInfo {
-    content: Value,
-}
-
-#[derive(Serialize)]
-#[serde(tag = "type")]
-enum MemPoolResult {
-    Unknown,
-    MemPool(MemPoolTxInfo),
-    Committed(TxInfo),
-}
-
-#[derive(Serialize)]
-struct MemPoolInfo {
-    size: usize,
 }
 
 /// Private system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
     blockchain: Blockchain,
-    pool: TxPool,
     info: NodeInfo,
     shared_api_state: SharedNodeState,
     node_channel: ApiSender<NodeChannel>,
 }
 
 impl SystemApi {
-    /// Creates a new `SystemApi` instance.
+    /// Creates a new `public::SystemApi` instance.
     pub fn new(
         info: NodeInfo,
         blockchain: Blockchain,
-        pool: TxPool,
         shared_api_state: SharedNodeState,
         node_channel: ApiSender<NodeChannel>,
     ) -> SystemApi {
@@ -119,48 +112,40 @@ impl SystemApi {
             info,
             blockchain,
             node_channel,
-            pool,
             shared_api_state,
         }
     }
 
-    fn get_mempool_info(&self) -> MemPoolInfo {
-        MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() }
-    }
-
     fn get_peers_info(&self) -> PeersInfo {
+        let mut incoming_connections: HashMap<SocketAddr, IncommingConnection> 
+                = HashMap::new();
+
+        for socket in self.shared_api_state.incoming_connections(){
+            incoming_connections.insert(socket, Default::default());
+        }
+
+        for (s, delay) in self.shared_api_state
+                          .reconnects_timeout(){
+            incoming_connections.entry(s)
+                                .or_insert(Default::default())
+                                .state = IncommingConnectionState::Reconnect(ReconnectInfo{delay});
+        }
+
+        for (s, p) in self.shared_api_state
+                          .peers_info(){
+            incoming_connections.entry(s)
+                                .or_insert(Default::default())
+                                .public_key = Some(p);
+        }
+
         PeersInfo {
-            incoming_connections: self.shared_api_state.incoming_connections(),
+            incoming_connections,
             outgoing_connections: self.shared_api_state.outgoing_connections(),
-            reconnects: self.shared_api_state
-                .reconnects_timeout()
-                .into_iter()
-                .map(|(s, d)| PeerInfo { addr: s, delay: d })
-                .collect(),
         }
     }
 
     fn get_network_info(&self) -> NodeInfo {
         self.info.clone()
-    }
-
-    fn get_mempool_tx(&self, hash_str: &str) -> Result<MemPoolResult, ApiError> {
-        let hash = Hash::from_hex(hash_str)?;
-        self.pool
-            .read()
-            .expect("Expected read lock")
-            .get(&hash)
-            .map_or_else(
-                || {
-                    let explorer = BlockchainExplorer::new(&self.blockchain);
-                    Ok(explorer.tx_info(&hash)?.map_or(
-                        MemPoolResult::Unknown,
-                        MemPoolResult::Committed,
-                    ))
-                },
-                |o| Ok(MemPoolResult::MemPool(MemPoolTxInfo { content: o.info() })),
-            )
-
     }
 
     fn peer_add(&self, ip_str: &str) -> Result<(), ApiError> {
@@ -172,27 +157,6 @@ impl SystemApi {
 
 impl Api for SystemApi {
     fn wire(&self, router: &mut Router) {
-        let _self = self.clone();
-        let mempool = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("hash") {
-                Some(hash_str) => {
-                    let info = _self.get_mempool_tx(hash_str)?;
-                    _self.ok_response(&::serde_json::to_value(info).unwrap())
-                }
-                None => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required parameter of transaction 'hash' is missing".into(),
-                    ))?
-                }
-            }
-        };
-
-        let _self = self.clone();
-        let mempool_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = _self.get_mempool_info();
-            _self.ok_response(&::serde_json::to_value(info).unwrap())
-        };
 
         let _self = self.clone();
         let peer_add = move |req: &mut Request| -> IronResult<Response> {
@@ -222,10 +186,8 @@ impl Api for SystemApi {
             _self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
-        router.get("/v1/mempool", mempool_info, "mempool");
-        router.get("/v1/mempool/:hash", mempool, "mempool_tx");
         router.get("/v1/peers", peers_info, "peers_info");
-        router.post("/v1/peeradd", peer_add, "peer_add");
+        router.post("/v1/peers", peer_add, "peer_add");
         router.get("/v1/network", network, "network_info");
     }
 }
