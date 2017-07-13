@@ -84,21 +84,21 @@ cargo install --example configuration
         $ tree .
         .
         ├── configuration_service
-        │   └── validators
-        │       ├── 0.toml
-        │       ├── 1.toml
-        │       ├── 2.toml
-        │       └── 3.toml
+        │   └── validators
+        │       ├── 0.toml
+        │       ├── 1.toml
+        │       ├── 2.toml
+        │       └── 3.toml
         ├── etc
-        │   ├── conf.d
-        │   │   └── configuration_service.conf
-        │   └── supervisord.conf
+        │   ├── conf.d
+        │   │   └── configuration_service.conf
+        │   └── supervisord.conf
         ├── log
-        │   ├── supervisor
-        │   │   ├── configuration_service_00-stderr---supervisor-rMqmIy.log
-        │   │   ... ...
-        │   │   └── configuration_service_03-stdout---supervisor-s29Fd_.log
-        │   └── supervisord.log
+        │   ├── supervisor
+        │   │   ├── configuration_service_00-stderr---supervisor-rMqmIy.log
+        │   │   ... ...
+        │   │   └── configuration_service_03-stdout---supervisor-s29Fd_.log
+        │   └── supervisord.log
         └── run
             └── supervisord.pid
 
@@ -124,21 +124,21 @@ strings.
 ### Public endpoints
 
 #### Configurations' structure
-  
+
 This config is called *actual* config.
 
- 1. Only single config may be scheduled to become next config at any moment of 
+ 1. Only single config may be scheduled to become next config at any moment of
     time. This config is called *following* config.
 
- 1. For any current config, its *following* config will have `actual_from` 
+ 1. For any current config, its *following* config will have `actual_from`
     greater than the `actual_from` of current config.
 
- 1. For any current config, its *following* config will have 
+ 1. For any current config, its *following* config will have
     `previous_cfg_hash` equal to hash of current config.
 
- 1. Any config propose gets scheduled to become the *following* config only if 
-    it gets **2/3+1** supermajority of votes of `validators` of *actual* 
-    config. Thus, which entities can determine what the *following* config will 
+ 1. Any config propose gets scheduled to become the *following* config only if
+    it gets **2/3+1** supermajority of votes of `validators` of *actual*
+    config. Thus, which entities can determine what the *following* config will
     be is specified in the contents of *actual* config.
 
 [Examples](response-samples.md#public-response-samples)
@@ -159,50 +159,50 @@ endpoint.
 
 #### Propose and vote transactions restrictions
 
-  - Propose transactions will only get submitted and executed with state change 
+  - Propose transactions will only get submitted and executed with state change
     if all of the following conditions take place:
      1. new config body constitutes a valid json string and corresponds to
-        [StoredConfiguration](http://exonum.com/doc/crates/exonum/blockchain/config/struct.StoredConfiguration.html) 
+        [StoredConfiguration](http://exonum.com/doc/crates/exonum/blockchain/config/struct.StoredConfiguration.html)
         format.
 
-     1. `previous_cfg_hash` in proposed config body equals to hash of *actual* 
+     1. `previous_cfg_hash` in proposed config body equals to hash of *actual*
         config.
 
-     1. `actual_from` in proposed config body is greater than *current height*. 
-        *current height* is determined as the height of last 
-        committed block + 1. This is important to obtain sequential view of 
-        configs commit history. And, more important, the linear view of history 
+     1. `actual_from` in proposed config body is greater than *current height*.
+        *current height* is determined as the height of last
+        committed block + 1. This is important to obtain sequential view of
+        configs commit history. And, more important, the linear view of history
         of votes which conditioned scheduling of a config.
 
-     1. a *following* config isn't  already present. 
+     1. a *following* config isn't  already present.
 
      1. *actual* config contains the node-sender's public key in array of
-        `validators` field, as specified in `from` field of propose 
+        `validators` field, as specified in `from` field of propose
         transaction. The `from` field is determined by public key of node whose
-        `postpropose` endpoint is accessed for signing the transaction on 
-        maintainter's behalf. 
+        `postpropose` endpoint is accessed for signing the transaction on
+        maintainter's behalf.
 
      1. propose of config, which evaluates to the same hash, hasn't already
         been submitted.
 
-  - Vote transactions will only get submitted and executed with state change 
+  - Vote transactions will only get submitted and executed with state change
     if all of the following conditions take place:
      1. the vote transaction references a config propose with known config
         hash.
 
-     1. a *following* config isn't  already present. 
+     1. a *following* config isn't  already present.
 
-     1. *actual* config contains the node-sender's public key in 
-        `validators` field, as specified in `from` field of vote transaction. 
+     1. *actual* config contains the node-sender's public key in
+        `validators` field, as specified in `from` field of vote transaction.
         The `from` field is determined by public key of node whose
-        `postvote` endpoint is accessed for signing the transaction on 
-        maintainter's behalf. 
+        `postvote` endpoint is accessed for signing the transaction on
+        maintainter's behalf.
 
-     1. `previous_cfg_hash` in the config propose, which is referenced by 
+     1. `previous_cfg_hash` in the config propose, which is referenced by
         vote transaction, is equal to hash of *actual* config.
 
-     1. `actual_from` in the config propose, which is referenced by vote 
-        transaction, is greater than *current height*. 
+     1. `actual_from` in the config propose, which is referenced by vote
+        transaction, is greater than *current height*.
 
      1. no vote from the same node's public key has been submitted previously.
 

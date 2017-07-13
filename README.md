@@ -1,21 +1,19 @@
-## Exonum global variables updater service [![Build Status](https://travis-ci.com/exonum/exonum-configuration.svg?token=ygdqGfZjj1YKhGQQzBzp&branch=master)](https://travis-ci.com/exonum/exonum-configuration) 
+## Exonum Configuration Service
 
-This crate implements functionality of modifying `exonum` blockchain global 
-configuration via exchanging transactions with
+[![Build Status](https://travis-ci.org/exonum/exonum-configuration.svg?token=ygdqGfZjj1YKhGQQzBzp&branch=master)](https://travis-ci.org/exonum/exonum-configuration)
 
-- a config propose
-- a vote for a specific config propose
+This crate implements a service for [Exonum] blockchain that provides functionality of modifying
+the global configuration by the means of proposing a new configuration and voting for proposed
+configurations among the validators.
 
-## You may be looking for
-
+- [Specification](https://exonum.com/doc/advanced/configuration-updater/)
 - [Reference documentation](http://exonum.com/doc/crates/configuration_service/index.html)
 - [Example code](examples/configuration.rs)
 - [Testnet deploy and api usage tutorial](doc/testnet-api-tutorial.md)
 
-## Usage
+## LICENSE
 
-See [tutorial](doc/testnet-api-tutorial.md) for details.
+Exonum configuration service is licensed under the Apache License (Version 2.0).
+See [LICENSE](LICENSE) for details.
 
-## Licence
-
-Configuration service licensed under [Apache License, Version 2.0](LICENSE).
+[Exonum]: https://github.com/exonum/exonum

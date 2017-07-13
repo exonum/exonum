@@ -5,7 +5,7 @@
 extern crate log;
 extern crate exonum;
 extern crate sandbox;
-extern crate configuration_service;
+extern crate exonum_configuration;
 extern crate iron;
 extern crate router;
 extern crate serde;
