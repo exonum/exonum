@@ -85,8 +85,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(None, index.get(0));
     /// index.push(42);
     /// assert_eq!(Some(42), index.get(0));
@@ -103,8 +103,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(None, index.last());
     /// index.push(42);
     /// assert_eq!(Some(42), index.last());
@@ -124,8 +124,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(index.is_empty());
     /// index.push(42);
     /// assert!(!index.is_empty());
@@ -142,8 +142,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(0, index.len());
     /// index.push(10);
     /// assert_eq!(1, index.len());
@@ -164,12 +164,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let fork = db.fork();
-    /// let mut index: = ListIndexIter::new(vec![1, 2, 3], &mut fork);
-    /// index.extend([1, 2, 3, 4, 5].iter());
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// for val in index.iter() {
     ///     println!("{}", val);
     /// }
@@ -184,12 +184,12 @@ where
     /// # Examples
     ///
     /// ```
-    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let fork = db.fork();
-    /// let mut index: = ListIndexIter::new(vec![1, 2, 3], &mut fork);
-    /// index.extend([1, 2, 3, 4, 5].iter());
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// for val in index.iter_from(3) {
     ///     println!("{}", val);
     /// }
@@ -216,8 +216,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// index.push(1);
     /// assert!(!index.is_empty());
     /// ```
@@ -235,11 +235,11 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
-    /// assert_eq!(None, !index.pop());
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(None, index.pop());
     /// index.push(1);
-    /// assert_eq!(Some(1), !index.pop());
+    /// assert_eq!(Some(1), index.pop());
     /// ```
     pub fn pop(&mut self) -> Option<V> {
         // TODO: shoud we get and return dropped value?
@@ -262,10 +262,10 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(index.is_empty());
-    /// index.extend([1, 2, 3].iter());
+    /// index.extend([1, 2, 3].iter().cloned());
     /// assert_eq!(3, index.len());
     /// ```
     pub fn extend<I>(&mut self, iter: I)
@@ -291,9 +291,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
-    /// index.extend([1, 2, 3, 4, 5].iter());
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
     /// index.truncate(3);
     /// assert_eq!(3, index.len());
@@ -317,8 +317,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
     /// index.set(0, 10);
@@ -349,12 +349,12 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let snapshot = db.snapshot();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// index.push(1);
-    /// assert_eq!(!index.is_empty());
+    /// assert!(!index.is_empty());
     /// index.clear();
-    /// assert_eq!(index.is_empty());
+    /// assert!(index.is_empty());
     /// ```
     pub fn clear(&mut self) {
         self.length.set(Some(0));
