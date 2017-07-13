@@ -750,11 +750,12 @@ mod tests {
                 str::from_utf8(new_cfg.clone().into_bytes().as_slice()).unwrap(),
                 sandbox.service_secret_key(1),
             );
-            let legal_propose2 = TxConfigPropose::new(
-                &sandbox.service_public_key(1),
-                str::from_utf8(discarded_votes_cfg.clone().into_bytes().as_slice()).unwrap(),
-                sandbox.service_secret_key(1),
-            );
+            let legal_propose2 =
+                TxConfigPropose::new(
+                    &sandbox.service_public_key(1),
+                    str::from_utf8(discarded_votes_cfg.clone().into_bytes().as_slice()).unwrap(),
+                    sandbox.service_secret_key(1),
+                );
             add_one_height_with_transactions(
                 &sandbox,
                 &sandbox_state,
