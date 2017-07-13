@@ -713,7 +713,7 @@ mod tests {
             "Following cfg at height 6",
             &sandbox,
         );
-        let new_cfg_discarded_votes =
+        let discarded_votes_cfg =
             generate_config_with_message(initial_cfg.hash(), 8, "discarded votes", &sandbox);
 
         let (illegal_pub, illegal_sec) = gen_keypair_from_seed(&Seed::new([66; 32]));
@@ -750,11 +750,9 @@ mod tests {
                 str::from_utf8(new_cfg.clone().into_bytes().as_slice()).unwrap(),
                 sandbox.service_secret_key(1),
             );
-            let new_cfg_discarded_votes_str =
-                str::from_utf8(new_cfg_discarded_votes.clone().into_bytes().as_slice()).unwrap();
             let legal_propose2 = TxConfigPropose::new(
                 &sandbox.service_public_key(1),
-                new_cfg_discarded_votes_str,
+                str::from_utf8(discarded_votes_cfg.clone().into_bytes().as_slice()).unwrap(),
                 sandbox.service_secret_key(1),
             );
             add_one_height_with_transactions(
@@ -766,19 +764,19 @@ mod tests {
             assert_eq!(Some(legal_propose1), get_propose(&sandbox, new_cfg.hash()));
             assert_eq!(
                 Some(legal_propose2),
-                get_propose(&sandbox, new_cfg_discarded_votes.hash())
+                get_propose(&sandbox, discarded_votes_cfg.hash())
             );
         }
         {
             let illegal_validator_vote =
-                TxConfigVote::new(&illegal_pub, &new_cfg_discarded_votes.hash(), &illegal_sec);
+                TxConfigVote::new(&illegal_pub, &discarded_votes_cfg.hash(), &illegal_sec);
             add_one_height_with_transactions(
                 &sandbox,
                 &sandbox_state,
                 &[illegal_validator_vote.raw().clone()],
             );
             sandbox.assert_state(4, 1);
-            let votes = get_votes_for_propose(&sandbox, new_cfg_discarded_votes.hash());
+            let votes = get_votes_for_propose(&sandbox, discarded_votes_cfg.hash());
             assert!(!votes.contains(&Some(illegal_validator_vote)));
         }
         {
@@ -808,7 +806,7 @@ mod tests {
                 .map(|validator| {
                     TxConfigVote::new(
                         &sandbox.service_public_key(validator),
-                        &new_cfg_discarded_votes.hash(),
+                        &discarded_votes_cfg.hash(),
                         sandbox.service_secret_key(validator),
                     ).raw()
                         .clone()
@@ -816,7 +814,7 @@ mod tests {
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
             sandbox.assert_state(7, 1);
-            let actual_votes = get_votes_for_propose(&sandbox, new_cfg_discarded_votes.hash());
+            let actual_votes = get_votes_for_propose(&sandbox, discarded_votes_cfg.hash());
             for raw_vote in expected_votes {
                 let exp_vote = TxConfigVote::from_raw(raw_vote).unwrap();
                 assert!(!actual_votes.contains(&Some(exp_vote)));

@@ -41,7 +41,7 @@
 //!
 //! The same [hash of a configuration]
 //! (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is referenced in
-//! `TxConfigVote` in [cfg_hash](struct.TxConfigVote.html#method.cfg_hash).
+//! `TxConfigVote` in [`cfg_hash`](struct.TxConfigVote.html#method.cfg_hash).
 //!
 //! # Examples
 //!
