@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! RESTful API and corresponding utilities.
+//! `RESTful` API and corresponding utilities.
 
 use iron::IronError;
 use iron::prelude::*;
@@ -214,7 +214,7 @@ where
     }
 }
 
-/// `Api` trait defines RESTful API.
+/// `Api` trait defines `RESTful` API.
 pub trait Api {
     /// Loads hex value from the cookies.
     fn load_hex_value_from_cookie<'a>(
