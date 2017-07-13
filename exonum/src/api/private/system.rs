@@ -96,6 +96,7 @@ struct MemPoolInfo {
     size: usize,
 }
 
+/// Private system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
     blockchain: Blockchain,
@@ -106,7 +107,7 @@ pub struct SystemApi {
 }
 
 impl SystemApi {
-    /// Creates new `SystemApi`, from `ApiContext`
+    /// Creates a new `SystemApi` instance.
     pub fn new(
         info: NodeInfo,
         blockchain: Blockchain,

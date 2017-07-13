@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Command line commands utilities.
+
 use clap;
 use toml::Value;
 use serde::{Serialize, Deserialize};
@@ -33,46 +35,47 @@ mod details;
 mod internal;
 mod clap_backend;
 
+/// Default port value.
 pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 
-/// `Command` name type
+/// Name of the `Command`.
 pub type CommandName = &'static str;
 
+/// `Argument` with name.
 #[derive(Clone, Copy, Debug)]
-/// `Argument` with name helper structure
 pub struct NamedArgument {
     /// Short argument name, for example `-a`.
     pub short_name: Option<&'static str>,
     /// Long argument name, for example `--long-arg`.
     pub long_name: &'static str,
+    /// If `multiple` is true, then argument has more than one value.
     pub multiple: bool,
 }
 
+/// Possible types of the arguments.
 #[derive(Clone, Copy, Debug)]
-/// Possible types of argument
 pub enum ArgumentType {
     /// Unnamed positional argument.
     Positional,
-    /// argument with `long` and optionally `short` name
+    /// Named argument.
     Named(NamedArgument),
 }
 
+/// Abstraction to represent arguments in command line.
 #[derive(Clone, Copy, Debug)]
-/// Abstraction to represent arguments in command line
 pub struct Argument {
-    /// Name of the current argument.
-    /// This name is used in `context.arg(name)`.
+    /// Name of the current argument. This name is used in `context.arg(name)`.
     pub name: &'static str,
     /// Explains how this argument is represented.
     pub argument_type: ArgumentType,
     /// Explains if the argument required or not.
     pub required: bool,
-    /// Help string.
+    /// Help message.
     pub help: &'static str,
 }
 
 impl Argument {
-    /// Create new argument with `long` and optionally `short` names.
+    /// Creates a new argument with `long` and optionally `short` names.
     pub fn new_named<T>(
         name: &'static str,
         required: bool,
@@ -96,7 +99,7 @@ impl Argument {
         }
     }
 
-    /// Create new positional argument.
+    /// Creates a new positional argument.
     pub fn new_positional(name: &'static str, required: bool, help: &'static str) -> Argument {
         Argument {
             argument_type: ArgumentType::Positional,
@@ -107,9 +110,9 @@ impl Argument {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Default)]
 /// `Context` is a type, used to keep some values from `Command` into
 /// `CommandExtension` and vice verse.
+#[derive(PartialEq, Debug, Clone, Default)]
 pub struct Context {
     args: BTreeMap<String, String>,
     multiple_args: BTreeMap<String, Vec<String>>,
@@ -155,7 +158,7 @@ impl Context {
         context
     }
 
-    /// Get cmd argument value
+    /// Gets value of the command line argument.
     pub fn arg<T: FromStr>(&self, key: &str) -> Result<T, Box<Error>>
     where
         <T as FromStr>::Err: Error + 'static,
@@ -167,7 +170,7 @@ impl Context {
         }
     }
 
-    /// Get cmd argument multiple values
+    /// Gets multiple values of the command line argument.
     pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, Box<Error>>
     where
         <T as FromStr>::Err: Error + 'static,
@@ -179,7 +182,7 @@ impl Context {
         }
     }
 
-    /// Get variable from context.
+    /// Gets the variable from the context.
     pub fn get<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, Box<Error>> {
         if let Some(v) = self.variables.get(key) {
             Ok(v.clone().try_into()?)
@@ -189,28 +192,36 @@ impl Context {
     }
 
     /// Sets the variable in the context and returns the previous value.
-    /// ## Panic:
-    /// if value could not be serialized as `toml`
+    ///
+    /// # Panic
+    ///
+    /// Panics if value could not be serialized as TOML.
     pub fn set<T: Serialize>(&mut self, key: &'static str, value: T) -> Option<Value> {
         let value: Value = Value::try_from(value).expect("could not convert value into toml");
         self.variables.insert(key.to_owned(), value)
     }
 }
 
+/// `CommandExtension` is used for extending the existing commands.
 pub trait CommandExtension {
+    /// Returns arguments of the command.
     fn args(&self) -> Vec<Argument>;
+    /// Executes command.
     fn execute(&self, context: Context) -> Result<Context, Box<Error>>;
 }
 
+/// Factory for service creation.
 pub trait ServiceFactory: 'static {
     //TODO: we could move
     // `service_name` and `service_id` from `Service` trait into this one
     //fn name() -> &'static str;
-    /// return `CommandExtension` for specific `CommandName`
+
+    /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]
     fn command(command: CommandName) -> Option<Box<CommandExtension>> {
         None
     }
-    /// create new service, from context, returned by `run` command.
+
+    /// Create a new service instance from the context returned by the `Run` command.
     fn make_service(run_context: &Context) -> Box<Service>;
 }

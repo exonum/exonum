@@ -32,8 +32,8 @@ pub struct NodeBuilder {
 }
 
 impl NodeBuilder {
-    /// creates new empty `NodeBuilder`
-    pub fn new() -> NodeBuilder {
+    /// Creates a new empty `NodeBuilder`.
+    pub fn new() -> Self {
         NodeBuilder {
             commands: vec![
                 CollectedCommand::new(Box::new(GenerateTestnet)),
@@ -46,7 +46,7 @@ impl NodeBuilder {
         }
     }
 
-    /// append service to `NodeBuilder` context
+    /// Appends service to the `NodeBuilder` context.
     pub fn with_service<S: ServiceFactory>(mut self) -> NodeBuilder {
         //TODO: take endpoints, etc...
 
@@ -58,7 +58,7 @@ impl NodeBuilder {
         self
     }
 
-    #[doc(hiden)]
+    #[doc(hidden)]
     pub fn parse_cmd_string<I, T>(self, cmd_line: I) -> bool
     where
         I: IntoIterator<Item = T>,
@@ -87,7 +87,7 @@ impl NodeBuilder {
         }
     }
 
-    /// Run application
+    /// Runs application.
     pub fn run(self) {
         if let Some(mut node) = self.parse_cmd() {
             node.run().expect("Node return error")

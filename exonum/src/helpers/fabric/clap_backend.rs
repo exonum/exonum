@@ -22,8 +22,8 @@ use super::internal::{Feedback, CollectedCommand};
 pub struct ClapBackend;
 
 impl ClapBackend {
-    //TODO: remove code duplication
-    #[doc(hiden)]
+    // TODO: remove code duplication
+    #[doc(hidden)]
     pub fn execute_cmd_string<I, T>(commands: &[CollectedCommand], line: I) -> Feedback
     where
         I: IntoIterator<Item = T>,
@@ -57,6 +57,7 @@ impl ClapBackend {
 
         panic!("Subcommand not found");
     }
+
     pub fn execute(commands: &[CollectedCommand]) -> Feedback {
         let app = clap::App::new("Exonum application based on fabric configuration.")
             .version(crate_version!())

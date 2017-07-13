@@ -17,10 +17,10 @@ use byteorder::{ByteOrder, BigEndian};
 use std::mem;
 
 use crypto::Hash;
-use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
+use messages::{RawMessage, Precommit, CONSENSUS};
 use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex,
               ProofMapIndex, MapProof};
-use super::{Block, Blockchain};
+use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
 
 /// Generates prefix that combines service identifier, table identifier and given suffix.
