@@ -25,6 +25,53 @@ use messages::{RawMessage, MessageBuffer, Message};
 /// A trait that defines serialization of corresponding types as storage values.
 ///
 /// For compatibility with modern architectures the little-endian encoding is used.
+///
+/// # Examples
+///
+/// Implementing `StorageValue` for the type:
+///
+/// ```
+/// # extern crate exonum;
+/// # extern crate byteorder;
+///
+/// use std::mem;
+///
+/// use exonum::storage;
+/// use exonum::crypto::{self, Hash};
+/// use byteorder::LittleEndian;
+///
+/// struct Data {
+///     a: i16,
+///     b: u8,
+/// }
+///
+/// impl StorageValue for Data {
+///     fn into_bytes(self) -> Vec<u8> {
+///         let mut buffer = vec![0; mem::size_of::<Self>];
+///         LittleEndian::write_i16(&mut buffer[0..mem::size_of_val(&self.a)], self);
+///         LittleEndian::write_u8(
+///             &mut buffer[mem::size_of_val(&self.a)..buffer.len()],
+///             self.b);
+///         buffer
+///     }
+///
+///     fn from_bytes(value: Cow<[u8]>) -> Self {
+///         let a = LittleEndian::read_i16(&value[0..2]);
+///         let b = LittleEndian::read_i16(&value[2..3]);
+///         Data { a, b }
+///     }
+///
+///     fn hash(&self) -> Hash {
+///         let mut buffer = [0; mem::size_of::<Self>];
+///         LittleEndian::write_i16(&mut buffer[0..mem::size_of_val(&self.a)], self);
+///         LittleEndian::write_u8(
+///             &mut buffer[mem::size_of_val(&self.a)..buffer.len()],
+///             self.b);
+///         crypto::hash(&buffer)
+///     }
+/// }
+/// # fn main() {}
+/// ```
 pub trait StorageValue: Sized {
     /// Returns a hash of the value.
     ///
