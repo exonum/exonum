@@ -136,7 +136,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
     /// index.set(10);
-    /// assert!(Some(10), index.get());
+    /// assert_eq!(Some(10), index.get());
     /// ```
     pub fn set(&mut self, value: V) {
         self.base.put(&(), value)
@@ -153,9 +153,9 @@ where
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
     /// index.set(10);
-    /// assert!(Some(10), index.get());
+    /// assert_eq!(Some(10), index.get());
     /// index.remove();
-    /// assert!(None, index.get());
+    /// assert_eq!(None, index.get());
     /// ```
     pub fn remove(&mut self) {
         self.base.remove(&())
