@@ -127,14 +127,14 @@ impl SystemApi {
         for (s, delay) in self.shared_api_state.reconnects_timeout() {
             outgoing_connections
                 .entry(s)
-                .or_insert(Default::default())
+                .or_insert_with(|| Default::default())
                 .state = IncommingConnectionState::Reconnect(ReconnectInfo { delay });
         }
 
         for (s, p) in self.shared_api_state.peers_info() {
             outgoing_connections
                 .entry(s)
-                .or_insert(Default::default())
+                .or_insert_with(|| Default::default())
                 .public_key = Some(p);
         }
 
