@@ -10,18 +10,18 @@ cargo install --example configuration
 ```
 
 `exonum` crate system dependencies and rust toolchain configuration -
-[exonum install instructions](https://github.com/exonum/exonum-core/blob/master/INSTALL.md).
+[exonum install instructions](https://github.com/exonum/exonum/blob/master/INSTALL.md).
 
 ## Running testnet
 
 1. Generate testnet dir and testnet config.
 
-  - 4 is a required indexed parameter and stands for number of nodes in testnet:
+- `4` is a required indexed parameter and stands for number of nodes in testnet:
 
     ```bash
     mkdir -p testnet/configuration_service
     cd testnet/configuration_service
-    configuration generate --output-dir . --start-port 5400 4
+    configuration generate-testnet --start 5400 4 --output_dir .
     cd ..
     ```
 
@@ -37,30 +37,26 @@ cargo install --example configuration
       └── 3.toml
     ```
 
-2. Run 4 nodes:
+2. Run `4` nodes:
 
-  - manually for each node process:
+- manually for each node process:
 
     ```bash
-    configuration run --node-config configuration_service/validators/0.toml --leveldb-path configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
+    configuration run --node-config configuration_service/validators/0.toml --leveldb configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
     ...
-    configuration run --node-config configuration_service/validators/3.toml --leveldb-path configuration_service/db/3 --public-api-address 127.0.0.1:8003 --private-api-address 127.0.0.1:8013
+    configuration run --node-config configuration_service/validators/3.toml --leveldb configuration_service/db/3 --public-api-address 127.0.0.1:8003 --private-api-address 127.0.0.1:8013
     ```
 
       - parameters
 
-          - `--public-api-address` is for all of exonum's [public http api
-          endpoints](#public-endpoints)
+          - `--public-api-address` is for exonum's [public http api endpoints](#public-endpoints)
+          - `--private-api-address` is for exonum's [private http api endpoints](#private-endpoints)
+          - `--node-config` path to the node's config
+          - `--leveldb` path to the database
+          
+- automatically via the [supervisord](http://supervisord.org/) utility.
 
-          - `--private-api-address` is for exonum's [private http api
-          endpoints](#private-endpoints)
-
-          - `--node-config` and `--leveldb-path` are described on
-          [exonum install instructions](https://github.com/exonum/exonum-core/blob/master/INSTALL.md)
-
-  - automatically via the [supervisord](http://supervisord.org/) utility.
-
-     1. set the **TESTNET_DESTDIR** environment variable to the `testnet` dir
+     1. set the `TESTNET_DESTDIR` environment variable to the `testnet` dir
         created above:
 
         ```bash
@@ -77,7 +73,7 @@ cargo install --example configuration
         ./testnet/testnetctl.sh enable
         ```
 
-     1. go to `$TESTNET_DESTDIR`. It contains new `etc`, `run`, `log`folders.
+     1. go to `$TESTNET_DESTDIR`. It contains new `etc`, `run`, `log` folders.
 
         ```bash
         $ cd $TESTNET_DESTDIR
