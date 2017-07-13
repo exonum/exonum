@@ -14,7 +14,7 @@
 
 //! Consensus and other messages and related utilities.
 
-use bit_vec;
+use bit_vec::BitVec;
 
 use std::fmt;
 
@@ -33,40 +33,57 @@ mod protocol;
 #[cfg(test)]
 mod tests;
 
-pub type BitVec = bit_vec::BitVec;
-
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify)
 // TODO: use macro for implementing enums
 
+/// Raw transaction type.
 pub type RawTransaction = RawMessage;
 
+/// Any possible message.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Any {
+    /// `Connect` message.
     Connect(Connect),
+    /// `Status` message.
     Status(Status),
+    /// `Block` message.
     Block(Block),
+    /// Consensus message.
     Consensus(ConsensusMessage),
+    /// Request for the some data.
     Request(RequestMessage),
+    /// Transaction.
     Transaction(RawTransaction),
 }
 
+/// Consensus message.
 #[derive(Clone, PartialEq)]
 pub enum ConsensusMessage {
+    /// `Propose` message.
     Propose(Propose),
+    /// `Prevote` message.
     Prevote(Prevote),
+    /// `Precommit` message.
     Precommit(Precommit),
 }
 
+/// A request for the some data.
 #[derive(Clone, PartialEq)]
 pub enum RequestMessage {
+    /// Propose request.
     Propose(RequestPropose),
+    /// Transactions request.
     Transactions(RequestTransactions),
+    /// Prevotes request.
     Prevotes(RequestPrevotes),
+    /// Peers request.
     Peers(RequestPeers),
+    /// Block request.
     Block(RequestBlock),
 }
 
 impl RequestMessage {
+    /// Returns public key of the message sender.
     pub fn from(&self) -> &PublicKey {
         match *self {
             RequestMessage::Propose(ref msg) => msg.from(),
@@ -77,6 +94,7 @@ impl RequestMessage {
         }
     }
 
+    /// Returns public key of the message recipient.
     pub fn to(&self) -> &PublicKey {
         match *self {
             RequestMessage::Propose(ref msg) => msg.to(),
@@ -87,6 +105,7 @@ impl RequestMessage {
         }
     }
 
+    /// Verifies the message signature with given public key.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
@@ -98,6 +117,7 @@ impl RequestMessage {
         }
     }
 
+    /// Returns raw message.
     pub fn raw(&self) -> &RawMessage {
         match *self {
             RequestMessage::Propose(ref msg) => msg.raw(),
@@ -122,6 +142,7 @@ impl fmt::Debug for RequestMessage {
 }
 
 impl ConsensusMessage {
+    /// Returns validator id of the message sender.
     pub fn validator(&self) -> u16 {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.validator(),
@@ -148,6 +169,7 @@ impl ConsensusMessage {
         }
     }
 
+    /// Returns raw message.
     pub fn raw(&self) -> &RawMessage {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.raw(),
@@ -156,6 +178,7 @@ impl ConsensusMessage {
         }
     }
 
+    /// Verifies the message signature with given public key.
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.verify_signature(public_key),
@@ -176,6 +199,7 @@ impl fmt::Debug for ConsensusMessage {
 }
 
 impl Any {
+    /// Converts the `RawMessage` to the `Any` message.
     pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
         // TODO: check input message size
         let msg = if raw.service_id() == CONSENSUS {

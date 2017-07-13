@@ -43,7 +43,7 @@ use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::State;
 use storage::{Patch, Database, Snapshot, Fork, Error};
 
-pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
+pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig};
