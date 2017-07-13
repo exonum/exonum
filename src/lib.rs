@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! # Introduction
 //! This crate implements the standalone configuration service of `Exonum` blockchain,
 //! which, upon being plugged in, allows modifying
@@ -41,7 +55,7 @@
 //!
 //! The same [hash of a configuration]
 //! (../exonum/blockchain/config/struct.StoredConfiguration.html#method.hash) is referenced in
-//! `TxConfigVote` in [cfg_hash](struct.TxConfigVote.html#method.cfg_hash).
+//! `TxConfigVote` in [`cfg_hash`](struct.TxConfigVote.html#method.cfg_hash).
 //!
 //! # Examples
 //!
@@ -64,6 +78,8 @@
 //! }
 //! ```
 
+#![cfg_attr(feature = "cargo-clippy", allow(block_in_if_condition_stmt))]
+
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -71,7 +87,6 @@ extern crate log;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-//extern crate serde_json;
 extern crate iron;
 extern crate router;
 extern crate bodyparser;
@@ -186,7 +201,8 @@ pub struct ConfigurationSchema<T> {
 
 
 impl<T> ConfigurationSchema<T>
-    where T: AsRef<Snapshot>
+where
+    T: AsRef<Snapshot>,
 {
     pub fn new(snapshot: T) -> ConfigurationSchema<T> {
         ConfigurationSchema { view: snapshot }
@@ -254,8 +270,9 @@ impl<T> ConfigurationSchema<T>
 
     pub fn get_propose(&self, cfg_hash: &Hash) -> Option<TxConfigPropose> {
         let option_propose_data_by_config_hash = self.propose_data_by_config_hash().get(cfg_hash);
-        option_propose_data_by_config_hash
-            .map(|propose_data_by_config_hash| propose_data_by_config_hash.tx_propose())
+        option_propose_data_by_config_hash.map(|propose_data_by_config_hash| {
+            propose_data_by_config_hash.tx_propose()
+        })
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
@@ -264,24 +281,27 @@ impl<T> ConfigurationSchema<T>
         let votes = votes_table
             .into_iter()
             .map(|vote| if vote == ZEROVOTE.clone() {
-                     None
-                 } else {
-                     Some(vote)
-                 })
+                None
+            } else {
+                Some(vote)
+            })
             .collect();
         votes
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.propose_data_by_config_hash().root_hash(),
-             self.config_hash_by_ordinal().root_hash()]
+        vec![
+            self.propose_data_by_config_hash().root_hash(),
+            self.config_hash_by_ordinal().root_hash(),
+        ]
     }
 }
 
 impl<'a> ConfigurationSchema<&'a mut Fork> {
     /// Mutable version of `propose_data_by_config_hash` index.
-    pub fn propose_data_by_config_hash_mut(&mut self)
-                                           -> ProofMapIndex<&mut Fork, Hash, ProposeData> {
+    pub fn propose_data_by_config_hash_mut(
+        &mut self,
+    ) -> ProofMapIndex<&mut Fork, Hash, ProposeData> {
         let prefix = gen_prefix(CONFIG_SERVICE, 0, &());
         ProofMapIndex::new(prefix, &mut self.view)
     }
@@ -293,9 +313,10 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
     }
 
     /// Mutable version of `votes_by_config_hash` index.
-    pub fn votes_by_config_hash_mut(&mut self,
-                                    config_hash: &Hash)
-                                    -> ProofListIndex<&mut Fork, TxConfigVote> {
+    pub fn votes_by_config_hash_mut(
+        &mut self,
+        config_hash: &Hash,
+    ) -> ProofListIndex<&mut Fork, TxConfigVote> {
         let prefix = gen_prefix(CONFIG_SERVICE, 2, config_hash);
         ProofListIndex::new(prefix, &mut self.view)
     }
@@ -320,19 +341,23 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         let cfg_hash = &StorageValue::hash(&cfg);
 
         if let Some(old_tx_propose) = self.get_propose(cfg_hash) {
-            error!("Discarding TxConfigPropose:{} which contains an already posted config. \
+            error!(
+                "Discarding TxConfigPropose:{} which contains an already posted config. \
                     Previous TxConfigPropose:{}",
-                   serde_json::to_string(&tx_propose).unwrap(),
-                   serde_json::to_string(&old_tx_propose).unwrap());
+                serde_json::to_string(&tx_propose).unwrap(),
+                serde_json::to_string(&old_tx_propose).unwrap()
+            );
             return false;
         }
 
         let prev_cfg = Schema::new(&self.view)
             .configs()
             .get(&cfg.previous_cfg_hash)
-            .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigPropose:{:?}",
-                             &cfg.previous_cfg_hash,
-                             serde_json::to_string(&tx_propose).unwrap()));
+            .expect(&format!(
+                "Previous cfg:{:?} unexpectedly not found for TxConfigPropose:{:?}",
+                &cfg.previous_cfg_hash,
+                serde_json::to_string(&tx_propose).unwrap()
+            ));
 
         let propose_data_by_config_hash = {
             let mut votes_table = self.votes_by_config_hash_mut(cfg_hash);
@@ -342,9 +367,11 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
                 votes_table.push(ZEROVOTE.clone());
             }
 
-            StorageValueConfigProposeData::new(tx_propose,
-                                               &votes_table.root_hash(),
-                                               num_validators as u64)
+            StorageValueConfigProposeData::new(
+                tx_propose,
+                &votes_table.root_hash(),
+                num_validators as u64,
+            )
         };
 
         {
@@ -360,19 +387,23 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         let cfg_hash = tx_vote.cfg_hash();
         let mut propose_data_by_config_hash = self.propose_data_by_config_hash()
             .get(cfg_hash)
-            .expect(&format!("Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
-                             &tx_vote));
+            .expect(&format!(
+                "Corresponding propose unexpectedly not found for TxConfigVote:{:?}",
+                &tx_vote
+            ));
 
         let tx_propose = propose_data_by_config_hash.tx_propose();
-        let prev_cfg_hash =
-            <StoredConfiguration as StorageValue>::from_bytes(tx_propose.cfg().as_bytes().into())
-                .previous_cfg_hash;
+        let prev_cfg_hash = <StoredConfiguration as StorageValue>::from_bytes(
+            tx_propose.cfg().as_bytes().into(),
+        ).previous_cfg_hash;
         let prev_cfg = Schema::new(&self.view)
             .configs()
             .get(&prev_cfg_hash)
-            .expect(&format!("Previous cfg:{:?} unexpectedly not found for TxConfigVote:{:?}",
-                             prev_cfg_hash,
-                             &tx_vote));
+            .expect(&format!(
+                "Previous cfg:{:?} unexpectedly not found for TxConfigVote:{:?}",
+                prev_cfg_hash,
+                &tx_vote
+            ));
         //expect above depends on restriction during propose execute()
         //    let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
         //    ...
@@ -382,9 +413,11 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
             .validator_keys
             .iter()
             .position(|pk| pk.service_key == *from)
-            .expect(&format!("See !prev_cfg.validators.contains(self.from()) for \
+            .expect(&format!(
+                "See !prev_cfg.validators.contains(self.from()) for \
                               TxConfigVote:{:?}",
-                             &tx_vote));
+                &tx_vote
+            ));
         //expect above depends on restrictions both during propose and vote execute()
         //    if !actual_config.validators.contains(self.from()) {
         //        error!("Discarding TxConfigVote:{:?} from unknown validator. ",
@@ -403,8 +436,10 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
             }
         }
         if res {
-            self.propose_data_by_config_hash_mut()
-                .put(cfg_hash, propose_data_by_config_hash);
+            self.propose_data_by_config_hash_mut().put(
+                cfg_hash,
+                propose_data_by_config_hash,
+            );
         }
         res
     }
@@ -426,57 +461,69 @@ impl Transaction for TxConfigPropose {
             .following_configuration();
 
         if let Some(foll_cfg) = following_config {
-            error!("Discarding TxConfigPropose: {} as there is an already scheduled next config: \
+            error!(
+                "Discarding TxConfigPropose: {} as there is an already scheduled next config: \
                     {:?} ",
-                   serde_json::to_string(self).unwrap(),
-                   foll_cfg);
+                serde_json::to_string(self).unwrap(),
+                foll_cfg
+            );
             return;
         }
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config
-               .validator_keys
-               .iter()
-               .any(|k| k.service_key == *self.from()) {
-            error!("Discarding TxConfigPropose:{} from unknown validator. ",
-                   serde_json::to_string(self).unwrap());
+        if !actual_config.validator_keys.iter().any(|k| {
+            k.service_key == *self.from()
+        })
+        {
+            error!(
+                "Discarding TxConfigPropose:{} from unknown validator. ",
+                serde_json::to_string(self).unwrap()
+            );
             return;
         }
 
         let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes());
         if config_candidate.is_err() {
-            error!("Discarding TxConfigPropose:{} which contains config, which cannot be parsed: \
+            error!(
+                "Discarding TxConfigPropose:{} which contains config, which cannot be parsed: \
                     {:?}",
-                   serde_json::to_string(self).unwrap(),
-                   config_candidate);
+                serde_json::to_string(self).unwrap(),
+                config_candidate
+            );
             return;
         }
 
         let actual_config_hash = actual_config.hash();
         let config_candidate_body = config_candidate.unwrap();
         if config_candidate_body.previous_cfg_hash != actual_config_hash {
-            error!("Discarding TxConfigPropose:{} which does not reference actual config: {:?}",
-                   serde_json::to_string(self).unwrap(),
-                   actual_config);
+            error!(
+                "Discarding TxConfigPropose:{} which does not reference actual config: {:?}",
+                serde_json::to_string(self).unwrap(),
+                actual_config
+            );
             return;
         }
 
         let current_height = Schema::new(&fork).current_height();
         let actual_from = config_candidate_body.actual_from;
         if actual_from <= current_height {
-            error!("Discarding TxConfigPropose:{} which has actual_from height less than or \
+            error!(
+                "Discarding TxConfigPropose:{} which has actual_from height less than or \
                     equal to current: {:?}",
-                   serde_json::to_string(self).unwrap(),
-                   current_height);
+                serde_json::to_string(self).unwrap(),
+                current_height
+            );
             return;
         }
 
         let result = ConfigurationSchema::new(fork).put_propose(self.clone());
 
         if result {
-            trace!("Put TxConfigPropose:{} to config_proposes table",
-                   serde_json::to_string(self).unwrap());
+            trace!(
+                "Put TxConfigPropose:{} to config_proposes table",
+                serde_json::to_string(self).unwrap()
+            );
         }
     }
 }
@@ -489,8 +536,10 @@ impl Transaction for TxConfigVote {
     fn execute(&self, fork: &mut Fork) {
         let propose_option = ConfigurationSchema::new(&fork).get_propose(self.cfg_hash());
         if propose_option.is_none() {
-            error!("Discarding TxConfigVote:{:?} which references unknown config hash",
-                   self);
+            error!(
+                "Discarding TxConfigVote:{:?} which references unknown config hash",
+                self
+            );
             return;
         }
 
@@ -499,21 +548,25 @@ impl Transaction for TxConfigVote {
             .following_configuration();
 
         if let Some(foll_cfg) = following_config {
-            error!("Discarding TxConfigVote: {:?} as there is an already scheduled next config: \
+            error!(
+                "Discarding TxConfigVote: {:?} as there is an already scheduled next config: \
                     {:?} ",
-                   self,
-                   foll_cfg);
+                self,
+                foll_cfg
+            );
             return;
         }
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
 
-        if !actual_config
-               .validator_keys
-               .iter()
-               .any(|k| k.service_key == *self.from()) {
-            error!("Discarding TxConfigVote:{:?} from unknown validator. ",
-                   self);
+        if !actual_config.validator_keys.iter().any(|k| {
+            k.service_key == *self.from()
+        })
+        {
+            error!(
+                "Discarding TxConfigVote:{:?} from unknown validator. ",
+                self
+            );
             return;
         }
 
@@ -522,22 +575,26 @@ impl Transaction for TxConfigVote {
             StoredConfiguration::try_deserialize(referenced_tx_propose.cfg().as_bytes()).unwrap();
         let actual_config_hash = actual_config.hash();
         if parsed_config.previous_cfg_hash != actual_config_hash {
-            error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} does \
+            error!(
+                "Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} does \
                     not reference actual config: {:?}",
-                   self,
-                   serde_json::to_string(&referenced_tx_propose).unwrap(),
-                   actual_config);
+                self,
+                serde_json::to_string(&referenced_tx_propose).unwrap(),
+                actual_config
+            );
             return;
         }
 
         let current_height = Schema::new(&fork).current_height();
         let actual_from = parsed_config.actual_from;
         if actual_from <= current_height {
-            error!("Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} has \
+            error!(
+                "Discarding TxConfigVote:{:?}, whose corresponding TxConfigPropose:{} has \
                     actual_from height less than or equal to current: {:?}",
-                   self,
-                   serde_json::to_string(&referenced_tx_propose).unwrap(),
-                   current_height);
+                self,
+                serde_json::to_string(&referenced_tx_propose).unwrap(),
+                current_height
+            );
             return;
         }
 
@@ -547,8 +604,10 @@ impl Transaction for TxConfigVote {
             return;
         }
 
-        trace!("Put TxConfigVote:{:?} to corresponding cfg votes_by_config_hash table",
-               self);
+        trace!(
+            "Put TxConfigVote:{:?} to corresponding cfg votes_by_config_hash table",
+            self
+        );
 
         let mut votes_count = 0;
 
@@ -606,7 +665,9 @@ impl Service for ConfigurationService {
         match raw.message_type() {
             CONFIG_PROPOSE_MESSAGE_ID => Ok(Box::new(TxConfigPropose::from_raw(raw)?)),
             CONFIG_VOTE_MESSAGE_ID => Ok(Box::new(TxConfigVote::from_raw(raw)?)),
-            _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
+            _ => Err(StreamStructError::IncorrectMessageType {
+                message_type: raw.message_type(),
+            }),
         }
     }
 
