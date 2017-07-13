@@ -88,7 +88,7 @@ struct MemPoolTxInfo {
 enum MemPoolResult {
     Unknown,
     MemPool(MemPoolTxInfo),
-    Commited(TxInfo),
+    Committed(TxInfo),
 }
 
 #[derive(Serialize)]
@@ -154,7 +154,7 @@ impl SystemApi {
                     let explorer = BlockchainExplorer::new(&self.blockchain);
                     Ok(explorer.tx_info(&hash)?.map_or(
                         MemPoolResult::Unknown,
-                        MemPoolResult::Commited,
+                        MemPoolResult::Committed,
                     ))
                 },
                 |o| Ok(MemPoolResult::MemPool(MemPoolTxInfo { content: o.info() })),
