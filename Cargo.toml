@@ -13,4 +13,4 @@ serde_derive = "1.0"
 
 [dependencies.exonum]
 git = "ssh://git@github.com/exonum/exonum.git"
-rev = "cf87780b3de1ba161c490e0700870a0f2c308136"
+rev = "912fdff86e8294b822069f0e711167ca0a7adf1c"

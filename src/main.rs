@@ -9,7 +9,7 @@ extern crate iron;
 use exonum::blockchain::{self, Blockchain, Service, GenesisConfig,
                          ValidatorKeys, Transaction, ApiContext};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend,
-                   TxSender, NodeChannel};
+                   ApiSender, NodeChannel};
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
 use exonum::crypto::{PublicKey, Hash};
@@ -140,7 +140,7 @@ impl Transaction for TxTransfer {
 
 #[derive(Clone)]
 struct CryptocurrencyApi {
-    channel: TxSender<NodeChannel>,
+    channel: ApiSender<NodeChannel>,
 }
 
 impl Api for CryptocurrencyApi {
@@ -241,9 +241,8 @@ fn main() {
     let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
 
     let api_cfg = NodeApiConfig {
-        enable_blockchain_explorer: true,
         public_api_address: Some(api_address),
-        private_api_address: None,
+        ..Default::default()
     };
 
     let node_cfg = NodeConfig {
