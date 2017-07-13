@@ -49,3 +49,7 @@ node create-wallet-2.js
 # transfer funds from 1st to 2nd
 node transfer-funds.js
 ```
+
+## LICENSE
+
+Cryptocurrency is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
