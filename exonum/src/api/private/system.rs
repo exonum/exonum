@@ -68,6 +68,7 @@ struct ReconnectInfo {
 
 
 #[derive(Serialize)]
+#[serde(tag = "type")]
 enum IncommingConnectionState {
     Active,
     Reconnect(ReconnectInfo),
