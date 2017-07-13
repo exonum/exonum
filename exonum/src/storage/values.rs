@@ -25,6 +25,49 @@ use messages::{RawMessage, MessageBuffer, Message};
 /// A trait that defines serialization of corresponding types as storage values.
 ///
 /// For compatibility with modern architectures the little-endian encoding is used.
+///
+/// # Examples
+///
+/// Implementing `StorageValue` for the type:
+///
+/// ```
+/// # extern crate exonum;
+/// # extern crate byteorder;
+///
+/// use std::borrow::Cow;
+///
+/// use exonum::storage::StorageValue;
+/// use exonum::crypto::{self, Hash};
+/// use byteorder::{LittleEndian, ByteOrder};
+///
+/// struct Data {
+///     a: i16,
+///     b: u32,
+/// }
+///
+/// impl StorageValue for Data {
+///     fn into_bytes(self) -> Vec<u8> {
+///         let mut buffer = vec![0; 6];
+///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
+///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
+///         buffer
+///     }
+///
+///     fn from_bytes(value: Cow<[u8]>) -> Self {
+///         let a = LittleEndian::read_i16(&value[0..2]);
+///         let b = LittleEndian::read_u32(&value[2..6]);
+///         Data { a, b }
+///     }
+///
+///     fn hash(&self) -> Hash {
+///         let mut buffer = [0; 3];
+///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
+///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
+///         crypto::hash(&buffer)
+///     }
+/// }
+/// # fn main() {}
+/// ```
 pub trait StorageValue: Sized {
     /// Returns a hash of the value.
     ///

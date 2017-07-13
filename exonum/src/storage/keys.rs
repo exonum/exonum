@@ -20,6 +20,43 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// A trait that defines serialization of corresponding types as storage keys.
 ///
 /// Since internally the keys are sorted in a serialized form, the big-endian encoding is used.
+///
+/// # Examples
+///
+/// Implementing `StorageKey` for the type:
+///
+/// ```
+/// # extern crate exonum;
+/// # extern crate byteorder;
+///
+/// use std::mem;
+///
+/// use exonum::storage::StorageKey;
+/// use byteorder::{LittleEndian, ByteOrder};
+///
+/// struct Key {
+///     a: i16,
+///     b: u32,
+/// }
+///
+/// impl StorageKey for Key {
+///     fn size(&self) -> usize {
+///         mem::size_of_val(&self.a) + mem::size_of_val(&self.b)
+///     }
+///
+///     fn write(&self, buffer: &mut [u8]) {
+///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
+///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
+///     }
+///
+///     fn read(buffer: &[u8]) -> Self {
+///         let a = LittleEndian::read_i16(&buffer[0..2]);
+///         let b = LittleEndian::read_u32(&buffer[2..6]);
+///         Key { a, b }
+///     }
+/// }
+/// # fn main() {}
+/// ```
 pub trait StorageKey {
     /// Returns the size of the serialized key in bytes.
     fn size(&self) -> usize;

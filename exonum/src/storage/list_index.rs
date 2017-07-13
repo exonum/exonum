@@ -51,6 +51,18 @@ impl<T, V> ListIndex<T, V> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: ListIndex<_, u8> = ListIndex::new(prefix, &snapshot);
+    /// # drop(index);
+    /// ```
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ListIndex {
             base: BaseIndex::new(prefix, view),
@@ -66,11 +78,37 @@ where
     V: StorageValue,
 {
     /// Returns an element at that position or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(None, index.get(0));
+    /// index.push(42);
+    /// assert_eq!(Some(42), index.get(0));
+    /// ```
     pub fn get(&self, index: u64) -> Option<V> {
         self.base.get(&index)
     }
 
     /// Returns the last element of the list, or `None` if it is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(None, index.last());
+    /// index.push(42);
+    /// assert_eq!(Some(42), index.last());
+    /// ```
     pub fn last(&self) -> Option<V> {
         match self.len() {
             0 => None,
@@ -79,11 +117,39 @@ where
     }
 
     /// Returns `true` if the list contains no elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert!(index.is_empty());
+    /// index.push(42);
+    /// assert!(!index.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns the number of elements in the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(0, index.len());
+    /// index.push(10);
+    /// assert_eq!(1, index.len());
+    /// index.push(100);
+    /// assert_eq!(2, index.len());
+    /// ```
     pub fn len(&self) -> u64 {
         if let Some(len) = self.length.get() {
             return len;
@@ -94,12 +160,40 @@ where
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    /// for val in index.iter() {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter(&self) -> ListIndexIter<V> {
         ListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
     /// element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    /// for val in index.iter_from(3) {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
         ListIndexIter { base_iter: self.base.iter_from(&(), &from) }
     }
@@ -115,6 +209,18 @@ where
     }
 
     /// Appends an element to the back of the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.push(1);
+    /// assert!(!index.is_empty());
+    /// ```
     pub fn push(&mut self, value: V) {
         let len = self.len();
         self.base.put(&len, value);
@@ -122,6 +228,19 @@ where
     }
 
     /// Removes the last element from the list and returns it, or None if it is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(None, index.pop());
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.pop());
+    /// ```
     pub fn pop(&mut self) -> Option<V> {
         // TODO: shoud we get and return dropped value?
         match self.len() {
@@ -136,6 +255,19 @@ where
     }
 
     /// Extends the list with the contents of an iterator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert!(index.is_empty());
+    /// index.extend([1, 2, 3].iter().cloned());
+    /// assert_eq!(3, index.len());
+    /// ```
     pub fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = V>,
@@ -152,6 +284,20 @@ where
     /// Shortens the list, keeping the first `len` elements and dropping the rest.
     ///
     /// If `len` is greater than the list's current length, this has no effect.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    /// assert_eq!(5, index.len());
+    /// index.truncate(3);
+    /// assert_eq!(3, index.len());
+    /// ```
     pub fn truncate(&mut self, len: u64) {
         // TODO: optimize this
         while self.len() > len {
@@ -162,7 +308,22 @@ where
     /// Changes a value at the specified position.
     ///
     /// # Panics
+    ///
     /// Panics if `index` is equal or greater than the list's current length.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.get(0));
+    /// index.set(0, 10);
+    /// assert_eq!(Some(10), index.get(0));
+    /// ```
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
             panic!(
@@ -181,6 +342,20 @@ where
     /// Currently this method is not optimized to delete large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.push(1);
+    /// assert!(!index.is_empty());
+    /// index.clear();
+    /// assert!(index.is_empty());
+    /// ```
     pub fn clear(&mut self) {
         self.length.set(Some(0));
         self.base.clear()

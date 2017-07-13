@@ -49,6 +49,18 @@ impl<T, K> KeySetIndex<T, K> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(prefix, &snapshot);
+    /// # drop(index);
+    /// ```
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         KeySetIndex {
             base: BaseIndex::new(prefix, view),
@@ -63,17 +75,62 @@ where
     K: StorageKey,
 {
     /// Returns `true` if the set contains a value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert!(!index.contains(&1));
+    /// index.insert(1);
+    /// assert!(index.contains(&1));
+    /// ```
     pub fn contains(&self, item: &K) -> bool {
         self.base.contains(item)
     }
 
     /// An iterator visiting all elements in ascending order. The iterator element type is K.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.insert(1);
+    /// index.insert(2);
+    /// index.insert(3);
+    /// for val in index.iter() {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter(&self) -> KeySetIndexIter<K> {
         KeySetIndexIter { base_iter: self.base.iter(&()) }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified value.
     /// The iterator element type is K.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.insert(1);
+    /// index.insert(2);
+    /// index.insert(3);
+    /// for val in index.iter_from(&2) {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter_from(&self, from: &K) -> KeySetIndexIter<K> {
         KeySetIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
@@ -84,11 +141,37 @@ where
     K: StorageKey,
 {
     /// Adds a value to the set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.insert(1);
+    /// assert!(index.contains(&1));
+    /// ```
     pub fn insert(&mut self, item: K) {
         self.base.put(&item, ())
     }
 
     /// Removes a value from the set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.insert(1);
+    /// assert!(index.contains(&1));
+    /// index.remove(&1);
+    /// assert!(!index.contains(&1));
+    /// ```
     pub fn remove(&mut self, item: &K) {
         self.base.remove(item)
     }
@@ -99,6 +182,20 @@ where
     /// Currently this method is not optimized to delete large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.insert(1);
+    /// assert!(index.contains(&1));
+    /// index.clear();
+    /// assert!(!index.contains(&1));
+    /// ```
     pub fn clear(&mut self) {
         self.base.clear()
     }

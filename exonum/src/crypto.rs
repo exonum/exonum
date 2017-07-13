@@ -45,7 +45,7 @@ const BYTES_IN_DEBUG: usize = 4;
 
 /// Signs slice of bytes using the signer's secret key. Returns the resulting `Signature`.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -63,7 +63,7 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 
 /// Computes a secret key and a corresponding public key from a `Seed`.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto::{self, Seed};
@@ -80,7 +80,7 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 
 /// Randomly generates a secret key and a corresponding public key.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -97,7 +97,7 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 
 /// Verifies that `data` is signed with a secret key corresponding to the given public key.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -114,7 +114,7 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 
 /// Calculates `SHA256` hash of bytes slice.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -135,7 +135,7 @@ pub fn hash(data: &[u8]) -> Hash {
 ///
 /// Panics if sodium initialization is failed.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -233,7 +233,7 @@ macro_rules! implement_private_sodium_wrapper {
 implement_public_sodium_wrapper! {
 /// Public key used for verifying signatures.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -247,7 +247,7 @@ implement_public_sodium_wrapper! {
 
 implement_private_sodium_wrapper! {
 /// Secret key used for signing.
-////// # Example
+////// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -264,7 +264,7 @@ implement_public_sodium_wrapper! {
 ///
 /// `Default` implementation for the `Hash` returns hash consisting of zeros.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto::{self, Hash};
@@ -281,7 +281,7 @@ implement_public_sodium_wrapper! {
 implement_public_sodium_wrapper! {
 /// Signature.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -298,7 +298,7 @@ implement_public_sodium_wrapper! {
 implement_private_sodium_wrapper! {
 /// Seed that can be used for keypair generation.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto::{self, Seed};
