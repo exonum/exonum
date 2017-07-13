@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crypto::Hash;
-
+use messages::Precommit;
 
 pub const BLOCK_SIZE: usize = 112;
 
@@ -45,11 +45,18 @@ encoding_struct!(
     }
 );
 
+/// Block with pre-commits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BlockProof {
+    /// Block.
+    pub block: Block,
+    /// List of pre-commits for the block.
+    pub precommits: Vec<Precommit>,
+}
 
 #[cfg(test)]
 mod tests {
     use crypto::hash;
-
     use super::*;
 
     #[test]

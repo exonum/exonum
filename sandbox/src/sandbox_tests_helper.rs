@@ -14,12 +14,14 @@
 
 /// purpose of this module is to keep functions with reusable code used for sandbox tests
 
+use bit_vec::BitVec;
+
 use std::time::Duration;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
-                       RequestPrevotes, BitVec};
+                       RequestPrevotes};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::{Hash, HASH_SIZE};
 use exonum::events::Milliseconds;

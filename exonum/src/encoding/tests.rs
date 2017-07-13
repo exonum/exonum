@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bit_vec::BitVec;
+
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use crypto::{hash, gen_keypair};
-use blockchain;
+use blockchain::{self, BlockProof};
+use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
+               RequestBlock};
 
 use super::{Field, Offset};
-use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
-               BlockProof, RequestBlock, BitVec};
 
 #[test]
 #[should_panic(expected = "Found error in check: OffsetOverflow")]

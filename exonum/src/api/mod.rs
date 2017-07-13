@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! `RESTful` API and corresponding utilities.
+
 use iron::IronError;
 use iron::prelude::*;
 use iron::status;
@@ -36,19 +38,37 @@ use storage::{Result as StorageResult, Error as StorageError};
 pub use self::explorer_api::ExplorerApi;
 pub use self::private::{SystemApi, NodeInfo};
 
+mod explorer_api;
+mod private;
+#[cfg(test)]
+mod tests;
+
+/// List of possible Api errors.
 #[derive(Debug)]
 pub enum ApiError {
+    /// Service error.
     Service(Box<::std::error::Error + Send + Sync>),
+    /// Storage error.
     Storage(StorageError),
+    /// Events error.
     Events(EventsError),
+    /// Converting from hex error.
     FromHex(FromHexError),
+    /// Input/output error.
     Io(::std::io::Error),
+    /// File not found.
     FileNotFound(Hash),
+    /// Not found.
     NotFound,
+    /// File too big.
     FileTooBig,
+    /// File already exists.
     FileExists(Hash),
+    /// Incorrect request.
     IncorrectRequest(Box<::std::error::Error + Send + Sync>),
+    /// Unauthorized error.
     Unauthorized,
+    /// Address parse error.
     AddressParseError(::std::net::AddrParseError),
 }
 
@@ -129,8 +149,9 @@ impl From<ApiError> for IronError {
     }
 }
 
+/// `Field` that is serialized/deserialized from/to hex.
 #[derive(Clone, Debug)]
-pub struct HexField<T: AsRef<[u8]> + Clone>(pub T);
+struct HexField<T: AsRef<[u8]> + Clone>(pub T);
 
 impl<T> Deref for HexField<T>
 where
@@ -193,7 +214,9 @@ where
     }
 }
 
+/// `Api` trait defines `RESTful` API.
 pub trait Api {
+    /// Loads hex value from the cookies.
     fn load_hex_value_from_cookie<'a>(
         &self,
         request: &'a Request,
@@ -215,6 +238,7 @@ pub trait Api {
         ))
     }
 
+    /// Loads public and secret key from the cookies.
     fn load_keypair_from_cookies(
         &self,
         request: &Request,
@@ -233,6 +257,7 @@ pub trait Api {
         Ok((public_key, secret_key))
     }
 
+    /// Returns OK and some response with cookies.
     fn ok_response_with_cookies(
         &self,
         json: &serde_json::Value,
@@ -246,15 +271,11 @@ pub trait Api {
         Ok(resp)
     }
 
+    /// Returns OK and some response.
     fn ok_response(&self, json: &serde_json::Value) -> IronResult<Response> {
         self.ok_response_with_cookies(json, None)
     }
 
+    /// Used to extend Api.
     fn wire<'b>(&self, router: &'b mut Router);
 }
-
-mod explorer_api;
-mod private;
-
-#[cfg(test)]
-mod tests;
