@@ -37,6 +37,18 @@ impl<T, V> Entry<T, V> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: Entry<_, u8> = Entry::new(prefix, &snapshot);
+    /// # drop(index);
+    /// ```
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         Entry {
             base: BaseIndex::new(prefix, view),
@@ -51,16 +63,56 @@ where
     V: StorageValue,
 {
     /// Returns a value of the entry or `None` if does not exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(None, index.get());
+    /// index.set(10);
+    /// assert_eq!(Some(10), index.get());
+    /// ```
     pub fn get(&self) -> Option<V> {
         self.base.get(&())
     }
 
     /// Returns `true` if a value of the entry exists.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// assert!(!index.exists());
+    /// index.set(10);
+    /// assert!(index.exists());
+    /// ```
     pub fn exists(&self) -> bool {
         self.base.contains(&())
     }
 
     /// Returns hash of the entry or default hash value if does not exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(Hash::default(), index.hash());
+    /// index.set(10);
+    /// assert_ne!(Hash::default(), index.hash());
+    /// ```
     pub fn hash(&self) -> Hash {
         self.base
             .get::<(), V>(&())
@@ -74,11 +126,37 @@ where
     V: StorageValue,
 {
     /// Changes a value of the entry.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// index.set(10);
+    /// assert!(Some(10), index.get());
+    /// ```
     pub fn set(&mut self, value: V) {
         self.base.put(&(), value)
     }
 
     /// Removes a value of the entry.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, Entry};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// index.set(10);
+    /// assert!(Some(10), index.get());
+    /// index.remove();
+    /// assert!(None, index.get());
+    /// ```
     pub fn remove(&mut self) {
         self.base.remove(&())
     }

@@ -83,8 +83,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let fork = db.fork();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut index: = KeySetIndex::new(prefix, &mut fork);
+    /// let mut index: = KeySetIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(!index.contains(&1));
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -102,8 +101,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let fork = db.fork();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut index: = KeySetIndex::new(prefix, &mut fork);
+    /// let mut index: = KeySetIndex::new(vec![1, 2, 3], &mut fork);
     /// index.insert(1);
     /// index.insert(2);
     /// index.insert(3);
@@ -125,8 +123,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let fork = db.fork();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut index: = KeySetIndex::new(prefix, &mut fork);
+    /// let mut index: = KeySetIndex::new(vec![1, 2, 3], &mut fork);
     /// index.insert(1);
     /// index.insert(2);
     /// index.insert(3);
@@ -152,8 +149,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let fork = db.fork();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut index: = KeySetIndex::new(prefix, &mut fork);
+    /// let mut index: = KeySetIndex::new(vec![1, 2, 3], &mut fork);
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
@@ -170,8 +166,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let fork = db.fork();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut index: = KeySetIndex::new(prefix, &mut fork);
+    /// let mut index: = KeySetIndex::new(vec![1, 2, 3], &mut fork);
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// index.remove(&1);
@@ -195,8 +190,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let fork = db.fork();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut index: = KeySetIndex::new(prefix, &mut fork);
+    /// let mut index: = KeySetIndex::new(vec![1, 2, 3], &mut fork);
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// index.clear();
