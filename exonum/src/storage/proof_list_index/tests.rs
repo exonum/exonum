@@ -1,10 +1,24 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use rand::{thread_rng, Rng};
 
 use crypto::{Hash, hash};
 use super::super::{Database, MemoryDB, StorageValue};
 use super::{ProofListIndex, ListProof, pair_hash};
-use ::encoding::serialize::json::reexport::{to_string, from_str};
-use ::encoding::serialize::reexport::{Serialize};
+use encoding::serialize::json::reexport::{to_string, from_str};
+use encoding::serialize::reexport::Serialize;
 
 use self::ListProof::*;
 
@@ -86,8 +100,10 @@ fn test_iter() {
 
     assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
     assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
-    assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(),
-               Vec::<u8>::new());
+    assert_eq!(
+        list_index.iter_from(3).collect::<Vec<u8>>(),
+        Vec::<u8>::new()
+    );
 }
 
 #[test]
@@ -108,86 +124,126 @@ fn test_list_index_proof() {
 
     assert_eq!(index.root_hash(), h0);
     assert_eq!(index.get_proof(0), Leaf(2));
-    assert_eq!(index
-                   .get_proof(0)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(0, &2)]);
+    assert_eq!(
+        index
+            .get_proof(0)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(0, &2)]
+    );
 
     index.push(4u64);
     assert_eq!(index.root_hash(), h01);
     assert_eq!(index.get_proof(0), Left(Box::new(Leaf(2)), Some(h1)));
-    assert_eq!(index
-                   .get_proof(0)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(0, &2)]);
+    assert_eq!(
+        index
+            .get_proof(0)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(0, &2)]
+    );
     assert_eq!(index.get_proof(1), Right(h0, Box::new(Leaf(4))));
-    assert_eq!(index
-                   .get_proof(1)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(1, &4)]);
+    assert_eq!(
+        index
+            .get_proof(1)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(1, &4)]
+    );
 
-    assert_eq!(index.get_range_proof(0, 2),
-               Full(Box::new(Leaf(2)), Box::new(Leaf(4))));
-    assert_eq!(index
-                   .get_range_proof(0, 2)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(0, &2), (1, &4)]);
+    assert_eq!(
+        index.get_range_proof(0, 2),
+        Full(Box::new(Leaf(2)), Box::new(Leaf(4)))
+    );
+    assert_eq!(
+        index
+            .get_range_proof(0, 2)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(0, &2), (1, &4)]
+    );
 
     index.push(6u64);
     assert_eq!(index.root_hash(), h012);
-    assert_eq!(index.get_proof(0),
-               Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22)));
-    assert_eq!(index
-                   .get_proof(0)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(0, &2)]);
-    assert_eq!(index.get_proof(1),
-               Left(Box::new(Right(h0, Box::new(Leaf(4)))), Some(h22)));
-    assert_eq!(index
-                   .get_proof(1)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(1, &4)]);
-    assert_eq!(index.get_proof(2),
-               Right(h01, Box::new(Left(Box::new(Leaf(6)), None))));
-    assert_eq!(index
-                   .get_proof(2)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(2, &6)]);
+    assert_eq!(
+        index.get_proof(0),
+        Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22))
+    );
+    assert_eq!(
+        index
+            .get_proof(0)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(0, &2)]
+    );
+    assert_eq!(
+        index.get_proof(1),
+        Left(Box::new(Right(h0, Box::new(Leaf(4)))), Some(h22))
+    );
+    assert_eq!(
+        index
+            .get_proof(1)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(1, &4)]
+    );
+    assert_eq!(
+        index.get_proof(2),
+        Right(h01, Box::new(Left(Box::new(Leaf(6)), None)))
+    );
+    assert_eq!(
+        index
+            .get_proof(2)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(2, &6)]
+    );
 
 
-    assert_eq!(index.get_range_proof(0, 2),
-               Left(Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
-                    Some(h22)));
-    assert_eq!(index
-                   .get_range_proof(0, 2)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(0, &2), (1, &4)]);
+    assert_eq!(
+        index.get_range_proof(0, 2),
+        Left(
+            Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
+            Some(h22),
+        )
+    );
+    assert_eq!(
+        index
+            .get_range_proof(0, 2)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(0, &2), (1, &4)]
+    );
 
-    assert_eq!(index.get_range_proof(1, 3),
-               Full(Box::new(Right(h0, Box::new(Leaf(4)))),
-                    Box::new(Left(Box::new(Leaf(6)), None))));
-    assert_eq!(index
-                   .get_range_proof(1, 3)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(1, &4), (2, &6)]);
+    assert_eq!(
+        index.get_range_proof(1, 3),
+        Full(
+            Box::new(Right(h0, Box::new(Leaf(4)))),
+            Box::new(Left(Box::new(Leaf(6)), None)),
+        )
+    );
+    assert_eq!(
+        index
+            .get_range_proof(1, 3)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(1, &4), (2, &6)]
+    );
 
-    assert_eq!(index.get_range_proof(0, 3),
-               Full(Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
-                    Box::new(Left(Box::new(Leaf(6)), None))));
-    assert_eq!(index
-                   .get_range_proof(0, 3)
-                   .validate(index.root_hash(), index.len())
-                   .unwrap(),
-               [(0, &2), (1, &4), (2, &6)]);
+    assert_eq!(
+        index.get_range_proof(0, 3),
+        Full(
+            Box::new(Full(Box::new(Leaf(2)), Box::new(Leaf(4)))),
+            Box::new(Left(Box::new(Leaf(6)), None)),
+        )
+    );
+    assert_eq!(
+        index
+            .get_range_proof(0, 3)
+            .validate(index.root_hash(), index.len())
+            .unwrap(),
+        [(0, &2), (1, &4), (2, &6)]
+    );
 }
 
 #[test]
@@ -274,43 +330,51 @@ fn test_index_and_proof_roots() {
     let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
     let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
 
-    let expected_hash_comb: Vec<(Vec<u8>, Hash, u64)> = vec![(vec![1, 2], h1, 0),
-                                                             (vec![2, 3], h12, 1),
-                                                             (vec![3, 4], h123, 2),
-                                                             (vec![4, 5], h1234, 3),
-                                                             (vec![5, 6], h12345, 4),
-                                                             (vec![6, 7], h123456, 5),
-                                                             (vec![7, 8], h1234567, 6),
-                                                             (vec![8, 9], h12345678, 7)];
+    let expected_hash_comb: Vec<(Vec<u8>, Hash, u64)> = vec![
+        (vec![1, 2], h1, 0),
+        (vec![2, 3], h12, 1),
+        (vec![3, 4], h123, 2),
+        (vec![4, 5], h1234, 3),
+        (vec![5, 6], h12345, 4),
+        (vec![6, 7], h123456, 5),
+        (vec![7, 8], h1234567, 6),
+        (vec![8, 9], h12345678, 7),
+    ];
 
     for (inserted, exp_root, proof_ind) in expected_hash_comb {
         index.push(inserted);
 
         assert_eq!(index.root_hash(), exp_root);
         let range_proof = index.get_range_proof(proof_ind, proof_ind + 1);
-        assert_eq!(range_proof
-                       .validate(index.root_hash(), index.len())
-                       .unwrap()
-                       .len(),
-                   1);
+        assert_eq!(
+            range_proof
+                .validate(index.root_hash(), index.len())
+                .unwrap()
+                .len(),
+            1
+        );
         let json_repre = to_string(&range_proof).unwrap();
         let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
         let range_proof = index.get_range_proof(0, proof_ind + 1);
-        assert_eq!(range_proof
-                       .validate(index.root_hash(), index.len())
-                       .unwrap()
-                       .len(),
-                   (proof_ind + 1) as usize);
+        assert_eq!(
+            range_proof
+                .validate(index.root_hash(), index.len())
+                .unwrap()
+                .len(),
+            (proof_ind + 1) as usize
+        );
         let json_repre = to_string(&range_proof).unwrap();
         let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
         let range_proof = index.get_range_proof(0, 1);
-        assert_eq!(range_proof
-                       .validate(index.root_hash(), index.len())
-                       .unwrap()
-                       .len(),
-                   1);
+        assert_eq!(
+            range_proof
+                .validate(index.root_hash(), index.len())
+                .unwrap()
+                .len(),
+            1
+        );
         let json_repre = to_string(&range_proof).unwrap();
         let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
         assert_eq!(deser_proof, range_proof);
@@ -323,25 +387,37 @@ fn test_index_and_proof_roots() {
         .into_iter()
         .unzip();
     assert_eq!(inds, (0..8).collect::<Vec<_>>());
-    let expect_vals = vec![vec![1, 2], vec![2, 3], vec![3, 4], vec![4, 5], vec![5, 6], vec![6, 7],
-                           vec![7, 8], vec![8, 9]];
+    let expect_vals = vec![
+        vec![1, 2],
+        vec![2, 3],
+        vec![3, 4],
+        vec![4, 5],
+        vec![5, 6],
+        vec![6, 7],
+        vec![7, 8],
+        vec![8, 9],
+    ];
     let paired = expect_vals.into_iter().zip(val_refs);
     for pair in paired {
         assert_eq!(pair.0, *pair.1);
     }
 
     let mut range_proof = index.get_range_proof(3, 5);
-    assert_eq!(range_proof
-                   .validate(index.root_hash(), index.len())
-                   .unwrap()
-                   .len(),
-               2);
+    assert_eq!(
+        range_proof
+            .validate(index.root_hash(), index.len())
+            .unwrap()
+            .len(),
+        2
+    );
     range_proof = index.get_range_proof(2, 6);
-    assert_eq!(range_proof
-                   .validate(index.root_hash(), index.len())
-                   .unwrap()
-                   .len(),
-               4);
+    assert_eq!(
+        range_proof
+            .validate(index.root_hash(), index.len())
+            .unwrap()
+            .len(),
+        4
+    );
     assert_eq!(index.get(0), Some(vec![1, 2]));
 }
 
@@ -401,8 +477,10 @@ fn test_proof_structure() {
     assert_eq!(index.root_hash(), h12345);
     let range_proof = index.get_range_proof(4, 5);
 
-    assert_eq!(vec![4, 5, 6],
-               *(range_proof.validate(h12345, 5).unwrap()[0].1));
+    assert_eq!(
+        vec![4, 5, 6],
+        *(range_proof.validate(h12345, 5).unwrap()[0].1)
+    );
 
     if let ListProof::Right(left_hash1, right_proof1) = range_proof {
         assert_eq!(left_hash1, h1234);

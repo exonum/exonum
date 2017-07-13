@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use clap;
 use toml::Value;
 use serde::{Serialize, Deserialize};
@@ -10,9 +24,7 @@ use blockchain::Service;
 use self::internal::NotFoundInMap;
 
 pub use self::builder::NodeBuilder;
-pub use self::details::{Run, Finalize,
-                    GenerateNodeConfig, GenerateCommonConfig,
-                    GenerateTestnet };
+pub use self::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, GenerateTestnet};
 pub use self::shared::{AbstractConfig, NodePublicConfig, CommonConfigTemplate, NodePrivateConfig};
 
 mod shared;
@@ -42,7 +54,7 @@ pub enum ArgumentType {
     /// Unnamed positional argument.
     Positional,
     /// argument with `long` and optionally `short` name
-    Named(NamedArgument)
+    Named(NamedArgument),
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -60,38 +72,37 @@ pub struct Argument {
 }
 
 impl Argument {
-
     /// Create new argument with `long` and optionally `short` names.
-    pub fn new_named<T>(name: &'static str,
-                    required: bool,
-                    help: &'static str,
-                    short_name: T,
-                    long_name: &'static str,
-                    multiple: bool) -> Argument
-    where T: Into<Option<&'static str>>
+    pub fn new_named<T>(
+        name: &'static str,
+        required: bool,
+        help: &'static str,
+        short_name: T,
+        long_name: &'static str,
+        multiple: bool,
+    ) -> Argument
+    where
+        T: Into<Option<&'static str>>,
     {
         Argument {
-            argument_type: ArgumentType::Named (
-                NamedArgument {
-                    short_name: short_name.into(),
-                    long_name,
-                    multiple,
-                }
-            ),
-            name, help, required,
-
+            argument_type: ArgumentType::Named(NamedArgument {
+                short_name: short_name.into(),
+                long_name,
+                multiple,
+            }),
+            name,
+            help,
+            required,
         }
     }
 
     /// Create new positional argument.
-    pub fn new_positional(name: &'static str,
-                    required: bool,
-                    help: &'static str) -> Argument
-    {
+    pub fn new_positional(name: &'static str, required: bool, help: &'static str) -> Argument {
         Argument {
             argument_type: ArgumentType::Positional,
-            name, help, required,
-
+            name,
+            help,
+            required,
         }
     }
 }
@@ -106,7 +117,6 @@ pub struct Context {
 }
 
 impl Context {
-
     fn new_from_args(args: &[Argument], matches: &clap::ArgMatches) -> Context {
         let mut context = Context::default();
         for arg in args {
@@ -115,23 +125,30 @@ impl Context {
                 ArgumentType::Named(detail) if detail.multiple => {
                     if let Some(values) = matches.values_of(&arg.name) {
                         let values: Vec<String> = values.map(|e| e.to_owned()).collect();
-                        if context.multiple_args.insert(arg.name.to_owned(), values).is_some() {
+                        if context
+                            .multiple_args
+                            .insert(arg.name.to_owned(), values)
+                            .is_some()
+                        {
                             panic!("Duplicated argument: {}", arg.name);
                         }
                         continue;
-                        }
                     }
-                _ => ()
+                }
+                _ => (),
             };
 
             if let Some(value) = matches.value_of(&arg.name) {
-                if context.args.insert(arg.name.to_owned(), value.to_string()).is_some() {
+                if context
+                    .args
+                    .insert(arg.name.to_owned(), value.to_string())
+                    .is_some()
+                {
                     panic!("Duplicated argument: {}", arg.name);
                 }
-                            
-                
-            }
-            else if arg.required {
+
+
+            } else if arg.required {
                 panic!("Required argument is not found: {}", arg.name)
             }
         }
@@ -140,24 +157,24 @@ impl Context {
 
     /// Get cmd argument value
     pub fn arg<T: FromStr>(&self, key: &str) -> Result<T, Box<Error>>
-        where <T as FromStr>::Err: Error + 'static
+    where
+        <T as FromStr>::Err: Error + 'static,
     {
         if let Some(v) = self.args.get(key) {
             Ok(v.parse()?)
-        }
-        else{
+        } else {
             Err(Box::new(NotFoundInMap))
         }
     }
 
     /// Get cmd argument multiple values
     pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, Box<Error>>
-        where <T as FromStr>::Err: Error + 'static
+    where
+        <T as FromStr>::Err: Error + 'static,
     {
         if let Some(values) = self.multiple_args.get(key) {
             values.iter().map(|v| Ok(v.parse()?)).collect()
-        }
-        else{
+        } else {
             Err(Box::new(NotFoundInMap))
         }
     }
@@ -166,8 +183,7 @@ impl Context {
     pub fn get<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, Box<Error>> {
         if let Some(v) = self.variables.get(key) {
             Ok(v.clone().try_into()?)
-        }
-        else {
+        } else {
             Err(Box::new(NotFoundInMap))
         }
     }
@@ -175,14 +191,10 @@ impl Context {
     /// Sets the variable in the context and returns the previous value.
     /// ## Panic:
     /// if value could not be serialized as `toml`
-    pub fn set<T: Serialize>(&mut self,
-                         key: &'static str,
-                         value: T) -> Option<Value> {
-        let value: Value = Value::try_from(value)
-                            .expect("could not convert value into toml");
+    pub fn set<T: Serialize>(&mut self, key: &'static str, value: T) -> Option<Value> {
+        let value: Value = Value::try_from(value).expect("could not convert value into toml");
         self.variables.insert(key.to_owned(), value)
     }
-
 }
 
 pub trait CommandExtension {
@@ -200,5 +212,5 @@ pub trait ServiceFactory: 'static {
         None
     }
     /// create new service, from context, returned by `run` command.
-    fn make_service( run_context: &Context) -> Box<Service>;
+    fn make_service(run_context: &Context) -> Box<Service>;
 }

@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! An implementation of array list of items.
 use std::cell::Cell;
 use std::marker::PhantomData;
@@ -47,8 +61,9 @@ impl<T, V> ListIndex<T, V> {
 }
 
 impl<T, V> ListIndex<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     /// Returns an element at that position or `None` if out of bounds.
     pub fn get(&self, index: u64) -> Option<V> {
@@ -91,7 +106,8 @@ impl<T, V> ListIndex<T, V>
 }
 
 impl<'a, V> ListIndex<&'a mut Fork, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
@@ -121,7 +137,8 @@ impl<'a, V> ListIndex<&'a mut Fork, V>
 
     /// Extends the list with the contents of an iterator.
     pub fn extend<I>(&mut self, iter: I)
-        where I: IntoIterator<Item = V>
+    where
+        I: IntoIterator<Item = V>,
     {
         let mut len = self.len();
         for value in iter {
@@ -148,10 +165,12 @@ impl<'a, V> ListIndex<&'a mut Fork, V>
     /// Panics if `index` is equal or greater than the list's current length.
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
-            panic!("index out of bounds: \
+            panic!(
+                "index out of bounds: \
                     the len is {} but the index is {}",
-                   self.len(),
-                   index);
+                self.len(),
+                index
+            );
         }
         self.base.put(&index, value)
     }
@@ -169,8 +188,9 @@ impl<'a, V> ListIndex<&'a mut Fork, V>
 }
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     type Item = V;
     type IntoIter = ListIndexIter<'a, V>;
@@ -181,7 +201,8 @@ impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
 }
 
 impl<'a, V> Iterator for ListIndexIter<'a, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     type Item = V;
 
@@ -249,7 +270,9 @@ mod tests {
 
         assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
-        assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(),
-                   Vec::<u8>::new());
+        assert_eq!(
+            list_index.iter_from(3).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
     }
 }

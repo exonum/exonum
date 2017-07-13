@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use mio;
 
 use std::io;
@@ -136,12 +150,10 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
 
     fn post_event(&self, event: Self::ApplicationEvent) -> Result<()> {
         let msg = InternalEvent::Application(event);
-        self.inner
-            .send(msg)
-            .map_err(|e| {
-                error!("An error occured: {}", e);
-                Error::new(e.to_string())
-            })
+        self.inner.send(msg).map_err(|e| {
+            error!("An error occured: {}", e);
+            Error::new(e.to_string())
+        })
     }
 
     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
@@ -212,40 +224,53 @@ impl<H: EventHandler> MioAdapter<H> {
         }
     }
 
-    fn handle_send_to(&mut self,
-                      event_loop: &mut EventLoop<H>,
-                      address: &SocketAddr,
-                      message: RawMessage) {
+    fn handle_send_to(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        address: &SocketAddr,
+        message: RawMessage,
+    ) {
         if self.network.is_connected(address) {
             if let Err(e) = self.network.send_to(event_loop, address, message) {
-                error!("{}: An error during send_to occurred {:?}",
-                       self.network.address(),
-                       e);
+                error!(
+                    "{}: An error during send_to occurred {:?}",
+                    self.network.address(),
+                    e
+                );
                 self.handler.handle_event(Event::Disconnected(*address));
             }
         } else {
-            warn!("{}: Unable to send message to {}, connection does not established",
-                  self.network.address(),
-                  address);
+            warn!(
+                "{}: Unable to send message to {}, connection does not established",
+                self.network.address(),
+                address
+            );
         }
     }
 
     fn handle_connect(&mut self, event_loop: &mut EventLoop<H>, address: &SocketAddr) {
-        self.network
-            .connect(event_loop, address)
-            .log_error(format!("Unable to connect with {}", address));
+        self.network.connect(event_loop, address).log_error(
+            format!(
+                "Unable to connect with {}",
+                address
+            ),
+        );
     }
 
-    fn handle_add_timeout(&mut self,
-                          event_loop: &mut EventLoop<H>,
-                          timeout: H::Timeout,
-                          time: SystemTime) {
+    fn handle_add_timeout(
+        &mut self,
+        event_loop: &mut EventLoop<H>,
+        timeout: H::Timeout,
+        time: SystemTime,
+    ) {
         match time.duration_since(SystemTime::now()) {
-            Ok(duration) =>
-                event_loop.timeout_ms(Timeout::Node(timeout), num_milliseconds(&duration))
+            Ok(duration) => {
+                event_loop
+                    .timeout_ms(Timeout::Node(timeout), num_milliseconds(&duration))
                     .map(|_| ())
                     .map_err(|x| format!("{:?}", x))
-                    .log_error("Unable to add timeout to the event loop"),
+                    .log_error("Unable to add timeout to the event loop")
+            }
             Err(_) => self.handler.handle_timeout(timeout),
         }
     }
@@ -318,7 +343,8 @@ trait LogError {
 }
 
 impl<E> LogError for result::Result<(), E>
-    where E: fmt::Display
+where
+    E: fmt::Display,
 {
     fn log_error<S: AsRef<str>>(self, msg: S) {
         if let Err(error) = self {

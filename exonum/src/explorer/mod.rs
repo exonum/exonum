@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use serde_json::Value;
 
 use std::cmp;
@@ -41,19 +55,17 @@ impl<'a> BlockchainExplorer<'a> {
         let res = match tx {
             None => None,
             Some(raw_tx) => {
-                let box_transaction = self.blockchain
-                    .tx_from_raw(raw_tx.clone())
-                    .ok_or_else(|| {
-                                    ApiError::Service(format!("Service not found for tx: {:?}",
-                                                              raw_tx)
-                                                              .into())
-                                })?;
+                let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
+                    ApiError::Service(format!("Service not found for tx: {:?}", raw_tx).into())
+                })?;
                 let content = box_transaction.info();
 
-                let location = schema
-                    .tx_location_by_tx_hash()
-                    .get(tx_hash)
-                    .expect(&format!("Not found tx_hash location: {:?}", tx_hash));
+                let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
+                    &format!(
+                        "Not found tx_hash location: {:?}",
+                        tx_hash
+                    ),
+                );
 
                 let block_height = location.block_height();
                 let tx_index = location.position_in_block();
@@ -88,11 +100,12 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
-    pub fn blocks_range(&self,
-                        count: u64,
-                        upper: Option<u64>,
-                        skip_empty_blocks: bool)
-                        -> Vec<Block> {
+    pub fn blocks_range(
+        &self,
+        count: u64,
+        upper: Option<u64>,
+        skip_empty_blocks: bool,
+    ) -> Vec<Block> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
         let schema = Schema::new(&snapshot);
@@ -109,12 +122,14 @@ impl<'a> BlockchainExplorer<'a> {
             if skip_empty_blocks && block_txs.is_empty() {
                 continue;
             }
-            let block_hash = hashes
-                .get(height)
-                .expect(&format!("Block not found, height:{:?}", height));
-            let block = blocks
-                .get(&block_hash)
-                .expect(&format!("Block not found, hash:{:?}", block_hash));
+            let block_hash = hashes.get(height).expect(&format!(
+                "Block not found, height:{:?}",
+                height
+            ));
+            let block = blocks.get(&block_hash).expect(&format!(
+                "Block not found, hash:{:?}",
+                block_hash
+            ));
             v.push(block)
         }
         v

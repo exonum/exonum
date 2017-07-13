@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Serialize structure into specific format.
 //! Currently support only json.
 //! This module is a pack of superstructures over serde `Serializer's`\\`Deserializer's`
@@ -33,7 +47,7 @@ macro_rules! implement_exonum_serializer {
                                                         buffer: &mut B,
                                                         from: $crate::encoding::Offset,
                                                         to: $crate::encoding::Offset)
-                                                        -> Result<(), Box<::std::error::Error>> 
+                                                        -> Result<(), Box<::std::error::Error>>
             where B: $crate::encoding::serialize::WriteBufferWrapper
             {
                 use $crate::encoding::serialize::json::reexport::from_value;
@@ -42,7 +56,7 @@ macro_rules! implement_exonum_serializer {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> 
+            fn serialize_field(&self) ->
                 Result<$crate::encoding::serialize::json::reexport::Value,
                         Box<::std::error::Error>>
             {

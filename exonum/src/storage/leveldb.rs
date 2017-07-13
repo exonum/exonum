@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! An implementation of `LevelDB` database.
 use profiler;
 
@@ -82,9 +96,9 @@ impl Database for LevelDB {
     fn snapshot(&self) -> Box<Snapshot> {
         let _p = profiler::ProfilerSpan::new("LevelDB::snapshot");
         Box::new(LevelDBSnapshot {
-                     _db: self.db.clone(),
-                     snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-                 })
+            _db: self.db.clone(),
+            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+        })
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
@@ -96,9 +110,9 @@ impl Database for LevelDB {
                 Change::Delete => batch.delete(key),
             }
         }
-        self.db
-            .write(LEVELDB_WRITE_OPTIONS, &batch)
-            .map_err(Into::into)
+        self.db.write(LEVELDB_WRITE_OPTIONS, &batch).map_err(
+            Into::into,
+        )
     }
 }
 

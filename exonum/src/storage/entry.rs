@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! An implementation of index that may only contain one element.
 use std::marker::PhantomData;
 
@@ -32,8 +46,9 @@ impl<T, V> Entry<T, V> {
 }
 
 impl<T, V> Entry<T, V>
-    where T: AsRef<Snapshot>,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
 {
     /// Returns a value of the entry or `None` if does not exist.
     pub fn get(&self) -> Option<V> {
@@ -55,7 +70,8 @@ impl<T, V> Entry<T, V>
 }
 
 impl<'a, V> Entry<&'a mut Fork, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     /// Changes a value of the entry.
     pub fn set(&mut self, value: V) {

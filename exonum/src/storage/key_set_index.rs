@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! An implementation of set for items that implement `StorageKey` trait.
 use std::marker::PhantomData;
 
@@ -44,8 +58,9 @@ impl<T, K> KeySetIndex<T, K> {
 }
 
 impl<T, K> KeySetIndex<T, K>
-    where T: AsRef<Snapshot>,
-          K: StorageKey
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
 {
     /// Returns `true` if the set contains a value.
     pub fn contains(&self, item: &K) -> bool {
@@ -65,7 +80,8 @@ impl<T, K> KeySetIndex<T, K>
 }
 
 impl<'a, K> KeySetIndex<&'a mut Fork, K>
-    where K: StorageKey
+where
+    K: StorageKey,
 {
     /// Adds a value to the set.
     pub fn insert(&mut self, item: K) {
@@ -89,8 +105,9 @@ impl<'a, K> KeySetIndex<&'a mut Fork, K>
 }
 
 impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
-    where T: AsRef<Snapshot>,
-          K: StorageKey
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
 {
     type Item = K;
     type IntoIter = KeySetIndexIter<'a, K>;
@@ -101,7 +118,8 @@ impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
 }
 
 impl<'a, K> Iterator for KeySetIndexIter<'a, K>
-    where K: StorageKey
+where
+    K: StorageKey,
 {
     type Item = K;
 
