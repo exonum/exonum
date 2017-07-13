@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Blockchain explorer module provides api for getting information about blocks and transactions
+//! from the blockchain.
+
 use serde_json::Value;
 
 use std::cmp;
@@ -23,11 +26,13 @@ use messages::Precommit;
 // TODO: if explorer is usable anywhere else, remove `ApiError` dependencies.
 use api::ApiError;
 
+/// Blockchain explorer.
 #[derive(Debug)]
 pub struct BlockchainExplorer<'a> {
     blockchain: &'a Blockchain,
 }
 
+/// Block information.
 #[derive(Debug, Serialize)]
 pub struct BlockInfo {
     block: Block,
@@ -35,6 +40,7 @@ pub struct BlockInfo {
     txs: Vec<Hash>,
 }
 
+/// Transaction information.
 #[derive(Debug, Serialize)]
 pub struct TxInfo {
     content: Value,
@@ -43,10 +49,12 @@ pub struct TxInfo {
 }
 
 impl<'a> BlockchainExplorer<'a> {
-    pub fn new(blockchain: &'a Blockchain) -> BlockchainExplorer {
+    /// Creates a new `BlockchainExplorer` instance.
+    pub fn new(blockchain: &'a Blockchain) -> Self {
         BlockchainExplorer { blockchain: blockchain }
     }
 
+    /// Returns information about the transaction identified by the hash.
     pub fn tx_info(&self, tx_hash: &Hash) -> Result<Option<TxInfo>, ApiError> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
@@ -81,6 +89,7 @@ impl<'a> BlockchainExplorer<'a> {
         Ok(res)
     }
 
+    /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block_info(&self, height: u64) -> Option<BlockInfo> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
@@ -100,6 +109,7 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
+    /// Returns the list of blocks in the given range.
     pub fn blocks_range(
         &self,
         count: u64,

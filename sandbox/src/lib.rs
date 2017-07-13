@@ -19,6 +19,7 @@ extern crate env_logger;
 extern crate clap;
 #[macro_use]
 extern crate exonum;
+extern crate bit_vec;
 
 pub use self::sandbox::{timestamping_sandbox, sandbox_with_services};
 

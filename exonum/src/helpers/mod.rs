@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Different assorted utilities.
+
 use log::{LogRecord, LogLevel, SetLoggerError};
 use env_logger::LogBuilder;
 use colored::*;
@@ -26,6 +28,7 @@ use crypto::gen_keypair;
 pub mod fabric;
 pub mod config;
 
+/// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {
     let mut builder = LogBuilder::new();
     builder.format(format_log_record);
@@ -37,6 +40,7 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
     builder.init()
 }
 
+/// Generates testnet configuration.
 pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
         .map(|_| (gen_keypair(), gen_keypair()))

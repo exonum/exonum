@@ -38,13 +38,16 @@ use super::shared::{AbstractConfig, NodePublicConfig, SharedConfig, NodePrivateC
                     CommonConfigTemplate};
 use super::DEFAULT_EXONUM_LISTEN_PORT;
 
+/// Run command.
 pub struct Run;
 
 impl Run {
+    /// Returns the name of the `Run` command.
     pub fn name() -> CommandName {
         "run"
     }
 
+    /// Returns created database instance.
     #[cfg(not(feature = "memorydb"))]
     pub fn db_helper(ctx: &Context) -> Box<Database> {
         use storage::{LevelDB, LevelDBOptions};
@@ -57,6 +60,7 @@ impl Run {
         Box::new(LevelDB::open(Path::new(&path), options).unwrap())
     }
 
+    /// Returns created database instance.
     #[cfg(feature = "memorydb")]
     pub fn db_helper(_: &Context) -> Box<Database> {
         use storage::MemoryDB;
@@ -148,10 +152,11 @@ impl Command for Run {
     }
 }
 
-
-/// implements command for template generating
+/// Command for the template generation.
 pub struct GenerateCommonConfig;
+
 impl GenerateCommonConfig {
+    /// Returns the name of the `GenerateCommonConfig` command.
     pub fn name() -> CommandName {
         "generate-template"
     }
@@ -189,9 +194,11 @@ impl Command for GenerateCommonConfig {
     }
 }
 
+/// Command for the node configuration generation.
 pub struct GenerateNodeConfig;
 
 impl GenerateNodeConfig {
+    /// Returns the name of the `GenerateNodeConfig` command.
     pub fn name() -> CommandName {
         "generate-config"
     }
@@ -305,13 +312,17 @@ impl Command for GenerateNodeConfig {
     }
 }
 
+/// Finalize command.
 pub struct Finalize;
+
 impl Finalize {
+    /// Returns the name of the `Finalize` command.
     pub fn name() -> CommandName {
         "finalize"
     }
 
-    pub fn genesis_from_template(
+    /// Returns `GenesisConfig` from the template.
+    fn genesis_from_template(
         template: CommonConfigTemplate,
         configs: Vec<NodePublicConfig>,
     ) -> GenesisConfig {
@@ -321,7 +332,7 @@ impl Finalize {
         )
     }
 
-    pub fn reduce_configs(
+    fn reduce_configs(
         public_configs: Vec<SharedConfig>,
         our_config: &NodePrivateConfig,
     ) -> (CommonConfigTemplate, Vec<NodePublicConfig>, NodePublicConfig) {
@@ -439,8 +450,11 @@ impl Command for Finalize {
     }
 }
 
+/// Command for the testnet generation.
 pub struct GenerateTestnet;
+
 impl GenerateTestnet {
+    /// Returns the name of the `GenerateTestnet` command.
     pub fn name() -> CommandName {
         "generate-testnet"
     }

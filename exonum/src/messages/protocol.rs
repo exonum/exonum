@@ -33,20 +33,32 @@ use crypto::{Hash, PublicKey};
 use blockchain;
 use super::{RawMessage, BitVec};
 
+/// Consensus message type.
 pub const CONSENSUS: u16 = 0;
 
+/// `Connect` message id.
 pub const CONNECT_MESSAGE_ID: u16 = 0;
+/// `Status` message id.
 pub const STATUS_MESSAGE_ID: u16 = 1;
 
+/// `Propose` message id.
 pub const PROPOSE_MESSAGE_ID: u16 = 2;
+/// `Prevote` message id.
 pub const PREVOTE_MESSAGE_ID: u16 = 3;
+/// `Precommit` message id.
 pub const PRECOMMIT_MESSAGE_ID: u16 = 4;
+/// `Block` message id.
 pub const BLOCK_MESSAGE_ID: u16 = 5;
 
+/// `RequestPropose` message id.
 pub const REQUEST_PROPOSE_MESSAGE_ID: u16 = 6;
+/// `RequestTransactions` message id.
 pub const REQUEST_TRANSACTIONS_MESSAGE_ID: u16 = 7;
+/// `RequestPrevotes` message id.
 pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
+/// `RequestPeers` message id.
 pub const REQUEST_PEERS_MESSAGE_ID: u16 = 9;
+/// `RequestBlock` message id.
 pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
 
 message! {
@@ -67,8 +79,11 @@ message! {
         const ID = CONNECT_MESSAGE_ID;
         const SIZE = 50;
 
+        /// The sender's public key.
         field pub_key:        &PublicKey  [00 => 32]
+        /// The node's address.
         field addr:           SocketAddr  [32 => 38]
+        /// Time when the message was created.
         field time:           SystemTime  [38 => 50]
     }
 }
@@ -95,10 +110,15 @@ message! {
         const ID = PROPOSE_MESSAGE_ID;
         const SIZE = 54;
 
+        /// The validator id.
         field validator:      u16         [00 => 02]
+        /// The height to which the message is related.
         field height:         u64         [02 => 10]
+        /// The round to which the message is related.
         field round:          u32         [10 => 14]
+        /// Hash of the previous `Block`.
         field prev_hash:      &Hash       [14 => 46]
+        /// The list of transactions to include in the next block.
         field transactions:   &[Hash]     [46 => 54]
     }
 }
@@ -125,10 +145,15 @@ message! {
         const ID = PREVOTE_MESSAGE_ID;
         const SIZE = 50;
 
+        /// The validator id.
         field validator:      u16         [00 => 02]
+        /// The height to which the message is related.
         field height:         u64         [02 => 10]
+        /// The round to which the message is related.
         field round:          u32         [10 => 14]
+        /// Hash of the corresponding `Propose`.
         field propose_hash:   &Hash       [14 => 46]
+        /// Locked round.
         field locked_round:   u32         [46 => 50]
     }
 }
@@ -156,11 +181,17 @@ message! {
         const ID = PRECOMMIT_MESSAGE_ID;
         const SIZE = 90;
 
+        /// The validator id.
         field validator:      u16         [00 => 02]
+        /// The height to which the message is related.
         field height:         u64         [02 => 10]
+        /// The round to which the message is related.
         field round:          u32         [10 => 14]
+        /// Hash of the corresponding `Propose`.
         field propose_hash:   &Hash       [14 => 46]
+        /// Hash of the new block.
         field block_hash:     &Hash       [46 => 78]
+        /// Time of the `Precommit`.
         field time:           SystemTime  [78 => 90]
     }
 }
@@ -185,8 +216,11 @@ message! {
         const ID = STATUS_MESSAGE_ID;
         const SIZE = 72;
 
+        /// The sender's public key.
         field from:           &PublicKey          [00 => 32]
+        /// The height to which the message is related.
         field height:         u64                 [32 => 40]
+        /// Hash of the last committed block.
         field last_hash:      &Hash               [40 => 72]
     }
 }
@@ -209,18 +243,17 @@ message! {
         const ID = BLOCK_MESSAGE_ID;
         const SIZE = 88;
 
+        /// The sender's public key.
         field from:           &PublicKey          [00 => 32]
+        /// Public key of the recipient.
         field to:             &PublicKey          [32 => 64]
+        /// Block.
         field block:          blockchain::Block   [64 => 72]
+        /// List of pre-commits.
         field precommits:     Vec<Precommit>      [72 => 80]
+        /// List of the transactions.
         field transactions:   Vec<RawMessage>     [80 => 88]
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct BlockProof {
-    pub block: blockchain::Block,
-    pub precommits: Vec<Precommit>,
 }
 
 message! {
@@ -239,9 +272,13 @@ message! {
         const ID = REQUEST_PROPOSE_MESSAGE_ID;
         const SIZE = 104;
 
+        /// The sender's public key.
         field from:           &PublicKey  [00 => 32]
+        /// Public key of the recipient.
         field to:             &PublicKey  [32 => 64]
+        /// The height to which the message is related.
         field height:         u64         [64 => 72]
+        /// Hash of the `Propose`.
         field propose_hash:   &Hash       [72 => 104]
     }
 }
@@ -259,8 +296,11 @@ message! {
         const ID = REQUEST_TRANSACTIONS_MESSAGE_ID;
         const SIZE = 72;
 
+        /// The sender's public key.
         field from:           &PublicKey  [00 => 32]
+        /// Public key of the recipient.
         field to:             &PublicKey  [32 => 64]
+        /// The list of the transaction hashes.
         field txs:            &[Hash]     [64 => 72]
     }
 }
@@ -281,11 +321,17 @@ message! {
         const ID = REQUEST_PREVOTES_MESSAGE_ID;
         const SIZE = 116;
 
+        /// The sender's public key.
         field from:           &PublicKey  [00 => 32]
+        /// Public key of the recipient.
         field to:             &PublicKey  [32 => 64]
+        /// The height to which the message is related.
         field height:         u64         [64 => 72]
+        /// The round to which the message is related.
         field round:          u32         [72 => 76]
+        /// Hash of the `Propose`.
         field propose_hash:   &Hash       [76 => 108]
+        /// The list of validators that send pre-votes.
         field validators:     BitVec      [108 => 116]
     }
 }
@@ -308,7 +354,9 @@ message! {
         const ID = REQUEST_PEERS_MESSAGE_ID;
         const SIZE = 64;
 
+        /// The sender's public key.
         field from:           &PublicKey  [00 => 32]
+        /// Public key of the recipient.
         field to:             &PublicKey  [32 => 64]
     }
 }
@@ -329,8 +377,11 @@ message! {
         const ID = REQUEST_BLOCK_MESSAGE_ID;
         const SIZE = 72;
 
+        /// The sender's public key.
         field from:           &PublicKey  [00 => 32]
+        /// Public key of the recipient.
         field to:             &PublicKey  [32 => 64]
+        /// The height to which the message is related.
         field height:         u64         [64 => 72]
     }
 }

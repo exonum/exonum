@@ -26,13 +26,15 @@ use api::{Api, ApiError};
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
+/// Public explorer API.
 #[derive(Clone, Debug)]
 pub struct ExplorerApi {
     blockchain: Blockchain,
 }
 
 impl ExplorerApi {
-    pub fn new(blockchain: Blockchain) -> ExplorerApi {
+    /// Creates a new `ExplorerApi` instance.
+    pub fn new(blockchain: Blockchain) -> Self {
         ExplorerApi { blockchain }
     }
 

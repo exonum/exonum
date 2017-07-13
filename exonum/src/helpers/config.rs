@@ -12,20 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Loading and saving TOML-encoded configurations.
+
 use serde::{Serialize, Deserialize};
 use toml;
 
 use std::path::Path;
-use std::io;
-use std::fs;
+use std::io::{self, Read, Write};
+use std::fs::{self, File};
 use std::error::Error;
-use std::io::prelude::*;
-use std::fs::File;
 
+/// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]
 pub struct ConfigFile {}
 
 impl ConfigFile {
+    /// Loads TOML-encoded file.
     pub fn load<P, T>(path: P) -> Result<T, Box<Error>>
     where
         T: for<'r> Deserialize<'r>,
@@ -40,6 +42,7 @@ impl ConfigFile {
         })
     }
 
+    /// Saves TOML-encoded file.
     pub fn save<P, T>(value: &T, path: P) -> Result<(), Box<Error>>
     where
         T: Serialize,

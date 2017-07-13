@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use byteorder::{ByteOrder, LittleEndian};
+use bit_vec::BitVec;
 
-use messages::{BitVec, RawMessage, HEADER_LENGTH, MessageBuffer};
+use messages::{RawMessage, HEADER_LENGTH, MessageBuffer};
 use crypto::Hash;
 
 use super::{Result, Error, Field, Offset, CheckedOffset};

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(missing_docs)]
 //! `encoding` is a lazy serialization library,
 //! it allows to keep struct serialized in place, and deserialize fields on demand.
 //!

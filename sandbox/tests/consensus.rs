@@ -18,14 +18,16 @@ extern crate sandbox;
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+extern crate bit_vec;
 
 use rand::{thread_rng, Rng};
+use bit_vec::BitVec;
 
 use std::time::Duration;
 use std::collections::BTreeMap;
 
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, RequestPropose,
-                       RequestTransactions, RequestPrevotes, BitVec, CONSENSUS};
+                       RequestTransactions, RequestPrevotes, CONSENSUS};
 use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
 use exonum::blockchain::{Block, Blockchain, Schema};
 use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,

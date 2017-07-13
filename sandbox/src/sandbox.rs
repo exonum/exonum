@@ -24,9 +24,9 @@ use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, Externa
                    ListenerConfig, ServiceConfig};
 use exonum::node::state::{Round, Height};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState};
+                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof};
 use exonum::storage::{MemoryDB, MapProof};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
