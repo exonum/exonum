@@ -1,3 +1,19 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Different assorted utilities.
+
 use log::{LogRecord, LogLevel, SetLoggerError};
 use env_logger::LogBuilder;
 use colored::*;
@@ -10,7 +26,9 @@ use node::NodeConfig;
 use crypto::gen_keypair;
 
 pub mod fabric;
+pub mod config;
 
+/// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {
     let mut builder = LogBuilder::new();
     builder.format(format_log_record);
@@ -22,19 +40,23 @@ pub fn init_logger() -> Result<(), SetLoggerError> {
     builder.init()
 }
 
+/// Generates testnet configuration.
 pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
     let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
-        .map(|_| (gen_keypair(), gen_keypair())).unzip();
-    let genesis = GenesisConfig::new(validators.iter().zip(services.iter()).map(|x| ValidatorKeys {
-        consensus_key: (x.0).0,
-        service_key: (x.1).0,
+        .map(|_| (gen_keypair(), gen_keypair()))
+        .unzip();
+    let genesis = GenesisConfig::new(validators.iter().zip(services.iter()).map(|x| {
+        ValidatorKeys {
+            consensus_key: (x.0).0,
+            service_key: (x.1).0,
+        }
     }));
     let peers = (0..validators.len())
         .map(|x| {
-                 format!("127.0.0.1:{}", start_port + x as u16)
-                     .parse()
-                     .unwrap()
-             })
+            format!("127.0.0.1:{}", start_port + x as u16)
+                .parse()
+                .unwrap()
+        })
         .collect::<Vec<_>>();
 
     validators
@@ -102,12 +124,14 @@ fn format_log_record(record: &LogRecord) -> String {
             LogLevel::Debug => "DEBUG".cyan(),
             LogLevel::Trace => "TRACE".white(),
         };
-        format!("[{} : {}] - [ {} ] - {} - {}",
-                secs.bold(),
-                millis.bold(),
-                level,
-                &source_path,
-                record.args())
+        format!(
+            "[{} : {}] - [ {} ] - {} - {}",
+            secs.bold(),
+            millis.bold(),
+            level,
+            &source_path,
+            record.args()
+        )
     } else {
         let level = match record.level() {
             LogLevel::Error => "ERROR",
@@ -116,11 +140,13 @@ fn format_log_record(record: &LogRecord) -> String {
             LogLevel::Debug => "DEBUG",
             LogLevel::Trace => "TRACE",
         };
-        format!("[{} : {}] - [ {} ] - {} - {}",
-                secs,
-                millis,
-                level,
-                &source_path,
-                record.args())
+        format!(
+            "[{} : {}] - [ {} ] - {} - {}",
+            secs,
+            millis,
+            level,
+            &source_path,
+            record.args()
+        )
     }
 }

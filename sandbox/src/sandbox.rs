@@ -1,4 +1,18 @@
-use std::collections::{VecDeque, BinaryHeap, HashSet, HashMap};
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use std::collections::{VecDeque, BinaryHeap, HashSet, BTreeMap, HashMap};
 use std::iter::FromIterator;
 use std::cell::{RefCell, Ref, RefMut};
 use std::sync::{Arc, Mutex};
@@ -8,11 +22,11 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage,
                    ListenerConfig, ServiceConfig};
-use exonum::node::state::{Round, Height, TxPool};
+use exonum::node::state::{Round, Height};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service, ValidatorKeys};
+                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof};
 use exonum::storage::{MemoryDB, MapProof};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, BlockProof, Status};
+use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
                      EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
@@ -59,11 +73,9 @@ impl SandboxChannel {
     }
 
     fn send_message(&self, address: &SocketAddr, message: RawMessage) {
-        self.inner
-            .lock()
-            .unwrap()
-            .sent
-            .push_back((*address, message));
+        self.inner.lock().unwrap().sent.push_back(
+            (*address, message),
+        );
     }
 }
 
@@ -202,27 +214,33 @@ pub struct Sandbox {
 }
 
 impl Sandbox {
-    pub fn initialize(&self,
-                      connect_message_time: SystemTime,
-                      start_index: usize,
-                      end_index: usize) {
+    pub fn initialize(
+        &self,
+        connect_message_time: SystemTime,
+        start_index: usize,
+        end_index: usize,
+    ) {
         let connect = Connect::new(&self.p(0), self.a(0), connect_message_time, self.s(0));
 
         for validator in start_index..end_index {
-            self.recv(Connect::new(&self.p(validator),
-                                   self.a(validator),
-                                   self.time(),
-                                   self.s(validator)));
+            self.recv(Connect::new(
+                &self.p(validator),
+                self.a(validator),
+                self.time(),
+                self.s(validator),
+            ));
             self.send(self.a(validator), connect.clone());
         }
 
         self.check_unexpected_message()
     }
 
-    pub fn set_validators_map(&mut self,
-                              new_addresses_len: u8,
-                              validators: Vec<(PublicKey, SecretKey)>,
-                              services: Vec<(PublicKey, SecretKey)>) {
+    pub fn set_validators_map(
+        &mut self,
+        new_addresses_len: u8,
+        validators: Vec<(PublicKey, SecretKey)>,
+        services: Vec<(PublicKey, SecretKey)>,
+    ) {
         self.addresses = (1..(new_addresses_len + 1) as u8)
             .map(gen_primitive_socket_addr)
             .collect::<Vec<_>>();
@@ -289,8 +307,9 @@ impl Sandbox {
     }
 
     pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
-        RefMut::map(self.reactor.borrow_mut(),
-                    |reactor| &mut reactor.handler.blockchain)
+        RefMut::map(self.reactor.borrow_mut(), |reactor| {
+            &mut reactor.handler.blockchain
+        })
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
@@ -306,16 +325,20 @@ impl Sandbox {
         if let Some((real_addr, real_msg)) = sended {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
-                panic!("Expected to send the message {:?} to {} instead sending {:?} to {}",
-                       any_expected_msg,
-                       addr,
-                       any_real_msg,
-                       real_addr)
+                panic!(
+                    "Expected to send the message {:?} to {} instead sending {:?} to {}",
+                    any_expected_msg,
+                    addr,
+                    any_real_msg,
+                    real_addr
+                )
             }
         } else {
-            panic!("Expected to send the message {:?} to {} but nothing happened",
-                   any_expected_msg,
-                   addr);
+            panic!(
+                "Expected to send the message {:?} to {} but nothing happened",
+                any_expected_msg,
+                addr
+            );
         }
     }
 
@@ -325,7 +348,8 @@ impl Sandbox {
 
     // TODO: add self-test for broadcasting?
     pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: T, addresses: I)
-        where I: IntoIterator<Item = &'a SocketAddr>
+    where
+        I: IntoIterator<Item = &'a SocketAddr>,
     {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
 
@@ -338,32 +362,40 @@ impl Sandbox {
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
-                    panic!("Expected to broadcast the message {:?} instead sending {:?} to {}",
-                           any_expected_msg,
-                           any_real_msg,
-                           real_addr)
+                    panic!(
+                        "Expected to broadcast the message {:?} instead sending {:?} to {}",
+                        any_expected_msg,
+                        any_real_msg,
+                        real_addr
+                    )
                 }
                 if !expected_set.contains(&real_addr) {
-                    panic!("Double send the same message {:?} to {:?} during broadcasting",
-                           any_expected_msg,
-                           real_addr)
+                    panic!(
+                        "Double send the same message {:?} to {:?} during broadcasting",
+                        any_expected_msg,
+                        real_addr
+                    )
                 } else {
                     expected_set.remove(&real_addr);
                 }
             } else {
-                panic!("Expected to broadcast the message {:?} but someone don't recieve \
+                panic!(
+                    "Expected to broadcast the message {:?} but someone don't recieve \
                         messages: {:?}",
-                       any_expected_msg,
-                       expected_set);
+                    any_expected_msg,
+                    expected_set
+                );
             }
         }
     }
 
     pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
-        self.broadcast(Status::new(&self.node_public_key(),
-                                   height,
-                                   block_hash,
-                                   &self.node_secret_key()));
+        self.broadcast(Status::new(
+            &self.node_public_key(),
+            height,
+            block_hash,
+            &self.node_secret_key(),
+        ));
     }
 
     pub fn add_time(&self, duration: Duration) {
@@ -425,7 +457,8 @@ impl Sandbox {
     }
 
     pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<RawMessage>
-        where I: IntoIterator<Item = &'a RawMessage>
+    where
+        I: IntoIterator<Item = &'a RawMessage>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
@@ -449,11 +482,12 @@ impl Sandbox {
 
     /// Extract state_hash from fake block
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
-        where I: IntoIterator<Item = &'a RawTransaction>
+    where
+        I: IntoIterator<Item = &'a RawTransaction>,
     {
         let blockchain = &self.reactor.borrow().handler.blockchain;
         let (hashes, tx_pool) = {
-            let mut pool = TxPool::new();
+            let mut pool = BTreeMap::new();
             let mut hashes = Vec::new();
             for raw in txs {
                 let tx = blockchain.tx_from_raw(raw.clone()).unwrap();
@@ -508,14 +542,11 @@ impl Sandbox {
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        self.reactor
-            .borrow()
-            .handler
-            .state()
-            .transactions()
-            .keys()
-            .cloned()
-            .collect()
+        let b = self.reactor.borrow();
+        let rlock = b.handler.state().transactions().read().expect(
+            "Expected read lock",
+        );
+        rlock.keys().cloned().collect()
     }
 
     pub fn current_round(&self) -> Round {
@@ -533,11 +564,9 @@ impl Sandbox {
     }
 
     pub fn current_leader(&self) -> ValidatorId {
-        self.reactor
-            .borrow()
-            .handler
-            .state()
-            .leader(self.current_round())
+        self.reactor.borrow().handler.state().leader(
+            self.current_round(),
+        )
     }
 
     pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
@@ -585,14 +614,18 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 }
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
-    let validators = vec![gen_keypair_from_seed(&Seed::new([12; 32])),
-                          gen_keypair_from_seed(&Seed::new([13; 32])),
-                          gen_keypair_from_seed(&Seed::new([16; 32])),
-                          gen_keypair_from_seed(&Seed::new([19; 32]))];
-    let service_keys = vec![gen_keypair_from_seed(&Seed::new([20; 32])),
-                            gen_keypair_from_seed(&Seed::new([21; 32])),
-                            gen_keypair_from_seed(&Seed::new([22; 32])),
-                            gen_keypair_from_seed(&Seed::new([23; 32]))];
+    let validators = vec![
+        gen_keypair_from_seed(&Seed::new([12; 32])),
+        gen_keypair_from_seed(&Seed::new([13; 32])),
+        gen_keypair_from_seed(&Seed::new([16; 32])),
+        gen_keypair_from_seed(&Seed::new([19; 32])),
+    ];
+    let service_keys = vec![
+        gen_keypair_from_seed(&Seed::new([20; 32])),
+        gen_keypair_from_seed(&Seed::new([21; 32])),
+        gen_keypair_from_seed(&Seed::new([22; 32])),
+        gen_keypair_from_seed(&Seed::new([23; 32])),
+    ];
 
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
@@ -606,16 +639,15 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         propose_timeout: 200,
         txs_block_limit: 1000,
     };
-    let genesis = GenesisConfig::new_with_consensus(consensus,
-                                                    validators
-                                                        .iter()
-                                                        .zip(service_keys.iter())
-                                                        .map(|x| {
-                                                                 ValidatorKeys {
-                                                                     consensus_key: (x.0).0,
-                                                                     service_key: (x.1).0,
-                                                                 }
-                                                             }));
+    let genesis = GenesisConfig::new_with_consensus(
+        consensus,
+        validators.iter().zip(service_keys.iter()).map(|x| {
+            ValidatorKeys {
+                consensus_key: (x.0).0,
+                service_key: (x.1).0,
+            }
+        }),
+    );
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
@@ -638,15 +670,21 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     // TODO use factory or other solution like set_handler or run
 
     let inner = Arc::new(Mutex::new(SandboxInner {
-                                        address: addresses[0],
-                                        time: UNIX_EPOCH + Duration::new(1486720340, 0),
-                                        sent: VecDeque::new(),
-                                        events: VecDeque::new(),
-                                        timers: BinaryHeap::new(),
-                                    }));
+        address: addresses[0],
+        time: UNIX_EPOCH + Duration::new(1486720340, 0),
+        sent: VecDeque::new(),
+        events: VecDeque::new(),
+        timers: BinaryHeap::new(),
+    }));
 
     let channel = SandboxChannel { inner: inner.clone() };
-    let node = NodeHandler::new(blockchain.clone(), addresses[0], channel, config.clone());
+    let node = NodeHandler::new(
+        blockchain.clone(),
+        addresses[0],
+        channel,
+        config.clone(),
+        SharedNodeState::new(5000),
+    );
 
     let mut reactor = SandboxReactor {
         inner: inner.clone(),
@@ -669,8 +707,10 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
 pub fn timestamping_sandbox() -> Sandbox {
     let _ = init_logger();
-    sandbox_with_services(vec![Box::new(TimestampingService::new()),
-                               Box::new(ConfigUpdateService::new())])
+    sandbox_with_services(vec![
+        Box::new(TimestampingService::new()),
+        Box::new(ConfigUpdateService::new()),
+    ])
 }
 
 #[test]

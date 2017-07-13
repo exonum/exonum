@@ -1,3 +1,18 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! An implementation of `LevelDB` database.
 use profiler;
 
 use leveldb::database::Database as _LevelDB;
@@ -16,7 +31,10 @@ use std::path::Path;
 use std::error;
 use std::sync::Arc;
 
+/// Options to consider when opening a new or pre-existing `LevelDB` database.
 pub use leveldb::options::Options as LevelDBOptions;
+
+/// Represents a `LevelDB` cache.
 pub use leveldb::database::cache::Cache as LevelDBCache;
 
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
@@ -29,16 +47,19 @@ const LEVELDB_READ_OPTIONS: ReadOptions<'static> = ReadOptions {
 
 const LEVELDB_WRITE_OPTIONS: WriteOptions = WriteOptions { sync: false };
 
+/// Database implementation on the top of `LevelDB` backend.
 #[derive(Clone)]
 pub struct LevelDB {
     db: Arc<_LevelDB>,
 }
 
+/// A snapshot of a `LevelDB`.
 struct LevelDBSnapshot {
     _db: Arc<_LevelDB>,
     snapshot: _Snapshot<'static>,
 }
 
+/// An iterator over the entries of a `LevelDB`.
 struct LevelDBIterator<'a> {
     iter: _Iterator<'a>,
 }
@@ -56,8 +77,9 @@ impl From<io::Error> for Error {
 }
 
 impl LevelDB {
-    // TODO: configurate LRU cache
+    /// Open a database stored in the specified path with the specified options.
     pub fn open<P: AsRef<Path>>(path: P, options: LevelDBOptions) -> Result<LevelDB> {
+        // TODO: configure LRU cache
         if options.create_if_missing {
             fs::create_dir_all(path.as_ref())?;
         }
@@ -74,9 +96,9 @@ impl Database for LevelDB {
     fn snapshot(&self) -> Box<Snapshot> {
         let _p = profiler::ProfilerSpan::new("LevelDB::snapshot");
         Box::new(LevelDBSnapshot {
-                     _db: self.db.clone(),
-                     snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-                 })
+            _db: self.db.clone(),
+            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+        })
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
@@ -88,9 +110,9 @@ impl Database for LevelDB {
                 Change::Delete => batch.delete(key),
             }
         }
-        self.db
-            .write(LEVELDB_WRITE_OPTIONS, &batch)
-            .map_err(Into::into)
+        self.db.write(LEVELDB_WRITE_OPTIONS, &batch).map_err(
+            Into::into,
+        )
     }
 }
 

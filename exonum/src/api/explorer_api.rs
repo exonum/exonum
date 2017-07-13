@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::num::ParseIntError;
 use std::str::ParseBoolError;
 
@@ -12,21 +26,31 @@ use api::{Api, ApiError};
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
+/// Public explorer API.
 #[derive(Clone, Debug)]
 pub struct ExplorerApi {
     blockchain: Blockchain,
 }
 
 impl ExplorerApi {
-    pub fn new(blockchain: Blockchain) -> ExplorerApi {
-        ExplorerApi {
-            blockchain: blockchain
-        }
+    /// Creates a new `ExplorerApi` instance.
+    pub fn new(blockchain: Blockchain) -> Self {
+        ExplorerApi { blockchain }
     }
 
-    fn get_blocks(&self, count: u64, from: Option<u64>, skip_empty_blocks: bool) -> Result<Vec<Block>, ApiError> {
+    fn get_blocks(
+        &self,
+        count: u64,
+        from: Option<u64>,
+        skip_empty_blocks: bool,
+    ) -> Result<Vec<Block>, ApiError> {
         if count > MAX_BLOCKS_PER_REQUEST {
-             return Err(ApiError::IncorrectRequest("Max block count per request exceeded".into()))
+            return Err(ApiError::IncorrectRequest(
+                format!(
+                    "Max block count per request exceeded ({})",
+                    MAX_BLOCKS_PER_REQUEST
+                ).into(),
+            ));
         }
         let explorer = BlockchainExplorer::new(&self.blockchain);
         Ok(explorer.blocks_range(count, from, skip_empty_blocks))
@@ -52,26 +76,33 @@ impl Api for ExplorerApi {
             let map = req.get_ref::<Params>().unwrap();
             let count: u64 = match map.find(&["count"]) {
                 Some(&Value::String(ref count_str)) => {
-                    count_str.parse().map_err(|e: ParseIntError| ApiError::IncorrectRequest(Box::new(e)))?
+                    count_str.parse().map_err(|e: ParseIntError| {
+                        ApiError::IncorrectRequest(Box::new(e))
+                    })?
                 }
                 _ => {
-                    return Err(ApiError::IncorrectRequest("Required parameter of blocks 'count' is missing".into()))?;
+                    return Err(ApiError::IncorrectRequest(
+                        "Required parameter of blocks 'count' is missing".into(),
+                    ))?;
                 }
             };
             let from: Option<u64> = match map.find(&["from"]) {
                 Some(&Value::String(ref from_str)) => {
-                    Some(from_str.parse().map_err(|e: ParseIntError| ApiError::IncorrectRequest(Box::new(e)))?)
+                    Some(from_str.parse().map_err(|e: ParseIntError| {
+                        ApiError::IncorrectRequest(Box::new(e))
+                    })?)
                 }
                 _ => None,
             };
             let skip_empty_blocks: bool = match map.find(&["skip_empty_blocks"]) {
                 Some(&Value::String(ref skip_str)) => {
-                    skip_str.parse().map_err(|e: ParseBoolError| ApiError::IncorrectRequest(Box::new(e)))?
+                    skip_str.parse().map_err(|e: ParseBoolError| {
+                        ApiError::IncorrectRequest(Box::new(e))
+                    })?
                 }
                 _ => false,
             };
-            let info = _self
-                .get_blocks(count, from, skip_empty_blocks)?;
+            let info = _self.get_blocks(count, from, skip_empty_blocks)?;
             _self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
@@ -80,11 +111,17 @@ impl Api for ExplorerApi {
             let params = req.extensions.get::<Router>().unwrap();
             match params.find("height") {
                 Some(height_str) => {
-                    let height: u64 = height_str.parse().map_err(|e: ParseIntError| ApiError::IncorrectRequest(Box::new(e)))?;
+                    let height: u64 = height_str.parse().map_err(|e: ParseIntError| {
+                        ApiError::IncorrectRequest(Box::new(e))
+                    })?;
                     let info = _self.get_block(height)?;
                     _self.ok_response(&::serde_json::to_value(info).unwrap())
                 }
-                None => Err(ApiError::IncorrectRequest("Required parameter of block 'height' is missing".into()))?,
+                None => {
+                    Err(ApiError::IncorrectRequest(
+                        "Required parameter of block 'height' is missing".into(),
+                    ))?
+                }
             }
         };
 
@@ -96,7 +133,11 @@ impl Api for ExplorerApi {
                     let info = _self.get_transaction(hash_str)?;
                     _self.ok_response(&::serde_json::to_value(info).unwrap())
                 }
-                None => Err(ApiError::IncorrectRequest("Required parameter of transaction 'hash' is missing".into()))?,
+                None => {
+                    Err(ApiError::IncorrectRequest(
+                        "Required parameter of transaction 'hash' is missing".into(),
+                    ))?
+                }
             }
         };
 

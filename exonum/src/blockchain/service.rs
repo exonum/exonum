@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
@@ -5,21 +19,27 @@ use serde_json::Value;
 use iron::Handler;
 use mount::Mount;
 
+use std::fmt;
+use std::sync::{Arc, RwLock};
+use std::collections::{HashSet, HashMap};
+use std::net::SocketAddr;
+
+use events::Milliseconds;
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{Node, State, NodeChannel, TxSender};
+use node::{Node, State, NodeChannel, ApiSender};
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
-/// A trait that describes transaction processing rules (a group of sequential operations 
+/// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
 pub trait Transaction: Message + 'static {
-    /// Verifies the transaction, which includes the message signature verification and other 
+    /// Verifies the transaction, which includes the message signature verification and other
     /// specific internal constraints. verify is intended to check the internal consistency of
     /// a transaction; it has no access to the blockchain state.
-    /// If a transaction fails verify, it is considered incorrect and cannot be included into 
+    /// If a transaction fails verify, it is considered incorrect and cannot be included into
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
@@ -31,7 +51,7 @@ pub trait Transaction: Message + 'static {
     ///
     /// - When programming `execute`, you should perform state-related checks before any changes
     /// to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a `panic`, the changes made by the 
+    /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
     fn execute(&self, fork: &mut Fork);
     /// Returns the useful information about the transaction in the JSON format.
@@ -64,10 +84,10 @@ pub trait Service: Send + Sync + 'static {
     /// Tries to create `Transaction` object from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    /// Handles genesis block creation event.
     /// By this method you can initialize information schema of service
     /// and generates initial service configuration.
-    fn handle_genesis_block(&self, fork: &mut Fork) -> Value {
+    /// This method is called on genesis block creation event.
+    fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
 
@@ -75,7 +95,7 @@ pub trait Service: Send + Sync + 'static {
     /// For example service can create some transaction if the specific condition occurred.
     ///
     /// *Try not to perform long operations here*.
-    fn handle_commit(&self, context: &mut ServiceContext) { }
+    fn handle_commit(&self, context: &mut ServiceContext) {}
 
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
@@ -167,16 +187,148 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 }
 
-impl<'a, 'b> ::std::fmt::Debug for ServiceContext<'a, 'b> {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "ServiceContext(state: {:?}, txs: {:?})", self.state, self.txs)
+impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "ServiceContext(state: {:?}, txs: {:?})",
+            self.state,
+            self.txs
+        )
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ApiNodeState {
+    incoming_connections: HashSet<SocketAddr>,
+    outgoing_connections: HashSet<SocketAddr>,
+    reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
+}
+impl ApiNodeState {
+    fn new() -> ApiNodeState {
+        Self::default()
+    }
+}
+
+/// Shared part of the context, used to take some values from the `Node`s `State`
+/// should be used to take some metrics.
+#[derive(Clone, Debug)]
+pub struct SharedNodeState {
+    state: Arc<RwLock<ApiNodeState>>,
+    /// Timeout to update api state.
+    pub state_update_timeout: Milliseconds,
+}
+
+impl SharedNodeState {
+    /// Creates new `SharedNodeState`
+    pub fn new(state_update_timeout: Milliseconds) -> SharedNodeState {
+        SharedNodeState {
+            state: Arc::new(RwLock::new(ApiNodeState::new())),
+            state_update_timeout,
+        }
+    }
+    /// Return list of connected sockets
+    pub fn incoming_connections(&self) -> Vec<SocketAddr> {
+        self.state
+            .read()
+            .expect("Expected read lock.")
+            .incoming_connections
+            .iter()
+            .cloned()
+            .collect()
+    }
+    /// Return list of our connection sockets
+    pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
+        self.state
+            .read()
+            .expect("Expected read lock.")
+            .outgoing_connections
+            .iter()
+            .cloned()
+            .collect()
+    }
+    /// Return reconnects list
+    pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
+        self.state
+            .read()
+            .expect("Expected read lock.")
+            .reconnects_timeout
+            .iter()
+            .map(|(c, e)| (*c, *e))
+            .collect()
+    }
+    /// Update internal state, from `Node` State`
+    pub fn update_node_state(&self, _state: &State) {
+        //FIXME: Before merge implement update code
+    }
+
+    /// Returns value of the `state_update_timeout`.
+    pub fn state_update_timeout(&self) -> Milliseconds {
+        self.state_update_timeout
+    }
+
+    /// add incomming connection into state
+    pub fn add_incoming_connection(&self, addr: SocketAddr) {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .incoming_connections
+            .insert(addr);
+    }
+    /// add outgoing connection into state
+    pub fn add_outgoing_connection(&self, addr: SocketAddr) {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .outgoing_connections
+            .insert(addr);
+    }
+
+    /// remove incomming connection from state
+    pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .incoming_connections
+            .remove(addr)
+    }
+
+    /// remove outgoing connection from state
+    pub fn remove_outgoing_connection(&self, addr: &SocketAddr) -> bool {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .outgoing_connections
+            .remove(addr)
+    }
+
+    /// Add reconect timeout
+    pub fn add_reconnect_timeout(
+        &self,
+        addr: SocketAddr,
+        timeout: Milliseconds,
+    ) -> Option<Milliseconds> {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .reconnects_timeout
+            .insert(addr, timeout)
+    }
+
+    /// Removes reconect timeout and returns the previous value.
+    pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
+        self.state
+            .write()
+            .expect("Expected write lock")
+            .reconnects_timeout
+            .remove(addr)
     }
 }
 
 /// Provides the current node state to api handlers.
 pub struct ApiContext {
     blockchain: Blockchain,
-    node_channel: TxSender<NodeChannel>,
+    node_channel: ApiSender<NodeChannel>,
     public_key: PublicKey,
     secret_key: SecretKey,
 }
@@ -200,7 +352,7 @@ impl ApiContext {
     }
 
     /// Returns reference to the transaction sender.
-    pub fn node_channel(&self) -> &TxSender<NodeChannel> {
+    pub fn node_channel(&self) -> &ApiSender<NodeChannel> {
         &self.node_channel
     }
 
@@ -226,7 +378,12 @@ impl ApiContext {
 }
 
 impl ::std::fmt::Debug for ApiContext {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "ApiContext(blockchain: {:?}, public_key: {:?})", self.blockchain, self.public_key)
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "ApiContext(blockchain: {:?}, public_key: {:?})",
+            self.blockchain,
+            self.public_key
+        )
     }
 }

@@ -1,12 +1,28 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use bit_vec::BitVec;
+
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use crypto::{hash, gen_keypair};
-use blockchain;
+use blockchain::{self, BlockProof};
+use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
+               RequestBlock};
 
 use super::{Field, Offset};
-use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
-               BlockProof, RequestBlock, BitVec};
 
 #[test]
 #[should_panic(expected = "Found error in check: OffsetOverflow")]
@@ -14,7 +30,7 @@ fn test_read_overflow_arithmetic() {
     let pos = <u32>::max_value();
     let count: u32 = 4;
     let dat = vec![0xCC as u8; 4]; // u32
-    let mut buf = vec![255;8];
+    let mut buf = vec![255; 8];
     dat.write(&mut buf, 0, 8);
     //rewrite header
     pos.write(&mut buf, 0, 4);
@@ -107,7 +123,8 @@ fn test_segments_of_arrays() {
 
 
 fn assert_write_check_read<T>(input: T, header_size: Offset)
-    where T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug
+where
+    T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug,
 {
     let mut buffer = vec![0; header_size as usize];
     Field::write(&input, &mut buffer, 0, header_size);
@@ -120,7 +137,12 @@ fn assert_write_check_read<T>(input: T, header_size: Offset)
     //and fill old buffer with zeros
     buffer.resize(len, 0);
 
-    <T as Field>::check(&new_buffer, 0.into(), header_size.into(), header_size.into()).unwrap();
+    <T as Field>::check(
+        &new_buffer,
+        0.into(),
+        header_size.into(),
+        header_size.into(),
+    ).unwrap();
     let output = unsafe { Field::read(&new_buffer, 0, header_size) };
     assert_eq!(input, output);
 
@@ -214,12 +236,14 @@ fn test_prevote() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let prevote = Prevote::new(validator,
-                               height,
-                               round,
-                               &propose_hash,
-                               locked_round,
-                               &secret_key);
+    let prevote = Prevote::new(
+        validator,
+        height,
+        round,
+        &propose_hash,
+        locked_round,
+        &secret_key,
+    );
     // read
     assert_eq!(prevote.validator(), validator);
     assert_eq!(prevote.height(), height);
@@ -240,13 +264,15 @@ fn test_precommit() {
     let time = SystemTime::now();
 
     // write
-    let precommit = Precommit::new(validator,
-                                   height,
-                                   round,
-                                   &propose_hash,
-                                   &block_hash,
-                                   time,
-                                   &secret_key);
+    let precommit = Precommit::new(
+        validator,
+        height,
+        round,
+        &propose_hash,
+        &block_hash,
+        time,
+        &secret_key,
+    );
     // read
     assert_eq!(precommit.validator(), validator);
     assert_eq!(precommit.height(), height);
@@ -283,50 +309,64 @@ fn test_block() {
     let txs = [2];
     let tx_count = txs.len() as u32;
 
-    let content = blockchain::Block::new(blockchain::SCHEMA_MAJOR_VERSION,
-                                         0,
-                                         500,
-                                         tx_count,
-                                         &hash(&[1]),
-                                         &hash(&txs),
-                                         &hash(&[3]));
+    let content = blockchain::Block::new(
+        blockchain::SCHEMA_MAJOR_VERSION,
+        0,
+        500,
+        tx_count,
+        &hash(&[1]),
+        &hash(&txs),
+        &hash(&[3]),
+    );
 
-    let precommits = vec![Precommit::new(123,
-                                         15,
-                                         25,
-                                         &hash(&[1, 2, 3]),
-                                         &hash(&[3, 2, 1]),
-                                         ts,
-                                         &secret_key),
-                          Precommit::new(13,
-                                         25,
-                                         35,
-                                         &hash(&[4, 2, 3]),
-                                         &hash(&[3, 3, 1]),
-                                         ts,
-                                         &secret_key),
-                          Precommit::new(323,
-                                         15,
-                                         25,
-                                         &hash(&[1, 1, 3]),
-                                         &hash(&[5, 2, 1]),
-                                         ts,
-                                         &secret_key)];
-    let transactions = vec![Status::new(&pub_key, 2, &hash(&[]), &secret_key)
-                                .raw()
-                                .clone(),
-                            Status::new(&pub_key, 4, &hash(&[2]), &secret_key)
-                                .raw()
-                                .clone(),
-                            Status::new(&pub_key, 7, &hash(&[3]), &secret_key)
-                                .raw()
-                                .clone()];
-    let block = Block::new(&pub_key,
-                           &pub_key,
-                           content.clone(),
-                           precommits.clone(),
-                           transactions.clone(),
-                           &secret_key);
+    let precommits = vec![
+        Precommit::new(
+            123,
+            15,
+            25,
+            &hash(&[1, 2, 3]),
+            &hash(&[3, 2, 1]),
+            ts,
+            &secret_key
+        ),
+        Precommit::new(
+            13,
+            25,
+            35,
+            &hash(&[4, 2, 3]),
+            &hash(&[3, 3, 1]),
+            ts,
+            &secret_key
+        ),
+        Precommit::new(
+            323,
+            15,
+            25,
+            &hash(&[1, 1, 3]),
+            &hash(&[5, 2, 1]),
+            ts,
+            &secret_key
+        ),
+    ];
+    let transactions = vec![
+        Status::new(&pub_key, 2, &hash(&[]), &secret_key)
+            .raw()
+            .clone(),
+        Status::new(&pub_key, 4, &hash(&[2]), &secret_key)
+            .raw()
+            .clone(),
+        Status::new(&pub_key, 7, &hash(&[3]), &secret_key)
+            .raw()
+            .clone(),
+    ];
+    let block = Block::new(
+        &pub_key,
+        &pub_key,
+        content.clone(),
+        precommits.clone(),
+        transactions.clone(),
+        &secret_key,
+    );
 
     assert_eq!(block.from(), &pub_key);
     assert_eq!(block.to(), &pub_key);
@@ -353,22 +393,26 @@ fn test_block() {
 fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
 
-    let content = blockchain::Block::new(blockchain::SCHEMA_MAJOR_VERSION,
-                                         0,
-                                         200,
-                                         1,
-                                         &hash(&[1]),
-                                         &hash(&[2]),
-                                         &hash(&[3]));
+    let content = blockchain::Block::new(
+        blockchain::SCHEMA_MAJOR_VERSION,
+        0,
+        200,
+        1,
+        &hash(&[1]),
+        &hash(&[2]),
+        &hash(&[3]),
+    );
 
     let precommits = Vec::new();
     let transactions = Vec::new();
-    let block = Block::new(&pub_key,
-                           &pub_key,
-                           content.clone(),
-                           precommits.clone(),
-                           transactions.clone(),
-                           &secret_key);
+    let block = Block::new(
+        &pub_key,
+        &pub_key,
+        content.clone(),
+        precommits.clone(),
+        transactions.clone(),
+        &secret_key,
+    );
 
     assert_eq!(block.from(), &pub_key);
     assert_eq!(block.to(), &pub_key);

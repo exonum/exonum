@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /// `message!` implement structure that could be sent in exonum network.
 ///
 /// Each message is a piece of data that is signed by creators key.
@@ -28,9 +42,9 @@
 /// }
 ///
 /// # fn main() {
-///     let (p, creators_key) = ::exonum::crypto::gen_keypair();
-/// #    let stucture = create_message(&creators_key);
-/// #    println!("Debug structure = {:?}", stucture);
+///     let (_, creators_key) = ::exonum::crypto::gen_keypair();
+/// #    let structure = create_message(&creators_key);
+/// #    println!("Debug structure = {:?}", structure);
 /// # }
 ///
 /// # fn create_message(creators_key: &::exonum::crypto::SecretKey) -> SendTwoInteger {
@@ -138,7 +152,7 @@ macro_rules! message {
         }
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
-            /// Create messsage `$name` and sign it.
+            /// Creates messsage and sign it.
             #[allow(unused_mut)]
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
@@ -151,7 +165,7 @@ macro_rules! message {
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
 
-            /// Create message `$name` and append existing signature.
+            /// Creates message and appends existing signature.
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(dead_code, unused_mut)]
             pub fn new_with_signature($($field_name: $field_type,)*
@@ -167,7 +181,8 @@ macro_rules! message {
             }
 
             #[allow(unused_variables)]
-            fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::encoding::Result {
+            fn check_fields(raw_message: &$crate::messages::RawMessage)
+            -> $crate::encoding::Result {
                 let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
                                         as $crate::encoding::Offset).into();
                 $(
@@ -180,13 +195,13 @@ macro_rules! message {
                 Ok(latest_segment)
             }
 
-            /// return `$name`s `message_id` useable for matching.
+            /// Returns `message_id` useable for matching.
             #[allow(dead_code)]
             pub fn message_id() -> u16 {
                 $id
             }
 
-            /// return `$name`s `service_id` useable for matching.
+            /// Returns `service_id` useable for matching.
             #[allow(dead_code)]
             pub fn service_id() -> u16 {
                 $extension
@@ -210,7 +225,8 @@ macro_rules! message {
 
             fn from_bytes(value: ::std::borrow::Cow<[u8]>) -> Self {
                 $name {
-                    raw: ::std::sync::Arc::new($crate::messages::MessageBuffer::from_vec(value.into_owned()))
+                    raw: ::std::sync::Arc::new($crate::messages::MessageBuffer::from_vec(
+                        value.into_owned()))
                 }
             }
         }
@@ -326,8 +342,8 @@ macro_rules! message {
                 use $crate::encoding::serialize::json::reexport::Value;
                 use $crate::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
-                .map_err(|_| D::Error::custom("Can not deserialize value."))
+                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
+                    &value).map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 

@@ -1,3 +1,19 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! `RESTful` API and corresponding utilities.
+
 use iron::IronError;
 use iron::prelude::*;
 use iron::status;
@@ -19,25 +35,45 @@ use events::Error as EventsError;
 use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
 use encoding::serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
+pub use self::explorer_api::ExplorerApi;
+pub use self::private::{SystemApi, NodeInfo};
 
+mod explorer_api;
+mod private;
+#[cfg(test)]
+mod tests;
 
+/// List of possible Api errors.
 #[derive(Debug)]
 pub enum ApiError {
+    /// Service error.
     Service(Box<::std::error::Error + Send + Sync>),
+    /// Storage error.
     Storage(StorageError),
+    /// Events error.
     Events(EventsError),
+    /// Converting from hex error.
     FromHex(FromHexError),
+    /// Input/output error.
     Io(::std::io::Error),
+    /// File not found.
     FileNotFound(Hash),
+    /// Not found.
     NotFound,
+    /// File too big.
     FileTooBig,
+    /// File already exists.
     FileExists(Hash),
+    /// Incorrect request.
     IncorrectRequest(Box<::std::error::Error + Send + Sync>),
+    /// Unauthorized error.
     Unauthorized,
+    /// Address parse error.
+    AddressParseError(::std::net::AddrParseError),
 }
 
-impl ::std::fmt::Display for ApiError {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl fmt::Display for ApiError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
@@ -51,12 +87,19 @@ impl ::std::error::Error for ApiError {
             ApiError::Events(ref error) => error.description(),
             ApiError::FromHex(ref error) => error.description(),
             ApiError::Io(ref error) => error.description(),
-            ApiError::FileNotFound(_) => "FileNotFound",
-            ApiError::NotFound => "NotFound",
-            ApiError::FileTooBig => "FileToBig",
-            ApiError::FileExists(_) => "FileExists",
+            ApiError::FileNotFound(_) => "File not found",
+            ApiError::NotFound => "Not found",
+            ApiError::FileTooBig => "File too big",
+            ApiError::FileExists(_) => "File exists",
             ApiError::Unauthorized => "Unauthorized",
+            ApiError::AddressParseError(_) => "AddressParseError",
         }
+    }
+}
+
+impl From<::std::net::AddrParseError> for ApiError {
+    fn from(e: ::std::net::AddrParseError) -> ApiError {
+        ApiError::AddressParseError(e)
     }
 }
 
@@ -106,11 +149,13 @@ impl From<ApiError> for IronError {
     }
 }
 
+/// `Field` that is serialized/deserialized from/to hex.
 #[derive(Clone, Debug)]
-pub struct HexField<T: AsRef<[u8]> + Clone>(pub T);
+struct HexField<T: AsRef<[u8]> + Clone>(pub T);
 
 impl<T> Deref for HexField<T>
-    where T: AsRef<[u8]> + Clone
+where
+    T: AsRef<[u8]> + Clone,
 {
     type Target = T;
 
@@ -120,23 +165,27 @@ impl<T> Deref for HexField<T>
 }
 
 impl<T> Serialize for HexField<T>
-    where T: AsRef<[u8]> + Clone
+where
+    T: AsRef<[u8]> + Clone,
 {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         ser.serialize_str(&self.0.as_ref().to_hex())
     }
 }
 
 struct HexVisitor<T>
-    where T: AsRef<[u8]> + HexValue
+where
+    T: AsRef<[u8]> + HexValue,
 {
     _p: PhantomData<T>,
 }
 
 impl<'v, T> Visitor<'v> for HexVisitor<T>
-    where T: AsRef<[u8]> + HexValue + Clone
+where
+    T: AsRef<[u8]> + HexValue + Clone,
 {
     type Value = HexField<T>;
 
@@ -145,29 +194,34 @@ impl<'v, T> Visitor<'v> for HexVisitor<T>
     }
 
     fn visit_str<E>(self, s: &str) -> Result<HexField<T>, E>
-        where E: de::Error
+    where
+        E: de::Error,
     {
-        let v = T::from_hex(s)
-            .map_err(|_| de::Error::custom("Invalid hex"))?;
+        let v = T::from_hex(s).map_err(|_| de::Error::custom("Invalid hex"))?;
         Ok(HexField(v))
     }
 }
 
 impl<'de, T> Deserialize<'de> for HexField<T>
-    where T: AsRef<[u8]> + HexValue + Clone
+where
+    T: AsRef<[u8]> + HexValue + Clone,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         deserializer.deserialize_str(HexVisitor { _p: PhantomData })
     }
 }
 
+/// `Api` trait defines `RESTful` API.
 pub trait Api {
-    fn load_hex_value_from_cookie<'a>(&self,
-                                      request: &'a Request,
-                                      key: &str)
-                                      -> StorageResult<Vec<u8>> {
+    /// Loads hex value from the cookies.
+    fn load_hex_value_from_cookie<'a>(
+        &self,
+        request: &'a Request,
+        key: &str,
+    ) -> StorageResult<Vec<u8>> {
         if let Some(&Cookie(ref cookies)) = request.headers.get() {
             for cookie in cookies.iter() {
                 if let Ok(c) = CookiePair::parse(cookie.as_str()) {
@@ -179,28 +233,36 @@ pub trait Api {
                 }
             }
         }
-        Err(StorageError::new(format!("Unable to find value with given key {}", key)))
+        Err(StorageError::new(
+            format!("Unable to find value with given key {}", key),
+        ))
     }
 
-    fn load_keypair_from_cookies(&self,
-                                 request: &Request)
-                                 -> Result<(PublicKey, SecretKey), ApiError> {
-        let public_key = PublicKey::from_slice(self.load_hex_value_from_cookie(request,
-                                                                               "public_key")?
-                                                   .as_ref());
-        let secret_key = SecretKey::from_slice(self.load_hex_value_from_cookie(request,
-                                                                               "secret_key")?
-                                                   .as_ref());
+    /// Loads public and secret key from the cookies.
+    fn load_keypair_from_cookies(
+        &self,
+        request: &Request,
+    ) -> Result<(PublicKey, SecretKey), ApiError> {
+        let public_key = PublicKey::from_slice(
+            self.load_hex_value_from_cookie(request, "public_key")?
+                .as_ref(),
+        );
+        let secret_key = SecretKey::from_slice(
+            self.load_hex_value_from_cookie(request, "secret_key")?
+                .as_ref(),
+        );
 
         let public_key = public_key.ok_or(ApiError::Unauthorized)?;
         let secret_key = secret_key.ok_or(ApiError::Unauthorized)?;
         Ok((public_key, secret_key))
     }
 
-    fn ok_response_with_cookies(&self,
-                                json: &serde_json::Value,
-                                cookies: Option<Vec<String>>)
-                                -> IronResult<Response> {
+    /// Returns OK and some response with cookies.
+    fn ok_response_with_cookies(
+        &self,
+        json: &serde_json::Value,
+        cookies: Option<Vec<String>>,
+    ) -> IronResult<Response> {
         let mut resp = Response::with((status::Ok, serde_json::to_string_pretty(json).unwrap()));
         resp.headers.set(ContentType::json());
         if let Some(cookies) = cookies {
@@ -209,46 +271,11 @@ pub trait Api {
         Ok(resp)
     }
 
+    /// Returns OK and some response.
     fn ok_response(&self, json: &serde_json::Value) -> IronResult<Response> {
         self.ok_response_with_cookies(json, None)
     }
 
+    /// Used to extend Api.
     fn wire<'b>(&self, router: &'b mut Router);
-}
-
-#[cfg(test)]
-mod tests {
-    use router::Router;
-    use serde_json;
-
-    use blockchain::{Block, SCHEMA_MAJOR_VERSION};
-    use crypto::Hash;
-
-    use super::*;
-
-    #[test]
-    fn test_json_response_for_complex_val() {
-        let str_val = "sghdkgskgskldghshgsd";
-        let txs = [34, 32];
-        let tx_count = txs.len() as u32;
-        let complex_val = Block::new(SCHEMA_MAJOR_VERSION,
-                                     0,
-                                     24,
-                                     tx_count,
-                                     &Hash::new([24; 32]),
-                                     &Hash::new([34; 32]),
-                                     &Hash::new([38; 32]));
-        struct SampleAPI;
-        impl Api for SampleAPI {
-            fn wire<'b>(&self, _: &'b mut Router) {
-                return;
-            }
-        }
-        let stub = SampleAPI;
-        let result = stub.ok_response(&serde_json::to_value(str_val).unwrap());
-        assert!(result.is_ok());
-        let result = stub.ok_response(&serde_json::to_value(&complex_val).unwrap());
-        assert!(result.is_ok());
-        print!("{:?}", result);
-    }
 }

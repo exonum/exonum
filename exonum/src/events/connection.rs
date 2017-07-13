@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use byteorder::{ByteOrder, LittleEndian};
 use mio::tcp::TcpStream;
 use mio::{TryWrite, TryRead, EventSet};
@@ -40,8 +54,14 @@ impl MessageReader {
     pub fn allocate(&mut self) -> io::Result<()> {
         let size = self.total_len();
         if size > MAX_MESSAGE_LEN {
-            Err(io::Error::new(io::ErrorKind::Other,
-                               format!("Received message is too long: {}", size)))
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!(
+                    "Received message is too long: {}, maximum allowed length is {}",
+                    size,
+                    MAX_MESSAGE_LEN
+                ),
+            ))
         } else {
             self.raw.resize(size, 0);
             Ok(())
@@ -85,8 +105,11 @@ impl MessageWriter {
         while let Some(message) = self.queue.front().cloned() {
             let buf = message.as_ref().as_ref();
             if buf.len() > MAX_MESSAGE_LEN {
-                error!("Attempted to send too long message. len={}kb",
-                       buf.len() / 1024);
+                error!(
+                    "Attempted to send too long ({}) message, maximum allowed length is {}",
+                    buf.len(),
+                    MAX_MESSAGE_LEN
+                );
             }
             match socket.try_write(&buf[self.position..])? {
                 None | Some(0) => {
@@ -166,17 +189,19 @@ impl OutgoingConnection {
 
     pub fn try_write(&mut self) -> io::Result<()> {
         // TODO: reregister
-        self.writer.write(&mut self.socket).or_else(|e| {
-            match e.kind() {
+        self.writer.write(&mut self.socket).or_else(
+            |e| match e.kind() {
                 io::ErrorKind::WouldBlock |
                 io::ErrorKind::WriteZero => {
-                    warn!("Unable to write to socket {}, socket is blocked",
-                          self.address);
+                    warn!(
+                        "Unable to write to socket {}, socket is blocked",
+                        self.address
+                    );
                     Ok(())
                 }
                 _ => Err(e),
-            }
-        })
+            },
+        )
     }
 
     pub fn send(&mut self, message: RawMessage) -> io::Result<()> {

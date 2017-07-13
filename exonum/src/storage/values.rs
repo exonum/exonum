@@ -1,3 +1,18 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! A definition of `StorageValue` trait and implementations for common types.
 use byteorder::{ByteOrder, LittleEndian};
 
 use std::mem;
@@ -7,9 +22,21 @@ use std::borrow::Cow;
 use crypto::{Hash, hash, PublicKey};
 use messages::{RawMessage, MessageBuffer, Message};
 
+/// A trait that defines serialization of corresponding types as storage values.
+///
+/// For compatibility with modern architectures the little-endian encoding is used.
 pub trait StorageValue: Sized {
+    /// Returns a hash of the value.
+    ///
+    /// This method is actively used to build indices, so the hashing strategy must satisfy
+    /// the basic requirements of cryptographic hashing: equal values must have the same hash and
+    /// not equal values must have different hashes.
     fn hash(&self) -> Hash;
+
+    /// Serialize a value into a vector of bytes.
     fn into_bytes(self) -> Vec<u8>;
+
+    /// Deserialize a value from bytes.
     fn from_bytes(value: Cow<[u8]>) -> Self;
 }
 
