@@ -20,8 +20,7 @@ use router::Router;
 use iron::prelude::*;
 
 use blockchain::{Blockchain, Block};
-use crypto::{Hash, HexValue};
-use explorer::{TxInfo, BlockInfo, BlockchainExplorer};
+use explorer::{BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
@@ -61,11 +60,6 @@ impl ExplorerApi {
         Ok(explorer.block_info(height))
     }
 
-    fn get_transaction(&self, hash_str: &str) -> Result<Option<TxInfo>, ApiError> {
-        let explorer = BlockchainExplorer::new(&self.blockchain);
-        let hash = Hash::from_hex(hash_str)?;
-        explorer.tx_info(&hash)
-    }
 }
 
 impl Api for ExplorerApi {
@@ -86,7 +80,7 @@ impl Api for ExplorerApi {
                     ))?;
                 }
             };
-            let from: Option<u64> = match map.find(&["from"]) {
+            let latest: Option<u64> = match map.find(&["latest"]) {
                 Some(&Value::String(ref from_str)) => {
                     Some(from_str.parse().map_err(|e: ParseIntError| {
                         ApiError::IncorrectRequest(Box::new(e))
@@ -102,7 +96,7 @@ impl Api for ExplorerApi {
                 }
                 _ => false,
             };
-            let info = _self.get_blocks(count, from, skip_empty_blocks)?;
+            let info = _self.get_blocks(count, latest, skip_empty_blocks)?;
             _self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
@@ -125,24 +119,7 @@ impl Api for ExplorerApi {
             }
         };
 
-        let _self = self.clone();
-        let transaction = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("hash") {
-                Some(hash_str) => {
-                    let info = _self.get_transaction(hash_str)?;
-                    _self.ok_response(&::serde_json::to_value(info).unwrap())
-                }
-                None => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required parameter of transaction 'hash' is missing".into(),
-                    ))?
-                }
-            }
-        };
-
         router.get("/v1/blocks", blocks, "blocks");
         router.get("/v1/blocks/:height", block, "height");
-        router.get("/v1/transactions/:hash", transaction, "hash");
     }
 }

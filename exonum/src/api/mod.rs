@@ -35,11 +35,9 @@ use events::Error as EventsError;
 use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
 use encoding::serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
-pub use self::explorer_api::ExplorerApi;
-pub use self::private::{SystemApi, NodeInfo};
 
-mod explorer_api;
-mod private;
+pub mod public;
+pub mod private;
 #[cfg(test)]
 mod tests;
 
@@ -257,6 +255,21 @@ pub trait Api {
         Ok((public_key, secret_key))
     }
 
+    //TODO: Remove duplicate code
+    /// Returns OK and some response with cookies.
+    fn not_found_response_with_cookies(
+        &self,
+        json: &serde_json::Value,
+        cookies: Option<Vec<String>>,
+    ) -> IronResult<Response> {
+        let mut resp = Response::with((status::NotFound, serde_json::to_string_pretty(json).unwrap()));
+        resp.headers.set(ContentType::json());
+        if let Some(cookies) = cookies {
+            resp.headers.set(SetCookie(cookies));
+        }
+        Ok(resp)
+    }
+
     /// Returns OK and some response with cookies.
     fn ok_response_with_cookies(
         &self,
@@ -274,6 +287,10 @@ pub trait Api {
     /// Returns OK and some response.
     fn ok_response(&self, json: &serde_json::Value) -> IronResult<Response> {
         self.ok_response_with_cookies(json, None)
+    }
+    /// Returns NotFound and some response.
+    fn not_found_response(&self, json: &serde_json::Value) -> IronResult<Response> {
+        self.not_found_response_with_cookies(json, None)
     }
 
     /// Used to extend Api.
