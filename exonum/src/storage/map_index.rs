@@ -132,7 +132,7 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
-    /// assert!(!index.contains());
+    /// assert!(!index.contains(&1));
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     pub fn contains(&self, key: &K) -> bool {
@@ -141,36 +141,132 @@ where
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
     /// type is (K, V).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, MapIndexKeys};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index: = MapIndexKeys::new(vec![1, 2, 3], &mut fork);
+    /// index.put(1, 2);
+    /// index.put(3, 4);
+    /// index.put(5, 6);
+    /// for v in index.iter() {
+    ///     println!("{}", v);
+    /// }
+    /// ```
     pub fn iter(&self) -> MapIndexIter<K, V> {
         MapIndexIter { base_iter: self.base.iter(&()) }
     }
 
     /// Returns an iterator over the keys of the map in ascending order. The iterator element
     /// type is K.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, MapIndexKeys};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index: = MapIndexKeys::new(vec![1, 2, 3], &mut fork);
+    /// index.put(1, 2);
+    /// index.put(3, 4);
+    /// index.put(5, 6);
+    /// for key in index.keys() {
+    ///     println!("{}", key);
+    /// }
+    /// ```
     pub fn keys(&self) -> MapIndexKeys<K> {
         MapIndexKeys { base_iter: self.base.iter(&()) }
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys. The iterator
     /// element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, MapIndexKeys};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index: = MapIndexKeys::new(vec![1, 2, 3], &mut fork);
+    /// index.put(1, 2);
+    /// index.put(3, 4);
+    /// index.put(5, 6);
+    /// for val in index.values() {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn values(&self) -> MapIndexValues<V> {
         MapIndexValues { base_iter: self.base.iter(&()) }
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
     /// specified key. The iterator element type is (K, V).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, MapIndexKeys};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index: = MapIndexKeys::new(vec![1, 2, 3], &mut fork);
+    /// index.put(1, 2);
+    /// index.put(3, 4);
+    /// index.put(5, 6);
+    /// for v in index.iter_from(&2) {
+    ///     println!("{}", v);
+    /// }
+    /// ```
     pub fn iter_from(&self, from: &K) -> MapIndexIter<K, V> {
         MapIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
     /// specified key. The iterator element type is K.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, MapIndexKeys};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index: = MapIndexKeys::new(vec![1, 2, 3], &mut fork);
+    /// index.put(1, 2);
+    /// index.put(3, 4);
+    /// index.put(5, 6);
+    /// for key in index.keys_from(&2) {
+    ///     println!("{}", key);
+    /// }
+    /// ```
     pub fn keys_from(&self, from: &K) -> MapIndexKeys<K> {
         MapIndexKeys { base_iter: self.base.iter_from(&(), from) }
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys starting from the
     /// specified key. The iterator element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, MapIndexKeys};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index: = MapIndexKeys::new(vec![1, 2, 3], &mut fork);
+    /// index.put(1, 2);
+    /// index.put(3, 4);
+    /// index.put(5, 6);
+    /// for val in index.values_from(&2) {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn values_from(&self, from: &K) -> MapIndexValues<V> {
         MapIndexValues { base_iter: self.base.iter_from(&(), from) }
     }

@@ -160,12 +160,40 @@ where
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index: = ListIndexIter::new(vec![1, 2, 3], &mut fork);
+    /// index.extend([1, 2, 3, 4, 5].iter());
+    /// for val in index.iter() {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter(&self) -> ListIndexIter<V> {
         ListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
     /// element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index: = ListIndexIter::new(vec![1, 2, 3], &mut fork);
+    /// index.extend([1, 2, 3, 4, 5].iter());
+    /// for val in index.iter_from(3) {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
         ListIndexIter { base_iter: self.base.iter_from(&(), &from) }
     }
