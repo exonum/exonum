@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Public part of exonum rest api.
+//! Public part of the Exonum rest api.
 
 pub use self::system::SystemApi;
 pub use self::blockhain_explorer::ExplorerApi;

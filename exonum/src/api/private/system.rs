@@ -63,7 +63,7 @@ impl NodeInfo {
 
 #[derive(Serialize, Default)]
 struct ReconnectInfo {
-    delay: u64
+    delay: u64,
 }
 
 
@@ -82,7 +82,7 @@ impl Default for IncommingConnectionState {
 #[derive(Serialize, Default)]
 struct IncommingConnection {
     public_key: Option<PublicKey>,
-    state: IncommingConnectionState
+    state: IncommingConnectionState,
 }
 
 #[derive(Serialize)]
@@ -117,25 +117,24 @@ impl SystemApi {
     }
 
     fn get_peers_info(&self) -> PeersInfo {
-        let mut outgoing_connections: HashMap<SocketAddr, IncommingConnection> 
-                = HashMap::new();
+        let mut outgoing_connections: HashMap<SocketAddr, IncommingConnection> = HashMap::new();
 
-        for socket in self.shared_api_state.outgoing_connections(){
+        for socket in self.shared_api_state.outgoing_connections() {
             outgoing_connections.insert(socket, Default::default());
         }
 
-        for (s, delay) in self.shared_api_state
-                          .reconnects_timeout(){
-            outgoing_connections.entry(s)
-                                .or_insert(Default::default())
-                                .state = IncommingConnectionState::Reconnect(ReconnectInfo{delay});
+        for (s, delay) in self.shared_api_state.reconnects_timeout() {
+            outgoing_connections
+                .entry(s)
+                .or_insert(Default::default())
+                .state = IncommingConnectionState::Reconnect(ReconnectInfo { delay });
         }
 
-        for (s, p) in self.shared_api_state
-                          .peers_info(){
-            outgoing_connections.entry(s)
-                                .or_insert(Default::default())
-                                .public_key = Some(p);
+        for (s, p) in self.shared_api_state.peers_info() {
+            outgoing_connections
+                .entry(s)
+                .or_insert(Default::default())
+                .public_key = Some(p);
         }
 
         PeersInfo {

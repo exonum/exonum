@@ -666,7 +666,8 @@ impl Node {
                 mount.mount("api/services", api_context.mount_private_api());
                 let shared_api_state = self.handler().api_state().clone();
                 let mut router = Router::new();
-                let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
+                let node_info =
+                    private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
                 let system_api = private::SystemApi::new(
                     node_info,
                     blockchain.clone(),
@@ -690,7 +691,7 @@ impl Node {
                 let api_context = ApiContext::new(self);
                 let mut mount = Mount::new();
                 mount.mount("api/services", api_context.mount_public_api());
-            
+
                 let mut router = Router::new();
                 let pool = self.state().transactions().clone();
                 let system_api = public::SystemApi::new(pool, blockchain.clone());

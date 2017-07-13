@@ -204,7 +204,7 @@ pub struct ApiNodeState {
     outgoing_connections: HashSet<SocketAddr>,
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     //TODO: update on event?
-    peers_info: HashMap<SocketAddr, PublicKey>
+    peers_info: HashMap<SocketAddr, PublicKey>,
 }
 impl ApiNodeState {
     fn new() -> ApiNodeState {
@@ -271,11 +271,12 @@ impl SharedNodeState {
     }
     /// Update internal state, from `Node` State`
     pub fn update_node_state(&self, state: &State) {
-        for (p,c) in state.peers().iter() {
+        for (p, c) in state.peers().iter() {
             self.state
                 .write()
                 .expect("Expected write lock.")
-                .peers_info.insert(c.addr(), *p);
+                .peers_info
+                .insert(c.addr(), *p);
         }
     }
 

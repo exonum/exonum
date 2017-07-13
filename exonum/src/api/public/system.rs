@@ -47,15 +47,9 @@ pub struct SystemApi {
 }
 
 impl SystemApi {
-    /// Creates a new `privat::SystemApi` instance.
-    pub fn new(
-    pool: TxPool,
-    blockchain: Blockchain,
-    ) -> SystemApi {
-        SystemApi {
-            pool,
-            blockchain,
-        }
+    /// Creates a new `private::SystemApi` instance.
+    pub fn new(pool: TxPool, blockchain: Blockchain) -> SystemApi {
+        SystemApi { pool, blockchain }
     }
 
     fn get_mempool_info(&self) -> MemPoolInfo {
@@ -79,9 +73,7 @@ impl SystemApi {
                 |o| Ok(MemPoolResult::MemPool(MemPoolTxInfo { content: o.info() })),
             )
     }
-
 }
-
 
 impl Api for SystemApi {
     fn wire(&self, router: &mut Router) {
@@ -99,7 +91,7 @@ impl Api for SystemApi {
                     let info = _self.get_transaction(hash_str)?;
                     let result = match info {
                         MemPoolResult::Unknown => Self::not_found_response,
-                        _ => Self::ok_response
+                        _ => Self::ok_response,
                     };
                     result(&_self, &::serde_json::to_value(info).unwrap())
                 }
@@ -115,4 +107,3 @@ impl Api for SystemApi {
         router.get("/v1/transactions/:hash", transaction, "hash");
     }
 }
-

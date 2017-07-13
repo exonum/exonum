@@ -256,13 +256,16 @@ pub trait Api {
     }
 
     //TODO: Remove duplicate code
-    /// Returns OK and some response with cookies.
+    /// Returns NotFound and some response with cookies.
     fn not_found_response_with_cookies(
         &self,
         json: &serde_json::Value,
         cookies: Option<Vec<String>>,
     ) -> IronResult<Response> {
-        let mut resp = Response::with((status::NotFound, serde_json::to_string_pretty(json).unwrap()));
+        let mut resp = Response::with((
+            status::NotFound,
+            serde_json::to_string_pretty(json).unwrap(),
+        ));
         resp.headers.set(ContentType::json());
         if let Some(cookies) = cookies {
             resp.headers.set(SetCookie(cookies));
