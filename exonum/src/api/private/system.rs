@@ -87,8 +87,8 @@ struct IncommingConnection {
 
 #[derive(Serialize)]
 struct PeersInfo {
-    incoming_connections: HashMap<SocketAddr, IncommingConnection>,
-    outgoing_connections: Vec<SocketAddr>,
+    incoming_connections: Vec<SocketAddr>,
+    outgoing_connections: HashMap<SocketAddr, IncommingConnection>,
 }
 
 /// Private system API.
@@ -117,30 +117,30 @@ impl SystemApi {
     }
 
     fn get_peers_info(&self) -> PeersInfo {
-        let mut incoming_connections: HashMap<SocketAddr, IncommingConnection> 
+        let mut outgoing_connections: HashMap<SocketAddr, IncommingConnection> 
                 = HashMap::new();
 
-        for socket in self.shared_api_state.incoming_connections(){
-            incoming_connections.insert(socket, Default::default());
+        for socket in self.shared_api_state.outgoing_connections(){
+            outgoing_connections.insert(socket, Default::default());
         }
 
         for (s, delay) in self.shared_api_state
                           .reconnects_timeout(){
-            incoming_connections.entry(s)
+            outgoing_connections.entry(s)
                                 .or_insert(Default::default())
                                 .state = IncommingConnectionState::Reconnect(ReconnectInfo{delay});
         }
 
         for (s, p) in self.shared_api_state
                           .peers_info(){
-            incoming_connections.entry(s)
+            outgoing_connections.entry(s)
                                 .or_insert(Default::default())
                                 .public_key = Some(p);
         }
 
         PeersInfo {
-            incoming_connections,
-            outgoing_connections: self.shared_api_state.outgoing_connections(),
+            incoming_connections: self.shared_api_state.incoming_connections(),
+            outgoing_connections,
         }
     }
 
