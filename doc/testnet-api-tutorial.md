@@ -16,7 +16,7 @@ cargo install --example configuration
 
 1. Generate testnet dir and testnet config.
 
-- `4` is a required indexed parameter and stands for number of nodes in testnet:
+- `4` is a required indexed parameter and stands for the number of nodes in testnet:
 
     ```bash
     mkdir -p testnet/configuration_service
@@ -39,7 +39,7 @@ cargo install --example configuration
 
 2. Run `4` nodes:
 
-- manually for each node process:
+- manually for the each node's process:
 
     ```bash
     configuration run --node-config configuration_service/validators/0.toml --leveldb configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
