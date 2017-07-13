@@ -1,11 +1,24 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::error::Error as StdError;
 use std::fmt;
 use std::borrow::Cow;
 
 use super::Offset;
 
-
-#[derive( Debug)]
+#[derive(Debug)]
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
@@ -98,18 +111,18 @@ impl StdError for Error {
     fn description(&self) -> &str {
         match *self {
             Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
-            Error::IncorrectBoolean { .. } => "Incorrect bool.",
-            Error::IncorrectSegmentReference { .. } => "Incorrect segment reference.",
-            Error::IncorrectSegmentSize { .. } => "Incorrect segment size.",
-            Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage.",
-            Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage.",
-            Error::IncorrectMessageType { .. } => "Incorrect message type.",
-            Error::OverlappingSegment { .. } => "Overlapping segment.",
-            Error::SpaceBetweenSegments { .. } => "Space between segments.",
-            Error::Utf8 { .. } => "Utf8 error in parsing string.",
-            Error::OffsetOverflow => "Overflow in offset pointers.",
+            Error::IncorrectBoolean { .. } => "Incorrect boolean value",
+            Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
+            Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
+            Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage",
+            Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage",
+            Error::IncorrectMessageType { .. } => "Incorrect message type",
+            Error::OverlappingSegment { .. } => "Overlapping segments",
+            Error::SpaceBetweenSegments { .. } => "Space between segments",
+            Error::Utf8 { .. } => "Utf8 error in parsing string",
+            Error::OffsetOverflow => "Offset pointers overflow",
             Error::Basic(ref x) => x.as_ref(),
-            Error::Other(_) => "Other error.",
+            Error::Other(_) => "Other error",
         }
     }
 
@@ -129,15 +142,13 @@ impl From<Box<StdError>> for Error {
     }
 }
 
-impl From<Cow<'static, str>> for Error
-{
+impl From<Cow<'static, str>> for Error {
     fn from(t: Cow<'static, str>) -> Error {
         Error::Basic(t)
     }
 }
 
-impl From<&'static str> for Error
-{
+impl From<&'static str> for Error {
     fn from(t: &'static str) -> Error {
         Error::Basic(t.into())
     }

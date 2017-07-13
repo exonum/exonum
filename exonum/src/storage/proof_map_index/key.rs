@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::cmp::min;
 
 use crypto::{Hash, PublicKey, HASH_SIZE};
@@ -10,6 +24,10 @@ pub const LEAF_KEY_PREFIX: u8 = 01;
 pub const KEY_SIZE: usize = HASH_SIZE;
 pub const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 
+/// A trait that defines a subset of storage key types which are suitable for use with
+/// `ProofMapIndex`.
+///
+/// The size of the keys must be exactly 32 bytes and the keys must have a uniform distribution.
 pub trait ProofMapKey: StorageKey {}
 
 impl ProofMapKey for Hash {}
@@ -39,6 +57,7 @@ pub enum ChildKind {
     Right,
 }
 
+/// A struct that represents a bit slices of the proof map keys.
 #[derive(Clone)]
 pub struct DBKey {
     data: [u8; KEY_SIZE],
@@ -235,12 +254,14 @@ impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "DBKey(")?;
         for i in 0..self.len() {
-            write!(f,
-                   "{}",
-                   match self.get(i) {
-                       ChildKind::Left => '0',
-                       ChildKind::Right => '1',
-                   })?;
+            write!(
+                f,
+                "{}",
+                match self.get(i) {
+                    ChildKind::Left => '0',
+                    ChildKind::Right => '1',
+                }
+            )?;
         }
         write!(f, ")")
     }

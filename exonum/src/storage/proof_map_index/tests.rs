@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 extern crate rand;
 
 use std::collections::HashSet;
@@ -6,8 +20,8 @@ use rand::{thread_rng, Rng};
 
 use crypto::{hash, Hash};
 use super::super::{Database, MemoryDB};
-use ::encoding::serialize::json::reexport::to_string;
-use ::encoding::serialize::reexport::{Serialize, Serializer};
+use encoding::serialize::json::reexport::to_string;
+use encoding::serialize::reexport::{Serialize, Serializer};
 
 use super::{DBKey, ProofMapIndex};
 use super::proof::MapProof;
@@ -280,7 +294,8 @@ fn build_proof_in_empty_tree() {
     let mut storage = MemoryDB::new().fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
 
-    table.put(&[230; 32], vec![1]); //just to notify the compiler of the types used; same key is added and then removed from tree
+    // Just to notify the compiler of the types used; same key is added and then removed from tree.
+    table.put(&[230; 32], vec![1]);
     table.remove(&[230; 32]);
 
     let search_res = table.get_proof(&[244; 32]);
@@ -289,7 +304,7 @@ fn build_proof_in_empty_tree() {
         _ => assert!(false),
     }
     {
-        let check_res = search_res.verify_root_proof_consistency(&[244u8; 32], table.root_hash());
+        let check_res = search_res.validate(&[244u8; 32], table.root_hash());
         assert!(check_res.unwrap().is_none());
     }
 }
@@ -307,9 +322,7 @@ fn build_proof_in_leaf_tree() {
     let proof_path = table.get_proof(&searched_key);
 
     {
-        let check_res = proof_path
-            .verify_root_proof_consistency(&searched_key, table_root)
-            .unwrap();
+        let check_res = proof_path.validate(&searched_key, table_root).unwrap();
         assert!(check_res.is_none());
     }
 
@@ -322,11 +335,9 @@ fn build_proof_in_leaf_tree() {
     }
 
     let proof_path = table.get_proof(&root_key);
-    assert_eq!(table_root, proof_path.compute_proof_root());
+    assert_eq!(table_root, proof_path.root_hash());
     {
-        let check_res = proof_path
-            .verify_root_proof_consistency(&root_key, table_root)
-            .unwrap();
+        let check_res = proof_path.validate(&root_key, table_root).unwrap();
         assert_eq!(check_res.unwrap(), &root_val);
     }
     match proof_path {
@@ -344,9 +355,9 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
     let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(100)
         .into_iter()
         .map(|el| {
-                 let (key, val) = el;
-                 (hash(&key), hash(&val))
-             })
+            let (key, val) = el;
+            (hash(&key), hash(&val))
+        })
         .collect::<Vec<_>>();
 
     let mut storage = MemoryDB::new().fork();
@@ -358,7 +369,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
     let table_root_hash = table.root_hash();
     let item = data[0];
     let proof_path_to_key = table.get_proof(&item.0);
-    assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
+    assert_eq!(proof_path_to_key.root_hash(), table_root_hash);
 
     let proof_info = ProofInfo {
         root_hash: table_root_hash,
@@ -370,7 +381,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
     let json_repre = to_string(&proof_info).unwrap();
     info!("{}", json_repre);
 
-    let check_res = proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
+    let check_res = proof_path_to_key.validate(&item.0, table_root_hash);
     let proved_value: Option<&Hash> = check_res.unwrap();
     assert_eq!(proved_value.unwrap(), &item.1);
 }
@@ -390,8 +401,8 @@ fn fuzz_insert_build_proofs() {
 
     for item in &data {
         let proof_path_to_key = table.get_proof(&item.0);
-        assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
-        let check_res = proof_path_to_key.verify_root_proof_consistency(&item.0, table_root_hash);
+        assert_eq!(proof_path_to_key.root_hash(), table_root_hash);
+        let check_res = proof_path_to_key.validate(&item.0, table_root_hash);
         let proved_value: Option<&Vec<u8>> = check_res.unwrap();
         assert_eq!(proved_value.unwrap(), &item.1);
 
@@ -430,8 +441,8 @@ fn fuzz_delete_build_proofs() {
     let table_root_hash = index1.root_hash();
     for key in &keys_to_remove {
         let proof_path_to_key = index1.get_proof(key);
-        assert_eq!(proof_path_to_key.compute_proof_root(), table_root_hash);
-        let check_res = proof_path_to_key.verify_root_proof_consistency(key, table_root_hash);
+        assert_eq!(proof_path_to_key.root_hash(), table_root_hash);
+        let check_res = proof_path_to_key.validate(key, table_root_hash);
         assert!(check_res.is_ok());
         let proved_value: Option<&Vec<u8>> = check_res.unwrap();
         assert!(proved_value.is_none());
@@ -543,52 +554,80 @@ fn test_iter() {
     map_index.put(&k2, 2u8);
     map_index.put(&k3, 3u8);
 
-    assert_eq!(map_index.iter().collect::<Vec<([u8; 32], u8)>>(),
-               vec![(k1, 1), (k2, 2), (k3, 3)]);
+    assert_eq!(
+        map_index.iter().collect::<Vec<([u8; 32], u8)>>(),
+        vec![(k1, 1), (k2, 2), (k3, 3)]
+    );
 
-    assert_eq!(map_index.iter_from(&k0).collect::<Vec<([u8; 32], u8)>>(),
-               vec![(k1, 1), (k2, 2), (k3, 3)]);
-    assert_eq!(map_index.iter_from(&k1).collect::<Vec<([u8; 32], u8)>>(),
-               vec![(k1, 1), (k2, 2), (k3, 3)]);
-    assert_eq!(map_index.iter_from(&k2).collect::<Vec<([u8; 32], u8)>>(),
-               vec![(k2, 2), (k3, 3)]);
-    assert_eq!(map_index.iter_from(&k4).collect::<Vec<([u8; 32], u8)>>(),
-               Vec::<([u8; 32], u8)>::new());
+    assert_eq!(
+        map_index.iter_from(&k0).collect::<Vec<([u8; 32], u8)>>(),
+        vec![(k1, 1), (k2, 2), (k3, 3)]
+    );
+    assert_eq!(
+        map_index.iter_from(&k1).collect::<Vec<([u8; 32], u8)>>(),
+        vec![(k1, 1), (k2, 2), (k3, 3)]
+    );
+    assert_eq!(
+        map_index.iter_from(&k2).collect::<Vec<([u8; 32], u8)>>(),
+        vec![(k2, 2), (k3, 3)]
+    );
+    assert_eq!(
+        map_index.iter_from(&k4).collect::<Vec<([u8; 32], u8)>>(),
+        Vec::<([u8; 32], u8)>::new()
+    );
 
-    assert_eq!(map_index.keys().collect::<Vec<[u8; 32]>>(),
-               vec![k1, k2, k3]);
+    assert_eq!(
+        map_index.keys().collect::<Vec<[u8; 32]>>(),
+        vec![k1, k2, k3]
+    );
 
-    assert_eq!(map_index.keys_from(&k0).collect::<Vec<[u8; 32]>>(),
-               vec![k1, k2, k3]);
-    assert_eq!(map_index.keys_from(&k1).collect::<Vec<[u8; 32]>>(),
-               vec![k1, k2, k3]);
-    assert_eq!(map_index.keys_from(&k2).collect::<Vec<[u8; 32]>>(),
-               vec![k2, k3]);
-    assert_eq!(map_index.keys_from(&k4).collect::<Vec<[u8; 32]>>(),
-               Vec::<[u8; 32]>::new());
+    assert_eq!(
+        map_index.keys_from(&k0).collect::<Vec<[u8; 32]>>(),
+        vec![k1, k2, k3]
+    );
+    assert_eq!(
+        map_index.keys_from(&k1).collect::<Vec<[u8; 32]>>(),
+        vec![k1, k2, k3]
+    );
+    assert_eq!(
+        map_index.keys_from(&k2).collect::<Vec<[u8; 32]>>(),
+        vec![k2, k3]
+    );
+    assert_eq!(
+        map_index.keys_from(&k4).collect::<Vec<[u8; 32]>>(),
+        Vec::<[u8; 32]>::new()
+    );
 
     assert_eq!(map_index.values().collect::<Vec<u8>>(), vec![1, 2, 3]);
 
-    assert_eq!(map_index.values_from(&k0).collect::<Vec<u8>>(),
-               vec![1, 2, 3]);
-    assert_eq!(map_index.values_from(&k1).collect::<Vec<u8>>(),
-               vec![1, 2, 3]);
+    assert_eq!(
+        map_index.values_from(&k0).collect::<Vec<u8>>(),
+        vec![1, 2, 3]
+    );
+    assert_eq!(
+        map_index.values_from(&k1).collect::<Vec<u8>>(),
+        vec![1, 2, 3]
+    );
     assert_eq!(map_index.values_from(&k2).collect::<Vec<u8>>(), vec![2, 3]);
-    assert_eq!(map_index.values_from(&k4).collect::<Vec<u8>>(),
-               Vec::<u8>::new());
+    assert_eq!(
+        map_index.values_from(&k4).collect::<Vec<u8>>(),
+        Vec::<u8>::new()
+    );
 }
 
 fn bytes_to_hex<T: AsRef<[u8]> + ?Sized>(bytes: &T) -> String {
-    let strs: Vec<String> = bytes.as_ref()
+    let strs: Vec<String> = bytes
+        .as_ref()
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect();
     strs.join("")
 }
 
-fn serialize_str_u8<S, A>(data: &A, serializer:  S) -> Result<S::Ok, S::Error>
-    where S: Serializer,
-            A: AsRef<[u8]>
+fn serialize_str_u8<S, A>(data: &A, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    A: AsRef<[u8]>,
 {
     serializer.serialize_str(&bytes_to_hex(data.as_ref()))
 }

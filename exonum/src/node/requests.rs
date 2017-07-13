@@ -1,14 +1,29 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
                RequestBlock, Block};
 use blockchain::Schema;
 use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
-// TODO: height should be updated after any message, not only after status (if signature is correct).
+// TODO: height should be updated after any message, not only after status (if signature is correct)
 // TODO: Request propose makes sense only if we know that node is on our height.
 
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub fn handle_request(&mut self, msg: RequestMessage) {
@@ -18,7 +33,10 @@ impl<S> NodeHandler<S>
         }
 
         if !self.state.whitelist().allow(msg.from()) {
-            error!("Received request message from peer = {:?} which not in whitelist.", msg.from());
+            error!(
+                "Received request message from peer = {:?} which not in whitelist.",
+                msg.from()
+            );
             return;
         }
 
@@ -38,13 +56,15 @@ impl<S> NodeHandler<S>
 
     /// Handles `RequstPropose` message. For details see the message documentation.
     pub fn handle_request_propose(&mut self, msg: RequestPropose) {
-        trace!("HANDLE PROPOSE REQUEST!!!");
+        trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
             return;
         }
 
         let propose = if msg.height() == self.state.height() {
-            self.state.propose(msg.propose_hash()).map(|p| p.message().raw().clone())
+            self.state.propose(msg.propose_hash()).map(|p| {
+                p.message().raw().clone()
+            })
         } else {
             return;
         };
@@ -56,12 +76,14 @@ impl<S> NodeHandler<S>
 
     /// Handles `RequestTransactions` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
-        trace!("HANDLE TRANSACTIONS REQUEST!!!");
+        trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
             let tx = self.state
                 .transactions()
+                .read()
+                .expect("Expected read lock")
                 .get(hash)
                 .map(|tx| tx.raw())
                 .cloned()
@@ -75,7 +97,7 @@ impl<S> NodeHandler<S>
 
     /// Handles `RequestPrevotes` message. For details see the message documentation.
     pub fn handle_request_prevotes(&mut self, msg: RequestPrevotes) {
-        trace!("HANDLE PREVOTES REQUEST!!!");
+        trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
         }
@@ -95,9 +117,11 @@ impl<S> NodeHandler<S>
 
     /// Handles `RequestBlock` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: RequestBlock) {
-        trace!("Handle block request with height:{}, our height: {}",
-               msg.height(),
-               self.state.height());
+        trace!(
+            "Handle block request with height:{}, our height: {}",
+            msg.height(),
+            self.state.height()
+        );
         if msg.height() >= self.state.height() {
             return;
         }
@@ -113,15 +137,17 @@ impl<S> NodeHandler<S>
         let transactions = schema.block_txs(height);
 
 
-        let block_msg = Block::new(self.state.consensus_public_key(),
-                                   msg.from(),
-                                   block,
-                                   precommits.iter().collect(),
-                                   transactions
-                                        .iter()
-                                        .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
-                                        .collect(),
-                                   self.state.consensus_secret_key());
+        let block_msg = Block::new(
+            self.state.consensus_public_key(),
+            msg.from(),
+            block,
+            precommits.iter().collect(),
+            transactions
+                .iter()
+                .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
+                .collect(),
+            self.state.consensus_secret_key(),
+        );
         self.send_to_peer(*msg.from(), block_msg.raw());
     }
 }

@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use env_logger;
 
 use std::io;
@@ -7,9 +21,10 @@ use std::collections::VecDeque;
 use std::time::{SystemTime, Duration};
 
 use messages::{MessageWriter, RawMessage};
+use blockchain::SharedNodeState;
 use crypto::gen_keypair;
-use super::{Events, Reactor, Event, InternalEvent, Channel};
-use super::{Network, NetworkConfiguration, EventHandler};
+use super::{Events, Reactor, Event, InternalEvent, Channel, Network, NetworkConfiguration,
+            EventHandler};
 
 pub type TestEvent = InternalEvent<(), u32>;
 
@@ -64,15 +79,18 @@ pub struct TestEvents(pub Events<TestHandler>);
 
 impl TestEvents {
     pub fn with_addr(addr: SocketAddr) -> TestEvents {
-        let network = Network::with_config(addr,
-                                           NetworkConfiguration {
-                                               max_incoming_connections: 128,
-                                               max_outgoing_connections: 128,
-                                               tcp_nodelay: true,
-                                               tcp_keep_alive: Some(1),
-                                               tcp_reconnect_timeout: 1000,
-                                               tcp_reconnect_timeout_max: 600000,
-                                           });
+        let network = Network::with_config(
+            addr,
+            NetworkConfiguration {
+                max_incoming_connections: 128,
+                max_outgoing_connections: 128,
+                tcp_nodelay: true,
+                tcp_keep_alive: Some(1),
+                tcp_reconnect_timeout: 1000,
+                tcp_reconnect_timeout_max: 600000,
+            },
+            SharedNodeState::new(0),
+        );
         let handler = TestHandler::new();
 
         TestEvents(Events::new(network, handler).unwrap())
@@ -126,17 +144,21 @@ impl TestEvents {
         }
     }
 
-    pub fn wait_for_messages(&mut self,
-                             mut count: usize,
-                             duration: Duration)
-                             -> Result<Vec<RawMessage>, String> {
+    pub fn wait_for_messages(
+        &mut self,
+        mut count: usize,
+        duration: Duration,
+    ) -> Result<Vec<RawMessage>, String> {
         let mut v = Vec::new();
         let start = SystemTime::now();
         loop {
             self.process_events().unwrap();
 
             if start + duration < SystemTime::now() {
-                return Err(format!("Timeout exceeded, {} messages is not received", count));
+                return Err(format!(
+                    "Timeout exceeded, {} messages is not received",
+                    count
+                ));
             }
 
             if let Some(msg) = self.0.inner.handler.message() {
@@ -177,15 +199,21 @@ impl TestEvents {
 }
 
 pub fn gen_message(id: u16, len: usize) -> RawMessage {
-    let writer = MessageWriter::new(::messages::PROTOCOL_MAJOR_VERSION, ::messages::TEST_NETWORK_ID, 0, id, len);
+    let writer = MessageWriter::new(
+        ::messages::PROTOCOL_MAJOR_VERSION,
+        ::messages::TEST_NETWORK_ID,
+        0,
+        id,
+        len,
+    );
     RawMessage::new(writer.sign(&gen_keypair().1))
 }
 
 #[test]
 fn big_message() {
     let _ = env_logger::init();
-    let addrs: [SocketAddr; 2] = ["127.0.0.1:7200".parse().unwrap(),
-                                  "127.0.0.1:7201".parse().unwrap()];
+    let addrs: [SocketAddr; 2] =
+        ["127.0.0.1:7200".parse().unwrap(), "127.0.0.1:7201".parse().unwrap()];
 
     let m1 = gen_message(15, 100000);
     let m2 = gen_message(16, 400);
@@ -207,7 +235,8 @@ fn big_message() {
             e.send_to(&addrs[1], m2.clone());
             e.send_to(&addrs[1], m1.clone());
 
-            let msgs = e.wait_for_messages(3, Duration::from_millis(10000)).unwrap();
+            let msgs = e.wait_for_messages(3, Duration::from_millis(10000))
+                .unwrap();
             assert_eq!(msgs[0], m2);
             assert_eq!(msgs[1], m1);
             assert_eq!(msgs[2], m2);
@@ -225,7 +254,8 @@ fn big_message() {
             e.send_to(&addrs[0], m2.clone());
             e.send_to(&addrs[0], m1.clone());
             e.send_to(&addrs[0], m2.clone());
-            let msgs = e.wait_for_messages(3, Duration::from_millis(10000)).unwrap();
+            let msgs = e.wait_for_messages(3, Duration::from_millis(10000))
+                .unwrap();
             assert_eq!(msgs[0], m1);
             assert_eq!(msgs[1], m2);
             assert_eq!(msgs[2], m1);
@@ -240,8 +270,8 @@ fn big_message() {
 #[test]
 fn reconnect() {
     let _ = env_logger::init();
-    let addrs: [SocketAddr; 2] = ["127.0.0.1:9100".parse().unwrap(),
-                                  "127.0.0.1:9101".parse().unwrap()];
+    let addrs: [SocketAddr; 2] =
+        ["127.0.0.1:9100".parse().unwrap(), "127.0.0.1:9101".parse().unwrap()];
 
     let m1 = gen_message(15, 250);
     let m2 = gen_message(16, 400);
@@ -303,8 +333,10 @@ fn reconnect() {
                 assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m1));
                 trace!("t2: received m1 from t1");
                 trace!("t2: wait for m3");
-                assert_eq!(e.wait_for_message(Duration::from_millis(5000)),
-                           Some(m3.clone()));
+                assert_eq!(
+                    e.wait_for_message(Duration::from_millis(5000)),
+                    Some(m3.clone())
+                );
                 trace!("t2: received m3 from t1");
             }
             trace!("t2: connection closed");
@@ -333,7 +365,7 @@ mod benches {
 
     use time::Duration;
 
-    use ::events::{Network, NetworkConfiguration, Events, Reactor};
+    use events::{Network, NetworkConfiguration, Events, Reactor};
     use super::{gen_message, TestEvents, TestHandler};
 
     use test::Bencher;
@@ -346,15 +378,17 @@ mod benches {
 
     impl TestEvents {
         fn with_cfg(cfg: &BenchConfig, addr: SocketAddr) -> TestEvents {
-            let network = Network::with_config(addr,
-                                               NetworkConfiguration {
-                                                   max_incoming_connections: 128,
-                                                   max_outgoing_connections: 128,
-                                                   tcp_nodelay: cfg.tcp_nodelay,
-                                                   tcp_keep_alive: None,
-                                                   tcp_reconnect_timeout: 1000,
-                                                   tcp_reconnect_timeout_max: 600000,
-                                               });
+            let network = Network::with_config(
+                addr,
+                NetworkConfiguration {
+                    max_incoming_connections: 128,
+                    max_outgoing_connections: 128,
+                    tcp_nodelay: cfg.tcp_nodelay,
+                    tcp_keep_alive: None,
+                    tcp_reconnect_timeout: 1000,
+                    tcp_reconnect_timeout_max: 600000,
+                },
+            );
             let handler = TestHandler::new();
 
             TestEvents(Events::new(network, handler).unwrap())

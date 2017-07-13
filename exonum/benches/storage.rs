@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 #![feature(test)]
 
 extern crate test;
@@ -11,8 +25,8 @@ mod tests {
     use test::Bencher;
     use rand::{SeedableRng, XorShiftRng, Rng};
     use tempdir::TempDir;
-    use exonum::storage::{ProofListIndex, ProofMapIndex, Database, MapIndex, Fork,
-                          MemoryDB, LevelDB, LevelDBOptions};
+    use exonum::storage::{ProofListIndex, ProofMapIndex, Database, MapIndex, Fork, MemoryDB,
+                          LevelDB, LevelDBOptions};
 
     fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
         let kv_generator = |_| {
@@ -51,8 +65,8 @@ mod tests {
         let map = MapIndex::new(vec![234], db);
         let table = ProofMapIndex::new(map);
         b.iter(|| for item in &data {
-                   table.put(&item.0, item.1.clone()).unwrap();
-               });
+            table.put(&item.0, item.1.clone()).unwrap();
+        });
     }
 
     fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: &T) {
@@ -95,8 +109,8 @@ mod tests {
         }
 
         b.iter(|| for item in &data {
-                   table.put(&item.0, item.1.clone()).unwrap();
-               });
+            table.put(&item.0, item.1.clone()).unwrap();
+        });
     }
 
     #[bench]

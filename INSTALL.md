@@ -23,7 +23,7 @@ apt install build-essential libsodium-dev libleveldb-dev libssl-dev pkg-config
 Other linux users may find the packages with similar names in their package managers.
 
 ## Windows
-Workability is not yet guaranteed.
+Building and workability is not guaranteed yet.
 
 # Installing Rust
 The project uses a stable Rust version that can be installed by using the [rustup](https://www.rustup.rs) utility.
@@ -32,17 +32,17 @@ The project uses a stable Rust version that can be installed by using the [rustu
 curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable
 ```
 
-Nightly (`2017-05-10`) version is used for [clippy](https://github.com/Manishearth/rust-clippy). You can install it with the following command:
+Nightly (`2017-07-05`) version is used for [clippy](https://github.com/Manishearth/rust-clippy). You can install it with the following command:
 ```shell
-rustup toolchain install nightly-2017-05-10
+rustup toolchain install nightly-2017-07-05
 ```
 And run Clippy checks this way:
 ```shell
-cargo +nightly-2017-05-10 clippy
+cargo +nightly-2017-07-05 clippy
 ```
 
 # Compiling the project 
-You can verify that you installed everything correctly by compiling the `exonum-core` crate with the command:
+You can verify that you installed everything correctly by compiling the `exonum` crate and run tests suite with the command:
 ```shell
 cargo test --manifest-path exonum/Cargo.toml
 ```

@@ -1,3 +1,20 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Blockchain explorer module provides api for getting information about blocks and transactions
+//! from the blockchain.
+
 use serde_json::Value;
 
 use std::cmp;
@@ -6,17 +23,16 @@ use storage::ListProof;
 use crypto::Hash;
 use blockchain::{Schema, Blockchain, Block, TxLocation};
 use messages::Precommit;
+// TODO: if explorer is usable anywhere else, remove `ApiError` dependencies.
 use api::ApiError;
 
-pub use self::explorer_api::ExplorerApi;
-
-mod explorer_api;
-
+/// Blockchain explorer.
 #[derive(Debug)]
 pub struct BlockchainExplorer<'a> {
     blockchain: &'a Blockchain,
 }
 
+/// Block information.
 #[derive(Debug, Serialize)]
 pub struct BlockInfo {
     block: Block,
@@ -24,6 +40,7 @@ pub struct BlockInfo {
     txs: Vec<Hash>,
 }
 
+/// Transaction information.
 #[derive(Debug, Serialize)]
 pub struct TxInfo {
     content: Value,
@@ -32,10 +49,12 @@ pub struct TxInfo {
 }
 
 impl<'a> BlockchainExplorer<'a> {
-    pub fn new(blockchain: &'a Blockchain) -> BlockchainExplorer {
+    /// Creates a new `BlockchainExplorer` instance.
+    pub fn new(blockchain: &'a Blockchain) -> Self {
         BlockchainExplorer { blockchain: blockchain }
     }
 
+    /// Returns information about the transaction identified by the hash.
     pub fn tx_info(&self, tx_hash: &Hash) -> Result<Option<TxInfo>, ApiError> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
@@ -44,19 +63,17 @@ impl<'a> BlockchainExplorer<'a> {
         let res = match tx {
             None => None,
             Some(raw_tx) => {
-                let box_transaction = self.blockchain
-                    .tx_from_raw(raw_tx.clone())
-                    .ok_or_else(|| {
-                                    ApiError::Service(format!("Service not found for tx: {:?}",
-                                                              raw_tx)
-                                                              .into())
-                                })?;
+                let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
+                    ApiError::Service(format!("Service not found for tx: {:?}", raw_tx).into())
+                })?;
                 let content = box_transaction.info();
 
-                let location = schema
-                    .tx_location_by_tx_hash()
-                    .get(tx_hash)
-                    .expect(&format!("Not found tx_hash location: {:?}", tx_hash));
+                let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
+                    &format!(
+                        "Not found tx_hash location: {:?}",
+                        tx_hash
+                    ),
+                );
 
                 let block_height = location.block_height();
                 let tx_index = location.position_in_block();
@@ -72,6 +89,7 @@ impl<'a> BlockchainExplorer<'a> {
         Ok(res)
     }
 
+    /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block_info(&self, height: u64) -> Option<BlockInfo> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
@@ -91,11 +109,13 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
-    pub fn blocks_range(&self,
-                        count: u64,
-                        upper: Option<u64>,
-                        skip_empty_blocks: bool)
-                        -> Vec<Block> {
+    /// Returns the list of blocks in the given range.
+    pub fn blocks_range(
+        &self,
+        count: u64,
+        upper: Option<u64>,
+        skip_empty_blocks: bool,
+    ) -> Vec<Block> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
         let schema = Schema::new(&snapshot);
@@ -112,12 +132,14 @@ impl<'a> BlockchainExplorer<'a> {
             if skip_empty_blocks && block_txs.is_empty() {
                 continue;
             }
-            let block_hash = hashes
-                .get(height)
-                .expect(&format!("Block not found, height:{:?}", height));
-            let block = blocks
-                .get(&block_hash)
-                .expect(&format!("Block not found, hash:{:?}", block_hash));
+            let block_hash = hashes.get(height).expect(&format!(
+                "Block not found, height:{:?}",
+                height
+            ));
+            let block = blocks.get(&block_hash).expect(&format!(
+                "Block not found, hash:{:?}",
+                block_hash
+            ));
             v.push(block)
         }
         v
