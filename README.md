@@ -1,10 +1,21 @@
-# Exonum Core Library
+# Exonum
 
 [![Build Status](https://travis-ci.org/exonum/exonum.svg?token=XsvDzZa3zu2eW4sVWuqN&branch=master)](https://travis-ci.org/exonum/exonum)
+[![Join the chat at https://gitter.im/exonum/exonum](https://badges.gitter.im/exonum/exonum.svg)](https://gitter.im/exonum/exonum)
 
-[Exonum](http://exonum.com) is an extensible framework for blockchain software projects. Whether you want to make a supply chain solution or a land registry notarisation, coupons market or electronic auction, procurement or P2P lending platform, Exonum provides you with all the necessary blockchain functionality. Simply add your business logic and you're ready to go.
+[Exonum](https://exonum.com/) is an extensible open-source framework for creating blockchain
+applications. Exonum can be used to create cryptographically powered distributed ledgers in
+virtually any problem domain, including FinTech, GovTech, and LegalTech. The Exonum framework is
+oriented towards creating permissioned blockchains, that is, blockchains with the known set of
+blockchain infrastructure providers.
 
-* [Installation guide](INSTALL.md)
+* [What is Exonum?](https://exonum.com/doc/get-started/what-is-exonum/)
+* [Design Overview](https://exonum.com/doc/get-started/design-overview/)
+* [Installation guide](https://exonum.com/doc/get-started/install/)
+* [Tutorial](https://exonum.com/doc/get-started/create-service/)
+* [Roadmap](https://exonum.com/doc/roadmap/)
+* [Full Specification](https://exonum.com/doc/)
+* [Reference documentation](https://docs.rs/exonum)
 * [Contributing guide](CONTRIBUTING.md)
 
 ## LICENSE
