@@ -32,7 +32,6 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// use std::mem;
 ///
 /// use exonum::storage::StorageKey;
-/// use exonum::crypto::{self, Hash};
 /// use byteorder::{LittleEndian, ByteOrder};
 ///
 /// struct Key {
