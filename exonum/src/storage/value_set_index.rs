@@ -64,6 +64,18 @@ impl<T, V> ValueSetIndex<T, V> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// # drop(index);
+    /// ```
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ValueSetIndex {
             base: BaseIndex::new(prefix, view),
@@ -78,11 +90,40 @@ where
     V: StorageValue,
 {
     /// Returns `true` if the set contains a value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert!(!index.contains(&1));
+    /// index.insert(1);
+    /// assert!(index.contains(&1));
+    /// ```
     pub fn contains(&self, item: &V) -> bool {
         self.contains_by_hash(&item.hash())
     }
 
     /// Returns `true` if the set contains a value with the specified hash.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum::crypto;
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// let data = vec![1, 2, 3];
+    /// let data_hash = crypto::hash(&data);
+    /// assert!(!index.contains_by_hash(&data_hash));
+    /// index.insert(data);
+    /// assert!(index.contains_by_hash(&data_hash));
     pub fn contains_by_hash(&self, hash: &Hash) -> bool {
         self.base.contains(hash)
     }
@@ -116,16 +157,59 @@ where
     V: StorageValue,
 {
     /// Adds a value to the set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.insert(1);
+    /// assert!(index.contains(&1));
+    /// ```
     pub fn insert(&mut self, item: V) {
         self.base.put(&item.hash(), item)
     }
 
     /// Removes a value from the set.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.insert(1);
+    /// assert!(index.contains(&1));
+    /// index.remove(&1);
+    /// assert!(!index.contains(&1));
+    /// ```
     pub fn remove(&mut self, item: &V) {
         self.remove_by_hash(&item.hash())
     }
 
     /// Removes a value from the set by the specified hash.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum::crypto;
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// let data = vec![1, 2, 3];
+    /// let data_hash = crypto::hash(&data);
+    /// index.insert(data);
+    /// assert!(index.contains_by_hash(&data_hash));
+    /// index.remove_by_hash(&data_hash);
+    /// assert!(!index.contains_by_hash(&data_hash));
     pub fn remove_by_hash(&mut self, hash: &Hash) {
         self.base.remove(hash)
     }
@@ -136,6 +220,20 @@ where
     /// Currently this method is not optimized to delete large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// index.insert(1);
+    /// assert!(index.contains(&1));
+    /// index.clear();
+    /// assert!(!index.contains(&1));
+    /// ```
     pub fn clear(&mut self) {
         self.base.clear()
     }
