@@ -47,33 +47,43 @@ fn response_body(response: Response) -> serde_json::Value {
 }
 
 fn request_get<A: AsRef<str>>(route: A, router: &Router) -> IronResult<Response> {
-    info!("GET request:'{}'",
-          format!("http://127.0.0.1:8000/{}", route.as_ref()));
-    iron_test::request::get(&format!("http://127.0.0.1:8000/{}", route.as_ref()),
-                            Headers::new(),
-                            router)
+    info!(
+        "GET request:'{}'",
+        format!("http://127.0.0.1:8000/{}", route.as_ref())
+    );
+    iron_test::request::get(
+        &format!("http://127.0.0.1:8000/{}", route.as_ref()),
+        Headers::new(),
+        router,
+    )
 }
 
-fn request_post_str<B: AsRef<str>, A: AsRef<str>>(route: A,
-                                                  body: B,
-                                                  router: &Router)
-                                                  -> IronResult<Response> {
+fn request_post_str<B: AsRef<str>, A: AsRef<str>>(
+    route: A,
+    body: B,
+    router: &Router,
+) -> IronResult<Response> {
     let body_str = body.as_ref();
     let mut headers = Headers::new();
     headers.set(ContentType::json());
-    info!("POST request:'{}' with body '{}'",
-          format!("http://127.0.0.1:8000/{}", route.as_ref()),
-          body_str);
-    iron_test::request::post(&format!("http://127.0.0.1:8000/{}", route.as_ref()),
-                             headers,
-                             body_str,
-                             router)
+    info!(
+        "POST request:'{}' with body '{}'",
+        format!("http://127.0.0.1:8000/{}", route.as_ref()),
+        body_str
+    );
+    iron_test::request::post(
+        &format!("http://127.0.0.1:8000/{}", route.as_ref()),
+        headers,
+        body_str,
+        router,
+    )
 }
 
-fn request_post_body<T: Serialize, A: AsRef<str>>(route: A,
-                                                  body: T,
-                                                  router: &Router)
-                                                  -> IronResult<Response> {
+fn request_post_body<T: Serialize, A: AsRef<str>>(
+    route: A,
+    body: T,
+    router: &Router,
+) -> IronResult<Response> {
     let body_str: &str = &serde_json::to_string(&body).unwrap();
     request_post_str(route, body_str, router)
 }
@@ -123,8 +133,10 @@ impl ConfigurationApiSandbox {
     fn obtain_test_api(&self, validator_id: usize) -> Router {
         let channel = TestTxSender { transactions: self.transactions.clone() };
         let blockchain = self.sandbox.blockchain_ref().clone();
-        let keypair = (self.sandbox.service_public_key(validator_id),
-                       self.sandbox.service_secret_key(validator_id).clone());
+        let keypair = (
+            self.sandbox.service_public_key(validator_id),
+            self.sandbox.service_secret_key(validator_id).clone(),
+        );
         let pub_api = PublicConfigApi { blockchain: blockchain.clone() };
         let priv_api = PrivateConfigApi {
             channel: channel,
@@ -142,9 +154,9 @@ impl ConfigurationApiSandbox {
         debug!("Sandbox commits a sequence of {} transactions", txs.len());
         txs.iter()
             .inspect(|elem| {
-                         trace!("Message hash: {:?}", Message::hash(*elem));
-                         trace!("{:?}", (*elem).clone());
-                     })
+                trace!("Message hash: {:?}", Message::hash(*elem));
+                trace!("{:?}", (*elem).clone());
+            })
             .collect::<Vec<_>>();
         add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());
     }
@@ -160,9 +172,10 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_config_by_hash(&self, config_hash: Hash) -> IronResult<Response> {
-        let hash_str = serde_json::to_string(&config_hash)
-            .unwrap()
-            .replace("\"", "");
+        let hash_str = serde_json::to_string(&config_hash).unwrap().replace(
+            "\"",
+            "",
+        );
         self.get_config_by_hash_str(hash_str)
     }
 
@@ -172,9 +185,10 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_config_votes(&self, config_hash: Hash) -> IronResult<Response> {
-        let hash_str = serde_json::to_string(&config_hash)
-            .unwrap()
-            .replace("\"", "");
+        let hash_str = serde_json::to_string(&config_hash).unwrap().replace(
+            "\"",
+            "",
+        );
         self.get_config_votes_by_str(hash_str)
     }
 
@@ -183,34 +197,40 @@ impl ConfigurationApiSandbox {
         request_get(format!("/v1/configs/{}/votes", hash_str.as_ref()), &api)
     }
 
-    fn post_config_propose<T: Serialize>(&self,
-                                         validator_id: usize,
-                                         config: T)
-                                         -> IronResult<Response> {
+    fn post_config_propose<T: Serialize>(
+        &self,
+        validator_id: usize,
+        config: T,
+    ) -> IronResult<Response> {
         let api = self.obtain_test_api(validator_id);
         request_post_body("/v1/configs/postpropose", config, &api)
     }
 
-    fn post_config_vote<T: Serialize>(&self,
-                                      validator_id: usize,
-                                      config_hash: Hash,
-                                      body: T)
-                                      -> IronResult<Response> {
-        let hash_str = serde_json::to_string(&config_hash)
-            .unwrap()
-            .replace("\"", "");
+    fn post_config_vote<T: Serialize>(
+        &self,
+        validator_id: usize,
+        config_hash: Hash,
+        body: T,
+    ) -> IronResult<Response> {
+        let hash_str = serde_json::to_string(&config_hash).unwrap().replace(
+            "\"",
+            "",
+        );
         self.post_config_vote_by_str(validator_id, hash_str, body)
     }
 
-    fn post_config_vote_by_str<T: Serialize, A: AsRef<str>>(&self,
-                                                            validator_id: usize,
-                                                            hash_str: A,
-                                                            body: T)
-                                                            -> IronResult<Response> {
+    fn post_config_vote_by_str<T: Serialize, A: AsRef<str>>(
+        &self,
+        validator_id: usize,
+        hash_str: A,
+        body: T,
+    ) -> IronResult<Response> {
         let api = self.obtain_test_api(validator_id);
-        request_post_body(format!("/v1/configs/{}/postvote", hash_str.as_ref()),
-                          body,
-                          &api)
+        request_post_body(
+            format!("/v1/configs/{}/postvote", hash_str.as_ref()),
+            body,
+            &api,
+        )
     }
 }
 
@@ -262,10 +282,10 @@ fn test_get_following_config() {
         let n_validators = api_sandbox.sandbox.n_validators();
         (0..api_sandbox.sandbox.majority_count(n_validators))
             .inspect(|validator_id| {
-                         api_sandbox
-                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
-                             .unwrap();
-                     })
+                api_sandbox
+                    .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                    .unwrap();
+            })
             .collect::<Vec<_>>();
         api_sandbox.commit();
     }
@@ -325,17 +345,21 @@ fn test_get_config_by_hash2() {
             }
             hashes.root_hash()
         };
-        let (pub_key, sec_key) = (api_sandbox.sandbox.service_public_key(proposer),
-                                  api_sandbox.sandbox.service_secret_key(proposer).clone());
-        let expected_propose =
-            TxConfigPropose::new(&pub_key,
-                                 str::from_utf8(following_cfg.clone().into_bytes().as_slice())
-                                     .unwrap(),
-                                 &sec_key);
-        let expected_voting_data =
-            StorageValueConfigProposeData::new(expected_propose,
-                                               &expected_hash,
-                                               api_sandbox.sandbox.n_validators() as u64);
+        let (pub_key, sec_key) = (
+            api_sandbox.sandbox.service_public_key(proposer),
+            api_sandbox.sandbox.service_secret_key(proposer).clone(),
+        );
+        let expected_propose = TxConfigPropose::new(
+            &pub_key,
+            str::from_utf8(following_cfg.clone().into_bytes().as_slice())
+                .unwrap(),
+            &sec_key,
+        );
+        let expected_voting_data = StorageValueConfigProposeData::new(
+            expected_propose,
+            &expected_hash,
+            api_sandbox.sandbox.n_validators() as u64,
+        );
         ApiResponseConfigInfo {
             committed_config: None,
             propose: Some(expected_voting_data),
@@ -373,18 +397,20 @@ fn test_get_config_by_hash3() {
         let excluded_validator = 2;
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
             .inspect(|validator_id| if *validator_id != excluded_validator {
-                         api_sandbox
-                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
-                             .unwrap();
-                     })
+                api_sandbox
+                    .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                    .unwrap();
+            })
             .map(|validator_id| if validator_id == excluded_validator {
-                     ZEROVOTE.clone()
-                 } else {
-                     let (pub_key, sec_key) =
-                         (api_sandbox.sandbox.service_public_key(validator_id),
-                          api_sandbox.sandbox.service_secret_key(validator_id).clone());
-                     TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key)
-                 })
+                ZEROVOTE.clone()
+            } else {
+                let (pub_key, sec_key) =
+                    (
+                        api_sandbox.sandbox.service_public_key(validator_id),
+                        api_sandbox.sandbox.service_secret_key(validator_id).clone(),
+                    );
+                TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key)
+            })
             .collect::<Vec<_>>();
         api_sandbox.commit();
         votes
@@ -396,17 +422,21 @@ fn test_get_config_by_hash3() {
             hashes.extend(votes);
             hashes.root_hash()
         };
-        let (pub_key, sec_key) = (api_sandbox.sandbox.service_public_key(proposer),
-                                  api_sandbox.sandbox.service_secret_key(proposer).clone());
-        let expected_propose =
-            TxConfigPropose::new(&pub_key,
-                                 str::from_utf8(following_cfg.clone().into_bytes().as_slice())
-                                     .unwrap(),
-                                 &sec_key);
-        let expected_voting_data =
-            StorageValueConfigProposeData::new(expected_propose,
-                                               &expected_hash,
-                                               api_sandbox.sandbox.n_validators() as u64);
+        let (pub_key, sec_key) = (
+            api_sandbox.sandbox.service_public_key(proposer),
+            api_sandbox.sandbox.service_secret_key(proposer).clone(),
+        );
+        let expected_propose = TxConfigPropose::new(
+            &pub_key,
+            str::from_utf8(following_cfg.clone().into_bytes().as_slice())
+                .unwrap(),
+            &sec_key,
+        );
+        let expected_voting_data = StorageValueConfigProposeData::new(
+            expected_propose,
+            &expected_hash,
+            api_sandbox.sandbox.n_validators() as u64,
+        );
         ApiResponseConfigInfo {
             committed_config: Some(following_cfg.clone()),
             propose: Some(expected_voting_data),
@@ -458,18 +488,20 @@ fn test_get_config_votes() {
         let excluded_validator = 2;
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
             .inspect(|validator_id| if *validator_id != excluded_validator {
-                         api_sandbox
-                             .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
-                             .unwrap();
-                     })
+                api_sandbox
+                    .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                    .unwrap();
+            })
             .map(|validator_id| if validator_id == excluded_validator {
-                     None
-                 } else {
-                     let (pub_key, sec_key) =
-                         (api_sandbox.sandbox.service_public_key(validator_id),
-                          api_sandbox.sandbox.service_secret_key(validator_id).clone());
-                     Some(TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key))
-                 })
+                None
+            } else {
+                let (pub_key, sec_key) =
+                    (
+                        api_sandbox.sandbox.service_public_key(validator_id),
+                        api_sandbox.sandbox.service_secret_key(validator_id).clone(),
+                    );
+                Some(TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key))
+            })
             .collect::<Vec<_>>();
         api_sandbox.commit();
         votes
@@ -493,14 +525,16 @@ fn test_post_propose_response() {
     let following_cfg =
         generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
     let proposer = 0;
-    let (pub_key, sec_key) = (api_sandbox.sandbox.service_public_key(proposer),
-                              api_sandbox.sandbox.service_secret_key(proposer).clone());
+    let (pub_key, sec_key) = (
+        api_sandbox.sandbox.service_public_key(proposer),
+        api_sandbox.sandbox.service_secret_key(proposer).clone(),
+    );
     let expected_body = {
-        let propose_tx =
-            TxConfigPropose::new(&pub_key,
-                                 str::from_utf8(following_cfg.clone().into_bytes().as_slice())
-                                     .unwrap(),
-                                 &sec_key);
+        let propose_tx = TxConfigPropose::new(
+            &pub_key,
+            str::from_utf8(following_cfg.clone().into_bytes().as_slice()).unwrap(),
+            &sec_key,
+        );
         ApiResponseProposePost {
             tx_hash: Message::hash(&propose_tx),
             cfg_hash: following_cfg.hash(),
@@ -520,13 +554,17 @@ fn test_post_vote_response() {
     let api_sandbox = ConfigurationApiSandbox::new();
     let initial_cfg = api_sandbox.sandbox.cfg();
 
-    let following_cfg = generate_config_with_message(initial_cfg.hash(),
-                                                     10,
-                                                     "config which is voted for",
-                                                     &api_sandbox.sandbox);
+    let following_cfg = generate_config_with_message(
+        initial_cfg.hash(),
+        10,
+        "config which is voted for",
+        &api_sandbox.sandbox,
+    );
     let voter = 0;
-    let (pub_key, sec_key) = (api_sandbox.sandbox.service_public_key(voter),
-                              api_sandbox.sandbox.service_secret_key(voter).clone());
+    let (pub_key, sec_key) = (
+        api_sandbox.sandbox.service_public_key(voter),
+        api_sandbox.sandbox.service_secret_key(voter).clone(),
+    );
     let expected_body = {
         let vote_tx = TxConfigVote::new(&pub_key, &following_cfg.hash(), &sec_key);
         ApiResponseVotePost { tx_hash: Message::hash(&vote_tx) }
@@ -539,9 +577,11 @@ fn test_post_vote_response() {
     assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 }
 
-fn assert_response_status(response: IronResult<Response>,
-                          expected_status: Status,
-                          expected_message: &str) {
+fn assert_response_status(
+    response: IronResult<Response>,
+    expected_status: Status,
+    expected_message: &str,
+) {
     assert!(response.is_err());
     match response {
         Err(iron_error) => {
