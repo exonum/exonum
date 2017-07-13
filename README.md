@@ -7,5 +7,6 @@
 * [Installation guide](INSTALL.md)
 * [Contributing guide](CONTRIBUTING.md)
 
-# LICENSE
-Exonum Core Library is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
+## LICENSE
+
+Exonum core library is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
