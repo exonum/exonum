@@ -1,3 +1,5 @@
+//! Consensus and other messages and related utilities.
+
 use bit_vec;
 
 use std::fmt;

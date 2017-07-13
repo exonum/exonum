@@ -6,42 +6,80 @@ use std::fmt::Debug;
 use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
 use encoding::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset};
 
+/// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
-
+// TODO: Better name.
+#[doc(hidden)]
 pub const TEST_NETWORK_ID: u8 = 0;
+/// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
 
+/// thread-safe reference-counting pointer to the `MessageBuffer`.
 pub type RawMessage = sync::Arc<MessageBuffer>;
 
 // TODO: reduce `to` argument from `write`, `read` and `check` methods
 // TODO: payload_length as a first value into message header
 // TODO: make sure that message length is enougth when using mem::transmute
 
+/// A raw message represented by the bytes buffer.
 #[derive(Debug, PartialEq)]
 pub struct MessageBuffer {
     raw: Vec<u8>,
 }
 
 impl MessageBuffer {
+    /// Creates `MessageBuffer` instance from the bytes vector.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use exonum::messages::MessageBuffer;
+    ///
+    /// let data = vec![1, 2, 3];
+    /// let message_buffer = MessageBuffer::from_vec(data);
+    /// assert_ne!(false, message.is_empty());
+    /// ```
     pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
         // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
         MessageBuffer { raw: raw }
     }
 
-    /// Returns length of the message in bytes.
+    /// Returns the length of the message in bytes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use exonum::messages::MessageBuffer;
+    ///
+    /// let data = vec![1, 2, 3];
+    /// let message_buffer = MessageBuffer::from_vec(data.clone());
+    /// assert_ne!(data.len(), message.len());
+    /// ```
     pub fn len(&self) -> usize {
         self.raw.len()
     }
 
+    /// Returns `true` if the `MessageBuffer` contains no bytes.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use exonum::messages::MessageBuffer;
+    ///;
+    /// let message_buffer = MessageBuffer::from_vec(vec![]);
+    /// assert!(message.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.raw.is_empty()
     }
 
+    /// Returns network id.
     pub fn network_id(&self) -> u8 {
         self.raw[0]
     }
 
+    /// Returns the protocol version.
     pub fn version(&self) -> u8 {
         self.raw[1]
     }
@@ -51,28 +89,33 @@ impl MessageBuffer {
         LittleEndian::read_u16(&self.raw[4..6])
     }
 
+    /// Returns type of the message.
     pub fn message_type(&self) -> u16 {
         LittleEndian::read_u16(&self.raw[2..4])
     }
 
+    /// Returns message body without signature.
     pub fn body(&self) -> &[u8] {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
     }
 
-    pub fn check<'a, F: Field<'a>>(&'a self,
-                                    from: CheckedOffset,
-                                    to: CheckedOffset,
-                                    latest_segment: CheckedOffset) -> StreamStructResult {
-        F::check(self.body(), (from + HEADER_LENGTH as u32)?, (to + HEADER_LENGTH as u32)?, latest_segment)
-    }
-
-    pub unsafe fn read<'a, F: Field<'a>>(&'a self, from: Offset, to: Offset) -> F {
-        F::read(self.body(), from + HEADER_LENGTH as u32, to + HEADER_LENGTH as u32)
-    }
-
+    /// Returns signature of the message.
     pub fn signature(&self) -> &Signature {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
         unsafe { mem::transmute(&self.raw[sign_idx]) }
+    }
+
+    /// Checks that `Field` can be safely got with specified `from` and `to` offsets.
+    pub fn check<'a, F: Field<'a>>(&'a self,
+                                   from: CheckedOffset,
+                                   to: CheckedOffset,
+                                   latest_segment: CheckedOffset) -> StreamStructResult {
+        F::check(self.body(), (from + HEADER_LENGTH as u32)?, (to + HEADER_LENGTH as u32)?, latest_segment)
+    }
+
+    /// Returns `Field` specified by `from` and `to` offsets. Should not be used directly.
+    pub unsafe fn read<'a, F: Field<'a>>(&'a self, from: Offset, to: Offset) -> F {
+        F::read(self.body(), from + HEADER_LENGTH as u32, to + HEADER_LENGTH as u32)
     }
 }
 
@@ -82,6 +125,7 @@ impl convert::AsRef<[u8]> for MessageBuffer {
     }
 }
 
+/// Message writer.
 #[derive(Debug, PartialEq)]
 pub struct MessageWriter {
     raw: Vec<u8>,
