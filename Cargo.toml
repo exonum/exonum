@@ -21,4 +21,3 @@ params = "0.6.0"
 git = "ssh://git@github.com/exonum/exonum.git"
 version = "0.1.0"
 rev = "d75c80b6b77cce57b0a3abc0665aca3d840f9d62"
-
