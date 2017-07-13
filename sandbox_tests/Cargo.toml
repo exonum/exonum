@@ -1,7 +1,7 @@
 [package]
-name = "sandbox_tests"
+name = "exonum-configuration-sandbox"
 version = "0.1.0"
-authors = ["Exonum Team <exonum@bitfury.com>"]
+authors = ["The Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
 iron = "0.5.1"

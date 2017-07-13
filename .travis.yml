@@ -21,7 +21,7 @@ install:
 script:
 - cargo fmt -p exonum-configuration -- --write-mode=diff
 - cd sandbox_tests
-- cargo fmt -p sandbox_tests -- --write-mode=diff
+- cargo fmt -p exonum-configuration-sandbox -- --write-mode=diff
 - cd ..
 - cargo +$NIGHTLY_RUST clippy
 - cargo test
