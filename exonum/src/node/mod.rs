@@ -2,9 +2,6 @@
 //!
 //! For details about consensus message handling see messages module documentation.
 
-// TODO: Move to the root `lib.rs` when all other things are documented.
-#![deny(missing_docs)]
-
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};

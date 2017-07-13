@@ -1,4 +1,3 @@
-#![deny(missing_docs)]
 //! `encoding` is a lazy serialization library,
 //! it allows to keep struct serialized in place, and deserialize fields on demand.
 //!

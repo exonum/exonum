@@ -29,7 +29,9 @@ pub type CommandName = &'static str;
 #[derive(Clone, Copy, Debug)]
 /// `Argument` with name helper structure
 pub struct NamedArgument {
+    /// Short argument name, for example `-a`.
     pub short_name: Option<&'static str>,
+    /// Long argument name, for example `--long-arg`.
     pub long_name: &'static str,
     pub multiple: bool,
 }
@@ -37,7 +39,7 @@ pub struct NamedArgument {
 #[derive(Clone, Copy, Debug)]
 /// Possible types of argument
 pub enum ArgumentType {
-    /// argument without name, index based
+    /// Unnamed positional argument.
     Positional,
     /// argument with `long` and optionally `short` name
     Named(NamedArgument)
