@@ -59,7 +59,6 @@ impl ExplorerApi {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         Ok(explorer.block_info(height))
     }
-
 }
 
 impl Api for ExplorerApi {
