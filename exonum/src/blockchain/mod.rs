@@ -14,9 +14,6 @@
 //!
 //! [tutoral]: https://github.com/DenisKolodin/exonum-doc/blob/currency-tutorial/src/home/cryptocurrency/intro.md
 
-// TODO move to lib.rs
-#![deny(missing_docs)]
-
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;

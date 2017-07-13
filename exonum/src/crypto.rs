@@ -3,9 +3,6 @@
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 
-// TODO: Move to the root `lib.rs` when all other things are documented.
-#![deny(missing_docs)]
-
 use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
                                          Signature as SignatureSodium, sign_detached,

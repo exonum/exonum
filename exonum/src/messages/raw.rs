@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
 use encoding::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset};
 
-pub const HEADER_LENGTH: usize = 10; // TODO: rename to HEADER_LENGTH?
+pub const HEADER_LENGTH: usize = 10;
 
 pub const TEST_NETWORK_ID: u8 = 0;
 pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
@@ -29,6 +29,7 @@ impl MessageBuffer {
         MessageBuffer { raw: raw }
     }
 
+    /// Returns length of the message in bytes.
     pub fn len(&self) -> usize {
         self.raw.len()
     }
@@ -45,6 +46,7 @@ impl MessageBuffer {
         self.raw[1]
     }
 
+    /// Returns id of the service.
     pub fn service_id(&self) -> u16 {
         LittleEndian::read_u16(&self.raw[4..6])
     }

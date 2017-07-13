@@ -3,6 +3,7 @@
 //! For more information see the project readme.
 
 #![deny(missing_debug_implementations)]
+#![deny(missing_docs)]
 
 #![cfg_attr(all(feature = "nightly", test), feature(test))]
 
@@ -49,6 +50,7 @@ extern crate mount;
 pub mod encoding;
 #[macro_use]
 pub mod messages;
+#[doc(hidden)]
 pub mod events;
 pub mod crypto;
 pub mod node;

@@ -22,15 +22,21 @@ use storage::{Result as StorageResult, Error as StorageError};
 pub use self::explorer_api::ExplorerApi;
 pub use self::private::{SystemApi, NodeInfo};
 
+/// List of possible Api errors.
 #[derive(Debug)]
 pub enum ApiError {
+    /// Service error.
     Service(Box<::std::error::Error + Send + Sync>),
+    /// Storage error.
     Storage(StorageError),
+    /// Events error.
     Events(EventsError),
     FromHex(FromHexError),
     Io(::std::io::Error),
+    /// File not found.
     FileNotFound(Hash),
     NotFound,
+    /// File too big.
     FileTooBig,
     FileExists(Hash),
     IncorrectRequest(Box<::std::error::Error + Send + Sync>),

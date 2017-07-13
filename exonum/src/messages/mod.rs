@@ -114,6 +114,7 @@ impl ConsensusMessage {
         }
     }
 
+    /// Returns height of the message.
     pub fn height(&self) -> u64 {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.height(),
@@ -122,6 +123,7 @@ impl ConsensusMessage {
         }
     }
 
+    /// Returns round of the message.
     pub fn round(&self) -> u32 {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.round(),
