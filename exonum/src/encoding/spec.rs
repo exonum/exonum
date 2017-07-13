@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /// `encoding_struct!` implement structure that could be saved in blockchain.
 ///
 /// Storage value unlike message, could be mapped on buffers without any checks.
@@ -72,10 +86,12 @@ macro_rules! encoding_struct {
                         latest_segment: $crate::encoding::CheckedOffset)
                 -> $crate::encoding::Result
             {
-                let latest_segment_origin = <&[u8] as $crate::encoding::Field>::check(buffer, from_st_val, to_st_val, latest_segment)?;
-                let vec: &[u8] = unsafe{ $crate::encoding::Field::read(buffer,
-                                                                        from_st_val.unchecked_offset(),
-                                                                        to_st_val.unchecked_offset())};
+                let latest_segment_origin = <&[u8] as $crate::encoding::Field>::check(
+                    buffer, from_st_val, to_st_val, latest_segment)?;
+                let vec: &[u8] = unsafe{ $crate::encoding::Field::read(
+                    buffer,
+                    from_st_val.unchecked_offset(),
+                    to_st_val.unchecked_offset())};
                 let latest_segment: $crate::encoding::CheckedOffset =
                     ($body as $crate::encoding::Offset).into();
                 $(
@@ -167,8 +183,8 @@ macro_rules! encoding_struct {
                 $(
                 let val = obj.get(stringify!($field_name)).ok_or("Can't get object from json.")?;
 
-                <$field_type as $crate::encoding::serialize::json::ExonumJson>::deserialize_field(val, buffer,
-                                                                from + $from, from + $to )?;
+                <$field_type as $crate::encoding::serialize::json::ExonumJson>::deserialize_field(
+                    val, buffer, from + $from, from + $to )?;
 
                 )*
                 Ok(())
@@ -190,7 +206,8 @@ macro_rules! encoding_struct {
             }
         }
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value) -> Result<Self, Box<::std::error::Error>> {
+            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
+                -> Result<Self, Box<::std::error::Error>> {
                 let to = $body as $crate::encoding::Offset;
                 let from = 0;
                 use $crate::encoding::serialize::json::ExonumJson;
@@ -209,8 +226,8 @@ macro_rules! encoding_struct {
                 use $crate::encoding::serialize::json::reexport::Value;
                 use $crate::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
-                .map_err(|_| D::Error::custom("Can not deserialize value."))
+                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
+                    &value).map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 
@@ -237,15 +254,18 @@ macro_rules! check_bounds {
      $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)+
      ) => {
         debug_assert_eq!($prev_to, $field_from, "fields should be adjacent");
-        debug_assert_eq!($field_to - $field_from, <$field_type as Field>::field_size(), "wrong size of field");
-        check_bounds!(@deep $size, $field_to, $($next_name : $next_type [$next_from => $next_to],)+);
+        debug_assert_eq!($field_to - $field_from, <$field_type as Field>::field_size(),
+            "wrong size of field");
+        check_bounds!(@deep $size, $field_to,
+            $($next_name : $next_type [$next_from => $next_to],)+);
     };
     (@deep $size:expr, $prev_to:expr,
      $last_name:ident : $last_type:ty [$last_from:expr => $last_to:expr],
      ) => {
         debug_assert_eq!($prev_to, $last_from, "fields should be adjacent");
         debug_assert_eq!($last_to, $size, "last field should matches the size of struct");
-        debug_assert_eq!($last_to - $last_from, <$last_type as Field>::field_size(), "wrong size of field");
+        debug_assert_eq!($last_to - $last_from, <$last_type as Field>::field_size(),
+            "wrong size of field");
     };
     ($size:expr,
      $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
@@ -253,7 +273,8 @@ macro_rules! check_bounds {
         use $crate::encoding::Field;
         debug_assert_eq!($first_from, 0, "first field should start from 0");
         debug_assert_eq!($first_to, $size, "last field should matches the size of struct");
-        debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size(), "wrong size of field");
+        debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size(),
+            "wrong size of field");
     }};
     ($size:expr,
      $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
@@ -261,8 +282,10 @@ macro_rules! check_bounds {
      ) => {{
         use $crate::encoding::Field;
         debug_assert_eq!($first_from, 0, "first field should start from 0");
-        debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size(), "wrong size of field");
-        check_bounds!(@deep $size, $first_to, $($next_name : $next_type [$next_from => $next_to],)+);
+        debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size(),
+            "wrong size of field");
+        check_bounds!(@deep $size, $first_to,
+            $($next_name : $next_type [$next_from => $next_to],)+);
     }};
     ($size:expr,) => {{
         debug_assert_eq!($size, 0, "size of empty struct should be 0");

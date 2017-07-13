@@ -1,10 +1,24 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::error::Error as StdError;
 use std::fmt;
 use std::borrow::Cow;
 
 use super::Offset;
 
-#[derive( Debug)]
+#[derive(Debug)]
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
@@ -128,15 +142,13 @@ impl From<Box<StdError>> for Error {
     }
 }
 
-impl From<Cow<'static, str>> for Error
-{
+impl From<Cow<'static, str>> for Error {
     fn from(t: Cow<'static, str>) -> Error {
         Error::Basic(t)
     }
 }
 
-impl From<&'static str> for Error
-{
+impl From<&'static str> for Error {
     fn from(t: &'static str) -> Error {
         Error::Basic(t.into())
     }

@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 /// `message!` implement structure that could be sent in exonum network.
 ///
 /// Each message is a piece of data that is signed by creators key.
@@ -167,7 +181,8 @@ macro_rules! message {
             }
 
             #[allow(unused_variables)]
-            fn check_fields(raw_message: &$crate::messages::RawMessage) -> $crate::encoding::Result {
+            fn check_fields(raw_message: &$crate::messages::RawMessage)
+            -> $crate::encoding::Result {
                 let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
                                         as $crate::encoding::Offset).into();
                 $(
@@ -210,7 +225,8 @@ macro_rules! message {
 
             fn from_bytes(value: ::std::borrow::Cow<[u8]>) -> Self {
                 $name {
-                    raw: ::std::sync::Arc::new($crate::messages::MessageBuffer::from_vec(value.into_owned()))
+                    raw: ::std::sync::Arc::new($crate::messages::MessageBuffer::from_vec(
+                        value.into_owned()))
                 }
             }
         }
@@ -326,8 +342,8 @@ macro_rules! message {
                 use $crate::encoding::serialize::json::reexport::Value;
                 use $crate::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(&value)
-                .map_err(|_| D::Error::custom("Can not deserialize value."))
+                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
+                    &value).map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 

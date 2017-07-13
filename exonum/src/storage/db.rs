@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use std::collections::btree_map::{BTreeMap, Range};
 use std::collections::Bound::*;
 use std::cmp::Ordering::*;
@@ -36,9 +50,9 @@ pub enum Change {
 /// need to consistently apply several sets of changes for the same data, the next fork should be
 /// created after the previous fork has been merged.
 ///
-/// `Fork` also supports a checkpoint mechanism (methods [`checkpoint`], [`commit`] and [`rollback`])
-/// that allows you to rollback some of the latest changes if for some reason you can not provide
-/// a consistent state after the changes due to a runtime error.
+/// `Fork` also supports a checkpoint mechanism (methods [`checkpoint`], [`commit`] and
+/// [`rollback`]) that allows you to rollback some of the latest changes if for some reason you
+/// can not provide a consistent state after the changes due to a runtime error.
 ///
 /// `Fork` implements [`Snapshot`] trait and provides all the necessary methods for both reading and
 /// writing data from the database, so `&mut Fork` is used as a storage view for creating
@@ -91,8 +105,8 @@ enum NextIterValue {
 ///
 /// If you need to make any changes to the data, you need to create a [`Fork`] using method
 /// [`fork`][2]. As well as `Snapshot`, `Fork` provides read isolation and also allows you to create
-/// a sequence of changes to the database that are specified as a [`Patch`]. Later you can atomically
-/// merge a patch into the database using method [`merge`].
+/// a sequence of changes to the database that are specified as a [`Patch`]. Later you can
+/// atomically merge a patch into the database using method [`merge`].
 ///
 /// [`clone`]: #tymethod.fork
 /// [`Snapshot`]: trait.Snapshot.html
@@ -197,9 +211,9 @@ impl Snapshot for Fork {
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         let range = (Included(from), Unbounded);
         Box::new(ForkIter {
-                     snapshot: self.snapshot.iter(from),
-                     changes: self.changes.range::<[u8], _>(range).peekable(),
-                 })
+            snapshot: self.snapshot.iter(from),
+            changes: self.changes.range::<[u8], _>(range).peekable(),
+        })
     }
 }
 
@@ -249,8 +263,10 @@ impl Fork {
     /// Inserts the key-value pair into the fork.
     pub fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
         if self.logged {
-            self.changelog
-                .push((key.clone(), self.changes.insert(key, Change::Put(value))));
+            self.changelog.push((
+                key.clone(),
+                self.changes.insert(key, Change::Put(value)),
+            ));
         } else {
             self.changes.insert(key, Change::Put(value));
         }
@@ -259,8 +275,10 @@ impl Fork {
     /// Removes the key from the fork.
     pub fn remove(&mut self, key: Vec<u8>) {
         if self.logged {
-            self.changelog
-                .push((key.clone(), self.changes.insert(key, Change::Delete)));
+            self.changelog.push((
+                key.clone(),
+                self.changes.insert(key, Change::Delete),
+            ));
         } else {
             self.changes.insert(key, Change::Delete);
         }
@@ -270,10 +288,10 @@ impl Fork {
     pub fn remove_by_prefix(&mut self, prefix: &[u8]) {
         // Remove changes
         let keys = self.changes
-                       .range::<[u8], _>((Included(prefix), Unbounded))
-                       .map(|(k, ..)| k.to_vec())
-                       .take_while(|k| k.starts_with(prefix))
-                       .collect::<Vec<_>>();
+            .range::<[u8], _>((Included(prefix), Unbounded))
+            .map(|(k, ..)| k.to_vec())
+            .take_while(|k| k.starts_with(prefix))
+            .collect::<Vec<_>>();
         for k in keys {
             self.changes.remove(&k);
         }
@@ -376,26 +394,26 @@ impl<'a> Iterator for ForkIter<'a> {
                 Stored => return self.snapshot.next(),
                 Replaced => {
                     self.snapshot.next();
-                    return self.changes
-                               .next()
-                               .map(|(key, change)| {
-                                        (key.as_slice(),
-                                         match *change {
-                                             Change::Put(ref value) => value.as_slice(),
-                                             Change::Delete => unreachable!(),
-                                         })
-                                    });
+                    return self.changes.next().map(|(key, change)| {
+                        (
+                            key.as_slice(),
+                            match *change {
+                                Change::Put(ref value) => value.as_slice(),
+                                Change::Delete => unreachable!(),
+                            },
+                        )
+                    });
                 }
                 Inserted => {
-                    return self.changes
-                               .next()
-                               .map(|(key, change)| {
-                                        (key.as_slice(),
-                                         match *change {
-                                             Change::Put(ref value) => value.as_slice(),
-                                             Change::Delete => unreachable!(),
-                                         })
-                                    })
+                    return self.changes.next().map(|(key, change)| {
+                        (
+                            key.as_slice(),
+                            match *change {
+                                Change::Put(ref value) => value.as_slice(),
+                                Change::Delete => unreachable!(),
+                            },
+                        )
+                    })
                 }
                 Deleted => {
                     self.changes.next();
@@ -414,15 +432,15 @@ impl<'a> Iterator for ForkIter<'a> {
             match self.step() {
                 Stored => return self.snapshot.peek(),
                 Replaced | Inserted => {
-                    return self.changes
-                               .peek()
-                               .map(|&(key, change)| {
-                                        (key.as_slice(),
-                                         match *change {
-                                             Change::Put(ref value) => value.as_slice(),
-                                             Change::Delete => unreachable!(),
-                                         })
-                                    })
+                    return self.changes.peek().map(|&(key, change)| {
+                        (
+                            key.as_slice(),
+                            match *change {
+                                Change::Put(ref value) => value.as_slice(),
+                                Change::Delete => unreachable!(),
+                            },
+                        )
+                    })
                 }
                 Deleted => {
                     self.changes.next();

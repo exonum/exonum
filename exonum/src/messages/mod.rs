@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Consensus and other messages and related utilities.
 
 use bit_vec;
@@ -7,8 +21,8 @@ use std::fmt;
 use crypto::PublicKey;
 use encoding::Error;
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw,
-                    HEADER_LENGTH, PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_LENGTH,
+                    PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
 pub use self::protocol::*;
 
 #[macro_use]
@@ -73,7 +87,7 @@ impl RequestMessage {
         }
     }
 
-    #[cfg_attr(feature="flame_profile", flame)]
+    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn verify(&self, public_key: &PublicKey) -> bool {
         match *self {
             RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),
@@ -164,43 +178,44 @@ impl fmt::Debug for ConsensusMessage {
 impl Any {
     pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
         // TODO: check input message size
-        let msg =
-            if raw.service_id() == CONSENSUS {
-                match raw.message_type() {
-                    CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
-                    STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
-                    BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
+        let msg = if raw.service_id() == CONSENSUS {
+            match raw.message_type() {
+                CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
+                STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
+                BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
 
-                    PROPOSE_MESSAGE_ID => {
-                        Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
-                    }
-                    PREVOTE_MESSAGE_ID => {
-                        Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?))
-                    }
-                    PRECOMMIT_MESSAGE_ID => {
-                        Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?))
-                    }
-
-                    REQUEST_PROPOSE_MESSAGE_ID => {
-                        Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?))
-                    }
-                    REQUEST_TRANSACTIONS_MESSAGE_ID => Any::Request(RequestMessage::Transactions(RequestTransactions::from_raw(raw)?)),
-                    REQUEST_PREVOTES_MESSAGE_ID => {
-                        Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?))
-                    }
-                    REQUEST_PEERS_MESSAGE_ID => {
-                        Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))
-                    }
-                    REQUEST_BLOCK_MESSAGE_ID => {
-                        Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
-                    }
-                    message_type => {
-                        return Err(Error::IncorrectMessageType{ message_type });
-                    }
+                PROPOSE_MESSAGE_ID => {
+                    Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
                 }
-            } else {
-                Any::Transaction(raw)
-            };
+                PREVOTE_MESSAGE_ID => {
+                    Any::Consensus(ConsensusMessage::Prevote(Prevote::from_raw(raw)?))
+                }
+                PRECOMMIT_MESSAGE_ID => {
+                    Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?))
+                }
+
+                REQUEST_PROPOSE_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?))
+                }
+                REQUEST_TRANSACTIONS_MESSAGE_ID => Any::Request(RequestMessage::Transactions(
+                    RequestTransactions::from_raw(raw)?,
+                )),
+                REQUEST_PREVOTES_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?))
+                }
+                REQUEST_PEERS_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))
+                }
+                REQUEST_BLOCK_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
+                }
+                message_type => {
+                    return Err(Error::IncorrectMessageType { message_type });
+                }
+            }
+        } else {
+            Any::Transaction(raw)
+        };
         Ok(msg)
     }
 }

@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use crypto::Hash;
 
 
@@ -47,13 +61,15 @@ mod tests {
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
-        let block = Block::new(SCHEMA_MAJOR_VERSION,
-                               proposer_id,
-                               height,
-                               tx_count,
-                               &prev_hash,
-                               &tx_hash,
-                               &state_hash);
+        let block = Block::new(
+            SCHEMA_MAJOR_VERSION,
+            proposer_id,
+            height,
+            tx_count,
+            &prev_hash,
+            &tx_hash,
+            &state_hash,
+        );
 
         assert_eq!(block.schema_version(), SCHEMA_MAJOR_VERSION);
         assert_eq!(block.proposer_id(), proposer_id);

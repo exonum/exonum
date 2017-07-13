@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Exonum node that performs consensus algorithm.
 //!
 //! For details about consensus message handling see messages module documentation.
@@ -18,8 +32,7 @@ use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
              MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
-use blockchain::{SharedNodeState, Blockchain, Schema,
-                    GenesisConfig, Transaction, ApiContext};
+use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
 use api::{Api, ExplorerApi, SystemApi, NodeInfo};
 
@@ -65,16 +78,17 @@ pub enum NodeTimeout {
 /// Transactions sender.
 #[derive(Clone)]
 pub struct ApiSender<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     inner: S,
 }
 
 /// Handler that that performs consensus algorithm.
 pub struct NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
-
     /// State of the `NodeHandler`.
     pub state: State,
     /// Shared api state
@@ -86,7 +100,7 @@ pub struct NodeHandler<S>
     /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    timeout_adjuster: Box<TimeoutAdjuster>
+    timeout_adjuster: Box<TimeoutAdjuster>,
 }
 
 /// Service configuration.
@@ -140,7 +154,7 @@ impl Default for NodeApiConfig {
 pub struct MemoryPoolConfig {
     /// Maximum number of uncommited transactions.
     pub tx_pool_capacity: usize,
-    /// Sets the maximum number of messages that can be buffered on the event loop's 
+    /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
     pub events_pool_capacity: usize,
 }
@@ -213,7 +227,8 @@ pub struct Node {
 }
 
 impl<S> NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
@@ -222,8 +237,7 @@ impl<S> NodeHandler<S>
         sender: S,
         config: Configuration,
         api_state: SharedNodeState,
-        ) -> Self
-    {
+    ) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
@@ -238,28 +252,34 @@ impl<S> NodeHandler<S>
         let validator_id = stored
             .validator_keys
             .iter()
-            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
+            .position(|pk| {
+                pk.consensus_key == config.listener.consensus_public_key
+            })
             .map(|id| id as ValidatorId);
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Connect::new(&config.listener.consensus_public_key,
-                                   external_address,
-                                   sender.get_time(),
-                                   &config.listener.consensus_secret_key);
+        let connect = Connect::new(
+            &config.listener.consensus_public_key,
+            external_address,
+            sender.get_time(),
+            &config.listener.consensus_secret_key,
+        );
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
-        let mut state = State::new(validator_id,
-                               config.listener.consensus_public_key,
-                               config.listener.consensus_secret_key,
-                               config.service.service_public_key,
-                               config.service.service_secret_key,
-                               config.mempool.tx_pool_capacity,
-                               whitelist,
-                               stored,
-                               connect,
-                               last_hash,
-                               last_height,
-                               sender.get_time());
+        let mut state = State::new(
+            validator_id,
+            config.listener.consensus_public_key,
+            config.listener.consensus_secret_key,
+            config.service.service_public_key,
+            config.service.service_secret_key,
+            config.mempool.tx_pool_capacity,
+            whitelist,
+            stored,
+            connect,
+            last_hash,
+            last_height,
+            sender.get_time(),
+        );
 
         let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
         let timeout = timeout_adjuster.adjust_timeout(&state, &*snapshot);
@@ -278,7 +298,7 @@ impl<S> NodeHandler<S>
     /// Return internal `SharedNodeState`
     pub fn api_state(&self) -> &SharedNodeState {
         &self.api_state
-    } 
+    }
 
 
     /// Sets new timeout adjuster.
@@ -385,10 +405,12 @@ impl<S> NodeHandler<S>
     /// Adds `NodeTimeout::Round` timeout to the channel.
     pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round() + 1);
-        trace!("ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
-               time,
-               self.state.height(),
-               self.state.round());
+        trace!(
+            "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
+            time,
+            self.state.height(),
+            self.state.round()
+        );
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
@@ -397,12 +419,14 @@ impl<S> NodeHandler<S>
     pub fn add_propose_timeout(&mut self) {
         let adjusted_propose_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
-                   Duration::from_millis(adjusted_propose_timeout);
+            Duration::from_millis(adjusted_propose_timeout);
 
-        trace!("ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
-               time,
-               self.state.height(),
-               self.state.round());
+        trace!(
+            "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
+            time,
+            self.state.height(),
+            self.state.round()
+        );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
         self.channel.add_timeout(timeout, time);
     }
@@ -410,16 +434,20 @@ impl<S> NodeHandler<S>
     /// Adds `NodeTimeout::Status` timeout to the channel.
     pub fn add_status_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
-        self.channel
-            .add_timeout(NodeTimeout::Status(self.state.height()), time);
+        self.channel.add_timeout(
+            NodeTimeout::Status(self.state.height()),
+            time,
+        );
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
-        self.channel
-            .add_timeout(NodeTimeout::Request(data, peer), time);
+        self.channel.add_timeout(
+            NodeTimeout::Request(data, peer),
+            time,
+        );
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
@@ -431,8 +459,8 @@ impl<S> NodeHandler<S>
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
     pub fn add_update_api_state_timeout(&mut self) {
-        let time = self.channel.get_time() + 
-                Duration::from_millis(self.api_state().state_update_timeout());
+        let time = self.channel.get_time() +
+            Duration::from_millis(self.api_state().state_update_timeout());
         self.channel.add_timeout(NodeTimeout::UpdateApiState, time);
     }
 
@@ -449,7 +477,11 @@ impl<S> NodeHandler<S>
 }
 
 impl<S> EventHandler for NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<
+        ApplicationEvent = ExternalMessage,
+        Timeout = NodeTimeout,
+    >,
 {
     type Timeout = NodeTimeout;
     type ApplicationEvent = ExternalMessage;
@@ -488,11 +520,20 @@ impl<S> EventHandler for NodeHandler<S>
 }
 
 impl<S> fmt::Debug for NodeHandler<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> {
+where
+    S: Channel<
+        ApplicationEvent = ExternalMessage,
+        Timeout = NodeTimeout,
+    >,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, \
+        write!(
+            f,
+            "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, \
             peer_discovery: {:?}, timeout_adjuster: Box<TimeoutAdjuster> }}",
-               self.blockchain, self.peer_discovery)
+            self.blockchain,
+            self.peer_discovery
+        )
     }
 }
 
@@ -504,7 +545,8 @@ pub trait TransactionSend: Send + Sync {
 }
 
 impl<S> ApiSender<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// Creates new `ApiSender` with given channel.
     pub fn new(inner: S) -> ApiSender<S> {
@@ -519,7 +561,11 @@ impl<S> ApiSender<S>
 }
 
 impl<S> TransactionSend for ApiSender<S>
-    where S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>
+where
+    S: Channel<
+        ApplicationEvent = ExternalMessage,
+        Timeout = NodeTimeout,
+    >,
 {
     fn send(&self, tx: Box<Transaction>) -> EventsResult<()> {
         if !tx.verify() {
@@ -531,7 +577,12 @@ impl<S> TransactionSend for ApiSender<S>
 }
 
 impl<T> fmt::Debug for ApiSender<T>
-    where T: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout> {
+where
+    T: Channel<
+        ApplicationEvent = ExternalMessage,
+        Timeout = NodeTimeout,
+    >,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("ApiSender { .. }")
     }
@@ -542,15 +593,16 @@ impl Node {
     pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Self {
         crypto::init();
 
-        if cfg!(feature="flame_profile") {
-            ::profiler::init_handler(
-                ::std::env::var(PROFILE_ENV_VARIABLE_NAME)
-                .expect(
-                    &format!("You compiled exonum with profiling support, but {}",
-                     PROFILE_ENV_VARIABLE_NAME)))
+        if cfg!(feature = "flame_profile") {
+            ::profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(&format!(
+                "You compiled exonum with profiling support, but {}",
+                PROFILE_ENV_VARIABLE_NAME
+            )))
         };
 
-        blockchain.create_genesis_block(node_cfg.genesis.clone()).unwrap();
+        blockchain
+            .create_genesis_block(node_cfg.genesis.clone())
+            .unwrap();
 
 
         let mut events_cfg = EventsConfiguration::default();
@@ -572,27 +624,18 @@ impl Node {
             peer_discovery: node_cfg.peers,
         };
 
-        let external_address = 
-        if let Some(v) = node_cfg.external_address
-        {
+        let external_address = if let Some(v) = node_cfg.external_address {
             v
         } else {
             warn!("Could not find 'external_address' in the config, using 'listen_address'");
             node_cfg.listen_address
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
-        let network = Network::with_config(
-                        node_cfg.listen_address,
-                        config.network,
-                        api_state.clone()
-                    );
+        let network =
+            Network::with_config(node_cfg.listen_address, config.network, api_state.clone());
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
-        let worker = NodeHandler::new(blockchain,
-                                        external_address,
-                                        channel,
-                                        config,
-                                        api_state);
+        let worker = NodeHandler::new(blockchain, external_address, channel, config, api_state);
         Node {
             reactor: Events::with_event_loop(network, worker, event_loop),
             api_options: node_cfg.api,
@@ -621,21 +664,26 @@ impl Node {
                 let api_context = ApiContext::new(self);
                 let mut mount = Mount::new();
                 mount.mount("api/services", api_context.mount_private_api());
-                
+
                 let pool = self.state().transactions().clone();
                 let shared_api_state = self.handler().api_state().clone();
                 let mut router = Router::new();
-                let node_info = NodeInfo::new(blockchain.service_map().iter().map(|(_,s)|s));
-                let system_api = SystemApi::new(node_info, blockchain.clone(), pool, shared_api_state, channel);
+                let node_info = NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
+                let system_api = SystemApi::new(
+                    node_info,
+                    blockchain.clone(),
+                    pool,
+                    shared_api_state,
+                    channel,
+                );
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
 
                 let thread = thread::spawn(move || {
-                                               info!("Private exonum api started on {}",
-                                                     listen_address);
-                                               let chain = Chain::new(mount);
-                                               Iron::new(chain).http(listen_address).unwrap();
-                                           });
+                    info!("Private exonum api started on {}", listen_address);
+                    let chain = Chain::new(mount);
+                    Iron::new(chain).http(listen_address).unwrap();
+                });
                 Some(thread)
             }
             None => None,
@@ -654,12 +702,11 @@ impl Node {
                 }
 
                 let thread = thread::spawn(move || {
-                                               info!("Public exonum api started on {}",
-                                                     listen_address);
+                    info!("Public exonum api started on {}", listen_address);
 
-                                               let chain = Chain::new(mount);
-                                               Iron::new(chain).http(listen_address).unwrap();
-                                           });
+                    let chain = Chain::new(mount);
+                    Iron::new(chain).http(listen_address).unwrap();
+                });
                 Some(thread)
             }
             None => None,

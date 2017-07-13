@@ -1,10 +1,25 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use byteorder::{ByteOrder, BigEndian};
 
 use std::mem;
 
-use crypto::{Hash};
+use crypto::Hash;
 use messages::{RawMessage, Precommit, BlockProof, CONSENSUS};
-use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, MapProof};
+use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex,
+              ProofMapIndex, MapProof};
 use super::{Block, Blockchain};
 use super::config::StoredConfiguration;
 
@@ -46,7 +61,10 @@ pub struct Schema<T> {
     view: T,
 }
 
-impl<T> Schema<T> where T: AsRef<Snapshot> {
+impl<T> Schema<T>
+where
+    T: AsRef<Snapshot>,
+{
     /// Constructs information schema for the given `snapshot`.
     pub fn new(snapshot: T) -> Schema<T> {
         Schema { view: snapshot }
@@ -115,7 +133,7 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
         ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &self.view)
     }
 
-     /// Returns block hash for the given height.
+    /// Returns block hash for the given height.
     pub fn block_hash_by_height(&self, height: u64) -> Option<Hash> {
         self.block_hashes_by_height().get(height)
     }
@@ -139,11 +157,11 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
     /// Returns latest committed block.
     pub fn last_block(&self) -> Option<Block> {
         match self.block_hashes_by_height().last() {
-           Some(hash) => Some(self.blocks().get(&hash).unwrap()),
-           None => None,
+            Some(hash) => Some(self.blocks().get(&hash).unwrap()),
+            None => None,
         }
     }
-    
+
     /// Returns height of the latest committed block.
     pub fn last_height(&self) -> Option<u64> {
         let block_opt = self.last_block();
@@ -174,8 +192,10 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
         match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
-                let cfg = self.configuration_by_hash(cfg_hash)
-                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+                let cfg = self.configuration_by_hash(cfg_hash).expect(&format!(
+                    "Config with hash {:?} is absent in configs table",
+                    cfg_hash
+                ));
                 Some(cfg)
             }
             None => None,
@@ -187,13 +207,15 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
         let current_height = self.current_height();
         let idx = self.find_configurations_index_by_height(current_height);
         if idx > 0 {
-            let cfg_ref = self.configs_actual_from()
-                .get(idx - 1)
-                .expect(&format!("Configuration at index {} not found", idx));
+            let cfg_ref = self.configs_actual_from().get(idx - 1).expect(&format!(
+                "Configuration at index {} not found",
+                idx
+            ));
             let cfg_hash = cfg_ref.cfg_hash();
-            let cfg =
-                self.configuration_by_hash(cfg_hash)
-                    .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash));
+            let cfg = self.configuration_by_hash(cfg_hash).expect(&format!(
+                "Config with hash {:?} is absent in configs table",
+                cfg_hash
+            ));
             Some(cfg)
         } else {
             None
@@ -203,12 +225,15 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
     /// Returns the configuration that is the actual for the given height.
     pub fn configuration_by_height(&self, height: u64) -> StoredConfiguration {
         let idx = self.find_configurations_index_by_height(height);
-        let cfg_ref = self.configs_actual_from()
-            .get(idx)
-            .expect(&format!("Configuration at index {} not found", idx));
+        let cfg_ref = self.configs_actual_from().get(idx).expect(&format!(
+            "Configuration at index {} not found",
+            idx
+        ));
         let cfg_hash = cfg_ref.cfg_hash();
-        self.configuration_by_hash(cfg_hash)
-                .expect(&format!("Config with hash {:?} is absent in configs table", cfg_hash))
+        self.configuration_by_hash(cfg_hash).expect(&format!(
+            "Config with hash {:?} is absent in configs table",
+            cfg_hash
+        ))
     }
 
     /// Returns configuration for given configuration hash.
@@ -242,10 +267,7 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
     /// `Service` trait
     /// * `table_idx` - index of service table in `Vec`, returned by
     /// `state_hash` method of instance of type of `Service` trait
-    pub fn get_proof_to_service_table(&self,
-                                      service_id: u16,
-                                      table_idx: usize)
-                                      -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
         let key = Blockchain::service_table_unique_key(service_id, table_idx);
         let sum_table = self.state_hash_aggregator();
         sum_table.get_proof(&key)
@@ -255,11 +277,14 @@ impl<T> Schema<T> where T: AsRef<Snapshot> {
         let actual_from = self.configs_actual_from();
         for i in (0..actual_from.len()).rev() {
             if actual_from.get(i).unwrap().actual_from() <= height {
-                return i as u64
+                return i as u64;
             }
         }
-        panic!("Couldn't not find any config for height {}, \
-                that means that genesis block was created incorrectly.", height)
+        panic!(
+            "Couldn't not find any config for height {}, \
+                that means that genesis block was created incorrectly.",
+            height
+        )
     }
 }
 
@@ -341,14 +366,21 @@ impl<'a> Schema<&'a mut Fork> {
         if let Some(last_cfg) = self.configs_actual_from().last() {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
                 // TODO: Replace panic with errors.
-                panic!("Attempting to commit configuration with incorrect previous hash: {:?}, expected: {:?}",
-                    config_data.previous_cfg_hash, last_cfg.cfg_hash());
+                panic!(
+                    "Attempting to commit configuration with incorrect previous hash: {:?}, \
+                    expected: {:?}",
+                    config_data.previous_cfg_hash,
+                    last_cfg.cfg_hash()
+                );
             }
 
             if actual_from <= last_cfg.actual_from() {
-                panic!("Attempting to commit configuration with actual_from {} less than the last committed \
-                                              the last committed actual_from {}",
-                                              actual_from, last_cfg.actual_from());
+                panic!(
+                    "Attempting to commit configuration with actual_from {} less than the last \
+                    committed the last committed actual_from {}",
+                    actual_from,
+                    last_cfg.actual_from()
+                );
             }
         }
 
@@ -357,7 +389,10 @@ impl<'a> Schema<&'a mut Fork> {
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
-        info!("Scheduled the following configuration for acceptance: {:?}", config_data);
+        info!(
+            "Scheduled the following configuration for acceptance: {:?}",
+            config_data
+        );
         // TODO: clear storages
     }
 }

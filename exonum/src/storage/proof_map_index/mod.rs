@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! An implementation of a Merklized version of a map (Merkle Patricia tree).
 use std::marker::PhantomData;
 
@@ -17,7 +31,8 @@ mod key;
 mod node;
 mod proof;
 
-/// A Merkalized version of a map that provides proofs of existence or non-existence for the map keys.
+/// A Merkalized version of a map that provides proofs of existence or non-existence for the map
+/// keys.
 ///
 /// `ProofMapIndex` implements a Merkle Patricia tree, storing the values as leaves.
 /// `ProofMapIndex` requires that the keys implement [`ProofMapKey`] and values implement the
@@ -102,9 +117,10 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
 }
 
 impl<T, K, V> ProofMapIndex<T, K, V>
-    where T: AsRef<Snapshot>,
-          K: ProofMapKey,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    K: ProofMapKey,
+    V: StorageValue,
 {
     fn get_root_key(&self) -> Option<DBKey> {
         self.base.iter(&()).next().map(|(k, _): (DBKey, ())| k)
@@ -129,10 +145,11 @@ impl<T, K, V> ProofMapIndex<T, K, V>
         }
     }
 
-    fn construct_proof(&self,
-                       current_branch: &BranchNode,
-                       searched_slice: &DBKey)
-                       -> Option<ProofNode<V>> {
+    fn construct_proof(
+        &self,
+        current_branch: &BranchNode,
+        searched_slice: &DBKey,
+    ) -> Option<ProofNode<V>> {
 
         let mut child_slice = current_branch.child_slice(searched_slice.get(0));
         child_slice.set_from(searched_slice.from());
@@ -157,31 +174,32 @@ impl<T, K, V> ProofMapIndex<T, K, V>
                     match child_proof_pos {
                         ChildKind::Left => {
                             ProofNode::Branch(BranchProofNode::LeftBranch {
-                                                  left_hash: Box::new(child_proof),
-                                                  right_hash: neighbour_child_hash,
-                                                  left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                                                  right_key: r_s.suffix(searched_slice.from() + c_pr_l),
-                                              })
+                                left_hash: Box::new(child_proof),
+                                right_hash: neighbour_child_hash,
+                                left_key: l_s.suffix(searched_slice.from() + c_pr_l),
+                                right_key: r_s.suffix(searched_slice.from() + c_pr_l),
+                            })
                         }
                         ChildKind::Right => {
                             ProofNode::Branch(BranchProofNode::RightBranch {
-                                                  left_hash: neighbour_child_hash,
-                                                  right_hash: Box::new(child_proof),
-                                                  left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                                                  right_key: r_s.suffix(searched_slice.from() + c_pr_l),
-                                              })
+                                left_hash: neighbour_child_hash,
+                                right_hash: Box::new(child_proof),
+                                left_key: l_s.suffix(searched_slice.from() + c_pr_l),
+                                right_key: r_s.suffix(searched_slice.from() + c_pr_l),
+                            })
                         }
                     }
                 } else {
                     let l_h = *child_branch.child_hash(ChildKind::Left); //copy
                     let r_h = *child_branch.child_hash(ChildKind::Right); //copy
                     ProofNode::Branch(BranchProofNode::BranchKeyNotFound {
-                                          left_hash: l_h,
-                                          right_hash: r_h,
-                                          left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                                          right_key: r_s.suffix(searched_slice.from() + c_pr_l),
-                                      })
-                    // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
+                        left_hash: l_h,
+                        right_hash: r_h,
+                        left_key: l_s.suffix(searched_slice.from() + c_pr_l),
+                        right_key: r_s.suffix(searched_slice.from() + c_pr_l),
+                    })
+                    // proof of exclusion of a key, because none of child slices is a
+                    // prefix(searched_slice)
                 }
             }
         };
@@ -236,42 +254,43 @@ impl<T, K, V> ProofMapIndex<T, K, V>
                         match child_proof_pos {
                             ChildKind::Left => {
                                 MapProof::Branch(BranchProofNode::LeftBranch {
-                                                     left_hash: Box::new(child_proof),
-                                                     right_hash: neighbour_child_hash,
-                                                     left_key: l_s,
-                                                     right_key: r_s,
-                                                 })
+                                    left_hash: Box::new(child_proof),
+                                    right_hash: neighbour_child_hash,
+                                    left_key: l_s,
+                                    right_key: r_s,
+                                })
                             }
                             ChildKind::Right => {
                                 MapProof::Branch(BranchProofNode::RightBranch {
-                                                     left_hash: neighbour_child_hash,
-                                                     right_hash: Box::new(child_proof),
-                                                     left_key: l_s,
-                                                     right_key: r_s,
-                                                 })
+                                    left_hash: neighbour_child_hash,
+                                    right_hash: Box::new(child_proof),
+                                    left_key: l_s,
+                                    right_key: r_s,
+                                })
                             }
                         }
                     } else {
                         let l_h = *branch.child_hash(ChildKind::Left); //copy
                         let r_h = *branch.child_hash(ChildKind::Right); //copy
                         MapProof::Branch(BranchProofNode::BranchKeyNotFound {
-                                             left_hash: l_h,
-                                             right_hash: r_h,
-                                             left_key: l_s,
-                                             right_key: r_s,
-                                         })
-                        // proof of exclusion of a key, because none of child slices is a prefix(searched_slice)
+                            left_hash: l_h,
+                            right_hash: r_h,
+                            left_key: l_s,
+                            right_key: r_s,
+                        })
+                        // proof of exclusion of a key, because none of child slices is a
+                        // prefix(searched_slice)
                     }
                 } else {
                     // if common prefix length with root_slice is less than root_slice length
                     let l_h = *branch.child_hash(ChildKind::Left); //copy
                     let r_h = *branch.child_hash(ChildKind::Right); //copy
                     MapProof::Branch(BranchProofNode::BranchKeyNotFound {
-                                         left_hash: l_h,
-                                         right_hash: r_h,
-                                         left_key: l_s,
-                                         right_key: r_s,
-                                     })
+                        left_hash: l_h,
+                        right_hash: r_h,
+                        left_key: l_s,
+                        right_key: r_s,
+                    })
                     // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
             }
@@ -329,8 +348,9 @@ impl<T, K, V> ProofMapIndex<T, K, V>
 }
 
 impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
-    where K: ProofMapKey,
-          V: StorageValue
+where
+    K: ProofMapKey,
+    V: StorageValue,
 {
     fn insert_leaf(&mut self, key: &DBKey, value: V) -> Hash {
         debug_assert!(key.is_leaf());
@@ -341,11 +361,12 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
 
     // Inserts a new node as child of current branch and returns updated hash
     // or if a new node has more short key returns a new key length
-    fn insert_branch(&mut self,
-                     parent: &BranchNode,
-                     key_slice: &DBKey,
-                     value: V)
-                     -> (Option<u16>, Hash) {
+    fn insert_branch(
+        &mut self,
+        parent: &BranchNode,
+        key_slice: &DBKey,
+        value: V,
+    ) -> (Option<u16>, Hash) {
         let mut child_slice = parent.child_slice(key_slice.get(0));
         child_slice.set_from(key_slice.from());
         // If the slice is fully fit in key then there is a two cases
@@ -366,9 +387,11 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
                         let (j, h) = self.insert_branch(&branch, &key_slice.suffix(i), value);
                         match j {
                             Some(j) => {
-                                branch.set_child(key_slice.get(i),
-                                                 &key_slice.suffix(i).truncate(j),
-                                                 &h)
+                                branch.set_child(
+                                    key_slice.get(i),
+                                    &key_slice.suffix(i).truncate(j),
+                                    &h,
+                                )
                             }
                             None => branch.set_child_hash(key_slice.get(i), &h),
                         };
@@ -386,9 +409,11 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
             let hash = self.insert_leaf(&suffix_slice, value);
             new_branch.set_child(suffix_slice.get(0), &suffix_slice, &hash);
             // Move current branch
-            new_branch.set_child(child_slice.get(i),
-                                 &child_slice.suffix(i),
-                                 parent.child_hash(key_slice.get(0)));
+            new_branch.set_child(
+                child_slice.get(i),
+                &child_slice.suffix(i),
+                parent.child_hash(key_slice.get(0)),
+            );
 
             let hash = new_branch.hash();
             self.base.put(&key_slice.truncate(i), new_branch);
@@ -408,9 +433,11 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
                 if i < key_slice.len() {
                     let mut branch = BranchNode::empty();
                     branch.set_child(key_slice.get(i), &key_slice.suffix(i), &leaf_hash);
-                    branch.set_child(prefix_slice.get(i),
-                                     &prefix_slice.suffix(i),
-                                     &prefix_data.hash());
+                    branch.set_child(
+                        prefix_slice.get(i),
+                        &prefix_slice.suffix(i),
+                        &prefix_data.hash(),
+                    );
                     let new_prefix = key_slice.truncate(i);
                     self.base.put(&new_prefix, branch);
                 }
@@ -434,9 +461,11 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
                     // Inserts a new branch and adds current branch as its child
                     let hash = self.insert_leaf(&key_slice, value);
                     let mut new_branch = BranchNode::empty();
-                    new_branch.set_child(prefix_slice.get(i),
-                                         &prefix_slice.suffix(i),
-                                         &branch.hash());
+                    new_branch.set_child(
+                        prefix_slice.get(i),
+                        &prefix_slice.suffix(i),
+                        &branch.hash(),
+                    );
                     new_branch.set_child(key_slice.get(i), &key_slice.suffix(i), &hash);
                     // Saves a new branch
                     let new_prefix = prefix_slice.truncate(i);
@@ -543,9 +572,10 @@ impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
 }
 
 impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
-    where T: AsRef<Snapshot>,
-          K: ProofMapKey,
-          V: StorageValue
+where
+    T: AsRef<Snapshot>,
+    K: ProofMapKey,
+    V: StorageValue,
 {
     type Item = (K, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
@@ -556,21 +586,21 @@ impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 }
 
 impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
-    where K: ProofMapKey,
-          V: StorageValue
+where
+    K: ProofMapKey,
+    V: StorageValue,
 {
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter
-            .next()
-            .map(|(k, v)| (K::read(k.as_ref()), v))
+        self.base_iter.next().map(|(k, v)| (K::read(k.as_ref()), v))
     }
 }
 
 
 impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
-    where K: ProofMapKey
+where
+    K: ProofMapKey,
 {
     type Item = K;
 
@@ -580,7 +610,8 @@ impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 }
 
 impl<'a, V> Iterator for ProofMapIndexValues<'a, V>
-    where V: StorageValue
+where
+    V: StorageValue,
 {
     type Item = V;
 

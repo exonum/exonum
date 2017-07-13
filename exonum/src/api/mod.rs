@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use iron::IronError;
 use iron::prelude::*;
 use iron::status;
@@ -42,7 +56,6 @@ pub enum ApiError {
     IncorrectRequest(Box<::std::error::Error + Send + Sync>),
     Unauthorized,
     AddressParseError(::std::net::AddrParseError),
-    
 }
 
 impl fmt::Display for ApiError {
@@ -126,7 +139,8 @@ impl From<ApiError> for IronError {
 pub struct HexField<T: AsRef<[u8]> + Clone>(pub T);
 
 impl<T> Deref for HexField<T>
-    where T: AsRef<[u8]> + Clone
+where
+    T: AsRef<[u8]> + Clone,
 {
     type Target = T;
 
@@ -136,23 +150,27 @@ impl<T> Deref for HexField<T>
 }
 
 impl<T> Serialize for HexField<T>
-    where T: AsRef<[u8]> + Clone
+where
+    T: AsRef<[u8]> + Clone,
 {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         ser.serialize_str(&self.0.as_ref().to_hex())
     }
 }
 
 struct HexVisitor<T>
-    where T: AsRef<[u8]> + HexValue
+where
+    T: AsRef<[u8]> + HexValue,
 {
     _p: PhantomData<T>,
 }
 
 impl<'v, T> Visitor<'v> for HexVisitor<T>
-    where T: AsRef<[u8]> + HexValue + Clone
+where
+    T: AsRef<[u8]> + HexValue + Clone,
 {
     type Value = HexField<T>;
 
@@ -161,29 +179,32 @@ impl<'v, T> Visitor<'v> for HexVisitor<T>
     }
 
     fn visit_str<E>(self, s: &str) -> Result<HexField<T>, E>
-        where E: de::Error
+    where
+        E: de::Error,
     {
-        let v = T::from_hex(s)
-            .map_err(|_| de::Error::custom("Invalid hex"))?;
+        let v = T::from_hex(s).map_err(|_| de::Error::custom("Invalid hex"))?;
         Ok(HexField(v))
     }
 }
 
 impl<'de, T> Deserialize<'de> for HexField<T>
-    where T: AsRef<[u8]> + HexValue + Clone
+where
+    T: AsRef<[u8]> + HexValue + Clone,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         deserializer.deserialize_str(HexVisitor { _p: PhantomData })
     }
 }
 
 pub trait Api {
-    fn load_hex_value_from_cookie<'a>(&self,
-                                      request: &'a Request,
-                                      key: &str)
-                                      -> StorageResult<Vec<u8>> {
+    fn load_hex_value_from_cookie<'a>(
+        &self,
+        request: &'a Request,
+        key: &str,
+    ) -> StorageResult<Vec<u8>> {
         if let Some(&Cookie(ref cookies)) = request.headers.get() {
             for cookie in cookies.iter() {
                 if let Ok(c) = CookiePair::parse(cookie.as_str()) {
@@ -195,28 +216,34 @@ pub trait Api {
                 }
             }
         }
-        Err(StorageError::new(format!("Unable to find value with given key {}", key)))
+        Err(StorageError::new(
+            format!("Unable to find value with given key {}", key),
+        ))
     }
 
-    fn load_keypair_from_cookies(&self,
-                                 request: &Request)
-                                 -> Result<(PublicKey, SecretKey), ApiError> {
-        let public_key = PublicKey::from_slice(self.load_hex_value_from_cookie(request,
-                                                                               "public_key")?
-                                                   .as_ref());
-        let secret_key = SecretKey::from_slice(self.load_hex_value_from_cookie(request,
-                                                                               "secret_key")?
-                                                   .as_ref());
+    fn load_keypair_from_cookies(
+        &self,
+        request: &Request,
+    ) -> Result<(PublicKey, SecretKey), ApiError> {
+        let public_key = PublicKey::from_slice(
+            self.load_hex_value_from_cookie(request, "public_key")?
+                .as_ref(),
+        );
+        let secret_key = SecretKey::from_slice(
+            self.load_hex_value_from_cookie(request, "secret_key")?
+                .as_ref(),
+        );
 
         let public_key = public_key.ok_or(ApiError::Unauthorized)?;
         let secret_key = secret_key.ok_or(ApiError::Unauthorized)?;
         Ok((public_key, secret_key))
     }
 
-    fn ok_response_with_cookies(&self,
-                                json: &serde_json::Value,
-                                cookies: Option<Vec<String>>)
-                                -> IronResult<Response> {
+    fn ok_response_with_cookies(
+        &self,
+        json: &serde_json::Value,
+        cookies: Option<Vec<String>>,
+    ) -> IronResult<Response> {
         let mut resp = Response::with((status::Ok, serde_json::to_string_pretty(json).unwrap()));
         resp.headers.set(ContentType::json());
         if let Some(cookies) = cookies {

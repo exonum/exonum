@@ -1,7 +1,21 @@
-//! The module containing building blocks for creating blockchains powered by the 
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! The module containing building blocks for creating blockchains powered by the
 //! Exonum framework.
-//! 
-//! Services are the main extension point for the Exonum framework. To create your own service on 
+//!
+//! Services are the main extension point for the Exonum framework. To create your own service on
 //! top of Exonum blockchain you need to define following things:
 //!
 //! - Define your own information schema.
@@ -10,9 +24,9 @@
 //! - Create data structure that implements `Service` trait.
 //! - Optionally you can write api handlers.
 //!
-//! You may follow the [`minibank`][tutoral] tutorial to get experience of programming your services.
+//! You may follow the [`minibank`][1] tutorial to get experience of programming your services.
 //!
-//! [tutoral]: https://github.com/DenisKolodin/exonum-doc/blob/currency-tutorial/src/home/cryptocurrency/intro.md
+//! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
 
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
@@ -33,8 +47,7 @@ pub use self::block::{Block, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig};
-pub use self::service::{Service, Transaction, ServiceContext,
-                        ApiContext, SharedNodeState};
+pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
 
 mod block;
 mod schema;
@@ -45,8 +58,8 @@ mod tests;
 
 pub mod config;
 
-/// Exonum blockchain instance with the concrete services set and data storage. 
-/// Only blockchains with the identical set of services and genesis block can be combined 
+/// Exonum blockchain instance with the concrete services set and data storage.
+/// Only blockchains with the identical set of services and genesis block can be combined
 /// into the single network.
 pub struct Blockchain {
     db: Box<Database>,
@@ -60,8 +73,10 @@ impl Blockchain {
         for service in services {
             let id = service.service_id() as usize;
             if service_map.contains_key(id) {
-                panic!("Services have already contain service with id={}, please change it.",
-                       id);
+                panic!(
+                    "Services have already contain service with id={}, please change it.",
+                    id
+                );
             }
             service_map.insert(id, service);
         }
@@ -89,38 +104,38 @@ impl Blockchain {
     }
 
     /// Tries to create a `Transaction` object from the given raw message.
-    /// Raw message can be converted into `Transaction` object only 
+    /// Raw message can be converted into `Transaction` object only
     /// if following conditions are met.
     ///
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
         let id = raw.service_id() as usize;
-        self.service_map
-            .get(id)
-            .and_then(|service| service.tx_from_raw(raw).ok())
+        self.service_map.get(id).and_then(|service| {
+            service.tx_from_raw(raw).ok()
+        })
     }
 
-    /// Commits changes from the patch to the blockchain storage. 
+    /// Commits changes from the patch to the blockchain storage.
     /// See [`Fork`](../storage/struct.Fork.html) for details.
     pub fn merge(&mut self, patch: Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
 
     /// Returns the hash of latest committed block.
-    /// 
+    ///
     /// # Panics
     ///
     /// - If the genesis block was not committed.
     pub fn last_hash(&self) -> Hash {
         Schema::new(&self.snapshot())
-               .block_hashes_by_height()
-               .last()
-               .unwrap_or_else(Hash::default)
+            .block_hashes_by_height()
+            .last()
+            .unwrap_or_else(Hash::default)
     }
 
     /// Returns the latest committed block.
-    /// 
+    ///
     /// # Panics
     ///
     /// - If the genesis block was not committed.
@@ -145,8 +160,10 @@ impl Blockchain {
                 let cfg = service.initialize(&mut fork);
                 let name = service.service_name();
                 if config_propose.services.contains_key(name) {
-                    panic!("Services already contain service with '{}' name, please change it",
-                           name);
+                    panic!(
+                        "Services already contain service with '{}' name, please change it",
+                        name
+                    );
                 }
                 config_propose.services.insert(name.into(), cfg);
             }
@@ -189,12 +206,13 @@ impl Blockchain {
     /// Executes the given transactions from pool.
     /// Then it collects the resulting changes from the current storage state and returns them
     /// with the hash of resulting block.
-    pub fn create_patch(&self,
-                        proposer_id: u16,
-                        height: u64,
-                        tx_hashes: &[Hash],
-                        pool: &BTreeMap<Hash, Box<Transaction>>)
-                        -> (Hash, Patch) {
+    pub fn create_patch(
+        &self,
+        proposer_id: u16,
+        height: u64,
+        tx_hashes: &[Hash],
+        pool: &BTreeMap<Hash, Box<Transaction>>,
+    ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
 
@@ -207,9 +225,7 @@ impl Blockchain {
 
                 fork.checkpoint();
 
-                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                    tx.execute(&mut fork);
-                }));
+                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| { tx.execute(&mut fork); }));
 
                 match r {
                     Ok(..) => fork.commit(),
@@ -272,13 +288,15 @@ impl Blockchain {
             };
 
             // Create block
-            let block = Block::new(SCHEMA_MAJOR_VERSION,
-                                   proposer_id,
-                                   height,
-                                   tx_hashes.len() as u32,
-                                   &last_hash,
-                                   &tx_hash,
-                                   &state_hash);
+            let block = Block::new(
+                SCHEMA_MAJOR_VERSION,
+                proposer_id,
+                height,
+                tx_hashes.len() as u32,
+                &last_hash,
+                &tx_hash,
+                &state_hash,
+            );
             trace!("execute block = {:?}", block);
             // Eval block hash
             let block_hash = block.hash();
@@ -294,16 +312,18 @@ impl Blockchain {
         (block_hash, fork.into_patch())
     }
 
-    /// Commits to the storage block that proposes by node `State`. 
+    /// Commits to the storage block that proposes by node `State`.
     /// After that invokes `handle_commit` for each service in order of their identifiers
     /// and returns the list of transactions which which were created by the `handle_commit` event.
-    #[cfg_attr(feature="flame_profile", flame)]
-    pub fn commit<'a, I>(&mut self,
-                         state: &mut State,
-                         block_hash: Hash,
-                         precommits: I)
-                         -> Result<Vec<Box<Transaction>>, Error>
-        where I: Iterator<Item = &'a Precommit>
+    #[cfg_attr(feature = "flame_profile", flame)]
+    pub fn commit<'a, I>(
+        &mut self,
+        state: &mut State,
+        block_hash: Hash,
+        precommits: I,
+    ) -> Result<Vec<Box<Transaction>>, Error>
+    where
+        I: Iterator<Item = &'a Precommit>,
     {
         let (patch, txs) = {
             let mut fork = {
@@ -326,7 +346,7 @@ impl Blockchain {
                 let mut ctx = ServiceContext::new(state, &fork);
                 for service in self.service_map.values() {
                     service.handle_commit(&mut ctx);
-                };
+                }
                 ctx.transactions()
             };
 
@@ -369,7 +389,7 @@ impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
             db: self.db.clone(),
-            service_map: self.service_map.clone()
+            service_map: self.service_map.clone(),
         }
     }
 }

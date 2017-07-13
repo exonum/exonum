@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use tempdir::TempDir;
 
 use super::{Database, LevelDB, LevelDBOptions, MemoryDB, Snapshot, Fork};
@@ -46,19 +60,25 @@ fn fork_iter<T: Database>(mut db: T) {
     fork.put(vec![25], vec![25]);
     assert_iter(&fork, 0, &[(5, 5), (10, 10), (20, 20), (25, 25), (30, 30)]);
     fork.put(vec![35], vec![35]);
-    assert_iter(&fork,
-                0,
-                &[(5, 5), (10, 10), (20, 20), (25, 25), (30, 30), (35, 35)]);
+    assert_iter(
+        &fork,
+        0,
+        &[(5, 5), (10, 10), (20, 20), (25, 25), (30, 30), (35, 35)],
+    );
 
     // Double inserted
     fork.put(vec![25], vec![23]);
-    assert_iter(&fork,
-                0,
-                &[(5, 5), (10, 10), (20, 20), (25, 23), (30, 30), (35, 35)]);
+    assert_iter(
+        &fork,
+        0,
+        &[(5, 5), (10, 10), (20, 20), (25, 23), (30, 30), (35, 35)],
+    );
     fork.put(vec![26], vec![26]);
-    assert_iter(&fork,
-                0,
-                &[(5, 5), (10, 10), (20, 20), (25, 23), (26, 26), (30, 30), (35, 35)]);
+    assert_iter(
+        &fork,
+        0,
+        &[(5, 5), (10, 10), (20, 20), (25, 23), (26, 26), (30, 30), (35, 35)],
+    );
 
     // Replaced
     let mut fork = db.fork();

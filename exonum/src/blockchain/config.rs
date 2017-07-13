@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //! Exonum global variables which stored in blockchain as utf8 encoded json.
 
 use serde::de::Error;
@@ -23,7 +37,7 @@ pub struct ValidatorKeys {
 /// This configuration must be same for any exonum node in the certain network on given height.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
-    /// Link to the previous configuration. 
+    /// Link to the previous configuration.
     /// For configuration in genesis block `hash` is just an array of zeroes.
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
@@ -83,7 +97,8 @@ impl StoredConfiguration {
             }
             if keys.len() != config.validator_keys.len() * 2 {
                 return Err(JsonError::custom(
-                    "Duplicated keys are found: each consensus and service key must be unique"));
+                    "Duplicated keys are found: each consensus and service key must be unique",
+                ));
             }
         }
 
@@ -139,10 +154,14 @@ mod tests {
     }
 
     fn create_test_configuration() -> StoredConfiguration {
-        let validator_keys = (1..4).map(|i| ValidatorKeys {
-                consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
-                service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
-            }).collect();
+        let validator_keys = (1..4)
+            .map(|i| {
+                ValidatorKeys {
+                    consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
+                    service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
+                }
+            })
+            .collect();
 
         StoredConfiguration {
             previous_cfg_hash: Hash::zero(),

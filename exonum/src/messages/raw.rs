@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use byteorder::{ByteOrder, LittleEndian};
 
 use std::{mem, convert, sync};
@@ -106,16 +120,27 @@ impl MessageBuffer {
     }
 
     /// Checks that `Field` can be safely got with specified `from` and `to` offsets.
-    pub fn check<'a, F: Field<'a>>(&'a self,
-                                   from: CheckedOffset,
-                                   to: CheckedOffset,
-                                   latest_segment: CheckedOffset) -> StreamStructResult {
-        F::check(self.body(), (from + HEADER_LENGTH as u32)?, (to + HEADER_LENGTH as u32)?, latest_segment)
+    pub fn check<'a, F: Field<'a>>(
+        &'a self,
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> StreamStructResult {
+        F::check(
+            self.body(),
+            (from + HEADER_LENGTH as u32)?,
+            (to + HEADER_LENGTH as u32)?,
+            latest_segment,
+        )
     }
 
     /// Returns `Field` specified by `from` and `to` offsets. Should not be used directly.
     pub unsafe fn read<'a, F: Field<'a>>(&'a self, from: Offset, to: Offset) -> F {
-        F::read(self.body(), from + HEADER_LENGTH as u32, to + HEADER_LENGTH as u32)
+        F::read(
+            self.body(),
+            from + HEADER_LENGTH as u32,
+            to + HEADER_LENGTH as u32,
+        )
     }
 }
 
@@ -132,7 +157,13 @@ pub struct MessageWriter {
 }
 
 impl MessageWriter {
-    pub fn new(protocol_version: u8, network_id: u8, service_id: u16, message_type: u16, payload_length: usize) -> MessageWriter {
+    pub fn new(
+        protocol_version: u8,
+        network_id: u8,
+        service_id: u16,
+        message_type: u16,
+        payload_length: usize,
+    ) -> MessageWriter {
         let mut raw = MessageWriter { raw: vec![0; HEADER_LENGTH + payload_length] };
         raw.set_network_id(network_id);
         raw.set_version(protocol_version);
@@ -162,7 +193,11 @@ impl MessageWriter {
     }
 
     pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
-        field.write(&mut self.raw, from + HEADER_LENGTH as Offset, to + HEADER_LENGTH as Offset);
+        field.write(
+            &mut self.raw,
+            from + HEADER_LENGTH as Offset,
+            to + HEADER_LENGTH as Offset,
+        );
     }
 
     pub fn sign(mut self, secret_key: &SecretKey) -> MessageBuffer {
@@ -174,11 +209,11 @@ impl MessageWriter {
     }
 
     pub fn append_signature(mut self, signature: &Signature) -> MessageBuffer {
-        let payload_length = self.raw.len() + SIGNATURE_LENGTH; 
-        self.set_payload_length(payload_length); 
-        self.raw.extend_from_slice(signature.as_ref()); 
-        debug_assert_eq!(self.raw.len(), payload_length); 
-        MessageBuffer {raw: self.raw}
+        let payload_length = self.raw.len() + SIGNATURE_LENGTH;
+        self.set_payload_length(payload_length);
+        self.raw.extend_from_slice(signature.as_ref());
+        debug_assert_eq!(self.raw.len(), payload_length);
+        MessageBuffer { raw: self.raw }
     }
 }
 
