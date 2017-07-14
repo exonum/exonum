@@ -64,7 +64,8 @@ pub struct ConsensusConfig {
     pub propose_timeout: Milliseconds,
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,
-    pub txs_threshold: f64,
+    /// `TimeoutAdjuster` configuration.
+    pub timeout_adjuster: TimeoutAdjusterConfig,
 }
 
 impl Default for ConsensusConfig {
@@ -74,8 +75,8 @@ impl Default for ConsensusConfig {
             propose_timeout: 500,
             status_timeout: 5000,
             peers_timeout: 10000,
-            txs_threshold: 0.1,
             txs_block_limit: 1000,
+            timeout_adjuster: TimeoutAdjusterConfig::Constant(500),
         }
     }
 }
@@ -121,6 +122,33 @@ impl StorageValue for StoredConfiguration {
         let vec_bytes = self.try_serialize().unwrap();
         hash(&vec_bytes)
     }
+}
+
+/// `TimeoutAdjuster` config.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum TimeoutAdjusterConfig {
+    /// Constant timeout adjuster config.
+    Constant(Milliseconds),
+    /// Dynamic timeout adjuster configuration.
+    Dynamic {
+        /// Minimal timeout.
+        min: Milliseconds,
+        /// Maximal timeout.
+        max: Milliseconds,
+        /// Transactions threshold beginning from which adjuster returns minimal timeout.
+        threshold: u32,
+    },
+    /// Moving average timeout adjuster configuration.
+    MovingAverage {
+        /// Minimal timeout.
+        min: Milliseconds,
+        /// Maximal timeout.
+        max: Milliseconds,
+        /// Speed of the adjustment.
+        adjustment_speed: f64,
+        /// Optimal block load depending on the `txs_block_limit` from the `ConsensusConfig`.
+        optimal_block_load: f64,
+    },
 }
 
 #[cfg(test)]

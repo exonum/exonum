@@ -53,75 +53,111 @@ pub trait TimeoutAdjuster: Send {
 
 /// `Adjuster` implementation that returns value of `propose_timeout` field from `ConsensusConfig`.
 #[derive(Default, Debug)]
-pub struct Constant;
+pub struct Constant {
+    timeout: Milliseconds,
+}
+
+impl Constant {
+    /// Creates a new `Constant` timeout adjuster instance with the given timeout.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::node::timeout_adjuster::Constant;
+    ///
+    /// let mut adjuster = Constant::new(10);
+    /// ```
+    pub fn new(timeout: Milliseconds) -> Self {
+        Constant { timeout }
+    }
+}
 
 impl TimeoutAdjuster for Constant {
-    fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
-        state.consensus_config().propose_timeout
+    fn adjust_timeout(&mut self, _: &State, _: &Snapshot) -> Milliseconds {
+        self.timeout
     }
 }
 
 /// `Adjuster` implementation that returns minimal or maximal timeout value depending on the
-/// threshold, where threshold represents percent of `txs_block_limit` value from the
-/// `ConsensusConfig`.
-///
-/// Currently minimal timeout is equal to the value of `propose_timeout` field in the
-/// `ConsensusConfig` and maximal timeout is equal to `min * 10`.
-#[derive(Debug)]
+/// transactions amount in the previous block.
+#[derive(Debug, Default)]
 pub struct Dynamic {
-    threshold: f64,
+    min: Milliseconds,
+    max: Milliseconds,
+    threshold: u32,
 }
 
 impl Dynamic {
-    /// Creates `Dynamic` timeout adjuster with given `threshold` value.
-    pub fn new(threshold: f64) -> Self {
-        Dynamic { threshold }
+    /// Creates a new `Dynamic` timeout adjuster instance with given parameters.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::node::timeout_adjuster::Dynamic;
+    ///
+    /// let mut adjuster = Dynamic::new(1, 10, 100);
+    /// ```
+    pub fn new(min: Milliseconds, max: Milliseconds, threshold: u32) -> Self {
+        Dynamic {
+            min,
+            max,
+            threshold,
+        }
     }
 
-    fn adjust_timeout_impl(&mut self,
-                           txs_block_limit: u32,
-                           current_load: usize,
-                           propose_timeout: Milliseconds) -> Milliseconds {
-        if (current_load as f64) >= self.threshold * txs_block_limit as f64 {
-            propose_timeout
+    fn adjust_timeout_impl(&mut self, current_load: usize) -> Milliseconds {
+        if current_load >= self.threshold as usize {
+            self.min
         } else {
-            propose_timeout * 10
+            self.max
         }
     }
 }
 
 impl TimeoutAdjuster for Dynamic {
-    fn adjust_timeout(&mut self, state: &State, _: View) -> Milliseconds {
-        self.adjust_timeout_impl(state.config().consensus.txs_block_limit,
-                                 state.transactions().len(),
-                                 state.consensus_config().propose_timeout)
+    fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
+        self.adjust_timeout_impl(
+            state
+                .transactions()
+                .read()
+                .expect("Expected read lock")
+                .len(),
+        )
     }
 }
 
 /// Moving average timeout calculation. Initial timeout is equal to `min_timeout`.
 #[derive(Debug)]
 pub struct MovingAverage {
+    min: f64,
+    max: f64,
     adjustment_speed: f64,
     optimal_block_load: f64,
-    min_timeout: f64,
-    max_timeout: f64,
     previous_timeout: f64,
 }
 
 impl MovingAverage {
     /// Creates `MovingAverage` that generates values between `min_timeout` and `max_timeout`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::node::timeout_adjuster::MovingAverage;
+    ///
+    /// let mut adjuster = MovingAverage::new(1, 10, 0.5, 0.75);
+    /// ```
     pub fn new(
+        min: Milliseconds,
+        max: Milliseconds,
         adjustment_speed: f64,
         optimal_block_load: f64,
-        min_timeout: Milliseconds,
-        max_timeout: Milliseconds,
     ) -> Self {
         MovingAverage {
+            min: min as f64,
+            max: max as f64,
             adjustment_speed: adjustment_speed,
             optimal_block_load: optimal_block_load,
-            min_timeout: min_timeout as f64,
-            max_timeout: max_timeout as f64,
-            previous_timeout: min_timeout as f64,
+            previous_timeout: min as f64,
         }
     }
 
@@ -130,10 +166,10 @@ impl MovingAverage {
         let load_percent = current_load / optimal_load;
 
         let target_t = if current_load < optimal_load {
-            self.max_timeout - (self.max_timeout - self.previous_timeout) * load_percent
+            self.max - (self.max - self.previous_timeout) * load_percent
         } else {
             self.previous_timeout -
-                (self.previous_timeout - self.min_timeout) * (load_percent - 1.) /
+                (self.previous_timeout - self.min) * (load_percent - 1.) /
                     (1. / self.optimal_block_load - 1.)
         };
 
@@ -167,16 +203,21 @@ mod tests {
     fn dynamic_timeout_adjuster() {
         static MIN_TIMEOUT: Milliseconds = 1;
         static MAX_TIMEOUT: Milliseconds = 10;
-        static TXS_BLOCK_LIMIT: u32 = 10;
-        static THRESHOLD: f64 = 0.2;
+        static THRESHOLD: u32 = 2;
 
-        let test_data = [(0, MAX_TIMEOUT), (1, MAX_TIMEOUT), (2, MIN_TIMEOUT),
-                         (3, MIN_TIMEOUT), (10, MIN_TIMEOUT), (100, MIN_TIMEOUT)];
+        let test_data = [
+            (0, MAX_TIMEOUT),
+            (1, MAX_TIMEOUT),
+            (2, MIN_TIMEOUT),
+            (3, MIN_TIMEOUT),
+            (10, MIN_TIMEOUT),
+            (100, MIN_TIMEOUT),
+        ];
 
-        let mut adjuster = Dynamic::new(THRESHOLD);
+        let mut adjuster = Dynamic::new(MIN_TIMEOUT, MAX_TIMEOUT, THRESHOLD);
 
         for data in &test_data {
-            assert_eq!(data.1, adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, data.0, MIN_TIMEOUT));
+            assert_eq!(data.1, adjuster.adjust_timeout_impl(data.0));
         }
     }
 
@@ -189,7 +230,7 @@ mod tests {
         static TXS_BLOCK_LIMIT: f64 = 5000.;
         static TEST_COUNT: usize = 10;
 
-        let mut adjuster = MovingAverage::new(0.75, 0.7, MIN_TIMEOUT, MAX_TIMEOUT);
+        let mut adjuster = MovingAverage::new(MIN_TIMEOUT, MAX_TIMEOUT, 0.75, 0.7);
 
         // Timeout should stay minimal if there are `TXS_BLOCK_LIMIT` or more transactions.
         for _ in 0..TEST_COUNT {
