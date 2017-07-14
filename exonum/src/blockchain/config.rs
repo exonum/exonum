@@ -135,7 +135,7 @@ pub enum TimeoutAdjusterConfig {
         min: Milliseconds,
         /// Maximal timeout.
         max: Milliseconds,
-        /// Transactions threshold beginning from which adjuster returns minimal timeout.
+        /// Transactions threshold starting from which the adjuster returns the minimal timeout.
         threshold: u32,
     },
     /// Moving average timeout adjuster configuration.
