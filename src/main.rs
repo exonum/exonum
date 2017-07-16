@@ -105,7 +105,7 @@ impl Transaction for TxCreateWallet {
 
     fn execute(&self, view: &mut Fork) {
         let mut schema = CurrencySchema { view };
-        if let None = schema.wallet(self.pub_key()) {
+        if schema.wallet(self.pub_key()).is_none() {
             let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE);
             println!("Create the wallet: {:?}", wallet);
             schema.wallets().put(self.pub_key(), wallet)
