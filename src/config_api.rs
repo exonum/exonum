@@ -24,12 +24,12 @@ use exonum::api::{Api, ApiError};
 use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
 use exonum::storage::StorageValue;
-use exonum::node::{TxSender, NodeChannel, TransactionSend};
+use exonum::node::{ApiSender, NodeChannel, TransactionSend};
 use exonum::encoding::serialize::json::reexport as serde_json;
 
 use super::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigurationSchema};
 
-pub type ConfigTxSender = TxSender<NodeChannel>;
+pub type ConfigTxSender = ApiSender<NodeChannel>;
 
 #[derive(Serialize, Deserialize)]
 pub struct ApiResponseConfigHashInfo {
