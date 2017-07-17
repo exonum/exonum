@@ -6,8 +6,8 @@ authors = ["The Exonum Team <exonum@bitfury.com>"]
 [dependencies]
 exonum = {version="0.1", path="../exonum", features=["memorydb"]}
 
-log = "0.3"
-env_logger = "0.3"
-clap = {version="2.14", features=["unstable"]}
-rand = "0.3"
-bit-vec = "0.4.0"
+log = "0.3.8"
+env_logger = "0.4.3"
+clap = {version="2.25.0", features=["unstable"]}
+rand = "0.3.15"
+bit-vec = "0.4.4"
