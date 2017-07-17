@@ -148,7 +148,7 @@ pub fn init() {
     }
 }
 
-/// This structure provide a possibility to calculate hash for a stream of data
+/// This structure provides a possibility to calculate hash for a stream of data
 /// # Example
 ///
 /// ```rust
@@ -165,7 +165,7 @@ pub fn init() {
 pub struct HashStream(HashState);
 
 impl HashStream {
-    /// Create a new instance of `HashStream`
+    /// Creates a new instance of `HashStream`
     pub fn new() -> Self {
         HashStream(HashState::init())
     }
@@ -181,14 +181,14 @@ impl HashStream {
         self
     }
 
-    /// Complete process and returns final hash of stream data
+    /// Completes process and returns final hash of stream data
     pub fn finalize(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
     }
 }
 
-/// This structure provide a possibility to create signature for a stream of data
+/// This structure provides a possibility to create signature for a stream of data
 /// # Example
 ///
 /// ```rust
@@ -209,12 +209,12 @@ impl HashStream {
 pub struct SignStream(SignState);
 
 impl SignStream {
-    /// Create a new instance of `SignStream`
+    /// Creates a new instance of `SignStream`
     pub fn new() -> Self {
         SignStream(SignState::init())
     }
 
-    /// Adds a new `chunk` chunk to the message that will eventually be signed
+    /// Adds a new `chunk` to the message that will eventually be signed
     pub fn update(&mut self, chunk: &[u8]) {
         self.0.update(chunk);
     }
@@ -225,14 +225,14 @@ impl SignStream {
         self
     }
 
-    /// Computes a signature for the previously supplied messages,
+    /// Computes a signature for the previously supplied messages
     /// using the secret key `secret_key` and returns `Signature`
     pub fn finalize(&mut self, secret_key: &SecretKey) -> Signature {
         Signature(self.0.finalize(&secret_key.0))
     }
 
     /// Verifies that `sig` is a valid signature for the message whose content
-    /// has been previously supplied using `update` or `update_chain`, using the
+    /// has been previously supplied using `update` or `update_chain` using the
     /// public key `public_key`
     pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
         self.0.verify(&sig.0, &public_key.0)
