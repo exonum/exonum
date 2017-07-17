@@ -14,9 +14,11 @@
 
 //! `TimeoutAdjuster` is used to dynamically change propose timeout.
 
+use std::fmt::Debug;
+
 use events::Milliseconds;
-use node::State;
 use storage::Snapshot;
+use blockchain::Schema;
 
 /// `TimeoutAdjuster` trait is used to dynamically change propose timeout.
 ///
@@ -46,13 +48,13 @@ use storage::Snapshot;
 /// }
 /// ```
 /// For more examples see `Constant`, `Dynamic` and `MovingAverage` implementations.
-pub trait TimeoutAdjuster: Send {
+pub trait TimeoutAdjuster: Send + Debug {
     /// Called during node initialization and after accepting a new height.
-    fn adjust_timeout(&mut self, state: &State, view: &Snapshot) -> Milliseconds;
+    fn adjust_timeout(&mut self, view: &Snapshot) -> Milliseconds;
 }
 
 /// `Adjuster` implementation that returns value of `propose_timeout` field from `ConsensusConfig`.
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct Constant {
     timeout: Milliseconds,
 }
@@ -73,7 +75,7 @@ impl Constant {
 }
 
 impl TimeoutAdjuster for Constant {
-    fn adjust_timeout(&mut self, _: &State, _: &Snapshot) -> Milliseconds {
+    fn adjust_timeout(&mut self, _: &Snapshot) -> Milliseconds {
         self.timeout
     }
 }
@@ -105,8 +107,8 @@ impl Dynamic {
         }
     }
 
-    fn adjust_timeout_impl(&mut self, current_load: usize) -> Milliseconds {
-        if current_load >= self.threshold as usize {
+    fn adjust_timeout_impl(&mut self, current_load: u32) -> Milliseconds {
+        if current_load >= self.threshold {
             self.min
         } else {
             self.max
@@ -115,14 +117,11 @@ impl Dynamic {
 }
 
 impl TimeoutAdjuster for Dynamic {
-    fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
+    fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
+        let schema = Schema::new(snapshot);
+        let threshold = self.threshold;
         self.adjust_timeout_impl(
-            state
-                .transactions()
-                .read()
-                .expect("Expected read lock")
-                .len(),
-        )
+            schema.last_block().map_or(threshold, |block| block.tx_count()))
     }
 }
 
@@ -132,6 +131,7 @@ pub struct MovingAverage {
     min: f64,
     max: f64,
     adjustment_speed: f64,
+    txs_block_limit: f64,
     optimal_block_load: f64,
     previous_timeout: f64,
 }
@@ -150,19 +150,21 @@ impl MovingAverage {
         min: Milliseconds,
         max: Milliseconds,
         adjustment_speed: f64,
+        txs_block_limit: u32,
         optimal_block_load: f64,
     ) -> Self {
         MovingAverage {
             min: min as f64,
             max: max as f64,
-            adjustment_speed: adjustment_speed,
-            optimal_block_load: optimal_block_load,
+            adjustment_speed,
+            txs_block_limit: txs_block_limit as f64,
+            optimal_block_load,
             previous_timeout: min as f64,
         }
     }
 
-    fn adjust_timeout_impl(&mut self, txs_block_limit: f64, current_load: f64) -> Milliseconds {
-        let optimal_load = txs_block_limit * self.optimal_block_load;
+    fn adjust_timeout_impl(&mut self, current_load: f64) -> Milliseconds {
+        let optimal_load = self.txs_block_limit * self.optimal_block_load;
         let load_percent = current_load / optimal_load;
 
         let target_t = if current_load < optimal_load {
@@ -180,15 +182,10 @@ impl MovingAverage {
 }
 
 impl TimeoutAdjuster for MovingAverage {
-    fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
+    fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
+        let schema = Schema::new(snapshot);
         self.adjust_timeout_impl(
-            state.config().consensus.txs_block_limit as f64,
-            state
-                .transactions()
-                .read()
-                .expect("Expected read lock")
-                .len() as f64,
-        )
+            schema.last_block().map_or(0., |block| block.tx_count() as f64))
     }
 }
 
@@ -230,20 +227,21 @@ mod tests {
         static TXS_BLOCK_LIMIT: f64 = 5000.;
         static TEST_COUNT: usize = 10;
 
-        let mut adjuster = MovingAverage::new(MIN_TIMEOUT, MAX_TIMEOUT, 0.75, 0.7);
+        let mut adjuster = MovingAverage::new(
+            MIN_TIMEOUT, MAX_TIMEOUT, 0.75, TXS_BLOCK_LIMIT as u32, 0.7);
 
         // Timeout should stay minimal if there are `TXS_BLOCK_LIMIT` or more transactions.
         for _ in 0..TEST_COUNT {
             assert_eq!(
                 MIN_TIMEOUT,
-                adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, TXS_BLOCK_LIMIT)
+                adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT)
             );
         }
 
         for _ in 0..TEST_COUNT {
             assert_eq!(
                 MIN_TIMEOUT,
-                adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, TXS_BLOCK_LIMIT * 2.)
+                adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT * 2.)
             );
         }
 
@@ -267,9 +265,9 @@ mod tests {
         ];
 
         // As the transaction number declines, timeout should increase until it reaches maximum.
-        let mut previous_timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, TXS_BLOCK_LIMIT);
+        let mut previous_timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT);
         for transactions in TXS_TEST_DATA.iter().rev() {
-            let timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, *transactions);
+            let timeout = adjuster.adjust_timeout_impl(*transactions);
             info!(
                 "Timeout: current = {}, previous = {}",
                 timeout,
@@ -283,14 +281,14 @@ mod tests {
         for _ in 0..TEST_COUNT {
             assert_eq!(
                 MAX_TIMEOUT,
-                adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, 0.)
+                adjuster.adjust_timeout_impl(0.)
             );
         }
 
         // As the transactions number increases, timeout should decrease until it reaches minimum.
-        let mut previous_timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, 0.);
+        let mut previous_timeout = adjuster.adjust_timeout_impl(0.);
         for transactions in TXS_TEST_DATA {
-            let timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, *transactions);
+            let timeout = adjuster.adjust_timeout_impl(*transactions);
             info!(
                 "Timeout: current = {}, previous = {}",
                 timeout,
@@ -301,7 +299,7 @@ mod tests {
         }
         assert_eq!(
             MIN_TIMEOUT,
-            adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT, TXS_BLOCK_LIMIT)
+            adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT)
         );
     }
 }

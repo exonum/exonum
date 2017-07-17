@@ -25,10 +25,12 @@ use std::time::{SystemTime, Duration};
 
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
 use crypto::{PublicKey, SecretKey, Hash};
-use storage::Patch;
+use storage::{Patch, Snapshot};
 use events::Milliseconds;
-use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction};
+use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
+                 TimeoutAdjusterConfig};
 use node::whitelist::Whitelist;
+use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 
 // TODO: move request timeouts into node configuration
 
@@ -58,7 +60,6 @@ pub type TxPool = Arc<RwLock<BTreeMap<Hash, Box<Transaction>>>>;
 pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Connect,
-    propose_timeout: Milliseconds,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
@@ -97,6 +98,8 @@ pub struct State {
 
     // maximum of node height in consensus messages
     nodes_max_height: BTreeMap<PublicKey, Height>,
+
+    timeout_adjuster: Box<TimeoutAdjuster>,
 }
 
 /// State of a validator-node.
@@ -401,7 +404,7 @@ impl State {
 
             requests: HashMap::new(),
 
-            propose_timeout: stored.consensus.propose_timeout,
+            timeout_adjuster: make_timeout_adjuster(&stored.consensus),
             config: stored,
         }
     }
@@ -493,14 +496,9 @@ impl State {
         self.config = config;
     }
 
-    /// Returns value of the propose timeout from `ConsensusConfig`.
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.propose_timeout
-    }
-
-    /// Updates propose timeout value.
-    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
-        self.propose_timeout = timeout;
+    /// Returns adjusted (see `TimeoutAdjuster` for the details) value of the propose timeout.
+    pub fn propose_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
+        self.timeout_adjuster.adjust_timeout(snapshot)
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
@@ -1014,5 +1012,28 @@ impl State {
     /// Updates the `Connect` message of the current node.
     pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
+    }
+}
+
+fn make_timeout_adjuster(config: &ConsensusConfig) -> Box<TimeoutAdjuster> {
+    match config.timeout_adjuster {
+        TimeoutAdjusterConfig::Constant(timeout) => Box::new(Constant::new(timeout)),
+        TimeoutAdjusterConfig::Dynamic {
+            min,
+            max,
+            threshold,
+        } => Box::new(Dynamic::new(min, max, threshold)),
+        TimeoutAdjusterConfig::MovingAverage {
+            min,
+            max,
+            adjustment_speed,
+            optimal_block_load,
+        } => Box::new(MovingAverage::new(
+            min,
+            max,
+            adjustment_speed,
+            config.txs_block_limit,
+            optimal_block_load,
+        )),
     }
 }

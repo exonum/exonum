@@ -32,12 +32,9 @@ use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
              MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
-use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext,
-                 TimeoutAdjusterConfig};
+use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
 use api::{Api, public, private};
-
-use self::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -101,7 +98,6 @@ where
     /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    timeout_adjuster: Box<TimeoutAdjuster>,
 }
 
 /// Service configuration.
@@ -265,29 +261,9 @@ where
             &config.listener.consensus_secret_key,
         );
 
-        let mut timeout_adjuster: Box<TimeoutAdjuster> = match stored.consensus.timeout_adjuster {
-            TimeoutAdjusterConfig::Constant(timeout) => Box::new(Constant::new(timeout)),
-            TimeoutAdjusterConfig::Dynamic {
-                min,
-                max,
-                threshold,
-            } => Box::new(Dynamic::new(min, max, threshold)),
-            TimeoutAdjusterConfig::MovingAverage {
-                min,
-                max,
-                adjustment_speed,
-                optimal_block_load,
-            } => Box::new(MovingAverage::new(
-                min,
-                max,
-                adjustment_speed,
-                optimal_block_load,
-            )),
-        };
-
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
-        let mut state = State::new(
+        let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
             config.listener.consensus_secret_key,
@@ -302,12 +278,8 @@ where
             sender.get_time(),
         );
 
-        let timeout = timeout_adjuster.adjust_timeout(&state, &*snapshot);
-        state.set_propose_timeout(timeout);
-
         NodeHandler {
             blockchain,
-            timeout_adjuster,
             api_state,
             state,
             channel: sender,
@@ -318,12 +290,6 @@ where
     /// Return internal `SharedNodeState`
     pub fn api_state(&self) -> &SharedNodeState {
         &self.api_state
-    }
-
-
-    /// Sets new timeout adjuster.
-    pub fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
-        self.timeout_adjuster = adjuster;
     }
 
     /// Returns value of the `propose_timeout` field from the current `ConsensusConfig`.
@@ -437,9 +403,9 @@ where
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let adjusted_propose_timeout = self.state.propose_timeout();
+        let adjusted_timeout = self.state.propose_timeout(&*self.blockchain.snapshot());
         let time = self.round_start_time(self.state.round()) +
-            Duration::from_millis(adjusted_propose_timeout);
+            Duration::from_millis(adjusted_timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
@@ -549,8 +515,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, \
-            peer_discovery: {:?}, timeout_adjuster: Box<TimeoutAdjuster> }}",
+            "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, peer_discovery: {:?} }}",
             self.blockchain,
             self.peer_discovery
         )
