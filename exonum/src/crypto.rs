@@ -148,9 +148,9 @@ pub fn init() {
     }
 }
 
-/// This structure provide possibility to calculate hash for a stream of data 
+/// This structure provide possibility to calculate hash for a stream of data
 /// # Example
-/// 
+///
 /// ```rust
 /// use exonum::crypto::HashStream;
 ///
@@ -165,13 +165,12 @@ pub fn init() {
 pub struct HashStream(HashState);
 
 impl HashStream {
-
     /// Create new instance of `HashStream`
     pub fn new() -> Self {
         HashStream(HashState::init())
     }
 
-    /// Processes chunk of stream using state 
+    /// Processes chunk of stream using state
     pub fn update(&mut self, chunk: &[u8]) {
         self.0.update(chunk);
     }
@@ -182,17 +181,16 @@ impl HashStream {
         self
     }
 
-    /// Complete process and return final hash of stream data 
+    /// Complete process and return final hash of stream data
     pub fn finalize(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
     }
-
 }
 
-/// This structure provide possibility to create signature for a stream of data 
+/// This structure provide possibility to create signature for a stream of data
 /// # Example
-/// 
+///
 /// ```rust
 /// use exonum::crypto::{SignStream, gen_keypair};
 ///
@@ -211,7 +209,6 @@ impl HashStream {
 pub struct SignStream(SignState);
 
 impl SignStream {
-
     /// Create new instance of `SignStream`
     pub fn new() -> Self {
         SignStream(SignState::init())
@@ -228,19 +225,18 @@ impl SignStream {
         self
     }
 
-    /// Computes a signature for the previously supplied messages, 
+    /// Computes a signature for the previously supplied messages,
     /// using the secret key `secret_key` and returns `Signature`
     pub fn finalize(&mut self, secret_key: &SecretKey) -> Signature {
         Signature(self.0.finalize(&secret_key.0))
     }
 
-    /// Verifies that `sig` is a valid signature for the message whose content 
-    /// has been previously supplied using `update` or `update_chain`, using the 
+    /// Verifies that `sig` is a valid signature for the message whose content
+    /// has been previously supplied using `update` or `update_chain`, using the
     /// public key `public_key`
     pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
         self.0.verify(&sig.0, &public_key.0)
     }
-
 }
 
 macro_rules! implement_public_sodium_wrapper {
@@ -517,7 +513,8 @@ impl Default for Hash {
 
 #[cfg(test)]
 mod tests {
-    use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature, HashStream, SignStream};
+    use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature, HashStream,
+                SignStream};
     use super::HexValue;
     use serde_json;
 
@@ -602,10 +599,11 @@ mod tests {
         let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
         let h1 = hash(&data);
         let state = HashStream::new();
-        let h2 = state.update_chain(&data[..5])
-                    .update_chain(&data[5..])
-                    .finalize();
-        assert_eq!(h1, h2);   
+        let h2 = state
+            .update_chain(&data[..5])
+            .update_chain(&data[5..])
+            .finalize();
+        assert_eq!(h1, h2);
     }
 
     #[test]
