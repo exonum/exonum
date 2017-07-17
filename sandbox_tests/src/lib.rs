@@ -19,7 +19,7 @@
 extern crate log;
 extern crate exonum;
 extern crate sandbox;
-extern crate configuration_service;
+extern crate exonum_configuration;
 extern crate iron;
 extern crate router;
 extern crate serde;
@@ -84,8 +84,8 @@ mod tests {
     use sandbox::sandbox_with_services;
     use sandbox::sandbox_tests_helper::{SandboxState, add_one_height_with_transactions,
                                         add_one_height_with_transactions_from_other_validator};
-    use configuration_service::{TxConfigPropose, TxConfigVote, ConfigurationService,
-                                ConfigurationSchema};
+    use exonum_configuration::{TxConfigPropose, TxConfigVote, ConfigurationService,
+                               ConfigurationSchema};
 
     use super::generate_config_with_message;
 

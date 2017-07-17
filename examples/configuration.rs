@@ -13,11 +13,11 @@
 // limitations under the License.
 
 extern crate exonum;
-extern crate configuration_service;
+extern crate exonum_configuration;
 
 use exonum::helpers::fabric::NodeBuilder;
 
-use configuration_service::ConfigurationService;
+use exonum_configuration::ConfigurationService;
 
 fn main() {
     exonum::helpers::init_logger().unwrap();

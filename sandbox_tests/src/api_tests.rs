@@ -41,11 +41,11 @@ use exonum::encoding::serialize::json::reexport as serde_json;
 use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
 
-use configuration_service::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote,
-                            ConfigurationService, ZEROVOTE};
-use configuration_service::config_api::{PublicConfigApi, PrivateConfigApi, ApiResponseConfigInfo,
-                                        ApiResponseConfigHashInfo, ApiResponseVotesInfo,
-                                        ApiResponseProposePost, ApiResponseVotePost};
+use exonum_configuration::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote,
+                           ConfigurationService, ZEROVOTE};
+use exonum_configuration::config_api::{PublicConfigApi, PrivateConfigApi, ApiResponseConfigInfo,
+                                       ApiResponseConfigHashInfo, ApiResponseVotesInfo,
+                                       ApiResponseProposePost, ApiResponseVotePost};
 use super::generate_config_with_message;
 
 fn response_body(response: Response) -> serde_json::Value {

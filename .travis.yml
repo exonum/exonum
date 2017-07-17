@@ -27,10 +27,10 @@ install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 
 script:
-- cargo fmt -p configuration_service -- --write-mode=diff
+- cargo fmt -p exonum-configuration -- --write-mode=diff
 - cargo +$NIGHTLY_RUST clippy  -- -D warnings
 - cd sandbox_tests
-- cargo fmt -p sandbox_tests -- --write-mode=diff
+- cargo fmt -p exonum-configuration-sandbox -- --write-mode=diff
 - cargo +$NIGHTLY_RUST clippy  -- -D warnings
 - cd ..
 - cargo test
