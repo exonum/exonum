@@ -1,6 +1,6 @@
 # Exonum
 
-[![Build Status](https://travis-ci.org/exonum/exonum.svg?token=XsvDzZa3zu2eW4sVWuqN&branch=master)](https://travis-ci.org/exonum/exonum)
+[![Build Status](https://travis-ci.org/exonum/exonum.svg?branch=master)](https://travis-ci.org/exonum/exonum)
 [![Join the chat at https://gitter.im/exonum/exonum](https://badges.gitter.im/exonum/exonum.svg)](https://gitter.im/exonum/exonum)
 
 [Exonum](https://exonum.com/) is an extensible open-source framework for creating blockchain
