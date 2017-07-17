@@ -7,7 +7,7 @@ the global configuration by the means of proposing a new configuration and votin
 configurations among the validators.
 
 - [Specification](https://exonum.com/doc/advanced/configuration-updater/)
-- [Reference documentation](http://exonum.com/doc/crates/configuration_service/index.html)
+- [Reference documentation](https://docs.rs/exonum-configuration)
 - [Example code](examples/configuration.rs)
 - [Testnet deploy and api usage tutorial](doc/testnet-api-tutorial.md)
 
