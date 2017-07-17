@@ -24,16 +24,16 @@
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
 #![cfg_attr(feature="flame_profile",feature(plugin, custom_attribute))]
-#![cfg_attr(feature="flame_profile",plugin(flamer))]
+#![cfg_attr(feature="flame_profile",plugin(exonum_flamer))]
 
 #[macro_use]
-extern crate profiler;
+extern crate exonum_profiler as profiler;
 #[macro_use]
 extern crate log;
 extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
-extern crate leveldb;
+extern crate exonum_leveldb as leveldb;
 extern crate rand;
 extern crate serde;
 #[macro_use]
