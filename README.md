@@ -6,7 +6,6 @@ Minimal Exonum blockchain example.
 
 To run this example you need:
 
-* Latest [Node.js](https://nodejs.org/en/) (version 6.9.1 or above)
 * Latest [Rust](https://www.rust-lang.org/en-US/) (version 1.18.0 or above)
 
 ## Build & Run
@@ -28,19 +27,24 @@ Now the node is listening HTTP requests on `localhost:8000`.
 
 ### Sample transactions
 
-To check transactions use:
+When node is launched you can use transaction examples to check it:
 
 ```sh
 cd ./examples
 
+# every `curl` call returns hash of sent transactions
+
 # create 1st wallet and add funds
-curl -H "Content-Type: application/json" -X POST -d @create-wallet-1.json http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
+curl -H "Content-Type: application/json" -X POST -d @create-wallet-1.json \
+    http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
 
 # create 2nd wallet and add funds
-curl -H "Content-Type: application/json" -X POST -d @create-wallet-2.json http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
+curl -H "Content-Type: application/json" -X POST -d @create-wallet-2.json \
+    http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
 
 # transfer funds from 1st to 2nd
-curl -H "Content-Type: application/json" -X POST -d @transfer-funds.json http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
+curl -H "Content-Type: application/json" -X POST -d @transfer-funds.json \
+    http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
 ```
 
 ## LICENSE
