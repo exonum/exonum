@@ -7,7 +7,7 @@ repository = "https://github.com/exonum/exonum"
 documentation = "https://docs.rs/exonum"
 readme = "../README.md"
 license = "Apache-2.0"
-keywords = ["database", "distributed", "crypto", "blockchain", "framework", "exonum"]
+keywords = ["database", "distributed", "blockchain", "framework", "exonum"]
 categories = ["cryptography", "database-implementations"]
 description = "An extensible framework for blockchain software projects."
 
