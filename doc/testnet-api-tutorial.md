@@ -164,10 +164,10 @@ endpoint.
      1. `previous_cfg_hash` in proposed config body equals to hash of *actual*
         config.
 
-     1. `actual_from` in proposed config body is greater than *current height*.
-        *current height* is determined as the height of last
-        committed block + 1. This is important to obtain sequential view of
-        configs commit history. And, more important, the linear view of history
+     1. `actual_from` in proposed config body is greater than *current height*. 
+        *current height* is determined as the height of the last
+        committed block + 1. This is important to obtain a sequential view of
+        configs commit history. And, more important, the linear view of history 
         of votes which conditioned scheduling of a config.
 
      1. a *following* config isn't  already present.
