@@ -148,7 +148,7 @@ pub fn init() {
     }
 }
 
-/// This structure provide possibility to calculate hash for a stream of data
+/// This structure provide a possibility to calculate hash for a stream of data
 /// # Example
 ///
 /// ```rust
@@ -165,7 +165,7 @@ pub fn init() {
 pub struct HashStream(HashState);
 
 impl HashStream {
-    /// Create new instance of `HashStream`
+    /// Create a new instance of `HashStream`
     pub fn new() -> Self {
         HashStream(HashState::init())
     }
@@ -175,20 +175,20 @@ impl HashStream {
         self.0.update(chunk);
     }
 
-    /// Does the same as `update` but also return instance of `HashStream`
+    /// Does the same as `update` but also returns instance of `HashStream`
     pub fn update_chain(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
     }
 
-    /// Complete process and return final hash of stream data
+    /// Complete process and returns final hash of stream data
     pub fn finalize(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
     }
 }
 
-/// This structure provide possibility to create signature for a stream of data
+/// This structure provide a possibility to create signature for a stream of data
 /// # Example
 ///
 /// ```rust
@@ -209,17 +209,17 @@ impl HashStream {
 pub struct SignStream(SignState);
 
 impl SignStream {
-    /// Create new instance of `SignStream`
+    /// Create a new instance of `SignStream`
     pub fn new() -> Self {
         SignStream(SignState::init())
     }
 
-    /// Add a new `chunk` chunk to the message that will eventually be signed
+    /// Adds a new `chunk` chunk to the message that will eventually be signed
     pub fn update(&mut self, chunk: &[u8]) {
         self.0.update(chunk);
     }
 
-    /// Does the same as `update` but also return instance of `SignStream`
+    /// Does the same as `update` but also returns instance of `SignStream`
     pub fn update_chain(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
