@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::fmt;
+use std::panic::{self, PanicInfo};
 use std::ffi::OsString;
 
 use blockchain::{Service, Blockchain};
@@ -87,11 +88,31 @@ impl NodeBuilder {
         }
     }
 
+    // handle error, and print it.
+    fn panic_hook(info: &PanicInfo) {
+        let msg = match info.payload().downcast_ref::<&'static str>() {
+            Some(s) => *s,
+            None => {
+                match info.payload().downcast_ref::<String>() {
+                    Some(s) => &s[..],
+                    None => "Box<Any>",
+                }
+            }
+        };
+        println!("error: {}", msg);
+    }
+
     /// Runs application.
     pub fn run(self) {
-        if let Some(mut node) = self.parse_cmd() {
+        let old_hook = panic::take_hook();
+        panic::set_hook(Box::new(Self::panic_hook));
+        let feedback = self.parse_cmd();
+        panic::set_hook(old_hook);
+
+        if let Some(mut node) = feedback {
             node.run().expect("Node return error")
         }
+
     }
 }
 
