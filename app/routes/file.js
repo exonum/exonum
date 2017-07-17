@@ -3,7 +3,7 @@ var request = require('request');
 var router = express.Router();
 
 var baseUrl = 'http://127.0.0.1:2268/f/';
-var backendsUrl = 'http://127.0.0.1:1500/api/services/timestamping/v1/content';
+var backendsUrl = 'http://127.0.0.1:16000/timestamping/content';
 
 // router.post('/pay', function(req, res) {
 //     var db = req.db;
@@ -104,6 +104,7 @@ router.get('/:hash/exists', function(req, res, next) {
 
 router.get('/:hash/redirect', function(req, res) {
     var hash = req.params.hash;
+    var limit = 10;
 
     // start pooling until it will be able to get files info with GET request which means file is in a block
     (function pooling() {
@@ -115,6 +116,10 @@ router.get('/:hash/redirect', function(req, res) {
                 if (body.exists) {
                     res.redirect(body.redirect);
                 } else {
+                    limit++;
+                    if (limit > 10) {
+                        res.render('error');
+                    }
                     setTimeout(function() {
                         pooling(res, hash);
                     }, 512);
