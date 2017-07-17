@@ -1,6 +1,6 @@
 # Cryptocurrency (demo)
 
-Minimal blockchain example.
+Minimal Exonum blockchain example.
 
 ## Prerequisites
 

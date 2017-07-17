@@ -1,3 +1,17 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 extern crate serde;
 extern crate serde_json;
 #[macro_use] extern crate serde_derive;
@@ -9,7 +23,7 @@ extern crate iron;
 use exonum::blockchain::{self, Blockchain, Service, GenesisConfig,
                          ValidatorKeys, Transaction, ApiContext};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend,
-                   TxSender, NodeChannel};
+                   ApiSender, NodeChannel};
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
 use exonum::crypto::{PublicKey, Hash};
@@ -140,7 +154,7 @@ impl Transaction for TxTransfer {
 
 #[derive(Clone)]
 struct CryptocurrencyApi {
-    channel: TxSender<NodeChannel>,
+    channel: ApiSender<NodeChannel>,
 }
 
 impl Api for CryptocurrencyApi {
@@ -241,9 +255,8 @@ fn main() {
     let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
 
     let api_cfg = NodeApiConfig {
-        enable_blockchain_explorer: true,
         public_api_address: Some(api_address),
-        private_api_address: None,
+        ..Default::default()
     };
 
     let node_cfg = NodeConfig {
