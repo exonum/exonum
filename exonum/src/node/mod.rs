@@ -32,11 +32,12 @@ use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
              MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
              Error as EventsError};
-use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
+use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext,
+                 TimeoutAdjusterConfig};
 use messages::{Connect, RawMessage};
 use api::{Api, public, private};
 
-use self::timeout_adjuster::TimeoutAdjuster;
+use self::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -264,6 +265,26 @@ where
             &config.listener.consensus_secret_key,
         );
 
+        let mut timeout_adjuster: Box<TimeoutAdjuster> = match stored.consensus.timeout_adjuster {
+            TimeoutAdjusterConfig::Constant(timeout) => Box::new(Constant::new(timeout)),
+            TimeoutAdjusterConfig::Dynamic {
+                min,
+                max,
+                threshold,
+            } => Box::new(Dynamic::new(min, max, threshold)),
+            TimeoutAdjusterConfig::MovingAverage {
+                min,
+                max,
+                adjustment_speed,
+                optimal_block_load,
+            } => Box::new(MovingAverage::new(
+                min,
+                max,
+                adjustment_speed,
+                optimal_block_load,
+            )),
+        };
+
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
         let mut state = State::new(
@@ -281,7 +302,6 @@ where
             sender.get_time(),
         );
 
-        let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
         let timeout = timeout_adjuster.adjust_timeout(&state, &*snapshot);
         state.set_propose_timeout(timeout);
 

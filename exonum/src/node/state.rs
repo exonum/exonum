@@ -58,6 +58,7 @@ pub type TxPool = Arc<RwLock<BTreeMap<Hash, Box<Transaction>>>>;
 pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Connect,
+    propose_timeout: Milliseconds,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
@@ -400,6 +401,7 @@ impl State {
 
             requests: HashMap::new(),
 
+            propose_timeout: stored.consensus.propose_timeout,
             config: stored,
         }
     }
@@ -493,13 +495,12 @@ impl State {
 
     /// Returns value of the propose timeout from `ConsensusConfig`.
     pub fn propose_timeout(&self) -> Milliseconds {
-        self.config.consensus.propose_timeout
+        self.propose_timeout
     }
 
     /// Updates propose timeout value.
     pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
-        debug_assert!(timeout < self.config.consensus.round_timeout);
-        self.config.consensus.propose_timeout = timeout;
+        self.propose_timeout = timeout;
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
