@@ -1,7 +1,9 @@
 [package]
-name = "profiler"
+name = "exonum_profiler"
 version = "0.1.0"
-authors = ["Exonum Team <exonum@bitfury.com>"]
+authors = ["Exonum Team <exonum@bitfury.com>",
+            "Ty Overby <ty@pre-alpha.com>"]
+repository = "https://github.com/exonum/exonum"
 
 [dependencies]
 lazy_static = "0.2.1"

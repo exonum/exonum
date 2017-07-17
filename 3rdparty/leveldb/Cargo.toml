@@ -1,6 +1,6 @@
 [package]
 
-name = "leveldb"
+name = "exonum_leveldb"
 version = "0.9.0"
 authors = [ "Florian Gilcher <florian.gilcher@asquera.de>" ]
 
@@ -9,20 +9,17 @@ description = "An interface for leveldb"
 license = "MIT"
 readme = "README.md"
 
-documentation = "http://skade.github.io/leveldb/"
-homepage = "https://github.com/skade/leveldb"
-repository = "https://github.com/skade/leveldb"
+repository = "https://github.com/exonum/exonum"
 
 [lib]
 
-name = "leveldb"
+name = "exonum_leveldb"
 
 [dependencies]
 libc = "0.2"
 
-[dependencies.leveldb-sys]
-version="3.0"
-path="../leveldb-sys"
+leveldb-sys="2.0"
+
 
 [dev-dependencies]
 tempdir = "0.3"

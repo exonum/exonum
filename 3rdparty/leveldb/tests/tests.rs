@@ -1,4 +1,4 @@
-extern crate leveldb;
+extern crate exonum_leveldb as leveldb;
 extern crate tempdir;
 extern crate libc;
 

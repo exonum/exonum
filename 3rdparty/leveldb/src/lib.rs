@@ -40,7 +40,7 @@
 //! ```
 
 #![crate_type = "lib"]
-#![crate_name = "leveldb"]
+#![crate_name = "exonum_leveldb"]
 #![deny(missing_docs)]
 
 extern crate libc;

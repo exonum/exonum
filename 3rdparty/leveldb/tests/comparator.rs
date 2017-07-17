@@ -2,8 +2,8 @@
 mod comparator {
   use libc::c_char;
   use utils::{tmpdir, db_put_simple};
-  use leveldb::database::{Database};
-  use leveldb::iterator::Iterable;
+  use exonum_leveldb::database::{Database};
+  use exonum_leveldb::iterator::Iterable;
   use leveldb::options::{Options,ReadOptions};
   use leveldb::comparator::{Comparator,OrdComparator};
   use std::cmp::Ordering;
