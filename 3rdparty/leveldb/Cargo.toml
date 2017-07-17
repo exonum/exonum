@@ -1,25 +1,18 @@
 [package]
-
 name = "exonum_leveldb"
 version = "0.9.0"
-authors = [ "Florian Gilcher <florian.gilcher@asquera.de>" ]
-
+authors = ["Florian Gilcher <florian.gilcher@asquera.de>", "The Exonum Team <exonum@bitfury.com>"]
 description = "An interface for leveldb"
-
 license = "MIT"
 readme = "README.md"
-
 repository = "https://github.com/exonum/exonum"
 
 [lib]
-
 name = "exonum_leveldb"
 
 [dependencies]
 libc = "0.2"
-
 leveldb-sys="2.0"
-
 
 [dev-dependencies]
 tempdir = "0.3"
