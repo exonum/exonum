@@ -28,26 +28,19 @@ Now the node is listening HTTP requests on `localhost:8000`.
 
 ### Sample transactions
 
-To check transactions use [cc-examples](https://github.com/exonum/cc-examples/) repository:
+To check transactions use:
 
 ```sh
-# clone the repository with transactions
-git clone git@github.com:exonum/cc-examples.git
-cd cc-examples
-
-# use `npm login` to get access to `exonum-client`
-
-# get all dependencies
-npm install
+cd ./examples
 
 # create 1st wallet and add funds
-node create-wallet-1.js
+curl -H "Content-Type: application/json" -X POST -d @create-wallet-1.json http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
 
 # create 2nd wallet and add funds
-node create-wallet-2.js
+curl -H "Content-Type: application/json" -X POST -d @create-wallet-2.json http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
 
 # transfer funds from 1st to 2nd
-node transfer-funds.js
+curl -H "Content-Type: application/json" -X POST -d @transfer-funds.json http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
 ```
 
 ## LICENSE
