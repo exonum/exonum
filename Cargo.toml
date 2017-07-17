@@ -12,7 +12,7 @@ categories = ["database-implementations", "config"]
 description = "An Exonum service that provides functionality of modifying the global configuration."
 
 [badges]
-travis-ci = { repository = "https://github.com/exonum/exonum-configuration" }
+travis-ci = { repository = "exonum/exonum-configuration" }
 
 [dependencies]
 exonum = "0.1"
