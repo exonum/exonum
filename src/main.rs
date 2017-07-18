@@ -278,6 +278,6 @@ fn main() {
     println!("Starting a single node...");
     let mut node = Node::new(blockchain, node_cfg);
 
-    println!("Blockchain in ready for transactions!");
+    println!("Blockchain is ready for transactions!");
     node.run().unwrap();
 }
