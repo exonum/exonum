@@ -27,20 +27,21 @@ use blockchain::Schema;
 /// Implementing `TimeoutAdjuster`:
 ///
 /// ```
-/// use exonum::node::State;
 /// use exonum::node::timeout_adjuster::TimeoutAdjuster;
 /// use exonum::events::Milliseconds;
 /// use exonum::storage::Snapshot;
+/// use exonum::blockchain::Schema;
 ///
 /// # #[allow(dead_code)]
+/// # #[derive(Debug)]
 /// struct CustomAdjuster {}
 ///
 /// impl TimeoutAdjuster for CustomAdjuster {
-///     fn adjust_timeout(&mut self, _: &Snapshot) -> Milliseconds {
+///     fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
 ///         let schema = Schema::new(snapshot);
 ///         let transactions = schema.last_block().map_or(0, |block| block.tx_count());
 ///         // Simply increase propose time after empty blocks.
-///         if transactions == 0
+///         if transactions == 0 {
 ///             1000
 ///         } else {
 ///             200
@@ -66,9 +67,11 @@ impl Constant {
     /// # Examples
     ///
     /// ```
+    /// # #![allow(unused_mut)]
     /// use exonum::node::timeout_adjuster::Constant;
     ///
     /// let mut adjuster = Constant::new(10);
+    /// # drop(adjuster);
     /// ```
     pub fn new(timeout: Milliseconds) -> Self {
         Constant { timeout }
@@ -96,9 +99,11 @@ impl Dynamic {
     /// # Examples
     ///
     /// ```
+    /// # #![allow(unused_mut)]
     /// use exonum::node::timeout_adjuster::Dynamic;
     ///
     /// let mut adjuster = Dynamic::new(1, 10, 100);
+    /// # drop(adjuster);
     /// ```
     pub fn new(min: Milliseconds, max: Milliseconds, threshold: u32) -> Self {
         Dynamic {
@@ -145,9 +150,11 @@ impl MovingAverage {
     /// # Examples
     ///
     /// ```
+    /// # #![allow(unused_mut)]
     /// use exonum::node::timeout_adjuster::MovingAverage;
     ///
-    /// let mut adjuster = MovingAverage::new(1, 10, 0.5, 0.75);
+    /// let mut adjuster = MovingAverage::new(1, 10, 0.5, 5000, 0.75);
+    /// # drop(adjuster);
     /// ```
     pub fn new(
         min: Milliseconds,
