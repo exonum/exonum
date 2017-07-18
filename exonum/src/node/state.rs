@@ -1017,7 +1017,7 @@ impl State {
 
 fn make_timeout_adjuster(config: &ConsensusConfig) -> Box<TimeoutAdjuster> {
     match config.timeout_adjuster {
-        TimeoutAdjusterConfig::Constant(timeout) => Box::new(Constant::new(timeout)),
+        TimeoutAdjusterConfig::Constant { timeout } => Box::new(Constant::new(timeout)),
         TimeoutAdjusterConfig::Dynamic {
             min,
             max,

@@ -76,7 +76,7 @@ impl Default for ConsensusConfig {
             status_timeout: 5000,
             peers_timeout: 10000,
             txs_block_limit: 1000,
-            timeout_adjuster: TimeoutAdjusterConfig::Constant(500),
+            timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }
     }
 }
@@ -126,9 +126,13 @@ impl StorageValue for StoredConfiguration {
 
 /// `TimeoutAdjuster` config.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(tag = "type")]
 pub enum TimeoutAdjusterConfig {
     /// Constant timeout adjuster config.
-    Constant(Milliseconds),
+    Constant {
+        /// Timeout value.
+        timeout: Milliseconds,
+    },
     /// Dynamic timeout adjuster configuration.
     Dynamic {
         /// Minimal timeout.
@@ -154,6 +158,10 @@ pub enum TimeoutAdjusterConfig {
 #[cfg(test)]
 mod tests {
     use toml;
+    use serde::{Serialize, Deserialize};
+
+    use std::fmt::Debug;
+
     use crypto::{Seed, gen_keypair_from_seed};
     use super::*;
 
@@ -169,7 +177,7 @@ mod tests {
     #[test]
     fn stored_configuration_serialize_deserialize() {
         let configuration = create_test_configuration();
-        serialize_deserialize(&configuration);
+        assert_eq!(configuration, serialize_deserialize(&configuration));
     }
 
     #[test]
@@ -181,6 +189,33 @@ mod tests {
             service_key: PublicKey::zero(),
         });
         serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    fn constant_adjuster_config_toml() {
+        let config = TimeoutAdjusterConfig::Constant { timeout: 500 };
+        check_toml_roundtrip(&config);
+    }
+
+    #[test]
+    fn dynamic_adjuster_config_toml() {
+        let config = TimeoutAdjusterConfig::Dynamic {
+            min: 1,
+            max: 1000,
+            threshold: 10,
+        };
+        check_toml_roundtrip(&config);
+    }
+
+    #[test]
+    fn moving_average_adjuster_config_toml() {
+        let config = TimeoutAdjusterConfig::MovingAverage {
+            min: 1,
+            max: 1000,
+            adjustment_speed: 0.5,
+            optimal_block_load: 0.75,
+        };
+        check_toml_roundtrip(&config);
     }
 
     fn create_test_configuration() -> StoredConfiguration {
@@ -202,8 +237,17 @@ mod tests {
         }
     }
 
-    fn serialize_deserialize(configuration: &StoredConfiguration) {
+    fn serialize_deserialize(configuration: &StoredConfiguration) -> StoredConfiguration {
         let serialized = configuration.try_serialize().unwrap();
-        let _ = StoredConfiguration::try_deserialize(&serialized).unwrap();
+        StoredConfiguration::try_deserialize(&serialized).unwrap()
+    }
+
+    fn check_toml_roundtrip<T>(original: &T)
+    where
+        for<'de> T: Serialize + Deserialize<'de> + PartialEq + Debug,
+    {
+        let toml = toml::to_string(original).unwrap();
+        let deserialized: T = toml::from_str(&toml).unwrap();
+        assert_eq!(*original, deserialized);
     }
 }

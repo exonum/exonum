@@ -120,8 +120,10 @@ impl TimeoutAdjuster for Dynamic {
     fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
         let schema = Schema::new(snapshot);
         let threshold = self.threshold;
-        self.adjust_timeout_impl(
-            schema.last_block().map_or(threshold, |block| block.tx_count()))
+        self.adjust_timeout_impl(schema.last_block().map_or(
+            threshold,
+            |block| block.tx_count(),
+        ))
     }
 }
 
@@ -184,8 +186,10 @@ impl MovingAverage {
 impl TimeoutAdjuster for MovingAverage {
     fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
         let schema = Schema::new(snapshot);
-        self.adjust_timeout_impl(
-            schema.last_block().map_or(0., |block| block.tx_count() as f64))
+        self.adjust_timeout_impl(schema.last_block().map_or(
+            0.,
+            |block| block.tx_count() as f64,
+        ))
     }
 }
 
@@ -227,15 +231,12 @@ mod tests {
         static TXS_BLOCK_LIMIT: f64 = 5000.;
         static TEST_COUNT: usize = 10;
 
-        let mut adjuster = MovingAverage::new(
-            MIN_TIMEOUT, MAX_TIMEOUT, 0.75, TXS_BLOCK_LIMIT as u32, 0.7);
+        let mut adjuster =
+            MovingAverage::new(MIN_TIMEOUT, MAX_TIMEOUT, 0.75, TXS_BLOCK_LIMIT as u32, 0.7);
 
         // Timeout should stay minimal if there are `TXS_BLOCK_LIMIT` or more transactions.
         for _ in 0..TEST_COUNT {
-            assert_eq!(
-                MIN_TIMEOUT,
-                adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT)
-            );
+            assert_eq!(MIN_TIMEOUT, adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT));
         }
 
         for _ in 0..TEST_COUNT {
@@ -279,10 +280,7 @@ mod tests {
 
         // Timeout should stay maximal if there are no transactions for some time.
         for _ in 0..TEST_COUNT {
-            assert_eq!(
-                MAX_TIMEOUT,
-                adjuster.adjust_timeout_impl(0.)
-            );
+            assert_eq!(MAX_TIMEOUT, adjuster.adjust_timeout_impl(0.));
         }
 
         // As the transactions number increases, timeout should decrease until it reaches minimum.
@@ -297,9 +295,6 @@ mod tests {
             assert!(timeout <= previous_timeout);
             previous_timeout = timeout;
         }
-        assert_eq!(
-            MIN_TIMEOUT,
-            adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT)
-        );
+        assert_eq!(MIN_TIMEOUT, adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT));
     }
 }
