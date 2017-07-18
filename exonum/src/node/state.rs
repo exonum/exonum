@@ -478,8 +478,13 @@ impl State {
         &self.config.services
     }
 
-    /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node.
+    /// Replaces `StoredConfiguration` with a new one and updates validator id of the current node
+    /// if the new config is different from the previous one.
     pub fn update_config(&mut self, config: StoredConfiguration) {
+        if self.config == config {
+            return;
+        }
+
         trace!("Updating node config={:#?}", config);
         let validator_id = config
             .validator_keys
@@ -493,6 +498,8 @@ impl State {
         );
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
+
+        self.timeout_adjuster = make_timeout_adjuster(&config.consensus);
         self.config = config;
     }
 
