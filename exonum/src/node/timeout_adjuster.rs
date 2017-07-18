@@ -36,10 +36,11 @@ use blockchain::Schema;
 /// struct CustomAdjuster {}
 ///
 /// impl TimeoutAdjuster for CustomAdjuster {
-///     fn adjust_timeout(&mut self, state: &State, _: &Snapshot) -> Milliseconds {
+///     fn adjust_timeout(&mut self, _: &Snapshot) -> Milliseconds {
+///         let schema = Schema::new(snapshot);
+///         let transactions = schema.last_block().map_or(0, |block| block.tx_count());
 ///         // Simply increase propose time after empty blocks.
-///         if state.transactions()
-///                 .read().expect("Expected read lock").is_empty() {
+///         if transactions == 0
 ///             1000
 ///         } else {
 ///             200
