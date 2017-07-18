@@ -65,7 +65,6 @@ impl NodeBuilder {
         T: Into<OsString> + Clone,
     {
         ClapBackend::execute_cmd_string(self.commands.as_slice(), cmd_line) != Feedback::None
-
     }
 
     /// Parse cmd args, return `Node`, if run command found

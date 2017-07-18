@@ -292,11 +292,6 @@ where
         &self.api_state
     }
 
-    /// Returns value of the `propose_timeout` field from the current `ConsensusConfig`.
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.state().consensus_config().propose_timeout
-    }
-
     /// Returns value of the `round_timeout` field from the current `ConsensusConfig`.
     pub fn round_timeout(&self) -> Milliseconds {
         self.state().consensus_config().round_timeout

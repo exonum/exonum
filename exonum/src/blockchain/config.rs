@@ -60,8 +60,6 @@ pub struct ConsensusConfig {
     pub status_timeout: Milliseconds,
     /// Peer exchange timeout.
     pub peers_timeout: Milliseconds,
-    /// Proposal timeout after committing a block.
-    pub propose_timeout: Milliseconds,
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,
     /// `TimeoutAdjuster` configuration.
@@ -72,7 +70,6 @@ impl Default for ConsensusConfig {
     fn default() -> Self {
         ConsensusConfig {
             round_timeout: 3000,
-            propose_timeout: 500,
             status_timeout: 5000,
             peers_timeout: 10000,
             txs_block_limit: 1000,

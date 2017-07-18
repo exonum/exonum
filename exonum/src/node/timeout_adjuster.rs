@@ -54,7 +54,7 @@ pub trait TimeoutAdjuster: Send + Debug {
     fn adjust_timeout(&mut self, view: &Snapshot) -> Milliseconds;
 }
 
-/// `Adjuster` implementation that returns value of `propose_timeout` field from `ConsensusConfig`.
+/// `Adjuster` implementation that always returns the same value.
 #[derive(Debug)]
 pub struct Constant {
     timeout: Milliseconds,
