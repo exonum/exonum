@@ -4,9 +4,8 @@ Minimal Exonum blockchain example.
 
 ## Prerequisites
 
-To run this example you need:
-
-* Latest [Rust](https://www.rust-lang.org/en-US/) (version 1.18.0 or above)
+To run this example you need to install [Rust](https://www.rust-lang.org/en-US/)
+compiler and [third-party libraries](http://exonum.com/doc/get-started/install/).
 
 ## Build & Run
 
