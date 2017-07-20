@@ -499,6 +499,10 @@ impl Command for GenerateTestnet {
             DEFAULT_EXONUM_LISTEN_PORT,
         );
 
+        if count == 0 {
+            panic!("Can't generate testnet with zero nodes count.");
+        }
+
         let dir = Path::new(&dir);
         let dir = dir.join("validators");
         if !dir.exists() {
