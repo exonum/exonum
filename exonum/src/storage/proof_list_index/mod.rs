@@ -64,6 +64,23 @@ impl<T, V> ProofListIndex<T, V> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    ///
+    /// let snapshot = db.snapshot();
+    /// let index: ProofListIndex<_, u8> = ListIndex::new(prefix, &snapshot);
+    ///
+    /// let mut fork = db.fork();
+    /// let mut mut_index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// # drop(index);
+    /// # drop(mut_index);
+    /// ```
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ProofListIndex {
             base: BaseIndex::new(prefix, view),
@@ -133,11 +150,39 @@ where
     }
 
     /// Returns an element at that position or `None` if out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// assert_eq!(None, index.get(0));
+    /// index.push(10);
+    /// assert_eq!(Some(10), index.get(0));
+    /// ```
     pub fn get(&self, index: u64) -> Option<V> {
         self.base.get(&ProofListKey::leaf(index))
     }
 
     /// Returns the last element of the proof list, or `None` if it is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// assert_eq!(None, index.last());
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.last());
+    /// ```
     pub fn last(&self) -> Option<V> {
         match self.len() {
             0 => None,
@@ -146,11 +191,39 @@ where
     }
 
     /// Returns `true` if the proof list contains no elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// assert!(index.is_empty());
+    /// index.push(10);
+    /// assert!(!index.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Returns the number of elements in the proof list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// assert_eq!(0, index.len());
+    /// index.push(1);
+    /// assert_eq!(1, index.len());
+    /// ```
     pub fn len(&self) -> u64 {
         if let Some(len) = self.length.get() {
             return len;
