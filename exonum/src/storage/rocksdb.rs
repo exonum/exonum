@@ -38,17 +38,19 @@ impl From<_Error> for Error {
     }
 }
 
-/// Creates new `RocksDB` struct
+/// Database implementation on the top of `RocksDB` backend.
 #[derive(Clone)]
 pub struct RocksDB {
     db: Arc<_RocksDB>,
 }
 
+/// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
     _db: Arc<_RocksDB>,
     snapshot: _Snapshot<'static>,
 }
 
+/// An iterator over the entries of a `RocksDB`.
 struct RocksDBIterator {
     iter: DBRawIterator,
     key: Option<Vec<u8>>,
@@ -56,7 +58,7 @@ struct RocksDBIterator {
 }
 
 impl RocksDB {
-    /// Creates new rocksdb
+    /// Open a database stored in the specified path with the specified options.
     pub fn open(path: &Path, options: RocksDBOptions) -> Result<RocksDB> {
         let database = _RocksDB::open(&options, path)?;
         Ok(RocksDB { db: Arc::new(database) })
