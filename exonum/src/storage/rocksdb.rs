@@ -38,7 +38,7 @@ impl From<_Error> for Error {
     }
 }
 
-/// Creates new RocksDB struct
+/// Creates new `RocksDB` struct
 #[derive(Clone)]
 pub struct RocksDB {
     db: Arc<_RocksDB>,
