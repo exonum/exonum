@@ -143,7 +143,7 @@ where
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
     ///
     /// for val in index.iter() {
-    ///     println!("{}", val);
+    ///     println!("{:?}", val);
     /// }
     /// ```
     pub fn iter(&self) -> ValueSetIndexIter<V> {
@@ -166,8 +166,8 @@ where
     ///
     /// let hash = Hash::default();
     ///
-    /// for val in index.iter_from(hash) {
-    ///     println!("{}", val);
+    /// for val in index.iter_from(&hash) {
+    ///     println!("{:?}", val);
     /// }
     /// ```
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
@@ -211,8 +211,8 @@ where
     ///
     /// let hash = Hash::default();
     ///
-    /// for val in index.hashes_from(hash) {
-    ///     println!("{}", val);
+    /// for val in index.hashes_from(&hash) {
+    ///     println!("{:?}", val);
     /// }
     /// ```
     pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes {
@@ -304,7 +304,7 @@ where
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
-    /// 
+    ///
     /// index.clear();
     /// assert!(!index.contains(&1));
     /// ```

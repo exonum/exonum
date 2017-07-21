@@ -74,7 +74,7 @@ impl<T, V> ProofListIndex<T, V> {
     /// let prefix = vec![1, 2, 3];
     ///
     /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(prefix, &snapshot);
+    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(prefix.clone(), &snapshot);
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(prefix, &mut fork);
@@ -248,16 +248,13 @@ where
     /// let prefix = vec![1, 2, 3];
     /// let mut fork = db.fork();
     /// let mut index = ProofListIndex::new(prefix, &mut fork);
-    /// assert_eq!(0, index.height());
+    /// assert_eq!(1, index.height());
     ///
     /// index.push(1);
     /// assert_eq!(1, index.len());
     ///
     /// index.push(1);
-    /// assert_eq!(1, index.len());
-    ///
-    /// index.push(1);
-    /// assert_eq!(1, index.len());
+    /// assert_eq!(2, index.len());
     /// ```
     pub fn height(&self) -> u8 {
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
@@ -368,9 +365,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index = ProofListIndex::new(vec![1, 2, 3], &snapshot);
-    ///
-    /// index.extend([1, 2, 3].iter().cloned());
+    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(vec![1, 2, 3], &snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
@@ -390,9 +385,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index = ProofListIndex::new(vec![1, 2, 3], &snapshot);
-    ///
-    /// index.extend([1, 2, 3].iter().cloned());
+    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(vec![1, 2, 3], &snapshot);
     ///
     /// for val in index.iter_from(1) {
     ///     println!("{}", val);
@@ -426,7 +419,7 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let fork = db.fork();
+    /// let mut fork = db.fork();
     /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
     ///
     /// index.push(1);
@@ -460,7 +453,7 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let fork = db.fork();
+    /// let mut fork = db.fork();
     /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -487,14 +480,14 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let fork = db.fork();
-    /// let index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut fork = db.fork();
+    /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
     ///
     /// index.set(0, 100);
-    /// assert_eq!(Some(0), index.get(0));
+    /// assert_eq!(Some(100), index.get(0));
     /// ```
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
@@ -536,8 +529,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let fork = db.fork();
-    /// let index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut fork = db.fork();
+    /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());

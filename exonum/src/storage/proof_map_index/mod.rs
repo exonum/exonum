@@ -112,15 +112,16 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     ///
     /// ```
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     ///
     /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix.clone(), &snapshot);
     ///
     /// let mut fork = db.fork();
-    /// let mut mut_index: ProofListIndex<_, u8, u8> = ProofMapIndex::new(prefix, &mut fork);
+    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
@@ -239,7 +240,7 @@ where
     /// let default_hash = index.root_hash();
     /// assert_eq!(Hash::default(), default_hash);
     ///
-    /// index.put(1, 100);
+    /// index.put(&default_hash, 100);
     /// let hash = index.root_hash();
     /// assert_ne!(hash, default_hash);
     /// ```
@@ -264,10 +265,11 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(prefix, &mut fork);
     ///
-    /// assert_eq!(None, index.get(1));
+    /// let hash = Hash::default();
+    /// assert_eq!(None, index.get(&hash));
     ///
-    /// index.put(1, 2);
-    /// assert_eq!(Some(2), index.get(&1));
+    /// index.put(&hash, 2);
+    /// assert_eq!(Some(2), index.get(&hash));
     /// ```
     pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(&DBKey::leaf(key))
@@ -286,10 +288,11 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(prefix, &mut fork);
     ///
-    /// assert!(!index.contains(&1));
+    /// let hash = Hash::default();
+    /// assert!(!index.contains(&hash));
     ///
-    /// index.put(1, 2);
-    /// assert!(index.contains(&1));
+    /// index.put(&hash, 2);
+    /// assert!(index.contains(&hash));
     /// ```
     pub fn contains(&self, key: &K) -> bool {
         self.base.contains(&DBKey::leaf(key))
@@ -306,9 +309,11 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, u8, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
     ///
-    /// let proof = index.get_proof(&100);
+    /// let hash = Hash::default();
+    /// let proof = index.get_proof(&hash);
+    /// # drop(proof);
     /// ```
     pub fn get_proof(&self, key: &K) -> MapProof<V> {
         let searched_slice = DBKey::leaf(key);
@@ -394,7 +399,7 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, u8, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
@@ -419,10 +424,10 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, u8, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
     ///
-    /// for val in index.keys() {
-    ///     println!("{}", val);
+    /// for key in index.keys() {
+    ///     println!("{:?}", key);
     /// }
     /// ```
     pub fn keys(&self) -> ProofMapIndexKeys<K> {
@@ -444,9 +449,9 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, u8, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
     ///
-    /// for val in index.keys() {
+    /// for val in index.values() {
     ///     println!("{}", val);
     /// }
     /// ```
@@ -466,9 +471,10 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, u8, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
     ///
-    /// for val in index.iter_from(&2) {
+    /// let hash = Hash::default();
+    /// for val in index.iter_from(&hash) {
     ///     println!("{:?}", val);
     /// }
     /// ```
@@ -491,10 +497,11 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, u8, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
     ///
-    /// for val in index.keys_from(&2) {
-    ///     println!("{}", val);
+    /// let hash = Hash::default();
+    /// for key in index.keys_from(&hash) {
+    ///     println!("{:?}", key);
     /// }
     /// ```
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
@@ -516,9 +523,10 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, u8, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
     ///
-    /// for val in index.values_from(&2) {
+    /// let hash = Hash::default();
+    /// for val in index.values_from(&hash) {
     ///     println!("{}", val);
     /// }
     /// ```
@@ -614,8 +622,9 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(prefix, &mut fork);
     ///
-    /// index.put(1, 2);
-    /// assert!(index.contains(&1));
+    /// let hash = Hash::default();
+    /// index.put(&hash, 2);
+    /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
         let key_slice = DBKey::leaf(key);
@@ -732,11 +741,12 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(prefix, &mut fork);
     ///
-    /// index.put(1, 2);
-    /// assert!(index.contains(&1));
+    /// let hash = Hash::default();
+    /// index.put(&hash, 2);
+    /// assert!(index.contains(&hash));
     ///
-    /// index.remove(&1);
-    /// assert!(!index.contains(&1));
+    /// index.remove(&hash);
+    /// assert!(!index.contains(&hash));
     /// ```
     pub fn remove(&mut self, key: &K) {
         let key_slice = DBKey::leaf(key);
@@ -792,11 +802,12 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(prefix, &mut fork);
     ///
-    /// index.put(1, 2);
-    /// assert!(index.contains(&1));
+    /// let hash = Hash::default();
+    /// index.put(&hash, 2);
+    /// assert!(index.contains(&hash));
     ///
     /// index.clear();
-    /// assert!(!index.contains(&1));
+    /// assert!(!index.contains(&hash));
     /// ```
     pub fn clear(&mut self) {
         self.base.clear()
