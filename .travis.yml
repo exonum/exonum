@@ -29,7 +29,7 @@ before_install:
 - cargo install --list
 
 install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev librocksdb libssl-dev
+- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev librocksdb libsnappy-dev libssl-dev
 
 script:
 - cargo fmt -p exonum -- --write-mode=diff
