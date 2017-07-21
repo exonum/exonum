@@ -74,10 +74,10 @@ impl<T, V> ProofListIndex<T, V> {
     /// let prefix = vec![1, 2, 3];
     ///
     /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ListIndex::new(prefix, &snapshot);
+    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(prefix, &snapshot);
     ///
     /// let mut fork = db.fork();
-    /// let mut mut_index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(prefix, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
@@ -159,8 +159,9 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let mut fork = db.fork();
-    /// let mut index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(prefix, &mut fork);
     /// assert_eq!(None, index.get(0));
+    ///
     /// index.push(10);
     /// assert_eq!(Some(10), index.get(0));
     /// ```
@@ -178,8 +179,9 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let mut fork = db.fork();
-    /// let mut index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(prefix, &mut fork);
     /// assert_eq!(None, index.last());
+    ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.last());
     /// ```
@@ -200,8 +202,9 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let mut fork = db.fork();
-    /// let mut index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(prefix, &mut fork);
     /// assert!(index.is_empty());
+    ///
     /// index.push(10);
     /// assert!(!index.is_empty());
     /// ```
@@ -219,8 +222,9 @@ where
     /// let db = MemoryDB::new();
     /// let prefix = vec![1, 2, 3];
     /// let mut fork = db.fork();
-    /// let mut index: ProofListIndex<_, u8> = ListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(prefix, &mut fork);
     /// assert_eq!(0, index.len());
+    ///
     /// index.push(1);
     /// assert_eq!(1, index.len());
     /// ```
@@ -234,11 +238,51 @@ where
     }
 
     /// Returns the height of the proof list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// assert_eq!(0, index.height());
+    ///
+    /// index.push(1);
+    /// assert_eq!(1, index.len());
+    ///
+    /// index.push(1);
+    /// assert_eq!(1, index.len());
+    ///
+    /// index.push(1);
+    /// assert_eq!(1, index.len());
+    /// ```
     pub fn height(&self) -> u8 {
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
     /// Returns the root hash of the proof list or default hash value if it is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    ///
+    /// let default_hash = index.root_hash();
+    /// assert_eq!(Hash::default(), default_hash);
+    ///
+    /// index.push(1);
+    /// let hash = index.root_hash();
+    /// assert_ne!(hash, default_hash);
+    /// ```
     pub fn root_hash(&self) -> Hash {
         self.get_branch(self.root_key()).unwrap_or_default()
     }
@@ -246,12 +290,28 @@ where
     /// Returns the proof of existence for the list element at the specified position.
     ///
     /// # Panics
+    ///
     /// Panics if `index` is out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    ///
+    /// index.push(1);
+    ///
+    /// let proof = index.get_proof(0);
+    /// # drop(proof);
+    /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
         if index >= self.len() {
             panic!(
-                "index out of bounds: \
-                    the len is {} but the index is {}",
+                "Index out of bounds: the len is {} but the index is {}",
                 self.len(),
                 index
             );
@@ -262,20 +322,35 @@ where
     /// Returns the proof of existence for the list elements in the specified range.
     ///
     /// # Panics
+    ///
     /// Panics if the range is out of bounds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    ///
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    ///
+    /// let list_proof = index.get_range_proof(1, 3);
+    /// # drop(list_proof);
+    /// ```
     pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
         if to > self.len() {
             panic!(
-                "illegal range boundaries: \
-                    the len is {:?}, but the range end is {:?}",
+                "Illegal range boundaries: the len is {:?}, but the range end is {:?}",
                 self.len(),
                 to
             )
         }
         if to <= from {
             panic!(
-                "illegal range boundaries: \
-                    the range start is {:?}, but the range end is {:?}",
+                "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
                 from,
                 to
             )
@@ -285,12 +360,44 @@ where
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let index = ProofListIndex::new(vec![1, 2, 3], &snapshot);
+    ///
+    /// index.extend([1, 2, 3].iter().cloned());
+    ///
+    /// for val in index.iter() {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter(&self) -> ProofListIndexIter<V> {
         ProofListIndexIter { base_iter: self.base.iter(&0u8) }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
     /// element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let index = ProofListIndex::new(vec![1, 2, 3], &snapshot);
+    ///
+    /// index.extend([1, 2, 3].iter().cloned());
+    ///
+    /// for val in index.iter_from(1) {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
         ProofListIndexIter { base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)) }
     }
@@ -312,6 +419,19 @@ where
     }
 
     /// Appends an element to the back of the proof list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.push(1);
+    /// assert!(!index.is_empty());
+    /// ```
     pub fn push(&mut self, value: V) {
         let len = self.len();
         self.set_len(len + 1);
@@ -333,6 +453,19 @@ where
     }
 
     /// Extends the proof list with the contents of an iterator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.extend([1, 2, 3].iter().cloned());
+    /// assert_eq!(3, index.len());
+    /// ```
     pub fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = V>,
@@ -345,12 +478,28 @@ where
     /// Changes a value at the specified position.
     ///
     /// # Panics
+    ///
     /// Panics if `index` is equal or greater than the proof list's current length.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.get(0));
+    ///
+    /// index.set(0, 100);
+    /// assert_eq!(Some(0), index.get(0));
+    /// ```
     pub fn set(&mut self, index: u64, value: V) {
         if index >= self.len() {
             panic!(
-                "index out of bounds: \
-                    the len is {} but the index is {}",
+                "Index out of bounds: the len is {} but the index is {}",
                 self.len(),
                 index
             );
@@ -376,9 +525,26 @@ where
     /// Clears the proof list, removing all values.
     ///
     /// # Notes
+    ///
     /// Currently this method is not optimized to delete large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let fork = db.fork();
+    /// let index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.push(1);
+    /// assert!(!index.is_empty());
+    ///
+    /// index.clear();
+    /// assert!(index.is_empty());
+    /// ```
     pub fn clear(&mut self) {
         self.length.set(Some(0));
         self.base.clear()
