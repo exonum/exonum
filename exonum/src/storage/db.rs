@@ -221,7 +221,8 @@ impl Fork {
     /// Creates a new checkpoint.
     ///
     /// # Panics
-    /// Panics if another checkpoint was created before and it was not commited or rollbacked yet.
+    ///
+    /// Panics if another checkpoint was created before and it was not committed or rollbacked yet.
     pub fn checkpoint(&mut self) {
         if self.logged {
             panic!("call checkpoint before rollback or commit");
@@ -232,7 +233,8 @@ impl Fork {
     /// Finalizes all changes after the last checkpoint.
     ///
     /// # Panics
-    /// Panics if checkpoint was not created before or last checkpoint is already commited or
+    /// 
+    /// Panics if checkpoint was not created before or last checkpoint is already committed or
     /// rollbacked.
     pub fn commit(&mut self) {
         if !self.logged {
@@ -245,7 +247,8 @@ impl Fork {
     /// Rollbakcs all changes after the last checkpoint.
     ///
     /// # Panics
-    /// Panics if checkpoint was not created before or last checkpoint is already commited or
+    ///
+    /// Panics if checkpoint was not created before or last checkpoint is already committed or
     /// rollbacked.
     pub fn rollback(&mut self) {
         if !self.logged {
@@ -319,7 +322,8 @@ impl Fork {
     /// method is useful only if you are sure that forks interacted with different indices.
     ///
     /// # Panics
-    /// Panics if checkpoint was created before and it was not commited or rollbacked yet.
+    ///
+    /// Panics if checkpoint was created before and it was not committed or rollbacked yet.
     pub fn merge(&mut self, patch: Patch) {
         if self.logged {
             panic!("call merge before commit or rollback");

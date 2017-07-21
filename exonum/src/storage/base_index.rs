@@ -164,6 +164,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// Clears the index, removing all entries.
     ///
     /// # Notes
+    ///
     /// Currently this method is not optimized to delete large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
