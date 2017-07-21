@@ -20,8 +20,9 @@ use std::net::SocketAddr;
 use std::error::Error;
 
 use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
+use helpers::Height;
 use events::Channel;
-use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
+use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
 
 impl<S> NodeHandler<S>
 where
@@ -122,7 +123,7 @@ where
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
         trace!(
-            "HANDLE STATUS: current height = {}, msg height = {}",
+            "HANDLE STATUS: current height = {:?}, msg height = {:?}",
             height,
             msg.height()
         );

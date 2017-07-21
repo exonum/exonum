@@ -28,6 +28,7 @@ use crypto::{PublicKey, SecretKey, Hash};
 use storage::Patch;
 use events::Milliseconds;
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction};
+use helpers::{Height, Round, ValidatorId};
 use node::whitelist::Whitelist;
 
 // TODO: move request timeouts into node configuration
@@ -40,13 +41,6 @@ pub const REQUEST_TRANSACTIONS_TIMEOUT: Milliseconds = 100;
 pub const REQUEST_PREVOTES_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `RequestBlock` message.
 pub const REQUEST_BLOCK_TIMEOUT: Milliseconds = 100;
-
-/// Consensus round index.
-pub type Round = u32;
-/// Blockchain's height (number of blocks).
-pub type Height = u64;
-/// Validators id.
-pub type ValidatorId = u16;
 
 /// Transactions pool.
 // TODO replace by persistent TxPool
@@ -220,7 +214,7 @@ where
 
     /// Inserts a new message if it hasn't been inserted yet.
     pub fn insert(&mut self, message: &T) {
-        let voter = message.validator() as usize;
+        let voter = message.validator().0 as usize;
         if !self.validators[voter] {
             self.count += 1;
             self.validators.set(voter, true);
@@ -362,7 +356,7 @@ impl State {
         stored: StoredConfiguration,
         connect: Connect,
         last_hash: Hash,
-        last_height: u64,
+        last_height: Height,
         height_start_time: SystemTime,
     ) -> Self {
         State {
@@ -377,8 +371,8 @@ impl State {
             connections: HashMap::new(),
             height: last_height,
             height_start_time,
-            round: 0,
-            locked_round: 0,
+            round: Round(0),
+            locked_round: Round(0),
             locked_propose: None,
             last_hash,
 
@@ -460,7 +454,7 @@ impl State {
         self.validators()
             .iter()
             .position(|pk| pk.consensus_key == peer)
-            .map(|id| id as ValidatorId)
+            .map(|id| ValidatorId(id as u16))
     }
 
     /// Returns `ConsensusConfig`.
@@ -480,7 +474,7 @@ impl State {
             .validator_keys
             .iter()
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
-            .map(|id| id as ValidatorId);
+            .map(|id| ValidatorId(id as u16));
         self.whitelist.set_validators(
             config.validator_keys.iter().map(|x| {
                 x.consensus_key
@@ -526,7 +520,7 @@ impl State {
 
     /// Returns public key of a validator identified by id.
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
-        self.validators().get(id as usize).map(|x| x.consensus_key)
+        self.validators().get(id.0 as usize).map(|x| x.consensus_key)
     }
 
     /// Returns the consensus public key of the current node.
@@ -551,17 +545,17 @@ impl State {
 
     /// Returns the leader id for the specified round and current height.
     pub fn leader(&self, round: Round) -> ValidatorId {
-        ((self.height() + round as u64) % (self.validators().len() as u64)) as ValidatorId
+        ValidatorId(((self.height().0 + round.0 as u64) % (self.validators().len() as u64)) as u16)
     }
 
     /// Returns the height for a validator identified by the public key.
     pub fn node_height(&self, key: &PublicKey) -> Height {
-        *self.nodes_max_height.get(key).unwrap_or(&0)
+        *self.nodes_max_height.get(key).unwrap_or(&Height(0))
     }
 
     /// Updates known height for a validator identified by the public key.
     pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
-        *self.nodes_max_height.entry(key).or_insert(0) = height;
+        *self.nodes_max_height.entry(key).or_insert(Height(0)) = height;
     }
 
     /// Returns a list of nodes whose height is bigger than one of the current node.
@@ -584,7 +578,7 @@ impl State {
     }
 
     /// Returns current height.
-    pub fn height(&self) -> u64 {
+    pub fn height(&self) -> Height {
         self.height
     }
 
@@ -647,16 +641,16 @@ impl State {
 
     /// Increments node's round by one.
     pub fn new_round(&mut self) {
-        self.round += 1;
+        self.round = self.round.next();
     }
 
     /// Increments the node height by one and resets previous height data.
     // FIXME use block_hash
     pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
-        self.height += 1;
+        self.height = self.height.next();
         self.height_start_time = height_start_time;
-        self.round = 1;
-        self.locked_round = 0;
+        self.round = Round(1);
+        self.locked_round = Round(0);
         self.locked_propose = None;
         self.last_hash = *block_hash;
         {
@@ -954,10 +948,10 @@ impl State {
 
     /// Returns `true` if the node doesn't have proposes different from the locked one.
     pub fn have_incompatible_prevotes(&self) -> bool {
-        for round in self.locked_round + 1..self.round + 1 {
+        for round in self.locked_round.0 + 1..self.round.0 + 1 {
             match self.validator_state {
                 Some(ref validator_state) => {
-                    if let Some(msg) = validator_state.our_prevotes.get(&round) {
+                    if let Some(msg) = validator_state.our_prevotes.get(&Round(round)) {
                         // TODO: unefficient
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;

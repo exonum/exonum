@@ -30,6 +30,8 @@ use std::net::SocketAddr;
 use std::error::Error;
 
 use crypto::{Hash, PublicKey, Signature};
+use helpers::{Height, Round, ValidatorId};
+
 // TODO: should we implement serilize for: `SecretKey`, `Seed` ?
 
 use encoding::{Field, Offset};
@@ -171,7 +173,7 @@ macro_rules! impl_deserialize_hex_segment {
     ($($name:ty);*) => ($(impl_deserialize_hex_segment!{@impl $name})*);
 }
 
-impl_deserialize_int!{u8; u16; u32; i8; i16; i32 }
+impl_deserialize_int!{u8; u16; u32; i8; i16; i32}
 impl_deserialize_bigint!{u64; i64}
 
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
@@ -407,6 +409,58 @@ impl ExonumJson for BitVec {
             }
         }
         Ok(Value::String(out))
+    }
+}
+
+// TODO: Make a macro for tuple struct typedefs?
+impl ExonumJson for Height {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let val: u64 = value.as_str().ok_or("Can't cast json as string")?.parse()?;
+        buffer.write(from, to, Height(val));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::String(self.0.to_string()))
+    }
+}
+
+impl ExonumJson for Round {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let number = value.as_i64().ok_or("Can't cast json as integer")?;
+        buffer.write(from, to, Round(number as u32));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::Number((self.0).into()))
+    }
+}
+
+impl ExonumJson for ValidatorId {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let number = value.as_i64().ok_or("Can't cast json as integer")?;
+        buffer.write(from, to, ValidatorId(number as u16));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::Number((self.0).into()))
     }
 }
 

@@ -31,6 +31,7 @@ use std::time::SystemTime;
 
 use crypto::{Hash, PublicKey};
 use blockchain;
+use helpers::{Height, Round, ValidatorId};
 use super::{RawMessage, BitVec};
 
 /// Consensus message type.
@@ -111,11 +112,11 @@ message! {
         const SIZE = 54;
 
         /// The validator id.
-        field validator:      u16         [00 => 02]
+        field validator:      ValidatorId [00 => 02]
         /// The height to which the message is related.
-        field height:         u64         [02 => 10]
+        field height:         Height      [02 => 10]
         /// The round to which the message is related.
-        field round:          u32         [10 => 14]
+        field round:          Round       [10 => 14]
         /// Hash of the previous `Block`.
         field prev_hash:      &Hash       [14 => 46]
         /// The list of transactions to include in the next block.
@@ -146,15 +147,15 @@ message! {
         const SIZE = 50;
 
         /// The validator id.
-        field validator:      u16         [00 => 02]
+        field validator:      ValidatorId [00 => 02]
         /// The height to which the message is related.
-        field height:         u64         [02 => 10]
+        field height:         Height      [02 => 10]
         /// The round to which the message is related.
-        field round:          u32         [10 => 14]
+        field round:          Round       [10 => 14]
         /// Hash of the corresponding `Propose`.
         field propose_hash:   &Hash       [14 => 46]
         /// Locked round.
-        field locked_round:   u32         [46 => 50]
+        field locked_round:   Round       [46 => 50]
     }
 }
 
@@ -182,11 +183,11 @@ message! {
         const SIZE = 90;
 
         /// The validator id.
-        field validator:      u16         [00 => 02]
+        field validator:      ValidatorId [00 => 02]
         /// The height to which the message is related.
-        field height:         u64         [02 => 10]
+        field height:         Height      [02 => 10]
         /// The round to which the message is related.
-        field round:          u32         [10 => 14]
+        field round:          Round       [10 => 14]
         /// Hash of the corresponding `Propose`.
         field propose_hash:   &Hash       [14 => 46]
         /// Hash of the new block.
@@ -219,7 +220,7 @@ message! {
         /// The sender's public key.
         field from:           &PublicKey          [00 => 32]
         /// The height to which the message is related.
-        field height:         u64                 [32 => 40]
+        field height:         Height              [32 => 40]
         /// Hash of the last committed block.
         field last_hash:      &Hash               [40 => 72]
     }
@@ -277,7 +278,7 @@ message! {
         /// Public key of the recipient.
         field to:             &PublicKey  [32 => 64]
         /// The height to which the message is related.
-        field height:         u64         [64 => 72]
+        field height:         Height      [64 => 72]
         /// Hash of the `Propose`.
         field propose_hash:   &Hash       [72 => 104]
     }
@@ -326,9 +327,9 @@ message! {
         /// Public key of the recipient.
         field to:             &PublicKey  [32 => 64]
         /// The height to which the message is related.
-        field height:         u64         [64 => 72]
+        field height:         Height      [64 => 72]
         /// The round to which the message is related.
-        field round:          u32         [72 => 76]
+        field round:          Round       [72 => 76]
         /// Hash of the `Propose`.
         field propose_hash:   &Hash       [76 => 108]
         /// The list of validators that send pre-votes.
@@ -382,6 +383,6 @@ message! {
         /// Public key of the recipient.
         field to:             &PublicKey  [32 => 64]
         /// The height to which the message is related.
-        field height:         u64         [64 => 72]
+        field height:         Height      [64 => 72]
     }
 }

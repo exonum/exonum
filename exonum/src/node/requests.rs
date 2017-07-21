@@ -106,7 +106,7 @@ where
         let prevotes = self.state
             .prevotes(msg.round(), *msg.propose_hash())
             .iter()
-            .filter(|p| !has_prevotes[p.validator() as usize])
+            .filter(|p| !has_prevotes[p.validator().0 as usize])
             .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 
@@ -118,7 +118,7 @@ where
     /// Handles `RequestBlock` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: RequestBlock) {
         trace!(
-            "Handle block request with height:{}, our height: {}",
+            "Handle block request with height:{:?}, our height: {:?}",
             msg.height(),
             self.state.height()
         );

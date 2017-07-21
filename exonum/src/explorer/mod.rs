@@ -25,6 +25,7 @@ use blockchain::{Schema, Blockchain, Block, TxLocation};
 use messages::Precommit;
 // TODO: if explorer is usable anywhere else, remove `ApiError` dependencies.
 use api::ApiError;
+use helpers::Height;
 
 /// Blockchain explorer.
 #[derive(Debug)]
@@ -90,7 +91,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     /// Returns block information for the specified height or `None` if there is no such block.
-    pub fn block_info(&self, height: u64) -> Option<BlockInfo> {
+    pub fn block_info(&self, height: Height) -> Option<BlockInfo> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
         let schema = Schema::new(&snapshot);
@@ -128,7 +129,7 @@ impl<'a> BlockchainExplorer<'a> {
 
         let mut v = Vec::new();
         for height in (lower..upper).rev() {
-            let block_txs = schema.block_txs(height);
+            let block_txs = schema.block_txs(Height(height));
             if skip_empty_blocks && block_txs.is_empty() {
                 continue;
             }

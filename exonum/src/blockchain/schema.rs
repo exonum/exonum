@@ -20,6 +20,7 @@ use crypto::Hash;
 use messages::{RawMessage, Precommit, CONSENSUS};
 use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex,
               ProofMapIndex, MapProof};
+use helpers::Height;
 use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
 
@@ -49,9 +50,9 @@ encoding_struct! (
     struct TxLocation {
         const SIZE = 16;
         /// Height of block in the blockchain.
-        field block_height:         u64  [00 => 08]
+        field block_height:         Height  [00 => 08]
         /// Index in block.
-        field position_in_block:    u64  [08 => 16]
+        field position_in_block:    u64     [08 => 16]
     }
 );
 
@@ -92,8 +93,8 @@ where
     }
 
     /// Returns table that keeps a list of transactions for the each block.
-    pub fn block_txs(&self, height: u64) -> ProofListIndex<&T, Hash> {
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), &self.view)
+    pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.0), &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
@@ -134,12 +135,12 @@ where
     }
 
     /// Returns block hash for the given height.
-    pub fn block_hash_by_height(&self, height: u64) -> Option<Hash> {
-        self.block_hashes_by_height().get(height)
+    pub fn block_hash_by_height(&self, height: Height) -> Option<Hash> {
+        self.block_hashes_by_height().get(height.0)
     }
 
     /// Returns the block for the given height with the proof of its inclusion.
-    pub fn block_and_precommits(&self, height: u64) -> Option<BlockProof> {
+    pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
         let block_hash = match self.block_hash_by_height(height) {
             None => return None,
             Some(block_hash) => block_hash,
@@ -163,17 +164,17 @@ where
     }
 
     /// Returns height of the latest committed block.
-    pub fn last_height(&self) -> Option<u64> {
+    pub fn last_height(&self) -> Option<Height> {
         let block_opt = self.last_block();
         block_opt.map(|block| block.height())
     }
 
     /// Returns the current height of the blockchain. Its value is equal to `last_height + 1`.
-    pub fn current_height(&self) -> u64 {
+    pub fn current_height(&self) -> Height {
         let last_height = self.last_height();
         match last_height {
-            Some(last_height) => last_height + 1,
-            None => 0,
+            Some(last_height) => last_height.next(),
+            None => Height(0),
         }
     }
 
@@ -223,7 +224,7 @@ where
     }
 
     /// Returns the configuration that is the actual for the given height.
-    pub fn configuration_by_height(&self, height: u64) -> StoredConfiguration {
+    pub fn configuration_by_height(&self, height: Height) -> StoredConfiguration {
         let idx = self.find_configurations_index_by_height(height);
         let cfg_ref = self.configs_actual_from().get(idx).expect(&format!(
             "Configuration at index {} not found",
@@ -273,15 +274,15 @@ where
         sum_table.get_proof(&key)
     }
 
-    fn find_configurations_index_by_height(&self, height: u64) -> u64 {
+    fn find_configurations_index_by_height(&self, height: Height) -> u64 {
         let actual_from = self.configs_actual_from();
         for i in (0..actual_from.len()).rev() {
-            if actual_from.get(i).unwrap().actual_from() <= height {
+            if actual_from.get(i).unwrap().actual_from() <= height.0 {
                 return i as u64;
             }
         }
         panic!(
-            "Couldn't not find any config for height {}, \
+            "Couldn't not find any config for height {:?}, \
                 that means that genesis block was created incorrectly.",
             height
         )
@@ -320,15 +321,15 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`block_hash_by_height`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_hash_by_height
-    pub fn block_hash_by_height_mut(&mut self, height: u64) -> Option<Hash> {
-        self.block_hashes_by_height().get(height)
+    pub fn block_hash_by_height_mut(&mut self, height: Height) -> Option<Hash> {
+        self.block_hashes_by_height().get(height.0)
     }
 
     /// Mutable reference to the [`block_txs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_txs
-    pub fn block_txs_mut(&mut self, height: u64) -> ProofListIndex<&mut Fork, Hash> {
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), &mut self.view)
+    pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.0), &mut self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.

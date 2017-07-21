@@ -18,9 +18,10 @@ use crypto::{Hash, PublicKey, HexValue};
 use blockchain::{Schema, Transaction};
 use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
                RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
+use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use events::Channel;
-use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
 
 // TODO reduce view invokations
 impl<S> NodeHandler<S>
@@ -31,9 +32,9 @@ where
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
         // Ignore messages from previous and future height
-        if msg.height() < self.state.height() || msg.height() > self.state.height() + 1 {
+        if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
             warn!(
-                "Received consensus message from other height: msg.height={}, self.height={}",
+                "Received consensus message from other height: msg.height={:?}, self.height={:?}",
                 msg.height(),
                 self.state.height()
             );
@@ -42,10 +43,10 @@ where
 
         // Queued messages from next height or round
         // TODO: shoud we ignore messages from far rounds?
-        if msg.height() == self.state.height() + 1 || msg.round() > self.state.round() {
+        if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
-                "Received consensus message from future round: msg.height={}, msg.round={}, \
-                    self.height={}, self.round={}",
+                "Received consensus message from future round: msg.height={:?}, msg.round={:?}, \
+                    self.height={:?}, self.round={:?}",
                 msg.height(),
                 msg.round(),
                 self.state.height(),
@@ -96,7 +97,7 @@ where
         // Check leader
         if msg.validator() != self.state.leader(msg.round()) {
             error!(
-                "Wrong propose leader detected: actual={}, expected={}",
+                "Wrong propose leader detected: actual={:?}, expected={:?}",
                 msg.validator(),
                 self.state.leader(msg.round())
             );
@@ -250,7 +251,7 @@ where
     /// Executes and commits block. This function is called when node has full propose information.
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
-        if self.state.locked_round() == 0 {
+        if self.state.locked_round().0 == 0 {
             if self.state.is_validator() && !self.state.have_prevote(propose_round) {
                 self.broadcast_prevote(propose_round, &hash);
             } else {
@@ -260,8 +261,10 @@ where
 
         // Lock to propose
         // TODO: avoid loop here
-        let start_round = ::std::cmp::max(self.state.locked_round() + 1, propose_round);
-        for round in start_round..self.state.round() + 1 {
+        let start_round = ::std::cmp::max(self.state.locked_round().next(), propose_round);
+        for round in start_round.0..self.state.round().next().0 {
+            // TODO: Replace by `Step` implementation.
+            let round = Round(round);
             if self.state.has_majority_prevotes(round, hash) {
                 self.has_majority_prevotes(round, &hash);
             }
@@ -375,7 +378,8 @@ where
     /// Locks node to the specified round, so pre-votes for the lower round will be ignored.
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
-        for round in prevote_round..self.state.round() + 1 {
+        for round in prevote_round.0..self.state.round().next().0 {
+            let round = Round(round);
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
                 self.broadcast_prevote(round, &propose_hash);
@@ -463,10 +467,11 @@ where
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
 
-        info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
+        info!("COMMIT ====== height={:?}, proposer={:?}, round={:?}, committed={}, \
+            pool={}, hash={}",
               height,
               proposer,
-              round.map(|x| x.to_string()).unwrap_or_else(|| "?".into()),
+              round.map(|x| format!("{:?}", x)).unwrap_or_else(|| "?".into()),
               commited_txs,
               self.state
                   .transactions()
@@ -597,7 +602,7 @@ where
         if round != self.state.round() {
             return;
         }
-        warn!("ROUND TIMEOUT height={}, round={}", height, round);
+        warn!("ROUND TIMEOUT height={:?}, round={:?}", height, round);
 
         // Update state to new round
         self.state.new_round();
@@ -747,7 +752,7 @@ where
     /// Creates block with given transaction and returns its hash and corresponding changes.
     pub fn create_block(
         &mut self,
-        proposer_id: u16,
+        proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {

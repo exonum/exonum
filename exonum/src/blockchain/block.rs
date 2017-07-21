@@ -14,6 +14,7 @@
 
 use crypto::Hash;
 use messages::Precommit;
+use helpers::{Height, ValidatorId};
 
 pub const BLOCK_SIZE: usize = 112;
 
@@ -30,9 +31,9 @@ encoding_struct!(
         /// Information schema version.
         field schema_version:         u16         [00 => 02]
         /// Block proposer id.
-        field proposer_id:            u16         [02 => 04]
+        field proposer_id:            ValidatorId [02 => 04]
         /// Height of the committed block
-        field height:                 u64         [04 => 12]
+        field height:                 Height      [04 => 12]
         /// Number of transactions in block.
         field tx_count:               u32         [12 => 16]
         /// Hash link to the previous block in blockchain.
