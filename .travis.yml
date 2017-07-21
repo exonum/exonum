@@ -24,7 +24,7 @@ before_install:
 - rustup toolchain install $NIGHTLY_RUST
 - cargo +$NIGHTLY_RUST clippy -V | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --vers $CLIPPY_VERS --force
 - sudo add-apt-repository -y ppa:elt/libsodium
-- sudo add-apt-repository -y ppa:giskou/librocksdb
+- sudo add-apt-repository -y ppa:ulikoehler/deb-buildscripts
 - sudo apt-get -qq update
 - cargo install --list
 
