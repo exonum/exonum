@@ -34,7 +34,7 @@ where
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
             warn!(
-                "Received consensus message from other height: msg.height={:?}, self.height={:?}",
+                "Received consensus message from other height: msg.height={}, self.height={}",
                 msg.height(),
                 self.state.height()
             );
@@ -45,8 +45,8 @@ where
         // TODO: shoud we ignore messages from far rounds?
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
-                "Received consensus message from future round: msg.height={:?}, msg.round={:?}, \
-                    self.height={:?}, self.round={:?}",
+                "Received consensus message from future round: msg.height={}, msg.round={}, \
+                    self.height={}, self.round={}",
                 msg.height(),
                 msg.round(),
                 self.state.height(),
@@ -97,7 +97,7 @@ where
         // Check leader
         if msg.validator() != self.state.leader(msg.round()) {
             error!(
-                "Wrong propose leader detected: actual={:?}, expected={:?}",
+                "Wrong propose leader detected: actual={}, expected={}",
                 msg.validator(),
                 self.state.leader(msg.round())
             );
@@ -251,7 +251,7 @@ where
     /// Executes and commits block. This function is called when node has full propose information.
     pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
-        if self.state.locked_round().0 == 0 {
+        if self.state.locked_round() == Round::zero() {
             if self.state.is_validator() && !self.state.have_prevote(propose_round) {
                 self.broadcast_prevote(propose_round, &hash);
             } else {
@@ -467,11 +467,10 @@ where
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
 
-        info!("COMMIT ====== height={:?}, proposer={:?}, round={:?}, committed={}, \
-            pool={}, hash={}",
+        info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
               height,
               proposer,
-              round.map(|x| format!("{:?}", x)).unwrap_or_else(|| "?".into()),
+              round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
               commited_txs,
               self.state
                   .transactions()
@@ -602,7 +601,7 @@ where
         if round != self.state.round() {
             return;
         }
-        warn!("ROUND TIMEOUT height={:?}, round={:?}", height, round);
+        warn!("ROUND TIMEOUT height={}, round={}", height, round);
 
         // Update state to new round
         self.state.new_round();

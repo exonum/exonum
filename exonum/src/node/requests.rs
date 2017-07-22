@@ -118,7 +118,7 @@ where
     /// Handles `RequestBlock` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: RequestBlock) {
         trace!(
-            "Handle block request with height:{:?}, our height: {:?}",
+            "Handle block request with height:{}, our height: {}",
             msg.height(),
             self.state.height()
         );

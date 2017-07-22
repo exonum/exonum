@@ -371,8 +371,8 @@ impl State {
             connections: HashMap::new(),
             height: last_height,
             height_start_time,
-            round: Round(0),
-            locked_round: Round(0),
+            round: Round::zero(),
+            locked_round: Round::zero(),
             locked_propose: None,
             last_hash,
 
@@ -550,7 +550,7 @@ impl State {
 
     /// Returns the height for a validator identified by the public key.
     pub fn node_height(&self, key: &PublicKey) -> Height {
-        *self.nodes_max_height.get(key).unwrap_or(&Height(0))
+        *self.nodes_max_height.get(key).unwrap_or(&Height::zero())
     }
 
     /// Updates known height for a validator identified by the public key.
@@ -641,16 +641,16 @@ impl State {
 
     /// Increments node's round by one.
     pub fn new_round(&mut self) {
-        self.round = self.round.next();
+        self.round.increment();
     }
 
     /// Increments the node height by one and resets previous height data.
     // FIXME use block_hash
     pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
-        self.height = self.height.next();
+        self.height.increment();
         self.height_start_time = height_start_time;
         self.round = Round(1);
-        self.locked_round = Round(0);
+        self.locked_round = Round::zero();
         self.locked_propose = None;
         self.last_hash = *block_hash;
         {

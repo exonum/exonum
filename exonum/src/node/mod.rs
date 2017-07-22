@@ -350,7 +350,7 @@ where
 
         let round = Round(1);
         self.state.jump_round(round);
-        info!("Jump to round {:?}", round);
+        info!("Jump to round {}", round);
 
         self.add_round_timeout();
         self.add_status_timeout();
@@ -407,7 +407,7 @@ where
     pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round().next());
         trace!(
-            "ADD ROUND TIMEOUT: time={:?}, height={:?}, round={:?}",
+            "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
             time,
             self.state.height(),
             self.state.round()
@@ -423,7 +423,7 @@ where
             Duration::from_millis(adjusted_propose_timeout);
 
         trace!(
-            "ADD PROPOSE TIMEOUT: time={:?}, height={:?}, round={:?}",
+            "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
             time,
             self.state.height(),
             self.state.round()

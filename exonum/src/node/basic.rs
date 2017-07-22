@@ -123,7 +123,7 @@ where
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
         trace!(
-            "HANDLE STATUS: current height = {:?}, msg height = {:?}",
+            "HANDLE STATUS: current height = {}, msg height = {}",
             height,
             msg.height()
         );

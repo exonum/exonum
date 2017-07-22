@@ -171,14 +171,14 @@ impl Blockchain {
             // Commit actual configuration
             {
                 let mut schema = Schema::new(&mut fork);
-                if schema.block_hash_by_height(Height(0)).is_some() {
+                if schema.block_hash_by_height(Height::zero()).is_some() {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
                     return Ok(());
                 }
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId(0), Height(0), &[], &BTreeMap::new()).1
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new()).1
         };
         self.merge(patch)?;
         Ok(())
