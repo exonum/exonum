@@ -263,7 +263,7 @@ where
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
-        let state = State::new(
+        let mut state = State::new(
             validator_id,
             config.listener.consensus_public_key,
             config.listener.consensus_secret_key,
@@ -277,6 +277,9 @@ where
             last_height,
             sender.get_time(),
         );
+
+        // Adjust propose timeout for the first time.
+        state.adjust_timeout(&*snapshot);
 
         NodeHandler {
             blockchain,
@@ -398,7 +401,7 @@ where
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let adjusted_timeout = self.state.propose_timeout(&*self.blockchain.snapshot());
+        let adjusted_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
             Duration::from_millis(adjusted_timeout);
 

@@ -100,6 +100,7 @@ pub struct State {
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
     timeout_adjuster: Box<TimeoutAdjuster>,
+    propose_timeout: Milliseconds,
 }
 
 /// State of a validator-node.
@@ -405,6 +406,7 @@ impl State {
             requests: HashMap::new(),
 
             timeout_adjuster: make_timeout_adjuster(&stored.consensus),
+            propose_timeout: 0,
             config: stored,
         }
     }
@@ -503,9 +505,15 @@ impl State {
         self.config = config;
     }
 
+    /// Adjusts propose timeout (see `TimeoutAdjuster` for the details).
+    pub fn adjust_timeout(&mut self, snapshot: &Snapshot) {
+        let timeout = self.timeout_adjuster.adjust_timeout(snapshot);
+        self.propose_timeout = timeout;
+    }
+
     /// Returns adjusted (see `TimeoutAdjuster` for the details) value of the propose timeout.
-    pub fn propose_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
-        self.timeout_adjuster.adjust_timeout(snapshot)
+    pub fn propose_timeout(&self) -> Milliseconds {
+        self.propose_timeout
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
