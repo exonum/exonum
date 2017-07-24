@@ -6,6 +6,7 @@ var baseUrl = 'http://127.0.0.1:2268/f/';
 var backendsUrl = 'http://127.0.0.1:16000/timestamping/content';
 
 router.post('/upload', function(req, res) {
+    var db = req.db;
     var hash = req.body.label;
     var description = req.body.description;
 
