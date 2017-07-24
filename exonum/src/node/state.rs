@@ -955,7 +955,7 @@ impl State {
         for round in self.locked_round.next().iter_to(self.round.next()) {
             match self.validator_state {
                 Some(ref validator_state) => {
-                    if let Some(msg) = validator_state.our_prevotes.get(&Round(round)) {
+                    if let Some(msg) = validator_state.our_prevotes.get(&round) {
                         // TODO: unefficient
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;

@@ -377,7 +377,6 @@ where
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
         for round in prevote_round.iter_to(self.state.round().next()) {
-            let round = Round(round);
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
                 self.broadcast_prevote(round, &propose_hash);

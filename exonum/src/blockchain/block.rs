@@ -62,9 +62,9 @@ mod tests {
 
     #[test]
     fn test_block() {
-        let proposer_id = 1024;
+        let proposer_id = ValidatorId(1024);
         let txs = [4, 5, 6];
-        let height = 123_345;
+        let height = Height(123_345);
         let prev_hash = hash(&[1, 2, 3]);
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;

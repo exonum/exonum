@@ -17,6 +17,7 @@ use serde_json;
 
 use blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use crypto::Hash;
+use helpers::{Height, ValidatorId};
 
 use super::*;
 
@@ -27,8 +28,8 @@ fn test_json_response_for_complex_val() {
     let tx_count = txs.len() as u32;
     let complex_val = Block::new(
         SCHEMA_MAJOR_VERSION,
-        0,
-        24,
+        ValidatorId(0),
+        Height(24),
         tx_count,
         &Hash::new([24; 32]),
         &Hash::new([34; 32]),

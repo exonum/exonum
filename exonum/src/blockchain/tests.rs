@@ -14,6 +14,8 @@
 
 #![allow(dead_code)]
 
+use helpers::{Height, ValidatorId};
+
 #[test]
 fn test_u64() {
     encoding_struct! {
@@ -165,8 +167,8 @@ fn test_handling_tx_panic() {
     );
 
     let (_, patch) = blockchain.create_patch(
-        0,
-        0,
+        ValidatorId(0),
+        Height(0),
         &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
         &pool,
     );
@@ -257,8 +259,8 @@ fn test_handling_tx_panic_storage_error() {
     );
 
     blockchain.create_patch(
-        0,
-        0,
+        ValidatorId(0),
+        Height(0),
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
         &pool,
     );

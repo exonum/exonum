@@ -84,7 +84,7 @@ impl Height {
     ///
     /// let mut height = Height(20);
     /// height.decrement();
-    /// assert_eq!(19, previous_height.0);
+    /// assert_eq!(19, height.0);
     /// ```
     pub fn decrement(&mut self) {
         assert_ne!(0, self.0);
@@ -190,13 +190,13 @@ impl Round {
     ///
     /// let round = Round::zero();
     /// let mut iter = round.iter_to(Round(2));
-    /// assert_eq!(Some(0), iter.next());
-    /// assert_eq!(Some(1), iter.next());
+    /// assert_eq!(Some(Round(0)), iter.next());
+    /// assert_eq!(Some(Round(1)), iter.next());
     /// assert_eq!(None, iter.next());
     /// ```
     pub fn iter_to(&self, to: Round) -> RoundRangeIter {
         RoundRangeIter {
-            next: self,
+            next: self.clone(),
             last: to,
         }
     }
@@ -217,7 +217,7 @@ impl ValidatorId {
     /// let id = ValidatorId::zero();
     /// assert_eq!(0, id.0);
     /// ```
-    pub fn zero(&self) -> Self {
+    pub fn zero() -> Self {
         ValidatorId(0)
     }
 }
@@ -240,7 +240,9 @@ impl fmt::Display for ValidatorId {
     }
 }
 
-struct RoundRangeIter {
+/// Iterator over rounds range.
+#[derive(Debug)]
+pub struct RoundRangeIter {
     next: Round,
     last: Round,
 }
@@ -250,7 +252,7 @@ impl Iterator for RoundRangeIter {
     type Item = Round;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if next < last {
+        if self.next < self.last {
             let res = Some(self.next);
             self.next.increment();
             res
