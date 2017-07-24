@@ -520,7 +520,9 @@ impl State {
 
     /// Returns public key of a validator identified by id.
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
-        self.validators().get(id.0 as usize).map(|x| x.consensus_key)
+        self.validators().get(id.0 as usize).map(
+            |x| x.consensus_key,
+        )
     }
 
     /// Returns the consensus public key of the current node.
@@ -545,7 +547,9 @@ impl State {
 
     /// Returns the leader id for the specified round and current height.
     pub fn leader(&self, round: Round) -> ValidatorId {
-        ValidatorId(((self.height().0 + round.0 as u64) % (self.validators().len() as u64)) as u16)
+        ValidatorId(
+            ((self.height().0 + round.0 as u64) % (self.validators().len() as u64)) as u16,
+        )
     }
 
     /// Returns the height for a validator identified by the public key.

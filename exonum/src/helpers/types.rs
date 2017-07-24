@@ -68,7 +68,7 @@ impl Height {
     /// assert_eq!(1, height.0);
     /// ```
     pub fn increment(&mut self) {
-       self.0 += 1;
+        self.0 += 1;
     }
 
     /// Decrements the height value.
@@ -195,7 +195,10 @@ impl Round {
     /// assert_eq!(None, iter.next());
     /// ```
     pub fn iter_to(&self, to: Round) -> RoundRangeIter {
-        RoundRangeIter { next: self, last: to }
+        RoundRangeIter {
+            next: self,
+            last: to,
+        }
     }
 }
 

@@ -178,7 +178,8 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new()).1
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new())
+                .1
         };
         self.merge(patch)?;
         Ok(())
