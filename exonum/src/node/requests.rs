@@ -106,7 +106,7 @@ where
         let prevotes = self.state
             .prevotes(msg.round(), *msg.propose_hash())
             .iter()
-            .filter(|p| !has_prevotes[p.validator().0 as usize])
+            .filter(|p| !has_prevotes[p.validator().as_usize()])
             .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 

@@ -214,7 +214,7 @@ where
 
     /// Inserts a new message if it hasn't been inserted yet.
     pub fn insert(&mut self, message: &T) {
-        let voter = message.validator().0 as usize;
+        let voter = message.validator().as_usize();
         if !self.validators[voter] {
             self.count += 1;
             self.validators.set(voter, true);
@@ -520,7 +520,7 @@ impl State {
 
     /// Returns public key of a validator identified by id.
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
-        self.validators().get(id.0 as usize).map(
+        self.validators().get(id.as_usize()).map(
             |x| x.consensus_key,
         )
     }
@@ -559,7 +559,7 @@ impl State {
 
     /// Updates known height for a validator identified by the public key.
     pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
-        *self.nodes_max_height.entry(key).or_insert(Height(0)) = height;
+        *self.nodes_max_height.entry(key).or_insert(Height::zero()) = height;
     }
 
     /// Returns a list of nodes whose height is bigger than one of the current node.

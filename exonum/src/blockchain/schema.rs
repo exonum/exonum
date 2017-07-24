@@ -94,7 +94,7 @@ where
 
     /// Returns table that keeps a list of transactions for the each block.
     pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.0), &self.view)
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.as_usize()), &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
@@ -136,7 +136,7 @@ where
 
     /// Returns block hash for the given height.
     pub fn block_hash_by_height(&self, height: Height) -> Option<Hash> {
-        self.block_hashes_by_height().get(height.0)
+        self.block_hashes_by_height().get(height.as_usize())
     }
 
     /// Returns the block for the given height with the proof of its inclusion.
@@ -322,14 +322,14 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.block_hash_by_height
     pub fn block_hash_by_height_mut(&mut self, height: Height) -> Option<Hash> {
-        self.block_hashes_by_height().get(height.0)
+        self.block_hashes_by_height().get(height.as_usize())
     }
 
     /// Mutable reference to the [`block_txs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_txs
     pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.0), &mut self.view)
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.as_usize()), &mut self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.

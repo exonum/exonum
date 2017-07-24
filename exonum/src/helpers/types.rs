@@ -90,6 +90,20 @@ impl Height {
         assert_ne!(0, self.0);
         self.0 -= 1;
     }
+
+    /// Returns inner value as `usize`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::helpers::Height;
+    ///
+    /// let height = Height::zero();
+    /// assert_eq!(0, height.as_usize());
+    /// ```
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
 }
 
 /// Consensus round index.
@@ -200,6 +214,20 @@ impl Round {
             last: to,
         }
     }
+
+    /// Returns inner value as `usize`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::helpers::Round;
+    ///
+    /// let round = Round::zero();
+    /// assert_eq!(0, round.as_usize());
+    /// ```
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
+    }
 }
 
 /// Validators identifier.
@@ -219,6 +247,20 @@ impl ValidatorId {
     /// ```
     pub fn zero() -> Self {
         ValidatorId(0)
+    }
+
+    /// Returns inner value as `usize`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::helpers::ValidatorId;
+    ///
+    /// let id = ValidatorId::zero();
+    /// assert_eq!(0, id.as_usize());
+    /// ```
+    pub fn as_usize(&self) -> usize {
+        self.0 as usize
     }
 }
 
