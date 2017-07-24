@@ -5,26 +5,7 @@ var router = express.Router();
 var baseUrl = 'http://127.0.0.1:2268/f/';
 var backendsUrl = 'http://127.0.0.1:16000/timestamping/content';
 
-// router.post('/pay', function(req, res) {
-//     var db = req.db;
-//     var hash = req.body.label;
-//     var description = req.body.description;
-//
-//     db.serialize(function() {
-//         db.get('SELECT 1 FROM pairs WHERE hash = "' + hash + '"', function(err, row) {
-//             if (typeof row === 'undefined') {
-//                 db.prepare('INSERT INTO pairs (hash, description) VALUES (?, ?)').run(hash, description).finalize();
-//             } else {
-//                 db.run('UPDATE pairs SET description = "' + description + '" WHERE hash = "' + hash + '"');
-//             }
-//         });
-//     });
-//
-//     res.redirect(307, 'https://money.yandex.ru/quickpay/confirm.xml');
-// });
-
 router.post('/upload', function(req, res) {
-    var db = req.db;
     var hash = req.body.label;
     var description = req.body.description;
 
@@ -58,31 +39,6 @@ router.post('/upload', function(req, res) {
         });
     });
 });
-
-// router.post('/proceed', function(req, res) {
-//     var db = req.db;
-//     var hash = req.body.label;
-//
-//     db.serialize(function() {
-//         db.each('SELECT 1 rowid, * FROM pairs WHERE hash = "' + hash + '" LIMIT 1', function(err, row) {
-//             if (typeof row !== 'undefined') {
-//                 request.post({
-//                     url: backendsUrl,
-//                     headers: [{
-//                         name: 'content-type',
-//                         value: 'multipart/form-data'
-//                     }],
-//                     formData: {
-//                         hash: hash,
-//                         description: row.description
-//                     }
-//                 });
-//             }
-//         });
-//     });
-//
-//     res.status(200).send();
-// });
 
 router.get('/:hash/exists', function(req, res, next) {
     var hash = req.params.hash;
