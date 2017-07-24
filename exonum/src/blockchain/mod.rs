@@ -148,7 +148,7 @@ impl Blockchain {
     pub fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
-            actual_from: Height::zero(),
+            actual_from: 0,
             validator_keys: cfg.validator_keys,
             consensus: cfg.consensus,
             services: BTreeMap::new(),

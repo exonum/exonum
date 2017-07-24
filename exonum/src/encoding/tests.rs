@@ -428,10 +428,10 @@ fn test_request_block() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let request = RequestBlock::new(&public_key, &public_key, Height::first(), &secret_key);
+    let request = RequestBlock::new(&public_key, &public_key, Height(1), &secret_key);
     // read
     assert_eq!(request.from(), &public_key);
-    assert_eq!(request.height(), Height::first());
+    assert_eq!(request.height(), Height(1));
     assert_eq!(request.to(), &public_key);
     assert!(request.verify_signature(&public_key));
 }

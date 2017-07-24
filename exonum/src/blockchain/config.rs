@@ -22,7 +22,6 @@ use std::collections::{BTreeMap, HashSet};
 use storage::StorageValue;
 use events::Milliseconds;
 use crypto::{hash, PublicKey, Hash};
-use helpers::Height;
 
 /// Public keys of a validator.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -42,7 +41,7 @@ pub struct StoredConfiguration {
     /// For configuration in genesis block `hash` is just an array of zeroes.
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
-    pub actual_from: Height,
+    pub actual_from: u64,
     /// List of validator's consensus and service public keys.
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.

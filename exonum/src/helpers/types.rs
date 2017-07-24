@@ -21,20 +21,6 @@ impl Height {
         Height(0)
     }
 
-    /// Returns first value of the height.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::helpers::Height;
-    ///
-    /// let height = Height::first();
-    /// assert_eq!(1, height.0);
-    /// ```
-    pub fn first() -> Self {
-        Height(1)
-    }
-
     /// Returns next value of the height.
     ///
     /// # Examples

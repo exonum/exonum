@@ -94,7 +94,7 @@ where
 
     /// Returns table that keeps a list of transactions for the each block.
     pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.as_usize()), &self.view)
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.0), &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
@@ -136,7 +136,7 @@ where
 
     /// Returns block hash for the given height.
     pub fn block_hash_by_height(&self, height: Height) -> Option<Hash> {
-        self.block_hashes_by_height().get(height.as_usize())
+        self.block_hashes_by_height().get(height.0)
     }
 
     /// Returns the block for the given height with the proof of its inclusion.
@@ -322,14 +322,14 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.block_hash_by_height
     pub fn block_hash_by_height_mut(&mut self, height: Height) -> Option<Hash> {
-        self.block_hashes_by_height().get(height.as_usize())
+        self.block_hashes_by_height().get(height.0)
     }
 
     /// Mutable reference to the [`block_txs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_txs
     pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.as_usize()), &mut self.view)
+        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height.0), &mut self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.
@@ -363,7 +363,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Adds a new configuration to the blockchain, which will become an actual at
     /// the `actual_from` height in `config_data`.
     pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
-        let actual_from = config_data.actual_from;
+        let actual_from = Height(config_data.actual_from);
         if let Some(last_cfg) = self.configs_actual_from().last() {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
                 // TODO: Replace panic with errors.
