@@ -221,7 +221,9 @@ impl Blockchain {
             let last_hash = self.last_hash();
             // Save & execute transactions
             for (index, hash) in tx_hashes.iter().enumerate() {
-                let tx = &pool[hash];
+                let tx = pool.get(hash).expect(
+                    "BUG: Cannot find transaction in pool.",
+                );
 
                 fork.checkpoint();
 
