@@ -262,9 +262,7 @@ where
         // Lock to propose
         // TODO: avoid loop here
         let start_round = ::std::cmp::max(self.state.locked_round().next(), propose_round);
-        for round in start_round.0..self.state.round().next().0 {
-            // TODO: Replace by `Step` implementation.
-            let round = Round(round);
+        for round in start_round.iter_to(self.state.round().next()) {
             if self.state.has_majority_prevotes(round, hash) {
                 self.has_majority_prevotes(round, &hash);
             }
@@ -378,7 +376,7 @@ where
     /// Locks node to the specified round, so pre-votes for the lower round will be ignored.
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
         trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
-        for round in prevote_round.0..self.state.round().next().0 {
+        for round in prevote_round.iter_to(self.state.round().next()) {
             let round = Round(round);
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {

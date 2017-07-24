@@ -180,6 +180,23 @@ impl Round {
         assert_ne!(0, self.0);
         self.0 -= 1;
     }
+
+    /// Returns the iterator over rounds in the range from `self` to `to - 1`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::helpers::Round;
+    ///
+    /// let round = Round::zero();
+    /// let mut iter = round.iter_to(Round(2));
+    /// assert_eq!(Some(0), iter.next());
+    /// assert_eq!(Some(1), iter.next());
+    /// assert_eq!(None, iter.next());
+    /// ```
+    pub fn iter_to(&self, to: Round) -> RoundRangeIter {
+        RoundRangeIter { next: self, last: to }
+    }
 }
 
 /// Validators identifier.
@@ -217,5 +234,25 @@ impl fmt::Display for Round {
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+struct RoundRangeIter {
+    next: Round,
+    last: Round,
+}
+
+// TODO: Add (or replace by) `Step` implementation.
+impl Iterator for RoundRangeIter {
+    type Item = Round;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if next < last {
+            let res = Some(self.next);
+            self.next.increment();
+            res
+        } else {
+            None
+        }
     }
 }

@@ -948,7 +948,7 @@ impl State {
 
     /// Returns `true` if the node doesn't have proposes different from the locked one.
     pub fn have_incompatible_prevotes(&self) -> bool {
-        for round in self.locked_round.0 + 1..self.round.0 + 1 {
+        for round in self.locked_round.next().iter_to(self.round.next()) {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&Round(round)) {
