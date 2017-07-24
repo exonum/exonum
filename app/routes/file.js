@@ -20,7 +20,7 @@ router.post('/upload', function(req, res) {
             description: description
         }
     }, function() {
-        db.serialize(function(error, response, body) {
+        db.serialize(function() {
             db.get('SELECT 1 FROM pairs WHERE hash = "' + hash + '"', function(err, row) {
                 if (typeof row === 'undefined') {
                     db.prepare('INSERT INTO pairs (hash, description) VALUES (?, ?)').run(hash, description).finalize(function() {
