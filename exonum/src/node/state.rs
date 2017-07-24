@@ -653,7 +653,7 @@ impl State {
     pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height.increment();
         self.height_start_time = height_start_time;
-        self.round = Round(1);
+        self.round = Round::first();
         self.locked_round = Round::zero();
         self.locked_propose = None;
         self.last_hash = *block_hash;

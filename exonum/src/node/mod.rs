@@ -348,7 +348,7 @@ where
             info!("Trying to connect with peer {}", address);
         }
 
-        let round = Round(1);
+        let round = Round::first();
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 

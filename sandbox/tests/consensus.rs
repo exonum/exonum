@@ -87,7 +87,7 @@ fn test_check_leader() {
              sandbox.cfg().consensus.round_timeout) as u32,
     );
 
-    for round in Round(1).iter_to(n_rounds_without_request_peers) {
+    for round in Round::first().iter_to(n_rounds_without_request_peers) {
         sandbox.assert_state(HEIGHT_ONE, round);
         add_round_with_transactions(&sandbox, &sandbox_state, &[tx.hash()]);
         sandbox.assert_state(HEIGHT_ONE, round.next());

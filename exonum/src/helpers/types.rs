@@ -21,6 +21,20 @@ impl Height {
         Height(0)
     }
 
+    /// Returns first value of the height.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::helpers::Height;
+    ///
+    /// let height = Height::first();
+    /// assert_eq!(1, height.0);
+    /// ```
+    pub fn first() -> Self {
+        Height(1)
+    }
+
     /// Returns next value of the height.
     ///
     /// # Examples
@@ -123,6 +137,20 @@ impl Round {
     /// ```
     pub fn zero() -> Self {
         Round(0)
+    }
+
+    /// Returns first value of the round.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::helpers::Round;
+    ///
+    /// let round = Round::first();
+    /// assert_eq!(1, round.0);
+    /// ```
+    pub fn first() -> Self {
+        Round(1)
     }
 
     /// Returns next value of the round.
