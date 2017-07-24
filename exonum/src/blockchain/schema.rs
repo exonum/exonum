@@ -174,7 +174,7 @@ where
         let last_height = self.last_height();
         match last_height {
             Some(last_height) => last_height.next(),
-            None => Height(0),
+            None => Height::zero(),
         }
     }
 
@@ -282,7 +282,7 @@ where
             }
         }
         panic!(
-            "Couldn't not find any config for height {:?}, \
+            "Couldn't not find any config for height {}, \
                 that means that genesis block was created incorrectly.",
             height
         )
