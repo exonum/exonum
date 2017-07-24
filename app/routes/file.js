@@ -39,7 +39,7 @@ router.post('/upload', function(req, res) {
             description: description
         }
     }, function() {
-        db.serialize(function() {
+        db.serialize(function(error, response, body) {
             db.get('SELECT 1 FROM pairs WHERE hash = "' + hash + '"', function(err, row) {
                 if (typeof row === 'undefined') {
                     db.prepare('INSERT INTO pairs (hash, description) VALUES (?, ?)').run(hash, description).finalize(function() {
@@ -91,7 +91,7 @@ router.get('/:hash/exists', function(req, res, next) {
         if (!error) {
             if (response.statusCode === 200) {
                 res.json({exists: true, redirect: '/f/' + hash});
-            } else if (response.statusCode === 409) {
+            } else if (body.type === 'FileNotFound') {
                 res.json({exists: false});
             } else {
                 res.render('error', {error: error});
@@ -104,7 +104,7 @@ router.get('/:hash/exists', function(req, res, next) {
 
 router.get('/:hash/redirect', function(req, res) {
     var hash = req.params.hash;
-    var limit = 10;
+    var limit = 0;
 
     // start pooling until it will be able to get files info with GET request which means file is in a block
     (function pooling() {
@@ -113,13 +113,14 @@ router.get('/:hash/redirect', function(req, res) {
             json: true
         }, function(error, response, body) {
             if (!error) {
-                if (body.exists) {
+                if (body.exists === true) {
                     res.redirect(body.redirect);
                 } else {
-                    limit++;
                     if (limit > 10) {
                         res.render('error');
+                        return;
                     }
+                    limit++;
                     setTimeout(function() {
                         pooling(res, hash);
                     }, 512);
@@ -142,9 +143,8 @@ router.get('/:hash', function(req, res, next) {
                 if (response.statusCode === 200) {
                     data['title'] = 'Certificate of proof ' + hash;
                     data['url'] = encodeURIComponent(baseUrl + hash);
-
                     res.render('file', data);
-                } else if (response.statusCode === 409) {
+                } else if (data.type === 'FileNotFound') {
                     res.render('file-not-found', {title: 'File not found', hash: hash});
                 } else {
                     res.render('error', {error: error});
