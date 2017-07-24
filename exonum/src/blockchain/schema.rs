@@ -39,7 +39,7 @@ encoding_struct! (
     struct ConfigReference {
         const SIZE = 40;
         /// The height, starting from which this configuration becomes actual.
-        field actual_from: u64    [00 => 08]
+        field actual_from: Height [00 => 08]
         /// Hash of the configuration contents that serialized as raw bytes vec.
         field cfg_hash:    &Hash  [08 => 40]
     }
@@ -277,7 +277,7 @@ where
     fn find_configurations_index_by_height(&self, height: Height) -> u64 {
         let actual_from = self.configs_actual_from();
         for i in (0..actual_from.len()).rev() {
-            if actual_from.get(i).unwrap().actual_from() <= height.0 {
+            if actual_from.get(i).unwrap().actual_from() <= height {
                 return i as u64;
             }
         }

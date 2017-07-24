@@ -25,38 +25,38 @@ use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, Req
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::{Hash, HASH_SIZE};
 use exonum::events::Milliseconds;
-use exonum::node::ValidatorId;
 use exonum::storage::Database;
+use exonum::helpers::{Height, Round, ValidatorId};
 
 use sandbox::Sandbox;
 use timestamping::{TimestampTx, TimestampingTxGenerator};
 
 pub type TimestampingSandbox = Sandbox;
 
-pub const HEIGHT_ZERO: u64 = 0;
-pub const HEIGHT_ONE: u64 = 1;
-pub const HEIGHT_TWO: u64 = 2;
-pub const HEIGHT_THREE: u64 = 3;
-pub const HEIGHT_FOUR: u64 = 4;
-pub const LOCK_ZERO: u32 = 0;
-pub const LOCK_ONE: u32 = 1;
-pub const LOCK_TWO: u32 = 2;
-pub const ROUND_ONE: u32 = 1;
-pub const ROUND_TWO: u32 = 2;
-pub const ROUND_THREE: u32 = 3;
-pub const ROUND_FOUR: u32 = 4;
-pub const ROUND_FIVE: u32 = 5;
-pub const VALIDATOR_0: u16 = 0;
-pub const VALIDATOR_1: u16 = 1;
-pub const VALIDATOR_2: u16 = 2;
-pub const VALIDATOR_3: u16 = 3;
-pub const INCORRECT_VALIDATOR_ID: u16 = 64_999;
+pub const HEIGHT_ZERO: Height = Height(0);
+pub const HEIGHT_ONE: Height = Height(1);
+pub const HEIGHT_TWO: Height = Height(2);
+pub const HEIGHT_THREE: Height = Height(3);
+pub const HEIGHT_FOUR: Height = Height(4);
+pub const LOCK_ZERO: Round = Round(0);
+pub const LOCK_ONE: Round = Round(1);
+pub const LOCK_TWO: Round = Round(2);
+pub const ROUND_ONE: Round = Round(1);
+pub const ROUND_TWO: Round = Round(2);
+pub const ROUND_THREE: Round = Round(3);
+pub const ROUND_FOUR: Round = Round(4);
+pub const ROUND_FIVE: Round = Round(5);
+pub const VALIDATOR_0: ValidatorId = ValidatorId(0);
+pub const VALIDATOR_1: ValidatorId = ValidatorId(1);
+pub const VALIDATOR_2: ValidatorId = ValidatorId(2);
+pub const VALIDATOR_3: ValidatorId = ValidatorId(3);
+pub const INCORRECT_VALIDATOR_ID: ValidatorId = ValidatorId(64_999);
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
 // default data from sandbox and, possibly, update few fields with custom data.
 pub struct BlockBuilder<'a> {
-    proposer_id: Option<u16>,
-    height: Option<u64>,
+    proposer_id: Option<ValidatorId>,
+    height: Option<Height>,
     duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<Hash>,
     tx_hash: Option<Hash>,
@@ -81,12 +81,12 @@ impl<'a> BlockBuilder<'a> {
         }
     }
 
-    pub fn with_proposer_id(mut self, proposer_id: u16) -> Self {
+    pub fn with_proposer_id(mut self, proposer_id: ValidatorId) -> Self {
         self.proposer_id = Some(proposer_id);
         self
     }
 
-    pub fn with_height(mut self, height: u64) -> Self {
+    pub fn with_height(mut self, height: Height) -> Self {
         self.height = Some(height);
         self
     }
@@ -143,9 +143,9 @@ impl<'a> BlockBuilder<'a> {
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Propose with
 // default data from sandbox and, possibly, update few fields with custom data.
 pub struct ProposeBuilder<'a> {
-    validator_id: Option<u16>,
-    height: Option<u64>,
-    round: Option<u32>,
+    validator_id: Option<ValidatorId>,
+    height: Option<Height>,
+    round: Option<Round>,
     duration_since_sandbox_time: Option<Milliseconds>,
     prev_hash: Option<&'a Hash>,
     tx_hashes: Option<&'a [Hash]>,
@@ -166,17 +166,17 @@ impl<'a> ProposeBuilder<'a> {
         }
     }
 
-    pub fn with_validator(mut self, validator_id: u16) -> Self {
+    pub fn with_validator(mut self, validator_id: ValidatorId) -> Self {
         self.validator_id = Some(validator_id);
         self
     }
 
-    pub fn with_height(mut self, height: u64) -> Self {
+    pub fn with_height(mut self, height: Height) -> Self {
         self.height = Some(height);
         self
     }
 
-    pub fn with_round(mut self, round: u32) -> Self {
+    pub fn with_round(mut self, round: Round) -> Self {
         self.round = Some(round);
         self
     }
@@ -210,7 +210,7 @@ impl<'a> ProposeBuilder<'a> {
             self.tx_hashes.unwrap_or(&[]),
             self.sandbox.s(self.validator_id.unwrap_or_else(
                 || self.sandbox.current_leader(),
-            ) as usize),
+            )),
         )
     }
 }
@@ -341,7 +341,7 @@ where
     let n_validators = sandbox.n_validators();
     for _ in 0..n_validators {
         propose = add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref());
-        let round: u32 = sandbox.current_round();
+        let round = sandbox.current_round();
         if sandbox.is_leader() {
             // ok, we are leader
             trace!("ok, we are leader, round: {:?}", round);
@@ -354,8 +354,9 @@ where
 
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
+                let val_idx = ValidatorId(val_idx as u16);
                 sandbox.recv(Prevote::new(
-                    val_idx as u16,
+                    val_idx,
                     initial_height,
                     round,
                     &propose.hash(),
@@ -386,13 +387,14 @@ where
                 &propose.hash(),
                 &block.hash(),
                 sandbox.time(),
-                sandbox.s(VALIDATOR_0 as usize),
+                sandbox.s(VALIDATOR_0),
             ));
             sandbox.assert_lock(round, Some(propose.hash()));
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
+                let val_idx = ValidatorId(val_idx as u16);
                 sandbox.recv(Precommit::new(
-                    val_idx as u16,
+                    val_idx,
                     initial_height,
                     round,
                     &propose.hash(),
@@ -401,12 +403,12 @@ where
                     sandbox.s(val_idx),
                 ));
 
-                if val_idx != sandbox.majority_count(n_validators) - 1 {
+                if val_idx.0 as usize != sandbox.majority_count(n_validators) - 1 {
                     sandbox.assert_state(initial_height, round);
                 }
             }
 
-            let new_height = initial_height + 1;
+            let new_height = initial_height.next();
             sandbox.assert_state(new_height, ROUND_ONE);
             {
                 *sandbox_state.time_millis_since_round_start.borrow_mut() = 0;
@@ -453,7 +455,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
     for _ in 0..n_validators {
         //        add_round_with_transactions(&sandbox, &[tx.hash()]);
         add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref());
-        let round: u32 = sandbox.current_round();
+        let round = sandbox.current_round();
         if VALIDATOR_1 == sandbox.leader(round) {
             sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
             // ok, we are leader
@@ -464,8 +466,9 @@ pub fn add_one_height_with_transactions_from_other_validator(
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
             sandbox.recv(propose.clone());
             for val_idx in 0..sandbox.majority_count(n_validators) {
+                let val_idx = ValidatorId(val_idx as u16);
                 sandbox.recv(Prevote::new(
-                    val_idx as u16,
+                    val_idx,
                     initial_height,
                     round,
                     &propose.hash(),
@@ -488,8 +491,9 @@ pub fn add_one_height_with_transactions_from_other_validator(
             sandbox.assert_state(initial_height, round);
 
             for val_idx in 0..sandbox.majority_count(n_validators) {
+                let val_idx = ValidatorId(val_idx as u16);
                 sandbox.recv(Precommit::new(
-                    val_idx as u16,
+                    val_idx,
                     initial_height,
                     round,
                     &propose.hash(),
@@ -499,7 +503,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
                 ));
             }
 
-            let new_height = initial_height + 1;
+            let new_height = initial_height.next();
             sandbox.assert_state(new_height, ROUND_ONE);
             sandbox.check_broadcast_status(new_height, &block.hash());
 
@@ -530,7 +534,7 @@ fn get_propose_with_transactions_for_validator(
         sandbox.current_round(),
         &sandbox.last_hash(),
         transactions,
-        sandbox.s(validator as usize),
+        sandbox.s(validator),
     )
 }
 
@@ -580,7 +584,7 @@ fn check_and_broadcast_propose_and_prevote(
         sandbox.current_round(),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0 as usize),
+        sandbox.s(VALIDATOR_0),
     ));
     Some(propose.clone())
 }
@@ -597,7 +601,7 @@ pub fn receive_valid_propose_with_transactions(
         sandbox.current_round(),
         &sandbox.last_hash(),
         transactions,
-        sandbox.s(sandbox.current_leader() as usize),
+        sandbox.s(sandbox.current_leader()),
     );
     sandbox.recv(propose.clone());
     propose.clone()
@@ -608,11 +612,11 @@ pub fn make_request_propose_from_precommit(
     precommit: &Precommit,
 ) -> RequestPropose {
     RequestPropose::new(
-        &sandbox.p(VALIDATOR_0 as usize),
-        &sandbox.p(precommit.validator() as usize),
+        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(precommit.validator()),
         precommit.height(),
         precommit.propose_hash(),
-        sandbox.s(VALIDATOR_0 as usize),
+        sandbox.s(VALIDATOR_0),
     )
 }
 
@@ -622,13 +626,13 @@ pub fn make_request_prevote_from_precommit(
 ) -> RequestPrevotes {
     let validators = BitVec::from_elem(sandbox.n_validators(), false);
     RequestPrevotes::new(
-        &sandbox.p(VALIDATOR_0 as usize),
-        &sandbox.p(precommit.validator() as usize),
+        &sandbox.p(VALIDATOR_0),
+        &sandbox.p(precommit.validator()),
         precommit.height(),
         precommit.round(),
         precommit.propose_hash(),
         validators,
-        sandbox.s(VALIDATOR_0 as usize),
+        sandbox.s(VALIDATOR_0),
     )
 }
 
@@ -645,6 +649,6 @@ pub fn make_prevote_from_propose(sandbox: &TimestampingSandbox, propose: &Propos
         propose.round(),
         &propose.hash(),
         LOCK_ZERO,
-        sandbox.s(VALIDATOR_0 as usize),
+        sandbox.s(VALIDATOR_0),
     )
 }

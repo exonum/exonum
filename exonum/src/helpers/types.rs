@@ -3,7 +3,7 @@
 use std::fmt;
 
 /// Blockchain's height (number of blocks).
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Height(pub u64);
 
 impl Height {
@@ -93,7 +93,7 @@ impl Height {
 }
 
 /// Consensus round index.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Round(pub u32);
 
 impl Round {
@@ -203,7 +203,7 @@ impl Round {
 }
 
 /// Validators identifier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ValidatorId(pub u16);
 
 impl ValidatorId {
