@@ -106,7 +106,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.h tml
+    /// [`&mut Fork`]: ../struct.Fork.html
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ProofMapIndex {
             base: BaseIndex::new(prefix, view),
