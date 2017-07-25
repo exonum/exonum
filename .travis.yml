@@ -16,6 +16,7 @@ cache:
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
+  - $TRAVIS_BUILD_DIR/sandbox_tests/target
 sudo: false
 group: deprecated-2017Q2
 dist: trusty
@@ -72,6 +73,9 @@ jobs:
     rust: nightly-2017-07-05
     env:
     - FEATURE=clippy
+    # Needed to distinguish among `clippy` jobs when creating caches;
+    # see https://docs.travis-ci.com/user/caching#Caches-and-build-matrices
+    - SANDBOX=1
     script:
     - cd sandbox_tests && cargo clippy -- -D warnings
   - stage: test
