@@ -11,8 +11,11 @@ addons:
 rust:
   - stable
 
-cache: cargo
-sudo: required
+cache:
+- $HOME/.cargo
+- $HOME/.local
+- $TRAVIS_BUILD_DIR/target
+sudo: false
 group: deprecated-2017Q2
 dist: trusty
 
@@ -22,9 +25,17 @@ env:
     - CLIPPY_VERS=0.0.142
     - RUSTFMT_VERS=0.9.0
 
-before_install:
-- sudo add-apt-repository -y ppa:chris-lea/libsodium
-- sudo apt-get -qq update
+install:
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget https://download.libsodium.org/libsodium/releases/libsodium-1.0.13.tar.gz
+    tar xvf libsodium-1.0.13.tar.gz
+    cd libsodium-1.0.13
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+  fi
+- export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig
 - cargo-audit -V || cargo install cargo-audit --force
 - |
   if [[ "$FEATURE" == "clippy" ]]; then
