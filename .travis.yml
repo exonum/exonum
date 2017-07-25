@@ -33,6 +33,7 @@ install:
     ./configure --prefix=$HOME/.local
     make
     make install
+    cd ..
   fi
 - export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig
 - cargo-audit -V || cargo install cargo-audit --force
