@@ -15,26 +15,49 @@ env:
     - RUSTFMT_VERS=0.9.0
 
 before_install:
-- rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-- cargo-audit -V || cargo install cargo-audit --force
-- rustup toolchain install $NIGHTLY_RUST
-- cargo +$NIGHTLY_RUST clippy --version | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --force --vers $CLIPPY_VERS
 - sudo add-apt-repository -y ppa:chris-lea/libsodium
 - sudo apt-get -qq update
-- cargo install --list
-
+- cargo-audit -V || cargo install cargo-audit --force
+- |
+  if [[ "$FEATURE" == "clippy" ]]; then
+    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+  fi
+- |
+  if [[ "$FEATURE" == "fmt" ]]; then
+    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+  fi
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+- cargo install --list
 
-script:
-- cargo fmt -p exonum-configuration -- --write-mode=diff
-- cargo +$NIGHTLY_RUST clippy  -- -D warnings
-- cd sandbox_tests
-- cargo fmt -p exonum-configuration-sandbox -- --write-mode=diff
-- cargo +$NIGHTLY_RUST clippy  -- -D warnings
-- cd ..
-- cargo test
-- RUST_LOG=off cargo test --manifest-path sandbox_tests/Cargo.toml
+script: skip
+
+jobs:
+  include:
+  - stage: format
+    env:
+    - FEATURE=fmt
+    script:
+    - cargo fmt -p exonum-configuration -- --write-mode=diff
+    - cd sandbox_tests && cargo fmt -p exonum-configuration-sandbox -- --write-mode=diff
+  - stage: lint
+    rust: nightly-2017-07-05
+    env:
+    - FEATURE=clippy
+    script:
+    - cargo clippy -- -D warnings
+  - stage: lint
+    rust: nightly-2017-07-05
+    env:
+    - FEATURE=clippy
+    script:
+    - cd sandbox_tests && cargo clippy -- -D warnings
+  - stage: test
+    script:
+    - cargo test
+  - stage: test
+    script:
+    - RUST_LOG=off cargo test --manifest-path sandbox_tests/Cargo.toml
 
 notifications:
   slack:
