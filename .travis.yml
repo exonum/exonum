@@ -36,8 +36,9 @@ install:
     make install
     cd ..
   fi
-- export PKG_CONFIG_PATH=$HOME/.local/lib/pkgconfig
 - cargo-audit -V || cargo install cargo-audit --force
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
 - |
   if [[ "$FEATURE" == "clippy" ]]; then
     cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
