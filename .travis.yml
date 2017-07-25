@@ -76,8 +76,6 @@ jobs:
   - stage: test
     script:
     - cargo test
-  - stage: test
-    script:
     - RUST_LOG=off cargo test --manifest-path sandbox_tests/Cargo.toml
 
 notifications:
