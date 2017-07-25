@@ -2721,13 +2721,13 @@ fn test_exclude_validator_from_consensus() {
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.validator_keys.swap_remove(0);
-        consensus_cfg.actual_from = sandbox.current_height().next().next().0;
+        consensus_cfg.actual_from = sandbox.current_height().next().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         TxConfig::new(
             &sandbox.p(VALIDATOR_0),
             &consensus_cfg.clone().into_bytes(),
-            Height(consensus_cfg.actual_from),
+            consensus_cfg.actual_from,
             sandbox.s(VALIDATOR_0),
         )
     };
@@ -2752,13 +2752,13 @@ fn test_schema_config_changes() {
     let (tx_cfg, following_cfg) = {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.txs_block_limit = 2000;
-        consensus_cfg.actual_from = sandbox.current_height().next().next().0;
+        consensus_cfg.actual_from = sandbox.current_height().next().next();
         consensus_cfg.previous_cfg_hash = sandbox.cfg().hash();
 
         let tx = TxConfig::new(
             &sandbox.p(VALIDATOR_0),
             &consensus_cfg.clone().into_bytes(),
-            Height(consensus_cfg.actual_from),
+            consensus_cfg.actual_from,
             sandbox.s(VALIDATOR_0),
         );
         (tx, consensus_cfg)

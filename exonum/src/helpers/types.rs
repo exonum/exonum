@@ -1,9 +1,11 @@
 //! Common widely used typedefs.
 
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 use std::fmt;
 
 /// Blockchain's height (number of blocks).
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Height(pub u64);
 
 impl Height {
@@ -293,6 +295,25 @@ impl fmt::Display for Round {
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+// Serialization/deserialization is implemented manually because TOML round-trip for the tuple
+// structs is broken currently. See https://github.com/alexcrichton/toml-rs/issues/194 for details.
+impl Serialize for Height {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Height {
+    fn deserialize<D>(deserializer: D) -> Result<Height, D::Error>
+        where D: Deserializer<'de>
+    {
+
+        Ok(Height(u64::deserialize(deserializer)?))
     }
 }
 
