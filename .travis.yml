@@ -12,9 +12,10 @@ rust:
 - stable
 
 cache:
-- $HOME/.cargo
-- $HOME/.local
-- $TRAVIS_BUILD_DIR/target
+  directories:
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
 sudo: false
 group: deprecated-2017Q2
 dist: trusty
