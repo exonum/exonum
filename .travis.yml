@@ -1,5 +1,13 @@
 language: rust
 
+addons:
+  apt:
+    packages:
+    - gcc
+    - g++
+    - libleveldb-dev
+    - libssl-dev
+
 rust:
   - stable
 
@@ -26,8 +34,6 @@ before_install:
   if [[ "$FEATURE" == "fmt" ]]; then
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
   fi
-install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 - cargo install --list
 
 script: skip
