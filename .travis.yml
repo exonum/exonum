@@ -9,7 +9,7 @@ addons:
     - libssl-dev
 
 rust:
-  - stable
+- stable
 
 cache:
 - $HOME/.cargo
@@ -21,9 +21,8 @@ dist: trusty
 
 env:
   global:
-    - NIGHTLY_RUST=nightly-2017-07-05
-    - CLIPPY_VERS=0.0.142
-    - RUSTFMT_VERS=0.9.0
+  - CLIPPY_VERS=0.0.142
+  - RUSTFMT_VERS=0.9.0
 
 install:
 - |
