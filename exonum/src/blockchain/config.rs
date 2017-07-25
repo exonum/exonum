@@ -102,6 +102,49 @@ impl StoredConfiguration {
             }
         }
 
+        // Check timeout adjuster.
+        match config.consensus.timeout_adjuster {
+            // There is no need to validate `Constant` timeout adjuster.
+            TimeoutAdjusterConfig::Constant { .. } => (),
+            TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
+                if min >= max {
+                    return Err(JsonError::custom(format!(
+                        "Dynamic adjuster: minimal timeout should be less then maximal: \
+                        min = {}, max = {}",
+                        min,
+                        max
+                    )));
+                }
+            }
+            TimeoutAdjusterConfig::MovingAverage {
+                min,
+                max,
+                adjustment_speed,
+                optimal_block_load,
+            } => {
+                if min >= max {
+                    return Err(JsonError::custom(format!(
+                        "Moving average adjuster: minimal timeout must be less then maximal: \
+                        min = {}, max = {}",
+                        min,
+                        max
+                    )));
+                }
+                if adjustment_speed <= 0. || adjustment_speed > 1. {
+                    return Err(JsonError::custom(format!(
+                        "Moving average adjuster: adjustment speed must be in the (0..1] range: {}",
+                        adjustment_speed,
+                    )));
+                }
+                if optimal_block_load <= 0. || optimal_block_load > 1. {
+                    return Err(JsonError::custom(format!(
+                        "Moving average adjuster: block load must be in the (0..1] range: {}",
+                        adjustment_speed,
+                    )));
+                }
+            }
+        }
+
         Ok(config)
     }
 }
@@ -213,6 +256,95 @@ mod tests {
             optimal_block_load: 0.75,
         };
         check_toml_roundtrip(&config);
+    }
+
+    #[test]
+    #[should_panic(expected = "Dynamic adjuster: minimal timeout should be less then maximal")]
+    fn dynamic_adjuster_min_max() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Dynamic {
+            min: 10,
+            max: 0,
+            threshold: 1,
+        };
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "Moving average adjuster: minimal timeout must be less then maximal")]
+    fn moving_average_adjuster_min_max() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
+            min: 10,
+            max: 0,
+            adjustment_speed: 0.7,
+            optimal_block_load: 0.5,
+        };
+        serialize_deserialize(&configuration);
+    }
+
+    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
+    // is fixed.
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[test]
+    #[should_panic(expected = "Moving average adjuster: adjustment speed must be in the (0..1]")]
+    fn moving_average_adjuster_negative_adjustment_speed() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
+            min: 1,
+            max: 20,
+            adjustment_speed: -0.7,
+            optimal_block_load: 0.5,
+        };
+        serialize_deserialize(&configuration);
+    }
+
+    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
+    // is fixed.
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[test]
+    #[should_panic(expected = "Moving average adjuster: adjustment speed must be in the (0..1]")]
+    fn moving_average_adjuster_invalid_adjustment_speed() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
+            min: 10,
+            max: 20,
+            adjustment_speed: 1.5,
+            optimal_block_load: 0.5,
+        };
+        serialize_deserialize(&configuration);
+    }
+
+    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
+    // is fixed.
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[test]
+    #[should_panic(expected = "Moving average adjuster: block load must be in the (0..1] range")]
+    fn moving_average_adjuster_negative_block_load() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
+            min: 10,
+            max: 20,
+            adjustment_speed: 0.7,
+            optimal_block_load: -0.5,
+        };
+        serialize_deserialize(&configuration);
+    }
+
+    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
+    // is fixed.
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[test]
+    #[should_panic(expected = "Moving average adjuster: block load must be in the (0..1] range")]
+    fn moving_average_adjuster_invalid_block_load() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
+            min: 10,
+            max: 20,
+            adjustment_speed: 0.7,
+            optimal_block_load: 2.0,
+        };
+        serialize_deserialize(&configuration);
     }
 
     fn create_test_configuration() -> StoredConfiguration {
