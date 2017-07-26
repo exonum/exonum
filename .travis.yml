@@ -1,54 +1,95 @@
 language: rust
 
+addons:
+  apt:
+    packages:
+    - gcc
+    - g++
+    - libleveldb-dev
+    - libssl-dev
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
+    - libiberty-dev
+
 rust:
   - stable
 
-cache: cargo
+cache:
+  directories:
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
+  - $TRAVIS_BUILD_DIR/sandbox_tests/target
+
 sudo: required
 group: deprecated-2017Q2
 dist: trusty
 
 env:
   global:
-    - NIGHTLY_RUST=nightly-2017-07-05
-    - CLIPPY_VERS=0.0.142
-    - RUSTFMT_VERS=0.9.0
-    - RUSTFLAGS="-C link-dead-code"
-    - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
-
-before_install:
-- rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-- cargo-audit -V || cargo install cargo-audit --force
-- rustup toolchain install $NIGHTLY_RUST
-- cargo +$NIGHTLY_RUST clippy -V | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --vers $CLIPPY_VERS --force
-- sudo add-apt-repository -y ppa:elt/libsodium
-- sudo apt-get -qq update
-- cargo install --list
+  - NIGHTLY_RUST=nightly-2017-07-05
+  - CLIPPY_VERS=0.0.142
+  - RUSTFMT_VERS=0.9.0
+  - RUSTFLAGS="-C link-dead-code"
+  - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
 
 install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget https://github.com/jedisct1/libsodium/releases/download/1.0.13/libsodium-1.0.13.tar.gz
+    tar xvf libsodium-1.0.13.tar.gz
+    cd libsodium-1.0.13
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    cd ..
+  fi
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
+- |
+  if [[ "$FEATURE" == "clippy" ]]; then
+    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+  fi
+- |
+  if [[ "$FEATURE" == "fmt" ]]; then
+    cargo-audit -V || cargo install cargo-audit --force
+    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    cargo update
+  fi
+- cargo install --list
 
-script:
-- cargo fmt -p exonum -- --write-mode=diff
-- cargo fmt -p sandbox -- --write-mode=diff
-- cd exonum
-- cargo +$NIGHTLY_RUST clippy -- -D warnings
-- cd ..
-- cd sandbox
-- cargo +$NIGHTLY_RUST clippy -- -D warnings
-- cd ..
-- cargo audit
-- cargo test --manifest-path exonum/Cargo.toml
-- cargo test --manifest-path sandbox/Cargo.toml
+script: skip
 
-addons:
-  apt:
-    packages:
-      - libcurl4-openssl-dev
-      - libelf-dev
-      - libdw-dev
-      - binutils-dev
-      - libiberty-dev
+jobs:
+  include:
+  - stage: format
+    env:
+    - FEATURE=fmt
+    script:
+    - cargo audit
+    - cargo fmt -p exonum -- --write-mode=diff
+    - cargo fmt -p sandbox -- --write-mode=diff
+  - stage: lint
+    rust: nightly-2017-07-05
+    env:
+    - FEATURE=clippy
+    script:
+    - cd exonum && cargo clippy -- -D warnings
+  - stage: lint
+    rust: nightly-2017-07-05
+    env:
+    - FEATURE=clippy
+    # Needed to distinguish among `clippy` jobs when creating caches;
+    # see https://docs.travis-ci.com/user/caching#Caches-and-build-matrices
+    - SANDBOX=1
+    script:
+    - cd sandbox && cargo clippy -- -D warnings
+  - stage: test
+    script:
+    - cargo test -p exonum
+    - RUST_LOG=off cargo test -p sandbox
 
 after_success: |
   [ $TRAVIS_BRANCH = master ] &&
@@ -60,7 +101,7 @@ after_success: |
   cd build &&
   cmake .. &&
   make &&
-  sudo make install &&
+  make install &&
   cd ../.. &&
   rm -rf kcov-master &&
   for file in target/debug/exonum-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
@@ -72,4 +113,4 @@ notifications:
     secure: liTyhEuzF4d+w8OEa91QOGKCGEqHqUz4DQoXig0Ys36vsYkiFOghgniaDFNfif1c+WT2N8RRnuz9FCpdK5LZm8s/eM6dnVQvVXp1r3YjwNv+VFOQQvdHsU/sb7os0SiIyyDzvPz3rChglx5dsML6RnpkabOsn1mWk/NGlqIxp3PiQUACvnmWhIbrjoxvCi7HjUh64x7txJxcv6WISxQaIiUNidI6OZKhHpQOixC6LekxpKBNRroqXvvPJ5KAQOcYS5ztaTDLTz4HmOfCFa5CYLbwq6CxlmYpIuDupWAPCabQI98Bf0cdLTCsdHUbnAOLGYpdPqRkS79ygFWQz6I2ZVVjll9bnIL4vHZsbHKflDTglWdQhlhxb/rG1OhGdJJKHzlaAqDS+q4Pv1HWvj38LPrubOgN22Bi0+KT8YGV9mmzsz/bFW0FoZQMoKM33tNRURndHKwTryGtoHZo5Ljj0jifxLuqmUk5BwYQC/9bbaBRl99q7hOKuG4NNXPEbjv0fqrkft1/IqiWBGzjWsnlLLvkTl8QtEMu98AvNgW1nt/TsQV8io80reLDIMYbyZn4ItkEEXlZoQjWmsj2yvgpwOvHWSuSO4IQnHIBmbdptHiRUbx1zh+FKqpn8IhyNNuMBFzptV9Aa3S9xG/G5xChDut5KF2uX2VQNHpcAyzktvQ=
   webhooks:
     urls:
-      - https://webhooks.gitter.im/e/9599da7e3a500810190d
+    - https://webhooks.gitter.im/e/9599da7e3a500810190d
