@@ -43,7 +43,6 @@ install:
   if [[ "$FEATURE" == "clippy" ]]; then
     cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
   fi
-# TODO: rename stage and feature
 - |
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
@@ -56,7 +55,7 @@ script: skip
 
 jobs:
   include:
-  - stage: format
+  - stage: lint
     env:
     - FEATURE=fmt
     script:
