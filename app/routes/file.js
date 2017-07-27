@@ -5,10 +5,32 @@ var router = express.Router();
 var baseUrl = 'http://127.0.0.1:2268/f/';
 var backendsUrl = 'http://127.0.0.1:16000/timestamping/content';
 
+function validate(hash) {
+    if (typeof hash !== 'string') {
+        return false;
+    } else if (hash.length !== 64) {
+        return false;
+    }
+
+    for (var i = 0; i < hash.length; i++) {
+        if (isNaN(parseInt(hash[i], 16))) {
+            // invalid symbol in hexadecimal string
+            return false;
+        }
+    }
+
+    return true;
+}
+
 router.post('/upload', function(req, res) {
     var db = req.db;
     var hash = req.body.label;
     var description = req.body.description;
+
+    if (!validate(hash)) {
+        res.render('invalid-request', {title: 'Invalid request', hash: hash});
+        return;
+    }
 
     request.post({
         url: backendsUrl,
@@ -44,6 +66,11 @@ router.post('/upload', function(req, res) {
 router.get('/:hash/exists', function(req, res, next) {
     var hash = req.params.hash;
 
+    if (!validate(hash)) {
+        res.render('invalid-request', {title: 'Invalid request', hash: hash});
+        return;
+    }
+
     request.get(backendsUrl + '/' + hash, function(error, response, body) {
         if (!error) {
             if (response.statusCode === 200) {
@@ -62,6 +89,11 @@ router.get('/:hash/exists', function(req, res, next) {
 router.get('/:hash/redirect', function(req, res) {
     var hash = req.params.hash;
     var limit = 0;
+
+    if (!validate(hash)) {
+        res.render('invalid-request', {title: 'Invalid request', hash: hash});
+        return;
+    }
 
     // start pooling until it will be able to get files info with GET request which means file is in a block
     (function pooling() {
@@ -91,6 +123,11 @@ router.get('/:hash/redirect', function(req, res) {
 
 router.get('/:hash', function(req, res, next) {
     var hash = req.params.hash;
+
+    if (!validate(hash)) {
+        res.render('invalid-request', {title: 'Invalid request', hash: hash});
+        return;
+    }
 
     request.get(backendsUrl + '/' + hash, function(error, response, body) {
         if (!error) {
