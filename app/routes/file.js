@@ -6,7 +6,6 @@ var baseUrl = 'http://127.0.0.1:2268/f/';
 var backendsUrl = 'http://127.0.0.1:16000/timestamping/content';
 
 router.post('/upload', function(req, res) {
-    var db = req.db;
     var hash = req.body.label;
     var description = req.body.description;
 
@@ -21,23 +20,7 @@ router.post('/upload', function(req, res) {
             description: description
         }
     }, function() {
-        db.serialize(function() {
-            db.get('SELECT 1 FROM pairs WHERE hash = "' + hash + '"', function(err, row) {
-                if (typeof row === 'undefined') {
-                    db.prepare('INSERT INTO pairs (hash, description) VALUES (?, ?)').run(hash, description).finalize(function() {
-                        res.redirect(baseUrl + hash + '/redirect');
-                    });
-                } else {
-                    db.run('UPDATE pairs SET description = "' + description + '" WHERE hash = "' + hash + '"', function(error) {
-                        if (!error) {
-                            res.redirect(baseUrl + hash + '/redirect');
-                        } else {
-                            res.render('error', {error: error});
-                        }
-                    });
-                }
-            });
-        });
+        res.redirect(baseUrl + hash + '/redirect');
     });
 });
 
