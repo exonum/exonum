@@ -1,40 +1,86 @@
 language: rust
 
-rust:
-  - stable
+addons:
+  apt:
+    packages:
+    - gcc
+    - g++
+    - libleveldb-dev
+    - libssl-dev
 
-cache: cargo
-sudo: required
+rust:
+- stable
+
+cache:
+  directories:
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
+  - $TRAVIS_BUILD_DIR/sandbox_tests/target
+sudo: false
 group: deprecated-2017Q2
 dist: trusty
 
 env:
   global:
-    - NIGHTLY_RUST=nightly-2017-07-05
-    - CLIPPY_VERS=0.0.142
-    - RUSTFMT_VERS=0.9.0
-
-before_install:
-- rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-- cargo-audit -V || cargo install cargo-audit --force
-- rustup toolchain install $NIGHTLY_RUST
-- cargo +$NIGHTLY_RUST clippy --version | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --force --vers $CLIPPY_VERS
-- sudo add-apt-repository -y ppa:chris-lea/libsodium
-- sudo apt-get -qq update
-- cargo install --list
+  - CLIPPY_VERS=0.0.142
+  - RUSTFMT_VERS=0.9.0
 
 install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget https://download.libsodium.org/libsodium/releases/libsodium-1.0.13.tar.gz
+    tar xvf libsodium-1.0.13.tar.gz
+    cd libsodium-1.0.13
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    cd ..
+  fi
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
+- |
+  if [[ "$FEATURE" == "clippy" ]]; then
+    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+  fi
+- |
+  if [[ "$FEATURE" == "fmt" ]]; then
+    cargo-audit -V || cargo install cargo-audit --force
+    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    cargo update
+  fi
+- cargo install --list
 
-script:
-- cargo fmt -p exonum-configuration -- --write-mode=diff
-- cargo +$NIGHTLY_RUST clippy  -- -D warnings
-- cd sandbox_tests
-- cargo fmt -p exonum-configuration-sandbox -- --write-mode=diff
-- cargo +$NIGHTLY_RUST clippy  -- -D warnings
-- cd ..
-- cargo test
-- RUST_LOG=off cargo test --manifest-path sandbox_tests/Cargo.toml
+script: skip
+
+jobs:
+  include:
+  - stage: lint
+    env:
+    - FEATURE=fmt
+    script:
+    - cargo audit
+    - cargo fmt -p exonum-configuration -- --write-mode=diff
+    - cd sandbox_tests && cargo fmt -p exonum-configuration-sandbox -- --write-mode=diff
+  - stage: lint
+    rust: nightly-2017-07-05
+    env:
+    - FEATURE=clippy
+    script:
+    - cargo clippy -- -D warnings
+  - stage: lint
+    rust: nightly-2017-07-05
+    env:
+    - FEATURE=clippy
+    # Needed to distinguish among `clippy` jobs when creating caches;
+    # see https://docs.travis-ci.com/user/caching#Caches-and-build-matrices
+    - SANDBOX=1
+    script:
+    - cd sandbox_tests && cargo clippy -- -D warnings
+  - stage: test
+    script:
+    - cargo test
+    - RUST_LOG=off cargo test --manifest-path sandbox_tests/Cargo.toml
 
 notifications:
   slack:
