@@ -23,4 +23,4 @@ serde_json = "1.0.0"
 
 exonum = "0.1.0"
 exonum-configuration = "0.1.0"
-# exonum-btc-anchoring = "0.1.0"
+exonum-btc-anchoring = "0.1.0"

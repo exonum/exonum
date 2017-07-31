@@ -1,10 +1,12 @@
 extern crate exonum;
 extern crate exonum_configuration;
+extern crate exonum_btc_anchoring;
 extern crate timestamping;
 
 use exonum::helpers::fabric::NodeBuilder;
 
 use exonum_configuration::ConfigurationService;
+use exonum_btc_anchoring::AnchoringService;
 use timestamping::TimestampingService;
 
 fn main() {
@@ -12,5 +14,6 @@ fn main() {
     NodeBuilder::new()
         .with_service::<ConfigurationService>()
         .with_service::<TimestampingService>()
+        .with_service::<AnchoringService>()
         .run();
 }
