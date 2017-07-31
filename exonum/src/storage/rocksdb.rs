@@ -15,11 +15,10 @@
 //! An implementation of `RocksDB` database.
 use profiler;
 
-use rocksdb::DB as _RocksDB;
+use rocksdb::TransactionDB as _RocksDB;
 use rocksdb::DBRawIterator;
 use rocksdb::Snapshot as _Snapshot;
 use rocksdb::Error as _Error;
-use rocksdb::WriteBatch;
 
 use std::mem;
 use std::sync::Arc;
@@ -29,6 +28,7 @@ use std::error;
 
 pub use rocksdb::Options as RocksDBOptions;
 pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
+pub use rocksdb::{TransactionDBOptions, TransactionOptions, WriteOptions};
 
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
 
@@ -60,7 +60,8 @@ struct RocksDBIterator {
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
     pub fn open(path: &Path, options: RocksDBOptions) -> Result<RocksDB> {
-        let database = _RocksDB::open(&options, path)?;
+		let txn_db_options = TransactionDBOptions::default();
+        let database = _RocksDB::open(&options, &txn_db_options, path)?;
         Ok(RocksDB { db: Arc::new(database) })
     }
 }
@@ -80,14 +81,16 @@ impl Database for RocksDB {
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
         let _p = profiler::ProfilerSpan::new("RocksDB::merge");
-        let mut batch = WriteBatch::default();
+		let w_opts = WriteOptions::default();
+		let txn_opts = TransactionOptions::default();
+		let txn = self.db.transaction_begin(&w_opts, &txn_opts);
         for (key, change) in patch {
             match change {
-                Change::Put(ref value) => batch.put(&key, value)?,
-                Change::Delete => batch.delete(&key)?,
+                Change::Put(ref value) => txn.put(&key, value)?,
+                Change::Delete => txn.delete(&key)?,
             }
         }
-        self.db.write(batch).map_err(Into::into)
+		txn.commit().map_err(Into::into)
     }
 }
 

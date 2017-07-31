@@ -14,6 +14,13 @@
 
 #![allow(dead_code)]
 
+use std::path::Path;
+use rand::{thread_rng, Rng};
+
+use storage::Database;
+use super::Blockchain;
+
+
 #[test]
 fn test_u64() {
     encoding_struct! {
@@ -108,16 +115,65 @@ fn test_segments_has_spaces_between() {
     <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }
 
+#[cfg(feature = "leveldb")]
+fn create_database(path: &Path) -> Box<Database> {
+    use storage::{LevelDB, LevelDBOptions};
+    let mut opts = LevelDBOptions::default();
+    opts.create_if_missing = true;
+    Box::new(LevelDB::open(path, opts).unwrap())
+}
+
+#[cfg(feature = "rocksdb")]
+fn create_database(path: &Path) -> Box<Database> {
+    use storage::{RocksDB, RocksDBOptions};
+    let mut opts = RocksDBOptions::default();
+    opts.create_if_missing(true);
+    Box::new(RocksDB::open(path, opts).unwrap())
+}
+
+#[cfg(not(any(feature = "leveldb", feature = "rocksdb")))]
+fn create_database(_: &Path) -> Box<Database> {
+    use storage::MemoryDB;
+    Box::new(MemoryDB::new())
+}
+
+#[cfg(feature = "leveldb")]
+fn create_blockchain(path: &Path) -> Blockchain {
+    let db = create_database(path);
+    Blockchain::new(db, Vec::new())
+}
+
+#[cfg(feature = "rocksdb")]
+fn create_blockchain(path: &Path) -> Blockchain {
+    let db = create_database(path);
+    Blockchain::new(db, Vec::new())
+}
+
+#[cfg(not(any(feature = "leveldb", feature = "rocksdb")))]
+fn create_blockchain(_: &Path) -> Blockchain {
+    use storage::MemoryDB;
+    Blockchain::new(Box::new(MemoryDB::new()), Vec::new())
+}
+
+fn gen_tempdir_name() -> String {
+    thread_rng()
+        .gen_ascii_chars()
+        .take(10)
+        .collect()
+}
 
 #[test]
 fn test_handling_tx_panic() {
     use std::collections::BTreeMap;
-    use super::{Blockchain, Schema, Transaction};
+    use super::{Schema, Transaction};
     use crypto::{gen_keypair, Hash};
-    use storage::{Database, MemoryDB, Fork, Error, ListIndex};
+    use storage::{Fork, Error, ListIndex};
     use messages::Message;
+    use tempdir::TempDir;
 
-    let blockchain = Blockchain::new(Box::new(MemoryDB::new()), Vec::new());
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let blockchain = create_blockchain(path);
 
     message! {
         struct Tx {
@@ -171,7 +227,9 @@ fn test_handling_tx_panic() {
         &pool,
     );
 
-    let mut db = MemoryDB::new();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let mut db = create_database(path1);
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
 
@@ -204,12 +262,15 @@ fn test_handling_tx_panic() {
 #[should_panic]
 fn test_handling_tx_panic_storage_error() {
     use std::collections::BTreeMap;
-    use super::{Blockchain, Transaction};
+    use super::Transaction;
     use crypto::{gen_keypair, Hash};
-    use storage::{MemoryDB, Fork, Error, ListIndex};
+    use storage::{Fork, Error, ListIndex};
     use messages::Message;
+    use tempdir::TempDir;
 
-    let blockchain = Blockchain::new(Box::new(MemoryDB::new()), Vec::new());
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let blockchain = create_blockchain(path);
 
     message! {
         struct Tx {

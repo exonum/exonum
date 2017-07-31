@@ -43,7 +43,7 @@ mount = "0.3.0"
 exonum_profiler = { version = "^0.1.0", path="../3rdparty/profiler/" }
 exonum_flamer = { version = "^0.1.3", path="../3rdparty/flamer/", optional = true }
 
-[dependencies.rocksdb]
+[dependencies.exonum-rocksdb]
 git = "https://github.com/exonum/exonum-rocksdb"
 
 [dev-dependencies]
@@ -55,5 +55,7 @@ lazy_static = "0.2.8"
 default = []
 long_benchmarks = []
 memorydb = []
+leveldb = []
+rocksdb = []
 nightly = []
 flame_profile = ["exonum_profiler/nomock", "exonum_flamer"]

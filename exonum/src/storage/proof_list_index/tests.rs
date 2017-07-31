@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::path::Path;
 use rand::{thread_rng, Rng};
 
 use crypto::{Hash, hash};
-use super::super::{Database, MemoryDB, StorageValue};
+use storage::{Database, StorageValue};
 use super::{ProofListIndex, ListProof, pair_hash};
 use encoding::serialize::json::reexport::{to_string, from_str};
 use encoding::serialize::reexport::Serialize;
+use tempdir::TempDir;
 
 use self::ListProof::*;
 
@@ -40,9 +42,41 @@ fn random_values(len: usize) -> Vec<Vec<u8>> {
     (0..len).map(generator).collect::<Vec<_>>()
 }
 
+#[cfg(feature = "leveldb")]
+fn create_database(path: &Path) -> Box<Database> {
+    use super::super::{LevelDB, LevelDBOptions};
+    let mut opts = LevelDBOptions::default();
+    opts.create_if_missing = true;
+    Box::new(LevelDB::open(path, opts).unwrap())
+}
+
+#[cfg(feature = "rocksdb")]
+fn create_database(path: &Path) -> Box<Database> {
+    use super::super::{RocksDB, RocksDBOptions};
+    let mut opts = RocksDBOptions::default();
+    opts.create_if_missing(true);
+    Box::new(RocksDB::open(path, opts).unwrap())
+}
+
+#[cfg(any(not(any(feature = "leveldb", feature = "rocksdb"))))]
+fn create_database(_: &Path) -> Box<Database> {
+    use super::super::MemoryDB;
+    Box::new(MemoryDB::new())
+}
+
+fn gen_tempdir_name() -> String {
+    thread_rng()
+        .gen_ascii_chars()
+        .take(10)
+        .collect()
+}
+
 #[test]
 fn test_list_methods() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
 
     assert!(index.is_empty());
@@ -64,7 +98,10 @@ fn test_list_methods() {
 
 #[test]
 fn test_height() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
 
     index.push(vec![1]);
@@ -91,13 +128,15 @@ fn test_height() {
 
 #[test]
 fn test_iter() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut list_index = ProofListIndex::new(vec![255], &mut fork);
 
     list_index.extend(vec![1u8, 2, 3]);
 
     assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
-
     assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
     assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
     assert_eq!(
@@ -108,7 +147,10 @@ fn test_iter() {
 
 #[test]
 fn test_list_index_proof() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
 
     let h0 = 2u64.hash();
@@ -249,7 +291,10 @@ fn test_list_index_proof() {
 #[test]
 fn randomly_generate_proofs() {
     let _ = ::helpers::init_logger();
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     let num_vals = 100;
     let values = random_values(num_vals as usize);
@@ -294,7 +339,10 @@ fn randomly_generate_proofs() {
 
 #[test]
 fn test_index_and_proof_roots() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     assert_eq!(index.root_hash(), Hash::zero());
 
@@ -424,7 +472,10 @@ fn test_index_and_proof_roots() {
 #[test]
 #[should_panic]
 fn test_proof_illegal_lower_bound() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     index.get_range_proof(0, 1);
     index.push(vec![1]);
@@ -433,7 +484,10 @@ fn test_proof_illegal_lower_bound() {
 #[test]
 #[should_panic]
 fn test_proof_illegal_bound_empty() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     for i in 0u8..8 {
         index.push(vec![i]);
@@ -444,7 +498,10 @@ fn test_proof_illegal_bound_empty() {
 #[test]
 #[should_panic]
 fn test_proof_illegal_range() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     for i in 0u8..4 {
         index.push(vec![i]);
@@ -454,7 +511,10 @@ fn test_proof_illegal_range() {
 
 #[test]
 fn test_proof_structure() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     assert_eq!(index.root_hash(), Hash::zero());
 
@@ -507,7 +567,10 @@ fn test_simple_root_hash() {
     let h1 = hash(&[1]);
     let h2 = hash(&[2]);
 
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     assert_eq!(index.get(0), None);
     index.push(vec![1]);
@@ -519,8 +582,12 @@ fn test_simple_root_hash() {
 
 #[test]
 fn test_same_root_hash() {
-    let mut fork = MemoryDB::new().fork();
-    let mut i1 = ProofListIndex::new(vec![255], &mut fork);
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let db1 = create_database(path1);
+    let mut fork1 = db1.fork();
+
+    let mut i1 = ProofListIndex::new(vec![255], &mut fork1);
     i1.push(vec![1]);
     i1.push(vec![2]);
     i1.push(vec![3]);
@@ -531,8 +598,11 @@ fn test_same_root_hash() {
     i1.set(2, vec![5]);
     i1.set(3, vec![1]);
 
-    let mut fork = MemoryDB::new().fork();
-    let mut i2 = ProofListIndex::new(vec![255], &mut fork);
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db2 = create_database(path2);
+    let mut fork2 = db2.fork();
+    let mut i2 = ProofListIndex::new(vec![255], &mut fork2);
     i2.push(vec![4]);
     i2.push(vec![7]);
     i2.push(vec![5]);

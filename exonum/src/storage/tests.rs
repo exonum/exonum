@@ -12,23 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(not(feature = "memorydb"))]
 use tempdir::TempDir;
 
-use super::{Database, LevelDB, LevelDBOptions, RocksDB, RocksDBOptions, MemoryDB, Snapshot, Fork};
+#[cfg(not(feature = "memorydb"))]
+use std::path::Path;
 
+use super::{Database, Snapshot, Fork};
+#[cfg(any(feature = "memorydb", not(any(feature = "leveldb", feature = "rocksdb"))))]
+use super::MemoryDB;
+#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
+use super::{LevelDB, LevelDBOptions};
+#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
+use super::{RocksDB, RocksDBOptions};
 
-fn leveldb_database() -> LevelDB {
+#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
+fn leveldb_database(path: &Path) -> LevelDB {
     let mut options = LevelDBOptions::new();
     options.create_if_missing = true;
-    LevelDB::open(TempDir::new("exonum").unwrap().path(), options).unwrap()
+    LevelDB::open(path, options).unwrap()
 }
 
-fn rocksdb_database() -> RocksDB {
+#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
+fn rocksdb_database(path: &Path) -> RocksDB {
     let mut options = RocksDBOptions::default();
     options.create_if_missing(true);
-    RocksDB::open(TempDir::new("exonum_rocksdb").unwrap().path(), options).unwrap()
+    RocksDB::open(path, options).unwrap()
 }
 
+#[cfg(any(feature = "memorydb", not(any(feature = "leveldb", feature = "rocksdb"))))]
 fn memorydb_database() -> MemoryDB {
     MemoryDB::new()
 }
@@ -180,32 +192,46 @@ fn changelog<T: Database>(db: T) {
     assert_eq!(fork.get(&[4]), None);
 }
 
+#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
 #[test]
 fn test_leveldb_fork_iter() {
-    fork_iter(leveldb_database())
+    let dir = TempDir::new("exonum_leveldb1").unwrap();
+    let path = dir.path();
+    fork_iter(leveldb_database(path));
 }
 
+#[cfg(any(feature = "memorydb", not(any(feature = "leveldb", feature = "rocksdb"))))]
 #[test]
 fn test_memory_fork_iter() {
-    fork_iter(memorydb_database())
+    fork_iter(memorydb_database());
 }
 
+#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
 #[test]
 fn test_rocksdb_fork_iter() {
-    fork_iter(rocksdb_database())
+    let dir = TempDir::new("exonum_rocksdb1").unwrap();
+    let path = dir.path();
+    fork_iter(rocksdb_database(path));
 }
 
+#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
 #[test]
 fn test_leveldb_changelog() {
-    changelog(leveldb_database())
+    let dir = TempDir::new("exonum_leveldb2").unwrap();
+    let path = dir.path();
+    changelog(leveldb_database(path));
 }
 
+#[cfg(any(feature = "memorydb", not(any(feature = "leveldb", feature = "rocksdb"))))]
 #[test]
 fn test_memory_changelog() {
-    changelog(memorydb_database())
+    changelog(memorydb_database());
 }
 
+#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
 #[test]
 fn test_rocksdb_changelog() {
-    changelog(rocksdb_database())
+    let dir = TempDir::new("exonum_rocksdb2").unwrap();
+    let path = dir.path();
+    changelog(rocksdb_database(path));
 }

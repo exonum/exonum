@@ -107,7 +107,9 @@
 pub use self::error::Error;
 pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
 
+#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
 pub use self::leveldb::{LevelDB, LevelDBOptions, LevelDBCache};
+#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
 pub use self::rocksdb::{RocksDB, RocksDBOptions, RocksBlockOptions};
 pub use self::memorydb::MemoryDB;
 
@@ -128,9 +130,10 @@ pub use self::proof_map_index::{ProofMapIndex, MapProof};
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 mod error;
-
 mod db;
+#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
 mod leveldb;
+#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
 mod rocksdb;
 mod memorydb;
 

@@ -15,11 +15,13 @@
 extern crate rand;
 
 use std::collections::HashSet;
+use std::path::Path;
 
 use rand::{thread_rng, Rng};
+use tempdir::TempDir;
 
 use crypto::{hash, Hash};
-use super::super::{Database, MemoryDB};
+use storage::db::Database;
 use encoding::serialize::json::reexport::to_string;
 use encoding::serialize::reexport::{Serialize, Serializer};
 
@@ -30,7 +32,6 @@ use super::key::{KEY_SIZE, LEAF_KEY_PREFIX};
 // Makes large data set with unique keys
 fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
     let mut rng = thread_rng();
-
     let mut exists_keys = HashSet::new();
     let mut base = [0; KEY_SIZE];
     rng.fill_bytes(&mut base);
@@ -77,10 +78,45 @@ fn generate_fully_random_data_keys(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)>
     (0..len).map(kv_generator).collect::<Vec<_>>()
 }
 
+fn gen_tempdir_name() -> String {
+    thread_rng()
+        .gen_ascii_chars()
+        .take(10)
+        .collect()
+}
+
+#[cfg(feature = "leveldb")]
+fn create_database(path: &Path) -> Box<Database> {
+    use super::super::{LevelDB, LevelDBOptions};
+    let mut opts = LevelDBOptions::default();
+    opts.create_if_missing = true;
+    Box::new(LevelDB::open(path, opts).unwrap())
+}
+
+#[cfg(feature = "rocksdb")]
+fn create_database(path: &Path) -> Box<Database> {
+    use super::super::{RocksDB, RocksDBOptions};
+    let mut opts = RocksDBOptions::default();
+    opts.create_if_missing(true);
+    Box::new(RocksDB::open(path, opts).unwrap())
+}
+
+#[cfg(any(not(any(feature = "leveldb", feature = "rocksdb"))))]
+fn create_database(_: &Path) -> Box<Database> {
+    use super::super::MemoryDB;
+    Box::new(MemoryDB::new())
+}
+
 #[test]
 fn insert_trivial() {
-    let mut storage1 = MemoryDB::new().fork();
-    let mut storage2 = MemoryDB::new().fork();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db1 = create_database(path1);
+    let mut storage1 = db1.fork();
+    let db2 = create_database(path2);
+    let mut storage2 = db2.fork();
 
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     index1.put(&[255; 32], vec![1]);
@@ -101,7 +137,10 @@ fn insert_trivial() {
 
 #[test]
 fn insert_same_key() {
-    let mut storage = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut storage = db.fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
     assert_eq!(table.root_hash(), Hash::zero());
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0u8]].concat();
@@ -115,8 +154,14 @@ fn insert_same_key() {
 
 #[test]
 fn insert_simple() {
-    let mut storage1 = MemoryDB::new().fork();
-    let mut storage2 = MemoryDB::new().fork();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db1 = create_database(path1);
+    let mut storage1 = db1.fork();
+    let db2 = create_database(path2);
+    let mut storage2 = db2.fork();
 
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     index1.put(&[255; 32], vec![3]);
@@ -136,7 +181,10 @@ fn insert_simple() {
 
 #[test]
 fn insert_reverse() {
-    let mut storage1 = MemoryDB::new().fork();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let db1 = create_database(path1);
+    let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     index1.put(&[42; 32], vec![1]);
     index1.put(&[64; 32], vec![2]);
@@ -145,7 +193,10 @@ fn insert_reverse() {
     index1.put(&[250; 32], vec![5]);
     index1.put(&[255; 32], vec![6]);
 
-    let mut storage2 = MemoryDB::new().fork();
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db2 = create_database(path2);
+    let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
     index2.put(&[255; 32], vec![6]);
     index2.put(&[250; 32], vec![5]);
@@ -161,12 +212,18 @@ fn insert_reverse() {
 
 #[test]
 fn remove_trivial() {
-    let mut storage1 = MemoryDB::new().fork();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let db1 = create_database(path1);
+    let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     index1.put(&[255; 32], vec![6]);
     index1.remove(&[255; 32]);
 
-    let mut storage2 = MemoryDB::new().fork();
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db2 = create_database(path2);
+    let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
     index2.put(&[255; 32], vec![6]);
     index2.remove(&[255; 32]);
@@ -177,7 +234,10 @@ fn remove_trivial() {
 
 #[test]
 fn remove_simple() {
-    let mut storage1 = MemoryDB::new().fork();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let db1 = create_database(path1);
+    let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     index1.put(&[255; 32], vec![1]);
     index1.put(&[250; 32], vec![2]);
@@ -186,7 +246,10 @@ fn remove_simple() {
     index1.remove(&[255; 32]);
     index1.remove(&[245; 32]);
 
-    let mut storage2 = MemoryDB::new().fork();
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db2 = create_database(path2);
+    let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
     index2.put(&[250; 32], vec![2]);
     index2.put(&[255; 32], vec![1]);
@@ -207,7 +270,10 @@ fn remove_simple() {
 
 #[test]
 fn remove_reverse() {
-    let mut storage1 = MemoryDB::new().fork();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let db1 = create_database(path1);
+    let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     index1.put(&[42; 32], vec![1]);
     index1.put(&[64; 32], vec![2]);
@@ -223,7 +289,10 @@ fn remove_reverse() {
     index1.remove(&[64; 32]);
     index1.remove(&[42; 32]);
 
-    let mut storage2 = MemoryDB::new().fork();
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db2 = create_database(path2);
+    let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
     index2.put(&[255; 32], vec![6]);
     index2.put(&[250; 32], vec![5]);
@@ -246,14 +315,19 @@ fn remove_reverse() {
 fn fuzz_insert() {
     let mut data = generate_random_data(100);
     let mut rng = rand::thread_rng();
-
-    let mut storage1 = MemoryDB::new().fork();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let db1 = create_database(path1);
+    let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     for item in &data {
         index1.put(&item.0, item.1.clone());
     }
 
-    let mut storage2 = MemoryDB::new().fork();
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db2 = create_database(path2);
+    let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
     rng.shuffle(&mut data);
     for item in &data {
@@ -291,7 +365,10 @@ fn fuzz_insert() {
 
 #[test]
 fn build_proof_in_empty_tree() {
-    let mut storage = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut storage = db.fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
 
     // Just to notify the compiler of the types used; same key is added and then removed from tree.
@@ -311,7 +388,10 @@ fn build_proof_in_empty_tree() {
 
 #[test]
 fn build_proof_in_leaf_tree() {
-    let mut storage = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut storage = db.fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
     let root_key = [230u8; 32];
     let root_val = vec![2];
@@ -360,7 +440,10 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
         })
         .collect::<Vec<_>>();
 
-    let mut storage = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut storage = db.fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
     for item in &data {
         table.put(&item.0, item.1.clone());
@@ -390,8 +473,10 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes() {
 fn fuzz_insert_build_proofs() {
     let _ = ::helpers::init_logger();
     let data = generate_fully_random_data_keys(100);
-
-    let mut storage = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut storage = db.fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
     for item in &data {
         table.put(&item.0, item.1.clone());
@@ -422,11 +507,13 @@ fn fuzz_insert_build_proofs() {
 fn fuzz_delete_build_proofs() {
     let data = generate_fully_random_data_keys(100);
     let mut rng = rand::thread_rng();
-
-    let mut storage1 = MemoryDB::new().fork();
-    let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut storage = db.fork();
+    let mut index = ProofMapIndex::new(vec![255], &mut storage);
     for item in &data {
-        index1.put(&item.0, item.1.clone());
+        index.put(&item.0, item.1.clone());
     }
 
     let mut keys_to_remove = data.iter()
@@ -436,11 +523,11 @@ fn fuzz_delete_build_proofs() {
 
     rng.shuffle(&mut keys_to_remove);
     for key in &keys_to_remove {
-        index1.remove(key);
+        index.remove(key);
     }
-    let table_root_hash = index1.root_hash();
+    let table_root_hash = index.root_hash();
     for key in &keys_to_remove {
-        let proof_path_to_key = index1.get_proof(key);
+        let proof_path_to_key = index.get_proof(key);
         assert_eq!(proof_path_to_key.root_hash(), table_root_hash);
         let check_res = proof_path_to_key.validate(key, table_root_hash);
         assert!(check_res.is_ok());
@@ -453,14 +540,19 @@ fn fuzz_delete_build_proofs() {
 fn fuzz_delete() {
     let mut data = generate_random_data(100);
     let mut rng = rand::thread_rng();
-
-    let mut storage1 = MemoryDB::new().fork();
+    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path1 = dir1.path();
+    let db1 = create_database(path1);
+    let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
     for item in &data {
         index1.put(&item.0, item.1.clone());
     }
 
-    let mut storage2 = MemoryDB::new().fork();
+    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path2 = dir2.path();
+    let db2 = create_database(path2);
+    let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(vec![255], &mut storage2);
     rng.shuffle(&mut data);
     for item in &data {
@@ -511,37 +603,43 @@ fn fuzz_delete() {
 
 #[test]
 fn fuzz_insert_after_delete() {
-    let mut storage1 = MemoryDB::new().fork();
-    let mut index1 = ProofMapIndex::new(vec![255], &mut storage1);
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut storage = db.fork();
+    let mut index = ProofMapIndex::new(vec![255], &mut storage);
 
     let data = generate_random_data(100);
 
     for item in &data[0..50] {
-        index1.put(&item.0, item.1.clone());
+        index.put(&item.0, item.1.clone());
     }
-    let saved_hash = index1.root_hash();
+    let saved_hash = index.root_hash();
     for item in &data[50..] {
-        index1.put(&item.0, item.1.clone());
+        index.put(&item.0, item.1.clone());
     }
     for item in &data[50..] {
-        index1.remove(&item.0);
+        index.remove(&item.0);
     }
 
     for item in &data[0..50] {
-        let v1 = index1.get(&item.0);
+        let v1 = index.get(&item.0);
         assert_eq!(v1.as_ref(), Some(&item.1));
     }
     for item in &data[50..] {
-        let v1 = index1.get(&item.0);
+        let v1 = index.get(&item.0);
         assert_eq!(v1.as_ref(), None);
     }
-    assert_eq!(index1.root_hash(), saved_hash);
+    assert_eq!(index.root_hash(), saved_hash);
 }
 
 
 #[test]
 fn test_iter() {
-    let mut fork = MemoryDB::new().fork();
+    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
+    let path = dir.path();
+    let db = create_database(path);
+    let mut fork = db.fork();
     let mut map_index = ProofMapIndex::new(vec![255], &mut fork);
 
     let k0 = [0; 32];

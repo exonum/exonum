@@ -33,8 +33,11 @@ extern crate log;
 extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
+#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
 extern crate exonum_leveldb as leveldb;
-extern crate rocksdb;
+#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
+extern crate exonum_rocksdb as rocksdb;
+
 extern crate rand;
 extern crate serde;
 #[macro_use]
