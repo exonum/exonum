@@ -79,10 +79,7 @@ fn generate_fully_random_data_keys(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)>
 }
 
 fn gen_tempdir_name() -> String {
-    thread_rng()
-        .gen_ascii_chars()
-        .take(10)
-        .collect()
+    thread_rng().gen_ascii_chars().take(10).collect()
 }
 
 #[cfg(feature = "leveldb")]

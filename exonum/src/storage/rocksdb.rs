@@ -60,7 +60,7 @@ struct RocksDBIterator {
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
     pub fn open(path: &Path, options: RocksDBOptions) -> Result<RocksDB> {
-		let txn_db_options = TransactionDBOptions::default();
+        let txn_db_options = TransactionDBOptions::default();
         let database = _RocksDB::open(&options, &txn_db_options, path)?;
         Ok(RocksDB { db: Arc::new(database) })
     }
@@ -81,16 +81,16 @@ impl Database for RocksDB {
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
         let _p = profiler::ProfilerSpan::new("RocksDB::merge");
-		let w_opts = WriteOptions::default();
-		let txn_opts = TransactionOptions::default();
-		let txn = self.db.transaction_begin(&w_opts, &txn_opts);
+        let w_opts = WriteOptions::default();
+        let txn_opts = TransactionOptions::default();
+        let txn = self.db.transaction_begin(&w_opts, &txn_opts);
         for (key, change) in patch {
             match change {
                 Change::Put(ref value) => txn.put(&key, value)?,
                 Change::Delete => txn.delete(&key)?,
             }
         }
-		txn.commit().map_err(Into::into)
+        txn.commit().map_err(Into::into)
     }
 }
 

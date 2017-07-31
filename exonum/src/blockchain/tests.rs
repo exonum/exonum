@@ -156,10 +156,7 @@ fn create_blockchain(_: &Path) -> Blockchain {
 }
 
 fn gen_tempdir_name() -> String {
-    thread_rng()
-        .gen_ascii_chars()
-        .take(10)
-        .collect()
+    thread_rng().gen_ascii_chars().take(10).collect()
 }
 
 #[test]
