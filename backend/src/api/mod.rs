@@ -12,6 +12,7 @@ use exonum::crypto::{Hash, HexValue, Signature};
 use exonum::blockchain::Blockchain;
 use exonum::node::TransactionSend;
 use exonum::api::Api;
+use exonum::storage::MapProof;
 
 use {TimestampTx, TimestampingSchema, Content};
 pub use self::error::Error as ApiError;
@@ -59,12 +60,20 @@ where
             .get(&hash)
             .ok_or_else(|| ApiError::FileNotFound(hash))
     }
+
+    fn get_proof(&self, hash_str: &str) -> Result<MapProof<Content>, ApiError> {
+        let hash = Hash::from_hex(hash_str)?;
+        let view = self.blockchain.snapshot();
+        let schema = TimestampingSchema::new(&view);
+        Ok(schema.contents().get_proof(&hash))
+    }
 }
 
 impl<T> Api for PublicApi<T>
 where
     T: TransactionSend + Clone + 'static,
 {
+    // FIXME Rewrite without unwrap and boiler-plate code
     fn wire(&self, router: &mut Router) {
         // Receive a message by POST and play it back.
         let api = self.clone();
@@ -95,7 +104,7 @@ where
                 .get::<Router>()
                 .unwrap()
                 .find("hash")
-                .unwrap();
+                .unwrap(); // TODO remove unwrap!
             let content = api.get_content(&hash)?;
 
             let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
@@ -103,7 +112,22 @@ where
             Ok(response)
         };
 
+        let api = self.clone();
+        let get_proof = move |req: &mut Request| -> IronResult<Response> {
+            let ref hash = req.extensions
+                .get::<Router>()
+                .unwrap()
+                .find("hash")
+                .unwrap();
+            let content = api.get_proof(&hash)?;
+
+            let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
+            let response = Response::with((content_type, status::Ok, json!(content).to_string()));
+            Ok(response)
+        };
+
         router.get("/v1/content/:hash", get_content, "get_content");
+        router.get("/v1/proof/:hash", get_proof, "get_proof");
         router.post("/v1/content", put_content, "put_content");
     }
 }
