@@ -27,6 +27,7 @@ use leveldb::snapshots::Snapshots;
 use std::fs;
 use std::io;
 use std::mem;
+use std::ptr;
 use std::path::Path;
 use std::error;
 use std::sync::Arc;
@@ -56,7 +57,7 @@ pub struct LevelDB {
 /// A snapshot of a `LevelDB`.
 struct LevelDBSnapshot {
     _db: Arc<_LevelDB>,
-    snapshot: _Snapshot<'static>,
+    snapshot: *mut _Snapshot<'static>,
 }
 
 /// An iterator over the entries of a `LevelDB`.
@@ -95,10 +96,14 @@ impl Database for LevelDB {
 
     fn snapshot(&self) -> Box<Snapshot> {
         let _p = profiler::ProfilerSpan::new("LevelDB::snapshot");
-        Box::new(LevelDBSnapshot {
+        let mut snapshot = Box::new(LevelDBSnapshot{
             _db: self.db.clone(),
-            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-        })
+            snapshot: ptr::null_mut(),
+        });
+        snapshot.snapshot = unsafe {
+            mem::transmute(Box::into_raw(Box::new(snapshot._db.snapshot())))
+        };
+        snapshot
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
@@ -119,7 +124,8 @@ impl Database for LevelDB {
 impl Snapshot for LevelDBSnapshot {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         let _p = profiler::ProfilerSpan::new("LevelDBSnapshot::get");
-        match self.snapshot.get(LEVELDB_READ_OPTIONS, key) {
+        let snapshot = unsafe { &*self.snapshot };
+        match snapshot.get(LEVELDB_READ_OPTIONS, key) {
             Ok(value) => value,
             Err(err) => panic!(err),
         }
@@ -127,9 +133,16 @@ impl Snapshot for LevelDBSnapshot {
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
         let _p = profiler::ProfilerSpan::new("LevelDBSnapshot::iter");
-        let mut iter = self.snapshot.iter(LEVELDB_READ_OPTIONS);
+        let snapshot = unsafe { &*self.snapshot };
+        let mut iter = snapshot.iter(LEVELDB_READ_OPTIONS);
         iter.seek(from);
         Box::new(LevelDBIterator { iter: iter })
+    }
+}
+
+impl Drop for LevelDBSnapshot {
+    fn drop(&mut self) {
+        unsafe { Box::from_raw(self.snapshot); }
     }
 }
 
@@ -154,5 +167,24 @@ impl ::std::fmt::Debug for LevelDB {
 impl ::std::fmt::Debug for LevelDBSnapshot {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "LevelDBSnapshot(..)")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tempdir::TempDir;
+    use storage::Fork;
+    use super::*;
+
+    #[test]
+    fn fork_outlives_db() {
+        let mut fork = create_fork(TempDir::new("exonum").unwrap().path());
+        fork.put(vec![1, 2, 3], vec![4, 5, 6]);
+    }
+
+    fn create_fork(path: &Path) -> Fork {
+        let mut opts = LevelDBOptions::default();
+        opts.create_if_missing = true;
+        LevelDB::open(path, opts).unwrap().fork()
     }
 }
