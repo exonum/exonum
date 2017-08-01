@@ -10,6 +10,7 @@ env_logger = "0.4.0"
 params = "0.6.0"
 router = "0.5.1"
 iron = "0.5.1"
+bodyparser = "0.7.0"
 
 chrono = "0.3.0"
 rand = "0.3.0"
@@ -21,6 +22,24 @@ serde = "1.0.0"
 serde_derive = "1.0.0"
 serde_json = "1.0.0"
 
-exonum = "0.1.0"
-exonum-configuration = "0.1.0"
-exonum-btc-anchoring = "0.1.0"
+# exonum = "0.1.0"
+# exonum-configuration = "0.1.0"
+# exonum-btc-anchoring = "0.1.0"
+
+[dependencies.exonum]
+git = "https://github.com/exonum/exonum.git"
+version = "0.1.0"
+tag = "v0.1"
+
+[dependencies.exonum-configuration]
+git = "https://github.com/exonum/exonum-configuration.git"
+version = "0.1.0"
+tag = "v0.1"
+
+[dependencies.exonum-btc-anchoring]
+git = "https://github.com/exonum/exonum-btc-anchoring.git"
+version = "0.1.0"
+tag = "v0.1"
+
+[replace]
+"exonum:0.1.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.1" }

@@ -1,5 +1,6 @@
 [workspace]
 
 members = [
-    "backend"
+    "backend",
+    "backend/sandbox_tests"
 ]

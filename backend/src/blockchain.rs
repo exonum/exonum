@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use serde_json;
 use serde_json::Value;
 
@@ -14,21 +16,18 @@ message! {
     struct TimestampTx {
         const TYPE = TIMESTAMPING_SERVICE_ID;
         const ID = TIMESTAMPING_TX_ID;
-        const SIZE = 48;
+        const SIZE = 8;
 
-        field description:    &str        [00 => 08]
-        field time:           i64         [08 => 16]
-        field hash:           &Hash       [16 => 48]
+        field content:        Content     [00 => 08]
     }
 }
 
 encoding_struct! {
     struct Content {
-        const SIZE = 48;
+        const SIZE = 40;
 
         field description:        &str        [00 => 08]
-        field time:               i64         [08 => 16]
-        field data_hash:          &Hash       [16 => 48]
+        field data_hash:          &Hash       [08 => 40]
     }
 }
 
@@ -68,8 +67,8 @@ impl Transaction for TimestampTx {
 
     fn execute(&self, fork: &mut Fork) {
         let mut schema = TimestampingSchema::new(fork);
-        let content = Content::new(self.description(), self.time(), self.hash());
-        schema.contents_mut().put(self.hash(), content)
+        let content = self.content();
+        schema.contents_mut().put(content.data_hash(), content.clone())
     }
 
     fn info(&self) -> Value {
@@ -79,8 +78,6 @@ impl Transaction for TimestampTx {
 
 #[cfg(test)]
 mod tests {
-    use chrono::UTC;
-
     use exonum::crypto::{gen_keypair, hash};
 
     use super::{TimestampTx, Content};
@@ -88,25 +85,21 @@ mod tests {
     #[test]
     fn test_timestamp_tx() {
         let description = "Test Description";
-        let time = UTC::now().timestamp();
         let hash = hash(b"js9sdhcsdh32or830ru8043ru-wf9-12u8u3280y8hfwoefnsdljs");
         let (_, sec_key) = gen_keypair();
 
-        let tx = TimestampTx::new(description, time, &hash, &sec_key);
-        assert_eq!(tx.description(), description);
-        assert_eq!(tx.time(), time);
-        assert_eq!(tx.hash(), &hash);
+        let content = Content::new(description, &hash);
+        let tx = TimestampTx::new(content.clone(), &sec_key);
+        assert_eq!(tx.content(), content);
     }
 
     #[test]
     fn test_file_content() {
         let description = "Test Description";
-        let time = UTC::now().timestamp();
         let hash = hash(b"js9sdhcsdh32or830ru8043ru-wf9-12u8u3280y8hfwoefnsdljs");
 
-        let content = Content::new(description, time, &hash);
+        let content = Content::new(description, &hash);
         assert_eq!(content.description(), description);
-        assert_eq!(content.time(), time);
         assert_eq!(content.data_hash(), &hash);
     }
 }
