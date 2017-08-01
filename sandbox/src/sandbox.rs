@@ -23,7 +23,8 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig,
                    ServiceConfig};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof};
+                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof,
+                         TimeoutAdjusterConfig};
 use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
@@ -537,7 +538,10 @@ impl Sandbox {
     }
 
     pub fn propose_timeout(&self) -> Milliseconds {
-        self.cfg().consensus.propose_timeout
+        match self.cfg().consensus.timeout_adjuster {
+            TimeoutAdjusterConfig::Constant { timeout } => timeout,
+            _ => panic!("Unexpected timeout adjuster config type"),
+        }
     }
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
@@ -643,8 +647,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         round_timeout: 1000,
         status_timeout: 600000,
         peers_timeout: 600000,
-        propose_timeout: 200,
         txs_block_limit: 1000,
+        timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 200 },
     };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,

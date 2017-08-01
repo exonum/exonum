@@ -21,6 +21,7 @@ use super::super::StorageKey;
 pub const BRANCH_KEY_PREFIX: u8 = 00;
 pub const LEAF_KEY_PREFIX: u8 = 01;
 
+/// Size in bytes of the `ProofMapKey`.
 pub const KEY_SIZE: usize = HASH_SIZE;
 pub const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 

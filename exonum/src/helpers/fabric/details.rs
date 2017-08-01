@@ -256,7 +256,6 @@ impl Command for GenerateNodeConfig {
             "expected secret config path",
         );
 
-
         let addr = Self::addr(&context);
         let common: CommonConfigTemplate =
             ConfigFile::load(&common_config_path).expect("Could not load common config");
@@ -289,7 +288,7 @@ impl Command for GenerateNodeConfig {
             node: node_pub_config,
             common: common,
         };
-        // save public config seperately
+        // Save public config separately.
         ConfigFile::save(&shared_config, &pub_config_path).expect(
             "Could not write public config file.",
         );

@@ -217,7 +217,7 @@ where
                             return;
                         }
                     });
-                    self.state.add_transaction(hash, tx);
+                    self.state.add_transaction(hash, tx, true);
                     tx_hashes.push(hash);
                 } else {
                     error!("Unknown transaction in block detected, block={:?}", msg);
@@ -481,11 +481,8 @@ where
         self.broadcast_status();
         self.add_status_timeout();
 
-        let timeout = self.timeout_adjuster.adjust_timeout(
-            &self.state,
-            &*self.blockchain.snapshot(),
-        );
-        self.state.set_propose_timeout(timeout);
+        // Adjust propose timeout after accepting a new block.
+        self.state.adjust_timeout(&*self.blockchain.snapshot());
 
         // Handle queued transactions from services
         for tx in new_txs {
@@ -547,7 +544,7 @@ where
             }
         });
 
-        let full_proposes = self.state.add_transaction(hash, tx);
+        let full_proposes = self.state.add_transaction(hash, tx, false);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));
@@ -580,7 +577,7 @@ where
         trace!("Broadcast transactions: {:?}", msg.raw());
         self.broadcast(msg.raw());
 
-        let full_proposes = self.state.add_transaction(hash, msg);
+        let full_proposes = self.state.add_transaction(hash, msg, false);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));
