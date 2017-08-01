@@ -2,11 +2,12 @@ use iron::Handler;
 use router::Router;
 
 use exonum::api::Api;
+use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::crypto::Hash;
-use exonum::storage::View;
+use exonum::storage::Snapshot;
 use exonum::blockchain::{Transaction, Service, ApiContext};
-use exonum::storage::Error as StorageError;
-use exonum::messages::{FromRaw, RawTransaction, Error as MessageError};
+use exonum::messages::{FromRaw, RawTransaction};
+use exonum::encoding::Error as MessageError;
 
 use {TimestampingSchema, TimestampTx};
 use api::PublicApi;
@@ -30,7 +31,7 @@ impl Service for TimestampingService {
         "timestamping"
     }
 
-    fn state_hash(&self, view: &View) -> Result<Vec<Hash>, StorageError> {
+    fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
         let schema = TimestampingSchema::new(view);
         schema.state_hash()
     }
@@ -44,5 +45,11 @@ impl Service for TimestampingService {
         let api = PublicApi::new(context.blockchain().clone(), context.node_channel().clone());
         api.wire(&mut router);
         Some(Box::new(router))
+    }
+}
+
+impl ServiceFactory for TimestampingService {
+    fn make_service(_: &Context) -> Box<Service> {
+        Box::new(TimestampingService::new())
     }
 }

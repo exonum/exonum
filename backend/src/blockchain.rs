@@ -2,9 +2,9 @@ use serde_json;
 use serde_json::Value;
 
 use exonum::crypto::Hash;
-use exonum::storage::View;
-use exonum::blockchain::Transaction;
-use exonum::storage::{MapTable, MerklePatriciaTable, Map, Error as StorageError};
+use exonum::storage::{Snapshot, Fork};
+use exonum::blockchain::{Transaction, gen_prefix};
+use exonum::storage::ProofMapIndex;
 
 use TIMESTAMPING_SERVICE_ID;
 
@@ -22,7 +22,7 @@ message! {
     }
 }
 
-storage_value! {
+encoding_struct! {
     struct Content {
         const SIZE = 48;
 
@@ -32,21 +32,32 @@ storage_value! {
     }
 }
 
-pub struct TimestampingSchema<'a> {
-    view: &'a View,
+pub struct TimestampingSchema<T> {
+    view: T,
 }
 
-impl<'a> TimestampingSchema<'a> {
-    pub fn new(view: &'a View) -> TimestampingSchema {
-        TimestampingSchema { view: view }
+impl<T> TimestampingSchema<T>
+where
+    T: AsRef<Snapshot>,
+{
+    pub fn new(snapshot: T) -> TimestampingSchema<T> {
+        TimestampingSchema { view: snapshot }
     }
 
-    pub fn contents(&self) -> MerklePatriciaTable<MapTable<View, [u8], Vec<u8>>, Hash, Content> {
-        MerklePatriciaTable::new(MapTable::new(vec![TIMESTAMPING_SERVICE_ID as u8, 0], self.view))
+    pub fn contents(&self) -> ProofMapIndex<&T, Hash, Content> {
+        let prefix = gen_prefix(TIMESTAMPING_SERVICE_ID, 0, &());
+        ProofMapIndex::new(prefix, &self.view)
     }
 
-    pub fn state_hash(&self) -> Result<Vec<Hash>, StorageError> {
-        Ok(vec![self.contents().root_hash()?])
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![self.contents().root_hash()]
+    }
+}
+
+impl<'a> TimestampingSchema<&'a mut Fork> {
+    pub fn contents_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Content> {
+        let prefix = gen_prefix(TIMESTAMPING_SERVICE_ID, 0, &());
+        ProofMapIndex::new(prefix, &mut self.view)
     }
 }
 
@@ -55,10 +66,10 @@ impl Transaction for TimestampTx {
         true
     }
 
-    fn execute(&self, view: &View) -> Result<(), StorageError> {
-        let schema = TimestampingSchema::new(view);
+    fn execute(&self, fork: &mut Fork) {
+        let mut schema = TimestampingSchema::new(fork);
         let content = Content::new(self.description(), self.time(), self.hash());
-        schema.contents().put(self.hash(), content)
+        schema.contents_mut().put(self.hash(), content)
     }
 
     fn info(&self) -> Value {

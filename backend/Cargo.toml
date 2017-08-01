@@ -21,17 +21,6 @@ serde = "1.0.0"
 serde_derive = "1.0.0"
 serde_json = "1.0.0"
 
-[dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum-core.git"
-version = "0.1.0"
-rev = "3a4c74df9f9fe0787b60612018190fa0f0a6f7ad"
-
-[dependencies.anchoring_btc_service]
-git = "ssh://git@github.com/exonum/exonum-btc-anchoring.git"
-version = "0.1.0"
-rev = "2b3b0a8d6a2b77cee1d0d674b82dcb305816f5ff"
-
-[dependencies.configuration_service]
-git = "ssh://git@github.com/exonum/exonum-configuration.git"
-version = "0.1.0"
-rev = "daf0e0a6dfb3067fbc6ad7e2078b56c89745c550"
+exonum = "0.1.0"
+exonum-configuration = "0.1.0"
+exonum-btc-anchoring = "0.1.0"
