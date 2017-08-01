@@ -233,7 +233,7 @@ impl Fork {
     /// Finalizes all changes after the last checkpoint.
     ///
     /// # Panics
-    /// 
+    ///
     /// Panics if checkpoint was not created before or last checkpoint is already committed or
     /// rollbacked.
     pub fn commit(&mut self) {
