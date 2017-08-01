@@ -2,8 +2,6 @@ mod error;
 
 use router::Router;
 use iron::prelude::*;
-use iron::status;
-use iron::mime::{Mime, TopLevel, SubLevel};
 use params::{Params, Value};
 use params;
 use chrono::UTC;
@@ -69,6 +67,15 @@ where
     }
 }
 
+fn find_str<'a>(map: &'a params::Map, path: &[&str]) -> Result<&'a str, ApiError> {
+    let value = map.find(path);
+    if let Some(&Value::String(ref s)) = value {
+        Ok(s)
+    } else {
+        Err(ApiError::IncorrectRequest)
+    }
+}
+
 impl<T> Api for PublicApi<T>
 where
     T: TransactionSend + Clone + 'static,
@@ -80,50 +87,31 @@ where
         let put_content = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
 
-            fn find_str<'a>(map: &'a params::Map, path: &[&str]) -> Result<&'a str, ApiError> {
-                let value = map.find(path);
-                if let Some(&Value::String(ref s)) = value {
-                    Ok(s)
-                } else {
-                    Err(ApiError::IncorrectRequest)
-                }
-            };
-
             let hash = find_str(map, &["hash"])?;
             let description = find_str(map, &["description"]).unwrap_or("");
 
             let tx = api.put_content(hash, description)?;
-            let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-            let response = Response::with((content_type, status::Ok, json!(tx).to_string()));
-            return Ok(response);
+            api.ok_response(&json!(tx))
         };
 
         let api = self.clone();
         let get_content = move |req: &mut Request| -> IronResult<Response> {
-            let ref hash = req.extensions
-                .get::<Router>()
-                .unwrap()
-                .find("hash")
-                .unwrap(); // TODO remove unwrap!
+            let map = req.get_ref::<Params>().unwrap();
+
+            let hash = find_str(map, &["hash"])?;
             let content = api.get_content(&hash)?;
 
-            let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-            let response = Response::with((content_type, status::Ok, json!(content).to_string()));
-            Ok(response)
+            api.ok_response(&json!(content))
         };
 
         let api = self.clone();
         let get_proof = move |req: &mut Request| -> IronResult<Response> {
-            let ref hash = req.extensions
-                .get::<Router>()
-                .unwrap()
-                .find("hash")
-                .unwrap();
-            let content = api.get_proof(&hash)?;
+            let map = req.get_ref::<Params>().unwrap();
 
-            let content_type = Mime(TopLevel::Application, SubLevel::Json, Vec::new());
-            let response = Response::with((content_type, status::Ok, json!(content).to_string()));
-            Ok(response)
+            let hash = find_str(map, &["hash"])?;
+            let proof = api.get_proof(&hash)?;
+
+            api.ok_response(&json!(proof))
         };
 
         router.get("/v1/content/:hash", get_content, "get_content");
