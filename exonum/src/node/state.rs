@@ -573,7 +573,9 @@ impl State {
 
     /// Updates known height for a validator identified by the public key.
     pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
-        *self.nodes_max_height.entry(key).or_insert_with(Height::zero) = height;
+        *self.nodes_max_height.entry(key).or_insert_with(
+            Height::zero,
+        ) = height;
     }
 
     /// Returns a list of nodes whose height is bigger than one of the current node.
