@@ -36,8 +36,6 @@ use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction
 use messages::{Connect, RawMessage};
 use api::{Api, public, private};
 
-use self::timeout_adjuster::TimeoutAdjuster;
-
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
 
@@ -100,7 +98,6 @@ where
     /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    timeout_adjuster: Box<TimeoutAdjuster>,
 }
 
 /// Service configuration.
@@ -281,13 +278,11 @@ where
             sender.get_time(),
         );
 
-        let mut timeout_adjuster = Box::new(timeout_adjuster::Constant::default());
-        let timeout = timeout_adjuster.adjust_timeout(&state, &*snapshot);
-        state.set_propose_timeout(timeout);
+        // Adjust propose timeout for the first time.
+        state.adjust_timeout(&*snapshot);
 
         NodeHandler {
             blockchain,
-            timeout_adjuster,
             api_state,
             state,
             channel: sender,
@@ -298,17 +293,6 @@ where
     /// Return internal `SharedNodeState`
     pub fn api_state(&self) -> &SharedNodeState {
         &self.api_state
-    }
-
-
-    /// Sets new timeout adjuster.
-    pub fn set_timeout_adjuster(&mut self, adjuster: Box<timeout_adjuster::TimeoutAdjuster>) {
-        self.timeout_adjuster = adjuster;
-    }
-
-    /// Returns value of the `propose_timeout` field from the current `ConsensusConfig`.
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.state().consensus_config().propose_timeout
     }
 
     /// Returns value of the `round_timeout` field from the current `ConsensusConfig`.
@@ -417,9 +401,9 @@ where
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let adjusted_propose_timeout = self.state.propose_timeout();
+        let adjusted_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
-            Duration::from_millis(adjusted_propose_timeout);
+            Duration::from_millis(adjusted_timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
@@ -529,8 +513,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, \
-            peer_discovery: {:?}, timeout_adjuster: Box<TimeoutAdjuster> }}",
+            "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, peer_discovery: {:?} }}",
             self.blockchain,
             self.peer_discovery
         )

@@ -128,7 +128,6 @@ fn run_node(config: &str, folder: &str) {
     ]));
 }
 
-
 #[test]
 fn test_generate_template() {
     let command = "generate-template";
@@ -160,7 +159,6 @@ fn test_generate_config() {
         panic::resume_unwind(err);
     }
 }
-
 
 #[test]
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
