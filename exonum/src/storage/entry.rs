@@ -73,6 +73,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(None, index.get());
+    ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
     /// ```
@@ -91,6 +92,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
     /// assert!(!index.exists());
+    ///
     /// index.set(10);
     /// assert!(index.exists());
     /// ```
@@ -110,6 +112,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(Hash::default(), index.hash());
+    ///
     /// index.set(10);
     /// assert_ne!(Hash::default(), index.hash());
     /// ```
@@ -135,6 +138,7 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
     /// ```
@@ -152,8 +156,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
+    ///
     /// index.remove();
     /// assert_eq!(None, index.get());
     /// ```

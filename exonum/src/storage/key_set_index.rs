@@ -85,6 +85,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(!index.contains(&1));
+    ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
@@ -100,11 +101,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
-    /// index.insert(1);
-    /// index.insert(2);
-    /// index.insert(3);
+    /// let snapshot = db.snapshot();
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(vec![1, 2, 3], &snapshot);
+    ///
     /// for val in index.iter() {
     ///     println!("{}", val);
     /// }
@@ -122,11 +121,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
-    /// index.insert(1);
-    /// index.insert(2);
-    /// index.insert(3);
+    /// let snapshot = db.snapshot();
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(vec![1, 2, 3], &snapshot);
+    ///
     /// for val in index.iter_from(&2) {
     ///     println!("{}", val);
     /// }
@@ -150,6 +147,7 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
@@ -167,8 +165,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
+    ///
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
     /// ```
@@ -191,8 +191,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
+    ///
     /// index.clear();
     /// assert!(!index.contains(&1));
     /// ```
