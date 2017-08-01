@@ -157,9 +157,9 @@ pub fn init() {
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
 /// let mut hash_stream = HashStream::new();
 /// for chunk in data {
-///     hash_stream.update(&chunk);
+///     hash_stream = hash_stream.update(&chunk);
 /// }
-/// let _ = hash_stream.finalize();
+/// let _ = hash_stream.hash();
 /// ```
 #[derive(Debug, Default)]
 pub struct HashStream(HashState);
@@ -170,19 +170,14 @@ impl HashStream {
         HashStream(HashState::init())
     }
 
-    /// Processes chunk of stream using state
-    pub fn update(&mut self, chunk: &[u8]) {
-        self.0.update(chunk);
-    }
-
-    /// Does the same as `update` but also returns instance of `HashStream`
-    pub fn update_chain(mut self, chunk: &[u8]) -> Self {
+    /// Processes chunk of stream using state and returns instance of `HashStream`
+    pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
     }
 
     /// Completes process and returns final hash of stream data
-    pub fn finalize(self) -> Hash {
+    pub fn hash(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
     }
@@ -199,10 +194,10 @@ impl HashStream {
 /// let mut create_stream = SignStream::new();
 /// let mut verify_stream = SignStream::new();
 /// for chunk in data {
-///     create_stream.update(&chunk);
-///     verify_stream.update(&chunk);
+///     create_stream = create_stream.update(&chunk);
+///     verify_stream = verify_stream.update(&chunk);
 /// }
-/// let file_sign = create_stream.finalize(&sk);
+/// let file_sign = create_stream.hash(&sk);
 /// assert!(verify_stream.verify(&file_sign, &pk));
 /// ```
 #[derive(Debug, Default)]
@@ -215,25 +210,20 @@ impl SignStream {
     }
 
     /// Adds a new `chunk` to the message that will eventually be signed
-    pub fn update(&mut self, chunk: &[u8]) {
-        self.0.update(chunk);
-    }
-
-    /// Does the same as `update` but also returns instance of `SignStream`
-    pub fn update_chain(mut self, chunk: &[u8]) -> Self {
+    pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
     }
 
     /// Computes a signature for the previously supplied messages
     /// using the secret key `secret_key` and returns `Signature`
-    pub fn finalize(&mut self, secret_key: &SecretKey) -> Signature {
+    pub fn hash(&mut self, secret_key: &SecretKey) -> Signature {
         Signature(self.0.finalize(&secret_key.0))
     }
 
     /// Verifies that `sig` is a valid signature for the message whose content
-    /// has been previously supplied using `update` or `update_chain` using the
-    /// public key `public_key`
+    /// has been previously supplied using `update` using the public key
+    /// `public_key`
     pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
         self.0.verify(&sig.0, &public_key.0)
     }
@@ -577,9 +567,8 @@ mod tests {
     #[test]
     fn test_hash_streaming_zero() {
         let h1 = hash(&[]);
-        let mut state = HashStream::new();
-        state.update(&[]);
-        let h2 = state.finalize();
+        let state = HashStream::new();
+        let h2 = state.update(&[]).hash();
         assert_eq!(h1, h2);
     }
 
@@ -587,33 +576,17 @@ mod tests {
     fn test_hash_streaming_chunks() {
         let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
         let h1 = hash(&data);
-        let mut state = HashStream::new();
-        state.update(&data[..5]);
-        state.update(&data[5..]);
-        let h2 = state.finalize();
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn test_hash_chain_streaming() {
-        let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
-        let h1 = hash(&data);
         let state = HashStream::new();
-        let h2 = state
-            .update_chain(&data[..5])
-            .update_chain(&data[5..])
-            .finalize();
+        let h2 = state.update(&data[..5]).update(&data[5..]).hash();
         assert_eq!(h1, h2);
     }
 
     #[test]
     fn test_sign_streaming_zero() {
         let (pk, sk) = gen_keypair();
-        let mut creation_stream = SignStream::new();
-        creation_stream.update(&[]);
-        let sig = creation_stream.finalize(&sk);
-        let mut verified_stream = SignStream::new();
-        verified_stream.update(&[]);
+        let mut creation_stream = SignStream::new().update(&[]);
+        let sig = creation_stream.hash(&sk);
+        let mut verified_stream = SignStream::new().update(&[]);
         assert!(verified_stream.verify(&sig, &pk));
     }
 
@@ -621,13 +594,9 @@ mod tests {
     fn test_sign_streaming_chunks() {
         let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
         let (pk, sk) = gen_keypair();
-        let mut creation_stream = SignStream::new();
-        creation_stream.update(&data[..5]);
-        creation_stream.update(&data[5..]);
-        let sig = creation_stream.finalize(&sk);
-        let mut verified_stream = SignStream::new();
-        verified_stream.update(&data[..5]);
-        verified_stream.update(&data[5..]);
+        let mut creation_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
+        let sig = creation_stream.hash(&sk);
+        let mut verified_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
         assert!(verified_stream.verify(&sig, &pk));
     }
 }
