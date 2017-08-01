@@ -197,7 +197,7 @@ impl HashStream {
 ///     create_stream = create_stream.update(&chunk);
 ///     verify_stream = verify_stream.update(&chunk);
 /// }
-/// let file_sign = create_stream.hash(&sk);
+/// let file_sign = create_stream.sign(&sk);
 /// assert!(verify_stream.verify(&file_sign, &pk));
 /// ```
 #[derive(Debug, Default)]
@@ -217,7 +217,7 @@ impl SignStream {
 
     /// Computes a signature for the previously supplied messages
     /// using the secret key `secret_key` and returns `Signature`
-    pub fn hash(&mut self, secret_key: &SecretKey) -> Signature {
+    pub fn sign(&mut self, secret_key: &SecretKey) -> Signature {
         Signature(self.0.finalize(&secret_key.0))
     }
 
@@ -585,7 +585,7 @@ mod tests {
     fn test_sign_streaming_zero() {
         let (pk, sk) = gen_keypair();
         let mut creation_stream = SignStream::new().update(&[]);
-        let sig = creation_stream.hash(&sk);
+        let sig = creation_stream.sign(&sk);
         let mut verified_stream = SignStream::new().update(&[]);
         assert!(verified_stream.verify(&sig, &pk));
     }
@@ -595,7 +595,7 @@ mod tests {
         let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
         let (pk, sk) = gen_keypair();
         let mut creation_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
-        let sig = creation_stream.hash(&sk);
+        let sig = creation_stream.sign(&sk);
         let mut verified_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
         assert!(verified_stream.verify(&sig, &pk));
     }
