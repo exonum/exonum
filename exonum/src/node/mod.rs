@@ -37,8 +37,6 @@ use messages::{Connect, RawMessage};
 use api::{Api, public, private};
 use helpers::{Height, Round, ValidatorId};
 
-use self::timeout_adjuster::TimeoutAdjuster;
-
 pub use self::state::{State, RequestData, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
 

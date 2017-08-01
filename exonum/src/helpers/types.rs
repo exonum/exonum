@@ -302,7 +302,8 @@ impl fmt::Display for ValidatorId {
 // structs is broken currently. See https://github.com/alexcrichton/toml-rs/issues/194 for details.
 impl Serialize for Height {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         self.0.serialize(serializer)
     }
@@ -310,7 +311,8 @@ impl Serialize for Height {
 
 impl<'de> Deserialize<'de> for Height {
     fn deserialize<D>(deserializer: D) -> Result<Height, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
 
         Ok(Height(u64::deserialize(deserializer)?))
