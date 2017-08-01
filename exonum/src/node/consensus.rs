@@ -216,7 +216,7 @@ where
                             return;
                         }
                     });
-                    self.state.add_transaction(hash, tx);
+                    self.state.add_transaction(hash, tx, true);
                     tx_hashes.push(hash);
                 } else {
                     error!("Unknown transaction in block detected, block={:?}", msg);
@@ -543,7 +543,7 @@ where
             }
         });
 
-        let full_proposes = self.state.add_transaction(hash, tx);
+        let full_proposes = self.state.add_transaction(hash, tx, false);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));
@@ -576,7 +576,7 @@ where
         trace!("Broadcast transactions: {:?}", msg.raw());
         self.broadcast(msg.raw());
 
-        let full_proposes = self.state.add_transaction(hash, msg);
+        let full_proposes = self.state.add_transaction(hash, msg, false);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(RequestData::Transactions(hash));

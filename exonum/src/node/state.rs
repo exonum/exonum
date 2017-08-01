@@ -717,10 +717,16 @@ impl State {
     /// Transaction is ignored if the following criteria are fulfilled:
     /// - transactions pool size is exceeded
     /// - transaction isn't contained in unknown transaction list of any propose
-    pub fn add_transaction(&mut self, tx_hash: Hash, msg: Box<Transaction>) -> Vec<(Hash, Round)> {
+    /// - transaction isn't a part of block
+    pub fn add_transaction(
+        &mut self,
+        tx_hash: Hash,
+        msg: Box<Transaction>,
+        // if tx is in some of propose or in a block,
+        // we should add it, or we could become stuck in some state
+        mut high_priority_tx: bool,
+    ) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
-        // if tx is in some of propose, we should add it, or we can stuck on some state
-        let mut high_priority_tx = false;
         for (propose_hash, propose_state) in &mut self.proposes {
             high_priority_tx |= propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
