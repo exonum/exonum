@@ -226,7 +226,7 @@ impl Round {
     /// ```
     pub fn iter_to(&self, to: Round) -> RoundRangeIter {
         RoundRangeIter {
-            next: self.clone(),
+            next: *self,
             last: to,
         }
     }
