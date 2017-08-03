@@ -46,8 +46,8 @@ pub struct RocksDB {
 
 /// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
-    _db: Arc<_RocksDB>,
     snapshot: _Snapshot<'static>,
+    _db: Arc<_RocksDB>,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -74,8 +74,8 @@ impl Database for RocksDB {
     fn snapshot(&self) -> Box<Snapshot> {
         let _p = profiler::ProfilerSpan::new("RocksDB::snapshot");
         Box::new(RocksDBSnapshot {
-            _db: self.db.clone(),
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+            _db: self.db.clone(),
         })
     }
 
