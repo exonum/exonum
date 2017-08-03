@@ -15,7 +15,7 @@
 use router::Router;
 use serde_json;
 
-use blockchain::{Block, SCHEMA_MAJOR_VERSION};
+use blockchain::{BlockHeader, SCHEMA_MAJOR_VERSION};
 use crypto::Hash;
 
 use super::*;
@@ -25,7 +25,7 @@ fn test_json_response_for_complex_val() {
     let str_val = "sghdkgskgskldghshgsd";
     let txs = [34, 32];
     let tx_count = txs.len() as u32;
-    let complex_val = Block::new(
+    let complex_val = BlockHeader::new(
         SCHEMA_MAJOR_VERSION,
         0,
         24,

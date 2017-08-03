@@ -244,15 +244,15 @@ message! {
         const SIZE = 88;
 
         /// The sender's public key.
-        field from:           &PublicKey          [00 => 32]
+        field from:           &PublicKey                [00 => 32]
         /// Public key of the recipient.
-        field to:             &PublicKey          [32 => 64]
-        /// Block.
-        field block:          blockchain::Block   [64 => 72]
+        field to:             &PublicKey                [32 => 64]
+        /// Block header.
+        field block:          blockchain::BlockHeader   [64 => 72]
         /// List of pre-commits.
-        field precommits:     Vec<Precommit>      [72 => 80]
+        field precommits:     Vec<Precommit>            [72 => 80]
         /// List of the transactions.
-        field transactions:   Vec<RawMessage>     [80 => 88]
+        field transactions:   Vec<RawMessage>           [80 => 88]
     }
 }
 

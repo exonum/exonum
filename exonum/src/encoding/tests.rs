@@ -18,7 +18,7 @@ use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use crypto::{hash, gen_keypair};
-use blockchain::{self, BlockProof};
+use blockchain::{self, BlockProof, BlockHeader};
 use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
                RequestBlock};
 
@@ -309,7 +309,7 @@ fn test_block() {
     let txs = [2];
     let tx_count = txs.len() as u32;
 
-    let content = blockchain::Block::new(
+    let content = BlockHeader::new(
         blockchain::SCHEMA_MAJOR_VERSION,
         0,
         500,
@@ -393,7 +393,7 @@ fn test_block() {
 fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
 
-    let content = blockchain::Block::new(
+    let content = BlockHeader::new(
         blockchain::SCHEMA_MAJOR_VERSION,
         0,
         200,

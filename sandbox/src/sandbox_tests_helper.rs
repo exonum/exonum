@@ -22,7 +22,7 @@ use std::collections::BTreeMap;
 
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
                        RequestPrevotes};
-use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
+use exonum::blockchain::{BlockHeader, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::{Hash, HASH_SIZE};
 use exonum::events::Milliseconds;
 use exonum::node::ValidatorId;
@@ -123,8 +123,8 @@ impl<'a> BlockBuilder<'a> {
         self
     }
 
-    pub fn build(&self) -> Block {
-        Block::new(
+    pub fn build(&self) -> BlockHeader {
+        BlockHeader::new(
             SCHEMA_MAJOR_VERSION,
             self.proposer_id.unwrap_or_else(
                 || self.sandbox.current_leader(),

@@ -29,7 +29,7 @@ use std::collections::BTreeMap;
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, RequestPropose,
                        RequestTransactions, RequestPrevotes, CONSENSUS};
 use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
-use exonum::blockchain::{Block, Blockchain, Schema};
+use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::state::{Round, Height, REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
                           REQUEST_TRANSACTIONS_TIMEOUT};
 
@@ -185,7 +185,7 @@ fn test_retrieve_block_and_precommits() {
     // use serde_json;
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
-    let block: Block = block_proof.block;
+    let block = block_proof.block;
     let precommits: Vec<Precommit> = block_proof.precommits;
     let expected_height = target_height - 1;
     let expected_block_hash = block.hash();

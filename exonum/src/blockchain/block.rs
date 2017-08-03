@@ -21,10 +21,15 @@ pub const BLOCK_SIZE: usize = 112;
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
 encoding_struct!(
-    /// Exonum block data structure. Block is essentially a list of transactions, which is
-    /// a result of the consensus algorithm (thus authenticated by the supermajority
-    /// of validators) and is applied atomically to the blockchain state.
-    struct Block {
+    /// Exonum block header data structure.
+    ///
+    /// Block is essentially a list of transactions, which is
+    /// a result of the consensus algorithm (thus authenticated by the supermajority of validators)
+    /// and is applied atomically to the blockchain state.
+    ///
+    /// Header only contains the amount of transactions and the transactions root hash as well as
+    /// other information, but not the transactions themselves.
+    struct BlockHeader {
         const SIZE = BLOCK_SIZE;
 
         /// Information schema version.
@@ -49,7 +54,7 @@ encoding_struct!(
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockProof {
     /// Block.
-    pub block: Block,
+    pub block: BlockHeader,
     /// List of pre-commits for the block.
     pub precommits: Vec<Precommit>,
 }
@@ -68,7 +73,7 @@ mod tests {
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
-        let block = Block::new(
+        let block = BlockHeader::new(
             SCHEMA_MAJOR_VERSION,
             proposer_id,
             height,
@@ -86,7 +91,7 @@ mod tests {
         assert_eq!(block.tx_hash(), &tx_hash);
         assert_eq!(block.state_hash(), &state_hash);
         let json_str = ::serde_json::to_string(&block).unwrap();
-        let block1: Block = ::serde_json::from_str(&json_str).unwrap();
+        let block1: BlockHeader = ::serde_json::from_str(&json_str).unwrap();
         assert_eq!(block1, block);
     }
 }

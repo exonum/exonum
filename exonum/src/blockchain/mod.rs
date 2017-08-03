@@ -43,7 +43,7 @@ use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::State;
 use storage::{Patch, Database, Snapshot, Fork, Error};
 
-pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
+pub use self::block::{BlockHeader, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
@@ -139,7 +139,7 @@ impl Blockchain {
     /// # Panics
     ///
     /// - If the genesis block was not committed.
-    pub fn last_block(&self) -> Block {
+    pub fn last_block(&self) -> BlockHeader {
         Schema::new(&self.snapshot()).last_block().unwrap()
     }
 
@@ -290,7 +290,7 @@ impl Blockchain {
             };
 
             // Create block
-            let block = Block::new(
+            let block = BlockHeader::new(
                 SCHEMA_MAJOR_VERSION,
                 proposer_id,
                 height,
