@@ -1,6 +1,6 @@
 [workspace]
 
-members = [
-    "backend",
-    "backend/sandbox_tests"
-]
+members = ["backend"]
+
+[replace]
+"exonum:0.1.0" = { git = "https://github.com/vldm/exonum.git", rev="60c813506828c287e8fac35619f83a30052653e5" }

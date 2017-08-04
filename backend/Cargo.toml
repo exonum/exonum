@@ -22,24 +22,15 @@ serde = "1.0.0"
 serde_derive = "1.0.0"
 serde_json = "1.0.0"
 
-# exonum = "0.1.0"
-# exonum-configuration = "0.1.0"
-# exonum-btc-anchoring = "0.1.0"
+exonum = "0.1.0"
+exonum-configuration = "0.1.0"
+exonum-btc-anchoring = "0.1.0"
 
-[dependencies.exonum]
-git = "https://github.com/exonum/exonum.git"
+[dev-dependencies]
+iron-test = "0.5.0"
+mime = "0.2.0"
+
+[dev-dependencies.sandbox]
+git = "https://github.com/vldm/exonum.git"
 version = "0.1.0"
-tag = "v0.1"
-
-[dependencies.exonum-configuration]
-git = "https://github.com/exonum/exonum-configuration.git"
-version = "0.1.0"
-tag = "v0.1"
-
-[dependencies.exonum-btc-anchoring]
-git = "https://github.com/exonum/exonum-btc-anchoring.git"
-version = "0.1.0"
-tag = "v0.1"
-
-[replace]
-"exonum:0.1.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.1" }
+rev = "60c813506828c287e8fac35619f83a30052653e5"

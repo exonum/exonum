@@ -10,6 +10,16 @@ extern crate iron;
 extern crate params;
 extern crate router;
 
+#[cfg(test)]
+#[macro_use]
+extern crate log;
+#[cfg(test)]
+extern crate iron_test;
+#[cfg(test)]
+extern crate mime;
+#[cfg(test)]
+extern crate sandbox;
+
 pub mod api;
 mod service;
 mod blockchain;
