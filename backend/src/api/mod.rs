@@ -1,19 +1,17 @@
-mod error;
+#[cfg(test)]
+mod tests;
 
-use router::Router;
 use iron::prelude::*;
-use params::{Params, Value};
-use params;
-use chrono::UTC;
+use router::{Router, Params};
+use bodyparser;
 
 use exonum::crypto::{Hash, HexValue, Signature};
 use exonum::blockchain::Blockchain;
 use exonum::node::TransactionSend;
-use exonum::api::Api;
+use exonum::api::{Api, ApiError};
 use exonum::storage::MapProof;
 
 use {TimestampTx, TimestampingSchema, Content};
-pub use self::error::Error as ApiError;
 
 #[derive(Clone)]
 pub struct PublicApi<T: TransactionSend + Clone> {
@@ -32,47 +30,57 @@ where
         }
     }
 
-    fn put_content(&self, hash_str: &str, description: &str) -> Result<TimestampTx, ApiError> {
-        let hash = Hash::from_hex(hash_str)?;
-        let snapshot = self.blockchain.snapshot();
-
-        if TimestampingSchema::new(&snapshot)
-            .contents()
-            .get(&hash)
-            .is_some()
+    fn put_content(&self, content: Content) -> Result<TimestampTx, ApiError> {
         {
-            return Err(ApiError::FileExists(hash));
+            let hash = content.data_hash();
+            let snapshot = self.blockchain.snapshot();
+
+            if TimestampingSchema::new(&snapshot)
+                .contents()
+                .get(&hash)
+                .is_some()
+            {
+                return Err(ApiError::FileExists(*hash));
+            }
         }
         // Create transaction
-        let ts = UTC::now().timestamp();
-        let tx = TimestampTx::new_with_signature(&description, ts, &hash, &Signature::zero());
+        let tx = TimestampTx::new_with_signature(content, &Signature::zero());
         self.channel.send(Box::new(tx.clone()))?;
         Ok(tx)
     }
 
-    fn get_content(&self, hash_str: &str) -> Result<Content, ApiError> {
-        let hash = Hash::from_hex(hash_str)?;
+    fn get_content(&self, hash: &Hash) -> Result<Content, ApiError> {
         let view = self.blockchain.snapshot();
         TimestampingSchema::new(&view)
             .contents()
             .get(&hash)
-            .ok_or_else(|| ApiError::FileNotFound(hash))
+            .ok_or_else(|| ApiError::FileNotFound(*hash))
     }
 
-    fn get_proof(&self, hash_str: &str) -> Result<MapProof<Content>, ApiError> {
-        let hash = Hash::from_hex(hash_str)?;
+    fn get_proof(&self, hash: &Hash) -> Result<MapProof<Content>, ApiError> {
         let view = self.blockchain.snapshot();
         let schema = TimestampingSchema::new(&view);
         Ok(schema.contents().get_proof(&hash))
     }
 }
 
-fn find_str<'a>(map: &'a params::Map, path: &[&str]) -> Result<&'a str, ApiError> {
-    let value = map.find(path);
-    if let Some(&Value::String(ref s)) = value {
-        Ok(s)
-    } else {
-        Err(ApiError::IncorrectRequest)
+fn parse_hex(map: &Params, id: &str) -> Result<Hash, ApiError> {
+    match map.find(id) {
+        Some(hex_str) => {
+            let hash = Hash::from_hex(hex_str).map_err(|e| {
+                let msg = format!(
+                    "An error during parsing of the `{}` id occurred: {}",
+                    hex_str,
+                    e
+                );
+                ApiError::IncorrectRequest(msg.into())
+            })?;
+            Ok(hash)
+        }
+        None => {
+            let msg = format!("The `{}` hash is not specified.", id);
+            Err(ApiError::IncorrectRequest(msg.into()))
+        }
     }
 }
 
@@ -85,20 +93,21 @@ where
         // Receive a message by POST and play it back.
         let api = self.clone();
         let put_content = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-
-            let hash = find_str(map, &["hash"])?;
-            let description = find_str(map, &["description"]).unwrap_or("");
-
-            let tx = api.put_content(hash, description)?;
-            api.ok_response(&json!(tx))
+            match req.get::<bodyparser::Struct<Content>>() {
+                Ok(Some(content)) => {
+                    let tx = api.put_content(content)?;
+                    api.ok_response(&json!(tx))
+                }
+                Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
+                Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            }
         };
 
         let api = self.clone();
         let get_content = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
+            let map = req.extensions.get::<Router>().unwrap();
 
-            let hash = find_str(map, &["hash"])?;
+            let hash = parse_hex(&map, "hash")?;
             let content = api.get_content(&hash)?;
 
             api.ok_response(&json!(content))
@@ -106,9 +115,9 @@ where
 
         let api = self.clone();
         let get_proof = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
+            let map = req.extensions.get::<Router>().unwrap();
 
-            let hash = find_str(map, &["hash"])?;
+            let hash = parse_hex(&map, "hash")?;
             let proof = api.get_proof(&hash)?;
 
             api.ok_response(&json!(proof))
@@ -116,6 +125,6 @@ where
 
         router.get("/v1/content/:hash", get_content, "get_content");
         router.get("/v1/proof/:hash", get_proof, "get_proof");
-        router.post("/v1/content", put_content, "put_content");
+        router.put("/v1/content", put_content, "put_content");
     }
 }
