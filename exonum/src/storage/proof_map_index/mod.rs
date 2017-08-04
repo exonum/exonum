@@ -22,7 +22,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 
-pub use self::key::ProofMapKey;
+pub use self::key::{ProofMapKey, KEY_SIZE as PROOF_MAP_KEY_SIZE};
 pub use self::proof::{MapProof, ProofNode, BranchProofNode};
 
 #[cfg(test)]
@@ -107,6 +107,24 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    ///
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix.clone(), &snapshot);
+    ///
+    /// let mut fork = db.fork();
+    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &mut fork);
+    /// # drop(index);
+    /// # drop(mut_index);
+    /// ```
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         ProofMapIndex {
             base: BaseIndex::new(prefix, view),
@@ -207,6 +225,25 @@ where
     }
 
     /// Returns the root hash of the proof map or default hash value if it is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    ///
+    /// let default_hash = index.root_hash();
+    /// assert_eq!(Hash::default(), default_hash);
+    ///
+    /// index.put(&default_hash, 100);
+    /// let hash = index.root_hash();
+    /// assert_ne!(hash, default_hash);
+    /// ```
     pub fn root_hash(&self) -> Hash {
         match self.get_root_node() {
             Some((k, Node::Leaf(v))) => hash(&[&k.to_vec(), v.hash().as_ref()].concat()),
@@ -216,16 +253,68 @@ where
     }
 
     /// Returns a value corresponding to the key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    ///
+    /// let hash = Hash::default();
+    /// assert_eq!(None, index.get(&hash));
+    ///
+    /// index.put(&hash, 2);
+    /// assert_eq!(Some(2), index.get(&hash));
+    /// ```
     pub fn get(&self, key: &K) -> Option<V> {
         self.base.get(&DBKey::leaf(key))
     }
 
     /// Returns `true` if the map contains a value for the specified key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    ///
+    /// let hash = Hash::default();
+    /// assert!(!index.contains(&hash));
+    ///
+    /// index.put(&hash, 2);
+    /// assert!(index.contains(&hash));
+    /// ```
     pub fn contains(&self, key: &K) -> bool {
         self.base.contains(&DBKey::leaf(key))
     }
 
     /// Returns the proof of existence or non-existence for the specified key.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    ///
+    /// let hash = Hash::default();
+    /// let proof = index.get_proof(&hash);
+    /// # drop(proof);
+    /// ```
     pub fn get_proof(&self, key: &K) -> MapProof<V> {
         let searched_slice = DBKey::leaf(key);
 
@@ -300,6 +389,22 @@ where
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
     /// type is (K, V).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    ///
+    /// for val in index.iter() {
+    ///     println!("{:?}", val);
+    /// }
+    /// ```
     pub fn iter(&self) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
             base_iter: self.base.iter(&LEAF_KEY_PREFIX),
@@ -309,6 +414,22 @@ where
 
     /// Returns an iterator over the keys of the map in ascending order. The iterator element
     /// type is K.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    ///
+    /// for key in index.keys() {
+    ///     println!("{:?}", key);
+    /// }
+    /// ```
     pub fn keys(&self) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
             base_iter: self.base.iter(&LEAF_KEY_PREFIX),
@@ -318,12 +439,45 @@ where
 
     /// Returns an iterator over the values of the map in ascending order of keys. The iterator
     /// element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    ///
+    /// for val in index.values() {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn values(&self) -> ProofMapIndexValues<V> {
         ProofMapIndexValues { base_iter: self.base.iter(&LEAF_KEY_PREFIX) }
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
     /// specified key. The iterator element type is (K, V).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    ///
+    /// let hash = Hash::default();
+    /// for val in index.iter_from(&hash) {
+    ///     println!("{:?}", val);
+    /// }
+    /// ```
     pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
             base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
@@ -333,6 +487,23 @@ where
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
     /// specified key. The iterator element type is K.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    ///
+    /// let hash = Hash::default();
+    /// for key in index.keys_from(&hash) {
+    ///     println!("{:?}", key);
+    /// }
+    /// ```
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
             base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
@@ -342,6 +513,23 @@ where
 
     /// Returns an iterator over the values of the map in ascending order of keys starting from the
     /// specified key. The iterator element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    ///
+    /// let hash = Hash::default();
+    /// for val in index.values_from(&hash) {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
         ProofMapIndexValues { base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)) }
     }
@@ -422,6 +610,22 @@ where
     }
 
     /// Inserts the key-value pair into the proof map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    ///
+    /// let hash = Hash::default();
+    /// index.put(&hash, 2);
+    /// assert!(index.contains(&hash));
+    /// ```
     pub fn put(&mut self, key: &K, value: V) {
         let key_slice = DBKey::leaf(key);
         match self.get_root_node() {
@@ -525,6 +729,25 @@ where
     }
 
     /// Removes the key from the proof map.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    ///
+    /// let hash = Hash::default();
+    /// index.put(&hash, 2);
+    /// assert!(index.contains(&hash));
+    ///
+    /// index.remove(&hash);
+    /// assert!(!index.contains(&hash));
+    /// ```
     pub fn remove(&mut self, key: &K) {
         let key_slice = DBKey::leaf(key);
         match self.get_root_node() {
@@ -563,9 +786,29 @@ where
     /// Clears the proof map, removing all entries.
     ///
     /// # Notes
+    ///
     /// Currently this method is not optimized to delete large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let mut fork = db.fork();
+    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    ///
+    /// let hash = Hash::default();
+    /// index.put(&hash, 2);
+    /// assert!(index.contains(&hash));
+    ///
+    /// index.clear();
+    /// assert!(!index.contains(&hash));
+    /// ```
     pub fn clear(&mut self) {
         self.base.clear()
     }

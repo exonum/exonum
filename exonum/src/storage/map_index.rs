@@ -115,6 +115,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(index.get(&1).is_none());
+    ///
     /// index.put(&1, 2);
     /// assert_eq!(Some(2), index.get(&1));
     /// ```
@@ -133,6 +134,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(!index.contains(&1));
+    ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     pub fn contains(&self, key: &K) -> bool {
@@ -148,11 +150,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
-    /// index.put(&1, 2);
-    /// index.put(&3, 4);
-    /// index.put(&5, 6);
+    /// let snapshot = db.snapshot();
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    ///
     /// for v in index.iter() {
     ///     println!("{:?}", v);
     /// }
@@ -170,11 +170,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
-    /// index.put(&1, 2);
-    /// index.put(&3, 4);
-    /// index.put(&5, 6);
+    /// let snapshot = db.snapshot();
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    ///
     /// for key in index.keys() {
     ///     println!("{}", key);
     /// }
@@ -192,11 +190,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
-    /// index.put(&1, 2);
-    /// index.put(&3, 4);
-    /// index.put(&5, 6);
+    /// let snapshot = db.snapshot();
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    ///
     /// for val in index.values() {
     ///     println!("{}", val);
     /// }
@@ -214,11 +210,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
-    /// index.put(&1, 2);
-    /// index.put(&3, 4);
-    /// index.put(&5, 6);
+    /// let snapshot = db.snapshot();
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    ///
     /// for v in index.iter_from(&2) {
     ///     println!("{:?}", v);
     /// }
@@ -236,11 +230,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
-    /// index.put(&1, 2);
-    /// index.put(&3, 4);
-    /// index.put(&5, 6);
+    /// let snapshot = db.snapshot();
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    ///
     /// for key in index.keys_from(&2) {
     ///     println!("{}", key);
     /// }
@@ -258,11 +250,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
-    /// index.put(&1, 2);
-    /// index.put(&3, 4);
-    /// index.put(&5, 6);
+    /// let snapshot = db.snapshot();
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    //
     /// for val in index.values_from(&2) {
     ///     println!("{}", val);
     /// }
@@ -287,6 +277,7 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     pub fn put(&mut self, key: &K, value: V) {
@@ -303,8 +294,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
+    ///
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
     pub fn remove(&mut self, key: &K) {
@@ -326,8 +319,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
+    ///
     /// index.clear();
     /// assert!(!index.contains(&1));
     pub fn clear(&mut self) {

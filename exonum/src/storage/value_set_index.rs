@@ -100,6 +100,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(!index.contains(&1));
+    ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
@@ -122,6 +123,7 @@ where
     /// let data = vec![1, 2, 3];
     /// let data_hash = crypto::hash(&data);
     /// assert!(!index.contains_by_hash(&data_hash));
+    ///
     /// index.insert(data);
     /// assert!(index.contains_by_hash(&data_hash));
     pub fn contains_by_hash(&self, hash: &Hash) -> bool {
@@ -129,24 +131,90 @@ where
     }
 
     /// An iterator visiting all elements in arbitrary order. The iterator element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    ///
+    /// for val in index.iter() {
+    ///     println!("{:?}", val);
+    /// }
+    /// ```
     pub fn iter(&self) -> ValueSetIndexIter<V> {
         ValueSetIndexIter { base_iter: self.base.iter(&()) }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified hash of
     /// a value. The iterator element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    ///
+    /// let hash = Hash::default();
+    ///
+    /// for val in index.iter_from(&hash) {
+    ///     println!("{:?}", val);
+    /// }
+    /// ```
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
         ValueSetIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
 
     /// An iterator visiting hashes of all elements in ascending order. The iterator element type
     /// is [Hash](../../crypto/struct.Hash.html).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    ///
+    /// for val in index.hashes() {
+    ///     println!("{:?}", val);
+    /// }
+    /// ```
     pub fn hashes(&self) -> ValueSetIndexHashes {
         ValueSetIndexHashes { base_iter: self.base.iter(&()) }
     }
 
     /// An iterator visiting hashes of all elements in ascending order starting from the specified
     /// hash. The iterator element type is [Hash](../../crypto/struct.Hash.html).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    ///
+    /// let hash = Hash::default();
+    ///
+    /// for val in index.hashes_from(&hash) {
+    ///     println!("{:?}", val);
+    /// }
+    /// ```
     pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes {
         ValueSetIndexHashes { base_iter: self.base.iter_from(&(), from) }
     }
@@ -166,6 +234,7 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
@@ -183,8 +252,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
+    ///
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
     /// ```
@@ -208,6 +279,7 @@ where
     /// let data_hash = crypto::hash(&data);
     /// index.insert(data);
     /// assert!(index.contains_by_hash(&data_hash));
+    ///
     /// index.remove_by_hash(&data_hash);
     /// assert!(!index.contains_by_hash(&data_hash));
     pub fn remove_by_hash(&mut self, hash: &Hash) {
@@ -229,8 +301,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
+    ///
     /// index.clear();
     /// assert!(!index.contains(&1));
     /// ```

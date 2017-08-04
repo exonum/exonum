@@ -21,10 +21,13 @@ service_key = "7413a596e4fa0953cf22b120bd1ee0ba233bd1c619f10b21e6854b6b3cc9a6e9"
 
 [genesis.consensus]
 peers_timeout = 10000
-propose_timeout = 500
 round_timeout = 3000
 status_timeout = 5000
 txs_block_limit = 1000
+
+[genesis.consensus.timeout_adjuster]
+type = "Constant"
+timeout = 500
 
 [mempool]
 events_pool_capacity = 400000
