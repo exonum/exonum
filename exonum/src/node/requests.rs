@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
-               RequestBlock, Block};
+               RequestBlock, BlockResponse};
 use blockchain::Schema;
 use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
@@ -137,7 +137,7 @@ where
         let transactions = schema.block_txs(height);
 
 
-        let block_msg = Block::new(
+        let block_msg = BlockResponse::new(
             self.state.consensus_public_key(),
             msg.from(),
             block,

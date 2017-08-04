@@ -19,7 +19,7 @@ use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
-use blockchain::{Blockchain, BlockHeader};
+use blockchain::{Blockchain, Block};
 use explorer::{BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
 
@@ -42,7 +42,7 @@ impl ExplorerApi {
         count: u64,
         from: Option<u64>,
         skip_empty_blocks: bool,
-    ) -> Result<Vec<BlockHeader>, ApiError> {
+    ) -> Result<Vec<Block>, ApiError> {
         if count > MAX_BLOCKS_PER_REQUEST {
             return Err(ApiError::IncorrectRequest(
                 format!(

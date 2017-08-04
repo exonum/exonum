@@ -29,7 +29,7 @@ encoding_struct!(
     ///
     /// Header only contains the amount of transactions and the transactions root hash as well as
     /// other information, but not the transactions themselves.
-    struct BlockHeader {
+    struct Block {
         const SIZE = BLOCK_SIZE;
 
         /// Information schema version.
@@ -54,7 +54,7 @@ encoding_struct!(
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockProof {
     /// Block.
-    pub block: BlockHeader,
+    pub block: Block,
     /// List of pre-commits for the block.
     pub precommits: Vec<Precommit>,
 }
@@ -73,7 +73,7 @@ mod tests {
         let tx_hash = hash(&txs);
         let tx_count = txs.len() as u32;
         let state_hash = hash(&[7, 8, 9]);
-        let block = BlockHeader::new(
+        let block = Block::new(
             SCHEMA_MAJOR_VERSION,
             proposer_id,
             height,
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(block.tx_hash(), &tx_hash);
         assert_eq!(block.state_hash(), &state_hash);
         let json_str = ::serde_json::to_string(&block).unwrap();
-        let block1: BlockHeader = ::serde_json::from_str(&json_str).unwrap();
+        let block1: Block = ::serde_json::from_str(&json_str).unwrap();
         assert_eq!(block1, block);
     }
 }

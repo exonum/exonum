@@ -47,7 +47,7 @@ pub enum Any {
     /// `Status` message.
     Status(Status),
     /// `Block` message.
-    Block(Block),
+    Block(BlockResponse),
     /// Consensus message.
     Consensus(ConsensusMessage),
     /// Request for the some data.
@@ -206,7 +206,7 @@ impl Any {
             match raw.message_type() {
                 CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
                 STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
-                BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
+                BLOCK_RESPONSE_MESSAGE_ID => Any::Block(BlockResponse::from_raw(raw)?),
 
                 PROPOSE_MESSAGE_ID => {
                     Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))

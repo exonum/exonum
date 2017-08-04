@@ -21,7 +21,7 @@ use std::cmp;
 
 use storage::ListProof;
 use crypto::Hash;
-use blockchain::{Schema, Blockchain, BlockHeader, TxLocation};
+use blockchain::{Schema, Blockchain, Block, TxLocation};
 use messages::Precommit;
 // TODO: if explorer is usable anywhere else, remove `ApiError` dependencies.
 use api::ApiError;
@@ -35,7 +35,7 @@ pub struct BlockchainExplorer<'a> {
 /// Block information.
 #[derive(Debug, Serialize)]
 pub struct BlockInfo {
-    block: BlockHeader,
+    block: Block,
     precommits: Vec<Precommit>,
     txs: Vec<Hash>,
 }
@@ -115,7 +115,7 @@ impl<'a> BlockchainExplorer<'a> {
         count: u64,
         upper: Option<u64>,
         skip_empty_blocks: bool,
-    ) -> Vec<BlockHeader> {
+    ) -> Vec<Block> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
         let schema = Schema::new(&snapshot);

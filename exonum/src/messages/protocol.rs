@@ -47,8 +47,8 @@ pub const PROPOSE_MESSAGE_ID: u16 = 2;
 pub const PREVOTE_MESSAGE_ID: u16 = 3;
 /// `Precommit` message id.
 pub const PRECOMMIT_MESSAGE_ID: u16 = 4;
-/// `Block` message id.
-pub const BLOCK_MESSAGE_ID: u16 = 5;
+/// `BlockResponse` message id.
+pub const BLOCK_RESPONSE_MESSAGE_ID: u16 = 5;
 
 /// `RequestPropose` message id.
 pub const REQUEST_PROPOSE_MESSAGE_ID: u16 = 6;
@@ -116,7 +116,7 @@ message! {
         field height:         u64         [02 => 10]
         /// The round to which the message is related.
         field round:          u32         [10 => 14]
-        /// Hash of the previous `Block`.
+        /// Hash of the previous block.
         field prev_hash:      &Hash       [14 => 46]
         /// The list of transactions to include in the next block.
         field transactions:   &[Hash]     [46 => 54]
@@ -238,21 +238,21 @@ message! {
 ///
 /// ### Generation
 /// The message is sent as response to `RequestBlock`.
-    struct Block {
+    struct BlockResponse {
         const TYPE = CONSENSUS;
-        const ID = BLOCK_MESSAGE_ID;
+        const ID = BLOCK_RESPONSE_MESSAGE_ID;
         const SIZE = 88;
 
         /// The sender's public key.
-        field from:           &PublicKey                [00 => 32]
+        field from:           &PublicKey          [00 => 32]
         /// Public key of the recipient.
-        field to:             &PublicKey                [32 => 64]
+        field to:             &PublicKey          [32 => 64]
         /// Block header.
-        field block:          blockchain::BlockHeader   [64 => 72]
+        field block:          blockchain::Block   [64 => 72]
         /// List of pre-commits.
-        field precommits:     Vec<Precommit>            [72 => 80]
+        field precommits:     Vec<Precommit>      [72 => 80]
         /// List of the transactions.
-        field transactions:   Vec<RawMessage>           [80 => 88]
+        field transactions:   Vec<RawMessage>     [80 => 88]
     }
 }
 
@@ -368,7 +368,7 @@ message! {
 /// The message is ignored if its `height` is bigger than the node's one.
 ///
 /// ### Processing
-/// `Block` message is sent as the response.
+/// `BlockResponse` message is sent as the response.
 ///
 /// ### Generation
 /// This message can be sent during `Status` processing.

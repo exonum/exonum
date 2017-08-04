@@ -20,7 +20,7 @@ use crypto::Hash;
 use messages::{RawMessage, Precommit, CONSENSUS};
 use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex,
               ProofMapIndex, MapProof};
-use super::{BlockHeader, BlockProof, Blockchain};
+use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
 
 /// Generates prefix that combines service identifier, table identifier and given suffix.
@@ -82,7 +82,7 @@ where
     }
 
     /// Returns table that stores block object for every block height.
-    pub fn blocks(&self) -> MapIndex<&T, Hash, BlockHeader> {
+    pub fn blocks(&self) -> MapIndex<&T, Hash, Block> {
         MapIndex::new(gen_prefix(CONSENSUS, 2, &()), &self.view)
     }
 
@@ -155,7 +155,7 @@ where
     }
 
     /// Returns latest committed block.
-    pub fn last_block(&self) -> Option<BlockHeader> {
+    pub fn last_block(&self) -> Option<Block> {
         match self.block_hashes_by_height().last() {
             Some(hash) => Some(self.blocks().get(&hash).unwrap()),
             None => None,
@@ -306,7 +306,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`blocks][1] index.
     ///
     /// [1]: struct.Schema.html#method.blocks
-    pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, BlockHeader> {
+    pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
         MapIndex::new(gen_prefix(CONSENSUS, 2, &()), &mut self.view)
     }
 
