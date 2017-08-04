@@ -2,10 +2,10 @@
 mod comparator {
   use libc::c_char;
   use utils::{tmpdir, db_put_simple};
-  use exonum_leveldb::database::{Database};
-  use exonum_leveldb::iterator::Iterable;
-  use leveldb::options::{Options,ReadOptions};
-  use leveldb::comparator::{Comparator,OrdComparator};
+  use leveldb::database::Database;
+  use leveldb::iterator::Iterable;
+  use leveldb::options::{Options, ReadOptions};
+  use leveldb::comparator::{Comparator, OrdComparator};
   use std::cmp::Ordering;
   
   struct ReverseComparator {}
@@ -34,8 +34,8 @@ mod comparator {
     let read_opts = ReadOptions::new();
     let mut iter = database.iter(read_opts);
 
-    assert_eq!((b"2".to_vec().as_slice(), vec![2]), iter.next().unwrap());
-    assert_eq!((b"1".to_vec().as_slice(), vec![1]), iter.next().unwrap());
+    assert_eq!((b"2".to_vec().as_slice(), vec![2].as_slice()), iter.next().unwrap());
+    assert_eq!((b"1".to_vec().as_slice(), vec![1].as_slice()), iter.next().unwrap());
   }
 
   #[test]
@@ -51,7 +51,7 @@ mod comparator {
     let read_opts = ReadOptions::new();
     let mut iter = database.iter(read_opts);
 
-    assert_eq!((b"1".to_vec().as_slice(), vec![1]), iter.next().unwrap());
-    assert_eq!((b"2".to_vec().as_slice(), vec![2]), iter.next().unwrap());
+    assert_eq!((b"1".to_vec().as_slice(), vec![1].as_slice()), iter.next().unwrap());
+    assert_eq!((b"2".to_vec().as_slice(), vec![2].as_slice()), iter.next().unwrap());
   }
 }
