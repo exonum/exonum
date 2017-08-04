@@ -13,7 +13,7 @@ use serde_json;
 
 use exonum::api::Api;
 use exonum::blockchain::Transaction;
-use exonum::crypto::{hash, Hash, HexValue};
+use exonum::crypto::{hash, HexValue, Signature};
 use exonum::events::Error as EventsError;
 use exonum::messages::{Message, RawMessage, FromRaw};
 use exonum::node::TransactionSend;
@@ -24,6 +24,7 @@ use sandbox::sandbox_tests_helper::add_one_height_with_transactions;
 use sandbox::sandbox_tests_helper::SandboxState;
 
 use {TimestampingService, TimestampTx, Content};
+use blockchain::TimestampingSchema;
 use api::PublicApi;
 
 pub struct TimestampingSandbox {
@@ -188,4 +189,43 @@ fn test_timestamping_put() {
     let tx = TimestampTx::from_raw(api.channel.txs()[0].clone()).unwrap();
 
     assert_eq!(tx2, tx);
+}
+
+#[test]
+fn test_timestamping_get_value() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let hash = hash(&[1, 2, 3]);
+    let description = "My first hash";
+    let content = Content::new(description, &hash);
+    let tx = TimestampTx::new_with_signature(content.clone(), &Signature::zero());
+    sandbox.add_height_with_tx(tx.clone());
+
+    let api = TimestampingApiSandbox::new(&sandbox);
+    let content2: Content = api.get(&format!("/v1/content/{}", hash.to_hex()));
+    assert_eq!(content2, content);
+}
+
+#[test]
+fn test_timestamping_get_proof() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let hash = hash(&[1, 2, 3]);
+    let description = "My first hash";
+    let content = Content::new(description, &hash);
+    let tx = TimestampTx::new_with_signature(content.clone(), &Signature::zero());
+    sandbox.add_height_with_tx(tx.clone());
+    let proof = {
+        let blockchain = sandbox.blockchain_ref().clone();
+        let snap = blockchain.snapshot();
+        TimestampingSchema::new(snap).contents().get_proof(&hash)
+    };
+
+    let api = TimestampingApiSandbox::new(&sandbox);
+    let proof2: serde_json::Value = api.get(&format!("/v1/proof/{}", hash.to_hex()));
+    assert_eq!(proof2, json!(proof));
 }

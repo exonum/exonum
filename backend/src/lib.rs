@@ -7,7 +7,6 @@ extern crate chrono;
 extern crate bodyparser;
 
 extern crate iron;
-extern crate params;
 extern crate router;
 
 #[cfg(test)]

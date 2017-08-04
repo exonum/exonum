@@ -1,5 +1,3 @@
-use std::time::SystemTime;
-
 use serde_json;
 use serde_json::Value;
 
@@ -68,7 +66,10 @@ impl Transaction for TimestampTx {
     fn execute(&self, fork: &mut Fork) {
         let mut schema = TimestampingSchema::new(fork);
         let content = self.content();
-        schema.contents_mut().put(content.data_hash(), content.clone())
+        schema.contents_mut().put(
+            content.data_hash(),
+            content.clone(),
+        )
     }
 
     fn info(&self) -> Value {

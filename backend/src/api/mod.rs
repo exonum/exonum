@@ -1,12 +1,8 @@
 #[cfg(test)]
 mod tests;
 
-use std::error::Error;
-
-use router::Router;
 use iron::prelude::*;
-use params::{Params, Value};
-use params;
+use router::{Router, Params};
 use bodyparser;
 
 use exonum::crypto::{Hash, HexValue, Signature};
@@ -61,21 +57,30 @@ where
             .ok_or_else(|| ApiError::FileNotFound(*hash))
     }
 
-    fn get_proof(&self, hash_str: &str) -> Result<MapProof<Content>, ApiError> {
-        let hash = Hash::from_hex(hash_str)?;
+    fn get_proof(&self, hash: &Hash) -> Result<MapProof<Content>, ApiError> {
         let view = self.blockchain.snapshot();
         let schema = TimestampingSchema::new(&view);
         Ok(schema.contents().get_proof(&hash))
     }
 }
 
-fn find_str<'a>(map: &'a params::Map, path: &[&str]) -> Result<&'a str, ApiError> {
-    let value = map.find(path);
-    if let Some(&Value::String(ref s)) = value {
-        Ok(s)
-    } else {
-        let msg = format!("Unable to find param: {:?}", path);
-        Err(ApiError::IncorrectRequest(msg.into()))
+fn parse_hex(map: &Params, id: &str) -> Result<Hash, ApiError> {
+    match map.find(id) {
+        Some(hex_str) => {
+            let hash = Hash::from_hex(hex_str).map_err(|e| {
+                let msg = format!(
+                    "An error during parsing of the `{}` id occurred: {}",
+                    hex_str,
+                    e
+                );
+                ApiError::IncorrectRequest(msg.into())
+            })?;
+            Ok(hash)
+        }
+        None => {
+            let msg = format!("The `{}` hash is not specified.", id);
+            Err(ApiError::IncorrectRequest(msg.into()))
+        }
     }
 }
 
@@ -100,11 +105,9 @@ where
 
         let api = self.clone();
         let get_content = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
+            let map = req.extensions.get::<Router>().unwrap();
 
-            let hash = Hash::from_hex(find_str(map, &["hash"])?).map_err(|err| {
-                ApiError::IncorrectRequest(err.description().into())
-            })?;
+            let hash = parse_hex(&map, "hash")?;
             let content = api.get_content(&hash)?;
 
             api.ok_response(&json!(content))
@@ -112,9 +115,9 @@ where
 
         let api = self.clone();
         let get_proof = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
+            let map = req.extensions.get::<Router>().unwrap();
 
-            let hash = find_str(map, &["hash"])?;
+            let hash = parse_hex(&map, "hash")?;
             let proof = api.get_proof(&hash)?;
 
             api.ok_response(&json!(proof))
