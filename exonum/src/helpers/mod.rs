@@ -87,12 +87,12 @@ fn has_colors() -> bool {
     use term::terminfo::TerminfoTerminal;
     use term::Terminal;
     use std::io;
+    use atty;
 
     let out = io::stderr();
-    if let Some(term) = TerminfoTerminal::new(out) {
-        term.supports_color()
-    } else {
-        false
+    match TerminfoTerminal::new(out) {
+        Some(ref term) if atty::is(atty::Stream::Stderr) => term.supports_color(),
+        _ => false,
     }
 }
 
