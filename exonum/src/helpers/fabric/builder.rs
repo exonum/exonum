@@ -21,7 +21,7 @@ use node::{Node, NodeConfig};
 
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
-use super::{Context, ServiceFactory};
+use super::ServiceFactory;
 use super::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, GenerateTestnet};
 
 /// `NodeBuilder` is a high level object,
@@ -29,7 +29,7 @@ use super::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, Ge
 #[derive(Default)]
 pub struct NodeBuilder {
     commands: Vec<CollectedCommand>,
-    service_constructors: Vec<Box<FnMut(&Context) -> Box<Service>>>,
+    service_factories: Vec<Box<ServiceFactory>>,
 }
 
 impl NodeBuilder {
@@ -43,19 +43,19 @@ impl NodeBuilder {
                 CollectedCommand::new(Box::new(GenerateCommonConfig)),
                 CollectedCommand::new(Box::new(Finalize)),
             ],
-            service_constructors: Vec::new(),
+            service_factories: Vec::new(),
         }
     }
 
     /// Appends service to the `NodeBuilder` context.
-    pub fn with_service<S: ServiceFactory>(mut self) -> NodeBuilder {
+    pub fn with_service(mut self, mut factory: Box<ServiceFactory>) -> NodeBuilder {
         //TODO: take endpoints, etc...
 
         for command in &mut self.commands {
             let name = command.name();
-            command.extend(S::command(name))
+            command.extend(factory.command(name));
         }
-        self.service_constructors.push(Box::new(S::make_service));
+        self.service_factories.push(factory);
         self
     }
 
@@ -75,9 +75,9 @@ impl NodeBuilder {
                 let db = Run::db_helper(ctx);
                 let config: NodeConfig =
                     ctx.get("node_config").expect("could not find node_config");
-                let services: Vec<Box<Service>> = self.service_constructors
+                let services: Vec<Box<Service>> = self.service_factories
                     .into_iter()
-                    .map(|mut constructor| constructor(ctx))
+                    .map(|mut factory| factory.make_service(ctx))
                     .collect();
                 let blockchain = Blockchain::new(db, services);
                 let node = Node::new(blockchain, config);
@@ -121,7 +121,7 @@ impl fmt::Debug for NodeBuilder {
             f,
             "NodeBuilder {{ commands: {:?}, services_count: {} }}",
             self.commands,
-            self.service_constructors.len()
+            self.service_factories.len()
         )
     }
 }
