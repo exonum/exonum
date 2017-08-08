@@ -31,7 +31,7 @@ pub struct MemoryDB {
 /// An iterator over the entries of a `MemoryDB`.
 struct MemoryDBIter<'a> {
     iter: Peekable<Range<'a, Vec<u8>, Vec<u8>>>,
-    _guard: RwLockReadGuard<'a, BTreeMap<Vec<u8>, Vec<u8>>>
+    _guard: RwLockReadGuard<'a, BTreeMap<Vec<u8>, Vec<u8>>>,
 }
 
 impl MemoryDB {
@@ -82,7 +82,7 @@ impl Snapshot for MemoryDB {
 
         Box::new(MemoryDBIter {
             iter: unsafe { transmute(guard.range::<[u8], _>(range).peekable()) },
-            _guard: guard
+            _guard: guard,
         })
     }
 }
