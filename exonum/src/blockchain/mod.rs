@@ -46,7 +46,7 @@ use storage::{Patch, Database, Snapshot, Fork, Error};
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
-pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig};
+pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
 pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
 
 mod block;
@@ -221,7 +221,9 @@ impl Blockchain {
             let last_hash = self.last_hash();
             // Save & execute transactions
             for (index, hash) in tx_hashes.iter().enumerate() {
-                let tx = &pool[hash];
+                let tx = pool.get(hash).expect(
+                    "BUG: Cannot find transaction in pool.",
+                );
 
                 fork.checkpoint();
 

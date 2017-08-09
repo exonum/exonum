@@ -88,6 +88,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(None, index.get(0));
+    ///
     /// index.push(42);
     /// assert_eq!(Some(42), index.get(0));
     /// ```
@@ -106,6 +107,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(None, index.last());
+    ///
     /// index.push(42);
     /// assert_eq!(Some(42), index.last());
     /// ```
@@ -127,6 +129,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(index.is_empty());
+    ///
     /// index.push(42);
     /// assert!(!index.is_empty());
     /// ```
@@ -145,8 +148,10 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(0, index.len());
+    ///
     /// index.push(10);
     /// assert_eq!(1, index.len());
+    ///
     /// index.push(100);
     /// assert_eq!(2, index.len());
     /// ```
@@ -169,7 +174,9 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    ///
     /// for val in index.iter() {
     ///     println!("{}", val);
     /// }
@@ -189,7 +196,9 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    ///
     /// for val in index.iter_from(3) {
     ///     println!("{}", val);
     /// }
@@ -218,6 +227,7 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.push(1);
     /// assert!(!index.is_empty());
     /// ```
@@ -238,6 +248,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(None, index.pop());
+    ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.pop());
     /// ```
@@ -265,6 +276,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert!(index.is_empty());
+    ///
     /// index.extend([1, 2, 3].iter().cloned());
     /// assert_eq!(3, index.len());
     /// ```
@@ -293,8 +305,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
+    ///
     /// index.truncate(3);
     /// assert_eq!(3, index.len());
     /// ```
@@ -319,8 +333,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
+    ///
     /// index.set(0, 10);
     /// assert_eq!(Some(10), index.get(0));
     /// ```
@@ -339,6 +355,7 @@ where
     /// Clears the list, removing all values.
     ///
     /// # Notes
+    ///
     /// Currently this method is not optimized to delete large set of data. During the execution of
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
@@ -351,8 +368,10 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
     /// index.push(1);
     /// assert!(!index.is_empty());
+    ///
     /// index.clear();
     /// assert!(index.is_empty());
     /// ```

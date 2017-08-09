@@ -19,10 +19,10 @@
 
 use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
-                                         Signature as SignatureSodium, sign_detached,
-                                         verify_detached, gen_keypair as gen_keypair_sodium,
-                                         keypair_from_seed};
-use sodiumoxide::crypto::hash::sha256::{Digest, hash as hash_sodium};
+                                         Signature as SignatureSodium, State as SignState,
+                                         sign_detached, verify_detached, keypair_from_seed,
+                                         gen_keypair as gen_keypair_sodium};
+use sodiumoxide::crypto::hash::sha256::{Digest, State as HashState, hash as hash_sodium};
 use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
@@ -145,6 +145,87 @@ pub fn hash(data: &[u8]) -> Hash {
 pub fn init() {
     if !sodiumoxide::init() {
         panic!("Cryptographic library hasn't initialized.");
+    }
+}
+
+/// This structure provides a possibility to calculate hash for a stream of data
+/// # Example
+///
+/// ```rust
+/// use exonum::crypto::HashStream;
+///
+/// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
+/// let mut hash_stream = HashStream::new();
+/// for chunk in data {
+///     hash_stream = hash_stream.update(&chunk);
+/// }
+/// let _ = hash_stream.hash();
+/// ```
+#[derive(Debug, Default)]
+pub struct HashStream(HashState);
+
+impl HashStream {
+    /// Creates a new instance of `HashStream`
+    pub fn new() -> Self {
+        HashStream(HashState::init())
+    }
+
+    /// Processes chunk of stream using state and returns instance of `HashStream`
+    pub fn update(mut self, chunk: &[u8]) -> Self {
+        self.0.update(chunk);
+        self
+    }
+
+    /// Completes process and returns final hash of stream data
+    pub fn hash(self) -> Hash {
+        let dig = self.0.finalize();
+        Hash(dig)
+    }
+}
+
+/// This structure provides a possibility to create signature for a stream of data
+/// # Example
+///
+/// ```rust
+/// use exonum::crypto::{SignStream, gen_keypair};
+///
+/// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
+/// let (pk, sk) = gen_keypair();
+/// let mut create_stream = SignStream::new();
+/// let mut verify_stream = SignStream::new();
+/// for chunk in data {
+///     create_stream = create_stream.update(&chunk);
+///     verify_stream = verify_stream.update(&chunk);
+/// }
+/// let file_sign = create_stream.sign(&sk);
+/// assert!(verify_stream.verify(&file_sign, &pk));
+/// ```
+#[derive(Debug, Default)]
+pub struct SignStream(SignState);
+
+impl SignStream {
+    /// Creates a new instance of `SignStream`
+    pub fn new() -> Self {
+        SignStream(SignState::init())
+    }
+
+    /// Adds a new `chunk` to the message that will eventually be signed
+    pub fn update(mut self, chunk: &[u8]) -> Self {
+        self.0.update(chunk);
+        self
+    }
+
+    /// Computes a signature for the previously supplied messages
+    /// using the secret key `secret_key` and returns `Signature`
+    pub fn sign(&mut self, secret_key: &SecretKey) -> Signature {
+        Signature(self.0.finalize(&secret_key.0))
+    }
+
+    /// Verifies that `sig` is a valid signature for the message whose content
+    /// has been previously supplied using `update` using the public key
+    /// `public_key`
+    pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
+        self.0.verify(&sig.0, &public_key.0)
     }
 }
 
@@ -422,7 +503,8 @@ impl Default for Hash {
 
 #[cfg(test)]
 mod tests {
-    use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature};
+    use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature, HashStream,
+                SignStream};
     use super::HexValue;
     use serde_json;
 
@@ -480,5 +562,41 @@ mod tests {
             &[244u8, 200, 153, 111, 185, 36, 39, 174, 65, 228],
             sub_range
         );
+    }
+
+    #[test]
+    fn test_hash_streaming_zero() {
+        let h1 = hash(&[]);
+        let state = HashStream::new();
+        let h2 = state.update(&[]).hash();
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_hash_streaming_chunks() {
+        let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+        let h1 = hash(&data);
+        let state = HashStream::new();
+        let h2 = state.update(&data[..5]).update(&data[5..]).hash();
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn test_sign_streaming_zero() {
+        let (pk, sk) = gen_keypair();
+        let mut creation_stream = SignStream::new().update(&[]);
+        let sig = creation_stream.sign(&sk);
+        let mut verified_stream = SignStream::new().update(&[]);
+        assert!(verified_stream.verify(&sig, &pk));
+    }
+
+    #[test]
+    fn test_sign_streaming_chunks() {
+        let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+        let (pk, sk) = gen_keypair();
+        let mut creation_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
+        let sig = creation_stream.sign(&sk);
+        let mut verified_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
+        assert!(verified_stream.verify(&sig, &pk));
     }
 }

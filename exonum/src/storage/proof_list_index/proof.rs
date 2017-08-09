@@ -82,7 +82,7 @@ impl<V: StorageValue> ListProof<V> {
     /// Verifies the correctness of the proof by the trusted root hash and the number of elements
     /// in the tree.
     ///
-    /// If the proof is valid, a vector with indicies and references to elements is returned.
+    /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, `Err` is returned.
     pub fn validate(&self, root_hash: Hash, len: u64) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
