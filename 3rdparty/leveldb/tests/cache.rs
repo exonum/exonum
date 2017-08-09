@@ -1,7 +1,7 @@
 use utils::{tmpdir};
-use exonum_leveldb::database::{Database};
-use leveldb::options::{Options};
-use leveldb::database::cache::{Cache};
+use leveldb::database::Database;
+use leveldb::options::Options;
+use leveldb::database::cache::Cache;
 
 #[test]
 fn test_open_database_with_cache() {

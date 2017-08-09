@@ -175,18 +175,16 @@ macro_rules! encoding_struct {
             fn deserialize_field<B> (value: &$crate::encoding::serialize::json::reexport::Value,
                                         buffer: & mut B,
                                         from: $crate::encoding::Offset,
-                                        _to: $crate::encoding::Offset )
+                                        to: $crate::encoding::Offset )
                 -> Result<(), Box<::std::error::Error>>
                 where B: $crate::encoding::serialize::WriteBufferWrapper
             {
-                let obj = value.as_object().ok_or("Can't cast json as object.")?;
-                $(
-                let val = obj.get(stringify!($field_name)).ok_or("Can't get object from json.")?;
+                use $crate::encoding::serialize::json::ExonumJsonDeserialize;
+                // deserialize full field
+                let structure = <Self as ExonumJsonDeserialize>::deserialize(value)?;
+                // then write it
+                buffer.write(from, to, structure);
 
-                <$field_type as $crate::encoding::serialize::json::ExonumJson>::deserialize_field(
-                    val, buffer, from + $from, from + $to )?;
-
-                )*
                 Ok(())
             }
 
@@ -206,14 +204,18 @@ macro_rules! encoding_struct {
             }
         }
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
+            #[allow(unused_imports, unused_mut)]
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>> {
-                let to = $body as $crate::encoding::Offset;
-                let from = 0;
-                use $crate::encoding::serialize::json::ExonumJson;
-
+                use $crate::encoding::serialize::json::ExonumJson as ExonumJson;
                 let mut buf = vec![0; $body];
-                <Self as ExonumJson>::deserialize_field(value, &mut buf, from, to)?;
+                let _obj = value.as_object().ok_or("Can't cast json as object.")?;
+                $(
+                    let val = _obj.get(stringify!($field_name))
+                                    .ok_or("Can't get object from json.")?;
+                    <$field_type as ExonumJson>::deserialize_field(val,
+                                                                    &mut buf, $from, $to )?;
+                )*
                 Ok($name { raw: buf })
             }
         }
