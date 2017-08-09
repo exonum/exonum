@@ -42,6 +42,9 @@ mount = "0.3.0"
 exonum_profiler = { version = "^0.1.0", path="../3rdparty/profiler/" }
 exonum_flamer = { version = "^0.1.3", path="../3rdparty/flamer/", optional = true }
 
+[dependencies.exonum-rocksdb]
+git = "https://github.com/exonum/exonum-rocksdb.git"
+
 [dependencies.sodiumoxide]
 git = "https://github.com/exonum/exonum-sodiumoxide.git"
 

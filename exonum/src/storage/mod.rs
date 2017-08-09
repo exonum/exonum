@@ -78,6 +78,7 @@
 //!
 //! [`Database`]: trait.Database.html
 //! [`LevelDB`]: struct.LevelDB.html
+//! [`RocksDB`]: struct.RocksDB.html
 //! [`MemoryDB`]: struct.MemoryDB.html
 //! [`Snapshot`]: trait.Snapshot.html
 //! [`Fork`]: struct.fork.html
@@ -107,6 +108,7 @@ pub use self::error::Error;
 pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
 
 pub use self::leveldb::{LevelDB, LevelDBOptions, LevelDBCache};
+pub use self::rocksdb::{RocksDB, RocksDBOptions, RocksBlockOptions};
 pub use self::memorydb::MemoryDB;
 
 pub use self::keys::StorageKey;
@@ -129,6 +131,7 @@ mod error;
 
 mod db;
 mod leveldb;
+mod rocksdb;
 mod memorydb;
 
 mod keys;

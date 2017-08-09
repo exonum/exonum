@@ -3,7 +3,11 @@ language: rust
 rust:
   - stable
 
-cache: cargo
+cache:
+  directories:
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
 sudo: required
 group: deprecated-2017Q2
 dist: trusty
@@ -15,6 +19,8 @@ env:
     - RUSTFMT_VERS=0.9.0
     - RUSTFLAGS="-C link-dead-code"
     - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
+    - ROCKSDB_LIB_DIR=$HOME/.local/lib
+    - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
 
 before_install:
 - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
@@ -26,7 +32,17 @@ before_install:
 - cargo install --list
 
 install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libsnappy-dev libssl-dev
+- |
+  if [ ! -f "$HOME/.local/lib/librocksdb.so" ]; then
+    wget -O rocksdb-5.6.1.tar.gz https://github.com/facebook/rocksdb/archive/v5.6.1.tar.gz
+    tar xvf rocksdb-5.6.1.tar.gz
+    cd rocksdb-5.6.1
+    INSTALL_PATH=$HOME/.local make install-shared
+    cd ..
+  fi
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
 
 script:
 - cargo fmt -p exonum -- --write-mode=diff
