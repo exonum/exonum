@@ -34,7 +34,7 @@ extern crate byteorder;
 extern crate mio;
 extern crate sodiumoxide;
 extern crate exonum_leveldb as leveldb;
-extern crate rocksdb;
+extern crate exonum_rocksdb as rocksdb;
 extern crate rand;
 extern crate serde;
 #[macro_use]
