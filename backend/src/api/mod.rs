@@ -1,5 +1,5 @@
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 use iron::prelude::*;
 use router::{Router, Params};
@@ -97,8 +97,8 @@ where
 {
     fn wire(&self, router: &mut Router) {
         self.make_put_request::<TxUpdateUser>(router, "/v1/users", "put_user");
-        self.make_put_request::<TxTimestamp>(router, "/v1/timestamp", "put_timestamp");
-        self.make_put_request::<TxPayment>(router, "/v1/payment", "put_payment");
+        self.make_put_request::<TxPayment>(router, "/v1/payments", "put_payment");
+        self.make_put_request::<TxTimestamp>(router, "/v1/timestamps", "put_timestamp");
 
         // Receive a message by POST and play it back.
         // let api = self.clone();

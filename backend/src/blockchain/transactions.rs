@@ -2,9 +2,8 @@ use serde_json::{Value, to_value};
 
 use exonum::storage::Fork;
 use exonum::blockchain::Transaction;
-use exonum::messages::{FromRaw, Message, RawTransaction};
-use exonum::crypto::{Hash, PublicKey};
-use exonum::encoding::Error as StreamStructError;
+use exonum::messages::{Message, RawTransaction};
+use exonum::crypto::{PublicKey};
 
 use blockchain::ToHash;
 use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp};

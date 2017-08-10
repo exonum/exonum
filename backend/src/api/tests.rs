@@ -13,7 +13,7 @@ use serde_json;
 
 use exonum::api::Api;
 use exonum::blockchain::Transaction;
-use exonum::crypto::{hash, HexValue, Signature};
+use exonum::crypto::{hash, Hash, HexValue, gen_keypair, PublicKey, SecretKey};
 use exonum::events::Error as EventsError;
 use exonum::messages::{Message, RawMessage, FromRaw};
 use exonum::node::TransactionSend;
@@ -23,8 +23,9 @@ use sandbox::sandbox::{Sandbox, sandbox_with_services};
 use sandbox::sandbox_tests_helper::add_one_height_with_transactions;
 use sandbox::sandbox_tests_helper::SandboxState;
 
-use {TimestampingService, TimestampTx, Content};
-use blockchain::TimestampingSchema;
+use TimestampingService;
+use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp, UserInfo, PaymentInfo, Timestamp};
+use blockchain::schema::Schema;
 use api::PublicApi;
 
 pub struct TimestampingSandbox {
@@ -62,6 +63,10 @@ impl TimestampingSandbox {
             inner: sandbox,
             state: SandboxState::new().into(),
         }
+    }
+
+    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
+        gen_keypair()
     }
 
     pub fn state_ref(&self) -> Ref<SandboxState> {
@@ -174,58 +179,63 @@ impl TimestampingApiSandbox {
 }
 
 #[test]
-fn test_timestamping_put() {
+fn test_api_put_user() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
 
-    let hash = hash(&[1, 2, 3]);
-    let description = "My first hash";
-    let content = Content::new(description, &hash);
+    let user_info = {
+        let (p, s) = gen_keypair();
+        UserInfo::new("User", &p, s[..].to_vec(), "metadata")
+    };
+    let keypair = sandbox.service_keypair();
+    let tx = TxUpdateUser::new(&keypair.0, user_info, &keypair.1);
 
     let api = TimestampingApiSandbox::new(&sandbox);
-
-    let tx2: TimestampTx = api.put("/v1/content", content);
-    let tx = TimestampTx::from_raw(api.channel.txs()[0].clone()).unwrap();
+    let tx_hash: Hash = api.put("/v1/users", tx.clone());
+    let tx2 = TxUpdateUser::from_raw(api.channel.txs()[0].clone()).unwrap();
 
     assert_eq!(tx2, tx);
+    assert_eq!(tx2.hash(), tx_hash);
 }
 
 #[test]
-fn test_timestamping_get_value() {
+fn test_api_put_payment() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
 
-    let hash = hash(&[1, 2, 3]);
-    let description = "My first hash";
-    let content = Content::new(description, &hash);
-    let tx = TimestampTx::new_with_signature(content.clone(), &Signature::zero());
-    sandbox.add_height_with_tx(tx.clone());
+    let info = 
+        PaymentInfo::new("User", 1000, "metadata")
+    ;
+    let keypair = sandbox.service_keypair();
+    let tx = TxPayment::new(&keypair.0, info, &keypair.1);
 
     let api = TimestampingApiSandbox::new(&sandbox);
-    let content2: Content = api.get(&format!("/v1/content/{}", hash.to_hex()));
-    assert_eq!(content2, content);
+    let tx_hash: Hash = api.put("/v1/payments", tx.clone());
+    let tx2 = TxPayment::from_raw(api.channel.txs()[0].clone()).unwrap();
+
+    assert_eq!(tx2, tx);
+    assert_eq!(tx2.hash(), tx_hash);
 }
 
 #[test]
-fn test_timestamping_get_proof() {
+fn test_api_put_timestamp() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
 
-    let hash = hash(&[1, 2, 3]);
-    let description = "My first hash";
-    let content = Content::new(description, &hash);
-    let tx = TimestampTx::new_with_signature(content.clone(), &Signature::zero());
-    sandbox.add_height_with_tx(tx.clone());
-    let proof = {
-        let blockchain = sandbox.blockchain_ref().clone();
-        let snap = blockchain.snapshot();
-        TimestampingSchema::new(snap).contents().get_proof(&hash)
-    };
+    let info = 
+        Timestamp::new("User", &Hash::zero(), "metadata")
+    ;
+    let keypair = gen_keypair();
+    let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
 
     let api = TimestampingApiSandbox::new(&sandbox);
-    let proof2: serde_json::Value = api.get(&format!("/v1/proof/{}", hash.to_hex()));
-    assert_eq!(proof2, json!(proof));
+    let tx_hash: Hash = api.put("/v1/timestamps", tx.clone());
+    let tx2 = TxTimestamp::from_raw(api.channel.txs()[0].clone()).unwrap();
+
+    assert_eq!(tx2, tx);
+    assert_eq!(tx2.hash(), tx_hash);
 }
+
