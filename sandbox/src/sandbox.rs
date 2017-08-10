@@ -277,7 +277,8 @@ impl Sandbox {
     }
 
     pub fn service_public_key(&self, id: ValidatorId) -> PublicKey {
-        self.nodes_keys()[id.as_usize()].service_key
+        let id: usize = id.into();
+        self.nodes_keys()[id].service_key
     }
 
     pub fn service_secret_key(&self, id: ValidatorId) -> &SecretKey {
@@ -286,7 +287,8 @@ impl Sandbox {
     }
 
     pub fn a(&self, id: ValidatorId) -> SocketAddr {
-        self.addresses[id.as_usize()]
+        let id: usize = id.into();
+        self.addresses[id]
     }
 
     pub fn validators(&self) -> Vec<PublicKey> {

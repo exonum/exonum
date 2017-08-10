@@ -647,7 +647,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
     {
         // respond to RequestPrevotes
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
-        validators.set(VALIDATOR_3.as_usize(), true);
+        validators.set(VALIDATOR_3.into(), true);
 
         sandbox.recv(RequestPrevotes::new(
             &sandbox.p(VALIDATOR_3),
@@ -730,7 +730,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
     {
         // respond to RequestPrevotes negative
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
-        validators.set(VALIDATOR_3.as_usize(), true);
+        validators.set(VALIDATOR_3.into(), true);
 
         sandbox.recv(RequestPrevotes::new(
             &sandbox.p(VALIDATOR_3),
@@ -888,7 +888,7 @@ fn request_prevotes_when_get_prevote_message() {
     );
 
     let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
-    validators.set(VALIDATOR_2.as_usize(), true);
+    validators.set(VALIDATOR_2.into(), true);
 
     sandbox.send(
         sandbox.a(VALIDATOR_2),
