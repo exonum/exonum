@@ -2,11 +2,11 @@ use std::time::SystemTime;
 
 use exonum::crypto::{PublicKey, Hash};
 
-use TIMESTAMPING_SERVICE_ID;
+use TIMESTAMPING_SERVICE;
 
 pub const TX_UPDATE_USER_ID: u16 = 0;
 pub const TX_PAYMENT_ID: u16 = 1;
-pub const TX_TIMESTAMP: u16 = 2;
+pub const TX_TIMESTAMP_ID: u16 = 2;
 
 encoding_struct! {
     /// Information about timestapming user.
@@ -16,7 +16,7 @@ encoding_struct! {
         /// Unique user identifier.
         field id:                       &str        [00 => 08]
         /// Public key of user.
-        field public_key:               &PublicKey  [08 => 40]
+        field pub_key:                  &PublicKey  [08 => 40]
         /// Encrypted secret key.
         field encrypted_secret_key:     Vec<u8>     [40 => 48]
         /// Additional metadata.
@@ -71,7 +71,7 @@ encoding_struct! {
 message! {
     /// Create or update user.
     struct TxUpdateUser {
-        const TYPE = TIMESTAMPING_SERVICE_ID;
+        const TYPE = TIMESTAMPING_SERVICE;
         const ID = TX_UPDATE_USER_ID;
         const SIZE = 40;
 
@@ -85,7 +85,7 @@ message! {
 message! {
     /// A payment transaction.
     struct TxPayment {
-        const TYPE = TIMESTAMPING_SERVICE_ID;
+        const TYPE = TIMESTAMPING_SERVICE;
         const ID = TX_PAYMENT_ID;
         const SIZE = 40;
 
@@ -99,8 +99,8 @@ message! {
 message! {
     /// A timestamp transaction.
     struct TxTimestamp {
-        const TYPE = TIMESTAMPING_SERVICE_ID;
-        const ID = TX_TIMESTAMP;
+        const TYPE = TIMESTAMPING_SERVICE;
+        const ID = TX_TIMESTAMP_ID;
         const SIZE = 40;
 
         /// Public key of transaction.
@@ -109,3 +109,5 @@ message! {
         field content:                  Timestamp   [32 => 40]
     }
 }
+
+// TODO content tests

@@ -23,7 +23,6 @@ pub mod api;
 mod service;
 mod blockchain;
 
-pub use service::{TimestampingService, TIMESTAMPING_SERVICE_ID};
-pub use blockchain::{TimestampingSchema, TimestampTx, Content};
+pub use service::{TimestampingService, TIMESTAMPING_SERVICE};
 
 pub const TIMESTAMPING_TX_ID: u16 = 0;

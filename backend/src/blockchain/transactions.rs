@@ -6,8 +6,9 @@ use exonum::messages::{FromRaw, Message, RawTransaction};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding::Error as StreamStructError;
 
-use super::dto::{TxUpdateUser, TxPayment, TxTimestamp};
-use super::schema::Schema;
+use blockchain::ToHash;
+use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp};
+use blockchain::schema::Schema;
 
 impl Transaction for TxUpdateUser {
     fn verify(&self) -> bool {
@@ -46,7 +47,20 @@ impl Transaction for TxTimestamp {
 
     fn execute(&self, view: &mut Fork) {
         let mut schema = Schema::new(view);
-        schema.add_timestamp(self.content());
+
+        let key_is_latest = schema
+            .users()
+            .get(&self.content().user_id().to_hash())
+            .and_then(|entry| if entry.info().pub_key() == self.pub_key() {
+                Some(())
+            } else {
+                None
+            })
+            .is_some();
+
+        if key_is_latest {
+            schema.add_timestamp(self.content());
+        }
     }
 
     fn info(&self) -> Value {

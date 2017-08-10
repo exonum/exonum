@@ -7,12 +7,14 @@ use exonum::crypto::Hash;
 use exonum::storage::Snapshot;
 use exonum::blockchain::{Transaction, Service, ApiContext};
 use exonum::messages::{FromRaw, RawTransaction};
-use exonum::encoding::Error as MessageError;
+use exonum::encoding::Error as StreamStructError;
 
-use {TimestampingSchema, TimestampTx};
+use blockchain::dto::{TX_PAYMENT_ID, TX_TIMESTAMP_ID, TX_UPDATE_USER_ID, TxUpdateUser, TxPayment,
+                      TxTimestamp};
+use blockchain::schema::Schema;
 use api::PublicApi;
 
-pub const TIMESTAMPING_SERVICE_ID: u16 = 128;
+pub const TIMESTAMPING_SERVICE: u16 = 128;
 
 pub struct TimestampingService {}
 
@@ -24,7 +26,7 @@ impl TimestampingService {
 
 impl Service for TimestampingService {
     fn service_id(&self) -> u16 {
-        TIMESTAMPING_SERVICE_ID
+        TIMESTAMPING_SERVICE
     }
 
     fn service_name(&self) -> &'static str {
@@ -32,12 +34,21 @@ impl Service for TimestampingService {
     }
 
     fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
-        let schema = TimestampingSchema::new(view);
+        let schema = Schema::new(view);
         schema.state_hash()
     }
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-        TimestampTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
+        match raw.message_type() {
+            TX_UPDATE_USER_ID => Ok(Box::new(TxUpdateUser::from_raw(raw)?)),
+            TX_PAYMENT_ID => Ok(Box::new(TxPayment::from_raw(raw)?)),
+            TX_TIMESTAMP_ID => Ok(Box::new(TxTimestamp::from_raw(raw)?)),
+            _ => {
+                Err(StreamStructError::IncorrectMessageType {
+                    message_type: raw.message_type(),
+                })
+            }
+        }
     }
 
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
