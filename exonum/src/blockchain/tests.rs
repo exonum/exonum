@@ -21,6 +21,30 @@ use storage::Database;
 use super::Blockchain;
 
 
+use crypto::Hash;
+use serde_json;
+
+#[test]
+fn test_encode_decode() {
+    encoding_struct! {
+        struct Parent {
+            const SIZE = 8;
+            field child:        Child     [00 => 08]
+        }
+    }
+
+    encoding_struct! {
+        struct Child {
+            const SIZE = 32;
+            field child:          &Hash       [00 => 32]
+        }
+    }
+    let content = Child::new(&Hash::zero());
+    let par = Parent::new(content);
+    let par_json = serde_json::to_value(par.clone()).unwrap();
+    assert_eq!(serde_json::from_value::<Parent>(par_json).unwrap(), par);
+}
+
 #[test]
 fn test_u64() {
     encoding_struct! {

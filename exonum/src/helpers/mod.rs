@@ -87,12 +87,12 @@ fn has_colors() -> bool {
     use term::terminfo::TerminfoTerminal;
     use term::Terminal;
     use std::io;
+    use atty;
 
     let out = io::stderr();
-    if let Some(term) = TerminfoTerminal::new(out) {
-        term.supports_color()
-    } else {
-        false
+    match TerminfoTerminal::new(out) {
+        Some(ref term) if atty::is(atty::Stream::Stderr) => term.supports_color(),
+        _ => false,
     }
 }
 
@@ -125,7 +125,7 @@ fn format_log_record(record: &LogRecord) -> String {
             LogLevel::Trace => "TRACE".white(),
         };
         format!(
-            "[{} : {}] - [ {} ] - {} - {}",
+            "[{} : {:03}] - [ {} ] - {} - {}",
             secs.bold(),
             millis.bold(),
             level,
@@ -141,7 +141,7 @@ fn format_log_record(record: &LogRecord) -> String {
             LogLevel::Trace => "TRACE",
         };
         format!(
-            "[{} : {}] - [ {} ] - {} - {}",
+            "[{} : {:03}] - [ {} ] - {} - {}",
             secs,
             millis,
             level,

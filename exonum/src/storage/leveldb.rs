@@ -55,8 +55,8 @@ pub struct LevelDB {
 
 /// A snapshot of a `LevelDB`.
 struct LevelDBSnapshot {
-    _db: Arc<_LevelDB>,
     snapshot: _Snapshot<'static>,
+    _db: Arc<_LevelDB>,
 }
 
 /// An iterator over the entries of a `LevelDB`.
@@ -96,8 +96,8 @@ impl Database for LevelDB {
     fn snapshot(&self) -> Box<Snapshot> {
         let _p = profiler::ProfilerSpan::new("LevelDB::snapshot");
         Box::new(LevelDBSnapshot {
-            _db: self.db.clone(),
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+            _db: self.db.clone(),
         })
     }
 

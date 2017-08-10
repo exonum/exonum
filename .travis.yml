@@ -1,70 +1,115 @@
 language: rust
 
+addons:
+  apt:
+    packages:
+    - gcc
+    - g++
+    - libleveldb-dev
+    - libssl-dev
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
+    - libiberty-dev
+
 rust:
   - stable
+matrix:
+  include:
+    - rust: nightly-2017-07-05
+      env: FEATURE=clippy-core
+    - rust: nightly-2017-07-05
+      env: FEATURE=clippy-sandbox
 
 cache:
   directories:
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
-sudo: required
-group: deprecated-2017Q2
+
 dist: trusty
+sudo: required
 
 env:
   global:
-    - NIGHTLY_RUST=nightly-2017-07-05
-    - CLIPPY_VERS=0.0.142
-    - RUSTFMT_VERS=0.9.0
-    - RUSTFLAGS="-C link-dead-code"
-    - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
-    - ROCKSDB_LIB_DIR=$HOME/.local/lib
-    - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - NIGHTLY_RUST=nightly-2017-07-05
+  - CLIPPY_VERS=0.0.142
+  - RUSTFMT_VERS=0.9.0
+  - SODIUM_VERS=1.0.13
+  - ROCKSDB_VERS=5.6.1
+  - CARGO_INCREMENTAL=1
+  - RUSTFLAGS="-C link-dead-code"
+  - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
+  - ROCKSDB_LIB_DIR=$HOME/.local/lib
+  - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  matrix:
+  - FEATURE=fmt
+  - FEATURE=test-core
+  - FEATURE=test-sandbox
+  - FEATURE=test-doc
 
-before_install:
-- rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-- cargo-audit -V || cargo install cargo-audit --force
-- rustup toolchain install $NIGHTLY_RUST
-- cargo +$NIGHTLY_RUST clippy -V | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --vers $CLIPPY_VERS --force
-- sudo add-apt-repository -y ppa:elt/libsodium
-- sudo apt-get -qq update
-- cargo install --list
 
 install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libsnappy-dev libssl-dev
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
+    tar xvf libsodium.tar.gz
+    cd libsodium-$SODIUM_VERS
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    cd ..
+  fi
 - |
   if [ ! -f "$HOME/.local/lib/librocksdb.so" ]; then
-    wget -O rocksdb-5.6.1.tar.gz https://github.com/facebook/rocksdb/archive/v5.6.1.tar.gz
-    tar xvf rocksdb-5.6.1.tar.gz
-    cd rocksdb-5.6.1
+    wget -O rocksdb-$ROCKSDB_VERS.tar.gz https://github.com/facebook/rocksdb/archive/v$ROCKSDB_VERS.tar.gz
+    tar xvf rocksdb-$ROCKSDB_VERS.tar.gz
+    cd rocksdb-$ROCKSDB_VERS
     INSTALL_PATH=$HOME/.local make install-shared
     cd ..
   fi
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
 - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
+- |
+  if [[ "$FEATURE" == "fmt" ]]; then
+    cargo-audit -V || cargo install cargo-audit --force
+    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    cargo update
+    fi
+- |
+  case "$FEATURE" in
+  clippy* )
+    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+  ;;
+  esac
+- cargo install --list
+script: |
+  case "$FEATURE" in
 
-script:
-- cargo fmt -p exonum -- --write-mode=diff
-- cargo fmt -p sandbox -- --write-mode=diff
-- cd exonum
-- cargo +$NIGHTLY_RUST clippy -- -D warnings
-- cd ..
-- cd sandbox
-- cargo +$NIGHTLY_RUST clippy -- -D warnings
-- cd ..
-- cargo audit
-- cargo test --manifest-path exonum/Cargo.toml
-- cargo test --manifest-path sandbox/Cargo.toml
+  "fmt" )
+      cargo audit
+      cargo fmt -p exonum -- --write-mode=diff
+      cargo fmt -p sandbox -- --write-mode=diff
+  ;;
 
-addons:
-  apt:
-    packages:
-      - libcurl4-openssl-dev
-      - libelf-dev
-      - libdw-dev
-      - binutils-dev
-      - libiberty-dev
+  "clippy-core" )
+      cd exonum && cargo clippy -- -D warnings
+  ;;
+  "clippy-sandbox" )
+      cd sandbox && cargo clippy -- -D warnings
+  ;;
+  "test-core" )
+      RUST_LOG=off cargo test -p exonum --tests --lib
+  ;;
+  "test-sandbox" )
+      RUST_LOG=off cargo test -p sandbox
+  ;;
+  "test-doc" )
+      cargo test -p exonum --doc -- --test-threads=2
+  ;;
+
+  esac
 
 after_success: |
   [ $TRAVIS_BRANCH = master ] &&
@@ -76,7 +121,7 @@ after_success: |
   cd build &&
   cmake .. &&
   make &&
-  sudo make install &&
+  make install &&
   cd ../.. &&
   rm -rf kcov-master &&
   for file in target/debug/exonum-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
