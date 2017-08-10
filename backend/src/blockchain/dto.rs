@@ -27,7 +27,7 @@ encoding_struct! {
 encoding_struct! {
     /// Information about payment.
     struct PaymentInfo {
-        const SIZE = 56;
+        const SIZE = 24;
 
         /// Unique user identifier.
         field user_id:                  &str        [00 => 08]

@@ -1,4 +1,5 @@
 pub mod dto;
+pub mod schema;
 
 use serde_json;
 use serde_json::Value;
