@@ -20,7 +20,7 @@ use std::time::SystemTime;
 use crypto::{hash, gen_keypair};
 use blockchain::{self, BlockProof, Block};
 use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
-               BlockResponse, RequestBlock};
+               BlockResponse, BlockRequest};
 
 use super::{Field, Offset};
 
@@ -433,7 +433,7 @@ fn test_request_block() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let request = RequestBlock::new(&public_key, &public_key, 1, &secret_key);
+    let request = BlockRequest::new(&public_key, &public_key, 1, &secret_key);
     // read
     assert_eq!(request.from(), &public_key);
     assert_eq!(request.height(), 1);

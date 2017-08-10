@@ -51,15 +51,15 @@ pub const PRECOMMIT_MESSAGE_ID: u16 = 4;
 pub const BLOCK_RESPONSE_MESSAGE_ID: u16 = 5;
 
 /// `RequestPropose` message id.
-pub const REQUEST_PROPOSE_MESSAGE_ID: u16 = 6;
+pub const PROPOSE_REQUEST_MESSAGE_ID: u16 = 6;
 /// `RequestTransactions` message id.
-pub const REQUEST_TRANSACTIONS_MESSAGE_ID: u16 = 7;
+pub const TRANSACTIONS_REQUEST_MESSAGE_ID: u16 = 7;
 /// `RequestPrevotes` message id.
-pub const REQUEST_PREVOTES_MESSAGE_ID: u16 = 8;
+pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = 8;
 /// `RequestPeers` message id.
-pub const REQUEST_PEERS_MESSAGE_ID: u16 = 9;
+pub const PEERS_REQUEST_MESSAGE_ID: u16 = 9;
 /// `RequestBlock` message id.
-pub const REQUEST_BLOCK_MESSAGE_ID: u16 = 10;
+pub const BLOCK_REQUEST_MESSAGE_ID: u16 = 10;
 
 message! {
 /// Connect to a node.
@@ -99,12 +99,12 @@ message! {
 ///     * is already known
 ///
 /// ### Processing
-/// If the message contains unknown transactions, then `RequestTransactions` is sent in reply.
+/// If the message contains unknown transactions, then `TransactionsRequest` is sent in reply.
 /// Otherwise `Prevote` is broadcast.
 ///
 /// ### Generation
 /// A node broadcasts `Propose` if it is a leader and is not locked for a different proposal. Also
-/// `Propose` can be sent as response to `RequestPropose`.
+/// `Propose` can be sent as response to `ProposeRequest`.
     struct Propose {
         const TYPE = CONSENSUS;
         const ID = PROPOSE_MESSAGE_ID;
@@ -132,9 +132,9 @@ message! {
 /// ### Processing
 /// Pre-vote is added to the list of known votes for the same proposal.
 /// If `locked_round` number from the message is bigger than in a node state, then a node replies
-/// with `RequestPrevotes`.
+/// with `PrevotesRequest`.
 /// If there are unknown transactions in the propose specified by `propose_hash`,
-/// `RequestTransactions` is sent in reply.
+/// `TransactionsRequest` is sent in reply.
 /// Otherwise if all transactions are known and there are +2/3 pre-votes, then a node is locked
 /// to that proposal and `Precommit` is broadcast.
 ///
@@ -166,10 +166,10 @@ message! {
 ///
 /// ### Processing
 /// Pre-commit is added to the list of known pre-commits.
-/// If a proposal is unknown to the node, `RequestPropose` is sent in reply.
+/// If a proposal is unknown to the node, `ProposeRequest` is sent in reply.
 /// If `round` number from the message is bigger than a node's "locked round", then a node replies
-/// with `RequestPrevotes`.
-/// If there are unknown transactions, then `RequestTransactions` is sent in reply.
+/// with `PrevotesRequest`.
+/// If there are unknown transactions, then `TransactionsRequest` is sent in reply.
 /// If a validator receives +2/3 precommits for the same proposal with the same block_hash, then
 /// block is executed and `Status` is broadcast.
 ///
@@ -204,7 +204,7 @@ message! {
 /// height.
 ///
 /// ### Processing
-/// If the message's `height` number is bigger than a node's one, then `RequestBlock` with current
+/// If the message's `height` number is bigger than a node's one, then `BlockRequest` with current
 /// node's height is sent in reply.
 ///
 /// ### Generation
@@ -237,7 +237,7 @@ message! {
 /// The block is added to the blockchain.
 ///
 /// ### Generation
-/// The message is sent as response to `RequestBlock`.
+/// The message is sent as response to `BlockRequest`.
     struct BlockResponse {
         const TYPE = CONSENSUS;
         const ID = BLOCK_RESPONSE_MESSAGE_ID;
@@ -266,10 +266,10 @@ message! {
 /// `Propose` is sent as the response.
 ///
 /// ### Generation
-/// A node can send `RequestPropose` during `Precommit` and `Prevote` handling.
-    struct RequestPropose {
+/// A node can send `ProposeRequest` during `Precommit` and `Prevote` handling.
+    struct ProposeRequest {
         const TYPE = CONSENSUS;
-        const ID = REQUEST_PROPOSE_MESSAGE_ID;
+        const ID = PROPOSE_REQUEST_MESSAGE_ID;
         const SIZE = 104;
 
         /// The sender's public key.
@@ -291,9 +291,9 @@ message! {
 ///
 /// ### Generation
 /// This message can be sent during `Propose`, `Prevote` and `Precommit` handling.
-    struct RequestTransactions {
+    struct TransactionsRequest {
         const TYPE = CONSENSUS;
-        const ID = REQUEST_TRANSACTIONS_MESSAGE_ID;
+        const ID = TRANSACTIONS_REQUEST_MESSAGE_ID;
         const SIZE = 72;
 
         /// The sender's public key.
@@ -316,9 +316,9 @@ message! {
 ///
 /// ### Generation
 /// This message can be sent during `Prevote` and `Precommit` handling.
-    struct RequestPrevotes {
+    struct PrevotesRequest {
         const TYPE = CONSENSUS;
-        const ID = REQUEST_PREVOTES_MESSAGE_ID;
+        const ID = PREVOTES_REQUEST_MESSAGE_ID;
         const SIZE = 116;
 
         /// The sender's public key.
@@ -347,11 +347,11 @@ message! {
 /// Peer `Connect` messages are sent to the recipient.
 ///
 /// ### Generation
-/// `RequestPeers` message is sent regularly with the timeout controlled by
+/// `PeersRequest` message is sent regularly with the timeout controlled by
 /// `blockchain::ConsensusConfig::peers_timeout`.
-    struct RequestPeers {
+    struct PeersRequest {
         const TYPE = CONSENSUS;
-        const ID = REQUEST_PEERS_MESSAGE_ID;
+        const ID = PEERS_REQUEST_MESSAGE_ID;
         const SIZE = 64;
 
         /// The sender's public key.
@@ -372,9 +372,9 @@ message! {
 ///
 /// ### Generation
 /// This message can be sent during `Status` processing.
-    struct RequestBlock {
+    struct BlockRequest {
         const TYPE = CONSENSUS;
-        const ID = REQUEST_BLOCK_MESSAGE_ID;
+        const ID = BLOCK_REQUEST_MESSAGE_ID;
         const SIZE = 72;
 
         /// The sender's public key.
