@@ -13,7 +13,8 @@ use serde_json;
 
 use exonum::api::Api;
 use exonum::blockchain::Transaction;
-use exonum::crypto::{hash, Hash, HexValue, gen_keypair, PublicKey, SecretKey};
+use exonum::encoding::serialize::HexValue;
+use exonum::crypto::{Hash, gen_keypair, PublicKey, SecretKey};
 use exonum::events::Error as EventsError;
 use exonum::messages::{Message, RawMessage, FromRaw};
 use exonum::node::TransactionSend;
@@ -24,9 +25,10 @@ use sandbox::sandbox_tests_helper::add_one_height_with_transactions;
 use sandbox::sandbox_tests_helper::SandboxState;
 
 use TimestampingService;
-use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp, UserInfo, PaymentInfo, Timestamp};
-use blockchain::schema::Schema;
-use api::PublicApi;
+use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp, UserInfo, UserInfoEntry, PaymentInfo,
+                      Timestamp};
+use blockchain::schema::INITIAL_TIMESTAMPS;
+use api::{PublicApi, TimestampInfo};
 
 pub struct TimestampingSandbox {
     inner: Sandbox,
@@ -186,7 +188,7 @@ fn test_api_put_user() {
 
     let user_info = {
         let (p, s) = gen_keypair();
-        UserInfo::new("User", &p, s[..].to_vec(), "metadata")
+        UserInfo::new("User", &p, &s[..].to_vec().to_hex(), "metadata")
     };
     let keypair = sandbox.service_keypair();
     let tx = TxUpdateUser::new(&keypair.0, user_info, &keypair.1);
@@ -205,9 +207,7 @@ fn test_api_put_payment() {
 
     let sandbox = TimestampingSandbox::new();
 
-    let info = 
-        PaymentInfo::new("User", 1000, "metadata")
-    ;
+    let info = PaymentInfo::new("User", 1000, "metadata");
     let keypair = sandbox.service_keypair();
     let tx = TxPayment::new(&keypair.0, info, &keypair.1);
 
@@ -225,9 +225,7 @@ fn test_api_put_timestamp() {
 
     let sandbox = TimestampingSandbox::new();
 
-    let info = 
-        Timestamp::new("User", &Hash::zero(), "metadata")
-    ;
+    let info = Timestamp::new("User", &Hash::zero(), "metadata");
     let keypair = gen_keypair();
     let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
 
@@ -239,3 +237,58 @@ fn test_api_put_timestamp() {
     assert_eq!(tx2.hash(), tx_hash);
 }
 
+#[test]
+fn test_api_get_user() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let user_info = {
+        let (p, s) = gen_keypair();
+        UserInfo::new("first_user", &p, &s[..].to_vec().to_hex(), "metadata")
+    };
+    let keypair = sandbox.service_keypair();
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+
+    // Checks results
+    let api = TimestampingApiSandbox::new(&sandbox);
+    let entry: UserInfoEntry = api.get("/v1/users/first_user");
+
+    assert_eq!(entry.info(), user_info);
+    assert_eq!(entry.available_timestamps(), INITIAL_TIMESTAMPS);
+    assert_eq!(entry.timestamps_hash(), &Hash::zero());
+    assert_eq!(entry.payments_hash(), &Hash::zero());
+}
+
+
+#[test]
+fn test_api_get_timestamp_exist() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let keypair = gen_keypair();
+    // Create user
+    let user_info = UserInfo::new(
+        "first_user",
+        &keypair.0,
+        &keypair.1[..].to_vec().to_hex(),
+        "metadata",
+    );
+    let keypair = sandbox.service_keypair();
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+    // Create timestamp
+    let info = Timestamp::new("first_user", &Hash::zero(), "metadata");
+    let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
+    sandbox.add_height_with_tx(tx);
+
+    // get proof
+    let api = TimestampingApiSandbox::new(&sandbox);
+    let _: serde_json::Value = api.get(&format!(
+        "/v1/timestamps/first_user/{}",
+        Hash::zero().to_hex()
+    ));
+    // TODO implement proof validation
+}

@@ -6,13 +6,24 @@ use router::{Router, Params};
 use bodyparser;
 use serde::Deserialize;
 
-use exonum::crypto::{Hash, HexValue, Signature};
-use exonum::blockchain::{Blockchain, Transaction};
+use exonum::crypto::{Hash, HexValue};
+use exonum::blockchain::{Blockchain, Transaction, BlockProof, Schema as CoreSchema};
 use exonum::node::TransactionSend;
 use exonum::api::{Api, ApiError};
 use exonum::storage::MapProof;
 
-use blockchain::dto::{TxUpdateUser, TxTimestamp, TxPayment};
+use TIMESTAMPING_SERVICE;
+use blockchain::ToHash;
+use blockchain::schema::Schema;
+use blockchain::dto::{TxUpdateUser, TxTimestamp, TxPayment, UserInfoEntry, TimestampEntry};
+
+#[derive(Debug, Serialize)]
+pub struct TimestampInfo {
+    pub block_info: BlockProof,
+    pub state_proof: MapProof<Hash>,
+    pub user_proof: MapProof<UserInfoEntry>,
+    pub timestamp_proof: MapProof<TimestampEntry>,
+}
 
 #[derive(Clone)]
 pub struct PublicApi<T: TransactionSend + Clone + 'static> {
@@ -31,24 +42,42 @@ where
         }
     }
 
-    // fn get_content(&self, hash: &Hash) -> Result<Content, ApiError> {
-    //     let view = self.blockchain.snapshot();
-    //     TimestampingSchema::new(&view)
-    //         .contents()
-    //         .get(&hash)
-    //         .ok_or_else(|| ApiError::FileNotFound(*hash))
-    // }
-
-    // fn get_proof(&self, hash: &Hash) -> Result<MapProof<Content>, ApiError> {
-    //     let view = self.blockchain.snapshot();
-    //     let schema = TimestampingSchema::new(&view);
-    //     Ok(schema.contents().get_proof(&hash))
-    // }
-
-    fn put_transaction<Tx: Transaction>(&self, tx: Tx) -> Result<Hash, ApiError> {
+    pub fn put_transaction<Tx: Transaction>(&self, tx: Tx) -> Result<Hash, ApiError> {
         let hash = tx.hash();
         self.channel.send(Box::new(tx))?;
         Ok(hash)
+    }
+
+    pub fn user_info(&self, user_id: &str) -> Result<Option<UserInfoEntry>, ApiError> {
+        let snap = self.blockchain.snapshot();
+        Ok(Schema::new(&snap).users().get(&user_id.to_hash()))
+    }
+
+    pub fn timestamp_info(
+        &self,
+        user_id: &str,
+        content_hash: &Hash,
+    ) -> Result<TimestampInfo, ApiError> {
+        let snap = self.blockchain.snapshot();
+        let (state_proof, block_info) = {
+            let core_schema = CoreSchema::new(&snap);
+
+            let last_block_height = self.blockchain.last_block().height();
+            let block_proof = core_schema.block_and_precommits(last_block_height).unwrap();
+            let state_proof = core_schema.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
+            (state_proof, block_proof)
+        };
+
+        let schema = Schema::new(&snap);
+        let user_proof = schema.users().get_proof(&user_id.to_hash());
+        let timestamp_proof = schema.timestamps(user_id).get_proof(content_hash);
+
+        Ok(TimestampInfo {
+            block_info,
+            state_proof,
+            user_proof,
+            timestamp_proof,
+        })
     }
 
     fn make_put_request<Tx>(&self, router: &mut Router, endpoint: &str, name: &str)
@@ -96,45 +125,37 @@ where
     T: TransactionSend + Clone + 'static,
 {
     fn wire(&self, router: &mut Router) {
+        let api = self.clone();
+        let get_user = move |req: &mut Request| -> IronResult<Response> {
+            let params = req.extensions.get::<Router>().unwrap();
+            let id = params.find("user_id").ok_or_else(|| {
+                let msg = "User id is unspecified";
+                ApiError::IncorrectRequest(msg.into())
+            })?;
+            let user_info = api.user_info(id)?;
+            api.ok_response(&json!(user_info))
+        };
+
+        let api = self.clone();
+        let get_timestamp = move |req: &mut Request| -> IronResult<Response> {
+            let params = req.extensions.get::<Router>().unwrap();
+            let id = params.find("user_id").ok_or_else(|| {
+                let msg = "User id is unspecified";
+                ApiError::IncorrectRequest(msg.into())
+            })?;
+            let hash = parse_hex(params, "content_hash")?;
+            let user_info = api.timestamp_info(id, &hash)?;
+            api.ok_response(&json!(user_info))
+        };
+
         self.make_put_request::<TxUpdateUser>(router, "/v1/users", "put_user");
         self.make_put_request::<TxPayment>(router, "/v1/payments", "put_payment");
         self.make_put_request::<TxTimestamp>(router, "/v1/timestamps", "put_timestamp");
-
-        // Receive a message by POST and play it back.
-        // let api = self.clone();
-        // let put_content = move |req: &mut Request| -> IronResult<Response> {
-        //     match req.get::<bodyparser::Struct<Content>>() {
-        //         Ok(Some(content)) => {
-        //             let tx = api.put_content(content)?;
-        //             api.ok_response(&json!(tx))
-        //         }
-        //         Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-        //         Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
-        //     }
-        // };
-
-        // let api = self.clone();
-        // let get_content = move |req: &mut Request| -> IronResult<Response> {
-        //     let map = req.extensions.get::<Router>().unwrap();
-
-        //     let hash = parse_hex(&map, "hash")?;
-        //     let content = api.get_content(&hash)?;
-
-        //     api.ok_response(&json!(content))
-        // };
-
-        // let api = self.clone();
-        // let get_proof = move |req: &mut Request| -> IronResult<Response> {
-        //     let map = req.extensions.get::<Router>().unwrap();
-
-        //     let hash = parse_hex(&map, "hash")?;
-        //     let proof = api.get_proof(&hash)?;
-
-        //     api.ok_response(&json!(proof))
-        // };
-
-        // router.get("/v1/content/:hash", get_content, "get_content");
-        // router.get("/v1/proof/:hash", get_proof, "get_proof");
-        // router.put("/v1/content", put_content, "put_content");
+        router.get("/v1/users/:user_id", get_user, "get_user");
+        router.get(
+            "/v1/timestamps/:user_id/:content_hash",
+            get_timestamp,
+            "get_timestamp",
+        );
     }
 }

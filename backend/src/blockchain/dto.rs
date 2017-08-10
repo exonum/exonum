@@ -1,5 +1,3 @@
-use std::time::SystemTime;
-
 use exonum::crypto::{PublicKey, Hash};
 
 use TIMESTAMPING_SERVICE;
@@ -17,8 +15,9 @@ encoding_struct! {
         field id:                       &str        [00 => 08]
         /// Public key of user.
         field pub_key:                  &PublicKey  [08 => 40]
+        // FIXME fix serialize issue in core (Vec<u8> must serialize as hex!)
         /// Encrypted secret key.
-        field encrypted_secret_key:     Vec<u8>     [40 => 48]
+        field encrypted_secret_key:     &str        [40 => 48] 
         /// Additional metadata.
         field metadata:                 &str        [48 => 56]
     }
@@ -67,6 +66,19 @@ encoding_struct! {
         field payments_hash:            &Hash       [48 => 80] 
     }
 }
+
+encoding_struct! {
+    /// Timestamp entry
+    struct TimestampEntry {
+        const SIZE = 40;
+
+        /// User identifier.
+        field timestamp:                Timestamp   [00 => 08]
+        /// Hash of tx.
+        field tx_hash:                  &Hash       [08 => 40]
+    }
+}
+
 
 message! {
     /// Create or update user.

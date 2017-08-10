@@ -1,14 +1,14 @@
-use exonum::crypto::{Hash, hash, PublicKey};
-use exonum::storage::{StorageValue, StorageKey, MapIndex, ProofMapIndex, ProofListIndex, Snapshot,
+use exonum::crypto::{Hash, PublicKey};
+use exonum::storage::{MapIndex, ProofMapIndex, ProofListIndex, Snapshot,
                       Fork};
-use exonum::storage::proof_map_index::ProofMapKey;
 use exonum::blockchain::gen_prefix;
+use exonum::messages::Message;
 
 use TIMESTAMPING_SERVICE;
 use blockchain::ToHash;
-use blockchain::dto::{UserInfoEntry, UserInfo, Timestamp, PaymentInfo};
+use blockchain::dto::{UserInfoEntry, UserInfo, Timestamp, TimestampEntry, PaymentInfo};
 
-const INITIAL_TIMESTAMPS: i64 = 10;
+pub const INITIAL_TIMESTAMPS: i64 = 10;
 
 #[derive(Debug)]
 pub struct Schema<T> {
@@ -35,9 +35,9 @@ where
         ProofMapIndex::new(prefix, &self.view)
     }
 
-    pub fn timestamps(&self, user_id: &str) -> ProofListIndex<&T, Timestamp> {
+    pub fn timestamps(&self, user_id: &str) -> ProofMapIndex<&T, Hash, TimestampEntry> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &user_id.to_owned());
-        ProofListIndex::new(prefix, &self.view)
+        ProofMapIndex::new(prefix, &self.view)
     }
 
     pub fn payments(&self, user_id: &str) -> ProofListIndex<&T, PaymentInfo> {
@@ -61,9 +61,9 @@ impl<'a> Schema<&'a mut Fork> {
         ProofMapIndex::new(prefix, &mut self.view)
     }
 
-    pub fn timestamps_mut(&mut self, user_id: &str) -> ProofListIndex<&mut Fork, Timestamp> {
+    pub fn timestamps_mut(&mut self, user_id: &str) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &user_id.to_owned());
-        ProofListIndex::new(prefix, &mut self.view)
+        ProofMapIndex::new(prefix, &mut self.view)
     }
 
     pub fn payments_mut(&mut self, user_id: &str) -> ProofListIndex<&mut Fork, PaymentInfo> {
@@ -71,7 +71,7 @@ impl<'a> Schema<&'a mut Fork> {
         ProofListIndex::new(prefix, &mut self.view)
     }
 
-    pub fn known_keys_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Vec<u8>> {
+    pub fn known_keys_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, String> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 3, &());
         MapIndex::new(prefix, &mut self.view)
     }
@@ -81,7 +81,7 @@ impl<'a> Schema<&'a mut Fork> {
         let entry = if let Some(entry) = self.users().get(&user_id) {
             self.known_keys_mut().put(
                 user.pub_key(),
-                user.encrypted_secret_key(),
+                user.encrypted_secret_key().into(),
             );
             UserInfoEntry::new(
                 user,
@@ -100,6 +100,7 @@ impl<'a> Schema<&'a mut Fork> {
         let user_id_hash = user_id.to_hash();
         if let Some(entry) = self.users().get(&user_id_hash) {
             self.payments_mut(&user_id).push(payment);
+            // Update user info
             let entry = UserInfoEntry::new(
                 entry.info(),
                 entry.available_timestamps(),
@@ -110,14 +111,17 @@ impl<'a> Schema<&'a mut Fork> {
         }
     }
 
-    pub fn add_timestamp(&mut self, timestamp: Timestamp) {
+    pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
+        let timestamp = timestamp_entry.timestamp();
         let user_id = timestamp.user_id().to_owned();
         let user_id_hash = user_id.to_hash();
         if let Some(entry) = self.users().get(&user_id_hash) {
-            self.timestamps_mut(&user_id).push(timestamp);
+            let content_hash = *timestamp.content_hash();
+            self.timestamps_mut(&user_id).put(&content_hash, timestamp_entry);
+            // Update user info
             let entry = UserInfoEntry::new(
                 entry.info(),
-                entry.available_timestamps(),
+                entry.available_timestamps() - 1,
                 &self.timestamps(&user_id).root_hash(),
                 entry.payments_hash(),
             );

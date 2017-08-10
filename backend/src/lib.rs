@@ -2,6 +2,8 @@
 extern crate exonum;
 extern crate serde;
 #[macro_use]
+extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 extern crate chrono;
 extern crate bodyparser;
@@ -20,8 +22,8 @@ extern crate mime;
 extern crate sandbox;
 
 pub mod api;
+pub mod blockchain;
 mod service;
-mod blockchain;
 
 pub use service::{TimestampingService, TIMESTAMPING_SERVICE};
 
