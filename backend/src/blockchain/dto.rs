@@ -29,7 +29,7 @@ encoding_struct! {
     struct PaymentInfo {
         const SIZE = 24;
 
-        /// Unique user identifier.
+        /// User identifier.
         field user_id:                  &str        [00 => 08]
         /// Total amount of available transactions.
         field total_amount:             u64         [08 => 16]
@@ -41,12 +41,14 @@ encoding_struct! {
 encoding_struct! {
     /// Information about payment.
     struct Timestamp {
-        const SIZE = 40;
+        const SIZE = 48;
 
+        /// User identifier.
+        field user_id:                  &str        [00 => 08]
         /// Hash of content.
-        field content_hash:             &Hash       [00 => 32]
+        field content_hash:             &Hash       [08 => 40]
         /// Additional metadata.
-        field metadata:                 &str        [32 => 40]
+        field metadata:                 &str        [40 => 48]
     }
 }
 
@@ -71,10 +73,12 @@ message! {
     struct TxUpdateUser {
         const TYPE = TIMESTAMPING_SERVICE_ID;
         const ID = TX_UPDATE_USER_ID;
-        const SIZE = 8;
+        const SIZE = 40;
 
+        /// Public key of transaction.
+        field pub_key:                  &PublicKey  [00 => 32]
         /// User information content.
-        field content:                  UserInfo    [00 => 08]
+        field content:                  UserInfo    [32 => 40]
     }
 }
 
@@ -83,10 +87,12 @@ message! {
     struct TxPayment {
         const TYPE = TIMESTAMPING_SERVICE_ID;
         const ID = TX_PAYMENT_ID;
-        const SIZE = 8;
+        const SIZE = 40;
 
+        /// Public key of transaction.
+        field pub_key:                  &PublicKey  [00 => 32]
         /// Information about payment.
-        field content:                  PaymentInfo [00 => 08]
+        field content:                  PaymentInfo [32 => 40]
     }
 }
 
@@ -95,9 +101,11 @@ message! {
     struct TxTimestamp {
         const TYPE = TIMESTAMPING_SERVICE_ID;
         const ID = TX_TIMESTAMP;
-        const SIZE = 8;
+        const SIZE = 40;
 
+        /// Public key of transaction.
+        field pub_key:                  &PublicKey  [00 => 32]
         /// Timestamp content.
-        field content:                  Timestamp   [00 => 08]
+        field content:                  Timestamp   [32 => 40]
     }
 }
