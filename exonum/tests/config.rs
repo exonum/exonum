@@ -17,7 +17,6 @@
 extern crate pretty_assertions;
 extern crate toml;
 extern crate exonum;
-extern crate lazy_static;
 
 use std::ffi::OsString;
 use std::fs::File;

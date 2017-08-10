@@ -426,7 +426,8 @@ impl ExonumJson for Height {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error>> {
-        Ok(Value::String(self.0.to_string()))
+        let val: u64 = self.to_owned().into();
+        Ok(Value::String(val.to_string()))
     }
 }
 
@@ -443,7 +444,8 @@ impl ExonumJson for Round {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error>> {
-        Ok(Value::Number((self.0).into()))
+        let val: u32 = self.to_owned().into();
+        Ok(Value::Number(val.into()))
     }
 }
 
@@ -460,7 +462,8 @@ impl ExonumJson for ValidatorId {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error>> {
-        Ok(Value::Number((self.0).into()))
+        let val: u16 = self.to_owned().into();
+        Ok(Value::Number(val.into()))
     }
 }
 

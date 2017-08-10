@@ -28,7 +28,7 @@ fn test_json_response_for_complex_val() {
     let tx_count = txs.len() as u32;
     let complex_val = Block::new(
         SCHEMA_MAJOR_VERSION,
-        ValidatorId(0),
+        ValidatorId::zero(),
         Height(24),
         tx_count,
         &Hash::new([24; 32]),

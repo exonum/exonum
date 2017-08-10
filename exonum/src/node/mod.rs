@@ -456,7 +456,8 @@ where
 
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
-        let ms = (round.0 - 1) as u64 * self.round_timeout();
+        let previous_round: u64 = round.previous().into();
+        let ms = previous_round * self.round_timeout();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }

@@ -92,20 +92,6 @@ impl Height {
         assert_ne!(0, self.0);
         self.0 -= 1;
     }
-
-    /// Returns inner value as `usize`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::helpers::Height;
-    ///
-    /// let height = Height::zero();
-    /// assert_eq!(0, height.as_usize());
-    /// ```
-    pub fn as_usize(&self) -> usize {
-        self.0 as usize
-    }
 }
 
 /// Consensus round index.
@@ -230,20 +216,6 @@ impl Round {
             last: to,
         }
     }
-
-    /// Returns inner value as `usize`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::helpers::Round;
-    ///
-    /// let round = Round::zero();
-    /// assert_eq!(0, round.as_usize());
-    /// ```
-    pub fn as_usize(&self) -> usize {
-        self.0 as usize
-    }
 }
 
 /// Validators identifier.
@@ -264,25 +236,17 @@ impl ValidatorId {
     pub fn zero() -> Self {
         ValidatorId(0)
     }
-
-    /// Returns inner value as `usize`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::helpers::ValidatorId;
-    ///
-    /// let id = ValidatorId::zero();
-    /// assert_eq!(0, id.as_usize());
-    /// ```
-    pub fn as_usize(&self) -> usize {
-        self.0 as usize
-    }
 }
 
 impl fmt::Display for Height {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl From<Height> for u64 {
+    fn from(val: Height) -> Self {
+        val.0
     }
 }
 
@@ -292,9 +256,33 @@ impl fmt::Display for Round {
     }
 }
 
+impl From<Round> for u32 {
+    fn from(val: Round) -> Self {
+        val.0
+    }
+}
+
+impl From<Round> for u64 {
+    fn from(val: Round) -> Self {
+        val.0 as u64
+    }
+}
+
 impl fmt::Display for ValidatorId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+impl From<ValidatorId> for u16 {
+    fn from(val: ValidatorId) -> Self {
+        val.0
+    }
+}
+
+impl From<ValidatorId> for usize {
+    fn from(val: ValidatorId) -> Self {
+        val.0 as usize
     }
 }
 

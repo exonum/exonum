@@ -105,7 +105,7 @@ macro_rules! implement_std_typedef_field {
                         buffer: &mut Vec<u8>,
                         from: $crate::encoding::Offset,
                         to: $crate::encoding::Offset) {
-                $fn_write(&mut buffer[from as usize..to as usize], self.0)
+                $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
             }
 
             fn check(_: &'a [u8],

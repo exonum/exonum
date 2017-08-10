@@ -306,7 +306,7 @@ fn test_block() {
 
     let content = blockchain::Block::new(
         blockchain::SCHEMA_MAJOR_VERSION,
-        ValidatorId(0),
+        ValidatorId::zero(),
         Height(500),
         tx_count,
         &hash(&[1]),
@@ -390,7 +390,7 @@ fn test_empty_block() {
 
     let content = blockchain::Block::new(
         blockchain::SCHEMA_MAJOR_VERSION,
-        ValidatorId(0),
+        ValidatorId::zero(),
         Height(200),
         1,
         &hash(&[1]),

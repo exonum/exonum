@@ -46,7 +46,6 @@ exonum_flamer = { version = "^0.1.3", path="../3rdparty/flamer/", optional = tru
 [dev-dependencies]
 pretty_assertions = "0.2.1"
 tempdir = "0.3.5"
-lazy_static = "0.2.8"
 
 [features]
 default = []

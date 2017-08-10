@@ -219,7 +219,7 @@ where
 
     /// Inserts a new message if it hasn't been inserted yet.
     pub fn insert(&mut self, message: &T) {
-        let voter = message.validator().as_usize();
+        let voter: usize = message.validator().into();
         if !self.validators[voter] {
             self.count += 1;
             self.validators.set(voter, true);
@@ -534,9 +534,8 @@ impl State {
 
     /// Returns public key of a validator identified by id.
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
-        self.validators().get(id.as_usize()).map(
-            |x| x.consensus_key,
-        )
+        let id: usize = id.into();
+        self.validators().get(id).map(|x| x.consensus_key)
     }
 
     /// Returns the consensus public key of the current node.
@@ -561,9 +560,9 @@ impl State {
 
     /// Returns the leader id for the specified round and current height.
     pub fn leader(&self, round: Round) -> ValidatorId {
-        ValidatorId(
-            ((self.height().0 + round.0 as u64) % (self.validators().len() as u64)) as u16,
-        )
+        let height: u64 = self.height().into();
+        let round: u64 = round.into();
+        ValidatorId(((height + round) % (self.validators().len() as u64)) as u16)
     }
 
     /// Returns the height for a validator identified by the public key.
