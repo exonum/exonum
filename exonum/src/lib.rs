@@ -32,7 +32,7 @@ extern crate exonum_profiler as profiler;
 extern crate log;
 extern crate byteorder;
 extern crate mio;
-extern crate sodiumoxide;
+extern crate exonum_sodiumoxide as sodiumoxide;
 #[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
 extern crate exonum_leveldb as leveldb;
 #[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
