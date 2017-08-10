@@ -59,6 +59,7 @@ extern crate bodyparser;
 extern crate params;
 extern crate cookie;
 extern crate mount;
+extern crate atty;
 
 #[macro_use]
 pub mod encoding;
