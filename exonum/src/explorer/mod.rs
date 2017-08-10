@@ -36,17 +36,23 @@ pub struct BlockchainExplorer<'a> {
 /// Block information.
 #[derive(Debug, Serialize)]
 pub struct BlockInfo {
-    block: Block,
-    precommits: Vec<Precommit>,
-    txs: Vec<Hash>,
+    /// Block header from blockchain.
+    pub block: Block,
+    /// List of precommit for this block.
+    pub precommits: Vec<Precommit>,
+    /// List of hashes for transactions that was executed into this block.
+    pub txs: Vec<Hash>,
 }
 
 /// Transaction information.
 #[derive(Debug, Serialize)]
 pub struct TxInfo {
-    content: Value,
-    location: TxLocation,
-    proof_to_block_merkle_root: ListProof<Hash>,
+    /// `JSON` serialized transaction
+    pub content: Value,
+    /// Transaction location in block
+    pub location: TxLocation,
+    /// Proof that transaction really exist in database
+    pub proof_to_block_merkle_root: ListProof<Hash>,
 }
 
 impl<'a> BlockchainExplorer<'a> {
