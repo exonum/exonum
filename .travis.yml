@@ -27,7 +27,7 @@ cache:
   - $TRAVIS_BUILD_DIR/target
 
 dist: trusty
-sudo: required
+sudo: false
 
 env:
   global:
