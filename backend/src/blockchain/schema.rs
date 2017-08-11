@@ -1,6 +1,5 @@
 use exonum::crypto::{Hash, PublicKey};
-use exonum::storage::{MapIndex, ListIndex, ProofMapIndex, ProofListIndex, Snapshot,
-                      Fork};
+use exonum::storage::{MapIndex, ListIndex, ProofMapIndex, ProofListIndex, Snapshot, Fork};
 use exonum::blockchain::gen_prefix;
 
 use TIMESTAMPING_SERVICE;
@@ -44,6 +43,7 @@ where
         ProofListIndex::new(prefix, &self.view)
     }
 
+    // TODO Wonder if the proofs is needed here?
     pub fn known_keys(&self) -> MapIndex<&T, PublicKey, Vec<u8>> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 3, &());
         MapIndex::new(prefix, &self.view)
@@ -65,7 +65,10 @@ impl<'a> Schema<&'a mut Fork> {
         ProofMapIndex::new(prefix, &mut self.view)
     }
 
-    pub fn timestamps_mut(&mut self, user_id: &str) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
+    pub fn timestamps_mut(
+        &mut self,
+        user_id: &str,
+    ) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &user_id.to_owned());
         ProofMapIndex::new(prefix, &mut self.view)
     }
@@ -86,12 +89,14 @@ impl<'a> Schema<&'a mut Fork> {
     }
 
     pub fn add_user(&mut self, user: UserInfo) {
+        // Add user key to known.
+        self.known_keys_mut().put(
+            user.pub_key(),
+            user.encrypted_secret_key().to_vec(),
+        );
+        // Add or modify user.
         let user_id = user.id().to_hash();
         let entry = if let Some(entry) = self.users().get(&user_id) {
-            self.known_keys_mut().put(
-                user.pub_key(),
-                user.encrypted_secret_key().to_vec(),
-            );
             UserInfoEntry::new(
                 user,
                 entry.available_timestamps(),
@@ -127,7 +132,10 @@ impl<'a> Schema<&'a mut Fork> {
         if let Some(entry) = self.users().get(&user_id_hash) {
             // Add timestamp
             let content_hash = *timestamp.content_hash();
-            self.timestamps_mut(&user_id).put(&content_hash, timestamp_entry);
+            self.timestamps_mut(&user_id).put(
+                &content_hash,
+                timestamp_entry,
+            );
             self.timestamps_history_mut(&user_id).push(content_hash);
             // Update user info
             let entry = UserInfoEntry::new(

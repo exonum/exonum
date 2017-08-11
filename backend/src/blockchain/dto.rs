@@ -15,9 +15,8 @@ encoding_struct! {
         field id:                       &str        [00 => 08]
         /// Public key of user.
         field pub_key:                  &PublicKey  [08 => 40]
-        // FIXME fix serialize issue in core (Vec<u8> must serialize as hex!)
         /// Encrypted secret key.
-        field encrypted_secret_key:     &[u8]       [40 => 48] 
+        field encrypted_secret_key:     &[u8]       [40 => 48]
         /// Additional metadata.
         field metadata:                 &str        [48 => 56]
     }
@@ -63,7 +62,7 @@ encoding_struct! {
         /// Root hash of user timestamps.
         field timestamps_hash:          &Hash       [16 => 48]
         /// Root hash of user payments.
-        field payments_hash:            &Hash       [48 => 80] 
+        field payments_hash:            &Hash       [48 => 80]
     }
 }
 

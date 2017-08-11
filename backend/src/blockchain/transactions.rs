@@ -46,18 +46,17 @@ impl Transaction for TxTimestamp {
     fn execute(&self, view: &mut Fork) {
         let mut schema = Schema::new(view);
 
-        let mut key_is_latest = schema
-            .users()
-            .get(&self.content().user_id().to_hash())
-            .and_then(|entry| if entry.info().pub_key() == self.pub_key() {
-                Some(())
+        let key_is_suitable = {
+            let user_id_hash = self.content().user_id().to_hash();
+            if let Some(entry) = schema.users().get(&user_id_hash) {
+                entry.info().pub_key() == self.pub_key()
             } else {
-                None
-            })
-            .is_some();
-        key_is_latest = true;
+                false
+            }
+        };
 
-        if key_is_latest {
+        if key_is_suitable {
+            trace!("Timestamp added: {:?}", self);
             let entry = TimestampEntry::new(self.content(), &self.hash());
             schema.add_timestamp(entry);
         }

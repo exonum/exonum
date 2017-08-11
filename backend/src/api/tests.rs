@@ -307,7 +307,6 @@ fn test_api_get_timestamps_range() {
         &keypair.1[..].as_ref(),
         "metadata",
     );
-    let keypair = sandbox.service_keypair();
     let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
     sandbox.add_height_with_tx(tx);
     // Create 5 timestamps
