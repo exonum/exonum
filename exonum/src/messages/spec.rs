@@ -132,7 +132,7 @@ macro_rules! message {
         impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::encoding::Error> {
-                let min_message_size = $body as usize 
+                let min_message_size = $body as usize
                             + $crate::messages::HEADER_LENGTH as usize
                             + $crate::crypto::SIGNATURE_LENGTH as usize;
                 if raw.len() < min_message_size {
