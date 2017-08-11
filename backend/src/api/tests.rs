@@ -329,3 +329,40 @@ fn test_api_get_timestamps_range() {
     let timestamps: Vec<TimestampEntry> = api.get("/v1/timestamps/first_user?count=1&from=1");
     assert_eq!(timestamps.len(), 1);
 }
+
+#[test]
+fn test_api_get_payments_range() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let keypair = gen_keypair();
+    // Create user
+    let user_info = UserInfo::new(
+        "first_user",
+        &keypair.0,
+        &keypair.1[..].as_ref(),
+        "metadata",
+    );
+    let keypair = sandbox.service_keypair();
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+    // Create 5 payments
+    for i in 0..5 {
+        let info = PaymentInfo::new("first_user", i, &i.to_string());
+        let keypair = sandbox.service_keypair();
+        let tx = TxPayment::new(&keypair.0, info, &keypair.1);
+        sandbox.add_height_with_tx(tx);
+    }
+    // Api checks
+    let api = TimestampingApiSandbox::new(&sandbox);
+    // Get payments list
+    let payments: Vec<PaymentInfo> = api.get("/v1/payments/first_user?count=10");
+    assert_eq!(payments.len(), 5);
+    // Get latest payment
+    let payments: Vec<PaymentInfo> = api.get("/v1/payments/first_user?count=1");
+    assert_eq!(payments.len(), 1);
+    // Get first payment
+    let payments: Vec<PaymentInfo> = api.get("/v1/payments/first_user?count=1&from=1");
+    assert_eq!(payments.len(), 1);
+}

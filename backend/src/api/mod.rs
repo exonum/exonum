@@ -1,15 +1,15 @@
 #[cfg(test)]
 mod tests;
+pub mod parser;
 
 use std::cmp;
 
 use iron::prelude::*;
-use router::{Router, Params as RouteParams};
-use params::{Params, Value};
+use router::Router;
 use bodyparser;
 use serde::Deserialize;
 
-use exonum::crypto::{Hash, HexValue};
+use exonum::crypto::Hash;
 use exonum::blockchain::{Blockchain, Transaction, BlockProof, Schema as CoreSchema};
 use exonum::node::TransactionSend;
 use exonum::api::{Api, ApiError};
@@ -18,7 +18,9 @@ use exonum::storage::MapProof;
 use TIMESTAMPING_SERVICE;
 use blockchain::ToHash;
 use blockchain::schema::Schema;
-use blockchain::dto::{TxUpdateUser, TxTimestamp, TxPayment, UserInfoEntry, TimestampEntry};
+use blockchain::dto::{TxUpdateUser, TxTimestamp, TxPayment, UserInfoEntry, TimestampEntry,
+                      PaymentInfo};
+use api::parser::RequestParser;
 
 #[derive(Debug, Serialize)]
 pub struct TimestampInfo {
@@ -83,6 +85,28 @@ where
         Ok(timestamps)
     }
 
+    pub fn payments_range(
+        &self,
+        user_id: &str,
+        count: u64,
+        upper: Option<u64>,
+    ) -> Result<Vec<PaymentInfo>, ApiError> {
+        let snap = self.blockchain.snapshot();
+        let schema = ::blockchain::schema::Schema::new(&snap);
+        let payments_history = schema.payments(user_id);
+
+        let max_len = payments_history.len();
+        let upper = upper.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
+        let lower = upper.checked_sub(count).unwrap_or(0);
+        // TODO use reverse iterators from storage
+        let payments = (lower..upper)
+            .rev()
+            .map(|idx| payments_history.get(idx).unwrap())
+            .collect::<Vec<_>>();
+        Ok(payments)
+    }
+
+
     pub fn timestamp_info(
         &self,
         user_id: &str,
@@ -130,33 +154,6 @@ where
     }
 }
 
-fn parse_hex(map: &RouteParams, id: &str) -> Result<Hash, ApiError> {
-    match map.find(id) {
-        Some(hex_str) => {
-            let hash = Hash::from_hex(hex_str).map_err(|e| {
-                let msg = format!(
-                    "An error during parsing of the `{}` id occurred: {}",
-                    hex_str,
-                    e
-                );
-                ApiError::IncorrectRequest(msg.into())
-            })?;
-            Ok(hash)
-        }
-        None => {
-            let msg = format!("The `{}` hash is not specified.", id);
-            Err(ApiError::IncorrectRequest(msg.into()))
-        }
-    }
-}
-
-fn parse_u64<S: AsRef<str>>(s: S) -> Result<u64, ApiError> {
-    s.as_ref().parse::<u64>().map_err(|e| {
-        let msg = format!("Unable to parse number, an error occured: {}", e);
-        ApiError::IncorrectRequest(msg.into())
-    })
-}
-
 impl<T> Api for PublicApi<T>
 where
     T: TransactionSend + Clone + 'static,
@@ -164,61 +161,51 @@ where
     fn wire(&self, router: &mut Router) {
         let api = self.clone();
         let get_user = move |req: &mut Request| -> IronResult<Response> {
-            let route = req.extensions.get::<Router>().unwrap();
-            let id = route.find("user_id").ok_or_else(|| {
-                let msg = "User id is unspecified";
-                ApiError::IncorrectRequest(msg.into())
-            })?;
-            let user_info = api.user_info(id)?;
+            let parser = RequestParser::new(req);
+            let user_id = parser.route_param::<String>("user_id")?;
+
+            let user_info = api.user_info(&user_id)?;
             api.ok_response(&json!(user_info))
         };
 
         let api = self.clone();
         let get_timestamp = move |req: &mut Request| -> IronResult<Response> {
-            let route = req.extensions.get::<Router>().unwrap();
-            let id = route.find("user_id").ok_or_else(|| {
-                let msg = "User id is unspecified";
-                ApiError::IncorrectRequest(msg.into())
-            })?;
-            let hash = parse_hex(route, "content_hash")?;
-            let user_info = api.timestamp_info(id, &hash)?;
+            let parser = RequestParser::new(req);
+            let user_id = parser.route_param::<String>("user_id")?;
+            let content_hash = parser.route_param("content_hash")?;
+
+            let user_info = api.timestamp_info(&user_id, &content_hash)?;
             api.ok_response(&json!(user_info))
         };
 
         let api = self.clone();
-        let get_timestamp_range = move |req: &mut Request| -> IronResult<Response> {
-            let user_id = {
-                let route = req.extensions.get::<Router>().unwrap();
-                route
-                    .find("user_id")
-                    .ok_or_else(|| {
-                        let msg = "User id is unspecified";
-                        ApiError::IncorrectRequest(msg.into())
-                    })?
-                    .to_owned()
-            };
-
-            let params = req.get_ref::<Params>().unwrap();
-            let count = match params.find(&["count"]) {
-                Some(&Value::String(ref count)) => parse_u64(count)?,
-                _ => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required parameter of timestamps 'count' is missing".into(),
-                    ))?
-                }
-            };
-            let from = match params.find(&["from"]) {
-                Some(&Value::String(ref from)) => Some(parse_u64(from)?), 
-                None => None,
-                _ => {
-                    Err(ApiError::IncorrectRequest(
-                        "Parameter of timestamps 'from' is not number".into(),
-                    ))?
-                }
-            };
+        let get_timestamps_range = move |req: &mut Request| -> IronResult<Response> {
+            let mut parser = RequestParser::new(req);
+            let user_id = parser.route_param::<String>("user_id")?;
+            let count = parser.optional_param("count")?.ok_or_else(|| {
+                ApiError::IncorrectRequest(
+                    "Required parameter of timestamps 'count' is missing".into(),
+                )
+            })?;
+            let from = parser.optional_param("from")?;
 
             let timestamps = api.timestamps_range(&user_id, count, from)?;
             api.ok_response(&json!(timestamps))
+        };
+
+        let api = self.clone();
+        let get_payments_range = move |req: &mut Request| -> IronResult<Response> {
+            let mut parser = RequestParser::new(req);
+            let user_id = parser.route_param::<String>("user_id")?;
+            let count = parser.optional_param("count")?.ok_or_else(|| {
+                ApiError::IncorrectRequest(
+                    "Required parameter of timestamps 'count' is missing".into(),
+                )
+            })?;
+            let from = parser.optional_param("from")?;
+
+            let payments = api.payments_range(&user_id, count, from)?;
+            api.ok_response(&json!(payments))
         };
 
         self.make_put_request::<TxUpdateUser>(router, "/v1/users", "put_user");
@@ -232,8 +219,13 @@ where
         );
         router.get(
             "/v1/timestamps/:user_id",
-            get_timestamp_range,
-            "get_timestamp_range",
+            get_timestamps_range,
+            "get_timestamps_range",
+        );
+        router.get(
+            "/v1/payments/:user_id",
+            get_payments_range,
+            "get_payments_range",
         );
     }
 }
