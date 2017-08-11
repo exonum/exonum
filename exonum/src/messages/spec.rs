@@ -132,17 +132,19 @@ macro_rules! message {
         impl $crate::messages::FromRaw for $name {
             fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::encoding::Error> {
-
-                if raw.len() < $body as usize {
+                let min_message_size = $body as usize
+                            + $crate::messages::HEADER_LENGTH as usize
+                            + $crate::crypto::SIGNATURE_LENGTH as usize;
+                if raw.len() < min_message_size {
                     return Err($crate::encoding::Error::UnexpectedlyShortPayload {
                         actual_size: raw.len() as $crate::encoding::Offset,
-                        minimum_size: $body,
+                        minimum_size: min_message_size as $crate::encoding::Offset,
                     });
                 }
 
-                let len = <Self>::check_fields(&raw)?;
+                let body_len = <Self>::check_fields(&raw)?;
 
-                if len.unchecked_offset() as usize +
+                if body_len.unchecked_offset() as usize +
                     $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
                    return Err("Incorrect raw message length.".into())
                 }
