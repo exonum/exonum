@@ -17,7 +17,7 @@ encoding_struct! {
         field pub_key:                  &PublicKey  [08 => 40]
         // FIXME fix serialize issue in core (Vec<u8> must serialize as hex!)
         /// Encrypted secret key.
-        field encrypted_secret_key:     &str        [40 => 48] 
+        field encrypted_secret_key:     &[u8]       [40 => 48] 
         /// Additional metadata.
         field metadata:                 &str        [48 => 56]
     }

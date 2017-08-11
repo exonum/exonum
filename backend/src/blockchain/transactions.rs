@@ -2,8 +2,7 @@ use serde_json::{Value, to_value};
 
 use exonum::storage::Fork;
 use exonum::blockchain::Transaction;
-use exonum::messages::{Message, RawTransaction};
-use exonum::crypto::{PublicKey};
+use exonum::messages::Message;
 
 use blockchain::ToHash;
 use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp, TimestampEntry};
@@ -47,16 +46,16 @@ impl Transaction for TxTimestamp {
     fn execute(&self, view: &mut Fork) {
         let mut schema = Schema::new(view);
 
-        let key_is_latest = true;
-        // let key_is_latest = schema
-        //     .users()
-        //     .get(&self.content().user_id().to_hash())
-        //     .and_then(|entry| if entry.info().pub_key() == self.pub_key() {
-        //         Some(())
-        //     } else {
-        //         None
-        //     })
-        //     .is_some();
+        let mut key_is_latest = schema
+            .users()
+            .get(&self.content().user_id().to_hash())
+            .and_then(|entry| if entry.info().pub_key() == self.pub_key() {
+                Some(())
+            } else {
+                None
+            })
+            .is_some();
+        key_is_latest = true;
 
         if key_is_latest {
             let entry = TimestampEntry::new(self.content(), &self.hash());

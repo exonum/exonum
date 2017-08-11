@@ -14,7 +14,7 @@ use serde_json;
 use exonum::api::Api;
 use exonum::blockchain::Transaction;
 use exonum::encoding::serialize::HexValue;
-use exonum::crypto::{Hash, gen_keypair, PublicKey, SecretKey};
+use exonum::crypto::{gen_keypair, hash, Hash, PublicKey, SecretKey};
 use exonum::events::Error as EventsError;
 use exonum::messages::{Message, RawMessage, FromRaw};
 use exonum::node::TransactionSend;
@@ -26,9 +26,9 @@ use sandbox::sandbox_tests_helper::SandboxState;
 
 use TimestampingService;
 use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp, UserInfo, UserInfoEntry, PaymentInfo,
-                      Timestamp};
+                      Timestamp, TimestampEntry};
 use blockchain::schema::INITIAL_TIMESTAMPS;
-use api::{PublicApi, TimestampInfo};
+use api::PublicApi;
 
 pub struct TimestampingSandbox {
     inner: Sandbox,
@@ -188,7 +188,7 @@ fn test_api_put_user() {
 
     let user_info = {
         let (p, s) = gen_keypair();
-        UserInfo::new("User", &p, &s[..].to_vec().to_hex(), "metadata")
+        UserInfo::new("User", &p, &s[..].as_ref(), "metadata")
     };
     let keypair = sandbox.service_keypair();
     let tx = TxUpdateUser::new(&keypair.0, user_info, &keypair.1);
@@ -245,7 +245,7 @@ fn test_api_get_user() {
 
     let user_info = {
         let (p, s) = gen_keypair();
-        UserInfo::new("first_user", &p, &s[..].to_vec().to_hex(), "metadata")
+        UserInfo::new("first_user", &p, &s[..].as_ref(), "metadata")
     };
     let keypair = sandbox.service_keypair();
     let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
@@ -273,7 +273,7 @@ fn test_api_get_timestamp_exist() {
     let user_info = UserInfo::new(
         "first_user",
         &keypair.0,
-        &keypair.1[..].to_vec().to_hex(),
+        &keypair.1[..].as_ref(),
         "metadata",
     );
     let keypair = sandbox.service_keypair();
@@ -291,4 +291,41 @@ fn test_api_get_timestamp_exist() {
         Hash::zero().to_hex()
     ));
     // TODO implement proof validation
+}
+
+#[test]
+fn test_api_get_timestamps_range() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let keypair = gen_keypair();
+    // Create user
+    let user_info = UserInfo::new(
+        "first_user",
+        &keypair.0,
+        &keypair.1[..].as_ref(),
+        "metadata",
+    );
+    let keypair = sandbox.service_keypair();
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+    // Create 5 timestamps
+    for i in 0..5 {
+        let hash = hash(&[i]);
+        let info = Timestamp::new("first_user", &hash, &i.to_string());
+        let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
+        sandbox.add_height_with_tx(tx);
+    }
+    // Api checks
+    let api = TimestampingApiSandbox::new(&sandbox);
+    // Get timestamps list
+    let timestamps: Vec<TimestampEntry> = api.get("/v1/timestamps/first_user?count=10");
+    assert_eq!(timestamps.len(), 5);
+    // Get latest timestamp
+    let timestamps: Vec<TimestampEntry> = api.get("/v1/timestamps/first_user?count=1");
+    assert_eq!(timestamps.len(), 1);
+    // Get first timestamp
+    let timestamps: Vec<TimestampEntry> = api.get("/v1/timestamps/first_user?count=1&from=1");
+    assert_eq!(timestamps.len(), 1);
 }

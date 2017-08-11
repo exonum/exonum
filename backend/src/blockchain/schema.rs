@@ -1,12 +1,11 @@
 use exonum::crypto::{Hash, PublicKey};
-use exonum::storage::{MapIndex, ProofMapIndex, ProofListIndex, Snapshot,
+use exonum::storage::{MapIndex, ListIndex, ProofMapIndex, ProofListIndex, Snapshot,
                       Fork};
 use exonum::blockchain::gen_prefix;
-use exonum::messages::Message;
 
 use TIMESTAMPING_SERVICE;
 use blockchain::ToHash;
-use blockchain::dto::{UserInfoEntry, UserInfo, Timestamp, TimestampEntry, PaymentInfo};
+use blockchain::dto::{UserInfoEntry, UserInfo, TimestampEntry, PaymentInfo};
 
 pub const INITIAL_TIMESTAMPS: i64 = 10;
 
@@ -45,9 +44,14 @@ where
         ProofListIndex::new(prefix, &self.view)
     }
 
-    pub fn known_keys(&self) -> MapIndex<&T, PublicKey, String> {
+    pub fn known_keys(&self) -> MapIndex<&T, PublicKey, Vec<u8>> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 3, &());
         MapIndex::new(prefix, &self.view)
+    }
+
+    pub fn timestamps_history(&self, user_id: &str) -> ListIndex<&T, Hash> {
+        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 4, &user_id.to_owned());
+        ListIndex::new(prefix, &self.view)
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
@@ -71,9 +75,14 @@ impl<'a> Schema<&'a mut Fork> {
         ProofListIndex::new(prefix, &mut self.view)
     }
 
-    pub fn known_keys_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, String> {
+    pub fn known_keys_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Vec<u8>> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 3, &());
         MapIndex::new(prefix, &mut self.view)
+    }
+
+    pub fn timestamps_history_mut(&mut self, user_id: &str) -> ListIndex<&mut Fork, Hash> {
+        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 4, &user_id.to_owned());
+        ListIndex::new(prefix, &mut self.view)
     }
 
     pub fn add_user(&mut self, user: UserInfo) {
@@ -81,7 +90,7 @@ impl<'a> Schema<&'a mut Fork> {
         let entry = if let Some(entry) = self.users().get(&user_id) {
             self.known_keys_mut().put(
                 user.pub_key(),
-                user.encrypted_secret_key().into(),
+                user.encrypted_secret_key().to_vec(),
             );
             UserInfoEntry::new(
                 user,
@@ -116,8 +125,10 @@ impl<'a> Schema<&'a mut Fork> {
         let user_id = timestamp.user_id().to_owned();
         let user_id_hash = user_id.to_hash();
         if let Some(entry) = self.users().get(&user_id_hash) {
+            // Add timestamp
             let content_hash = *timestamp.content_hash();
             self.timestamps_mut(&user_id).put(&content_hash, timestamp_entry);
+            self.timestamps_history_mut(&user_id).push(content_hash);
             // Update user info
             let entry = UserInfoEntry::new(
                 entry.info(),

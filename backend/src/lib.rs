@@ -10,8 +10,8 @@ extern crate bodyparser;
 
 extern crate iron;
 extern crate router;
+extern crate params;
 
-#[cfg(test)]
 #[macro_use]
 extern crate log;
 #[cfg(test)]

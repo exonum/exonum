@@ -15,6 +15,7 @@ dependencies = [
  "iron-test 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mime 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "params 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "router 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "sandbox 0.1.0 (git+https://github.com/exonum/exonum.git?rev=04b05a5bef94b0e6db746d82efd436f611c51c62)",
