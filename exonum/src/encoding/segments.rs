@@ -88,24 +88,6 @@ where
                         pointer_to.unchecked_offset() as usize],
         ).into();
 
-        if count.unchecked_offset() == 0 {
-            return Ok(latest_segment);
-        }
-
-        if segment_start < pointer_to {
-            return Err(Error::IncorrectSegmentReference {
-                position: pointer_from.unchecked_offset(),
-                value: segment_start.unchecked_offset(),
-            });
-        }
-
-        let segment_end = (segment_start + (count * Self::item_size())?)?;
-        if segment_end.unchecked_offset() > buffer.len() as u32 {
-            return Err(Error::IncorrectSegmentSize {
-                position: pointer_count_start,
-                value: count.unchecked_offset(),
-            });
-        }
         if segment_start < latest_segment {
             return Err(Error::OverlappingSegment {
                 last_end: latest_segment.unchecked_offset(),
@@ -117,6 +99,15 @@ where
                 start: segment_start.unchecked_offset(),
             });
         }
+
+        let segment_end = (segment_start + (count * Self::item_size())?)?;
+        if segment_end.unchecked_offset() > buffer.len() as u32 {
+            return Err(Error::IncorrectSegmentSize {
+                position: pointer_count_start,
+                value: count.unchecked_offset(),
+            });
+        }
+
         let latest_segment = segment_end;
 
         Self::check_data(buffer, segment_start, count, latest_segment)

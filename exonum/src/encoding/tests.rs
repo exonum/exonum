@@ -24,22 +24,52 @@ use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommi
 
 use super::{Field, Offset};
 
+#[allow(dead_code)]
+mod ignore_new {
+    use crypto::Hash;
+    encoding_struct! {
+        struct Parent {
+            const SIZE = 8;
+            field child: Child [0 => 8]
+        }
+    }
+
+    encoding_struct! {
+        struct Child {
+            const SIZE = 32;
+            field child: &Hash [0 => 32]
+        }
+    }
+}
+
+use self::ignore_new::*;
+
+#[test]
+#[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
+fn test_zero_size_segment() {
+    let buf = vec![8,0,0,0, // not overlap
+                   0,0,0,0,0]; // but with zero size
+
+    <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
+}
+
+#[test]
+#[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
+fn test_incorrect_pointer() {
+    let buf = vec![8,0,0,0, // not overlap
+                   0,0,0,0,0]; // but with zero size
+
+    <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
+}
+
 #[test]
 #[should_panic(expected = "Found error in check: OffsetOverflow")]
 fn test_read_overflow_arithmetic() {
     let pos = <u32>::max_value();
-    let count: u32 = 4;
-    let dat = vec![0xCC as u8; 4]; // u32
-    let mut buf = vec![255; 8];
-    dat.write(&mut buf, 0, 8);
-    //rewrite header
-    pos.write(&mut buf, 0, 4);
-    count.write(&mut buf, 4, 8);
+    let buf = vec![255; 0];
 
-    // let x1 = unsafe{ <Vec<u8> as Field>::read(&buf, 0, 8 )};
-    // ^ "attempt to add with overflow" in segment.rs
-
-    <Vec<u8> as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
+    <Vec<u8> as Field>::check(&buf, pos.into(), 8.into(), pos.into())
+        .expect("Found error in check");
 }
 
 #[test]
