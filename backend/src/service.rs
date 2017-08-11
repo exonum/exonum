@@ -16,6 +16,7 @@ use api::PublicApi;
 
 pub const TIMESTAMPING_SERVICE: u16 = 128;
 
+#[derive(Debug, Default)]
 pub struct TimestampingService {}
 
 impl TimestampingService {

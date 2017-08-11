@@ -1,3 +1,5 @@
+#![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
+
 #[macro_use]
 extern crate exonum;
 extern crate serde;
