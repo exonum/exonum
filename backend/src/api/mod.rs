@@ -175,7 +175,7 @@ where
         })
     }
 
-    fn make_put_request<Tx>(&self, router: &mut Router, endpoint: &str, name: &str)
+    fn make_post_request<Tx>(&self, router: &mut Router, endpoint: &str, name: &str)
     where
         Tx: Transaction + Clone,
         for<'a> Tx: Deserialize<'a>,
@@ -191,7 +191,7 @@ where
                 Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
             }
         };
-        router.put(endpoint, put_content, name);
+        router.post(endpoint, put_content, name);
     }
 }
 
@@ -262,9 +262,9 @@ where
         };
 
 
-        self.make_put_request::<TxUpdateUser>(router, "/v1/users", "put_user");
-        self.make_put_request::<TxPayment>(router, "/v1/payments", "put_payment");
-        self.make_put_request::<TxTimestamp>(router, "/v1/timestamps", "put_timestamp");
+        self.make_post_request::<TxUpdateUser>(router, "/v1/users", "post_user");
+        self.make_post_request::<TxPayment>(router, "/v1/payments", "post_payment");
+        self.make_post_request::<TxTimestamp>(router, "/v1/timestamps", "post_timestamp");
         router.get("/v1/users/:user_id", get_user, "get_user");
         router.get(
             "/v1/timestamps/:user_id/:content_hash",

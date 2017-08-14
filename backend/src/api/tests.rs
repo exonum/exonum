@@ -109,7 +109,7 @@ impl TestTxSender {
     }
 }
 
-fn request_put<A: AsRef<str>, B, C>(router: &Router, route: A, value: B) -> C
+fn request_post<A: AsRef<str>, B, C>(router: &Router, route: A, value: B) -> C
 where
     A: AsRef<str>,
     B: Serialize,
@@ -122,9 +122,9 @@ where
     let mime: Mime = "application/json".parse().unwrap();
     headers.set(ContentType(mime));
 
-    info!("PUT request: `{}` body={}", endpoint, body);
+    info!("POST request: `{}` body={}", endpoint, body);
 
-    let response = iron_test::request::put(&endpoint, headers, &body, router).unwrap();
+    let response = iron_test::request::post(&endpoint, headers, &body, router).unwrap();
     serde_json::from_value(response_body(response)).unwrap()
 }
 
@@ -164,12 +164,12 @@ impl TimestampingApiSandbox {
         TimestampingApiSandbox { router, channel }
     }
 
-    pub fn put<B, C>(&self, route: &str, value: B) -> C
+    pub fn post<B, C>(&self, route: &str, value: B) -> C
     where
         B: Serialize,
         for<'de> C: Deserialize<'de>,
     {
-        request_put(&self.router, route, value)
+        request_post(&self.router, route, value)
     }
 
     pub fn get<B>(&self, route: &str) -> B
@@ -181,7 +181,7 @@ impl TimestampingApiSandbox {
 }
 
 #[test]
-fn test_api_put_user() {
+fn test_api_post_user() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
@@ -194,7 +194,7 @@ fn test_api_put_user() {
     let tx = TxUpdateUser::new(&keypair.0, user_info, &keypair.1);
 
     let api = TimestampingApiSandbox::new(&sandbox);
-    let tx_hash: Hash = api.put("/v1/users", tx.clone());
+    let tx_hash: Hash = api.post("/v1/users", tx.clone());
     let tx2 = TxUpdateUser::from_raw(api.channel.txs()[0].clone()).unwrap();
 
     assert_eq!(tx2, tx);
@@ -202,7 +202,7 @@ fn test_api_put_user() {
 }
 
 #[test]
-fn test_api_put_payment() {
+fn test_api_post_payment() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
@@ -212,7 +212,7 @@ fn test_api_put_payment() {
     let tx = TxPayment::new(&keypair.0, info, &keypair.1);
 
     let api = TimestampingApiSandbox::new(&sandbox);
-    let tx_hash: Hash = api.put("/v1/payments", tx.clone());
+    let tx_hash: Hash = api.post("/v1/payments", tx.clone());
     let tx2 = TxPayment::from_raw(api.channel.txs()[0].clone()).unwrap();
 
     assert_eq!(tx2, tx);
@@ -220,7 +220,7 @@ fn test_api_put_payment() {
 }
 
 #[test]
-fn test_api_put_timestamp() {
+fn test_api_post_timestamp() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
@@ -230,7 +230,7 @@ fn test_api_put_timestamp() {
     let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
 
     let api = TimestampingApiSandbox::new(&sandbox);
-    let tx_hash: Hash = api.put("/v1/timestamps", tx.clone());
+    let tx_hash: Hash = api.post("/v1/timestamps", tx.clone());
     let tx2 = TxTimestamp::from_raw(api.channel.txs()[0].clone()).unwrap();
 
     assert_eq!(tx2, tx);
