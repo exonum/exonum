@@ -20,6 +20,7 @@ use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
 use toml::Value;
+use tokio_core::reactor::{Handle, Core};
 
 use std::io;
 use std::net::SocketAddr;
@@ -98,6 +99,8 @@ where
     /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
+    /// Event loop handle
+    pub handle: Handle,
 }
 
 /// Service configuration.
@@ -234,6 +237,7 @@ where
         sender: S,
         config: Configuration,
         api_state: SharedNodeState,
+        handle: Handle,
     ) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
@@ -287,7 +291,13 @@ where
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
+            handle,
         }
+    }
+
+    /// Events handle
+    pub fn tokio_handle(&self) -> Handle {
+        self.handle.clone()
     }
 
     /// Return internal `SharedNodeState`
@@ -352,7 +362,8 @@ where
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
             trace!("Send to address: {}", conn.addr());
-            self.channel.send_to(&conn.addr(), message.clone());
+            let handle = self.tokio_handle();
+            self.channel.send_to(handle, &conn.addr(), message.clone());
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
@@ -361,7 +372,8 @@ where
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         trace!("Send to address: {}", address);
-        self.channel.send_to(address, message.clone());
+        let handle = self.tokio_handle();
+        self.channel.send_to(handle, address, message.clone());
     }
 
     /// Broadcasts given message to all peers.
@@ -369,13 +381,15 @@ where
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
             trace!("Send to address: {}", conn.addr());
-            self.channel.send_to(&conn.addr(), message.clone());
+            let handle = self.tokio_handle();
+            self.channel.send_to(handle, &conn.addr(), message.clone());
         }
     }
 
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
-        self.channel.connect(address);
+        let handle = self.tokio_handle();
+        self.channel.connect(handle, address);
     }
 
     /// Adds request timeout if it isn't already requested.
@@ -396,7 +410,8 @@ where
             self.state.round()
         );
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
-        self.channel.add_timeout(timeout, time);
+        let handle = self.tokio_handle();
+        self.channel.add_timeout(handle, timeout, time);
     }
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
@@ -412,13 +427,16 @@ where
             self.state.round()
         );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
-        self.channel.add_timeout(timeout, time);
+        let handle = self.tokio_handle();
+        self.channel.add_timeout(handle, timeout, time);
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
     pub fn add_status_timeout(&mut self) {
         let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
+        let handle = self.tokio_handle();
         self.channel.add_timeout(
+            handle,
             NodeTimeout::Status(self.state.height()),
             time,
         );
@@ -428,7 +446,9 @@ where
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.channel.get_time() + data.timeout();
+        let handle = self.tokio_handle();
         self.channel.add_timeout(
+            handle,
             NodeTimeout::Request(data, peer),
             time,
         );
@@ -438,14 +458,24 @@ where
     pub fn add_peer_exchange_timeout(&mut self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.channel.get_time() + Duration::from_millis(self.peers_timeout());
-        self.channel.add_timeout(NodeTimeout::PeerExchange, time);
+        let handle = self.tokio_handle();
+        self.channel.add_timeout(
+            handle,
+            NodeTimeout::PeerExchange,
+            time,
+        );
     }
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
     pub fn add_update_api_state_timeout(&mut self) {
         let time = self.channel.get_time() +
             Duration::from_millis(self.api_state().state_update_timeout());
-        self.channel.add_timeout(NodeTimeout::UpdateApiState, time);
+        let handle = self.tokio_handle();
+        self.channel.add_timeout(
+            handle,
+            NodeTimeout::UpdateApiState,
+            time,
+        );
     }
 
     /// Returns hash of the last block.
@@ -536,10 +566,16 @@ where
         ApiSender { inner: inner }
     }
 
+    /// Dummy handle
+    pub fn tokio_handle(&self) -> Handle {
+        let dummy_core = Core::new().unwrap();
+        dummy_core.handle()
+    }
+
     /// Addr peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> EventsResult<()> {
         let msg = ExternalMessage::PeerAdd(addr);
-        self.inner.post_event(msg)
+        self.inner.post_event(self.tokio_handle(), msg)
     }
 }
 
@@ -555,7 +591,7 @@ where
             return Err(EventsError::new("Unable to verify transaction"));
         }
         let msg = ExternalMessage::Transaction(tx);
-        self.inner.post_event(msg)
+        self.inner.post_event(self.tokio_handle(), msg)
     }
 }
 
@@ -618,7 +654,14 @@ impl Node {
             Network::with_config(node_cfg.listen_address, config.network, api_state.clone());
         let event_loop = EventLoop::configured(config.events.clone()).unwrap();
         let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
-        let worker = NodeHandler::new(blockchain, external_address, channel, config, api_state);
+        let worker = NodeHandler::new(
+            blockchain,
+            external_address,
+            channel,
+            config,
+            api_state,
+            Core::new().unwrap().handle(),
+        );
         Node {
             reactor: Events::with_event_loop(network, worker, event_loop),
             api_options: node_cfg.api,

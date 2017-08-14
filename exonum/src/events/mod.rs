@@ -21,6 +21,8 @@ use std::result;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
+use tokio_core::reactor::Handle;
+
 use messages::RawMessage;
 
 pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
@@ -85,10 +87,10 @@ pub trait Channel: Sync + Send + Clone {
     fn get_time(&self) -> SystemTime;
     fn address(&self) -> SocketAddr;
 
-    fn post_event(&self, msg: Self::ApplicationEvent) -> Result<()>;
-    fn send_to(&mut self, address: &SocketAddr, message: RawMessage);
-    fn connect(&mut self, address: &SocketAddr);
-    fn add_timeout(&mut self, timeout: Self::Timeout, time: SystemTime);
+    fn post_event(&self, handle: Handle, msg: Self::ApplicationEvent) -> Result<()>;
+    fn send_to(&mut self, handle: Handle, address: &SocketAddr, message: RawMessage);
+    fn connect(&mut self, handle: Handle, address: &SocketAddr);
+    fn add_timeout(&mut self, handle: Handle, timeout: Self::Timeout, time: SystemTime);
 }
 
 pub trait Reactor<H: EventHandler> {
@@ -148,7 +150,7 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
         SystemTime::now()
     }
 
-    fn post_event(&self, event: Self::ApplicationEvent) -> Result<()> {
+    fn post_event(&self, _: Handle, event: Self::ApplicationEvent) -> Result<()> {
         let msg = InternalEvent::Application(event);
         self.inner.send(msg).map_err(|e| {
             error!("An error occured: {}", e);
@@ -156,19 +158,19 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
         })
     }
 
-    fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
+    fn send_to(&mut self, _: Handle, address: &SocketAddr, message: RawMessage) {
         self.inner
             .send(InternalEvent::Invoke(Invoke::SendTo(*address, message)))
             .log_error("Unable to send to");
     }
 
-    fn connect(&mut self, address: &SocketAddr) {
+    fn connect(&mut self, _: Handle, address: &SocketAddr) {
         self.inner
             .send(InternalEvent::Invoke(Invoke::Connect(*address)))
             .log_error("Unable to connect");
     }
 
-    fn add_timeout(&mut self, timeout: Self::Timeout, time: SystemTime) {
+    fn add_timeout(&mut self, _: Handle, timeout: Self::Timeout, time: SystemTime) {
         self.inner
             .send(InternalEvent::Invoke(Invoke::AddTimeout(timeout, time)))
             .log_error("Unable to add timeout");

@@ -60,6 +60,10 @@ extern crate params;
 extern crate cookie;
 extern crate mount;
 extern crate atty;
+extern crate bytes;
+extern crate tokio_core;
+extern crate tokio_io;
+extern crate futures;
 
 #[macro_use]
 pub mod encoding;
@@ -74,3 +78,5 @@ pub mod blockchain;
 pub mod explorer;
 pub mod helpers;
 pub mod api;
+#[doc(hidden)]
+pub mod tokio;

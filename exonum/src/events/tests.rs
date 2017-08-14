@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use env_logger;
+use tokio_core::reactor::{Handle, Core};
 
 use std::io;
 use std::thread;
@@ -96,13 +97,18 @@ impl TestEvents {
         TestEvents(Events::new(network, handler).unwrap())
     }
 
+    pub fn handle(&self) -> Handle {
+        let dummy_core = Core::new().unwrap();
+        dummy_core.handle()
+    }
+
     pub fn wait_for_bind(&mut self, addr: &SocketAddr) -> Option<()> {
         self.0.bind().unwrap();
         self.wait_for_connect(addr)
     }
 
     pub fn wait_for_connect(&mut self, addr: &SocketAddr) -> Option<()> {
-        self.0.channel().connect(addr);
+        self.0.channel().connect(self.handle(), addr);
 
         let start = SystemTime::now();
         loop {
@@ -189,7 +195,7 @@ impl TestEvents {
     }
 
     pub fn send_to(&mut self, addr: &SocketAddr, msg: RawMessage) {
-        self.0.channel().send_to(addr, msg);
+        self.0.channel().send_to(self.handle(), addr, msg);
         self.process_events().unwrap();
     }
 
