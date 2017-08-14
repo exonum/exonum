@@ -83,7 +83,8 @@ pub fn run_node(node: Node) -> io::Result<()> {
                                             Either::B((_, _writer)) => Ok(()).into_future(),
                                         })
                                 })
-                                .and_then(move |_| {
+                                .map_err(log_error)
+                                .then(move |reason| {
                                     info!("Tokio: Connection with peer={} closed", peer);
                                     let request = NetworkRequest::DisconnectWithPeer(peer);
                                     requests_tx
