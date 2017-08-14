@@ -22,7 +22,7 @@
 //! different threads by cloning its instance.
 //!
 //! Exonum provides three types of database: [`LevelDB`], [`RocksDB`] and [`MemoryDB`]. By default
-//! present all three types, but you can choose [`LevelDB`] or [`RocksDB`] with `--feature` parameter.
+//! present all three types, but you can choose [`LevelDB`] or [`RocksDB`] with `--feature` param.
 //! [`MemoryDB`] presents always. Also, you can make your own implementations of [`Database`] trait.
 //! See its documentation for more.
 //!
@@ -109,9 +109,9 @@
 pub use self::error::Error;
 pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
 
-#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
+#[cfg(feature = "leveldb")]
 pub use self::leveldb::{LevelDB, LevelDBOptions, LevelDBCache};
-#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
+#[cfg(feature = "rocksdb")]
 pub use self::rocksdb::{RocksDB, RocksDBOptions, RocksBlockOptions};
 pub use self::memorydb::MemoryDB;
 
@@ -133,9 +133,9 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 
 mod error;
 mod db;
-#[cfg(any(feature = "leveldb", not(any(feature = "rocksdb", feature = "memorydb"))))]
+#[cfg(feature = "leveldb")]
 mod leveldb;
-#[cfg(any(feature = "rocksdb", not(any(feature = "leveldb", feature = "memorydb"))))]
+#[cfg(feature = "rocksdb")]
 mod rocksdb;
 mod memorydb;
 

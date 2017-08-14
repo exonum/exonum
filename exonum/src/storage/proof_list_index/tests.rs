@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::path::Path;
 use rand::{thread_rng, Rng};
 
 use crypto::{Hash, hash};
@@ -20,7 +19,6 @@ use storage::{Database, StorageValue};
 use super::{ProofListIndex, ListProof, pair_hash};
 use encoding::serialize::json::reexport::{to_string, from_str};
 use encoding::serialize::reexport::Serialize;
-use tempdir::TempDir;
 
 use self::ListProof::*;
 
@@ -42,37 +40,11 @@ fn random_values(len: usize) -> Vec<Vec<u8>> {
     (0..len).map(generator).collect::<Vec<_>>()
 }
 
-#[cfg(feature = "leveldb")]
-fn create_database(path: &Path) -> Box<Database> {
-    use super::super::{LevelDB, LevelDBOptions};
-    let mut opts = LevelDBOptions::default();
-    opts.create_if_missing = true;
-    Box::new(LevelDB::open(path, opts).unwrap())
-}
-
-#[cfg(feature = "rocksdb")]
-fn create_database(path: &Path) -> Box<Database> {
-    use super::super::{RocksDB, RocksDBOptions};
-    let mut opts = RocksDBOptions::default();
-    opts.create_if_missing(true);
-    Box::new(RocksDB::open(path, opts).unwrap())
-}
-
-#[cfg(any(not(any(feature = "leveldb", feature = "rocksdb"))))]
-fn create_database(_: &Path) -> Box<Database> {
-    use super::super::MemoryDB;
-    Box::new(MemoryDB::new())
-}
-
 fn gen_tempdir_name() -> String {
     thread_rng().gen_ascii_chars().take(10).collect()
 }
 
-#[test]
-fn test_list_methods() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn list_methods(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
 
@@ -93,11 +65,7 @@ fn test_list_methods() {
     assert_eq!(index.get(2), Some(vec![3]));
 }
 
-#[test]
-fn test_height() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn height(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
 
@@ -123,11 +91,7 @@ fn test_height() {
     assert_eq!(index.get(1), Some(vec![10]));
 }
 
-#[test]
-fn test_iter() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn iter(db: Box<Database>) {
     let mut fork = db.fork();
     let mut list_index = ProofListIndex::new(vec![255], &mut fork);
 
@@ -142,11 +106,7 @@ fn test_iter() {
     );
 }
 
-#[test]
-fn test_list_index_proof() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn list_index_proof(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
 
@@ -285,12 +245,8 @@ fn test_list_index_proof() {
     );
 }
 
-#[test]
-fn randomly_generate_proofs() {
+fn randomly_generate_proofs(db: Box<Database>) {
     let _ = ::helpers::init_logger();
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     let num_vals = 100;
@@ -334,11 +290,7 @@ fn randomly_generate_proofs() {
     }
 }
 
-#[test]
-fn test_index_and_proof_roots() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn index_and_proof_roots(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     assert_eq!(index.root_hash(), Hash::zero());
@@ -466,24 +418,14 @@ fn test_index_and_proof_roots() {
     assert_eq!(index.get(0), Some(vec![1, 2]));
 }
 
-#[test]
-#[should_panic]
-fn test_proof_illegal_lower_bound() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn proof_illegal_lower_bound(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     index.get_range_proof(0, 1);
     index.push(vec![1]);
 }
 
-#[test]
-#[should_panic]
-fn test_proof_illegal_bound_empty() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn proof_illegal_bound_empty(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     for i in 0u8..8 {
@@ -492,12 +434,7 @@ fn test_proof_illegal_bound_empty() {
     index.get_range_proof(8, 9);
 }
 
-#[test]
-#[should_panic]
-fn test_proof_illegal_range() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn proof_illegal_range(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     for i in 0u8..4 {
@@ -506,11 +443,7 @@ fn test_proof_illegal_range() {
     index.get_range_proof(2, 2);
 }
 
-#[test]
-fn test_proof_structure() {
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
+fn proof_structure(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     assert_eq!(index.root_hash(), Hash::zero());
@@ -559,14 +492,10 @@ fn test_proof_structure() {
     }
 }
 
-#[test]
-fn test_simple_root_hash() {
+fn simple_root_hash(db: Box<Database>) {
     let h1 = hash(&[1]);
     let h2 = hash(&[2]);
 
-    let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path = dir.path();
-    let db = create_database(path);
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     assert_eq!(index.get(0), None);
@@ -577,11 +506,7 @@ fn test_simple_root_hash() {
     assert_eq!(index.root_hash(), h2);
 }
 
-#[test]
-fn test_same_root_hash() {
-    let dir1 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path1 = dir1.path();
-    let db1 = create_database(path1);
+fn same_root_hash(db1: Box<Database>, db2: Box<Database>) {
     let mut fork1 = db1.fork();
 
     let mut i1 = ProofListIndex::new(vec![255], &mut fork1);
@@ -595,10 +520,8 @@ fn test_same_root_hash() {
     i1.set(2, vec![5]);
     i1.set(3, vec![1]);
 
-    let dir2 = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-    let path2 = dir2.path();
-    let db2 = create_database(path2);
     let mut fork2 = db2.fork();
+
     let mut i2 = ProofListIndex::new(vec![255], &mut fork2);
     i2.push(vec![4]);
     i2.push(vec![7]);
@@ -615,4 +538,346 @@ struct ProofInfo<'a, V: Serialize + 'a> {
     proof: &'a ListProof<V>,
     range_st: u64,
     range_end: u64,
+}
+
+mod memorydb_tests {
+    use std::path::Path;
+    use tempdir::TempDir;
+    use storage::{Database, MemoryDB};
+
+    fn create_database(_: &Path) -> Box<Database> {
+        Box::new(MemoryDB::new())
+    }
+
+    #[test]
+    fn test_list_methods() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::list_methods(db);
+    }
+
+    #[test]
+    fn test_height() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::height(db);
+    }
+
+    #[test]
+    fn test_iter() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::iter(db);
+    }
+
+    #[test]
+    fn test_list_index_proof() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::list_index_proof(db);
+    }
+
+    #[test]
+    fn test_randomly_generate_proofs() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::randomly_generate_proofs(db);
+    }
+
+    #[test]
+    fn test_index_and_proof_roots() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::index_and_proof_roots(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_lower_bound() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_lower_bound(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_bound_empty() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_bound_empty(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_range() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_range(db);
+    }
+
+    #[test]
+    fn test_proof_structure() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_structure(db);
+    }
+
+    #[test]
+    fn test_siple_root_hash() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::simple_root_hash(db);
+    }
+
+    #[test]
+    fn test_same_root_hash() {
+        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path1 = dir1.path();
+        let db1 = create_database(path1);
+        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path2 = dir2.path();
+        let db2 = create_database(path2);
+        super::same_root_hash(db1, db2);
+    }
+}
+
+#[cfg(feature = "leveldb")]
+mod leveldb_tests {
+    use std::path::Path;
+    use tempdir::TempDir;
+    use storage::{Database, LevelDB, LevelDBOptions};
+
+    fn create_database(path: &Path) -> Box<Database> {
+        let mut opts = LevelDBOptions::default();
+        opts.create_if_missing = true;
+        Box::new(LevelDB::open(path, opts).unwrap())
+    }
+
+    #[test]
+    fn test_list_methods() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::list_methods(db);
+    }
+
+    #[test]
+    fn test_height() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::height(db);
+    }
+
+    #[test]
+    fn test_iter() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::iter(db);
+    }
+
+    #[test]
+    fn test_list_index_proof() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::list_index_proof(db);
+    }
+
+    #[test]
+    fn test_randomly_generate_proofs() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::randomly_generate_proofs(db);
+    }
+
+    #[test]
+    fn test_index_and_proof_roots() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::index_and_proof_roots(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_lower_bound() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_lower_bound(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_bound_empty() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_bound_empty(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_range() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_range(db);
+    }
+
+    #[test]
+    fn test_proof_structure() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_structure(db);
+    }
+
+    #[test]
+    fn test_siple_root_hash() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::simple_root_hash(db);
+    }
+
+    #[test]
+    fn test_same_root_hash() {
+        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path1 = dir1.path();
+        let db1 = create_database(path1);
+        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path2 = dir2.path();
+        let db2 = create_database(path2);
+        super::same_root_hash(db1, db2);
+    }
+}
+
+#[cfg(feature = "rocksdb")]
+mod rocksdb_tests {
+    use std::path::Path;
+    use tempdir::TempDir;
+    use storage::{Database, RocksDB, RocksDBOptions};
+
+    fn create_database(path: &Path) -> Box<Database> {
+        let mut opts = RocksDBOptions::default();
+        opts.create_if_missing(true);
+        Box::new(RocksDB::open(path, opts).unwrap())
+    }
+
+    #[test]
+    fn test_list_methods() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::list_methods(db);
+    }
+
+    #[test]
+    fn test_height() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::height(db);
+    }
+
+    #[test]
+    fn test_iter() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::iter(db);
+    }
+
+    #[test]
+    fn test_list_index_proof() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::list_index_proof(db);
+    }
+
+    #[test]
+    fn test_randomly_generate_proofs() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::randomly_generate_proofs(db);
+    }
+
+    #[test]
+    fn test_index_and_proof_roots() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::index_and_proof_roots(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_lower_bound() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_lower_bound(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_bound_empty() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_bound_empty(db);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_proof_illegal_range() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_illegal_range(db);
+    }
+
+    #[test]
+    fn test_proof_structure() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::proof_structure(db);
+    }
+
+    #[test]
+    fn test_siple_root_hash() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::simple_root_hash(db);
+    }
+
+    #[test]
+    fn test_same_root_hash() {
+        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path1 = dir1.path();
+        let db1 = create_database(path1);
+        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path2 = dir2.path();
+        let db2 = create_database(path2);
+        super::same_root_hash(db1, db2);
+    }
 }

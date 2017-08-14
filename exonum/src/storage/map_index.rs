@@ -379,44 +379,12 @@ where
 }
 
 #[cfg(test)]
-mod test {
-    use std::path::Path;
+mod tests {
     use storage::Database;
     use super::MapIndex;
-    use tempdir::TempDir;
     use rand::{thread_rng, Rng};
 
-    fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
-    }
-
-    #[cfg(feature = "leveldb")]
-    fn create_database(path: &Path) -> Box<Database> {
-        use super::super::{LevelDB, LevelDBOptions};
-        let mut opts = LevelDBOptions::default();
-        opts.create_if_missing = true;
-        Box::new(LevelDB::open(path, opts).unwrap())
-    }
-
-    #[cfg(feature = "rocksdb")]
-    fn create_database(path: &Path) -> Box<Database> {
-        use super::super::{RocksDB, RocksDBOptions};
-        let mut opts = RocksDBOptions::default();
-        opts.create_if_missing(true);
-        Box::new(RocksDB::open(path, opts).unwrap())
-    }
-
-    #[cfg(any(not(any(feature = "leveldb", feature = "rocksdb"))))]
-    fn create_database(_: &Path) -> Box<Database> {
-        use super::super::MemoryDB;
-        Box::new(MemoryDB::new())
-    }
-
-    #[test]
-    fn test_iter() {
-        let dir = TempDir::new(gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
+    fn iter(db: Box<Database>) {
         let mut fork = db.fork();
         let mut map_index = MapIndex::new(vec![255], &mut fork);
 
@@ -471,5 +439,72 @@ mod test {
             map_index.values_from(&4).collect::<Vec<u8>>(),
             Vec::<u8>::new()
         );
+    }
+
+    fn gen_tempdir_name() -> String {
+        thread_rng().gen_ascii_chars().take(10).collect()
+    }
+
+    mod memorydb_tests {
+        use std::path::Path;
+        use storage::{Database, MemoryDB};
+        use tempdir::TempDir;
+
+        fn create_database(_: &Path) -> Box<Database> {
+            Box::new(MemoryDB::new())
+        }
+
+        #[test]
+        fn test_iter() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::iter(db);
+        }
+
+    }
+
+    #[cfg(feature = "leveldb")]
+    mod leveldb_tests {
+        use std::path::Path;
+        use storage::Database;
+        use tempdir::TempDir;
+
+        fn create_database(path: &Path) -> Box<Database> {
+            use storage::{LevelDB, LevelDBOptions};
+            let mut opts = LevelDBOptions::default();
+            opts.create_if_missing = true;
+            Box::new(LevelDB::open(path, opts).unwrap())
+        }
+
+        #[test]
+        fn test_iter() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::iter(db);
+        }
+    }
+
+    #[cfg(feature = "rocksdb")]
+    mod rocksdb_tests {
+        use std::path::Path;
+        use storage::Database;
+        use tempdir::TempDir;
+
+        fn create_database(path: &Path) -> Box<Database> {
+            use storage::{RocksDB, RocksDBOptions};
+            let mut opts = RocksDBOptions::default();
+            opts.create_if_missing(true);
+            Box::new(RocksDB::open(path, opts).unwrap())
+        }
+
+        #[test]
+        fn test_iter() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::iter(db);
+        }
     }
 }
