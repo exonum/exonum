@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Import crates with necessary types into a new project.
+
 extern crate serde;
 extern crate serde_json;
 #[macro_use]
@@ -21,6 +23,8 @@ extern crate exonum;
 extern crate router;
 extern crate bodyparser;
 extern crate iron;
+
+// Import necessary types from crates.
 
 use exonum::blockchain::{self, Blockchain, Service, GenesisConfig, ValidatorKeys, Transaction,
                          ApiContext};
@@ -35,6 +39,8 @@ use iron::Handler;
 use router::Router;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
+
+// Define constants for transaction types within the service.
 
 const SERVICE_ID: u16 = 1;
 
@@ -156,27 +162,6 @@ impl Transaction for TxTransfer {
 #[derive(Clone)]
 struct CryptocurrencyApi {
     channel: ApiSender<NodeChannel>,
-    blockchain: Blockchain,
-}
-
-impl CryptocurrencyApi {
-    fn get_wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-        let mut view = self.blockchain.fork();
-        let mut schema = CurrencySchema { view: &mut view };
-        schema.wallet(pub_key)
-    }
-
-    fn get_wallets(&self) -> Option<Vec<Wallet>> {
-        let mut view = self.blockchain.fork();
-        let mut schema = CurrencySchema { view: &mut view };
-        let idx = schema.wallets();
-        let wallets: Vec<Wallet> = idx.values().collect();
-        if wallets.is_empty() {
-            None
-        } else {
-            Some(wallets)
-        }
-    }
 }
 
 impl Api for CryptocurrencyApi {
@@ -217,34 +202,8 @@ impl Api for CryptocurrencyApi {
                 Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
             }
         };
-
-        let self_ = self.clone();
-        let wallets_info = move |_: &mut Request| -> IronResult<Response> {
-            if let Some(wallets) = self_.get_wallets() {
-                self_.ok_response(&serde_json::to_value(wallets).unwrap())
-            } else {
-                self_.not_found_response(
-                    &serde_json::to_value("Wallets database is empty")
-                        .unwrap(),
-                )
-            }
-        };
-
-        let self_ = self.clone();
-        let wallet_info = move |req: &mut Request| -> IronResult<Response> {
-            let path = req.url.path();
-            let wallet_key = path.last().unwrap();
-            let public_key = PublicKey::from_hex(wallet_key).map_err(ApiError::FromHex)?;
-            if let Some(wallet) = self_.get_wallet(&public_key) {
-                self_.ok_response(&serde_json::to_value(wallet).unwrap())
-            } else {
-                self_.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-            }
-        };
-
-        router.post("/v1/wallets/transaction", transaction, "transaction");
-        router.get("/v1/wallets", wallets_info, "wallets_info");
-        router.get("/v1/wallet/:pub_key", wallet_info, "wallet_info");
+        let route_post = "/v1/wallets/transaction";
+        router.post(&route_post, transaction, "transaction");
     }
 }
 
@@ -276,10 +235,7 @@ impl Service for CurrencyService {
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = CryptocurrencyApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
+        let api = CryptocurrencyApi { channel: ctx.node_channel().clone() };
         api.wire(&mut router);
         Some(Box::new(router))
     }
